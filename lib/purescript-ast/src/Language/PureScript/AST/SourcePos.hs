@@ -15,7 +15,6 @@ import Language.PureScript.Comments
 import qualified Data.Aeson as A
 import qualified Data.Text as T
 import System.FilePath (makeRelative)
-import Data.Store (Store)
 
 -- | Source annotation - position information and comments.
 type SourceAnn = (SourceSpan, [Comment])
@@ -26,7 +25,7 @@ data SourcePos = SourcePos
     -- ^ Line number
   , sourcePosColumn :: Int
     -- ^ Column number
-  } deriving (Show, Eq, Ord, Generic, NFData, Store, Serialise)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 displaySourcePos :: SourcePos -> Text
 displaySourcePos sp =
@@ -54,7 +53,7 @@ data SourceSpan = SourceSpan
     -- ^ Start of the span
   , spanEnd :: SourcePos
     -- ^ End of the span
-  } deriving (Show, Eq, Ord, Generic, NFData, Store, Serialise)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 displayStartEndPos :: SourceSpan -> Text
 displayStartEndPos sp =

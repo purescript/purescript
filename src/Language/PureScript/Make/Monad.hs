@@ -10,20 +10,14 @@ module Language.PureScript.Make.Monad
   , readTextFile
   , readJSONFile
   , readJSONFileIO
-  , readStoreFile
-  , readStoreFileIO
   , readCborFile
   , readCborFileIO
   , readExternsFile
-  , readCborJsonFile
-  , readCborJsonFileIO
   , hashFile
   , writeTextFile
-  , writeStoreFile
   , writeJSONFile
   , writeCborFile
-  , writeCborJsonFile
-  , writeCborJsonFileIO
+  , writeCborFileIO
   , copyFile
   ) where
 
@@ -31,9 +25,6 @@ import           Prelude
 
 import           Codec.Serialise (Serialise)
 import qualified Codec.Serialise as Serialise
-import qualified Codec.CBOR.Write as Write
-import qualified Codec.CBOR.Read as Read
-import qualified Codec.CBOR.JSON as CborJson
 import           Control.Exception (fromException, tryJust)
 import           Control.Monad (join, guard)
 import           Control.Monad.Base (MonadBase(..))
@@ -45,9 +36,7 @@ import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Except
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import qualified Data.Aeson as Aeson
-import qualified Data.Store as Store
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as LB
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import           Data.Time.Clock (UTCTime)
@@ -117,33 +106,6 @@ readJSONFileIO path = do
   r <- catchDoesNotExist $ Aeson.decodeFileStrict' path
   return $ join r
 
-readCborJsonFile :: (MonadIO m, MonadError MultipleErrors m) => Aeson.FromJSON a => FilePath -> m (Maybe a)
-readCborJsonFile path =
-  makeIO ("read JSON file: " <> Text.pack path) (readCborJsonFileIO path)
-
-readCborJsonFileIO :: Aeson.FromJSON a => FilePath -> IO (Maybe a)
-readCborJsonFileIO path = do
-    r <- catchDoesNotExist $ LB.readFile path
-    case r of
-      Nothing -> pure Nothing
-      Just bytes -> case Read.deserialiseFromBytes (CborJson.decodeValue False) bytes of
-        Left err -> pure Nothing
-        Right (leftover, v) -> pure $ case Aeson.fromJSON v of
-          Aeson.Error _ -> Nothing
-          Aeson.Success a -> Just a
-
--- | Read a Store encoded file in the 'Make' monad, returning
--- 'Nothing' if the file does not exist or could not be parsed. Errors
--- are captured using the 'MonadError' instance.
-readStoreFile :: (MonadIO m, MonadError MultipleErrors m) => Store.Store a => FilePath -> m (Maybe a)
-readStoreFile path =
-  makeIO ("read Binary file: " <> Text.pack path) (readStoreFileIO path)
-
-readStoreFileIO :: Store.Store a => FilePath -> IO (Maybe a)
-readStoreFileIO path = do
-  r <- catchDoesNotExist $ Store.decodeEx <$> B.readFile path
-  return $ join r
-
 -- | Read a Cbor encoded file in the 'Make' monad, returning
 -- 'Nothing' if the file does not exist or could not be parsed. Errors
 -- are captured using the 'MonadError' instance.
@@ -161,10 +123,6 @@ readCborFileIO path = do
 -- compiler.
 readExternsFile :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> m (Maybe ExternsFile)
 readExternsFile path = do
-  -- rofl
-  -- mexterns <- readJsonFile path
-  -- mexterns <- readStoreFile path
-  -- mexterns <- readCborJsonFile path
   mexterns <- readCborFile path
   return $ do
     externs <- mexterns
@@ -210,30 +168,14 @@ writeJSONFile path value = makeIO ("write JSON file: " <> Text.pack path) $ do
   createParentDirectory path
   Aeson.encodeFile path value
 
--- | Write a Store encoded file in the 'Make' monad, capturing any
--- errors using the 'MonadError' instance.
-writeStoreFile :: (MonadIO m, MonadError MultipleErrors m) => Store.Store a => FilePath -> a -> m ()
-writeStoreFile path value = makeIO ("write Store file: " <> Text.pack path) $ do
-  createParentDirectory path
-  B.writeFile path (Store.encode value)
-
 writeCborFile :: (MonadIO m, MonadError MultipleErrors m) => Serialise a => FilePath -> a -> m ()
-writeCborFile path value = makeIO ("write Cbor file: " <> Text.pack path) $ do
+writeCborFile path value =
+  makeIO ("write Cbor file: " <> Text.pack path) (writeCborFileIO path value)
+
+writeCborFileIO :: Serialise a => FilePath -> a -> IO ()
+writeCborFileIO path value = do
   createParentDirectory path
   Serialise.writeFileSerialise path value
-
--- | Write a Store encoded file in the 'Make' monad, capturing any
--- errors using the 'MonadError' instance.
-writeCborJsonFile :: (MonadIO m, MonadError MultipleErrors m) => Aeson.ToJSON a => FilePath -> a -> m ()
-writeCborJsonFile path value =
-  makeIO
-    ("write Cborg Json file: " <> Text.pack path)
-    (writeCborJsonFileIO path value)
-
-writeCborJsonFileIO :: Aeson.ToJSON a => FilePath -> a -> IO ()
-writeCborJsonFileIO path value = do
-  createParentDirectory path
-  B.writeFile path (Write.toStrictByteString (CborJson.encodeValue (Aeson.toJSON value)))
 
 -- | Copy a file in the 'Make' monad, capturing any errors using the
 -- 'MonadError' instance.

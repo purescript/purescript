@@ -15,7 +15,6 @@ import Data.Functor.Contravariant (contramap)
 import GHC.Generics (Generic)
 import Data.Aeson
 import Data.Aeson.TH
-import Data.Store (Store)
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -31,7 +30,6 @@ data Name
   deriving (Eq, Ord, Show, Generic)
 
 instance NFData Name
-instance Store Name
 instance Serialise Name
 
 getIdentName :: Name -> Maybe Ident
@@ -81,7 +79,6 @@ data Ident
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData Ident
-instance Store Ident
 instance Serialise Ident
 
 runIdent :: Ident -> Text
@@ -106,7 +103,6 @@ newtype OpName (a :: OpNameType) = OpName { runOpName :: Text }
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData (OpName a)
-instance Store (OpName a)
 instance Serialise (OpName a)
 
 instance ToJSON (OpName a) where
@@ -133,7 +129,6 @@ newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: Text }
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData (ProperName a)
-instance Store (ProperName a)
 instance Serialise (ProperName a)
 
 instance ToJSON (ProperName a) where
@@ -166,7 +161,6 @@ newtype ModuleName = ModuleName [ProperName 'Namespace]
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData ModuleName
-instance Store ModuleName
 instance Serialise ModuleName
 
 runModuleName :: ModuleName -> Text
@@ -191,7 +185,6 @@ data Qualified a = Qualified (Maybe ModuleName) a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 instance NFData a => NFData (Qualified a)
-instance Store a => Store (Qualified a)
 instance Serialise a => Serialise (Qualified a)
 
 showQualified :: (a -> Text) -> Qualified a -> Text

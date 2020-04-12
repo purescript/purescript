@@ -10,7 +10,6 @@ import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as A
-import Data.Store (Store)
 
 import Language.PureScript.Crash
 
@@ -26,7 +25,6 @@ data Associativity = Infixl | Infixr | Infix
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData Associativity
-instance Store Associativity
 instance Serialise Associativity
 
 showAssoc :: Associativity -> String
@@ -53,7 +51,6 @@ data Fixity = Fixity Associativity Precedence
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData Fixity
-instance Store Fixity
 instance Serialise Fixity
 
 instance A.ToJSON Fixity where

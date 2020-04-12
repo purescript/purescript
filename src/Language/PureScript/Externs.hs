@@ -20,11 +20,9 @@ import Prelude.Compat
 
 import Codec.Serialise (Serialise)
 import GHC.Generics (Generic)
-import Data.Aeson.TH
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
 import Data.Foldable (fold)
-import Data.Store.TH (makeStore)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
@@ -265,21 +263,5 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       ]
   toExternsDeclaration _ = []
 
--- rofl
 externsFileName :: FilePath
 externsFileName = "externs.cbor"
--- externsFileName = "externs.json"
--- externsFileName = "externs.store"
--- externsFileName = "externs.json.cbor"
-
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFixity)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsTypeFixity)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsDeclaration)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFile)
-
-makeStore ''ExternsImport
-makeStore ''ExternsFixity
-makeStore ''ExternsTypeFixity
-makeStore ''ExternsDeclaration
-makeStore ''ExternsFile

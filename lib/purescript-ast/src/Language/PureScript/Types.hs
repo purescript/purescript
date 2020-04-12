@@ -23,7 +23,6 @@ import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics (Generic)
-import Data.Store (Store)
 
 import Language.PureScript.AST.SourcePos
 import qualified Language.PureScript.Constants.Prim as C
@@ -43,7 +42,6 @@ newtype SkolemScope = SkolemScope { runSkolemScope :: Int }
   deriving (Show, Eq, Ord, A.ToJSON, A.FromJSON, Generic)
 
 instance NFData SkolemScope
-instance Store SkolemScope
 instance Serialise SkolemScope
 
 -- |
@@ -91,7 +89,6 @@ data Type a
   deriving (Show, Generic, Functor, Foldable, Traversable)
 
 instance NFData a => NFData (Type a)
-instance Store a => Store (Type a)
 instance Serialise a => Serialise (Type a)
 
 srcTUnknown :: Int -> SourceType
@@ -161,7 +158,6 @@ data ConstraintData
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData ConstraintData
-instance Store ConstraintData
 instance Serialise ConstraintData
 
 -- | A typeclass constraint
@@ -179,7 +175,6 @@ data Constraint a = Constraint
   } deriving (Show, Generic, Functor, Foldable, Traversable)
 
 instance NFData a => NFData (Constraint a)
-instance Store a => Store (Constraint a)
 instance Serialise a => Serialise (Constraint a)
 
 srcConstraint :: Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> Maybe ConstraintData -> SourceConstraint

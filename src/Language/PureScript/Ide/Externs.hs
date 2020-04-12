@@ -21,11 +21,8 @@ readExternFile
   => FilePath
   -> m P.ExternsFile
 readExternFile fp = do
-  -- rofl
+  -- TODO(Christoph): Restore version comparison logic
   externsFile <- liftIO (Make.readCborFileIO fp)
-  -- externsFile <- liftIO (Make.readCborJsonFileIO fp)
-  -- externsFile <- liftIO (Make.readStoreFileIO fp)
-  -- externsFile <- liftIO (Make.readJSONFileIO fp)
   case externsFile of
     Nothing -> throwError (GeneralError "Failed to decode cbor json externs")
     Just externs -> pure externs

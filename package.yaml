@@ -51,7 +51,6 @@ dependencies:
   - bytestring
   - Cabal >= 2.2 && <3.0
   - cborg
-  - cborg-json
   - serialise
   - cheapskate >=0.1 && <0.2
   - clock
@@ -88,7 +87,6 @@ dependencies:
   - sourcemap >=0.1.6
   - split
   - stm >=0.2.4.0
-  - store
   - stringsearch
   - syb
   - text

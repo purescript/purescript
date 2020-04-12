@@ -14,7 +14,6 @@ import Control.DeepSeq (NFData)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
 import GHC.Generics (Generic)
-import Data.Store (Store)
 
 -- |
 -- The role of a type constructor's parameter.
@@ -31,7 +30,6 @@ data Role
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData Role
-instance Store Role
 instance Serialise Role
 
 $(A.deriveJSON A.defaultOptions ''Role)

@@ -17,7 +17,6 @@ import Data.Tree (Tree, rootLabel)
 import qualified Data.Graph as G
 import Data.Foldable (toList)
 import qualified Data.List.NonEmpty as NEL
-import Data.Store (Store)
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Crash
@@ -85,7 +84,6 @@ data FunctionalDependency = FunctionalDependency
   } deriving (Show, Generic)
 
 instance NFData FunctionalDependency
-instance Store FunctionalDependency
 instance Serialise FunctionalDependency
 
 instance A.FromJSON FunctionalDependency where
@@ -196,7 +194,6 @@ data NameVisibility
   deriving (Show, Eq, Generic)
 
 instance NFData NameVisibility
-instance Store NameVisibility
 instance Serialise NameVisibility
 
 -- | A flag for whether a name is for an private or public value - only public values will be
@@ -212,7 +209,6 @@ data NameKind
   deriving (Show, Eq, Generic)
 
 instance NFData NameKind
-instance Store NameKind
 instance Serialise NameKind
 
 -- | The kinds of a type
@@ -230,7 +226,6 @@ data TypeKind
   deriving (Show, Eq, Generic)
 
 instance NFData TypeKind
-instance Store TypeKind
 instance Serialise TypeKind
 
 instance A.ToJSON TypeKind where
@@ -265,7 +260,6 @@ data DataDeclType
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData DataDeclType
-instance Store DataDeclType
 instance Serialise DataDeclType
 
 showDataDeclType :: DataDeclType -> Text
