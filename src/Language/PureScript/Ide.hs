@@ -167,7 +167,7 @@ findAvailableExterns = do
     pure (P.moduleNameFromString . toS <$> moduleNames)
   where
     -- Takes the output directory and a filepath like "Data.Array" and
-    -- looks up, whether that folder contains an externs.json
+    -- looks up, whether that folder contains an externs file
     containsExterns :: FilePath -> FilePath -> IO Bool
     containsExterns oDir d
       | d `elem` [".", ".."] = pure False
