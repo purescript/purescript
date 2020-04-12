@@ -132,7 +132,7 @@ prettyPrintErrorMessage (ParserErrorInfo {..}) = case errType of
   ErrQualifierLexeme hd | isSpace hd ->
     "Unexpected whitespace character " <> displayCodePoint hd <> ", expected qualifier"
   ErrQualifierLexeme a ->
-    "Unexpected" <> [ a ] <> ", expected qualifier"
+    "Unexpected " <> [ a ] <> ", expected qualifier"
   ErrLineFeedInString ->
     "Unexpected line feed in string literal"
   ErrAstralCodePointInChar ->
