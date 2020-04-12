@@ -13,11 +13,13 @@ module Language.PureScript.Externs
   , externsIsCurrentVersion
   , moduleToExternsFile
   , applyExternsFileToEnvironment
+  , externsFileName
   ) where
 
 import Prelude.Compat
 
-import Data.Aeson.TH
+import Codec.Serialise (Serialise)
+import GHC.Generics (Generic)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
 import Data.Foldable (fold)
@@ -40,6 +42,9 @@ import Paths_purescript as Paths
 
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile
+  -- NOTE: Make sure to keep `efVersion` as the first field in this
+  -- record, so the derived Serialise instance produces CBOR that can
+  -- be checked for its version independent of the remaining format
   { efVersion :: Text
   -- ^ The externs version
   , efModuleName :: ModuleName
@@ -56,7 +61,9 @@ data ExternsFile = ExternsFile
   -- ^ List of type and value declaration
   , efSourceSpan :: SourceSpan
   -- ^ Source span for error reporting
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsFile
 
 -- | A module import in an externs file
 data ExternsImport = ExternsImport
@@ -67,7 +74,9 @@ data ExternsImport = ExternsImport
   , eiImportType :: ImportDeclarationType
   -- | The imported-as name, for qualified imports
   , eiImportedAs :: Maybe ModuleName
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsImport
 
 -- | A fixity declaration in an externs file
 data ExternsFixity = ExternsFixity
@@ -80,7 +89,9 @@ data ExternsFixity = ExternsFixity
   , efOperator :: OpName 'ValueOpName
   -- | The value the operator is an alias for
   , efAlias :: Qualified (Either Ident (ProperName 'ConstructorName))
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsFixity
 
 -- | A type fixity declaration in an externs file
 data ExternsTypeFixity = ExternsTypeFixity
@@ -93,7 +104,9 @@ data ExternsTypeFixity = ExternsTypeFixity
   , efTypeOperator :: OpName 'TypeOpName
   -- | The value the operator is an alias for
   , efTypeAlias :: Qualified (ProperName 'TypeName)
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsTypeFixity
 
 -- | A type or value declaration appearing in an externs file
 data ExternsDeclaration =
@@ -144,7 +157,9 @@ data ExternsDeclaration =
   | EDKind
       { edKindName                :: ProperName 'KindName
       }
-  deriving Show
+  deriving (Show, Generic)
+
+instance Serialise ExternsDeclaration
 
 -- | Check whether the version in an externs file matches the currently running
 -- version.
@@ -245,8 +260,5 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
     = [ EDKind pn ]
   toExternsDeclaration _ = []
 
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFixity)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsTypeFixity)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsDeclaration)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFile)
+externsFileName :: FilePath
+externsFileName = "externs.cbor"

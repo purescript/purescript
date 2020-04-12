@@ -9,6 +9,7 @@ module Language.PureScript.Kinds where
 import Prelude.Compat
 
 import GHC.Generics (Generic)
+import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
 import Control.DeepSeq (NFData)
 import Data.Text (Text)
@@ -36,6 +37,7 @@ data Kind a
   deriving (Show, Generic, Functor, Foldable, Traversable)
 
 instance NFData a => NFData (Kind a)
+instance Serialise a => Serialise (Kind a)
 
 srcKUnknown :: Int -> SourceKind
 srcKUnknown = KUnknown NullSourceAnn

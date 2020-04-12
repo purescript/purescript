@@ -21,11 +21,12 @@ module Language.PureScript.Ide.Externs
 
 import           Protolude hiding (to, from, (&))
 
+import           Codec.CBOR.Term as Term
 import           "monad-logger" Control.Monad.Logger
-import           Data.Aeson (decodeStrict)
-import           Data.Aeson.Types (withObject, parseMaybe, (.:))
-import qualified Data.ByteString as BS
 import           Data.Version (showVersion)
+import qualified Data.Text as Text
+import qualified Language.PureScript as P
+import qualified Language.PureScript.Make.Monad as Make
 import           Language.PureScript.Ide.Error (IdeError (..))
 import           Language.PureScript.Ide.Types
 import           Lens.Micro.Platform
@@ -37,25 +38,24 @@ readExternFile
   => FilePath
   -> m P.ExternsFile
 readExternFile fp = do
-   externsFile <- liftIO (BS.readFile fp)
-   case decodeStrict externsFile of
-     Nothing ->
-       let parser = withObject "ExternsFileVersion" $ \o -> o .: "efVersion"
-           maybeEFVersion = parseMaybe parser =<< decodeStrict externsFile
-       in case maybeEFVersion of
-         Nothing ->
-            throwError (GeneralError
-                        ("Parsing the extern at: " <> toS fp <> " failed"))
-         Just efVersion -> do
-           let errMsg = "Version mismatch for the externs at: " <> toS fp
-                        <> " Expected: " <> version
-                        <> " Found: " <> efVersion
-           logErrorN errMsg
-           throwError (GeneralError errMsg)
-     Just externs -> pure externs
-
-     where
-       version = toS (showVersion P.version)
+  externsFile <- liftIO (Make.readCborFileIO fp)
+  case externsFile of
+    Just externs | version == P.efVersion externs ->
+      pure externs
+    _ ->
+      liftIO (Make.readCborFileIO fp) >>= \case
+        Just (Term.TList (_tag : Term.TString efVersion : _rest)) -> do
+          let errMsg =
+                "Version mismatch for the externs at: "
+                <> toS fp
+                <> " Expected: " <> version
+                <> " Found: " <> efVersion
+          logErrorN errMsg
+          throwError (GeneralError errMsg)
+        _ ->
+          throwError (GeneralError ("Parsing the extern at: " <> toS fp <> " failed"))
+    where
+      version = toS (showVersion P.version)
 
 convertExterns :: P.ExternsFile -> ([IdeDeclarationAnn], [(P.ModuleName, P.DeclarationRef)])
 convertExterns ef =

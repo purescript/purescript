@@ -5,9 +5,10 @@ module Language.PureScript.Environment where
 import           Prelude.Compat
 import           Protolude (ordNub)
 
-import           GHC.Generics (Generic)
-import           Control.DeepSeq (NFData)
-import           Data.Aeson ((.=), (.:))
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
+import Codec.Serialise (Serialise)
+import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -85,6 +86,7 @@ data FunctionalDependency = FunctionalDependency
   } deriving (Show, Generic)
 
 instance NFData FunctionalDependency
+instance Serialise FunctionalDependency
 
 instance A.FromJSON FunctionalDependency where
   parseJSON = A.withObject "FunctionalDependency" $ \o ->
@@ -184,6 +186,7 @@ data NameVisibility
   deriving (Show, Eq, Generic)
 
 instance NFData NameVisibility
+instance Serialise NameVisibility
 
 -- | A flag for whether a name is for an private or public value - only public values will be
 -- included in a generated externs file.
@@ -198,6 +201,7 @@ data NameKind
   deriving (Show, Eq, Generic)
 
 instance NFData NameKind
+instance Serialise NameKind
 
 -- | The kinds of a type
 data TypeKind
@@ -214,6 +218,7 @@ data TypeKind
   deriving (Show, Eq, Generic)
 
 instance NFData TypeKind
+instance Serialise TypeKind
 
 instance A.ToJSON TypeKind where
   toJSON (DataType args ctors) =
@@ -247,6 +252,7 @@ data DataDeclType
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData DataDeclType
+instance Serialise DataDeclType
 
 showDataDeclType :: DataDeclType -> Text
 showDataDeclType Data = "data"
