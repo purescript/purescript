@@ -32,7 +32,7 @@ After you started the server you can start issuing requests using
 `purs ide client`. Make sure you start by loading the modules before you try to
 query them.
 
-`purs ide` expects the built externs.json inside the output folder of your
+`purs ide` expects the built externs inside the output folder of your
 project after running `pulp build` or `purs compile` respectively.
 
 (If you changed the port of the server you can change the port for

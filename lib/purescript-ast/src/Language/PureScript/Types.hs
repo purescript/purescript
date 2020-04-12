@@ -6,6 +6,7 @@ module Language.PureScript.Types where
 import Prelude.Compat
 import Protolude (ordNub)
 
+import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
 import Control.Arrow (first, second)
 import Control.DeepSeq (NFData)
@@ -41,6 +42,7 @@ newtype SkolemScope = SkolemScope { runSkolemScope :: Int }
   deriving (Show, Eq, Ord, A.ToJSON, A.FromJSON, Generic)
 
 instance NFData SkolemScope
+instance Serialise SkolemScope
 
 -- |
 -- The type of types
@@ -87,6 +89,7 @@ data Type a
   deriving (Show, Generic, Functor, Foldable, Traversable)
 
 instance NFData a => NFData (Type a)
+instance Serialise a => Serialise (Type a)
 
 srcTUnknown :: Int -> SourceType
 srcTUnknown = TUnknown NullSourceAnn
@@ -155,6 +158,7 @@ data ConstraintData
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData ConstraintData
+instance Serialise ConstraintData
 
 -- | A typeclass constraint
 data Constraint a = Constraint
@@ -171,6 +175,7 @@ data Constraint a = Constraint
   } deriving (Show, Generic, Functor, Foldable, Traversable)
 
 instance NFData a => NFData (Constraint a)
+instance Serialise a => Serialise (Constraint a)
 
 srcConstraint :: Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> Maybe ConstraintData -> SourceConstraint
 srcConstraint = Constraint NullSourceAnn

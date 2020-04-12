@@ -5,6 +5,8 @@ packages:
 - lib/purescript-ast
 - lib/purescript-cst
 extra-deps:
+- serialise-0.2.2.0
+- cborg-0.2.2.0
 - happy-1.19.9
 - language-javascript-0.7.0.0
 - network-3.0.1.1

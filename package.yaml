@@ -50,6 +50,8 @@ dependencies:
   - boxes >=0.1.4 && <0.2.0
   - bytestring
   - Cabal >= 2.2 && <3.0
+  - cborg
+  - serialise
   - cheapskate >=0.1 && <0.2
   - clock
   - containers

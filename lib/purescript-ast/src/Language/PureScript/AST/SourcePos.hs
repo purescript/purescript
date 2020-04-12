@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 -- |
 -- Source position information
 --
@@ -5,6 +6,7 @@ module Language.PureScript.AST.SourcePos where
 
 import Prelude.Compat
 
+import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Data.Aeson ((.=), (.:))
 import Data.Text (Text)
@@ -23,9 +25,7 @@ data SourcePos = SourcePos
     -- ^ Line number
   , sourcePosColumn :: Int
     -- ^ Column number
-  } deriving (Show, Eq, Ord, Generic)
-
-instance NFData SourcePos
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 displaySourcePos :: SourcePos -> Text
 displaySourcePos sp =
@@ -53,9 +53,7 @@ data SourceSpan = SourceSpan
     -- ^ Start of the span
   , spanEnd :: SourcePos
     -- ^ End of the span
-  } deriving (Show, Eq, Ord, Generic)
-
-instance NFData SourceSpan
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 displayStartEndPos :: SourceSpan -> Text
 displayStartEndPos sp =
