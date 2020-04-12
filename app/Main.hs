@@ -29,6 +29,8 @@ main :: IO ()
 main = do
     IO.hSetEncoding IO.stdout IO.utf8
     IO.hSetEncoding IO.stderr IO.utf8
+    IO.hSetBuffering IO.stdout IO.LineBuffering
+    IO.hSetBuffering IO.stderr IO.LineBuffering
     cmd <- Opts.handleParseResult . execParserPure opts =<< getArgs
     cmd
   where
