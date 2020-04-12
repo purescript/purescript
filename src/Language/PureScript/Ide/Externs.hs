@@ -7,7 +7,9 @@ module Language.PureScript.Ide.Externs
 
 import           Protolude hiding (to, from, (&))
 
+import           Codec.CBOR.Term as Term
 import           "monad-logger" Control.Monad.Logger
+import           Data.Version (showVersion)
 import qualified Data.Text as Text
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Make.Monad as Make
@@ -21,11 +23,24 @@ readExternFile
   => FilePath
   -> m P.ExternsFile
 readExternFile fp = do
-  -- TODO(Christoph): Restore version comparison logic
   externsFile <- liftIO (Make.readCborFileIO fp)
   case externsFile of
-    Nothing -> throwError (GeneralError "Failed to decode cbor json externs")
-    Just externs -> pure externs
+    Nothing ->
+      liftIO (Make.readCborFileIO fp) >>= \case
+        Just (Term.TList (_tag : Term.TString efVersion : _rest)) -> do
+          let errMsg =
+                "Version mismatch for the externs at: "
+                <> toS fp
+                <> " Expected: " <> version
+                <> " Found: " <> efVersion
+          logErrorN errMsg
+          throwError (GeneralError errMsg)
+        _ ->
+          throwError (GeneralError ("Parsing the extern at: " <> toS fp <> " failed"))
+    Just externs ->
+      pure externs
+    where
+      version = toS (showVersion P.version)
 
 convertExterns :: P.ExternsFile -> ([IdeDeclarationAnn], [(P.ModuleName, P.DeclarationRef)])
 convertExterns ef =

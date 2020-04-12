@@ -41,6 +41,9 @@ import Paths_purescript as Paths
 
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile
+  -- NOTE: Make sure to keep `efVersion` as the first field in this
+  -- record, so the derived Serialise instance produces CBOR that can
+  -- be checked for its version independently of the remaining format
   { efVersion :: Text
   -- ^ The externs version
   , efModuleName :: ModuleName
