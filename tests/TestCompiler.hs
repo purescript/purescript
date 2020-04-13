@@ -121,14 +121,14 @@ failingTests supportModules supportExterns supportForeigns = do
                   ]
   return $ testGroup "Failing examples" $ concat tests
 
-checkShouldReport :: [String] -> P.MultipleErrors -> Maybe String
-checkShouldReport expected errs =
+checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Maybe String
+checkShouldReport expected prettyPrintDiagnostics errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
   in if sort expected == sort (map T.unpack actual)
     then checkPositioned errs
     else Just $ "Expected these diagnostics: " ++ show expected ++ ", but got these: "
       ++ show actual ++ ", full diagnostic messages: \n"
-      ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) (P.runMultipleErrors errs))
+      ++ prettyPrintDiagnostics errs
 
 checkPositioned :: P.MultipleErrors -> Maybe String
 checkPositioned errs =
@@ -192,7 +192,7 @@ assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFi
       Left errs ->
         return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right warnings ->
-        return $ checkShouldReport shouldWarnWith warnings
+        return $ checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings P.defaultPPEOptions) warnings
 
 assertDoesNotCompile
   :: [P.Module]
@@ -209,7 +209,7 @@ assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles sh
           then Just $ "shouldFailWith declaration is missing (errors were: "
                       ++ show (map P.errorCode (P.runMultipleErrors errs))
                       ++ ")"
-          else checkShouldReport shouldFailWith errs
+          else checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors P.defaultPPEOptions) errs
       Right _ ->
         return $ Just "Should not have compiled"
 
