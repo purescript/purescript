@@ -1,4 +1,4 @@
-Error 1 of 4:
+Warning 1 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/MissingKindDeclaration.purs:7:1 - 7:21 (line 7, column 1 - line 7, column 21)
@@ -12,9 +12,9 @@ Error 1 of 4:
   in type constructor [33mProxy[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/MissingKindDeclaration.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 4:
+Warning 2 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/MissingKindDeclaration.purs:11:1 - 11:40 (line 11, column 1 - line 11, column 40)
@@ -28,9 +28,9 @@ Error 2 of 4:
   in type synonym [33mNatural[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/MissingKindDeclaration.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 3 of 4:
+Warning 3 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/MissingKindDeclaration.purs:9:1 - 9:20 (line 9, column 1 - line 9, column 20)
@@ -44,9 +44,9 @@ Error 3 of 4:
   in type constructor [33mF[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/MissingKindDeclaration.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 4 of 4:
+Warning 4 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/MissingKindDeclaration.purs:13:1 - 13:18 (line 13, column 1 - line 13, column 18)
@@ -60,5 +60,5 @@ Error 4 of 4:
   in type class declaration for [33mClazz[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/MissingKindDeclaration.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 

@@ -1,4 +1,4 @@
-Error found:
+Warning found:
 in module [33mMain[0m
 at tests/purs/warning/ScopeShadowing.purs:4:1 - 4:15 (line 4, column 1 - line 4, column 15)
 
@@ -10,5 +10,5 @@ at tests/purs/warning/ScopeShadowing.purs:4:1 - 4:15 (line 4, column 1 - line 4,
 
 
 See https://github.com/purescript/documentation/blob/master/errors/ScopeShadowing.md for more information,
-or to contribute content related to this error.
+or to contribute content related to this warning.
 

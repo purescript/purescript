@@ -1,4 +1,4 @@
-Error found:
+Warning found:
 in module [33mMain[0m
 at tests/purs/warning/DuplicateSelectiveImport.purs:5:1 - 5:22 (line 5, column 1 - line 5, column 22)
 
@@ -6,5 +6,5 @@ at tests/purs/warning/DuplicateSelectiveImport.purs:5:1 - 5:22 (line 5, column 1
 
 
 See https://github.com/purescript/documentation/blob/master/errors/DuplicateSelectiveImport.md for more information,
-or to contribute content related to this error.
+or to contribute content related to this warning.
 

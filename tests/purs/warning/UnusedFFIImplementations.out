@@ -1,4 +1,4 @@
-Error found:
+Warning found:
 at tests/purs/warning/UnusedFFIImplementations.purs:2:1 - 4:30 (line 2, column 1 - line 4, column 30)
 
   The following definitions in the foreign module for module [33mMain[0m are unused:
@@ -8,5 +8,5 @@ at tests/purs/warning/UnusedFFIImplementations.purs:2:1 - 4:30 (line 2, column 1
 
 
 See https://github.com/purescript/documentation/blob/master/errors/UnusedFFIImplementations.md for more information,
-or to contribute content related to this error.
+or to contribute content related to this warning.
 

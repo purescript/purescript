@@ -1,4 +1,4 @@
-Error found:
+Warning found:
 in module [33mMain[0m
 at tests/purs/warning/CustomWarning.purs:9:1 - 9:11 (line 9, column 1 - line 9, column 11)
 
@@ -10,5 +10,5 @@ at tests/purs/warning/CustomWarning.purs:9:1 - 9:11 (line 9, column 1 - line 9, 
 in value declaration [33mbar[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/UserDefinedWarning.md for more information,
-or to contribute content related to this error.
+or to contribute content related to this warning.
 

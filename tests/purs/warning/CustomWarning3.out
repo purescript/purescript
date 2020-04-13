@@ -1,4 +1,4 @@
-Error 1 of 2:
+Warning 1 of 2:
 
   in module [33mMain[0m
   at tests/purs/warning/CustomWarning3.purs:14:1 - 14:11 (line 14, column 1 - line 14, column 11)
@@ -11,9 +11,9 @@ Error 1 of 2:
   in value declaration [33mbaz[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/UserDefinedWarning.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 2:
+Warning 2 of 2:
 
   in module [33mMain[0m
   at tests/purs/warning/CustomWarning3.purs:14:1 - 14:11 (line 14, column 1 - line 14, column 11)
@@ -26,5 +26,5 @@ Error 2 of 2:
   in value declaration [33mbaz[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/UserDefinedWarning.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 

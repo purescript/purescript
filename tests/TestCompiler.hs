@@ -121,14 +121,14 @@ failingTests supportModules supportExterns supportForeigns = do
                   ]
   return $ testGroup "Failing examples" $ concat tests
 
-checkShouldFailWith :: [String] -> P.MultipleErrors -> Maybe String
-checkShouldFailWith expected errs =
+checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Maybe String
+checkShouldReport expected prettyPrintDiagnostics errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
   in if sort expected == sort (map T.unpack actual)
     then checkPositioned errs
-    else Just $ "Expected these errors: " ++ show expected ++ ", but got these: "
-      ++ show actual ++ ", full error messages: \n"
-      ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) (P.runMultipleErrors errs))
+    else Just $ "Expected these diagnostics: " ++ show expected ++ ", but got these: "
+      ++ show actual ++ ", full diagnostic messages: \n"
+      ++ prettyPrintDiagnostics errs
 
 checkPositioned :: P.MultipleErrors -> Maybe String
 checkPositioned errs =
@@ -137,7 +137,7 @@ checkPositioned errs =
       Nothing
     errs' ->
       Just
-        $ "Found errors with missing source spans:\n"
+        $ "Found diagnostics with missing source spans:\n"
         ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) errs')
   where
   guardSpans :: P.ErrorMessage -> Maybe P.ErrorMessage
@@ -192,13 +192,7 @@ assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFi
       Left errs ->
         return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right warnings ->
-        return
-          . fmap (printAllWarnings warnings)
-          $ checkShouldFailWith shouldWarnWith warnings
-
-  where
-  printAllWarnings warnings =
-    (<> "\n\n" <> P.prettyPrintMultipleErrors P.defaultPPEOptions warnings)
+        return $ checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings P.defaultPPEOptions) warnings
 
 assertDoesNotCompile
   :: [P.Module]
@@ -215,7 +209,7 @@ assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles sh
           then Just $ "shouldFailWith declaration is missing (errors were: "
                       ++ show (map P.errorCode (P.runMultipleErrors errs))
                       ++ ")"
-          else checkShouldFailWith shouldFailWith errs
+          else checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors P.defaultPPEOptions) errs
       Right _ ->
         return $ Just "Should not have compiled"
 
@@ -230,8 +224,12 @@ printErrorOrWarning
   -> IO String
 printErrorOrWarning supportModules supportExterns supportForeigns inputFiles = do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
-  (e, w) <- compile supportModules supportExterns supportForeigns (sort inputFiles) noPreCheck
-  return $ normalizePaths . P.prettyPrintMultipleErrors P.defaultPPEOptions $ either id (const w) e
+  (res, warnings) <- compile supportModules supportExterns supportForeigns (sort inputFiles) noPreCheck
+  return . normalizePaths $ case res of
+    Left errs ->
+      P.prettyPrintMultipleErrors P.defaultPPEOptions errs
+    Right _ ->
+      P.prettyPrintMultipleWarnings P.defaultPPEOptions warnings
   where
     noPreCheck = const (return ())
 

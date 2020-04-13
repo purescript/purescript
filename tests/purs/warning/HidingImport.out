@@ -1,4 +1,4 @@
-Error 1 of 2:
+Warning 1 of 2:
 
   in module [33mMain[0m
   at tests/purs/warning/HidingImport.purs:6:1 - 6:30 (line 6, column 1 - line 6, column 30)
@@ -10,9 +10,9 @@ Error 1 of 2:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/HidingImport.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 2:
+Warning 2 of 2:
 
   in module [33mMain[0m
   at tests/purs/warning/HidingImport.purs:5:1 - 5:28 (line 5, column 1 - line 5, column 28)
@@ -24,5 +24,5 @@ Error 2 of 2:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/HidingImport.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 

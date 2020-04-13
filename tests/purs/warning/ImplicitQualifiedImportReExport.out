@@ -1,4 +1,4 @@
-Error 1 of 2:
+Warning 1 of 2:
 
   in module [33mMain[0m
   at tests/purs/warning/ImplicitQualifiedImportReExport.purs:9:1 - 9:23 (line 9, column 1 - line 9, column 23)
@@ -11,9 +11,9 @@ Error 1 of 2:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/ImplicitQualifiedImportReExport.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 2:
+Warning 2 of 2:
 
   in module [33mMain[0m
   at tests/purs/warning/ImplicitQualifiedImportReExport.purs:10:1 - 10:24 (line 10, column 1 - line 10, column 24)
@@ -26,5 +26,5 @@ Error 2 of 2:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/ImplicitQualifiedImportReExport.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 

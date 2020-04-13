@@ -1,4 +1,4 @@
-Error 1 of 4:
+Warning 1 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateImportRef.purs:7:1 - 12:4 (line 7, column 1 - line 12, column 4)
@@ -7,9 +7,9 @@ Error 1 of 4:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateImportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 4:
+Warning 2 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateImportRef.purs:7:1 - 12:4 (line 7, column 1 - line 12, column 4)
@@ -18,9 +18,9 @@ Error 2 of 4:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateImportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 3 of 4:
+Warning 3 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateImportRef.purs:7:1 - 12:4 (line 7, column 1 - line 12, column 4)
@@ -29,9 +29,9 @@ Error 3 of 4:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateImportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 4 of 4:
+Warning 4 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateImportRef.purs:7:1 - 12:4 (line 7, column 1 - line 12, column 4)
@@ -40,5 +40,5 @@ Error 4 of 4:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateImportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 

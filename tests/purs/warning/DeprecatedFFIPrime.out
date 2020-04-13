@@ -1,4 +1,4 @@
-Error 1 of 4:
+Warning 1 of 4:
 
   at tests/purs/warning/DeprecatedFFIPrime.purs:5:1 - 10:28 (line 5, column 1 - line 10, column 28)
 
@@ -10,9 +10,9 @@ Error 1 of 4:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DeprecatedFFIPrime.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 4:
+Warning 2 of 4:
 
   at tests/purs/warning/DeprecatedFFIPrime.purs:5:1 - 10:28 (line 5, column 1 - line 10, column 28)
 
@@ -24,9 +24,9 @@ Error 2 of 4:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DeprecatedFFIPrime.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 3 of 4:
+Warning 3 of 4:
 
   at tests/purs/warning/DeprecatedFFIPrime.purs:5:1 - 10:28 (line 5, column 1 - line 10, column 28)
 
@@ -38,9 +38,9 @@ Error 3 of 4:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DeprecatedFFIPrime.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 4 of 4:
+Warning 4 of 4:
 
   at tests/purs/warning/DeprecatedFFIPrime.purs:5:1 - 10:28 (line 5, column 1 - line 10, column 28)
 
@@ -52,5 +52,5 @@ Error 4 of 4:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DeprecatedFFIPrime.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 

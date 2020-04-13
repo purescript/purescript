@@ -1,4 +1,4 @@
-Error found:
+Warning found:
 in module [33mMain[0m
 at tests/purs/warning/Kind-UnusedImport.purs:6:1 - 6:30 (line 6, column 1 - line 6, column 30)
 
@@ -6,5 +6,5 @@ at tests/purs/warning/Kind-UnusedImport.purs:6:1 - 6:30 (line 6, column 1 - line
 
 
 See https://github.com/purescript/documentation/blob/master/errors/UnusedImport.md for more information,
-or to contribute content related to this error.
+or to contribute content related to this warning.
 

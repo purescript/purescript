@@ -1,4 +1,4 @@
-Error 1 of 2:
+Warning 1 of 2:
 
   in module [33mMain[0m
   at tests/purs/warning/OverlappingPattern.purs:12:1 - 12:21 (line 12, column 1 - line 12, column 21)
@@ -10,9 +10,9 @@ Error 1 of 2:
   in value declaration [33mpat2[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/OverlappingPattern.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 2:
+Warning 2 of 2:
 
   in module [33mMain[0m
   at tests/purs/warning/OverlappingPattern.purs:7:1 - 7:21 (line 7, column 1 - line 7, column 21)
@@ -24,5 +24,5 @@ Error 2 of 2:
   in value declaration [33mpat1[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/OverlappingPattern.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
