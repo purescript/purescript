@@ -192,13 +192,7 @@ assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFi
       Left errs ->
         return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right warnings ->
-        return
-          . fmap (printAllWarnings warnings)
-          $ checkShouldReport shouldWarnWith warnings
-
-  where
-  printAllWarnings warnings =
-    (<> "\n\n" <> P.prettyPrintMultipleErrors P.defaultPPEOptions warnings)
+        return $ checkShouldReport shouldWarnWith warnings
 
 assertDoesNotCompile
   :: [P.Module]
