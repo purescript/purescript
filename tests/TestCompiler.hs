@@ -121,13 +121,13 @@ failingTests supportModules supportExterns supportForeigns = do
                   ]
   return $ testGroup "Failing examples" $ concat tests
 
-checkShouldFailWith :: [String] -> P.MultipleErrors -> Maybe String
-checkShouldFailWith expected errs =
+checkShouldReport :: [String] -> P.MultipleErrors -> Maybe String
+checkShouldReport expected errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
   in if sort expected == sort (map T.unpack actual)
     then checkPositioned errs
-    else Just $ "Expected these errors: " ++ show expected ++ ", but got these: "
-      ++ show actual ++ ", full error messages: \n"
+    else Just $ "Expected these diagnostics: " ++ show expected ++ ", but got these: "
+      ++ show actual ++ ", full diagnostic messages: \n"
       ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) (P.runMultipleErrors errs))
 
 checkPositioned :: P.MultipleErrors -> Maybe String
@@ -137,7 +137,7 @@ checkPositioned errs =
       Nothing
     errs' ->
       Just
-        $ "Found errors with missing source spans:\n"
+        $ "Found diagnostics with missing source spans:\n"
         ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) errs')
   where
   guardSpans :: P.ErrorMessage -> Maybe P.ErrorMessage
@@ -194,7 +194,7 @@ assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFi
       Right warnings ->
         return
           . fmap (printAllWarnings warnings)
-          $ checkShouldFailWith shouldWarnWith warnings
+          $ checkShouldReport shouldWarnWith warnings
 
   where
   printAllWarnings warnings =
@@ -215,7 +215,7 @@ assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles sh
           then Just $ "shouldFailWith declaration is missing (errors were: "
                       ++ show (map P.errorCode (P.runMultipleErrors errs))
                       ++ ")"
-          else checkShouldFailWith shouldFailWith errs
+          else checkShouldReport shouldFailWith errs
       Right _ ->
         return $ Just "Should not have compiled"
 
