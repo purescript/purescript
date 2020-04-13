@@ -1,4 +1,4 @@
-Error 1 of 4:
+Warning 1 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/CustomWarning4.purs:21:1 - 21:15 (line 21, column 1 - line 21, column 15)
@@ -11,9 +11,9 @@ Error 1 of 4:
   in value declaration [33mbaz'[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/UserDefinedWarning.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 4:
+Warning 2 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/CustomWarning4.purs:24:1 - 24:16 (line 24, column 1 - line 24, column 16)
@@ -26,9 +26,9 @@ Error 2 of 4:
   in value declaration [33mbaz''[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/UserDefinedWarning.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 3 of 4:
+Warning 3 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/CustomWarning4.purs:27:1 - 27:17 (line 27, column 1 - line 27, column 17)
@@ -41,9 +41,9 @@ Error 3 of 4:
   in value declaration [33mbaz'''[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/UserDefinedWarning.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 4 of 4:
+Warning 4 of 4:
 
   in module [33mMain[0m
   at tests/purs/warning/CustomWarning4.purs:30:1 - 30:18 (line 30, column 1 - line 30, column 18)
@@ -56,5 +56,5 @@ Error 4 of 4:
   in value declaration [33mbaz''''[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/UserDefinedWarning.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 

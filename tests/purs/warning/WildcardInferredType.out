@@ -1,4 +1,4 @@
-Error 1 of 2:
+Warning 1 of 2:
 
   in module [33mMain[0m
   at tests/purs/warning/WildcardInferredType.purs:7:6 - 7:7 (line 7, column 6 - line 7, column 7)
@@ -11,9 +11,9 @@ Error 1 of 2:
   in value declaration [33my[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/WildcardInferredType.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 2:
+Warning 2 of 2:
 
   in module [33mMain[0m
   at tests/purs/warning/WildcardInferredType.purs:5:10 - 5:11 (line 5, column 10 - line 5, column 11)
@@ -26,5 +26,5 @@ Error 2 of 2:
   in value declaration [33mx[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/WildcardInferredType.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 

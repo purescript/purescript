@@ -1,4 +1,4 @@
-Error found:
+Warning found:
 in module [33mMain[0m
 at tests/purs/warning/Kind-UnusedExplicitImport-2.purs:6:1 - 6:39 (line 6, column 1 - line 6, column 39)
 
@@ -13,5 +13,5 @@ at tests/purs/warning/Kind-UnusedExplicitImport-2.purs:6:1 - 6:39 (line 6, colum
 
 
 See https://github.com/purescript/documentation/blob/master/errors/UnusedExplicitImport.md for more information,
-or to contribute content related to this error.
+or to contribute content related to this warning.
 

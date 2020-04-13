@@ -1,4 +1,4 @@
-Error 1 of 7:
+Warning 1 of 7:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -7,9 +7,9 @@ Error 1 of 7:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 7:
+Warning 2 of 7:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -18,9 +18,9 @@ Error 2 of 7:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 3 of 7:
+Warning 3 of 7:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -29,9 +29,9 @@ Error 3 of 7:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 4 of 7:
+Warning 4 of 7:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -40,9 +40,9 @@ Error 4 of 7:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 5 of 7:
+Warning 5 of 7:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -51,9 +51,9 @@ Error 5 of 7:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 6 of 7:
+Warning 6 of 7:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -62,9 +62,9 @@ Error 6 of 7:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 7 of 7:
+Warning 7 of 7:
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -73,5 +73,5 @@ Error 7 of 7:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 

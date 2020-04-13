@@ -230,8 +230,12 @@ printErrorOrWarning
   -> IO String
 printErrorOrWarning supportModules supportExterns supportForeigns inputFiles = do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
-  (e, w) <- compile supportModules supportExterns supportForeigns (sort inputFiles) noPreCheck
-  return $ normalizePaths . P.prettyPrintMultipleErrors P.defaultPPEOptions $ either id (const w) e
+  (res, warnings) <- compile supportModules supportExterns supportForeigns (sort inputFiles) noPreCheck
+  return . normalizePaths $ case res of
+    Left errs ->
+      P.prettyPrintMultipleErrors P.defaultPPEOptions errs
+    Right _ ->
+      P.prettyPrintMultipleWarnings P.defaultPPEOptions warnings
   where
     noPreCheck = const (return ())
 

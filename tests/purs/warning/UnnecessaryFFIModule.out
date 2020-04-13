@@ -1,4 +1,4 @@
-Error found:
+Warning found:
 at tests/purs/warning/UnnecessaryFFIModule.purs:2:1 - 5:9 (line 2, column 1 - line 5, column 9)
 
   An unnecessary foreign module implementation was provided for module [33mMain[0m:
@@ -9,5 +9,5 @@ at tests/purs/warning/UnnecessaryFFIModule.purs:2:1 - 5:9 (line 2, column 1 - li
 
 
 See https://github.com/purescript/documentation/blob/master/errors/UnnecessaryFFIModule.md for more information,
-or to contribute content related to this error.
+or to contribute content related to this warning.
 

@@ -1,4 +1,4 @@
-Error 1 of 3:
+Warning 1 of 3:
 
   at tests/purs/warning/DeprecatedImportExportKinds.purs:6:13 - 6:21 (line 6, column 13 - line 6, column 21)
 
@@ -6,9 +6,9 @@ Error 1 of 3:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/WarningParsingModule.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 2 of 3:
+Warning 2 of 3:
 
   at tests/purs/warning/DeprecatedImportExportKinds/Lib.purs:5:1 - 5:24 (line 5, column 1 - line 5, column 24)
 
@@ -16,9 +16,9 @@ Error 2 of 3:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/WarningParsingModule.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 
-Error 3 of 3:
+Warning 3 of 3:
 
   at tests/purs/warning/DeprecatedImportExportKinds/Lib.purs:2:5 - 2:13 (line 2, column 5 - line 2, column 13)
 
@@ -26,5 +26,5 @@ Error 3 of 3:
 
 
   See https://github.com/purescript/documentation/blob/master/errors/WarningParsingModule.md for more information,
-  or to contribute content related to this error.
+  or to contribute content related to this warning.
 

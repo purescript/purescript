@@ -1,4 +1,4 @@
-Error found:
+Warning found:
 at tests/purs/warning/NewtypeInstance.purs:8:1 - 8:38 (line 8, column 1 - line 8, column 38)
 
   The derived newtype instance for
@@ -9,5 +9,5 @@ at tests/purs/warning/NewtypeInstance.purs:8:1 - 8:38 (line 8, column 1 - line 8
 
 
 See https://github.com/purescript/documentation/blob/master/errors/MissingNewtypeSuperclassInstance.md for more information,
-or to contribute content related to this error.
+or to contribute content related to this warning.
 
