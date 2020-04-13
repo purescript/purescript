@@ -100,7 +100,7 @@ qualifiedToJSON f (Qualified mn a) = object
   ]
 
 moduleNameToJSON :: ModuleName -> Value
-moduleNameToJSON (ModuleName name) = toJSON name
+moduleNameToJSON (ModuleName name) = toJSON (T.splitOn (T.pack ".") name)
 
 moduleToJSON :: Version -> Module Ann -> Value
 moduleToJSON v m = object
