@@ -21,6 +21,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@andyarvanitis](https://github.com/andyarvanitis) | Andy Arvanitis | [MIT license](http://opensource.org/licenses/MIT) |
 | [@anthok88](https://github.com/anthok88) | anthoq88 | MIT license |
 | [@ardumont](https://github.com/ardumont) | Antoine R. Dumont | [MIT license](http://opensource.org/licenses/MIT) |
+| [@arrowd](https://github.com/arrowd) | Gleb Popov | [MIT license](http://opensource.org/licenses/MIT) |
 | [@aspidites](https://github.com/aspidites) | Edwin Marshall | [MIT license](http://opensource.org/licenses/MIT) |
 | [@bagl](https://github.com/bagl) | Petr Vapenka | [MIT license](http://opensource.org/licenses/MIT) |
 | [@balajirrao](https://github.com/balajirrao) | Balaji Rao | MIT license |

@@ -122,6 +122,9 @@ data OpNameType = ValueOpName | TypeOpName | AnyOpName
 eraseOpName :: OpName a -> OpName 'AnyOpName
 eraseOpName = OpName . runOpName
 
+coerceOpName :: OpName a -> OpName b
+coerceOpName = OpName . runOpName
+
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
 --

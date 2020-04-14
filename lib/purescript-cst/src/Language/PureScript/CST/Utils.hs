@@ -19,6 +19,54 @@ import Language.PureScript.CST.Types
 import qualified Language.PureScript.Names as N
 import Language.PureScript.PSString (PSString, mkString)
 
+-- |
+-- A newtype for a qualified proper name whose ProperNameType has not yet been determined.
+-- This is a workaround for Happy's limited support for polymorphism; it is used
+-- inside the parser to allow us to write just one parser for qualified proper names
+-- which can be used for all of the different ProperNameTypes
+-- (via a call to getQualifiedProperName).
+newtype QualifiedProperName =
+  QualifiedProperName { getQualifiedProperName :: forall a. QualifiedName (N.ProperName a) }
+
+qualifiedProperName :: QualifiedName (N.ProperName a) -> QualifiedProperName
+qualifiedProperName n = QualifiedProperName (N.coerceProperName <$> n)
+
+-- |
+-- A newtype for a proper name whose ProperNameType has not yet been determined.
+-- This is a workaround for Happy's limited support for polymorphism; it is used
+-- inside the parser to allow us to write just one parser for proper names
+-- which can be used for all of the different ProperNameTypes
+-- (via a call to getProperName).
+newtype ProperName =
+  ProperName { getProperName :: forall a. Name (N.ProperName a) }
+
+properName :: Name (N.ProperName a) -> ProperName
+properName n = ProperName (N.coerceProperName <$> n)
+
+-- |
+-- A newtype for a qualified operator name whose OpNameType has not yet been determined.
+-- This is a workaround for Happy's limited support for polymorphism; it is used
+-- inside the parser to allow us to write just one parser for qualified operator names
+-- which can be used for all of the different OpNameTypes
+-- (via a call to getQualifiedOpName).
+newtype QualifiedOpName =
+  QualifiedOpName { getQualifiedOpName :: forall a. QualifiedName (N.OpName a) }
+
+qualifiedOpName :: QualifiedName (N.OpName a) -> QualifiedOpName
+qualifiedOpName n = QualifiedOpName (N.coerceOpName <$> n)
+
+-- |
+-- A newtype for a operator name whose OpNameType has not yet been determined.
+-- This is a workaround for Happy's limited support for polymorphism; it is used
+-- inside the parser to allow us to write just one parser for operator names
+-- which can be used for all of the different OpNameTypes
+-- (via a call to getOpName).
+newtype OpName =
+  OpName { getOpName :: forall a. Name (N.OpName a) }
+
+opName :: Name (N.OpName a) -> OpName
+opName n = OpName (N.coerceOpName <$> n)
+
 placeholder :: SourceToken
 placeholder = SourceToken
   { tokAnn = TokenAnn (SourceRange (SourcePos 0 0) (SourcePos 0 0)) [] []
