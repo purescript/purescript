@@ -1,6 +1,8 @@
 module Language.PureScript.Ide.Prim (idePrimDeclarations) where
 
 import           Protolude
+
+import qualified Data.Text as T
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Language.PureScript as P
@@ -33,8 +35,12 @@ idePrimDeclarations = Map.fromList
     )
   ]
   where
-    annType tys = foreach (Map.toList tys) $ \(tn, (kind, _)) ->
-      IdeDeclarationAnn emptyAnn (IdeDeclType (IdeType (P.disqualify tn) kind []))
+    annType tys = flip mapMaybe (Map.toList tys) $ \(tn, (kind, _)) -> do
+      let name = P.disqualify tn
+      -- We need to remove the ClassName$Dict synonyms, because we
+      -- don't want them to show up in completions
+      guard (isNothing (T.find (== '$') (P.runProperName name)))
+      Just (IdeDeclarationAnn emptyAnn (IdeDeclType (IdeType name kind [])))
     annClass cls = foreach (Map.toList cls) $ \(cn, _) ->
       -- Dummy kind and instances here, but we primarily care about the name completion
       IdeDeclarationAnn emptyAnn (IdeDeclTypeClass (IdeTypeClass (P.disqualify cn) P.kindType []) )
