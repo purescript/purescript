@@ -134,12 +134,12 @@ updateImportExports st@(PSCiState modules lets externs iprint _ _) =
   createEnv = runExceptT =<< fmap fst . runWriterT . foldM P.externsEnv P.primEnv
 
   temporaryName :: P.ModuleName
-  temporaryName = P.ModuleName [P.ProperName "$PSCI"]
+  temporaryName = P.ModuleName "$PSCI"
 
   temporaryModule :: P.Module
   temporaryModule =
     let
-      prim = (P.ModuleName [P.ProperName "Prim"], P.Implicit, Nothing)
+      prim = (P.ModuleName "Prim", P.Implicit, Nothing)
       decl = (importDecl `map` (prim : modules)) ++ lets
     in
       P.Module internalSpan [] temporaryName decl Nothing

@@ -379,7 +379,7 @@ partial :: forall a. (IsString a) => a
 partial = "Partial"
 
 pattern Prim :: ModuleName
-pattern Prim = ModuleName [ProperName "Prim"]
+pattern Prim = ModuleName "Prim"
 
 pattern Partial :: Qualified (ProperName 'ClassName)
 pattern Partial = Qualified (Just Prim) (ProperName "Partial")
@@ -390,7 +390,7 @@ pattern Record = Qualified (Just Prim) (ProperName "Record")
 -- Prim.Boolean
 
 pattern PrimBoolean :: ModuleName
-pattern PrimBoolean = ModuleName [ProperName "Prim", ProperName "Boolean"]
+pattern PrimBoolean = ModuleName "Prim.Boolean"
 
 booleanTrue :: Qualified (ProperName 'TypeName)
 booleanTrue = Qualified (Just PrimBoolean) (ProperName "True")
@@ -401,7 +401,7 @@ booleanFalse = Qualified (Just PrimBoolean) (ProperName "False")
 -- Prim.Ordering
 
 pattern PrimOrdering :: ModuleName
-pattern PrimOrdering = ModuleName [ProperName "Prim", ProperName "Ordering"]
+pattern PrimOrdering = ModuleName "Prim.Ordering"
 
 orderingLT :: Qualified (ProperName 'TypeName)
 orderingLT = Qualified (Just PrimOrdering) (ProperName "LT")
@@ -415,7 +415,7 @@ orderingGT = Qualified (Just PrimOrdering) (ProperName "GT")
 -- Prim.Row
 
 pattern PrimRow :: ModuleName
-pattern PrimRow = ModuleName [ProperName "Prim", ProperName "Row"]
+pattern PrimRow = ModuleName "Prim.Row"
 
 pattern RowUnion :: Qualified (ProperName 'ClassName)
 pattern RowUnion = Qualified (Just PrimRow) (ProperName "Union")
@@ -432,7 +432,7 @@ pattern RowLacks = Qualified (Just PrimRow) (ProperName "Lacks")
 -- Prim.RowList
 
 pattern PrimRowList :: ModuleName
-pattern PrimRowList = ModuleName [ProperName "Prim", ProperName "RowList"]
+pattern PrimRowList = ModuleName "Prim.RowList"
 
 pattern RowToList :: Qualified (ProperName 'ClassName)
 pattern RowToList = Qualified (Just PrimRowList) (ProperName "RowToList")
@@ -446,7 +446,7 @@ pattern RowListCons = Qualified (Just PrimRowList) (ProperName "Cons")
 -- Prim.Symbol
 
 pattern PrimSymbol :: ModuleName
-pattern PrimSymbol = ModuleName [ProperName "Prim", ProperName "Symbol"]
+pattern PrimSymbol = ModuleName "Prim.Symbol"
 
 pattern SymbolCompare :: Qualified (ProperName 'ClassName)
 pattern SymbolCompare = Qualified (Just PrimSymbol) (ProperName "Compare")
@@ -460,7 +460,7 @@ pattern SymbolCons = Qualified (Just PrimSymbol) (ProperName "Cons")
 -- Prim.TypeError
 
 pattern PrimTypeError :: ModuleName
-pattern PrimTypeError = ModuleName [ProperName "Prim", ProperName "TypeError"]
+pattern PrimTypeError = ModuleName "Prim.TypeError"
 
 pattern Fail :: Qualified (ProperName 'ClassName)
 pattern Fail = Qualified (Just PrimTypeError) (ProperName "Fail")
@@ -474,7 +474,7 @@ primModules = [Prim, PrimBoolean, PrimOrdering, PrimRow, PrimRowList, PrimSymbol
 -- Data.Symbol
 
 pattern DataSymbol :: ModuleName
-pattern DataSymbol = ModuleName [ProperName "Data", ProperName "Symbol"]
+pattern DataSymbol = ModuleName "Data.Symbol"
 
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
 pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
@@ -542,7 +542,7 @@ controlSemigroupoid :: forall a. (IsString a) => a
 controlSemigroupoid = "Control_Semigroupoid"
 
 pattern ControlBind :: ModuleName
-pattern ControlBind = ModuleName [ProperName "Control", ProperName "Bind"]
+pattern ControlBind = ModuleName "Control.Bind"
 
 controlBind :: forall a. (IsString a) => a
 controlBind = "Control_Bind"

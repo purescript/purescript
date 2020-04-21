@@ -142,7 +142,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
   -- Checks whether a module is the Prim module - used to suppress any checks
   -- made, as Prim is always implicitly imported.
   isPrim :: ModuleName -> Bool
-  isPrim = (== ModuleName [ProperName C.prim])
+  isPrim = (== C.Prim)
 
   -- Creates a map of virtual modules mapped to all the declarations that
   -- import to that module, with the corresponding source span, import type,

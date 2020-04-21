@@ -89,7 +89,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn ss com ty (A.App v1 v2) =
     App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
   exprToCoreFn ss com ty (A.Unused _) =
-    Var (ss, com, ty, Nothing) (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
+    Var (ss, com, ty, Nothing) (Qualified (Just C.Prim) (Ident C.undefined))
   exprToCoreFn _ com ty (A.Var ss ident) =
     Var (ss, com, ty, getValueMeta ident) ident
   exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =
