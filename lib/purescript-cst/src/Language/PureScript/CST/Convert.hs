@@ -85,7 +85,7 @@ moduleName = \case
   _ -> Nothing
   where
   go [] = Nothing
-  go ns = Just $ N.ModuleName $ N.ProperName <$> ns
+  go ns = Just $ N.ModuleName $ Text.intercalate "." ns
 
 qualified :: QualifiedName a -> N.Qualified a
 qualified q = N.Qualified (qualModule q) (qualName q)

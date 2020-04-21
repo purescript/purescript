@@ -11,6 +11,7 @@ import Codec.Serialise (Serialise)
 import Control.Monad.Supply.Class
 import Control.DeepSeq (NFData)
 import Data.Functor.Contravariant (contramap)
+import qualified Data.Vector as V
 
 import GHC.Generics (Generic)
 import Data.Aeson
@@ -160,26 +161,20 @@ coerceProperName = ProperName . runProperName
 -- |
 -- Module names
 --
-newtype ModuleName = ModuleName [ProperName 'Namespace]
+newtype ModuleName = ModuleName Text
   deriving (Show, Eq, Ord, Generic)
+  deriving newtype Serialise
 
 instance NFData ModuleName
-instance Serialise ModuleName
 
 runModuleName :: ModuleName -> Text
-runModuleName (ModuleName pns) = T.intercalate "." (runProperName <$> pns)
+runModuleName (ModuleName name) = name
 
 moduleNameFromString :: Text -> ModuleName
-moduleNameFromString = ModuleName . splitProperNames
-  where
-  splitProperNames s = case T.dropWhile (== '.') s of
-    "" -> []
-    s' -> ProperName w : splitProperNames s''
-      where (w, s'') = T.break (== '.') s'
+moduleNameFromString = ModuleName
 
 isBuiltinModuleName :: ModuleName -> Bool
-isBuiltinModuleName (ModuleName (ProperName "Prim" : _)) = True
-isBuiltinModuleName _ = False
+isBuiltinModuleName (ModuleName mn) = mn == "Prim" || T.isPrefixOf "Prim." mn
 
 -- |
 -- A qualified name, i.e. a name with an optional module name
@@ -244,7 +239,14 @@ isQualifiedWith _ _ = False
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Qualified)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ModuleName)
+
+instance ToJSON ModuleName where
+  toJSON (ModuleName name) = toJSON (T.splitOn "." name)
+
+instance FromJSON ModuleName where
+  parseJSON = withArray "ModuleName" $ \names -> do
+    names' <- traverse parseJSON names
+    pure (ModuleName (T.intercalate "." (V.toList names')))
 
 instance ToJSONKey ModuleName where
   toJSONKey = contramap runModuleName toJSONKey

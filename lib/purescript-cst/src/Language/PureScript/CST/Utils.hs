@@ -129,14 +129,14 @@ toModuleName :: SourceToken -> [Text] -> Parser (Maybe N.ModuleName)
 toModuleName _ [] = pure Nothing
 toModuleName tok ns = do
   when (not (all isValidModuleNamespace ns)) $ addFailure [tok] ErrModuleName
-  pure . Just . N.ModuleName $ N.ProperName <$> ns
+  pure . Just . N.ModuleName $ Text.intercalate "." ns
 
 upperToModuleName :: SourceToken -> Parser (Name N.ModuleName)
 upperToModuleName tok = case tokValue tok of
   TokUpperName q a -> do
     let ns = q <> [a]
     when (not (all isValidModuleNamespace ns)) $ addFailure [tok] ErrModuleName
-    pure . Name tok . N.ModuleName $ N.ProperName <$> ns
+    pure . Name tok . N.ModuleName $ Text.intercalate "." ns
   _ -> internalError $ "Invalid upper name: " <> show tok
 
 toQualifiedName :: (Text -> a) -> SourceToken -> Parser (QualifiedName a)

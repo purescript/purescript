@@ -104,7 +104,7 @@ qualifiedFromJSON f = withObject "Qualified" qualifiedFromObj
     return $ Qualified mn i
 
 moduleNameFromJSON :: Value -> Parser ModuleName
-moduleNameFromJSON v = ModuleName <$> listParser properNameFromJSON v
+moduleNameFromJSON v = ModuleName . T.intercalate "." <$> listParser parseJSON v
 
 moduleFromJSON :: Value -> Parser (Version, Module Ann)
 moduleFromJSON = withObject "Module" moduleFromObj

@@ -51,7 +51,7 @@ desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModu
   initialState :: MemberMap
   initialState =
     mconcat
-      [ M.mapKeys (qualify (ModuleName [ProperName C.prim])) primClasses
+      [ M.mapKeys (qualify C.Prim) primClasses
       , M.mapKeys (qualify C.PrimCoerce) primCoerceClasses
       , M.mapKeys (qualify C.PrimRow) primRowClasses
       , M.mapKeys (qualify C.PrimRowList) primRowListClasses

@@ -371,7 +371,7 @@ main = "main"
 -- Data.Symbol
 
 pattern DataSymbol :: ModuleName
-pattern DataSymbol = ModuleName [ProperName "Data", ProperName "Symbol"]
+pattern DataSymbol = ModuleName "Data.Symbol"
 
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
 pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
@@ -398,7 +398,7 @@ controlSemigroupoid :: forall a. (IsString a) => a
 controlSemigroupoid = "Control_Semigroupoid"
 
 pattern ControlBind :: ModuleName
-pattern ControlBind = ModuleName [ProperName "Control", ProperName "Bind"]
+pattern ControlBind = ModuleName "Control.Bind"
 
 controlBind :: forall a. (IsString a) => a
 controlBind = "Control_Bind"

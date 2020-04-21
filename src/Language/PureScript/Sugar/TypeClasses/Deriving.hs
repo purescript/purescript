@@ -263,19 +263,19 @@ deriveNewtypeInstance ss mn syns kinds ndis className ds tys tyConNm dargs = do
                 else tell . errorMessage' ss $ UnverifiableSuperclassInstance constraintClass className tys
 
 dataGenericRep :: ModuleName
-dataGenericRep = ModuleName [ ProperName "Data", ProperName "Generic", ProperName "Rep" ]
+dataGenericRep = ModuleName "Data.Generic.Rep"
 
 dataEq :: ModuleName
-dataEq = ModuleName [ ProperName "Data", ProperName "Eq" ]
+dataEq = ModuleName "Data.Eq"
 
 dataOrd :: ModuleName
-dataOrd = ModuleName [ ProperName "Data", ProperName "Ord" ]
+dataOrd = ModuleName "Data.Ord"
 
 dataNewtype :: ModuleName
-dataNewtype = ModuleName [ ProperName "Data", ProperName "Newtype" ]
+dataNewtype = ModuleName "Data.Newtype"
 
 dataFunctor :: ModuleName
-dataFunctor = ModuleName [ ProperName "Data", ProperName "Functor" ]
+dataFunctor = ModuleName "Data.Functor"
 
 unguarded :: Expr -> [GuardedExpr]
 unguarded e = [MkUnguarded e]
@@ -460,7 +460,7 @@ deriveEq ss mn syns kinds ds tyConNm = do
     mkEqFunction _ = internalError "mkEqFunction: expected DataDeclaration"
 
     preludeConj :: Expr -> Expr -> Expr
-    preludeConj = App . App (Var ss (Qualified (Just (ModuleName [ProperName "Data", ProperName "HeytingAlgebra"])) (Ident C.conj)))
+    preludeConj = App . App (Var ss (Qualified (Just (ModuleName "Data.HeytingAlgebra")) (Ident C.conj)))
 
     preludeEq :: Expr -> Expr -> Expr
     preludeEq = App . App (Var ss (Qualified (Just dataEq) (Ident C.eq)))
@@ -541,7 +541,7 @@ deriveOrd ss mn syns kinds ds tyConNm = do
       catchAll = CaseAlternative [NullBinder, NullBinder] (unguarded (orderingCtor "EQ"))
 
     orderingName :: Text -> Qualified (ProperName a)
-    orderingName = Qualified (Just (ModuleName [ProperName "Data", ProperName "Ordering"])) . ProperName
+    orderingName = Qualified (Just (ModuleName "Data.Ordering")) . ProperName
 
     orderingCtor :: Text -> Expr
     orderingCtor = Constructor ss . orderingName
