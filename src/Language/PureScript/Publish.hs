@@ -25,11 +25,11 @@ import Control.Arrow ((***))
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
-import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, eachInObject, key, keyOrDefault, asBool, asString, withString, asText, withText)
+import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, key, asString, withString)
 import qualified Data.ByteString.Lazy as BL
 import Data.Char (isSpace)
 import Data.String (String, lines)
-import Data.List (stripPrefix, (\\), nubBy)
+import Data.List (stripPrefix, (\\))
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
@@ -296,12 +296,7 @@ parseResolutionsFile resolutionsFile = do
     Right res ->
       pure res
     Left err ->
-      case parse asLegacyResolutions depsBS of
-        Right res -> do
-          warn $ LegacyResolutionsFormat resolutionsFile
-          pure res
-        Left _ ->
-          userError $ ResolutionsFileError resolutionsFile err
+      userError $ ResolutionsFileError resolutionsFile err
 
 -- | Parser for resolutions files, which contain information about the packages
 -- which this package depends on. A resolutions file should look something like
@@ -336,47 +331,6 @@ asResolutions =
 asVersion :: Parse D.PackageError Version
 asVersion =
   withString (note D.InvalidVersion . D.parseVersion')
-
--- | Extracts all dependencies and their versions from a legacy resolutions
--- file, which is based on the output of `bower list --json --offline`.
-asLegacyResolutions :: Parse D.PackageError [(PackageName, (FilePath, DependencyStatus))]
-asLegacyResolutions =
-  nubBy ((==) `on` fst) <$> go True
-  where
-  go isToplevel =
-    keyDependencies isToplevel $
-        (++) <$> (takeJusts <$> eachInObjectWithKey parsePackageName asDirectoryAndDependencyStatus)
-             <*> (concatMap snd <$> eachInObject (go False))
-
-
-  keyDependencies isToplevel =
-    if isToplevel
-      then key "dependencies"
-      else fmap (fromMaybe []) . keyMay "dependencies"
-
-  takeJusts :: [(a, Maybe b)] -> [(a,b)]
-  takeJusts = mapMaybe $ \(x,y) -> (x,) <$> y
-
-  asDirectoryAndDependencyStatus :: Parse D.PackageError (Maybe (FilePath, DependencyStatus))
-  asDirectoryAndDependencyStatus = do
-    isMissing <- keyOrDefault "missing" False asBool
-    if isMissing
-      then return Nothing
-      else do
-        directory <- key "canonicalDir" asString
-        status <- key "pkgMeta" $
-           keyOrDefault "_resolution" NoResolution $ do
-             type_ <- key "type" asText
-             case type_ of
-              "version" ->
-                key "tag" $ fmap ResolvedVersion $ withText $ \tag ->
-                  let
-                    tag' = fromMaybe tag (T.stripPrefix "v" tag)
-                  in
-                    note D.InvalidVersion (D.parseVersion' (T.unpack tag'))
-              other ->
-                return (ResolvedOther other)
-        return $ Just (directory, status)
 
 parsePackageName :: Text -> Either D.PackageError PackageName
 parsePackageName = first D.ErrorInPackageMeta . Bower.parsePackageName
