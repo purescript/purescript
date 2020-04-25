@@ -676,7 +676,7 @@ decl :: { Declaration () }
   | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
   | ident manyOrEmpty(binderAtom) guardedDecl { DeclValue () (ValueBindingFields $1 $2 $3) }
   | fixity { DeclFixity () $1 }
-  | 'foreign' 'import' ident '::' type { DeclForeign () $1 $2 (ForeignValue (Labeled $3 $4 $5)) }
+  | 'foreign' 'import' ident '::' type {% when (isConstrained $5) (addWarning ([$1, $2, nameTok $3, $4] <> toList (flattenType $5)) WarnDeprecatedConstraintInForeignImportSyntax) *> pure (DeclForeign () $1 $2 (ForeignValue (Labeled $3 $4 $5))) }
   | 'foreign' 'import' 'data' properName '::' type { DeclForeign () $1 $2 (ForeignData $3 (Labeled (getProperName $4) $5 $6)) }
   | 'foreign' 'import' 'kind' properName {% addWarning [$1, $2, $3, nameTok (getProperName $4)] WarnDeprecatedForeignKindSyntax *> pure (DeclForeign () $1 $2 (ForeignKind $3 (getProperName $4))) }
   | 'type' 'role' properName many(role) { DeclRole () $1 $2 (getProperName $3) $4 }
