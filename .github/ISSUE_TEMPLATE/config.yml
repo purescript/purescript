@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
+  - about: Please submit proposals for changing the language or compiler on Discourse first.
+    name: Proposals
+    url: https://discourse.purescript.org/new-topic?category=proposal&body=%23%23+Summary%0D%0A%0D%0AOne+or+two+sentence+summary+of+the+proposal.%0D%0A%0D%0A%23%23+Motivation%0D%0A%0D%0ABackground+information+about+why+this+proposal+is+necessary.%0D%0A%0D%0A%23%23+Proposal%0D%0A%0D%0ADetailed+description+of+the+proposal.%0D%0A%0D%0A%23%23+Examples%0D%0A%0D%0AAt+least+one+or+two+examples+of+the+proposal+being+used.%0D%0A
   - about: Please discuss ideas and ask questions on the PureScript Discourse.
     name: Ideas and Questions
     url: https://discourse.purescript.org/
