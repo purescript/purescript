@@ -12,3 +12,8 @@ withType = 42
 -- | a multi-line
 -- | comment
 multiline = "multiline"
+
+-- | Doc for class
+class DocClass where
+  -- | doc for member
+  member :: Int

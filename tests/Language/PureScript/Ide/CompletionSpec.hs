@@ -72,3 +72,17 @@ spec = describe "Applying completion options" $ do
                   , typ "CompletionSpecDocs"
                   ]
     result `shouldSatisfy` \res -> complDocumentation res == Just "Module Documentation\n"
+
+  it "gets docs on type class declaration" $ do
+    ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpecDocs"]
+                  , typ "DocClass"
+                  ]
+    result `shouldSatisfy` \res -> complDocumentation res == Just "Doc for class\n"
+
+  it "gets docs on type class members" $ do
+    ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpecDocs"]
+                  , typ "member"
+                  ]
+    result `shouldSatisfy` \res -> complDocumentation res == Just "doc for member\n"

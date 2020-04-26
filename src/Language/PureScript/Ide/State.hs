@@ -262,6 +262,7 @@ resolveLocationsForModule (defs, types) decls =
       annotateDataConstructor
       annotateType
       annotateKind
+      annotateType -- type classes live in the type namespace
       annotateModule
       d
       where
@@ -281,9 +282,10 @@ convertDeclaration'
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
+  -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> IdeDeclaration
   -> IdeDeclarationAnn
-convertDeclaration' annotateFunction annotateValue annotateDataConstructor annotateType annotateKind annotateModule d =
+convertDeclaration' annotateFunction annotateValue annotateDataConstructor annotateType annotateKind annotateClass annotateModule d =
   case d of
     IdeDeclValue v ->
       annotateFunction (v ^. ideValueIdent) d
@@ -294,7 +296,7 @@ convertDeclaration' annotateFunction annotateValue annotateDataConstructor annot
     IdeDeclDataConstructor dtor ->
       annotateDataConstructor (dtor ^. ideDtorName . properNameT) d
     IdeDeclTypeClass tc ->
-      annotateType (tc ^. ideTCName . properNameT) d
+      annotateClass (tc ^. ideTCName . properNameT) d
     IdeDeclValueOperator operator ->
       annotateValue (operator ^. ideValueOpName . opNameT) d
     IdeDeclTypeOperator operator ->
@@ -316,15 +318,21 @@ resolveDocumentationForModule
   :: P.Module
     -> [IdeDeclarationAnn]
     -> [IdeDeclarationAnn]
-resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) decls = map convertDecl decls
+resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) decls =
+  map convertDecl decls
   where
-  comments :: Map P.Name [P.Comment]
-  comments = Map.insert (P.ModName moduleName) moduleComments $ Map.fromListWith (flip (<>)) $ concatMap (\case
+  extractDeclComments :: P.Declaration -> [(P.Name, [P.Comment])]
+  extractDeclComments = \case
     P.DataDeclaration (_, cs) _ ctorName _ ctors ->
       (P.TyName ctorName, cs) : map dtorComments ctors
+    P.TypeClassDeclaration (_, cs) tyClassName _ _ _ members ->
+      (P.TyClassName tyClassName, cs) : concatMap extractDeclComments members
     decl ->
-      maybe [] (\name' -> [(name', snd (P.declSourceAnn decl))]) (name decl))
-    sdecls
+      maybe [] (\name' -> [(name', snd (P.declSourceAnn decl))]) (name decl)
+
+  comments :: Map P.Name [P.Comment]
+  comments = Map.insert (P.ModName moduleName) moduleComments $
+    Map.fromListWith (flip (<>)) $ concatMap extractDeclComments sdecls
 
   dtorComments :: P.DataConstructorDeclaration -> (P.Name, [P.Comment])
   dtorComments dcd = (P.DctorName (P.dataCtorName dcd), snd (P.dataCtorAnn dcd))
@@ -341,6 +349,7 @@ resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) de
       (annotateValue . P.DctorName . P.ProperName)
       (annotateValue . P.TyName . P.ProperName)
       (annotateValue . P.KiName . P.ProperName)
+      (annotateValue . P.TyClassName . P.ProperName)
       (annotateValue . P.ModName . P.moduleNameFromString)
       d
     where
