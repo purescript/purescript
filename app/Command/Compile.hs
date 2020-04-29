@@ -26,7 +26,7 @@ import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitSuccess, exitFailure)
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath.Glob (glob)
-import           System.IO (hPutStr, hPutStrLn, stderr)
+import           System.IO (hPutStr, hPutStrLn, stderr, stdout)
 import           System.IO.UTF8 (readUTF8FilesT)
 
 data PSCMakeOptions = PSCMakeOptions
@@ -41,25 +41,25 @@ data PSCMakeOptions = PSCMakeOptions
 printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
 printWarningsAndErrors verbose False warnings errors = do
   pwd <- getCurrentDirectory
-  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stderr
+  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stdout
   let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd }
   when (P.nonEmpty warnings) $
-    hPutStrLn stderr (P.prettyPrintMultipleWarnings ppeOpts warnings)
+    hPutStrLn stdout (P.prettyPrintMultipleWarnings ppeOpts warnings)
   case errors of
     Left errs -> do
-      hPutStrLn stderr (P.prettyPrintMultipleErrors ppeOpts errs)
+      hPutStrLn stdout (P.prettyPrintMultipleErrors ppeOpts errs)
       exitFailure
     Right _ -> return ()
 printWarningsAndErrors verbose True warnings errors = do
-  hPutStrLn stderr . LBU8.toString . A.encode $
+  hPutStrLn stdout . LBU8.toString . A.encode $
     JSONResult (toJSONErrors verbose P.Warning warnings)
                (either (toJSONErrors verbose P.Error) (const []) errors)
   either (const exitFailure) (const (return ())) errors
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
-  input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
-  when (null input && not pscmJSONErrors) $ do
+  input <- globWarningOnMisses warnFileTypeNotFound pscmInput
+  when (null input) $ do
     hPutStr stderr $ unlines [ "purs compile: No input files."
                              , "Usage: For basic information, try the `--help' option."
                              ]
