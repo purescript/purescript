@@ -1,3 +1,5 @@
+.build
+bin
 dist
 cabal-dev
 .cabal-sandbox

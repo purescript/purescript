@@ -70,6 +70,8 @@ install:
   tar -xzf stack.tar.gz --strip-components=1
   mv stack "$HOME/.local/bin/"
   popd
+- | # Install hlint.
+  BIN_DIR="$HOME/.local/bin/" BUILD_DIR="$HOME/hlint" ci/install-hlint.sh
 - | # Set up the timeout command
   if which timeout >/dev/null
   then
@@ -97,6 +99,7 @@ install:
     export CI_RELEASE=true
   fi
 script:
+- hlint --git
 # Set a timeout of 35 minutes. We could use travis_wait here, but travis_wait
 # doesn't produce any output until the command finishes, and also doesn't
 # always show all of the command's output.
