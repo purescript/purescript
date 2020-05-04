@@ -202,7 +202,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   where
   efVersion       = T.pack (showVersion Paths.version)
   efModuleName    = mn
-  efExports       = exps
+  efExports       = filter isVisible exps
   efImports       = mapMaybe importDecl ds
   efFixities      = mapMaybe fixityDecl ds
   efTypeFixities  = mapMaybe typeFixityDecl ds
@@ -265,6 +265,9 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       , TypeClassDictionaryInScope{..} <- NEL.toList nel
       ]
   toExternsDeclaration _ = []
+
+  isVisible (TypeRef _ pn _) = not $ isLocalSynonymName pn
+  isVisible _ = True
 
 externsFileName :: FilePath
 externsFileName = "externs.cbor"

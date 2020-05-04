@@ -148,25 +148,16 @@ usedImmediateIdents moduleName =
 usedTypeNames :: ModuleName -> Declaration -> [ProperName 'TypeName]
 usedTypeNames moduleName = go
   where
-  (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
+  (f, _, _, _, _) = accumTypes (usedTypeNamesFromModule (Just moduleName))
 
   go :: Declaration -> [ProperName 'TypeName]
   go decl = ordNub (f decl <> usedNamesForTypeClassDeps decl)
 
-  usedNames :: SourceType -> [ProperName 'TypeName]
-  usedNames (ConstrainedType _ con _) = usedConstraint con
-  usedNames (TypeConstructor _ (Qualified (Just moduleName') name))
-    | moduleName == moduleName' = [name]
-  usedNames _ = []
-
-  usedConstraint :: SourceConstraint -> [ProperName 'TypeName]
-  usedConstraint (Constraint _ (Qualified (Just moduleName') name) _ _ _)
-    | moduleName == moduleName' = [coerceProperName name]
-  usedConstraint _ = []
-
   usedNamesForTypeClassDeps :: Declaration -> [ProperName 'TypeName]
   usedNamesForTypeClassDeps (TypeClassDeclaration _ _ _ deps _ _) = foldMap usedConstraint deps
   usedNamesForTypeClassDeps _ = []
+
+  usedConstraint = usedConstraintFromModule (Just moduleName)
 
 declTypeName :: Declaration -> ProperName 'TypeName
 declTypeName (DataDeclaration _ _ pn _ _) = pn

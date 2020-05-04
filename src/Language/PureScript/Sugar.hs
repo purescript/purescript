@@ -20,6 +20,7 @@ import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.DoNotation as S
 import Language.PureScript.Sugar.AdoNotation as S
 import Language.PureScript.Sugar.LetPattern as S
+import Language.PureScript.Sugar.LocalTypeSynonyms as S
 import Language.PureScript.Sugar.Names as S
 import Language.PureScript.Sugar.ObjectWildcards as S
 import Language.PureScript.Sugar.Operators as S
@@ -44,6 +45,8 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --
 --  * Desugar type declarations into value declarations with explicit type annotations
 --
+--  * Hoist all local type synonyms
+--
 --  * Qualify any unqualified names and types
 --
 --  * Rebracket user-defined binary operators
@@ -66,6 +69,7 @@ desugar env externs =
     >=> map desugarLetPatternModule
     >>> traverse desugarCasesModule
     >=> traverse desugarTypeDeclarationsModule
+    >=> traverse desugarLocalTypeSynonymsModule
     >=> desugarImports env
     >=> rebracket externs
     >=> traverse checkFixityExports

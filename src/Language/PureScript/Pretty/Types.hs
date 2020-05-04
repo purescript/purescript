@@ -59,7 +59,7 @@ data PrettyPrintType
 type PrettyPrintConstraint = (Qualified (ProperName 'ClassName), [PrettyPrintType], [PrettyPrintType])
 
 convertPrettyPrintType :: Int -> Type a -> PrettyPrintType
-convertPrettyPrintType = go
+convertPrettyPrintType d0 = go d0 . everywhereOnTypes hideScopeVars
   where
   go _ (TUnknown _ n) = PPTUnknown n
   go _ (TypeVar _ t) = PPTypeVar t
@@ -99,6 +99,13 @@ convertPrettyPrintType = go
   goTypeApp d o ty@RCons{}
     | eqType o tyRecord = uncurry PPRecord (goRow d ty)
   goTypeApp d a b = PPTypeApp (go (d-1) a) (go (d-1) b)
+
+  hideScopeVars t = fromMaybe t $ hideScopeVars' 0 t where
+    hideScopeVars' depth = \case
+      (TypeApp _ f _) -> hideScopeVars' (depth + 1) f
+      (TypeConstructor ann (Qualified _ name)) | Just (depth', name') <- readLocalSynonymData name, depth == depth' ->
+        Just $ TypeConstructor ann (Qualified Nothing name')
+      _ -> Nothing
 
 -- TODO(Christoph): get rid of T.unpack s
 

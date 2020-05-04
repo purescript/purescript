@@ -754,7 +754,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 ]
     renderSimpleErrorMessage (CycleInTypeSynonym name) =
       paras [ line $ case name of
-                       Just pn -> "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
+                       Just pn -> "A cycle appears in the definition of type synonym " <> markCode (showTypeSynonymName pn)
                        Nothing -> "A cycle appears in a set of type synonym definitions."
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             , line "Consider using a 'newtype' instead."
@@ -778,7 +778,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (UndefinedTypeVariable name) =
       line $ "Type variable " <> markCode (runProperName name) <> " is undefined."
     renderSimpleErrorMessage (PartiallyAppliedSynonym name) =
-      paras [ line $ "Type synonym " <> markCode (showQualified runProperName name) <> " is partially applied."
+      paras [ line $ "Type synonym " <> markCode (showQualifiedTypeSynonymName name) <> " is partially applied."
             , line "Type synonyms must be applied to all of their type arguments."
             ]
     renderSimpleErrorMessage (EscapedSkolem name Nothing ty) =
@@ -1394,7 +1394,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderHint (ErrorInTypeSynonym name) detail =
       paras [ detail
-            , line $ "in type synonym " <> markCode (runProperName name)
+            , line $ "in type synonym " <> markCode (showTypeSynonymName name)
             ]
     renderHint (ErrorInValueDeclaration n) detail =
       paras [ detail

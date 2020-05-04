@@ -10,7 +10,9 @@ import Prelude.Compat
 import Codec.Serialise (Serialise)
 import Control.Monad.Supply.Class
 import Control.DeepSeq (NFData)
+import Data.Bifunctor (bimap)
 import Data.Functor.Contravariant (contramap)
+import Data.Maybe (fromMaybe)
 import qualified Data.Vector as V
 
 import GHC.Generics (Generic)
@@ -236,6 +238,41 @@ isUnqualified = not . isQualified
 isQualifiedWith :: ModuleName -> Qualified a -> Bool
 isQualifiedWith mn (Qualified (Just mn') _) = mn == mn'
 isQualifiedWith _ _ = False
+
+-- |
+-- Given a scope identifier (expected to start with "$"), a depth (number of
+-- type variables in scope), and a base name, generate the mangled name to use
+-- for a hoisted type synonym declaration.
+--
+makeLocalSynonymName :: Text -> Int -> ProperName 'TypeName -> ProperName 'TypeName
+makeLocalSynonymName scope depth name = ProperName $ T.concat ["local", scope, "$", T.pack (show depth), "$", runProperName name]
+
+isLocalSynonymName :: ProperName 'TypeName -> Bool
+isLocalSynonymName = ("local$" `T.isPrefixOf`) . runProperName
+
+-- |
+-- If the provided name is the generated name of a hoisted local type synonym,
+-- extract from it the number of synthetic type parameters added during
+-- hoisting and its original name.
+--
+readLocalSynonymData :: ProperName 'TypeName -> Maybe (Int, ProperName 'TypeName)
+readLocalSynonymData = fmap extractData . T.stripPrefix "local$" . runProperName
+  where
+  extractData = bimap (read . T.unpack) (ProperName . T.tail)
+              . T.break (== '$') . T.tail . snd . T.break (== '$')
+
+-- |
+-- A wrapper for runProperName that drops local type synonym mangling.
+--
+showTypeSynonymName :: ProperName 'TypeName -> Text
+showTypeSynonymName name = runProperName . fromMaybe name . fmap snd . readLocalSynonymData $ name
+
+showQualifiedTypeSynonymName :: Qualified (ProperName 'TypeName) -> Text
+showQualifiedTypeSynonymName name = fromMaybe (showQualified runProperName name)
+                                  . fmap (runProperName . snd)
+                                  . readLocalSynonymData
+                                  . disqualify
+                                  $ name
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Qualified)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)

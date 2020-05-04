@@ -307,6 +307,7 @@ letBindingRange = \case
   LetBindingSignature _ (Labeled a _ b) -> (nameTok a, snd $ typeRange b)
   LetBindingName _ a -> valueBindingFieldsRange a
   LetBindingPattern _ a _ b -> (fst $ binderRange a, snd $ whereRange b)
+  LetBindingType _ a _ b -> (fst $ dataHeadRange a, snd $ typeRange b)
 
 doStatementRange :: DoStatement a -> TokenRange
 doStatementRange = \case

@@ -457,6 +457,7 @@ letBinding :: { LetBinding () }
   | ident guardedDecl { LetBindingName () (ValueBindingFields $1 [] $2) }
   | ident many(binderAtom) guardedDecl { LetBindingName () (ValueBindingFields $1 (NE.toList $2) $3) }
   | binder1 '=' exprWhere { LetBindingPattern () $1 $2 $3 }
+  | typeHead '=' type {% checkNoWildcards $3 *> pure (LetBindingType () $1 $2 $3) }
 
 caseBranch :: { (Separated (Binder ()), Guarded ()) }
   : sep(binder1, ',') guardedCase { ($1, $2) }

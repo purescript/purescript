@@ -467,7 +467,7 @@ replaceAllTypeVars = go [] where
   go bs m (ForAll ann v mbK t sco)
     | v `elem` keys = go bs (filter ((/= v) . fst) m) $ ForAll ann v mbK' t sco
     | v `elem` usedVars =
-      let v' = genName v (keys ++ bs ++ usedVars)
+      let v' = genName (`elem` (keys ++ bs ++ usedVars)) v
           t' = go bs [(v, TypeVar ann v')] t
       in ForAll ann v' mbK' (go (v' : bs) m t') sco
     | otherwise = ForAll ann v mbK' (go (v : bs) m t) sco
@@ -482,10 +482,12 @@ replaceAllTypeVars = go [] where
   go bs m (ParensInType ann t) = ParensInType ann (go bs m t)
   go _  _ ty = ty
 
-  genName orig inUse = try' 0 where
-    try' :: Integer -> Text
-    try' n | (orig <> T.pack (show n)) `elem` inUse = try' (n + 1)
-           | otherwise = orig <> T.pack (show n)
+-- | Generate a name from an original that doesn't match a predicate
+genName :: (Text -> Bool) -> Text -> Text
+genName p orig = try' 0 where
+  try' :: Integer -> Text
+  try' n | p (orig <> T.pack (show n)) = try' (n + 1)
+         | otherwise = orig <> T.pack (show n)
 
 -- | Collect all type variables appearing in a type
 usedTypeVariables :: Type a -> [Text]
@@ -806,3 +808,19 @@ eqConstraint (Constraint _ a b c d) (Constraint _ a' b' c' d') = a == a' && and 
 
 compareConstraint :: Constraint a -> Constraint b -> Ordering
 compareConstraint (Constraint _ a b c d) (Constraint _ a' b' c' d') = compare a a' <> fold (zipWith compareType b b') <> fold (zipWith compareType c c') <> compare d d'
+
+usedTypeNamesFromModule :: Maybe ModuleName -> SourceType -> [ProperName 'TypeName]
+usedTypeNamesFromModule moduleName = ordNub . (everythingOnTypes (++) usedNames)
+  where
+  usedNames :: SourceType -> [ProperName 'TypeName]
+  usedNames (ConstrainedType _ con _) = usedConstraint con
+  usedNames (TypeConstructor _ (Qualified moduleName' name))
+    | moduleName == moduleName' = [name]
+  usedNames _ = []
+
+  usedConstraint = usedConstraintFromModule moduleName
+
+usedConstraintFromModule :: Maybe ModuleName -> SourceConstraint -> [ProperName 'TypeName]
+usedConstraintFromModule moduleName (Constraint _ (Qualified moduleName' name) _ _ _)
+  | moduleName == moduleName' = [coerceProperName name]
+usedConstraintFromModule _ _ = []

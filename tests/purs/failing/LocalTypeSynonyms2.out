@@ -1,0 +1,11 @@
+Error found:
+at tests/purs/failing/LocalTypeSynonyms2.purs:7:3 - 7:21 (line 7, column 3 - line 7, column 21)
+
+  A cycle appears in the definition of type synonym [33mT1[0m
+  Cycles are disallowed because they can lead to loops in the type checker.
+  Consider using a 'newtype' instead.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CycleInTypeSynonym.md for more information,
+or to contribute content related to this error.
+

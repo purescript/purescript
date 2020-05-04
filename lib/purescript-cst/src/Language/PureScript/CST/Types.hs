@@ -402,6 +402,7 @@ data LetBinding a
   = LetBindingSignature a (Labeled (Name Ident) (Type a))
   | LetBindingName a (ValueBindingFields a)
   | LetBindingPattern a (Binder a) SourceToken (Where a)
+  | LetBindingType a (DataHead a) SourceToken (Type a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data DoBlock a = DoBlock
