@@ -288,7 +288,7 @@ checkForeignDecls m path = do
 
   foreignIdentsStrs <- either errorParsingModule pure $ getExps js
 
-  let deprecatedFFI = filter (any (== '\'')) foreignIdentsStrs
+  let deprecatedFFI = filter (elem '\'') foreignIdentsStrs
   unless (null deprecatedFFI) $
     warningDeprecatedForeignPrimes deprecatedFFI
 
