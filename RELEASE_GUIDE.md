@@ -2,6 +2,7 @@
 
 ## Before making a release
 
+- Check that there are no unintended breaking changes by compiling [the latest package set](https://github.com/purescript/package-sets/releases/latest)
 - Check that INSTALL.md is up-to-date
 - Regenerate LICENSE: `make license-generator` (see `license-generator/` for
   details)
