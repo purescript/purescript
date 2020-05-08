@@ -44,14 +44,14 @@ printWarningsAndErrors verbose False warnings errors = do
   cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stdout
   let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd }
   when (P.nonEmpty warnings) $
-    hPutStrLn stdout (P.prettyPrintMultipleWarnings ppeOpts warnings)
+    putStrLn (P.prettyPrintMultipleWarnings ppeOpts warnings)
   case errors of
     Left errs -> do
-      hPutStrLn stdout (P.prettyPrintMultipleErrors ppeOpts errs)
+      putStrLn (P.prettyPrintMultipleErrors ppeOpts errs)
       exitFailure
     Right _ -> return ()
 printWarningsAndErrors verbose True warnings errors = do
-  hPutStrLn stdout . LBU8.toString . A.encode $
+  putStrLn . LBU8.toString . A.encode $
     JSONResult (toJSONErrors verbose P.Warning warnings)
                (either (toJSONErrors verbose P.Error) (const []) errors)
   either (const exitFailure) (const (return ())) errors
