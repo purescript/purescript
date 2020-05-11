@@ -3,7 +3,7 @@ module Main where
 
 import Safe.Coerce (coerce)
 
-data Nominal a b = Nominal a b
+data Nominal a (b :: Type) = Nominal a
 
 type role Nominal nominal phantom
 

@@ -80,6 +80,7 @@ data ErrorMessageHint
   | ErrorInTypeDeclaration Ident
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
   | ErrorInKindDeclaration (ProperName 'TypeName)
+  | ErrorInRoleDeclaration (ProperName 'TypeName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint SourceConstraint
   | PositionedError (NEL.NonEmpty SourceSpan)
