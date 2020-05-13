@@ -113,7 +113,7 @@ printModuleSignatures moduleName P.Environment{..} =
                       _ -> "data"
 
               in
-                Just $ textT (prefix <> " " <> P.runProperName name <> foldMap ((" " <>) . (\(name, _, _) -> name)) typevars) Box.// printCons pt
+                Just $ textT (prefix <> " " <> P.runProperName name <> foldMap ((" " <>) . (\(v, _, _) -> v)) typevars) Box.// printCons pt
 
             _ ->
               Nothing

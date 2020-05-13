@@ -10,7 +10,6 @@ module Language.PureScript.TypeChecker.Roles
   ) where
 
 import Prelude.Compat
-import Debug.Trace
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
@@ -21,7 +20,6 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
 import Data.Text (Text)
 
-import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
