@@ -575,6 +575,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       checkClassMembersAreExported e
       checkClassesAreExported e
       checkSuperClassesAreExported e
+      checkDataConstructorsAreExported e
     return $ Module ss coms mn decls' (Just exps)
   where
   qualify' :: a -> Qualified a
@@ -712,3 +713,19 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     extractMemberName (TypeDeclaration td) = tydeclIdent td
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
+
+  checkDataConstructorsAreExported :: DeclarationRef -> m ()
+  checkDataConstructorsAreExported dr@(TypeRef ss' name (Just exportedDataConstructorsNames))
+    | not (null exportedDataConstructorsNames) = do
+      let dataConstructorNames = fromMaybe [] . headMay $ mapMaybe findDataConstructorsNames decls
+          missingDataConstructorsNames = dataConstructorNames \\ exportedDataConstructorsNames
+      unless (null missingDataConstructorsNames) $
+        throwError . errorMessage' ss' $ TransitiveDctorExportError dr missingDataConstructorsNames
+      where
+      findDataConstructorsNames :: Declaration -> Maybe [ProperName 'ConstructorName]
+      findDataConstructorsNames (DataDeclaration _ _ name' _ constructors)
+        | name == name' = Just $ dataCtorName <$> constructors
+      findDataConstructorsNames (DataBindingGroupDeclaration decls')
+        = headMay . mapMaybe findDataConstructorsNames $ NEL.toList decls'
+      findDataConstructorsNames _ = Nothing
+  checkDataConstructorsAreExported _ = return ()

@@ -383,7 +383,7 @@ checkFixityExports m@(Module ss _ mn ds (Just exps)) =
       Right ctor ->
         unless (anyTypeRef (maybe False (elem ctor) . snd))
           . throwError . errorMessage' ss
-          $ TransitiveDctorExportError dr ctor
+          $ TransitiveDctorExportError dr [ctor]
   checkRef dr@(TypeOpRef ss' op) =
     for_ (getTypeOpAlias op) $ \ty ->
       unless (anyTypeRef ((== ty) . fst))
