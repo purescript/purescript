@@ -451,8 +451,8 @@ primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, Type
 primTypeErrorTypes =
   M.fromList $
     [ (primSubName C.typeError "Doc", (kindType, ExternData []))
-    , (primSubName C.typeError "Fail", (kindDoc -:> kindConstraint, ExternData [Phantom]))
-    , (primSubName C.typeError "Warn", (kindDoc -:> kindConstraint, ExternData [Phantom]))
+    , (primSubName C.typeError "Fail", (kindDoc -:> kindConstraint, ExternData [Nominal]))
+    , (primSubName C.typeError "Warn", (kindDoc -:> kindConstraint, ExternData [Nominal]))
     , (primSubName C.typeError "Text", (kindSymbol -:> kindDoc, ExternData [Phantom]))
     , (primSubName C.typeError "Quote", (kindType -:> kindDoc, ExternData [Phantom]))
     , (primSubName C.typeError "QuoteLabel", (kindSymbol -:> kindDoc, ExternData [Phantom]))
