@@ -2,7 +2,7 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/CoercibleRoleMismatch3.purs:8:1 - 8:23 (line 8, column 1 - line 8, column 23)
 
-  For the type parameter [33ma[0m:
+  Role mismatch for the type parameter [33ma[0m:
 
     The annotation says [33mrepresentational[0m but the role [33mnominal[0m is required.
 

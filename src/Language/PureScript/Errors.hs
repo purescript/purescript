@@ -1286,7 +1286,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
     renderSimpleErrorMessage (RoleMismatch var inferred declared) =
       paras
-        [ line $ "For the type parameter " <> markCode var <> ":"
+        [ line $ "Role mismatch for the type parameter " <> markCode var <> ":"
         , indent . line $
             "The annotation says " <> markCode (displayRole declared) <>
             " but the role " <> markCode (displayRole inferred) <>
