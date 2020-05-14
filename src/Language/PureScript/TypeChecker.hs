@@ -278,7 +278,7 @@ typeCheckAll moduleName _ = traverse go
       (dataCtors, ctorKind) <- kindOfData moduleName (sa, name, args, dctors)
       let args' = args `withKinds` ctorKind
       roles <- checkRoles moduleName name args' dctors
-      let args'' = zipWith (\(a, b) c -> (a,b,c)) args' roles
+      let args'' = args' `withRoles` roles
       addDataType moduleName dtype name args'' dataCtors ctorKind
     return $ DataDeclaration sa dtype name args dctors
   go (d@(DataBindingGroupDeclaration tys)) = do
