@@ -130,6 +130,21 @@ newtype Rec5 a f = Rec5 (f {})
 apRec4ToApRec5 :: forall a. Ap Rec4 Id1 -> Ap (Rec5 a) Id1
 apRec4ToApRec5 = coerce
 
+type Rec6 a = { f :: a }
+
+rec6ToRec6 :: Rec6 Int -> Rec6 (Id1 Int)
+rec6ToRec6 = coerce
+
+type Rec7 a b = { f :: a, g :: Int, h :: b }
+
+rec7ToRec7 :: Rec7 Int (Phantom2 String) -> Rec7 (Id1 Int) (Phantom2 Int)
+rec7ToRec7 = coerce
+
+type Rec8 r a = { f :: a | r }
+
+rec8ToRec8 :: ∀ r. Rec8 r Int -> Rec8 r (Id1 Int)
+rec8ToRec8 = coerce
+
 data Arr1 a b = Arr1 (Array a) (Array b)
 
 arr1ToArr1 :: Arr1 Int String -> Arr1 (Id1 Int) (Id2 String)
