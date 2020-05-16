@@ -47,6 +47,15 @@ spec = context "CoreFnFromJsonTest" $ do
       ss = SourceSpan mp (SourcePos 0 0) (SourcePos 0 0)
       ann = ssAnn ss
 
+  specify "should parse version" $ do
+    let v = Version [0, 13, 6] []
+        m = Module ss [] mn mp [] [] [] []
+        r = fst <$> parseModule (moduleToJSON v m)
+    r `shouldSatisfy` isSuccess
+    case r of
+      Error _   -> return ()
+      Aeson.Success v' -> v' `shouldBe` v
+
   specify "should parse an empty module" $ do
     let r = parseMod $ Module ss [] mn mp [] [] [] []
     r `shouldSatisfy` isSuccess
