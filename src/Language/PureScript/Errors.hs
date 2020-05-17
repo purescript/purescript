@@ -182,6 +182,7 @@ data SimpleErrorMessage
       Role -- ^ inferred role
       Role -- ^ declared role
   | InvalidCoercibleInstanceDeclaration [SourceType]
+  | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -340,6 +341,7 @@ errorCode em = case unwrapErrorMessage em of
   UnsupportedTypeInKind {} -> "UnsupportedTypeInKind"
   RoleMismatch {} -> "RoleMismatch"
   InvalidCoercibleInstanceDeclaration {} -> "InvalidCoercibleInstanceDeclaration"
+  RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1309,6 +1311,19 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
         , line "Instance declarations of this type class are disallowed."
         ]
+
+    renderSimpleErrorMessage (RoleDeclarationArityMismatch name expected actual) =
+      line $ T.intercalate " "
+        [ "The type"
+        , markCode (runProperName name)
+        , "expects"
+        , T.pack (show expected)
+        , if expected == 1 then "argument" else "arguments"
+        , "but its role declaration lists"
+            <> if actual > expected then "" else " only"
+        , T.pack (show actual)
+        , if actual > 1 then "roles" else "role"
+        ] <> "."
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =

@@ -80,6 +80,7 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
   checkRoleDeclarations = do
     let ds' = mapMaybe fromRoleDeclaration ds
     checkOrphanRoleDeclarations ds'
+    checkRoleDeclarationsArity ds'
     where
     fromRoleDeclaration :: Declaration -> Maybe (RoleDeclarationData, Maybe Declaration)
     fromRoleDeclaration (RoleDeclaration rdd@RoleDeclarationData{..}) =
@@ -96,3 +97,17 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
       (RoleDeclarationData{..}, Nothing) ->
         throwError . errorMessage' (fst rdeclSourceAnn) $ OrphanRoleDeclaration rdeclIdent
       _ -> return ()
+
+    checkRoleDeclarationsArity :: [(RoleDeclarationData, Maybe Declaration)] -> m ()
+    checkRoleDeclarationsArity = traverse_ $ \case
+      (rdd, Just (DataDeclaration _ _ _ args _)) ->
+        throwRoleDeclarationArityMismatch rdd $ length args
+      (rdd, Just (ExternDataDeclaration _ _ kind)) ->
+        throwRoleDeclarationArityMismatch rdd $ kindArity kind
+      _ -> return ()
+      where
+      throwRoleDeclarationArityMismatch RoleDeclarationData{..} expected = do
+        let actual = length rdeclRoles
+        unless (expected == actual) $
+          throwError . errorMessage' (fst rdeclSourceAnn) $
+            RoleDeclarationArityMismatch rdeclIdent expected actual
