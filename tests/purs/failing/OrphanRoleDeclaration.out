@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/OrphanRoleDeclaration.purs:4:1 - 4:26 (line 4, column 1 - line 4, column 26)
+
+  The role declaration for [33mMissing[0m lacks a definition.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/OrphanRoleDeclaration.md for more information,
+or to contribute content related to this error.
+

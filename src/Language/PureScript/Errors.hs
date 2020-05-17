@@ -72,6 +72,7 @@ data SimpleErrorMessage
   | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
   | OrphanKindDeclaration (ProperName 'TypeName)
+  | OrphanRoleDeclaration (ProperName 'TypeName)
   | RedefinedIdent Ident
   | OverlappingNamesInLet
   | UnknownName (Qualified Name)
@@ -237,6 +238,7 @@ errorCode em = case unwrapErrorMessage em of
   MultipleTypeOpFixities{} -> "MultipleTypeOpFixities"
   OrphanTypeDeclaration{} -> "OrphanTypeDeclaration"
   OrphanKindDeclaration{} -> "OrphanKindDeclaration"
+  OrphanRoleDeclaration{} -> "OrphanRoleDeclaration"
   RedefinedIdent{} -> "RedefinedIdent"
   OverlappingNamesInLet -> "OverlappingNamesInLet"
   UnknownName{} -> "UnknownName"
@@ -711,6 +713,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "The type declaration for " <> markCode (showIdent nm) <> " should be followed by its definition."
     renderSimpleErrorMessage (OrphanKindDeclaration nm) =
       line $ "The kind declaration for " <> markCode (runProperName nm) <> " should be followed by its definition."
+    renderSimpleErrorMessage (OrphanRoleDeclaration nm) =
+      line $ "The role declaration for " <> markCode (runProperName nm) <> " lacks a definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =

@@ -10,6 +10,9 @@ import Prelude.Compat
 
 import Control.Monad (unless)
 import Control.Monad.Error.Class (MonadError(..))
+import Data.Foldable (traverse_)
+import Data.List (find)
+import Data.Maybe (mapMaybe)
 
 import Language.PureScript.AST
 import Language.PureScript.Names
@@ -27,6 +30,7 @@ desugarTypeDeclarationsModule
 desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
   rethrow (addHint (ErrorInModule name)) $ do
     checkKindDeclarations ds
+    checkRoleDeclarations
     Module modSS coms name <$> desugarTypeDeclarations ds <*> pure exps
   where
 
@@ -71,3 +75,24 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
     throwError . errorMessage' (fst sa) $ OrphanKindDeclaration name'
   checkKindDeclarations (_ : rest) = checkKindDeclarations rest
   checkKindDeclarations [] = return ()
+
+  checkRoleDeclarations :: m ()
+  checkRoleDeclarations = do
+    let ds' = mapMaybe fromRoleDeclaration ds
+    checkOrphanRoleDeclarations ds'
+    where
+    fromRoleDeclaration :: Declaration -> Maybe (RoleDeclarationData, Maybe Declaration)
+    fromRoleDeclaration (RoleDeclaration rdd@RoleDeclarationData{..}) =
+      Just (rdd, find (byName rdeclIdent) ds)
+    fromRoleDeclaration _ = Nothing
+
+    byName :: ProperName 'TypeName -> Declaration -> Bool
+    byName name' (DataDeclaration _ _ name'' _ _) = name' == name''
+    byName name' (ExternDataDeclaration _ name'' _) = name' == name''
+    byName _ _ = False
+
+    checkOrphanRoleDeclarations :: [(RoleDeclarationData, Maybe Declaration)] -> m ()
+    checkOrphanRoleDeclarations = traverse_ $ \case
+      (RoleDeclarationData{..}, Nothing) ->
+        throwError . errorMessage' (fst rdeclSourceAnn) $ OrphanRoleDeclaration rdeclIdent
+      _ -> return ()
