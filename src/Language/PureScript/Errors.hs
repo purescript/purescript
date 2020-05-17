@@ -182,6 +182,7 @@ data SimpleErrorMessage
       Role -- ^ inferred role
       Role -- ^ declared role
   | InvalidCoercibleInstanceDeclaration [SourceType]
+  | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   deriving (Show)
 
@@ -341,6 +342,7 @@ errorCode em = case unwrapErrorMessage em of
   UnsupportedTypeInKind {} -> "UnsupportedTypeInKind"
   RoleMismatch {} -> "RoleMismatch"
   InvalidCoercibleInstanceDeclaration {} -> "InvalidCoercibleInstanceDeclaration"
+  UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
 
 -- | A stack trace for an error
@@ -1311,6 +1313,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
         , line "Instance declarations of this type class are disallowed."
         ]
+
+    renderSimpleErrorMessage UnsupportedRoleDeclaration =
+      line $ "Role declarations are only supported for data types, not for type synonyms nor type classes."
 
     renderSimpleErrorMessage (RoleDeclarationArityMismatch name expected actual) =
       line $ T.intercalate " "

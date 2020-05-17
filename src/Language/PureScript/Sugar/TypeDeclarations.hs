@@ -79,6 +79,7 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
   checkRoleDeclarations :: m ()
   checkRoleDeclarations = do
     let ds' = mapMaybe fromRoleDeclaration ds
+    checkUnsupportedRoleDeclarations ds'
     checkOrphanRoleDeclarations ds'
     checkRoleDeclarationsArity ds'
     where
@@ -90,7 +91,17 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
     byName :: ProperName 'TypeName -> Declaration -> Bool
     byName name' (DataDeclaration _ _ name'' _ _) = name' == name''
     byName name' (ExternDataDeclaration _ name'' _) = name' == name''
+    byName name' (TypeSynonymDeclaration _ name'' _ _) = name' == name''
+    byName name' (TypeClassDeclaration _ name'' _ _ _ _) = name' == coerceProperName name''
     byName _ _ = False
+
+    checkUnsupportedRoleDeclarations :: [(RoleDeclarationData, Maybe Declaration)] -> m ()
+    checkUnsupportedRoleDeclarations = traverse_ $ \case
+      (RoleDeclarationData{..}, Just TypeSynonymDeclaration{}) ->
+        throwError . errorMessage' (fst rdeclSourceAnn) $ UnsupportedRoleDeclaration
+      (RoleDeclarationData{..}, Just TypeClassDeclaration{}) ->
+        throwError . errorMessage' (fst rdeclSourceAnn) $ UnsupportedRoleDeclaration
+      _ -> return ()
 
     checkOrphanRoleDeclarations :: [(RoleDeclarationData, Maybe Declaration)] -> m ()
     checkOrphanRoleDeclarations = traverse_ $ \case
