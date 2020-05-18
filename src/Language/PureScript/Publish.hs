@@ -48,6 +48,7 @@ import qualified Web.Bower.PackageMeta as Bower
 import Language.PureScript.Publish.ErrorsWarnings
 import Language.PureScript.Publish.Utils
 import qualified Language.PureScript as P (version, ModuleName)
+import qualified Language.PureScript.CoreFn.FromJSON as P
 import qualified Language.PureScript.Docs as D
 
 data PublishOptions = PublishOptions
@@ -199,7 +200,7 @@ getVersionFromGitTag = do
     dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
   parseMay str = do
     digits <- stripPrefix "v" str
-    (str,) <$> D.parseVersion' digits
+    (str,) <$> P.parseVersion' digits
 
 -- | Given a git tag, get the time it was created.
 getTagTime :: Text -> PrepareM UTCTime
@@ -335,7 +336,7 @@ asResolutions =
 
 asVersion :: Parse D.PackageError Version
 asVersion =
-  withString (note D.InvalidVersion . D.parseVersion')
+  withString (note D.InvalidVersion . P.parseVersion')
 
 -- | Extracts all dependencies and their versions from a legacy resolutions
 -- file, which is based on the output of `bower list --json --offline`.
@@ -373,7 +374,7 @@ asLegacyResolutions =
                   let
                     tag' = fromMaybe tag (T.stripPrefix "v" tag)
                   in
-                    note D.InvalidVersion (D.parseVersion' (T.unpack tag'))
+                    note D.InvalidVersion (P.parseVersion' (T.unpack tag'))
               other ->
                 return (ResolvedOther other)
         return $ Just (directory, status)

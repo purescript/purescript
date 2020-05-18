@@ -4,6 +4,7 @@
 
 module Language.PureScript.CoreFn.FromJSON
   ( moduleFromJSON
+  , parseVersion'
   ) where
 
 import Prelude.Compat
@@ -12,7 +13,6 @@ import           Data.Aeson
 import           Data.Aeson.Types (Parser, Value, listParser)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Text.ParserCombinators.ReadP (readP_to_S)
 import qualified Data.Vector as V
 import           Data.Version (Version, parseVersion)
 
@@ -22,6 +22,14 @@ import           Language.PureScript.CoreFn.Ann
 import           Language.PureScript.CoreFn
 import           Language.PureScript.Names
 import           Language.PureScript.PSString (PSString)
+
+import           Text.ParserCombinators.ReadP (readP_to_S)
+
+parseVersion' :: String -> Maybe Version
+parseVersion' str =
+  case filter (null . snd) $ readP_to_S parseVersion str of
+    [(vers, "")] -> Just vers
+    _            -> Nothing
 
 constructorTypeFromJSON :: Value -> Parser ConstructorType
 constructorTypeFromJSON v = do
@@ -123,9 +131,9 @@ moduleFromJSON = withObject "Module" moduleFromObj
 
   versionFromJSON :: String -> Parser Version
   versionFromJSON v =
-    case readP_to_S parseVersion v of
-      (r, _) : _ -> return r
-      _ -> fail "failed parsing purs version"
+    case parseVersion' v of
+      Just r -> return r
+      Nothing -> fail "failed parsing purs version"
 
   importFromJSON :: FilePath -> Value -> Parser (Ann, ModuleName)
   importFromJSON modulePath = withObject "Import"
