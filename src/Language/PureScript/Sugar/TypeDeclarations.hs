@@ -11,7 +11,10 @@ import Prelude.Compat
 import Control.Monad (unless)
 import Control.Monad.Error.Class (MonadError(..))
 import Data.Foldable (traverse_)
-import Data.List (find)
+import Data.Function (on)
+import Data.List (find, partition)
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NEL
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.AST
@@ -78,7 +81,9 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
 
   checkRoleDeclarations :: m ()
   checkRoleDeclarations = do
-    let ds' = mapMaybe fromRoleDeclaration ds
+    ds' <- checkDuplicateRoleDeclarations
+         . groupRoleDeclarations
+         $ mapMaybe fromRoleDeclaration ds
     checkUnsupportedRoleDeclarations ds'
     checkOrphanRoleDeclarations ds'
     checkRoleDeclarationsArity ds'
@@ -94,6 +99,22 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
     byName name' (TypeSynonymDeclaration _ name'' _ _) = name' == name''
     byName name' (TypeClassDeclaration _ name'' _ _ _ _) = name' == coerceProperName name''
     byName _ _ = False
+
+    groupRoleDeclarations
+      :: [(RoleDeclarationData, Maybe Declaration)]
+      -> [(NEL.NonEmpty RoleDeclarationData, Maybe Declaration)]
+    groupRoleDeclarations ((rdd, d) : rest) =
+      let (duplicates, rest') = partition (((==) `on` rdeclIdent . fst) (rdd, d)) rest
+      in (rdd :| map fst duplicates, d) : groupRoleDeclarations rest'
+    groupRoleDeclarations [] = []
+
+    checkDuplicateRoleDeclarations
+      :: [(NEL.NonEmpty RoleDeclarationData, Maybe Declaration)]
+      -> m [(RoleDeclarationData, Maybe Declaration)]
+    checkDuplicateRoleDeclarations = traverse $ \case
+      (rdd :| [], d) -> return (rdd, d)
+      (RoleDeclarationData{..} :| _ : _, _) ->
+        throwError . errorMessage' (fst rdeclSourceAnn) $ DuplicateRoleDeclaration rdeclIdent
 
     checkUnsupportedRoleDeclarations :: [(RoleDeclarationData, Maybe Declaration)] -> m ()
     checkUnsupportedRoleDeclarations = traverse_ $ \case

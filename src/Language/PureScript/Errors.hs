@@ -184,6 +184,7 @@ data SimpleErrorMessage
   | InvalidCoercibleInstanceDeclaration [SourceType]
   | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
+  | DuplicateRoleDeclaration (ProperName 'TypeName)
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -344,6 +345,7 @@ errorCode em = case unwrapErrorMessage em of
   InvalidCoercibleInstanceDeclaration {} -> "InvalidCoercibleInstanceDeclaration"
   UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
+  DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1329,6 +1331,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         , T.pack (show actual)
         , if actual > 1 then "roles" else "role"
         ] <> "."
+
+    renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
+      line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
