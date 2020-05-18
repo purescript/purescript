@@ -71,8 +71,10 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
+    let reExps' = M.toList (M.withoutKeys reExps (S.fromList C.primModules))
     let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToJs) standardExps
                                ++ map (mkString . runIdent &&& foreignIdent) foreignExps
+                               ++ concatMap (reExportPairs mnLookup) reExps'
     return $ moduleBody ++ [AST.Assignment Nothing (accessorString "exports" (AST.Var Nothing "module")) exps']
 
   where
@@ -81,6 +83,21 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
   getNames :: Bind Ann -> [Ident]
   getNames (NonRec _ ident _) = [ident]
   getNames (Rec vals) = map (snd . fst) vals
+
+  -- | Generate code in the JavaScript IR for re-exported declarations, prepending
+  -- the module name from whence it was imported.
+  reExportPairs :: M.Map ModuleName (Ann, ModuleName) -> (ModuleName, [Ident]) -> [(PSString, AST)]
+  reExportPairs mnLookup (mn', idents) =
+    let toExportedMember :: Ident -> AST
+        toExportedMember =
+          maybe
+            (AST.Var Nothing . identToJs)
+            (flip accessor . AST.Var Nothing . moduleNameToJs . snd)
+            (M.lookup mn' mnLookup)
+    in
+      map
+        (mkString . runIdent &&& toExportedMember)
+        idents
 
   -- | Creates alternative names for each module to ensure they don't collide
   -- with declaration names.
