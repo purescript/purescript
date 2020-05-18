@@ -40,7 +40,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       exps' = ordNub $ concatMap exportToCoreFn exps
       externs = ordNub $ mapMaybe externToCoreFn decls
       decls' = concatMap declToCoreFn decls
-  in Module modSS coms mn (spanName modSS) imports' exps' externs decls'
+  in Module modSS coms mn (spanName modSS) imports' exps' M.empty externs decls'
 
   where
 

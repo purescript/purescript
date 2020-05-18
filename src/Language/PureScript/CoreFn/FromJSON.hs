@@ -11,6 +11,7 @@ import Prelude.Compat
 
 import           Data.Aeson
 import           Data.Aeson.Types (Parser, Value, listParser)
+import qualified Data.Map.Strict as M
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -124,6 +125,7 @@ moduleFromJSON = withObject "Module" moduleFromObj
     moduleSourceSpan <- o .: "sourceSpan" >>= sourceSpanFromJSON modulePath
     moduleImports <- o .: "imports" >>= listParser (importFromJSON modulePath)
     moduleExports <- o .: "exports" >>= listParser identFromJSON
+    moduleReExports <- o .: "reExports" >>= reExportsFromJSON
     moduleDecls <- o .: "decls" >>= listParser (bindFromJSON modulePath)
     moduleForeign <- o .: "foreign" >>= listParser identFromJSON
     moduleComments <- o .: "comments" >>= listParser parseJSON
@@ -141,6 +143,9 @@ moduleFromJSON = withObject "Module" moduleFromObj
       ann <- o .: "annotation" >>= annFromJSON modulePath
       mn  <- o .: "moduleName" >>= moduleNameFromJSON
       return (ann, mn))
+
+  reExportsFromJSON :: Value -> Parser (M.Map ModuleName [Ident])
+  reExportsFromJSON = fmap (M.map (map Ident)) . parseJSON
 
 bindFromJSON :: FilePath -> Value -> Parser (Bind Ann)
 bindFromJSON modulePath = withObject "Bind" bindFromObj
