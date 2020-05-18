@@ -28,13 +28,12 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 
 import qualified Language.PureScript.AST as P
+import qualified Language.PureScript.CoreFn.FromJSON as P
 import qualified Language.PureScript.Crash as P
 import qualified Language.PureScript.Environment as P
 import qualified Language.PureScript.Names as P
 import qualified Language.PureScript.Types as P
 import qualified Paths_purescript as Paths
-
-import Text.ParserCombinators.ReadP (readP_to_S)
 
 import Web.Bower.PackageMeta hiding (Version, displayError)
 
@@ -549,13 +548,7 @@ instance A.FromJSON GithubUser where
   parseJSON = toAesonParser' asGithubUser
 
 asVersion :: Parse PackageError Version
-asVersion = withString (maybe (Left InvalidVersion) Right . parseVersion')
-
-parseVersion' :: String -> Maybe Version
-parseVersion' str =
-  case filter (null . snd) $ readP_to_S parseVersion str of
-    [(vers, "")] -> Just vers
-    _            -> Nothing
+asVersion = withString (maybe (Left InvalidVersion) Right . P.parseVersion')
 
 asModule :: Parse PackageError Module
 asModule =
