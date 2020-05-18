@@ -187,6 +187,10 @@ inferDataDeclarationRoles moduleName (tyName, tyArgs, ctors) roleEnv =
     -- doesn't appear as a spurious parameter to @D@ when we complete
     -- inference.
     walk (S.insert tv btvs) t
+  walk btvs (ConstrainedType _ Constraint{..} t) =
+    -- For constrained types, mark all free variables in the constraint
+    -- arguments as nominal and recurse on the type beneath the constraint.
+    walk btvs t <> foldMap (freeNominals btvs) constraintArgs
   walk btvs (RCons _ _ thead ttail) = do
     -- For row types, we just walk along them and collect the results.
     walk btvs thead <> walk btvs ttail
@@ -214,7 +218,7 @@ inferDataDeclarationRoles moduleName (tyName, tyArgs, ctors) roleEnv =
               t1Roles = fromMaybe (repeat Phantom) $ M.lookup t1Name roleEnv
               k role ti = case role of
                 Nominal ->
-                  freeNominals ti
+                  freeNominals btvs ti
                 Representational ->
                   go ti
                 Phantom ->
@@ -224,14 +228,16 @@ inferDataDeclarationRoles moduleName (tyName, tyArgs, ctors) roleEnv =
           -- that term to collect its roles and mark all free variables in
           -- its argument as nominal.
           _ -> do
-            go t1 <> foldMap freeNominals t2s
+            go t1 <> foldMap (freeNominals btvs) t2s
     | otherwise =
         mempty
     where
       go = walk btvs
-      -- Given a type, computes the list of free variables in that type
-      -- (taking into account those bound in @walk@) and returns a @RoleMap@
-      -- ascribing a nominal role to each of those variables.
-      freeNominals x =
-        let ftvs = filter (flip S.notMember btvs) (freeTypeVariables x)
-        in  RoleMap (M.fromList $ map (, Nominal) ftvs)
+
+-- Given a type, computes the list of free variables in that type
+-- (taking into account those bound in @walk@) and returns a @RoleMap@
+-- ascribing a nominal role to each of those variables.
+freeNominals :: S.Set Text -> SourceType -> RoleMap
+freeNominals btvs x =
+  let ftvs = filter (flip S.notMember btvs) (freeTypeVariables x)
+  in  RoleMap (M.fromList $ map (, Nominal) ftvs)

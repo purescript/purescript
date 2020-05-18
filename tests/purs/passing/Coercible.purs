@@ -159,6 +159,17 @@ type role MyMap nominal representational
 mapToMap :: MyMap String String -> MyMap String NTString1
 mapToMap = coerce
 
+class Unary a
+
+data Constrained1 a b = Constrained1 (Unary a => b)
+
+constrained1ToConstrained1 :: forall a b. Constrained1 a b -> Constrained1 a (Id1 b)
+constrained1ToConstrained1 = coerce
+
+data Constrained2 a = Constrained2 a (forall a. Unary a => a)
+
+type role Constrained2 representational
+
 -- "role" should only be a reserved word after "type"
 testRoleNotReserved :: String -> String
 testRoleNotReserved role = role
