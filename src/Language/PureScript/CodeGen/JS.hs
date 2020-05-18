@@ -50,7 +50,7 @@ moduleToJs
   => Module Ann
   -> Maybe AST
   -> m [AST]
-moduleToJs (Module _ coms mn _ imps exps _ foreigns decls) foreign_ =
+moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
@@ -59,6 +59,7 @@ moduleToJs (Module _ coms mn _ imps exps _ foreigns decls) foreign_ =
     optimized <- traverse (traverse optimize) jsDecls
     let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
     let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
+          `S.union` M.keysSet reExps
     jsImports <- traverse (importToJs mnLookup)
       . filter (flip S.member usedModuleNames)
       . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
