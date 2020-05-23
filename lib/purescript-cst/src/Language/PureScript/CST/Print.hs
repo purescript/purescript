@@ -5,15 +5,18 @@
 module Language.PureScript.CST.Print
   ( printToken
   , printTokens
+  , printModule
   , printLeadingComment
   , printTrailingComment
   ) where
 
 import Prelude
 
+import qualified Data.DList as DList
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Language.PureScript.CST.Types
+import Language.PureScript.CST.Flatten (flattenModule)
 
 printToken :: Token -> Text
 printToken = \case
@@ -67,6 +70,9 @@ printTokens toks = Text.concat (map pp toks)
     Text.concat (map printLeadingComment leading)
       <> printToken tok
       <> Text.concat (map printTrailingComment trailing)
+
+printModule :: Module a -> Text
+printModule = printTokens . DList.toList . flattenModule
 
 printLeadingComment :: Comment LineFeed -> Text
 printLeadingComment = \case
