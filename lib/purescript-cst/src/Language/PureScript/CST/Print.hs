@@ -19,7 +19,12 @@ import Language.PureScript.CST.Types
 import Language.PureScript.CST.Flatten (flattenModule)
 
 printToken :: Token -> Text
-printToken = \case
+printToken = printToken' True
+
+-- | Prints a given Token. The bool controls whether or not layout
+-- tokens should be printed.
+printToken' :: Bool -> Token -> Text
+printToken' showLayout = \case
   TokLeftParen             -> "("
   TokRightParen            -> ")"
   TokLeftBrace             -> "{"
@@ -55,24 +60,27 @@ printToken = \case
   TokRawString raw         -> "\"\"\"" <> raw <> "\"\"\""
   TokInt raw _             -> raw
   TokNumber raw _          -> raw
-  TokLayoutStart           -> "{"
-  TokLayoutSep             -> ";"
-  TokLayoutEnd             -> "}"
-  TokEof                   -> "<eof>"
+  TokLayoutStart           -> if showLayout then "{" else ""
+  TokLayoutSep             -> if showLayout then ";" else ""
+  TokLayoutEnd             -> if showLayout then "}" else ""
+  TokEof                   -> if showLayout then "<eof>" else ""
 
 printQual :: [Text] -> Text
 printQual = Text.concat . map (<> ".")
 
 printTokens :: [SourceToken] -> Text
-printTokens toks = Text.concat (map pp toks)
+printTokens = printTokens' True
+
+printTokens' :: Bool -> [SourceToken] -> Text
+printTokens' showLayout toks = Text.concat (map pp toks)
   where
   pp (SourceToken (TokenAnn _ leading trailing) tok) =
     Text.concat (map printLeadingComment leading)
-      <> printToken tok
+      <> printToken' showLayout tok
       <> Text.concat (map printTrailingComment trailing)
 
 printModule :: Module a -> Text
-printModule = printTokens . DList.toList . flattenModule
+printModule = printTokens' False . DList.toList . flattenModule
 
 printLeadingComment :: Comment LineFeed -> Text
 printLeadingComment = \case
