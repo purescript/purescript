@@ -5,6 +5,57 @@ import Prelude
 import Data.DList (DList)
 import Language.PureScript.CST.Types
 
+flattenModule :: Module a -> DList SourceToken
+flattenModule (Module _ a b c d e f g) =
+  pure a <>
+  flattenName b <>
+  foldMap (flattenWrapped (flattenSeparated flattenExport)) c <>
+  pure d <>
+  foldMap flattenImportDecl e <>
+  foldMap flattenDeclaration f <>
+  pure (SourceToken (TokenAnn dummyRange g []) TokEof)
+  where
+    dummyPos = SourcePos 0 0
+    dummyRange = SourceRange dummyPos dummyPos
+
+flattenDeclaration :: Declaration a -> DList SourceToken
+flattenDeclaration _ = mempty
+
+flattenName :: Name a -> DList SourceToken
+flattenName = pure . nameTok
+
+flattenExport :: Export a -> DList SourceToken
+flattenExport = \case
+  ExportValue _ n -> flattenName n
+  ExportOp _ n -> flattenName n
+  ExportType _ n dms -> flattenName n <> foldMap flattenDataMembers dms
+  ExportTypeOp _ t n -> pure t <> flattenName n
+  ExportClass _ t n -> pure t <> flattenName n
+  ExportKind _ t n -> pure t <> flattenName n
+  ExportModule _ t n -> pure t <> flattenName n
+
+flattenDataMembers :: DataMembers a -> DList SourceToken
+flattenDataMembers = \case
+  DataAll _ t -> pure t
+  DataEnumerated _ ns -> flattenWrapped (foldMap (flattenSeparated flattenName)) ns
+
+flattenImportDecl :: ImportDecl a -> DList SourceToken
+flattenImportDecl (ImportDecl _ a b c d) =
+  pure a <>
+  flattenName b <>
+  foldMap (\(mt, is) ->
+             foldMap pure mt <> flattenWrapped (flattenSeparated flattenImport) is) c <>
+  foldMap (\(t, n) -> pure t <> flattenName n) d
+
+flattenImport :: Import a -> DList SourceToken
+flattenImport = \case
+  ImportValue _ n -> flattenName n
+  ImportOp _ n -> flattenName n
+  ImportType _ n dms -> flattenName n <> foldMap flattenDataMembers dms
+  ImportTypeOp _ t n -> pure t <> flattenName n
+  ImportClass _ t n -> pure t <> flattenName n
+  ImportKind _ t n -> pure t <> flattenName n
+
 flattenWrapped :: (a -> DList SourceToken) -> Wrapped a -> DList SourceToken
 flattenWrapped k (Wrapped a b c) = pure a <> k b <> pure c
 
