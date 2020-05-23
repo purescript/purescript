@@ -4,19 +4,21 @@ import Prelude
 
 import Data.DList (DList)
 import Language.PureScript.CST.Types
+import Language.PureScript.CST.Positions
 
 flattenModule :: Module a -> DList SourceToken
-flattenModule (Module _ a b c d e f g) =
+flattenModule m@(Module _ a b c d e f g) =
   pure a <>
   flattenName b <>
   foldMap (flattenWrapped (flattenSeparated flattenExport)) c <>
   pure d <>
   foldMap flattenImportDecl e <>
   foldMap flattenDeclaration f <>
-  pure (SourceToken (TokenAnn dummyRange g []) TokEof)
+  pure (SourceToken (TokenAnn eofRange g []) TokEof)
   where
-    dummyPos = SourcePos 0 0
-    dummyRange = SourceRange dummyPos dummyPos
+    (_, endTkn) = moduleRange m
+    endPos = srcEnd (srcRange endTkn)
+    eofRange = SourceRange endPos endPos
 
 flattenDataHead :: DataHead a -> DList SourceToken
 flattenDataHead (DataHead a b c) = pure a <> flattenName b <> foldMap flattenTypeVarBinding c
