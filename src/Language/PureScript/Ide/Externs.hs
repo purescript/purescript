@@ -24,14 +24,11 @@ import           Protolude hiding (to, from, (&))
 import           Codec.CBOR.Term as Term
 import           "monad-logger" Control.Monad.Logger
 import           Data.Version (showVersion)
-import qualified Data.Text as Text
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Make.Monad as Make
 import           Language.PureScript.Ide.Error (IdeError (..))
 import           Language.PureScript.Ide.Types
 import           Lens.Micro.Platform
-
-import qualified Language.PureScript as P
 
 readExternFile
   :: (MonadIO m, MonadError IdeError m, MonadLogger m)
