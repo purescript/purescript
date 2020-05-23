@@ -17,8 +17,8 @@ flattenModule m@(Module _ a b c d e f g) =
   pure (SourceToken (TokenAnn eofRange g []) TokEof)
   where
     (_, endTkn) = moduleRange m
-    endPos = srcEnd (srcRange endTkn)
-    eofRange = SourceRange endPos endPos
+    eofPos = advanceLeading (srcEnd (srcRange endTkn)) g
+    eofRange = SourceRange eofPos eofPos
 
 flattenDataHead :: DataHead a -> DList SourceToken
 flattenDataHead (DataHead a b c) = pure a <> flattenName b <> foldMap flattenTypeVarBinding c
