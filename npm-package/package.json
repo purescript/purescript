@@ -1,6 +1,6 @@
 {
   "name": "purescript",
-  "version": "0.13.6",
+  "version": "0.13.7",
   "license": "ISC",
   "description": "PureScript wrapper that makes it available as a local dependency",
   "author": {
@@ -43,7 +43,7 @@
   ],
   "scripts": {
     "prepublishOnly": "node -e \"require('fs').copyFileSync('purs.bin.placeholder', 'purs.bin');\"",
-    "postinstall": "install-purescript --purs-ver=0.13.6",
+    "postinstall": "install-purescript --purs-ver=0.13.7",
     "test": "echo 'Error: no test specified' && exit 1"
   }
 }
