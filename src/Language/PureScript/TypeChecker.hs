@@ -717,15 +717,14 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkDataConstructorsAreExported :: DeclarationRef -> m ()
   checkDataConstructorsAreExported dr@(TypeRef ss' name (Just exportedDataConstructorsNames))
     | not (null exportedDataConstructorsNames) = do
-      let dataConstructorNames = fromMaybe [] . headMay $ mapMaybe findDataConstructorsNames decls
+      env <- getEnv
+      let dataConstructorNames = fromMaybe [] $
+            M.lookup (mkQualified name mn) (types env) >>= getDataConstructorNames . snd
           missingDataConstructorsNames = dataConstructorNames \\ exportedDataConstructorsNames
       unless (null missingDataConstructorsNames) $
         throwError . errorMessage' ss' $ TransitiveDctorExportError dr missingDataConstructorsNames
       where
-      findDataConstructorsNames :: Declaration -> Maybe [ProperName 'ConstructorName]
-      findDataConstructorsNames (DataDeclaration _ _ name' _ constructors)
-        | name == name' = Just $ dataCtorName <$> constructors
-      findDataConstructorsNames (DataBindingGroupDeclaration decls')
-        = headMay . mapMaybe findDataConstructorsNames $ NEL.toList decls'
-      findDataConstructorsNames _ = Nothing
+      getDataConstructorNames :: TypeKind -> Maybe [ProperName 'ConstructorName]
+      getDataConstructorNames (DataType _ constructors) = Just $ fst <$> constructors
+      getDataConstructorNames _ = Nothing
   checkDataConstructorsAreExported _ = return ()
