@@ -249,10 +249,14 @@ externToCoreFn _ = Nothing
 -- constructor, instances and values are flattened into one list.
 exportToCoreFn :: A.DeclarationRef -> [Ident]
 exportToCoreFn (A.TypeRef _ _ (Just dctors)) = fmap properToIdent dctors
+exportToCoreFn (A.TypeRef _ _ Nothing) = []
+exportToCoreFn (A.TypeOpRef _ _) = []
 exportToCoreFn (A.ValueRef _ name) = [name]
+exportToCoreFn (A.ValueOpRef _ _) = []
 exportToCoreFn (A.TypeClassRef _ name) = [properToIdent name]
 exportToCoreFn (A.TypeInstanceRef _ name) = [name]
-exportToCoreFn _ = []
+exportToCoreFn (A.ModuleRef _ _) = []
+exportToCoreFn (A.ReExportRef _ _ _) = []
 
 -- | Makes a typeclass dictionary constructor function. The returned expression
 -- is a function that accepts the superclass instances and member
