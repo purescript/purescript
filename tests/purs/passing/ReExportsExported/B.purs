@@ -1,4 +1,4 @@
-module B (module A) where
+module B (module A, A(..)) where
 
 import A
 
