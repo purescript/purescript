@@ -18,13 +18,18 @@ nt2ToNT1 :: NTString2 -> NTString1
 nt2ToNT1 = coerce
 
 newtype Id1 a = Id1 a
-newtype Id2 a = Id2 a
+newtype Id2 b = Id2 b
 
 id1ToId2 :: forall a. Id1 a -> Id2 a
 id1ToId2 = coerce
 
 id12ToId21 :: forall b. Id1 (Id2 b) -> Id2 (Id1 b)
 id12ToId21 = coerce
+
+newtype Ap f a = Ap (f a)
+
+apId1ToApId2 :: forall a. Ap Id1 a -> Ap Id2 a
+apId1ToApId2 = coerce
 
 newtype Phantom1 a b = Phantom1 a
 

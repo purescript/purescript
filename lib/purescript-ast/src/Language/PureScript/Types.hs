@@ -10,11 +10,13 @@ import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
 import Control.Arrow (first, second)
 import Control.DeepSeq (NFData)
-import Control.Monad ((<=<), (>=>))
+import Control.Monad ((<=<), (>=>), replicateM)
+import Control.Monad.Supply (runSupply)
+import Control.Monad.Supply.Class (fresh)
 import Data.Aeson ((.:), (.:?), (.!=), (.=))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
-import Data.Foldable (fold)
+import Data.Foldable (fold, foldl')
 import qualified Data.IntSet as IS
 import Data.List (sort, sortBy)
 import Data.Ord (comparing)
@@ -584,6 +586,17 @@ unapplyConstraints = go []
   where
   go acc (ConstrainedType _ con ty) = go (con : acc) ty
   go acc ty = (reverse acc, ty)
+
+saturate :: S.Set Text -> SourceType -> Int -> SourceType
+saturate bound ty n = fst . runSupply 0 $ do
+  tvs <- replicateM n freshTyVar
+  return $ foldl' srcTypeApp ty (srcTypeVar <$> tvs)
+  where
+  freshTyVar = do
+    tv <- ("t" <>) . T.pack . show <$> fresh
+    if tv `elem` bound
+      then freshTyVar
+      else return tv
 
 everywhereOnTypes :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypes f = go where

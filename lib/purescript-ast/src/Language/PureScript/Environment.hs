@@ -408,7 +408,7 @@ primBooleanTypes =
 primCoerceTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primCoerceTypes =
   M.fromList $ mconcat
-    [ primClass (primSubName C.moduleCoerce "Coercible") (\kind -> kindType -:> kindType -:> kind)
+    [ primClass (primSubName C.moduleCoerce "Coercible") (\kind -> tyForall "k" kindType $ tyVar "k" -:> tyVar "k" -:> kind)
     ]
 
 primOrderingTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
@@ -485,9 +485,10 @@ allPrimClasses = M.unions
 primCoerceClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primCoerceClasses =
   M.fromList
+    -- class Coercible (a :: k) (b :: k)
     [ (primSubName C.moduleCoerce "Coercible", makeTypeClassData
-        [ ("a", Just kindType)
-        , ("b", Just kindType)
+        [ ("a", Just (tyVar "k"))
+        , ("b", Just (tyVar "k"))
         ] [] [] [] True)
     ]
 

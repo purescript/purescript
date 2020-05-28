@@ -406,55 +406,64 @@ entails SolverOptions{..} constraint context hints =
     -- @Coercible a b@ and reduce them to a set of simpler wanted constraints
     -- whose satisfaction will yield the goal.
     coercibleWanteds :: Environment -> SourceType -> SourceType -> Maybe [SourceConstraint]
-    coercibleWanteds env a b = case a of
-      TypeConstructor _ tyName -> do
-        -- If the first argument is a plain newtype (e.g. @newtype T = T U@ and
-        -- the constraint @Coercible T b@), look up the type of its wrapped
-        -- field and yield a new wanted constraint in terms of that type
-        -- (@Coercible U b@ in the example).
-        (_, wrappedTy, _) <- lookupNewtypeConstructor env tyName
-        pure [Constraint nullSourceAnn C.Coercible [] [wrappedTy, b] Nothing]
-      t
-        | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
-        , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
-        , not (null axs) && not (null bxs) && aTyName == bTyName -> do
-            -- If both arguments are applications of the same type constructor
-            -- (e.g. @data D a b = D a@ in the constraint
-            -- @Coercible (D a b) (D a' b')@), infer the roles of the type
-            -- constructor's arguments and generate wanted constraints
-            -- appropriately (e.g. here @a@ is representational and @b@ is
-            -- phantom, yielding @Coercible a a'@).
-            let tyRoles = lookupRoles env aTyName
-                k role ax bx = case role of
-                  Nominal
-                    -- If we had first-class equality constraints, we'd just
-                    -- emit one of the form @(a ~ b)@ here and let the solver
-                    -- recurse. Since we don't we must compare the types at
-                    -- this point and fail if they don't match. This likely
-                    -- means there are cases we should be able to handle that
-                    -- we currently can't, but is at least sound.
-                    | ax == bx ->
-                        Just []
-                    | otherwise ->
-                        Nothing
-                  Representational ->
-                    Just [Constraint nullSourceAnn C.Coercible [] [ax, bx] Nothing]
-                  Phantom ->
-                    Just []
-            fmap concat $ sequence $ zipWith3 k tyRoles axs bxs
-        | (TypeConstructor _ tyName, _, xs) <- unapplyTypes t
-        , not $ null xs
-        , Just (tvs, wrappedTy, _) <- lookupNewtypeConstructor env tyName -> do
-            -- If the first argument is a newtype applied to some other types
-            -- (e.g. @newtype T a = T a@ in @Coercible (T X) b@), look up the
-            -- type of its wrapped field and yield a new wanted constraint in
-            -- terms of that type with the type arguments substituted in (e.g.
-            -- @Coercible (T[X/a]) b = Coercible X b@ in the example).
-            let wrappedTySub = replaceAllTypeVars (zip tvs xs) wrappedTy
-            pure [Constraint nullSourceAnn C.Coercible [] [wrappedTySub, b] Nothing]
-      _ ->
+    coercibleWanteds env a b
+      | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
+      , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
+      , Just (aTyKind, _) <- M.lookup aTyName $ types env
+      , Just (bTyKind, _) <- M.lookup bTyName $ types env
+      , i <- kindArity aTyKind - length axs
+      , j <- kindArity bTyKind - length bxs
+      , i > 0 && j > 0 = do
+          -- If both arguments have kind @k1 -> k2@ (e.g. @data D a b = D a@
+          -- in the constraint @Coercible (D a) (D a')@), yield a new wanted
+          -- constraint in terms of the types saturated with the same variables
+          -- (e.g. @Coercible (D a t0) (D a' t0)@ in the exemple).
+          let aTyVars = S.fromList $ usedTypeVariables a
+              bTyVars = S.fromList $ usedTypeVariables b
+              saturate' = saturate $ aTyVars `S.union` bTyVars
+          pure [srcCoercibleConstraint (saturate' a i) (saturate' b j)]
+      | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
+      , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
+      , not (null axs) && not (null bxs) && aTyName == bTyName = do
+          -- If both arguments are applications of the same type constructor
+          -- (e.g. @data D a b = D a@ in the constraint
+          -- @Coercible (D a b) (D a' b')@), infer the roles of the type
+          -- constructor's arguments and generate wanted constraints
+          -- appropriately (e.g. here @a@ is representational and @b@ is
+          -- phantom, yielding @Coercible a a'@).
+          let tyRoles = lookupRoles env aTyName
+              k role ax bx = case role of
+                Nominal
+                  -- If we had first-class equality constraints, we'd just
+                  -- emit one of the form @(a ~ b)@ here and let the solver
+                  -- recurse. Since we don't we must compare the types at
+                  -- this point and fail if they don't match. This likely
+                  -- means there are cases we should be able to handle that
+                  -- we currently can't, but is at least sound.
+                  | ax == bx ->
+                      Just []
+                  | otherwise ->
+                      Nothing
+                Representational ->
+                  Just [srcCoercibleConstraint ax bx]
+                Phantom ->
+                  Just []
+          fmap concat $ sequence $ zipWith3 k tyRoles axs bxs
+      | (TypeConstructor _ tyName, _, xs) <- unapplyTypes a
+      , Just (tvs, wrappedTy, _) <- lookupNewtypeConstructor env tyName = do
+          -- If the first argument is a newtype applied to some other types
+          -- (e.g. @newtype T a = T a@ in @Coercible (T X) b@), look up the
+          -- type of its wrapped field and yield a new wanted constraint in
+          -- terms of that type with the type arguments substituted in (e.g.
+          -- @Coercible (T[X/a]) b = Coercible X b@ in the example).
+          let wrappedTySub = replaceAllTypeVars (zip tvs xs) wrappedTy
+          pure [srcCoercibleConstraint wrappedTySub b]
+      | otherwise =
         -- In all other cases we can't solve the constraint.
         Nothing
+
+    srcCoercibleConstraint :: SourceType -> SourceType -> SourceConstraint
+    srcCoercibleConstraint a b = srcConstraint C.Coercible [] [a, b] Nothing
 
     solveIsSymbol :: [SourceType] -> Maybe [TypeClassDict]
     solveIsSymbol [TypeLevelString ann sym] = Just [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [] [] [TypeLevelString ann sym] Nothing]
