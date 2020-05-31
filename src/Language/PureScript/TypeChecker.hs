@@ -221,10 +221,7 @@ checkTypeClassInstance cls i = check where
   check = \case
     TypeVar _ _ -> return ()
     TypeLevelString _ _ -> return ()
-    TypeConstructor _ ctor -> do
-      env <- getEnv
-      when (ctor `M.member` typeSynonyms env && not isFunDepDetermined) . throwError . errorMessage $ TypeSynonymInstance
-      return ()
+    TypeConstructor _ _ -> return ()
     TypeApp _ t1 t2 -> check t1 >> check t2
     KindApp _ t k -> check t >> check k
     KindedType _ t _ -> check t
