@@ -389,13 +389,14 @@ typeCheckAll moduleName _ = traverse go
           checkInstanceArity dictName className typeClass tys
           (deps', kinds', tys', vars) <- withFreshSubstitution $ checkInstanceDeclaration moduleName (sa, deps, className, tys)
           sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys')
-          let nonOrphanModules = findNonOrphanModules className typeClass tys'
-          checkOrphanInstance dictName className tys' nonOrphanModules
+          tys'' <- traverse replaceAllTypeSynonyms tys'
+          let nonOrphanModules = findNonOrphanModules className typeClass tys''
+          checkOrphanInstance dictName className tys'' nonOrphanModules
           let qualifiedChain = Qualified (Just moduleName) <$> ch
-          checkOverlappingInstance qualifiedChain dictName className typeClass tys' nonOrphanModules
+          checkOverlappingInstance qualifiedChain dictName className typeClass tys'' nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
-          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className vars kinds' tys' (Just deps'')
+          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className vars kinds' tys'' (Just deps'')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 
