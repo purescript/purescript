@@ -1,0 +1,15 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/QuantifiedKind.purs:6:22 - 6:23 (line 6, column 22 - line 6, column 23)
+
+  Type variable [33mk[0m is undefined.
+
+while inferring the kind of [33mk[0m
+while checking that type [33mk[0m
+  has kind [33mType[0m
+while inferring the kind of [33mforall (a :: k) k. Proxy a[0m
+in value declaration [33mtest[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/UndefinedTypeVariable.md for more information,
+or to contribute content related to this error.
+

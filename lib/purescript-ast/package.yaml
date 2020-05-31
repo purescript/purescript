@@ -1,0 +1,41 @@
+name: purescript-ast
+version: '0.1.0.0'
+synopsis: PureScript Programming Language Abstract Syntax Tree
+description: Defines the underlying syntax of the PureScript Programming Language.
+category: Language
+author: Phil Freeman <paf31@cantab.net>
+maintainer: >
+  Gary Burgess <gary.burgess@gmail.com>,
+  Hardy Jones <jones3.hardy@gmail.com>,
+  Harry Garrood <harry@garrood.me>,
+  Christoph Hegemann <christoph.hegemann1337@gmail.com>,
+  Liam Goodacre <goodacre.liam@gmail.com>,
+  Nathan Faubion <nathan@n-son.com>
+copyright: (c) 2013-17 Phil Freeman, (c) 2014-19 Gary Burgess, (c) other contributors (see CONTRIBUTORS.md)
+license: BSD3
+github: purescript/purescript
+homepage: http://www.purescript.org/
+extra-source-files:
+  - README.md
+dependencies:
+  - aeson >=1.0 && <1.5
+  - base >=4.11 && <4.13
+  - base-compat >=0.6.0
+  - bytestring
+  - containers
+  - deepseq
+  - filepath
+  - microlens >=0.4.10 && <0.5
+  - mtl >=2.1.0 && <2.3.0
+  - protolude >=0.1.6 && <0.2.4
+  - scientific >=0.3.4.9 && <0.4
+  - serialise
+  - text
+  - vector
+
+library:
+  source-dirs: src
+  ghc-options: -Wall -O2
+  default-extensions: !include "../../default-extensions.yaml"
+
+stability: experimental

@@ -1,0 +1,14 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/DuplicateTypeClass.purs:4:1 - 4:8 (line 4, column 1 - line 4, column 8)
+
+  Type class [33mC[0m has been defined multiple times:
+
+    tests/purs/failing/DuplicateTypeClass.purs:4:1 - 4:8 (line 4, column 1 - line 4, column 8)
+
+
+in type class declaration for [33mC[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/DuplicateTypeClass.md for more information,
+or to contribute content related to this error.
+

@@ -1,0 +1,10 @@
+Error found:
+in module [33mM1[0m
+at tests/purs/failing/ExportExplicit2.purs:3:12 - 3:16 (line 3, column 12 - line 3, column 16)
+
+  Cannot export data constructor [33mY[0m for type [33mX[0m, as it has not been declared.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownExportDataConstructor.md for more information,
+or to contribute content related to this error.
+

@@ -7,7 +7,7 @@ import Prelude
 data Unit = Unit
 
 -- This is only a warning as the `Prelude` import is implicit. If `Unit` was
--- named explicitly in an import list, then this refernce to `Unit`
+-- named explicitly in an import list, then this reference to `Unit`
 -- would be a `ScopeConflict` error instead.
 test :: Unit
 test = const Unit unit

@@ -1,0 +1,30 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/TypedBinders2.purs:8:3 - 8:14 (line 8, column 3 - line 8, column 14)
+
+  Could not match type
+  [33m      [0m
+  [33m  Unit[0m
+  [33m      [0m
+  with type
+  [33m        [0m
+  [33m  String[0m
+  [33m        [0m
+
+while checking that expression [33mcase $0 of       [0m
+                               [33m  s -> log "Done"[0m
+  has type [33mEffect t2[0m
+while applying a function [33m(bind (#dict Bind t1)) (log "Foo")[0m
+  of type [33m(t0 -> t1 t2) -> t1 t2[0m
+  to argument [33m\$0 ->             [0m
+              [33m  case $0 of       [0m
+              [33m    s -> log "Done"[0m
+in value declaration [33mmain[0m
+
+where [33mt1[0m is an unknown type
+      [33mt0[0m is an unknown type
+      [33mt2[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+or to contribute content related to this error.
+

@@ -42,10 +42,19 @@ isSuccess _           = False
 
 spec :: Spec
 spec = context "CoreFnFromJsonTest" $ do
-  let mn = ModuleName [ProperName "Example", ProperName "Main"]
+  let mn = ModuleName "Example.Main"
       mp = "src/Example/Main.purs"
       ss = SourceSpan mp (SourcePos 0 0) (SourcePos 0 0)
       ann = ssAnn ss
+
+  specify "should parse version" $ do
+    let v = Version [0, 13, 6] []
+        m = Module ss [] mn mp [] [] [] []
+        r = fst <$> parseModule (moduleToJSON v m)
+    r `shouldSatisfy` isSuccess
+    case r of
+      Error _   -> return ()
+      Aeson.Success v' -> v' `shouldBe` v
 
   specify "should parse an empty module" $ do
     let r = parseMod $ Module ss [] mn mp [] [] [] []
@@ -217,7 +226,7 @@ spec = context "CoreFnFromJsonTest" $ do
                       [ CaseAlternative
                         [ ConstructorBinder
                             ann
-                            (Qualified (Just (ModuleName [ProperName "Data", ProperName "Either"])) (ProperName "Either"))
+                            (Qualified (Just (ModuleName "Data.Either")) (ProperName "Either"))
                             (Qualified Nothing (ProperName "Left"))
                             [VarBinder ann (Ident "z")]
                         ]

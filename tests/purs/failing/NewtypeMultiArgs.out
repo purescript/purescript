@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/NewtypeMultiArgs.purs:6:30 - 6:37 (line 6, column 30 - line 6, column 37)
+
+  Unable to parse module:
+  Unexpected token 'Boolean'
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

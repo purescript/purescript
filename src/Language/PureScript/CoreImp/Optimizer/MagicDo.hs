@@ -11,7 +11,7 @@ import Data.Text (Text)
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common
 import Language.PureScript.PSString (mkString)
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prelude as C
 
 -- | Inline type class dictionaries for >>= and return for the Eff monad
 --
@@ -47,6 +47,10 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   convert (App _ (App _ pure' [val]) []) | isPure pure' = val
   -- Desugar discard
   convert (App _ (App _ bind [m]) [Function s1 Nothing [] (Block s2 js)]) | isDiscard bind =
+    Function s1 (Just fnName) [] $ Block s2 (App s2 m [] : map applyReturns js )
+  -- Desugar bind to wildcard
+  convert (App _ (App _ bind [m]) [Function s1 Nothing [] (Block s2 js)])
+    | isBind bind =
     Function s1 (Just fnName) [] $ Block s2 (App s2 m [] : map applyReturns js )
   -- Desugar bind
   convert (App _ (App _ bind [m]) [Function s1 Nothing [arg] (Block s2 js)]) | isBind bind =

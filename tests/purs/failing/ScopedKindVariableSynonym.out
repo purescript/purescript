@@ -1,0 +1,12 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ScopedKindVariableSynonym.purs:7:14 - 7:15 (line 7, column 14 - line 7, column 15)
+
+  Type variable [33ma[0m is undefined.
+
+while inferring the kind of [33ma[0m
+in type synonym [33mB[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/UndefinedTypeVariable.md for more information,
+or to contribute content related to this error.
+

@@ -1,6 +1,6 @@
 module ConstrainedArgument where
 
-class Foo t
+class Foo (t :: Type)
 
 type WithoutArgs      = forall a. (Partial => a) -> a
 type WithArgs         = forall a. (Foo a => a) -> a

@@ -1,0 +1,16 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/MPTCs.purs:9:1 - 10:10 (line 9, column 1 - line 10, column 10)
+
+  The type class [33mMain.Foo[0m expects 1 argument.
+  But the instance [33mfooStringString[0m provided 2.
+
+in type class instance
+[33m                 [0m
+[33m  Main.Foo String[0m
+[33m           String[0m
+[33m                 [0m
+
+See https://github.com/purescript/documentation/blob/master/errors/ClassInstanceArityMismatch.md for more information,
+or to contribute content related to this error.
+

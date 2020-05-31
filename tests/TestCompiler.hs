@@ -20,216 +20,115 @@ module TestCompiler where
 --   -- @shouldFailWith TypesDoNotUnify
 --   -- @shouldFailWith TypesDoNotUnify
 --   -- @shouldFailWith TransitiveExportError
+--
+-- Failing tests also check their output against the relative golden files (`.out`).
+-- The golden files are generated automatically when missing, and can be updated
+-- by passing `--accept` to `--test-arguments.`
 
 import Prelude ()
 import Prelude.Compat
 
 import qualified Language.PureScript as P
 
-import Data.Char (isSpace)
+import Control.Arrow ((>>>))
 import Data.Function (on)
-import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy, minimumBy)
+import Data.List (sort, stripPrefix, intercalate, minimumBy)
 import Data.Maybe (mapMaybe)
-import Data.Time.Clock (UTCTime())
 import qualified Data.Text as T
-import Data.Tuple (swap)
+import qualified Data.Text.Encoding as T
 
 import qualified Data.Map as M
 
-import Control.Monad
-import Control.Arrow ((***), (>>>))
+import qualified Data.ByteString.Lazy as BS
 
-import Control.Monad.Reader
-import Control.Monad.Trans.Except
+import Control.Monad
 
 import System.Exit
-import System.Process hiding (cwd)
+import System.Process
 import System.FilePath
-import System.Directory
 import System.IO
-import System.IO.UTF8
-import qualified System.FilePath.Glob as Glob
+import System.IO.UTF8 (readUTF8File)
+
+import Text.Regex.Base
+import Text.Regex.TDFA (Regex)
 
 import TestUtils
 import Test.Tasty
 import Test.Tasty.Hspec
+import Test.Tasty (testGroup)
+import Test.Tasty.Golden (goldenVsString)
 
 main :: IO TestTree
-main = testSpec "compiler" spec
+main = do
+  (supportModules, supportExterns, supportForeigns) <- setupSupportModules
+  passing <- passingTests supportModules supportExterns supportForeigns
+  warning <- warningTests supportModules supportExterns supportForeigns
+  failing <- failingTests supportModules supportExterns supportForeigns
+  return . testGroup "compiler" $ [passing, warning, failing]
 
-spec :: Spec
-spec = do
+passingTests
+  :: [P.Module]
+  -> [P.ExternsFile]
+  -> M.Map P.ModuleName FilePath
+  -> IO TestTree
+passingTests supportModules supportExterns supportForeigns = do
+  passingTestCases <- getTestFiles "passing"
 
-  (supportModules, supportExterns, supportForeigns, passingTestCases, warningTestCases, failingTestCases) <- runIO $ do
-    cwd <- getCurrentDirectory
-    let passing = cwd </> "tests" </> "purs" </> "passing"
-    let warning = cwd </> "tests" </> "purs" </> "warning"
-    let failing = cwd </> "tests" </> "purs" </> "failing"
-    passingFiles <- getTestFiles passing <$> testGlob passing
-    warningFiles <- getTestFiles warning <$> testGlob warning
-    failingFiles <- getTestFiles failing <$> testGlob failing
-    ms <- getSupportModuleTuples
-    let modules = map snd ms
-    supportExterns <- runExceptT $ do
-      foreigns <- inferForeignModules ms
-      externs <- ExceptT . fmap fst . runTest $ P.make (makeActions modules foreigns) modules
-      return (externs, foreigns)
-    case supportExterns of
-      Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
-      Right (externs, foreigns) -> return (modules, externs, foreigns, passingFiles, warningFiles, failingFiles)
+  outputFile <- createOutputFile logfile
 
-  outputFile <- runIO $ do
-    tmp <- getTemporaryDirectory
-    createDirectoryIfMissing False (tmp </> logpath)
-    openFile (tmp </> logpath </> logfile) WriteMode
-
-  context "Passing examples" $
+  testSpec "Passing examples" $
     forM_ passingTestCases $ \testPurs ->
       it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $
         assertCompiles supportModules supportExterns supportForeigns testPurs outputFile
 
-  context "Warning examples" $
-    forM_ warningTestCases $ \testPurs -> do
-      let mainPath = getTestMain testPurs
-      expectedWarnings <- runIO $ getShouldWarnWith mainPath
+warningTests
+  :: [P.Module]
+  -> [P.ExternsFile]
+  -> M.Map P.ModuleName FilePath
+  -> IO TestTree
+warningTests supportModules supportExterns supportForeigns = do
+  warningTestCases <- getTestFiles "warning"
+  tests <- forM warningTestCases $ \testPurs -> do
+    let mainPath = getTestMain testPurs
+    expectedWarnings <- getShouldWarnWith mainPath
+    wTc <- testSpecs $
       it ("'" <> takeFileName mainPath <> "' should compile with warning(s) '" <> intercalate "', '" expectedWarnings <> "'") $
         assertCompilesWithWarnings supportModules supportExterns supportForeigns testPurs expectedWarnings
+    return $ wTc ++ [ goldenVsString
+                      ("'" <> takeFileName mainPath <> "' golden test")
+                      (replaceExtension mainPath ".out")
+                      (BS.fromStrict . T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
+                    ]
+  return $ testGroup "Warning examples" $ concat tests
 
-  context "Failing examples" $
-    forM_ failingTestCases $ \testPurs -> do
-      let mainPath = getTestMain testPurs
-      expectedFailures <- runIO $ getShouldFailWith mainPath
+failingTests
+  :: [P.Module]
+  -> [P.ExternsFile]
+  -> M.Map P.ModuleName FilePath
+  -> IO TestTree
+failingTests supportModules supportExterns supportForeigns = do
+  failingTestCases <- getTestFiles "failing"
+  tests <- forM failingTestCases $ \testPurs -> do
+    let mainPath = getTestMain testPurs
+    expectedFailures <- getShouldFailWith mainPath
+    fTc <- testSpecs $
       it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $
         assertDoesNotCompile supportModules supportExterns supportForeigns testPurs expectedFailures
+    return $ fTc ++ [ goldenVsString
+                    ("'" <> takeFileName mainPath <> "' golden test")
+                    (replaceExtension mainPath ".out")
+                    (BS.fromStrict . T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
+                  ]
+  return $ testGroup "Failing examples" $ concat tests
 
-  where
-
-  -- A glob for all purs and js files within a test directory
-  testGlob :: FilePath -> IO [FilePath]
-  testGlob = Glob.globDir1 (Glob.compile "**/*.purs")
-
-  -- Groups the test files so that a top-level file can have dependencies in a
-  -- subdirectory of the same name. The inner tuple contains a list of the
-  -- .purs files and the .js files for the test case.
-  getTestFiles :: FilePath -> [FilePath] -> [[FilePath]]
-  getTestFiles baseDir
-    = map (filter ((== ".purs") . takeExtensions) . map (baseDir </>))
-    . groupBy ((==) `on` extractPrefix)
-    . sortBy (compare `on` extractPrefix)
-    . map (makeRelative baseDir)
-
-  -- Takes the test entry point from a group of purs files - this is determined
-  -- by the file with the shortest path name, as everything but the main file
-  -- will be under a subdirectory.
-  getTestMain :: [FilePath] -> FilePath
-  getTestMain = minimumBy (compare `on` length)
-
-  -- Extracts the filename part of a .purs file, or if the file is in a
-  -- subdirectory, the first part of that directory path.
-  extractPrefix :: FilePath -> FilePath
-  extractPrefix fp =
-    let dir = takeDirectory fp
-        ext = reverse ".purs"
-    in if dir == "."
-       then maybe fp reverse $ stripPrefix ext $ reverse fp
-       else dir
-
-  -- Scans a file for @shouldFailWith directives in the comments, used to
-  -- determine expected failures
-  getShouldFailWith :: FilePath -> IO [String]
-  getShouldFailWith = extractPragma "shouldFailWith"
-
-  -- Scans a file for @shouldWarnWith directives in the comments, used to
-  -- determine expected warnings
-  getShouldWarnWith :: FilePath -> IO [String]
-  getShouldWarnWith = extractPragma "shouldWarnWith"
-
-  extractPragma :: String -> FilePath -> IO [String]
-  extractPragma pragma = fmap go . readUTF8File
-    where
-    go = lines >>> mapMaybe (stripPrefix ("-- @" ++ pragma ++ " ")) >>> map trim
-
-inferForeignModules
-  :: MonadIO m
-  => [(FilePath, P.Module)]
-  -> m (M.Map P.ModuleName FilePath)
-inferForeignModules = P.inferForeignModules . fromList
-  where
-    fromList :: [(FilePath, P.Module)] -> M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
-    fromList = M.fromList . map ((P.getModuleName *** Right) . swap)
-
-trim :: String -> String
-trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
-
-modulesDir :: FilePath
-modulesDir = ".test_modules" </> "node_modules"
-
-makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
-makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
-                               { P.getInputTimestamp = getInputTimestamp
-                               , P.getOutputTimestamp = getOutputTimestamp
-                               , P.progress = const (pure ())
-                               }
-  where
-  getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
-  getInputTimestamp mn
-    | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
-    | otherwise = return (Left P.RebuildAlways)
-    where
-    isSupportModule = flip elem (map (P.runModuleName . P.getModuleName) modules)
-
-  getOutputTimestamp :: P.ModuleName -> P.Make (Maybe UTCTime)
-  getOutputTimestamp mn = do
-    let filePath = modulesDir </> T.unpack (P.runModuleName mn)
-    exists <- liftIO $ doesDirectoryExist filePath
-    return (if exists then Just (P.internalError "getOutputTimestamp: read timestamp") else Nothing)
-
-runTest :: P.Make a -> IO (Either P.MultipleErrors a, P.MultipleErrors)
-runTest = P.runMake P.defaultOptions
-
-compile
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> [FilePath]
-  -> ([P.Module] -> IO ())
-  -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile supportModules supportExterns supportForeigns inputFiles check = runTest $ do
-  fs <- liftIO $ readInput inputFiles
-  ms <- P.parseModulesFromFiles id fs
-  foreigns <- inferForeignModules ms
-  liftIO (check (map snd ms))
-  let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
-  case ms of
-    [singleModule] -> pure <$> P.rebuildModule actions supportExterns (snd singleModule)
-    _ -> P.make actions (supportModules ++ map snd ms)
-
-assert
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> [FilePath]
-  -> ([P.Module] -> IO ())
-  -> (Either P.MultipleErrors P.MultipleErrors -> IO (Maybe String))
-  -> Expectation
-assert supportModules supportExterns supportForeigns inputFiles check f = do
-  (e, w) <- compile supportModules supportExterns supportForeigns inputFiles check
-  maybeErr <- f (const w <$> e)
-  maybe (return ()) expectationFailure maybeErr
-
-checkMain :: [P.Module] -> IO ()
-checkMain ms =
-  unless (any ((== P.moduleNameFromString "Main") . P.getModuleName) ms)
-    (fail "Main module missing")
-
-checkShouldFailWith :: [String] -> P.MultipleErrors -> Maybe String
-checkShouldFailWith expected errs =
+checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Maybe String
+checkShouldReport expected prettyPrintDiagnostics errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
   in if sort expected == sort (map T.unpack actual)
     then checkPositioned errs
-    else Just $ "Expected these errors: " ++ show expected ++ ", but got these: "
-      ++ show actual ++ ", full error messages: \n"
-      ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) (P.runMultipleErrors errs))
+    else Just $ "Expected these diagnostics: " ++ show expected ++ ", but got these: "
+      ++ show actual ++ ", full diagnostic messages: \n"
+      ++ prettyPrintDiagnostics errs
 
 checkPositioned :: P.MultipleErrors -> Maybe String
 checkPositioned errs =
@@ -238,7 +137,7 @@ checkPositioned errs =
       Nothing
     errs' ->
       Just
-        $ "Found errors with missing source spans:\n"
+        $ "Found diagnostics with missing source spans:\n"
         ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) errs')
   where
   guardSpans :: P.ErrorMessage -> Maybe P.ErrorMessage
@@ -293,13 +192,7 @@ assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFi
       Left errs ->
         return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right warnings ->
-        return
-          . fmap (printAllWarnings warnings)
-          $ checkShouldFailWith shouldWarnWith warnings
-
-  where
-  printAllWarnings warnings =
-    (<> "\n\n" <> P.prettyPrintMultipleErrors P.defaultPPEOptions warnings)
+        return $ checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings P.defaultPPEOptions) warnings
 
 assertDoesNotCompile
   :: [P.Module]
@@ -316,15 +209,71 @@ assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles sh
           then Just $ "shouldFailWith declaration is missing (errors were: "
                       ++ show (map P.errorCode (P.runMultipleErrors errs))
                       ++ ")"
-          else checkShouldFailWith shouldFailWith errs
+          else checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors P.defaultPPEOptions) errs
       Right _ ->
         return $ Just "Should not have compiled"
 
   where
   noPreCheck = const (return ())
 
-logpath :: FilePath
-logpath = "purescript-output"
+printErrorOrWarning
+  :: [P.Module]
+  -> [P.ExternsFile]
+  -> M.Map P.ModuleName FilePath
+  -> [FilePath]
+  -> IO String
+printErrorOrWarning supportModules supportExterns supportForeigns inputFiles = do
+  -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
+  (res, warnings) <- compile supportModules supportExterns supportForeigns (sort inputFiles) noPreCheck
+  return . normalizePaths $ case res of
+    Left errs ->
+      P.prettyPrintMultipleErrors P.defaultPPEOptions errs
+    Right _ ->
+      P.prettyPrintMultipleWarnings P.defaultPPEOptions warnings
+  where
+    noPreCheck = const (return ())
+
+-- Replaces Windows-style paths in an error or warning with POSIX paths
+normalizePaths :: String -> String
+normalizePaths = if pathSeparator == '\\'
+  then replaceMatches " [0-9A-Za-z_-]+(\\\\[0-9A-Za-z_-]+)+\\.[A-Za-z]+\\>" (map turnSlash)
+  else id
+  where
+    turnSlash '\\' = '/'
+    turnSlash c = c
+
+-- Uses a function to replace all matches of a regular expression in a string
+replaceMatches :: String -> (String -> String) -> String -> String
+replaceMatches reString phi = go
+  where
+    re :: Regex
+    re = makeRegex reString
+    go :: String -> String
+    go haystack =
+      let (prefix, needle, suffix) = match re haystack
+      in prefix ++ (if null needle then "" else phi needle ++ go suffix)
+
+-- Takes the test entry point from a group of purs files - this is determined
+-- by the file with the shortest path name, as everything but the main file
+-- will be under a subdirectory.
+getTestMain :: [FilePath] -> FilePath
+getTestMain = minimumBy (compare `on` length)
+
+-- Scans a file for @shouldFailWith directives in the comments, used to
+-- determine expected failures
+getShouldFailWith :: FilePath -> IO [String]
+getShouldFailWith = extractPragma "shouldFailWith"
+
+-- Scans a file for @shouldWarnWith directives in the comments, used to
+-- determine expected warnings
+getShouldWarnWith :: FilePath -> IO [String]
+getShouldWarnWith = extractPragma "shouldWarnWith"
+
+extractPragma :: String -> FilePath -> IO [String]
+extractPragma pragma = fmap go . readUTF8File
+  where
+    go = lines >>> mapMaybe (stripPrefix ("-- @" ++ pragma ++ " ")) >>> map trim
+
 
 logfile :: FilePath
 logfile = "psc-tests.out"

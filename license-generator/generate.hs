@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-12.0 script
+-- stack --resolver lts-13.12 script
 
 {-# LANGUAGE TupleSections #-}
 -- |
@@ -59,9 +59,13 @@ depsNamesAndVersions :: IO [(String, String)]
 depsNamesAndVersions = do
   contents <- lines <$> getContents
   deps <- traverse parse contents
-  pure (filter (\(name, _) -> name /= "purescript" && name /= "rts") deps)
+  pure (filter (\(name, _) -> not (excluded name)) deps)
 
   where
+  excluded name =
+    name == "purescript"
+    || name == "rts"
+
   parse line =
     case splitOn " " line of
       [pkg, vers] -> pure (pkg, vers)

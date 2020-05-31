@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/LetPatterns4.purs:6:1 - 6:2 (line 6, column 1 - line 6, column 2)
+
+  Unable to parse module:
+  Unexpected token 'X'
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

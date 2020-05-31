@@ -23,8 +23,8 @@ fn _ _ = X
 
 infix 2 fn as !
 
-class Y a
+class Y (a :: Type)
 
-type Natural f g = forall a. f a -> g a
+type Natural f g = forall (a :: Type). f a -> g a
 
 infixl 1 type Natural as ~>

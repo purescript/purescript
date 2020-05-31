@@ -4,30 +4,28 @@ If you are having difficulty installing the PureScript compiler, feel free to
 ask for help! A good place is the #purescript IRC channel on Freenode, the #purescript channel on [FPChat Slack](https://fpchat-invite.herokuapp.com/), or
 alternatively Stack Overflow.
 
-## Using prebuilt binaries
+## Requirements
 
-The prebuilt binaries are compiled with GHC 8.2.2 and therefore they should
-run on any operating system supported by GHC 8.2.2, such as:
+The PureScript compiler is built using GHC 8.6.4, and should be able to run on any operating system supported by GHC 8.6.4. In particular:
 
-* Windows Vista or later,
-* OS X 10.7 or later,
-* Linux ??? (we're not sure what the minimum version is)
+* for Windows users, versions predating Vista are not officially supported,
+* for macOS / OS X users, versions predating Mac OS X 10.7 (Lion) are not officially supported.
 
-This list is not exhaustive. If your OS is too old or not listed, or if the binaries fail to run, you may be able to install the compiler by building it from source; see below. See also <https://www.haskell.org/ghc/download_ghc_8_2_2.html> for more details about the operating systems which GHC 8.2.2 supports.
+See also <https://www.haskell.org/ghc/download_ghc_8_6_4.html> for more details about the operating systems which GHC 8.6.4 supports.
 
-Other prebuilt distributions (eg, Homebrew, AUR, npm) will probably have the
-same requirements.
+## Official prebuilt binaries
 
-## Installing a pre-built distribution
+Each release comes with prebuilt x86-64 binary bundles for Linux, mac OS, and Windows. Users of other operating systems or architectures will likely need to build the compiler from source; see below.
 
-There are several options available for aquiring a pre-built binary of the PureScript compiler.  This is by no means an exhaustive list, and is presented in no particular order. Each example is expected to install the latest available compiler version at the time of running the command. Many of these are provided and maintained by the community, and may not be immediately up to date.
+To install a binary bundle, simply extract it and place the `purs` executable somewhere on your PATH.
+
+## Other distributions
+
+There are several other distributions of the PureScript compiler available, which may be more convenient to use in certain setups. This is by no means an exhaustive list, and is presented in no particular order. Many of these distributions are provided and maintained by the community, and may not be immediately up to date following a new release.
 
 * NPM: `npm install -g purescript`
-* Homebrew (for OS X): `brew install purescript`
-* [PSVM](https://github.com/ThomasCrevoisier/psvm-js) (PS Version Manager): 
-  1) `psvm install-latest` will install the latest version available
-  2) `psvm latest` will print the latest version number available
-  3) `psvm use <latest version number>` will enable the version we just installed. For example, if the version is `v0.11.7`, you'd run `psvm use v0.11.7`
+* Homebrew (for macOS): `brew install purescript`
+* [PSVM](https://github.com/ThomasCrevoisier/psvm-js): `npm install -g psvm`
 
 ## Compiling from source
 
@@ -40,14 +38,9 @@ $ cd purescript-x.y.z  # (replace x.y.z with whichever version you just download
 $ stack install --flag purescript:RELEASE
 ```
 
-This will then copy the compiler and utilities into `~/.local/bin`.
+This will then copy the compiler executable (`purs`) into `~/.local/bin`.
 
-
-If you don't have stack installed, there are install instructions
-[here](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md).
-
-If you don't have GHC installed, stack will prompt you to run `stack setup`
-which will install the correct version of GHC for you.
+If you don't have stack installed, please see the [stack install documentation](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md).
 
 ## The "curses" library
 

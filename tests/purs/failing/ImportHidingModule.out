@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/ImportHidingModule.purs:4:18 - 4:24 (line 4, column 18 - line 4, column 24)
+
+  Unable to parse module:
+  Unexpected token 'module'
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

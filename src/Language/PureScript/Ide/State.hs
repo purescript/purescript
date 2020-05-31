@@ -12,10 +12,11 @@
 -- Functions to access psc-ide's state
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE PackageImports  #-}
+{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns  #-}
-{-# LANGUAGE BangPatterns    #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
@@ -31,6 +32,8 @@ module Language.PureScript.Ide.State
   , populateVolatileState
   , populateVolatileStateSync
   , populateVolatileStateSTM
+  , getOutputDirectory
+  , updateCacheTimestamp
   -- for tests
   , resolveOperatorsForModule
   , resolveInstances
@@ -42,22 +45,51 @@ import           Protolude hiding (moduleName)
 import           Control.Arrow
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
+import           Data.IORef
 import qualified Data.Map.Lazy                      as Map
+import           Data.Time.Clock (UTCTime)
 import qualified Language.PureScript                as P
 import           Language.PureScript.Docs.Convert.Single (convertComments)
 import           Language.PureScript.Externs
+import           Language.PureScript.Make.Actions (cacheDbFile)
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           Lens.Micro.Platform                hiding ((&))
+import           System.Directory (getModificationTime)
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
 resetIdeState = do
   ideVar <- ideStateVar <$> ask
   liftIO (atomically (writeTVar ideVar emptyIdeState))
+
+getOutputDirectory :: Ide m => m FilePath
+getOutputDirectory = do
+  confOutputPath . ideConfiguration <$> ask
+
+getCacheTimestamp :: Ide m => m (Maybe UTCTime)
+getCacheTimestamp = do
+  x <- ideCacheDbTimestamp <$> ask
+  liftIO (readIORef x)
+
+readCacheTimestamp :: Ide m => m (Maybe UTCTime)
+readCacheTimestamp = do
+  cacheDb <- cacheDbFile <$> getOutputDirectory
+  liftIO (hush <$> try @SomeException (getModificationTime cacheDb))
+
+updateCacheTimestamp :: Ide m => m (Maybe (Maybe UTCTime, Maybe UTCTime))
+updateCacheTimestamp = do
+  old <- getCacheTimestamp
+  new <- readCacheTimestamp
+  if old == new
+    then pure Nothing
+    else do
+      ts <- ideCacheDbTimestamp <$> ask
+      liftIO (writeIORef ts new)
+      pure (Just (old, new))
 
 -- | Gets the loaded Modulenames
 getLoadedModulenames :: Ide m => m [P.ModuleName]
@@ -224,23 +256,33 @@ resolveLocationsForModule (defs, types) decls =
   map convertDeclaration decls
   where
     convertDeclaration :: IdeDeclarationAnn -> IdeDeclarationAnn
-    convertDeclaration (IdeDeclarationAnn ann d) = convertDeclaration' annotateFunction annotateValue annotateType annotateKind d
+    convertDeclaration (IdeDeclarationAnn ann d) = convertDeclaration'
+      annotateFunction
+      annotateValue
+      annotateDataConstructor
+      annotateType
+      annotateType -- type classes live in the type namespace
+      annotateModule
+      d
       where
         annotateFunction x = IdeDeclarationAnn (ann { _annLocation = Map.lookup (IdeNamespaced IdeNSValue (P.runIdent x)) defs
                                                     , _annTypeAnnotation = Map.lookup x types
                                                     })
         annotateValue x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSValue x) defs})
+        annotateDataConstructor x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSValue x) defs})
         annotateType x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSType x) defs})
-        annotateKind x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSKind x) defs})
+        annotateModule x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSModule x) defs})
 
 convertDeclaration'
   :: (P.Ident -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
+  -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
+  -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> IdeDeclaration
   -> IdeDeclarationAnn
-convertDeclaration' annotateFunction annotateValue annotateType annotateKind d =
+convertDeclaration' annotateFunction annotateValue annotateDataConstructor annotateType annotateClass annotateModule d =
   case d of
     IdeDeclValue v ->
       annotateFunction (v ^. ideValueIdent) d
@@ -249,15 +291,15 @@ convertDeclaration' annotateFunction annotateValue annotateType annotateKind d =
     IdeDeclTypeSynonym s ->
       annotateType (s ^. ideSynonymName . properNameT) d
     IdeDeclDataConstructor dtor ->
-      annotateValue (dtor ^. ideDtorName . properNameT) d
+      annotateDataConstructor (dtor ^. ideDtorName . properNameT) d
     IdeDeclTypeClass tc ->
-      annotateType (tc ^. ideTCName . properNameT) d
+      annotateClass (tc ^. ideTCName . properNameT) d
     IdeDeclValueOperator operator ->
       annotateValue (operator ^. ideValueOpName . opNameT) d
     IdeDeclTypeOperator operator ->
       annotateType (operator ^. ideTypeOpName . opNameT) d
-    IdeDeclKind i ->
-      annotateKind (i ^. properNameT) d
+    IdeDeclModule mn ->
+      annotateModule (P.runModuleName mn) d
 
 resolveDocumentation
   :: ModuleMap P.Module
@@ -271,26 +313,38 @@ resolveDocumentationForModule
   :: P.Module
     -> [IdeDeclarationAnn]
     -> [IdeDeclarationAnn]
-resolveDocumentationForModule (P.Module _ _ _ sdecls _) decls = map convertDecl decls
-  where 
+resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) decls =
+  map convertDecl decls
+  where
+  extractDeclComments :: P.Declaration -> [(P.Name, [P.Comment])]
+  extractDeclComments = \case
+    P.DataDeclaration (_, cs) _ ctorName _ ctors ->
+      (P.TyName ctorName, cs) : map dtorComments ctors
+    P.TypeClassDeclaration (_, cs) tyClassName _ _ _ members ->
+      (P.TyClassName tyClassName, cs) : concatMap extractDeclComments members
+    decl ->
+      maybe [] (\name' -> [(name', snd (P.declSourceAnn decl))]) (name decl)
+
   comments :: Map P.Name [P.Comment]
-  comments = Map.fromListWith (flip (<>)) $ mapMaybe (\d -> 
-    case name d of 
-      Just name' -> Just (name', snd $ P.declSourceAnn d)
-      _ -> Nothing)
-    sdecls 
+  comments = Map.insert (P.ModName moduleName) moduleComments $
+    Map.fromListWith (flip (<>)) $ concatMap extractDeclComments sdecls
+
+  dtorComments :: P.DataConstructorDeclaration -> (P.Name, [P.Comment])
+  dtorComments dcd = (P.DctorName (P.dataCtorName dcd), snd (P.dataCtorAnn dcd))
 
   name :: P.Declaration -> Maybe P.Name
   name (P.TypeDeclaration d) = Just $ P.IdentName $ P.tydeclIdent d
   name decl = P.declName decl
 
   convertDecl :: IdeDeclarationAnn -> IdeDeclarationAnn
-  convertDecl (IdeDeclarationAnn ann d) = 
+  convertDecl (IdeDeclarationAnn ann d) =
     convertDeclaration'
       (annotateValue . P.IdentName)
-      (annotateValue . P.IdentName . P.Ident) 
+      (annotateValue . P.IdentName . P.Ident)
+      (annotateValue . P.DctorName . P.ProperName)
       (annotateValue . P.TyName . P.ProperName)
-      (annotateValue . P.KiName . P.ProperName)
+      (annotateValue . P.TyClassName . P.ProperName)
+      (annotateValue . P.ModName . P.moduleNameFromString)
       d
     where
       docs :: P.Name -> Text

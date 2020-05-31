@@ -10,13 +10,16 @@ module Language.PureScript.Externs
   , ExternsFixity(..)
   , ExternsTypeFixity(..)
   , ExternsDeclaration(..)
+  , externsIsCurrentVersion
   , moduleToExternsFile
   , applyExternsFileToEnvironment
+  , externsFileName
   ) where
 
 import Prelude.Compat
 
-import Data.Aeson.TH
+import Codec.Serialise (Serialise)
+import GHC.Generics (Generic)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
 import Data.Foldable (fold)
@@ -24,14 +27,13 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
 import qualified Data.Map as M
-import qualified Data.Set as S
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Kinds
 import Language.PureScript.Names
+import Language.PureScript.Roles
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
@@ -39,6 +41,9 @@ import Paths_purescript as Paths
 
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile
+  -- NOTE: Make sure to keep `efVersion` as the first field in this
+  -- record, so the derived Serialise instance produces CBOR that can
+  -- be checked for its version independent of the remaining format
   { efVersion :: Text
   -- ^ The externs version
   , efModuleName :: ModuleName
@@ -55,7 +60,9 @@ data ExternsFile = ExternsFile
   -- ^ List of type and value declaration
   , efSourceSpan :: SourceSpan
   -- ^ Source span for error reporting
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsFile
 
 -- | A module import in an externs file
 data ExternsImport = ExternsImport
@@ -66,7 +73,9 @@ data ExternsImport = ExternsImport
   , eiImportType :: ImportDeclarationType
   -- | The imported-as name, for qualified imports
   , eiImportedAs :: Maybe ModuleName
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsImport
 
 -- | A fixity declaration in an externs file
 data ExternsFixity = ExternsFixity
@@ -79,7 +88,9 @@ data ExternsFixity = ExternsFixity
   , efOperator :: OpName 'ValueOpName
   -- | The value the operator is an alias for
   , efAlias :: Qualified (Either Ident (ProperName 'ConstructorName))
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsFixity
 
 -- | A type fixity declaration in an externs file
 data ExternsTypeFixity = ExternsTypeFixity
@@ -92,23 +103,30 @@ data ExternsTypeFixity = ExternsTypeFixity
   , efTypeOperator :: OpName 'TypeOpName
   -- | The value the operator is an alias for
   , efTypeAlias :: Qualified (ProperName 'TypeName)
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsTypeFixity
 
 -- | A type or value declaration appearing in an externs file
 data ExternsDeclaration =
   -- | A type declaration
     EDType
       { edTypeName                :: ProperName 'TypeName
-      , edTypeKind                :: SourceKind
+      , edTypeKind                :: SourceType
       , edTypeDeclarationKind     :: TypeKind
+      }
+  -- | A role declaration
+  | EDRole
+      { edRoleTypeName            :: ProperName 'TypeName
+      , edRoleRoles               :: [Role]
       }
   -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
-      , edTypeSynonymArguments    :: [(Text, Maybe SourceKind)]
+      , edTypeSynonymArguments    :: [(Text, Maybe SourceType)]
       , edTypeSynonymType         :: SourceType
       }
-  -- | A data construtor
+  -- | A data constructor
   | EDDataConstructor
       { edDataCtorName            :: ProperName 'ConstructorName
       , edDataCtorOrigin          :: DataDeclType
@@ -124,25 +142,32 @@ data ExternsDeclaration =
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
-      , edClassTypeArguments      :: [(Text, Maybe SourceKind)]
+      , edClassTypeArguments      :: [(Text, Maybe SourceType)]
       , edClassMembers            :: [(Ident, SourceType)]
       , edClassConstraints        :: [SourceConstraint]
       , edFunctionalDependencies  :: [FunctionalDependency]
+      , edIsEmpty                 :: Bool
       }
   -- | An instance declaration
   | EDInstance
       { edInstanceClassName       :: Qualified (ProperName 'ClassName)
       , edInstanceName            :: Ident
+      , edInstanceForAll          :: [(Text, SourceType)]
+      , edInstanceKinds           :: [SourceType]
       , edInstanceTypes           :: [SourceType]
       , edInstanceConstraints     :: Maybe [SourceConstraint]
       , edInstanceChain           :: [Qualified Ident]
       , edInstanceChainIndex      :: Integer
       }
-  -- | A kind declaration
-  | EDKind
-      { edKindName                :: ProperName 'KindName
-      }
-  deriving Show
+  deriving (Show, Generic)
+
+instance Serialise ExternsDeclaration
+
+-- | Check whether the version in an externs file matches the currently running
+-- version.
+externsIsCurrentVersion :: ExternsFile -> Bool
+externsIsCurrentVersion ef =
+  T.unpack (efVersion ef) == showVersion Paths.version
 
 -- | Convert an externs file back into a module
 applyExternsFileToEnvironment :: ExternsFile -> Environment -> Environment
@@ -150,19 +175,19 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   where
   applyDecl :: Environment -> ExternsDeclaration -> Environment
   applyDecl env (EDType pn kind tyKind) = env { types = M.insert (qual pn) (kind, tyKind) (types env) }
+  applyDecl env (EDRole pn roles) = env { roleDeclarations = M.insert (qual pn) roles (roleDeclarations env) }
   applyDecl env (EDTypeSynonym pn args ty) = env { typeSynonyms = M.insert (qual pn) (args, ty) (typeSynonyms env) }
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
-  applyDecl env (EDClass pn args members cs deps) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps) (typeClasses env) }
-  applyDecl env (EDKind pn) = env { kinds = S.insert (qual pn) (kinds env) }
-  applyDecl env (EDInstance className ident tys cs ch idx) =
+  applyDecl env (EDClass pn args members cs deps tcIsEmpty) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps tcIsEmpty) (typeClasses env) }
+  applyDecl env (EDInstance className ident vars kinds tys cs ch idx) =
     env { typeClassDictionaries =
             updateMap
               (updateMap (M.insertWith (<>) (qual ident) (pure dict)) className)
               (Just efModuleName) (typeClassDictionaries env) }
     where
     dict :: NamedDict
-    dict = TypeClassDictionaryInScope ch idx (qual ident) [] className tys cs
+    dict = TypeClassDictionaryInScope ch idx (qual ident) [] className vars kinds tys cs
 
     updateMap :: (Ord k, Monoid a) => (a -> a) -> k -> M.Map k a -> M.Map k a
     updateMap f = M.alter (Just . f . fold)
@@ -181,7 +206,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   efImports       = mapMaybe importDecl ds
   efFixities      = mapMaybe fixityDecl ds
   efTypeFixities  = mapMaybe typeFixityDecl ds
-  efDeclarations  = concatMap toExternsDeclaration efExports
+  efDeclarations  = concatMap toExternsDeclaration efExports ++ mapMaybe roleDecl ds
   efSourceSpan    = ss
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
@@ -201,6 +226,10 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   importDecl (ImportDeclaration _ m mt qmn) = Just (ExternsImport m mt qmn)
   importDecl _ = Nothing
 
+  roleDecl :: Declaration -> Maybe ExternsDeclaration
+  roleDecl (RoleDeclaration (RoleDeclarationData _ name roles)) = Just (EDRole name roles)
+  roleDecl _ = Nothing
+
   toExternsDeclaration :: DeclarationRef -> [ExternsDeclaration]
   toExternsDeclaration (TypeRef _ pn dctors) =
     case Qualified (Just mn) pn `M.lookup` types env of
@@ -218,27 +247,24 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
     | Just (ty, _, _) <- Qualified (Just mn) ident `M.lookup` names env
     = [ EDValue ident ty ]
   toExternsDeclaration (TypeClassRef _ className)
-    | Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
-    , Just (kind, TypeSynonym) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
-    , Just (_, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
-    = [ EDType (coerceProperName className) kind TypeSynonym
-      , EDTypeSynonym (coerceProperName className) typeClassArguments synTy
-      , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies
+    | let dictName = dictSynonymName . coerceProperName $ className
+    , Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
+    , Just (kind, ExternData) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
+    , Just (synKind, TypeSynonym) <- Qualified (Just mn) dictName `M.lookup` types env
+    , Just (synArgs, synTy) <- Qualified (Just mn) dictName `M.lookup` typeSynonyms env
+    = [ EDType (coerceProperName className) kind ExternData
+      , EDType dictName synKind TypeSynonym
+      , EDTypeSynonym dictName synArgs synTy
+      , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef _ ident)
-    = [ EDInstance tcdClassName ident tcdInstanceTypes tcdDependencies tcdChain tcdIndex
+    = [ EDInstance tcdClassName ident tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
       , TypeClassDictionaryInScope{..} <- NEL.toList nel
       ]
-  toExternsDeclaration (KindRef _ pn)
-    | Qualified (Just mn) pn `S.member` kinds env
-    = [ EDKind pn ]
   toExternsDeclaration _ = []
 
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFixity)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsTypeFixity)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsDeclaration)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFile)
+externsFileName :: FilePath
+externsFileName = "externs.cbor"

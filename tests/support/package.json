@@ -1,7 +1,7 @@
 {
   "private": true,
   "dependencies": {
-    "bower": "^1.4.1",
+    "bower": "^1.8.8",
     "glob": "^5.0.14",
     "rimraf": "^2.5.2"
   }

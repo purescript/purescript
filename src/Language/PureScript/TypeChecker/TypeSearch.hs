@@ -93,8 +93,8 @@ accessorSearch unsolved env st userT = maybe ([], []) fst $ checkInEnvironment e
 
   userT' <- initializeSkolems userT
 
-  rowType <- freshType
-  resultType <- freshType
+  rowType <- freshTypeWithKind (P.kindRow P.kindType)
+  resultType <- freshTypeWithKind P.kindType
   let recordFunction = srcTypeApp (srcTypeApp tyFunction (srcTypeApp tyRecord rowType)) resultType
   _ <- subsumes recordFunction userT'
   subst <- gets TC.checkSubstitution

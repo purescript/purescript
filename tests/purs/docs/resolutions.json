@@ -1,21 +1,10 @@
 {
-  "canonicalDir": ".",
-  "pkgMeta": {
-    "dependencies": {
-      "purescript-prelude": "./bower_components/purescript-prelude"
-    }
+  "purescript-prelude": {
+    "version": "1.0.0",
+    "path": "bower_components/purescript-prelude"
   },
-  "dependencies": {
-    "purescript-prelude": {
-      "canonicalDir": "bower_components/purescript-prelude",
-      "pkgMeta": {
-        "_resolution": {
-          "type": "version",
-          "tag": "v2.4.0",
-          "commit": "21067a4c782f42d08bc877214f85b92ce6769b21"
-        }
-      },
-      "dependencies": {}
-    }
+  "purescript-newtype": {
+    "version": "1.0.0",
+    "path": "bower_components/purescript-newtype"
   }
 }

@@ -1,0 +1,14 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/3132.purs:2:1 - 18:13 (line 2, column 1 - line 18, column 13)
+
+  An export for [33mclass C3[0m requires the following to also be exported:
+
+    [33mclass C1[0m
+    [33mclass C2[0m
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/TransitiveExportError.md for more information,
+or to contribute content related to this error.
+

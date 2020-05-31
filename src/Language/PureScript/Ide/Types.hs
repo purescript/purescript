@@ -1,28 +1,17 @@
------------------------------------------------------------------------------
---
--- Module      : Language.PureScript.Ide.Types
--- Description : Type definitions for psc-ide
--- Copyright   : Christoph Hegemann 2016
--- License     : MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  : Christoph Hegemann <christoph.hegemann1337@gmail.com>
--- Stability   : experimental
---
 -- |
 -- Type definitions for psc-ide
------------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE DeriveAnyClass  #-}
-{-# LANGUAGE DeriveFoldable  #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# language DeriveAnyClass, NoGeneralizedNewtypeDeriving, TemplateHaskell #-}
 
 module Language.PureScript.Ide.Types where
 
 import           Protolude hiding (moduleName)
 
-import           Control.Concurrent.STM
-import           Data.Aeson
+import           Control.Concurrent.STM (TVar)
+import           Data.Aeson (ToJSON, FromJSON, (.=))
+import qualified Data.Aeson as Aeson
+import           Data.IORef (IORef)
+import           Data.Time.Clock (UTCTime)
 import qualified Data.Map.Lazy as M
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Errors.JSON as P
@@ -39,59 +28,59 @@ data IdeDeclaration
   | IdeDeclTypeClass IdeTypeClass
   | IdeDeclValueOperator IdeValueOperator
   | IdeDeclTypeOperator IdeTypeOperator
-  | IdeDeclKind (P.ProperName 'P.KindName)
+  | IdeDeclModule P.ModuleName
   deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeValue = IdeValue
   { _ideValueIdent :: P.Ident
-  , _ideValueType  :: P.SourceType
+  , _ideValueType :: P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeType = IdeType
  { _ideTypeName :: P.ProperName 'P.TypeName
- , _ideTypeKind :: P.SourceKind
+ , _ideTypeKind :: P.SourceType
  , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.SourceType)]
  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeSynonym = IdeTypeSynonym
   { _ideSynonymName :: P.ProperName 'P.TypeName
   , _ideSynonymType :: P.SourceType
-  , _ideSynonymKind :: P.SourceKind
+  , _ideSynonymKind :: P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeDataConstructor = IdeDataConstructor
-  { _ideDtorName     :: P.ProperName 'P.ConstructorName
+  { _ideDtorName :: P.ProperName 'P.ConstructorName
   , _ideDtorTypeName :: P.ProperName 'P.TypeName
-  , _ideDtorType     :: P.SourceType
+  , _ideDtorType :: P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeClass = IdeTypeClass
   { _ideTCName :: P.ProperName 'P.ClassName
-  , _ideTCKind :: P.SourceKind
+  , _ideTCKind :: P.SourceType
   , _ideTCInstances :: [IdeInstance]
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeInstance = IdeInstance
-  { _ideInstanceModule      :: P.ModuleName
-  , _ideInstanceName        :: P.Ident
-  , _ideInstanceTypes       :: [P.SourceType]
+  { _ideInstanceModule :: P.ModuleName
+  , _ideInstanceName :: P.Ident
+  , _ideInstanceTypes :: [P.SourceType]
   , _ideInstanceConstraints :: Maybe [P.SourceConstraint]
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeValueOperator = IdeValueOperator
-  { _ideValueOpName          :: P.OpName 'P.ValueOpName
-  , _ideValueOpAlias         :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))
-  , _ideValueOpPrecedence    :: P.Precedence
+  { _ideValueOpName :: P.OpName 'P.ValueOpName
+  , _ideValueOpAlias :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))
+  , _ideValueOpPrecedence :: P.Precedence
   , _ideValueOpAssociativity :: P.Associativity
-  , _ideValueOpType          :: Maybe P.SourceType
+  , _ideValueOpType :: Maybe P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeOperator = IdeTypeOperator
-  { _ideTypeOpName          :: P.OpName 'P.TypeOpName
-  , _ideTypeOpAlias         :: P.Qualified (P.ProperName 'P.TypeName)
-  , _ideTypeOpPrecedence    :: P.Precedence
+  { _ideTypeOpName :: P.OpName 'P.TypeOpName
+  , _ideTypeOpAlias :: P.Qualified (P.ProperName 'P.TypeName)
+  , _ideTypeOpPrecedence :: P.Precedence
   , _ideTypeOpAssociativity :: P.Associativity
-  , _ideTypeOpKind          :: Maybe P.SourceKind
+  , _ideTypeOpKind :: Maybe P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 _IdeDeclValue :: Traversal' IdeDeclaration IdeValue
@@ -122,9 +111,9 @@ _IdeDeclTypeOperator :: Traversal' IdeDeclaration IdeTypeOperator
 _IdeDeclTypeOperator f (IdeDeclTypeOperator x) = map IdeDeclTypeOperator (f x)
 _IdeDeclTypeOperator _ x = pure x
 
-_IdeDeclKind :: Traversal' IdeDeclaration (P.ProperName 'P.KindName)
-_IdeDeclKind f (IdeDeclKind x) = map IdeDeclKind (f x)
-_IdeDeclKind _ x = pure x
+_IdeDeclModule :: Traversal' IdeDeclaration P.ModuleName
+_IdeDeclModule f (IdeDeclModule x) = map IdeDeclModule (f x)
+_IdeDeclModule _ x = pure x
 
 anyOf :: Getting Any s a -> (a -> Bool) -> s -> Bool
 anyOf g p = getAny . getConst . g (Const . Any . p)
@@ -139,16 +128,16 @@ makeLenses ''IdeValueOperator
 makeLenses ''IdeTypeOperator
 
 data IdeDeclarationAnn = IdeDeclarationAnn
-  { _idaAnnotation  :: Annotation
+  { _idaAnnotation :: Annotation
   , _idaDeclaration :: IdeDeclaration
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data Annotation
   = Annotation
-  { _annLocation       :: Maybe P.SourceSpan
-  , _annExportedFrom   :: Maybe P.ModuleName
+  { _annLocation :: Maybe P.SourceSpan
+  , _annExportedFrom :: Maybe P.ModuleName
   , _annTypeAnnotation :: Maybe P.SourceType
-  , _annDocumentation  :: Maybe Text
+  , _annDocumentation :: Maybe Text
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 makeLenses ''Annotation
@@ -170,21 +159,21 @@ data IdeLogLevel = LogDebug | LogPerf | LogAll | LogDefault | LogNone
 data IdeConfiguration =
   IdeConfiguration
   { confOutputPath :: FilePath
-  , confLogLevel   :: IdeLogLevel
-  , confGlobs      :: [FilePath]
-  , confEditorMode :: Bool
+  , confLogLevel :: IdeLogLevel
+  , confGlobs :: [FilePath]
   }
 
 data IdeEnvironment =
   IdeEnvironment
-  { ideStateVar      :: TVar IdeState
+  { ideStateVar :: TVar IdeState
   , ideConfiguration :: IdeConfiguration
+  , ideCacheDbTimestamp :: IORef (Maybe UTCTime)
   }
 
 type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
 
 data IdeState = IdeState
-  { ideFileState     :: IdeFileState
+  { ideFileState :: IdeFileState
   , ideVolatileState :: IdeVolatileState
   } deriving (Show)
 
@@ -216,8 +205,8 @@ data IdeFileState = IdeFileState
 -- with open imports which is used to provide completions for module private
 -- declarations
 data IdeVolatileState = IdeVolatileState
-  { vsAstData       :: AstData P.SourceSpan
-  , vsDeclarations  :: ModuleMap [IdeDeclarationAnn]
+  { vsAstData :: AstData P.SourceSpan
+  , vsDeclarations :: ModuleMap [IdeDeclarationAnn]
   , vsCachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
   } deriving (Show)
 
@@ -226,34 +215,35 @@ newtype Match a = Match (P.ModuleName, a)
 
 -- | A completion as it gets sent to the editors
 data Completion = Completion
-  { complModule        :: Text
-  , complIdentifier    :: Text
-  , complType          :: Text
-  , complExpandedType  :: Text
-  , complLocation      :: Maybe P.SourceSpan
+  { complModule :: Text
+  , complIdentifier :: Text
+  , complType :: Text
+  , complExpandedType :: Text
+  , complLocation :: Maybe P.SourceSpan
   , complDocumentation :: Maybe Text
-  , complExportedFrom  :: [P.ModuleName]
+  , complExportedFrom :: [P.ModuleName]
   } deriving (Show, Eq, Ord)
 
 instance ToJSON Completion where
   toJSON (Completion {..}) =
-    object [ "module" .= complModule
-           , "identifier" .= complIdentifier
-           , "type" .= complType
-           , "expandedType" .= complExpandedType
-           , "definedAt" .= complLocation
-           , "documentation" .= complDocumentation
-           , "exportedFrom" .= map P.runModuleName complExportedFrom
-           ]
+    Aeson.object
+      [ "module" .= complModule
+      , "identifier" .= complIdentifier
+      , "type" .= complType
+      , "expandedType" .= complExpandedType
+      , "definedAt" .= complLocation
+      , "documentation" .= complDocumentation
+      , "exportedFrom" .= map P.runModuleName complExportedFrom
+      ]
 
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
-identifierFromDeclarationRef (P.TypeRef _ name _) = P.runProperName name
-identifierFromDeclarationRef (P.ValueRef _ ident) = P.runIdent ident
-identifierFromDeclarationRef (P.TypeClassRef _ name) = P.runProperName name
-identifierFromDeclarationRef (P.KindRef _ name) = P.runProperName name
-identifierFromDeclarationRef (P.ValueOpRef _ op) = P.showOp op
-identifierFromDeclarationRef (P.TypeOpRef _ op) = P.showOp op
-identifierFromDeclarationRef _ = ""
+identifierFromDeclarationRef = \case
+  P.TypeRef _ name _ -> P.runProperName name
+  P.ValueRef _ ident -> P.runIdent ident
+  P.TypeClassRef _ name -> P.runProperName name
+  P.ValueOpRef _ op -> P.showOp op
+  P.TypeOpRef _ op -> P.showOp op
+  _ -> ""
 
 data Success =
   CompletionResult [Completion]
@@ -265,47 +255,56 @@ data Success =
   | RebuildSuccess P.MultipleErrors
   deriving (Show)
 
-encodeSuccess :: (ToJSON a) => a -> Value
+encodeSuccess :: ToJSON a => a -> Aeson.Value
 encodeSuccess res =
-    object ["resultType" .= ("success" :: Text), "result" .= res]
+  Aeson.object ["resultType" .= ("success" :: Text), "result" .= res]
 
 instance ToJSON Success where
-  toJSON (CompletionResult cs) = encodeSuccess cs
-  toJSON (TextResult t) = encodeSuccess t
-  toJSON (UsagesResult ssp) = encodeSuccess ssp
-  toJSON (MultilineTextResult ts) = encodeSuccess ts
-  toJSON (ImportList (moduleName, imports)) = object [ "resultType" .= ("success" :: Text)
-                                                     , "result" .= object [ "imports" .= map encodeImport imports
-                                                                          , "moduleName" .= P.runModuleName moduleName]]
-  toJSON (ModuleList modules) = encodeSuccess modules
-  toJSON (RebuildSuccess warnings) = encodeSuccess (P.toJSONErrors False P.Warning warnings)
+  toJSON = \case
+    CompletionResult cs -> encodeSuccess cs
+    TextResult t -> encodeSuccess t
+    UsagesResult ssp -> encodeSuccess ssp
+    MultilineTextResult ts -> encodeSuccess ts
+    ImportList (moduleName, imports) ->
+      Aeson.object
+        [ "resultType" .= ("success" :: Text)
+        , "result" .= Aeson.object
+            [ "imports" .= map encodeImport imports
+            , "moduleName" .= P.runModuleName moduleName
+            ]
+        ]
+    ModuleList modules -> encodeSuccess modules
+    RebuildSuccess warnings -> encodeSuccess (P.toJSONErrors False P.Warning warnings)
 
-encodeImport :: (P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName) -> Value
+encodeImport :: (P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName) -> Aeson.Value
 encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifier) = case importType of
   P.Implicit ->
-    object $ [ "module" .= mn
-             , "importType" .= ("implicit" :: Text)
-             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
+    Aeson.object $
+      [ "module" .= mn
+      , "importType" .= ("implicit" :: Text)
+      ] ++ map ("qualifier" .=) (maybeToList qualifier)
   P.Explicit refs ->
-    object $ [ "module" .= mn
-             , "importType" .= ("explicit" :: Text)
-             , "identifiers" .= (identifierFromDeclarationRef <$> refs)
-             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
+    Aeson.object $
+      [ "module" .= mn
+      , "importType" .= ("explicit" :: Text)
+      , "identifiers" .= (identifierFromDeclarationRef <$> refs)
+      ] ++ map ("qualifier" .=) (maybeToList qualifier)
   P.Hiding refs ->
-    object $ [ "module" .= mn
-             , "importType" .= ("hiding" :: Text)
-             , "identifiers" .= (identifierFromDeclarationRef <$> refs)
-             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
+    Aeson.object $
+      [ "module" .= mn
+      , "importType" .= ("hiding" :: Text)
+      , "identifiers" .= (identifierFromDeclarationRef <$> refs)
+      ] ++ map ("qualifier" .=) (maybeToList qualifier)
 
 -- | Denotes the different namespaces a name in PureScript can reside in.
-data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind
+data IdeNamespace = IdeNSValue | IdeNSType | IdeNSModule
   deriving (Show, Eq, Ord, Generic, NFData)
 
 instance FromJSON IdeNamespace where
-  parseJSON (String s) = case s of
+  parseJSON (Aeson.String s) = case s of
     "value" -> pure IdeNSValue
-    "type"  -> pure IdeNSType
-    "kind"  -> pure IdeNSKind
+    "type" -> pure IdeNSType
+    "module" -> pure IdeNSModule
     _       -> mzero
   parseJSON _ = mzero
 

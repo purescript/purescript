@@ -1,0 +1,27 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/OperatorSections.purs:7:3 - 7:17 (line 7, column 3 - line 7, column 17)
+
+  Could not match type
+  [33m         [0m
+  [33m  Boolean[0m
+  [33m         [0m
+  with type
+  [33m          [0m
+  [33m  t1 -> t2[0m
+  [33m          [0m
+
+while applying a function [33m(not (#dict HeytingAlgebra t2)) true[0m
+  of type [33mt0[0m
+  to argument [33m$0[0m
+while inferring the type of [33m\$0 ->         [0m
+                            [33m  (not true) $0[0m
+in value declaration [33mmain[0m
+
+where [33mt1[0m is an unknown type
+      [33mt0[0m is an unknown type
+      [33mt2[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+or to contribute content related to this error.
+

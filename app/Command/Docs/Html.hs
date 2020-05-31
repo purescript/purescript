@@ -8,6 +8,8 @@ module Command.Docs.Html
   , writeHtmlModules
   ) where
 
+import Prelude
+
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Monad.Writer
@@ -23,13 +25,10 @@ import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 import qualified Text.Blaze.Html.Renderer.Text as Blaze
 import           System.IO.UTF8 (writeUTF8FileT)
-import           System.FilePath.Glob (glob)
-import           System.Directory (removeFile)
 import           Version (versionString)
 
 writeHtmlModules :: FilePath -> [(P.ModuleName, D.HtmlOutputModule Html)] -> IO ()
 writeHtmlModules outputDir modules = do
-  glob (outputDir <> "/*.html") >>= mapM_ removeFile
   let moduleList = sort $ map fst modules
   writeHtmlFile (outputDir ++ "/index.html") (renderIndexModule moduleList)
   mapM_ (writeHtmlModule outputDir . (fst &&& layout moduleList)) modules

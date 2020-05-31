@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/2874-wildcard.purs:10:25 - 10:26 (line 10, column 25 - line 10, column 26)
+
+  Unable to parse module:
+  Unexpected wildcard in type; type wildcards are only allowed in value annotations
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

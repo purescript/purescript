@@ -96,7 +96,7 @@ matchOperators isBinOp extractOp fromOp reapply modOpTable ops = parseChains
   -- grouping them by shared precedence, then if any of the following conditions
   -- are met, we have something to report:
   --   1. any of the groups have mixed associativity
-  --   2. there is more than one occurance of a non-associative operator in a
+  --   2. there is more than one occurrence of a non-associative operator in a
   --      precedence group
   mkErrors :: Chain a -> [ErrorMessage]
   mkErrors chain =

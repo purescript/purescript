@@ -28,14 +28,13 @@ import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Declarations
 import Language.PureScript.AST.Literals
 import Language.PureScript.Crash
-import Language.PureScript.Environment
+import Language.PureScript.Environment hiding (tyVar)
 import Language.PureScript.Errors
-import Language.PureScript.Kinds
 import Language.PureScript.Names as P
 import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)
 import Language.PureScript.Traversals
 import Language.PureScript.Types as P
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 
 -- | There are two modes of failure for the redundancy check:
 --
@@ -67,11 +66,11 @@ getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'Construct
 getConstructors env defmn n = extractConstructors lnte
   where
 
-  extractConstructors :: Maybe (SourceKind, TypeKind) -> [(ProperName 'ConstructorName, [SourceType])]
+  extractConstructors :: Maybe (SourceType, TypeKind) -> [(ProperName 'ConstructorName, [SourceType])]
   extractConstructors (Just (_, DataType _ pt)) = pt
   extractConstructors _ = internalError "Data name not in the scope of the current environment in extractConstructors"
 
-  lnte :: Maybe (SourceKind, TypeKind)
+  lnte :: Maybe (SourceType, TypeKind)
   lnte = M.lookup qpn (types env)
 
   qpn :: Qualified (ProperName 'TypeName)
@@ -306,8 +305,9 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
       ty :: Text -> SourceType
       ty tyVar =
         srcForAll tyVar
+          Nothing
           ( srcConstrainedType
-              (srcConstraint C.Partial [] (Just constraintData))
+              (srcConstraint C.Partial [] [] (Just constraintData))
               $ srcTypeApp (srcTypeApp tyFunction (srcTypeVar tyVar)) (srcTypeVar tyVar)
           )
           Nothing

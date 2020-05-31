@@ -1,7 +1,11 @@
+.build
+bin
 dist
 cabal-dev
 .cabal-sandbox
 cabal.sandbox.config
+dist-newstyle/
+cabal.project.local*
 *.o
 *.hi
 *.chi
@@ -30,3 +34,4 @@ TAGS
 *.prof
 *.ps
 *.svg
+tests/purs/make/

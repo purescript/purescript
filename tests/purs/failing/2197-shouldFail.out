@@ -1,0 +1,14 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/2197-shouldFail.purs:9:6 - 9:12 (line 9, column 6 - line 9, column 12)
+
+  Conflicting definitions are in scope for type [33mNumber[0m from the following modules:
+
+    [33mMain[0m
+    [33mPrim[0m
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ScopeConflict.md for more information,
+or to contribute content related to this error.
+

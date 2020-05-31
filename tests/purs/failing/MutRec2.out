@@ -1,0 +1,9 @@
+Error found:
+at tests/purs/failing/MutRec2.purs:6:1 - 6:6 (line 6, column 1 - line 6, column 6)
+
+  The value of [33mx[0m is undefined here, so this reference is not allowed.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CycleInDeclaration.md for more information,
+or to contribute content related to this error.
+

@@ -17,7 +17,6 @@ module Language.PureScript.Sugar.Names.Env
   , exportTypeClass
   , exportValue
   , exportValueOp
-  , exportKind
   , getExports
   , checkImportConflicts
   ) where
@@ -36,7 +35,7 @@ import Safe (headMay)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -112,7 +111,7 @@ data Imports = Imports
   -- |
   -- Local names for kinds within a module mapped to their qualified names
   --
-  , importedKinds :: ImportMap (ProperName 'KindName)
+  , importedKinds :: ImportMap (ProperName 'TypeName)
   } deriving (Show)
 
 nullImports :: Imports
@@ -145,17 +144,13 @@ data Exports = Exports
   -- from.
   --
   , exportedValueOps :: M.Map (OpName 'ValueOpName) ExportSource
-  -- |
-  -- The exported kinds along with the module they originally came from.
-  --
-  , exportedKinds :: M.Map (ProperName 'KindName) ExportSource
   } deriving (Show)
 
 -- |
 -- An empty 'Exports' value.
 --
 nullExports :: Exports
-nullExports = Exports M.empty M.empty M.empty M.empty M.empty M.empty
+nullExports = Exports M.empty M.empty M.empty M.empty M.empty
 
 -- |
 -- The imports and exports for a collection of modules. The 'SourceSpan' is used
@@ -186,43 +181,49 @@ envModuleExports (_, _, exps) = exps
 -- The exported types from the @Prim@ module
 --
 primExports :: Exports
-primExports = mkPrimExports primTypes primClasses primKinds
+primExports = mkPrimExports primTypes primClasses
 
 -- |
 -- The exported types from the @Prim.Boolean@ module
 --
 primBooleanExports :: Exports
-primBooleanExports = mkPrimExports primBooleanTypes mempty primBooleanKinds
+primBooleanExports = mkPrimExports primBooleanTypes mempty
+
+-- |
+-- The exported types from the @Prim.Coerce@ module
+--
+primCoerceExports :: Exports
+primCoerceExports = mkPrimExports primCoerceTypes primCoerceClasses
 
 -- |
 -- The exported types from the @Prim.Ordering@ module
 --
 primOrderingExports :: Exports
-primOrderingExports = mkPrimExports primOrderingTypes mempty primOrderingKinds
+primOrderingExports = mkPrimExports primOrderingTypes mempty
 
 -- |
 -- The exported types from the @Prim.Row@ module
 --
 primRowExports :: Exports
-primRowExports = mkPrimExports primRowTypes primRowClasses mempty
+primRowExports = mkPrimExports primRowTypes primRowClasses
 
 -- |
 -- The exported types from the @Prim.RowList@ module
 --
 primRowListExports :: Exports
-primRowListExports = mkPrimExports primRowListTypes primRowListClasses primRowListKinds
+primRowListExports = mkPrimExports primRowListTypes primRowListClasses
 
 -- |
 -- The exported types from the @Prim.Symbol@ module
 --
 primSymbolExports :: Exports
-primSymbolExports = mkPrimExports primSymbolTypes primSymbolClasses mempty
+primSymbolExports = mkPrimExports primSymbolTypes primSymbolClasses
 
 -- |
 -- The exported types from the @Prim.TypeError@ module
 --
 primTypeErrorExports :: Exports
-primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses primTypeErrorKinds
+primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses
 
 -- |
 -- Create a set of exports for a Prim module.
@@ -230,18 +231,15 @@ primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses pri
 mkPrimExports
   :: M.Map (Qualified (ProperName 'TypeName)) a
   -> M.Map (Qualified (ProperName 'ClassName)) b
-  -> S.Set (Qualified (ProperName 'KindName))
   -> Exports
-mkPrimExports ts cs ks =
+mkPrimExports ts cs =
   nullExports
     { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys ts
     , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys cs
-    , exportedKinds = M.fromList $ mkKindEntry `map` S.toList ks
     }
   where
   mkTypeEntry (Qualified mn name) = (name, ([], primExportSource mn))
   mkClassEntry (Qualified mn name) = (name, primExportSource mn)
-  mkKindEntry (Qualified mn name) = (name, primExportSource mn)
 
   primExportSource mn =
     ExportSource
@@ -257,6 +255,9 @@ primEnv = M.fromList
     )
   , ( C.PrimBoolean
     , (internalModuleSourceSpan "<Prim.Boolean>", nullImports, primBooleanExports)
+    )
+  , ( C.PrimCoerce
+    , (internalModuleSourceSpan "<Prim.Coerce>", nullImports, primCoerceExports)
     )
   , ( C.PrimOrdering
     , (internalModuleSourceSpan "<Prim.Ordering>", nullImports, primOrderingExports)
@@ -318,6 +319,9 @@ exportType ss exportMode exps name dctors src = do
           throwDeclConflict (DctorName dctor) (TyClassName (coerceProperName dctor))
     ReExport -> do
       let mn = exportSourceDefinedIn src
+      forM_ (coerceProperName name `M.lookup` exClasses) $ \src' ->
+        let mn' = exportSourceDefinedIn src' in
+        throwExportConflict' ss mn mn' (TyName name) (TyClassName (coerceProperName name))
       forM_ (name `M.lookup` exTypes) $ \(_, src') ->
         let mn' = exportSourceDefinedIn src' in
         when (mn /= mn') $
@@ -398,20 +402,6 @@ exportValueOp ss exps op src = do
   return $ exps { exportedValueOps = valueOps }
 
 -- |
--- Safely adds a kind to some exports, returning an error if a conflict occurs.
---
-exportKind
-  :: MonadError MultipleErrors m
-  => SourceSpan
-  -> Exports
-  -> ProperName 'KindName
-  -> ExportSource
-  -> m Exports
-exportKind ss exps name src = do
-  kinds <- addExport ss KiName name src (exportedKinds exps)
-  return $ exps { exportedKinds = kinds }
-
--- |
 -- Adds an entry to a list of exports unless it is already present, in which
 -- case an error is returned.
 --
@@ -458,8 +448,23 @@ throwExportConflict
   -> Name
   -> m a
 throwExportConflict ss new existing name =
+  throwExportConflict' ss new existing name name
+
+-- |
+-- Raises an error for when there are conflicting names in the exports. Allows
+-- different categories of names. E.g. class and type names conflicting.
+--
+throwExportConflict'
+  :: MonadError MultipleErrors m
+  => SourceSpan
+  -> ModuleName
+  -> ModuleName
+  -> Name
+  -> Name
+  -> m a
+throwExportConflict' ss new existing newName existingName =
   throwError . errorMessage' ss $
-    ExportConflict (Qualified (Just new) name) (Qualified (Just existing) name)
+    ExportConflict (Qualified (Just new) newName) (Qualified (Just existing) existingName)
 
 -- |
 -- Gets the exports for a module, or raise an error if the module doesn't exist.

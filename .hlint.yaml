@@ -1,0 +1,114 @@
+# HLint configuration file
+# https://github.com/ndmitchell/hlint
+##########################
+
+# This file contains a template configuration file, which is typically
+# placed as .hlint.yaml in the root of your project
+
+
+# Warnings currently triggered by your code
+- ignore: {name: "Unused LANGUAGE pragma"}
+- ignore: {name: "Redundant =="}
+- ignore: {name: "Use infix"}
+- ignore: {name: "Redundant do"}
+- ignore: {name: "Use newtype instead of data"}
+- ignore: {name: "Redundant bracket"}
+- ignore: {name: "Use join"}
+- ignore: {name: "Fuse foldr/map"}
+- ignore: {name: "Eta reduce"}
+- ignore: {name: "Use notElem"}
+- ignore: {name: "Use lambda-case"}
+- ignore: {name: "Avoid lambda"}
+- ignore: {name: "Use tuple-section"}
+- ignore: {name: "Use sortOn"}
+- ignore: {name: "Redundant $"}
+- ignore: {name: "Use record patterns"}
+- ignore: {name: "Use String"}
+- ignore: {name: "Use isDigit"}
+- ignore: {name: "Use list literal pattern"}
+- ignore: {name: "Use unless"}
+- ignore: {name: "Move brackets to avoid $"}
+- ignore: {name: "Use section"}
+- ignore: {name: "Use &&"}
+- ignore: {name: "Use <$>"}
+- ignore: {name: "Use ."}
+- ignore: {name: "Redundant if"}
+- ignore: {name: "Use traverse_"}
+- ignore: {name: "Use :"}
+- ignore: {name: "Parse error"}
+- ignore: {name: "Avoid reverse"}
+- ignore: {name: "Use Just"}
+- ignore: {name: "Use /="}
+- ignore: {name: "Reduce duplication"}
+- ignore: {name: "Use fewer imports"}
+- ignore: {name: "Use camelCase"}
+- ignore: {name: "Use ++"}
+- ignore: {name: "Hoist not"}
+- ignore: {name: "Functor law"}
+- ignore: {name: "Use $>"}
+- ignore: {name: "Redundant fmap"}
+- ignore: {name: "Use =<<"}
+- ignore: {name: "Use maybe"}
+- ignore: {name: "Use zipWithM_"}
+- ignore: {name: "Use fromMaybe"}
+- ignore: {name: "Use gets"}
+- ignore: {name: "Use unwords"}
+- ignore: {name: "Use fmap"}
+- ignore: {name: "Avoid lambda using `infix`"}
+- ignore: {name: "Use <$"}
+- ignore: {name: "Use const"}
+- ignore: {name: "Fuse mapM/map"}
+
+
+# Specify additional command line arguments
+#
+# - arguments: [--color, --cpp-simple, -XQuasiQuotes]
+
+
+# Control which extensions/flags/modules/functions can be used
+#
+# - extensions:
+#   - default: false # all extension are banned by default
+#   - name: [PatternGuards, ViewPatterns] # only these listed extensions can be used
+#   - {name: CPP, within: CrossPlatform} # CPP can only be used in a given module
+#
+# - flags:
+#   - {name: -w, within: []} # -w is allowed nowhere
+#
+# - modules:
+#   - {name: [Data.Set, Data.HashSet], as: Set} # if you import Data.Set qualified, it must be as 'Set'
+#   - {name: Control.Arrow, within: []} # Certain modules are banned entirely
+#
+# - functions:
+#   - {name: unsafePerformIO, within: []} # unsafePerformIO can only appear in no modules
+
+
+# Add custom hints for this project
+#
+# Will suggest replacing "wibbleMany [myvar]" with "wibbleOne myvar"
+# - error: {lhs: "wibbleMany [x]", rhs: wibbleOne x}
+
+
+# Turn on hints that are off by default
+#
+# Ban "module X(module X) where", to require a real export list
+# - warn: {name: Use explicit module export list}
+#
+# Replace a $ b $ c with a . b $ c
+# - group: {name: dollar, enabled: true}
+#
+# Generalise map to fmap, ++ to <>
+# - group: {name: generalise, enabled: true}
+
+
+# Ignore some builtin hints
+# - ignore: {name: Use let}
+# - ignore: {name: Use const, within: SpecialModule} # Only within certain modules
+
+
+# Define some custom infix operators
+# - fixity: infixr 3 ~^#^~
+
+
+# To generate a suitable file for HLint do:
+# $ hlint --default > .hlint.yaml

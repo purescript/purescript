@@ -1,0 +1,9 @@
+Error found:
+at tests/purs/failing/3405.purs:8:1 - 8:43 (line 8, column 1 - line 8, column 43)
+
+  Cannot derive a type class instance, because the type declaration for [33mSomething[0m could not be found.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CannotFindDerivingType.md for more information,
+or to contribute content related to this error.
+

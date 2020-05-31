@@ -18,7 +18,10 @@ import qualified TestPrimDocs
 import qualified TestPsci
 import qualified TestIde
 import qualified TestPscPublish
+import qualified TestBundle
+import qualified TestMake
 import qualified TestUtils
+import qualified TestGraph
 
 import System.IO (hSetEncoding, stdout, stderr, utf8)
 
@@ -29,27 +32,33 @@ main = do
 
   heading "Updating support code"
   TestUtils.updateSupportCode
-  heading "Prim documentation test suite"
-  TestPrimDocs.main
 
   ideTests <- TestIde.main
   compilerTests <- TestCompiler.main
+  makeTests <- TestMake.main
   psciTests <- TestPsci.main
+  pscBundleTests <- TestBundle.main
   coreFnTests <- TestCoreFn.main
   docsTests <- TestDocs.main
+  primDocsTests <- TestPrimDocs.main
   publishTests <- TestPscPublish.main
   hierarchyTests <- TestHierarchy.main
+  graphTests <- TestGraph.main
 
   defaultMain $
     testGroup
       "Tests"
       [ compilerTests
+      , makeTests
       , psciTests
+      , pscBundleTests
       , ideTests
       , coreFnTests
       , docsTests
+      , primDocsTests
       , publishTests
       , hierarchyTests
+      , graphTests
       ]
 
   where

@@ -1,0 +1,12 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/QuantificationCheckFailure.purs:13:48 - 13:69 (line 13, column 48 - line 13, column 69)
+
+  Cannot generalize the kind of type variable [33md[0m since it would not be well-scoped.
+  Try adding a kind annotation.
+
+in kind declaration for [33mT[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/QuantificationCheckFailureInKind.md for more information,
+or to contribute content related to this error.
+

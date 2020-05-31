@@ -1,0 +1,22 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/2542.purs:8:16 - 8:17 (line 8, column 16 - line 8, column 17)
+
+  Type variable [33ma[0m is undefined.
+
+while inferring the kind of [33ma[0m
+while checking that type [33ma[0m
+  has kind [33mType[0m
+while inferring the kind of [33mArray a[0m
+while checking that expression [33mbar       [0m
+                               [33m  where   [0m
+                               [33m  bar = [][0m
+  has type [33mArray a0[0m
+in value declaration [33mfoo[0m
+
+where [33ma0[0m is a rigid type variable
+        bound at (line 7, column 7 - line 7, column 10)
+
+See https://github.com/purescript/documentation/blob/master/errors/UndefinedTypeVariable.md for more information,
+or to contribute content related to this error.
+

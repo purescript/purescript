@@ -1,0 +1,14 @@
+Error found:
+at tests/purs/failing/InvalidDerivedInstance.purs:8:1 - 8:30 (line 8, column 1 - line 8, column 30)
+
+  Cannot derive the type class instance
+  [33m              [0m
+  [33m  Data.Eq.Eq X[0m
+  [33m             X[0m
+  [33m              [0m
+  because the [33mData.Eq.Eq[0m type class has 1 type argument, but the declaration specifies 2.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/InvalidDerivedInstance.md for more information,
+or to contribute content related to this error.
+
