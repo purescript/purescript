@@ -139,13 +139,11 @@ inferRoles env tyName
 -- the absence of a role signature, provides the safest default for a type whose
 -- constructors are opaque to us.
 rolesFromForeignTypeKind :: SourceType -> [Role]
-rolesFromForeignTypeKind
-  = go []
-  where
-    go acc = \case
-      TypeApp _ (TypeApp _ fn _k1) k2 | eqType fn tyFunction ->
-        go (Nominal : acc) k2
-      ForAll _ _ _ k _ ->
-        go acc k
-      _k ->
-        acc
+rolesFromForeignTypeKind k = replicate (kindArity k) Nominal
+
+kindArity :: SourceType -> Int
+kindArity = go 0 where
+  go n (TypeApp _ (TypeApp _ fn _) k)
+    | fn == tyFunction = go (n + 1) k
+  go n (ForAll _ _ _ k _) = go n k
+  go n _ = n
