@@ -143,7 +143,7 @@ rolesFromForeignTypeKind
   = go []
   where
     go acc = \case
-      TypeApp _ (TypeApp _ fn k1) _k2 | eqType fn tyFunction ->
-        go (Nominal : acc) k1
+      TypeApp _ (TypeApp _ fn _k1) k2 | eqType fn tyFunction ->
+        go (Nominal : acc) k2
       _k ->
-        Nominal : acc
+        acc
