@@ -11,6 +11,7 @@ import           Prelude.Compat
 
 import           Control.Arrow ((***))
 import           Data.Either (isLeft)
+import qualified Data.Map.Strict as M
 import           Data.Maybe (maybe)
 import           Data.Aeson
 import           Data.Version (Version, showVersion)
@@ -109,6 +110,7 @@ moduleToJSON v m = object
   , T.pack "modulePath" .= toJSON (modulePath m)
   , T.pack "imports"    .= map importToJSON (moduleImports m)
   , T.pack "exports"    .= map identToJSON (moduleExports m)
+  , T.pack "reExports"  .= reExportsToJSON (moduleReExports m)
   , T.pack "foreign"    .= map identToJSON (moduleForeign m)
   , T.pack "decls"      .= map bindToJSON (moduleDecls m)
   , T.pack "builtWith"  .= toJSON (showVersion v)
@@ -120,6 +122,9 @@ moduleToJSON v m = object
     [ T.pack "annotation" .= annToJSON ann
     , T.pack "moduleName" .= moduleNameToJSON mn
     ]
+
+  reExportsToJSON :: M.Map ModuleName [Ident] -> Value
+  reExportsToJSON = toJSON . M.map (map runIdent)
 
 bindToJSON :: Bind Ann -> Value
 bindToJSON (NonRec ann n e)
