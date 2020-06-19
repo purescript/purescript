@@ -6,7 +6,7 @@ import Protolude (ordNub)
 import Control.Monad.Writer (MonadWriter(..))
 
 import Data.Foldable (for_)
-import Data.List (nub, (\\))
+import Data.List (group, sort, (\\))
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.AST
@@ -24,13 +24,24 @@ warnDuplicateRefs
   -> m ()
 warnDuplicateRefs pos toError refs = do
   let withoutCtors = deleteCtors `map` refs
-      dupeRefs = mapMaybe (refToName pos) $ withoutCtors \\ nub withoutCtors
+      dupeRefs = mapMaybe (refToName pos) $ removeUnique withoutCtors
       dupeCtors = concat $ mapMaybe (extractCtors pos) refs
 
   for_ (dupeRefs ++ dupeCtors) $ \(pos', name) ->
     warnWithPosition pos' . tell . errorMessage $ toError name
 
   where
+
+  -- Removes all unique elements from list
+  -- Example:
+  --  removeUnique [1,2,2,3,3,3,4] == [2,2,3,3,3]
+  removeUnique :: Eq a => Ord a => [a] -> [a]
+  removeUnique = concat . filter twoOrMore . group . sort
+    where
+      twoOrMore :: [a] -> Bool
+      twoOrMore [] = False
+      twoOrMore [_] = False
+      twoOrMore _ = True
 
   -- Deletes the constructor information from TypeRefs so that only the
   -- referenced type is used in the duplicate check - constructors are handled
