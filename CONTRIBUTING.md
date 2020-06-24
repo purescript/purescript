@@ -129,7 +129,7 @@ Then open the generated `purs.prof.html` in your web browser.
 
 ### Additional Resources
 
-* PureScript-compiler-focused [guide](todo) covering VSCode + HIE setup.
+* PureScript-compiler-focused [guide](https://discourse.purescript.org/t/haskell-tooling-guide-vscode-hie/1505) covering VSCode + HIE setup.
 
 * Beginner-friendly [guide](https://www.vacationlabs.com/haskell/environment-setup.html) covering VSCode + HIE setup, although the steps needed some tweaking for compatibility with the PureScript compiler project.
 
