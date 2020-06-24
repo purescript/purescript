@@ -8,32 +8,16 @@ Install `stack`. [Instructions](https://docs.haskellstack.org/en/stable/README/)
 
 See the [PureScript Install Guide](INSTALL.md) for information on the `curses`/`ncurses` dependency.
 
-Update `stack` before proceeding:
+Update stack's package index before proceeding:
 ```
 stack update
 ```
 
-## Select Release
-
-After cloning the PureScript compiler repo, `checkout` the tagged release that you'd like to build.
-
-For example:
-```
-git checkout v0.13.8
-```
-
-Note that you can view the latest tags with:
-```
-git log --oneline --tags
-```
-
-You may also skip this tagged checkout and build the unreleased `master` branch instead.
-
-Another option is to "unpack" the latest release locally. This creates another directory containing the code for that release, but this code is not tracked by git, so it is less convenient if you are planning on making changes:
+## Clone
 
 ```
-stack unpack purescript
-cd purescript-x.y.z  # (replace x.y.z to match the directory just created via unpack)
+git clone https://github.com/purescript/purescript.git purescript_compiler
+cd purescript_compiler
 ```
 
 ## Build
@@ -68,7 +52,7 @@ Create a profiling build with:
 ```
 stack build --profile
 ```
-This will also take a while the first time it is run. Incremental builds are faster, and you may swap between standard and profiling builds without a rebuild penalty as work for each is saved in separate directories.
+This will also take a while the first time it is run. Incremental builds are faster. If you are using stack 2.x, you may swap between standard and profiling builds without a rebuild penalty as work for each is saved in separate directories.
 
 Setting-up a local shell for your profiling build is similar to the steps for the standard build, just add the `--profile` flag:
 ```
@@ -96,59 +80,9 @@ Then open the generated `purs.prof.html` in your web browser.
 
 See the [Contributing](CONTRIBUTING.md) readme for testing instructions.
 
-## Haskell IDE
-
-There are many Haskell IDE options. Feel free to contribute instructions for your preferred editor.
-
-Here are instructions for getting VSCode + HIE backend configured for this PureScript compiler project.
-
-Install [VSCode](https://code.visualstudio.com/) and the [vscode-hie-server](https://github.com/alanz/vscode-hie-server) extension.
-
-### Setup [HIE](https://github.com/haskell/haskell-ide-engine)
-This needs to be built from source. You should also take a look at the [readme](https://github.com/haskell/haskell-ide-engine/blob/master/README.md#installation) to check for any OS-specific instructions. These steps for for Ubuntu 20.04.
-
-Clone the code:
-```
-git clone https://github.com/haskell/haskell-ide-engine --recurse-submodules
-cd haskell-ide-engine
-```
-
-Find the GHC version that your branch of the PureScript compiler is using. This requires navigating to the compiler's source directory and running:
-```
-$ stack ghc -- --version
-The Glorious Glasgow Haskell Compilation System, version 8.6.5
-```
-Note that this version will likely be different if this command is run from another location, such as your home directory.
-
-Then, back in the `haskell-ide-engine` source directory, install for that version of the compiler. For example:
-```
-stack ./install.hs hie-8.6.5
-```
-This command will take a while to complete.
-
-You can then optionally generate a Hoogle database to provide pop-up documentation when hovering over a symbol in VSCode. Run this command from the same `haskell-ide-engine` directory.
-```
-stack --stack-yaml=stack-8.6.5.yaml exec hoogle generate
-```
-
-### Other Tools
-
-Optionally install [`hlint`](https://github.com/ndmitchell/hlint) for warnings/errors, [`apply-refact`](https://github.com/mpickering/apply-refact) for quick-fix suggestions, and [`brittany`](https://github.com/lspitzner/brittany) for code formatting. If these tools are installed, then their additional functionality will be picked-up by the VSCode extension.
-```
-stack install hlint apply-refact brittany
-```
-
-### Running VSCode
-
-Then launch VSCode from the root of the PureScript compiler directory.
-```
-cd <purescript compiler directory>
-code .
-```
-
-You can read more about the [available extension features here](https://github.com/alanz/vscode-hie-server#features).
-
 ## Additional Resources
+
+* PureScript-compiler-focused [guide](todo) covering VSCode + HIE setup.
 
 * Beginner-friendly [guide](https://www.vacationlabs.com/haskell/environment-setup.html) covering VSCode + HIE setup, although the steps needed some tweaking for compatibility with the PureScript compiler project.
 

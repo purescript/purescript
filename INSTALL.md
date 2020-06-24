@@ -29,7 +29,18 @@ There are several other distributions of the PureScript compiler available, whic
 
 ## Compiling from source
 
-See the [Developer Guide](DEVELOPER_GUIDE.md).
+The easiest way is to use stack:
+
+```
+$ stack update
+$ stack unpack purescript
+$ cd purescript-x.y.z  # (replace x.y.z with whichever version you just downloaded)
+$ stack install --flag purescript:RELEASE
+```
+
+This will then copy the compiler executable (`purs`) into `~/.local/bin`.
+
+If you don't have stack installed, please see the [stack install documentation](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md).
 
 ## The "curses" library
 
