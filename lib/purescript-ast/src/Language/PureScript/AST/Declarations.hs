@@ -201,7 +201,6 @@ instance Ord DeclarationRef where
   TypeClassRef _ name `compare` TypeClassRef _ name' = compare name name'
   TypeInstanceRef _ name `compare` TypeInstanceRef _ name' = compare name name'
   ModuleRef _ name `compare` ModuleRef _ name' = compare name name'
-  KindRef _ name `compare` KindRef _ name' = compare name name'
   ReExportRef _ mn ref `compare` ReExportRef _ mn' ref' = compare mn mn' <> compare ref ref'
   compare ref ref' =
     compare (orderOf ref) (orderOf ref')
@@ -214,8 +213,7 @@ instance Ord DeclarationRef where
         orderOf TypeClassRef{} = 4
         orderOf TypeInstanceRef{} = 5
         orderOf ModuleRef{} = 6
-        orderOf KindRef{} = 7
-        orderOf ReExportRef{} = 8
+        orderOf ReExportRef{} = 7
 
 data ExportSource =
   ExportSource
