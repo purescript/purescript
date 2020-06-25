@@ -36,6 +36,7 @@ import Language.PureScript.Names
 import Language.PureScript.Roles
 import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
+import Language.PureScript.TypeChecker.Roles as T
 import Language.PureScript.TypeChecker.Synonyms as T
 import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Unify (varIfUnknown)
@@ -49,7 +50,7 @@ addDataType
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
-  -> [(Text, Maybe SourceType)]
+  -> [(Text, Maybe SourceType, Role)]
   -> [(DataConstructorDeclaration, SourceType)]
   -> SourceType
   -> m ()
@@ -80,13 +81,17 @@ addDataConstructor moduleName dtype name dctor dctorArgs polyType = do
   checkTypeSynonyms polyType
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
-addRoleDeclaration
+-- | Add an explicit role declaration to the Environment. The idea is that we
+-- do this before encountering the data type which it refers to; we don't check
+-- that the role declaration is valid until we encounter the data type's own
+-- declaration.
+addExplicitRoleDeclaration
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => ModuleName
   -> ProperName 'TypeName
   -> [Role]
   -> m ()
-addRoleDeclaration moduleName name roles = do
+addExplicitRoleDeclaration moduleName name roles = do
   env <- getEnv
   putEnv $ env { roleDeclarations = M.insert (Qualified (Just moduleName) name) roles (roleDeclarations env) }
 
@@ -149,7 +154,7 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
   unless (hasSig || not (containsForAll kind)) $ do
     tell . errorMessage $ MissingKindDeclaration ClassSig (disqualify qualName) kind
   traverse_ (checkMemberIsUsable newClass (typeSynonyms env) (types env)) classMembers
-  putEnv $ env { types = M.insert qualName (kind, ExternData) (types env)
+  putEnv $ env { types = M.insert qualName (kind, ExternData (nominalRolesForKind kind)) (types env)
                , typeClasses = M.insert qualifiedClassName newClass (typeClasses env) }
   where
     classMembers :: [(Ident, SourceType)]
@@ -250,6 +255,8 @@ checkTypeSynonyms = void . replaceAllTypeSynonyms
 --
 --  * Type-check all values and add them to the @Environment@
 --
+--  * Infer all type roles and add them to the @Environment@
+--
 --  * Bring type class instances into scope
 --
 --  * Process module imports
@@ -270,7 +277,9 @@ typeCheckAll moduleName _ = traverse go
       checkDuplicateTypeArguments $ map fst args
       (dataCtors, ctorKind) <- kindOfData moduleName (sa, name, args, dctors)
       let args' = args `withKinds` ctorKind
-      addDataType moduleName dtype name args' dataCtors ctorKind
+      roles <- checkRoles moduleName name args' dctors
+      let args'' = args' `withRoles` roles
+      addDataType moduleName dtype name args'' dataCtors ctorKind
     return $ DataDeclaration sa dtype name args dctors
   go (d@(DataBindingGroupDeclaration tys)) = do
     let tysList = NEL.toList tys
@@ -284,7 +293,7 @@ typeCheckAll moduleName _ = traverse go
       for_ (zip dataDecls data_ks) $ \((dtype, (_, name, args, dctors)), (dataCtors, ctorKind)) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
         checkDuplicateTypeArguments $ map fst args
-        let args' = args `withKinds` ctorKind
+        let args' = args `withKinds` ctorKind `withRoles` repeat Phantom
         addDataType moduleName dtype name args' dataCtors ctorKind
       for_ (zip syns syn_ks) $ \((_, name, args, _), (elabTy, kind)) -> do
         checkDuplicateTypeArguments $ map fst args
@@ -318,7 +327,7 @@ typeCheckAll moduleName _ = traverse go
       putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabTy, LocalTypeVariable) (types env) }
       return $ KindDeclaration sa kindFor name elabTy
   go d@(RoleDeclaration (RoleDeclarationData _sa name roles)) = do
-    addRoleDeclaration moduleName name roles
+    addExplicitRoleDeclaration moduleName name roles
     return d
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
@@ -352,7 +361,10 @@ typeCheckAll moduleName _ = traverse go
   go (d@(ExternDataDeclaration _ name kind)) = do
     elabKind <- withFreshSubstitution $ checkKindDeclaration moduleName kind
     env <- getEnv
-    putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabKind, ExternData) (types env) }
+    let qualName = Qualified (Just moduleName) name
+    -- If there's an explicit role declaration, just trust it
+    let roles = fromMaybe (nominalRolesForKind elabKind) $ M.lookup qualName (roleDeclarations env)
+    putEnv $ env { types = M.insert qualName (elabKind, ExternData roles) (types env) }
     return d
   go (d@(ExternDeclaration (ss, _) name ty)) = do
     warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (positionedError ss)) $ do
@@ -544,6 +556,9 @@ typeCheckAll moduleName _ = traverse go
   withKinds (s@(_, Just _):ss) (TypeApp _ (TypeApp _ tyFn _) k2) | eqType tyFn tyFunction = s : withKinds ss k2
   withKinds ((s, Nothing):ss) (TypeApp _ (TypeApp _ tyFn k1) k2) | eqType tyFn tyFunction = (s, Just k1) : withKinds ss k2
   withKinds _ _ = internalError "Invalid arguments to withKinds"
+
+  withRoles :: [(Text, Maybe SourceType)] -> [Role] -> [(Text, Maybe SourceType, Role)]
+  withRoles = zipWith $ \(v, k) r -> (v, k, r)
 
 checkNewtype
   :: forall m

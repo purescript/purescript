@@ -417,15 +417,15 @@ entails SolverOptions{..} constraint context hints =
       t
         | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
         , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
-        , not (null axs) && not (null bxs) && aTyName == bTyName
-        , tyRoles <- inferRoles env aTyName -> do
+        , not (null axs) && not (null bxs) && aTyName == bTyName -> do
             -- If both arguments are applications of the same type constructor
             -- (e.g. @data D a b = D a@ in the constraint
             -- @Coercible (D a b) (D a' b')@), infer the roles of the type
             -- constructor's arguments and generate wanted constraints
             -- appropriately (e.g. here @a@ is representational and @b@ is
             -- phantom, yielding @Coercible a a'@).
-            let k role ax bx = case role of
+            let tyRoles = lookupEnvRoles env aTyName
+                k role ax bx = case role of
                   Nominal
                     -- If we had first-class equality constraints, we'd just
                     -- emit one of the form @(a ~ b)@ here and let the solver

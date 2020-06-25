@@ -41,6 +41,7 @@ import           Language.PureScript.Names
 import           Language.PureScript.Pretty
 import           Language.PureScript.Pretty.Common (endWith)
 import           Language.PureScript.PSString (decodeStringWithReplacement)
+import           Language.PureScript.Roles
 import           Language.PureScript.Traversals
 import           Language.PureScript.Types
 import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
@@ -174,6 +175,11 @@ data SimpleErrorMessage
   | QuantificationCheckFailureInType [Int] SourceType
   | VisibleQuantificationCheckFailureInType Text
   | UnsupportedTypeInKind SourceType
+  -- | Declared role was more permissive than inferred.
+  | RoleMismatch
+      Text -- ^ Type variable in question
+      Role -- ^ inferred role
+      Role -- ^ declared role
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -329,6 +335,7 @@ errorCode em = case unwrapErrorMessage em of
   QuantificationCheckFailureInType {} -> "QuantificationCheckFailureInType"
   VisibleQuantificationCheckFailureInType {} -> "VisibleQuantificationCheckFailureInType"
   UnsupportedTypeInKind {} -> "UnsupportedTypeInKind"
+  RoleMismatch {} -> "RoleMismatch"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1277,6 +1284,15 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         , line "is not supported in kinds."
         ]
 
+    renderSimpleErrorMessage (RoleMismatch var inferred declared) =
+      paras
+        [ line $ "Role mismatch for the type parameter " <> markCode var <> ":"
+        , indent . line $
+            "The annotation says " <> markCode (displayRole declared) <>
+            " but the role " <> markCode (displayRole inferred) <>
+            " is required."
+        ]
+
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
       let (row1Box, row2Box) = printRows t1 t2
@@ -1411,6 +1427,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderHint (ErrorInKindDeclaration name) detail =
       paras [ detail
             , line $ "in kind declaration for " <> markCode (runProperName name)
+            ]
+    renderHint (ErrorInRoleDeclaration name) detail =
+      paras [ detail
+            , line $ "in role declaration for " <> markCode (runProperName name)
             ]
     renderHint (ErrorInForeignImport nm) detail =
       paras [ detail
