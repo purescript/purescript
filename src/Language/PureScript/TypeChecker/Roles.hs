@@ -174,17 +174,3 @@ checkRoles moduleName tyName tyArgs ctors = do
       freeNominals x =
         let ftvs = filter (flip S.notMember btvs) (freeTypeVariables x)
         in  RoleMap (M.fromList $ map (, Nominal) ftvs)
-
--- |
--- Given the kind of a foreign type, generate a list @Nominal@ roles which, in
--- the absence of a role signature, provides the safest default for a type whose
--- constructors are opaque to us.
-rolesFromForeignTypeKind :: SourceType -> [Role]
-rolesFromForeignTypeKind k = replicate (kindArity k) Nominal
-
-kindArity :: SourceType -> Int
-kindArity = go 0 where
-  go n (TypeApp _ (TypeApp _ fn _) k)
-    | fn == tyFunction = go (n + 1) k
-  go n (ForAll _ _ _ k _) = go n k
-  go n _ = n

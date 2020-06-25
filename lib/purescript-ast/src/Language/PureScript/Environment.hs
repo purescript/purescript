@@ -629,15 +629,14 @@ isDictSynonym :: ProperName a -> Bool
 isDictSynonym = T.isSuffixOf "$Dict" . runProperName
 
 -- |
--- Generate a list of nominal roles, whose length is the same as the number of
--- type arguments of types of the given kind.
---
+-- Given the kind of a type, generate a list @Nominal@ roles. This is used for
+-- opaque foreign types as well as type classes.
 nominalRolesForKind :: Type a -> [Role]
-nominalRolesForKind
-  = go []
-  where
-    go acc = \case
-      TypeApp _ (TypeApp _ fn k1) _k2 | eqType fn tyFunction ->
-        go (Nominal : acc) k1
-      _k ->
-        Nominal : acc
+nominalRolesForKind k = replicate (kindArity k) Nominal
+
+kindArity :: Type a -> Int
+kindArity = go 0 where
+  go n (TypeApp _ (TypeApp _ fn _) k)
+    | eqType fn tyFunction = go (n + 1) k
+  go n (ForAll _ _ _ k _) = go n k
+  go n _ = n
