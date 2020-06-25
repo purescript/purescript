@@ -5,6 +5,12 @@
 -- @shouldWarnWith DuplicateExportRef
 -- @shouldWarnWith DuplicateExportRef
 -- @shouldWarnWith DuplicateExportRef
+-- @shouldWarnWith DuplicateExportRef
+-- @shouldWarnWith DuplicateExportRef
+-- @shouldWarnWith DuplicateExportRef
+-- @shouldWarnWith DuplicateExportRef
+-- @shouldWarnWith DuplicateExportRef
+-- @shouldWarnWith DuplicateExportRef
 module Main
   ( X(X, X), X
   , fn, fn
