@@ -229,7 +229,7 @@ addExplicitImport' decl moduleName qualifier imports =
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
     insertDeclIntoImport :: IdeDeclaration -> Import -> Import
     insertDeclIntoImport decl' (Import mn (P.Explicit refs) qual) =
-      Import mn (P.Explicit (sortBy P.compDecRef (insertDeclIntoRefs decl' refs))) qual
+      Import mn (P.Explicit (sort (insertDeclIntoRefs decl' refs))) qual
     insertDeclIntoImport _ is = is
 
     insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]

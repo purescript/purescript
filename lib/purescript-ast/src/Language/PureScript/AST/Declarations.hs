@@ -149,13 +149,17 @@ importPrim =
 --
 data DeclarationRef
   -- |
-  -- A type constructor with data constructors
+  -- A type class
   --
-  = TypeRef SourceSpan (ProperName 'TypeName) (Maybe [ProperName 'ConstructorName])
+  = TypeClassRef SourceSpan (ProperName 'ClassName)
   -- |
   -- A type operator
   --
   | TypeOpRef SourceSpan (OpName 'TypeOpName)
+  -- |
+  -- A type constructor with data constructors
+  --
+  | TypeRef SourceSpan (ProperName 'TypeName) (Maybe [ProperName 'ConstructorName])
   -- |
   -- A value
   --
@@ -164,10 +168,6 @@ data DeclarationRef
   -- A value-level operator
   --
   | ValueOpRef SourceSpan (OpName 'ValueOpName)
-  -- |
-  -- A type class
-  --
-  | TypeClassRef SourceSpan (ProperName 'ClassName)
   -- |
   -- A type class instance, created during typeclass desugaring (name, class name, instance types)
   --
@@ -184,22 +184,22 @@ data DeclarationRef
   deriving (Show, Generic, NFData, Serialise)
 
 instance Eq DeclarationRef where
-  (TypeRef _ name dctors) == (TypeRef _ name' dctors') = name == name' && dctors == dctors'
+  (TypeClassRef _ name) == (TypeClassRef _ name') = name == name'
   (TypeOpRef _ name) == (TypeOpRef _ name') = name == name'
+  (TypeRef _ name dctors) == (TypeRef _ name' dctors') = name == name' && dctors == dctors'
   (ValueRef _ name) == (ValueRef _ name') = name == name'
   (ValueOpRef _ name) == (ValueOpRef _ name') = name == name'
-  (TypeClassRef _ name) == (TypeClassRef _ name') = name == name'
   (TypeInstanceRef _ name) == (TypeInstanceRef _ name') = name == name'
   (ModuleRef _ name) == (ModuleRef _ name') = name == name'
   (ReExportRef _ mn ref) == (ReExportRef _ mn' ref') = mn == mn' && ref == ref'
   _ == _ = False
 
 instance Ord DeclarationRef where
-  TypeRef _ name dctors `compare` TypeRef _ name' dctors' = compare name name' <> compare dctors dctors'
+  TypeClassRef _ name `compare` TypeClassRef _ name' = compare name name'
   TypeOpRef _ name `compare` TypeOpRef _ name' = compare name name'
+  TypeRef _ name dctors `compare` TypeRef _ name' dctors' = compare name name' <> compare dctors dctors'
   ValueRef _ name `compare` ValueRef _ name' = compare name name'
   ValueOpRef _ name `compare` ValueOpRef _ name' = compare name name'
-  TypeClassRef _ name `compare` TypeClassRef _ name' = compare name name'
   TypeInstanceRef _ name `compare` TypeInstanceRef _ name' = compare name name'
   ModuleRef _ name `compare` ModuleRef _ name' = compare name name'
   ReExportRef _ mn ref `compare` ReExportRef _ mn' ref' = compare mn mn' <> compare ref ref'
@@ -207,11 +207,11 @@ instance Ord DeclarationRef where
     compare (orderOf ref) (orderOf ref')
       where
         orderOf :: DeclarationRef -> Int
-        orderOf TypeRef{} = 0
+        orderOf TypeClassRef{} = 0
         orderOf TypeOpRef{} = 1
-        orderOf ValueRef{} = 2
-        orderOf ValueOpRef{} = 3
-        orderOf TypeClassRef{} = 4
+        orderOf TypeRef{} = 2
+        orderOf ValueRef{} = 3
+        orderOf ValueOpRef{} = 4
         orderOf TypeInstanceRef{} = 5
         orderOf ModuleRef{} = 6
         orderOf ReExportRef{} = 7
@@ -222,29 +222,6 @@ data ExportSource =
   , exportSourceDefinedIn :: ModuleName
   }
   deriving (Eq, Ord, Show, Generic, NFData, Serialise)
-
--- enable sorting lists of explicitly imported refs when suggesting imports in linting, IDE, etc.
--- not an Ord because this implementation is not consistent with its Eq instance.
--- think of it as a notion of contextual, not inherent, ordering.
-compDecRef :: DeclarationRef -> DeclarationRef -> Ordering
-compDecRef (TypeRef _ name _) (TypeRef _ name' _) = compare name name'
-compDecRef (TypeOpRef _ name) (TypeOpRef _ name') = compare name name'
-compDecRef (ValueRef _ ident) (ValueRef _ ident') = compare ident ident'
-compDecRef (ValueOpRef _ name) (ValueOpRef _ name') = compare name name'
-compDecRef (TypeClassRef _ name) (TypeClassRef _ name') = compare name name'
-compDecRef (TypeInstanceRef _ ident) (TypeInstanceRef _ ident') = compare ident ident'
-compDecRef (ModuleRef _ name) (ModuleRef _ name') = compare name name'
-compDecRef (ReExportRef _ name _) (ReExportRef _ name' _) = compare name name'
-compDecRef ref ref' = compare
-  (orderOf ref) (orderOf ref')
-    where
-      orderOf :: DeclarationRef -> Int
-      orderOf TypeClassRef{} = 0
-      orderOf TypeOpRef{} = 1
-      orderOf TypeRef{} = 2
-      orderOf ValueRef{} = 3
-      orderOf ValueOpRef{} = 4
-      orderOf _ = 6
 
 declRefSourceSpan :: DeclarationRef -> SourceSpan
 declRefSourceSpan (TypeRef ss _ _) = ss
