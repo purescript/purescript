@@ -52,5 +52,24 @@ On Linux, you will probably need to install `ncurses` manually. On Ubuntu, for
 example, this can be done by running:
 
 ```
-$ sudo apt-get install libncurses5-dev
+$ sudo apt install libncurses5-dev
 ```
+
+Another `curses` dependency may be `libtinfo`. If you encounter this error:
+```
+error while loading shared libraries: libtinfo.so.5: cannot open shared object file: No such file or directory
+```
+
+The solution is to install that dependency. Here's the Ubuntu command for this:
+```
+sudo apt install libtinfo5
+```
+
+## EACCES error
+
+If you encounter this error while trying to install via `npm`:
+```
+Error: EACCES: permission denied
+```
+
+The best solution is to install [Node.js and npm via a node version manager](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm#using-a-node-version-manager-to-install-nodejs-and-npm). This error is due to permissions issues when installing packages globally. You can read more about [this error here](https://docs.npmjs.com/getting-started/fixing-npm-permissions).
