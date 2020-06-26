@@ -728,66 +728,41 @@ eqMaybeType _ _ = False
 
 compareType :: Type a -> Type b -> Ordering
 compareType (TUnknown _ a) (TUnknown _ a') = compare a a'
-compareType (TUnknown {}) _ = LT
-
 compareType (TypeVar _ a) (TypeVar _ a') = compare a a'
-compareType (TypeVar {}) _ = LT
-compareType _ (TypeVar {}) = GT
-
 compareType (TypeLevelString _ a) (TypeLevelString _ a') = compare a a'
-compareType (TypeLevelString {}) _ = LT
-compareType _ (TypeLevelString {}) = GT
-
 compareType (TypeWildcard _ a) (TypeWildcard _ a') = compare a a'
-compareType (TypeWildcard {}) _ = LT
-compareType _ (TypeWildcard {}) = GT
-
 compareType (TypeConstructor _ a) (TypeConstructor _ a') = compare a a'
-compareType (TypeConstructor {}) _ = LT
-compareType _ (TypeConstructor {}) = GT
-
 compareType (TypeOp _ a) (TypeOp _ a') = compare a a'
-compareType (TypeOp {}) _ = LT
-compareType _ (TypeOp {}) = GT
-
 compareType (TypeApp _ a b) (TypeApp _ a' b') = compareType a a' <> compareType b b'
-compareType (TypeApp {}) _ = LT
-compareType _ (TypeApp {}) = GT
-
 compareType (KindApp _ a b) (KindApp _ a' b') = compareType a a' <> compareType b b'
-compareType (KindApp {}) _ = LT
-compareType _ (KindApp {}) = GT
-
 compareType (ForAll _ a b c d) (ForAll _ a' b' c' d') = compare a a' <> compareMaybeType b b' <> compareType c c' <> compare d d'
-compareType (ForAll {}) _ = LT
-compareType _ (ForAll {}) = GT
-
 compareType (ConstrainedType _ a b) (ConstrainedType _ a' b') = compareConstraint a a' <> compareType b b'
-compareType (ConstrainedType {}) _ = LT
-compareType _ (ConstrainedType {}) = GT
-
 compareType (Skolem _ a b c d) (Skolem _ a' b' c' d') = compare a a' <> compareMaybeType b b' <> compare c c' <> compare d d'
-compareType (Skolem {}) _ = LT
-compareType _ (Skolem {}) = GT
-
 compareType (REmpty _) (REmpty _) = EQ
-compareType (REmpty _) _ = LT
-compareType _ (REmpty _) = GT
-
 compareType (RCons _ a b c) (RCons _ a' b' c') = compare a a' <> compareType b b' <> compareType c c'
-compareType (RCons {}) _ = LT
-compareType _ (RCons {}) = GT
-
 compareType (KindedType _ a b) (KindedType _ a' b') = compareType a a' <> compareType b b'
-compareType (KindedType {}) _ = LT
-compareType _ (KindedType {}) = GT
-
 compareType (BinaryNoParensType _ a b c) (BinaryNoParensType _ a' b' c') = compareType a a' <> compareType b b' <> compareType c c'
-compareType (BinaryNoParensType {}) _ = LT
-compareType _ (BinaryNoParensType {}) = GT
-
 compareType (ParensInType _ a) (ParensInType _ a') = compareType a a'
-compareType (ParensInType {}) _ = GT
+compareType typ typ' =
+  compare (orderOf typ) (orderOf typ')
+    where
+      orderOf :: Type a -> Int
+      orderOf TUnknown{} = 0
+      orderOf TypeVar{} = 1
+      orderOf TypeLevelString{} = 2
+      orderOf TypeWildcard{} = 3
+      orderOf TypeConstructor{} = 4
+      orderOf TypeOp{} = 5
+      orderOf TypeApp{} = 6
+      orderOf KindApp{} = 7
+      orderOf ForAll{} = 8
+      orderOf ConstrainedType{} = 9
+      orderOf Skolem{} = 10
+      orderOf REmpty{} = 11
+      orderOf RCons{} = 12
+      orderOf KindedType{} = 13
+      orderOf BinaryNoParensType{} = 14
+      orderOf ParensInType{} = 15
 
 compareMaybeType :: Maybe (Type a) -> Maybe (Type b) -> Ordering
 compareMaybeType (Just a) (Just b) = compareType a b
