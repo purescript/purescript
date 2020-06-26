@@ -103,7 +103,7 @@ Create a profiling build with:
 ```
 stack build --profile
 ```
-This will also take a while the first time it is run. Incremental builds are faster. If you are using stack 2.x, you may swap between standard and profiling builds without a rebuild penalty as work for each is saved in separate directories.
+This will also take a while the first time it is run.
 
 Setting-up a local shell for your profiling build is similar to the steps for the standard build, just add the `--profile` flag:
 ```
@@ -120,12 +120,25 @@ Note: There are other profiling flags (such as `-hc` for heap size). You can rea
 
 This creates a `purs.prof` file. You can view the contents of this file directly, but it is often more convenient to use a visualizer.
 
-One nice `.prof` visualizer is [`profiteur`](https://github.com/jaspervdj/profiteur).
+### Profile Visualizers
+
+Each of these produces a clickable visual display of profiling info. Feel free to open the output files in the web browser of your choice. These examples use `firefox`.
+
+#### [ghc-prof-flamegraph](https://github.com/fpco/ghc-prof-flamegraph)
+```
+stack install ghc-prof-flamegraph
+ghc-prof-flamegraph purs.prof
+firefox purs.svg
+```
+
+For more flamegraph customizations, you can also try [`stackcollapse-ghc`](https://github.com/marcin-rzeznicki/stackcollapse-ghc)
+
+#### [profiteur](https://github.com/jaspervdj/profiteur)
 ```
 stack install profiteur
 profiteur purs.prof
+firefox purs.prof.html
 ```
-Then open the generated `purs.prof.html` in your web browser.
 
 ### Additional Resources
 
