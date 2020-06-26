@@ -2,10 +2,6 @@
 -- @shouldWarnWith DuplicateImportRef
 -- @shouldWarnWith DuplicateImportRef
 -- @shouldWarnWith DuplicateImportRef
--- @shouldWarnWith DuplicateImportRef
--- @shouldWarnWith DuplicateImportRef
--- @shouldWarnWith DuplicateImportRef
--- @shouldWarnWith DuplicateImportRef
 module Main where
 
 import Prelude
