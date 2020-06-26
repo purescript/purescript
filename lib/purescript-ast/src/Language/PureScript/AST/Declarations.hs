@@ -194,6 +194,28 @@ instance Eq DeclarationRef where
   (ReExportRef _ mn ref) == (ReExportRef _ mn' ref') = mn == mn' && ref == ref'
   _ == _ = False
 
+instance Ord DeclarationRef where
+  TypeRef _ name dctors `compare` TypeRef _ name' dctors' = compare name name' <> compare dctors dctors'
+  TypeOpRef _ name `compare` TypeOpRef _ name' = compare name name'
+  ValueRef _ name `compare` ValueRef _ name' = compare name name'
+  ValueOpRef _ name `compare` ValueOpRef _ name' = compare name name'
+  TypeClassRef _ name `compare` TypeClassRef _ name' = compare name name'
+  TypeInstanceRef _ name `compare` TypeInstanceRef _ name' = compare name name'
+  ModuleRef _ name `compare` ModuleRef _ name' = compare name name'
+  ReExportRef _ mn ref `compare` ReExportRef _ mn' ref' = compare mn mn' <> compare ref ref'
+  compare ref ref' =
+    compare (orderOf ref) (orderOf ref')
+      where
+        orderOf :: DeclarationRef -> Int
+        orderOf TypeRef{} = 0
+        orderOf TypeOpRef{} = 1
+        orderOf ValueRef{} = 2
+        orderOf ValueOpRef{} = 3
+        orderOf TypeClassRef{} = 4
+        orderOf TypeInstanceRef{} = 5
+        orderOf ModuleRef{} = 6
+        orderOf ReExportRef{} = 7
+
 data ExportSource =
   ExportSource
   { exportSourceImportedFrom :: Maybe ModuleName
