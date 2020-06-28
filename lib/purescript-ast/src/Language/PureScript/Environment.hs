@@ -35,7 +35,7 @@ data Environment = Environment
   , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
   -- ^ Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
-  , roleDeclarations :: M.Map (Qualified (ProperName 'TypeName)) [Role]
+  , roleDeclarations :: RoleEnv
   -- ^ Explicit role declarations currently in scope. Note that this field is
   -- only used to store declared roles temporarily until they can be checked;
   -- to find a type's real checked and/or inferred roles, refer to the TypeKind
@@ -51,6 +51,21 @@ data Environment = Environment
   } deriving (Show, Generic)
 
 instance NFData Environment
+
+type RoleEnv = M.Map (Qualified (ProperName 'TypeName)) [Role]
+
+typeKindRoles :: TypeKind -> Maybe [Role]
+typeKindRoles = \case
+  DataType args _ ->
+    Just $ map (\(_, _, role) -> role) args
+  ExternData roles ->
+    Just roles
+  _ ->
+    Nothing
+
+getRoleEnv :: Environment -> RoleEnv
+getRoleEnv env =
+  M.mapMaybe (typeKindRoles . snd) (types env)
 
 -- | Information about a type class
 data TypeClassData = TypeClassData

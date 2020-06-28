@@ -60,6 +60,8 @@ emptySubstitution = Substitution M.empty M.empty
 data CheckState = CheckState
   { checkEnv :: Environment
   -- ^ The current @Environment@
+  , checkRoleEnv :: RoleEnv
+  -- ^ The current role environment used for role inference
   , checkNextType :: Int
   -- ^ The next type unification variable
   , checkNextSkolem :: Int
@@ -79,7 +81,7 @@ data CheckState = CheckState
 
 -- | Create an empty @CheckState@
 emptyCheckState :: Environment -> CheckState
-emptyCheckState env = CheckState env 0 0 0 Nothing emptySubstitution []
+emptyCheckState env = CheckState env (getRoleEnv env) 0 0 0 Nothing emptySubstitution []
 
 -- | Unification variables
 type Unknown = Int
@@ -295,6 +297,10 @@ putEnv env = modify (\s -> s { checkEnv = env })
 -- | Modify the @Environment@
 modifyEnv :: (MonadState CheckState m) => (Environment -> Environment) -> m ()
 modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
+
+-- | Modify the @RoleEnv@
+modifyRoleEnv :: (MonadState CheckState m) => (RoleEnv -> RoleEnv) -> m ()
+modifyRoleEnv f = modify (\s -> s { checkRoleEnv = f (checkRoleEnv s) })
 
 -- | Run a computation in the typechecking monad, starting with an empty @Environment@
 runCheck :: (Functor m) => StateT CheckState m a -> m (a, Environment)
