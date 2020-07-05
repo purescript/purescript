@@ -206,7 +206,10 @@ desugarDecl mn exps = go
     modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration _ _ _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
-  go d@(TypeInstanceDeclaration sa _ _ name deps className tys (ExplicitInstance members)) = do
+  go d@(TypeInstanceDeclaration sa _ _ name deps className tys (ExplicitInstance members))
+    | className == C.Coercible
+    = throwError . errorMessage' (fst sa) $ InvalidCoercibleInstanceDeclaration tys
+    | otherwise = do
     desugared <- desugarCases members
     dictDecl <- typeInstanceDictionaryDeclaration sa name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])
