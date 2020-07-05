@@ -14,14 +14,15 @@ module Language.PureScript.TypeChecker.Entailment
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Applicative ((<|>))
+import Control.Applicative ((<|>), empty)
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
+import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Writer
 
-import Data.Foldable (for_, fold, toList)
+import Data.Foldable (for_, fold, foldl', toList)
 import Data.Function (on)
 import Data.Functor (($>))
 import Data.List (minimumBy, groupBy, nubBy, sortBy, zipWith4)
@@ -39,7 +40,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Roles
-import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds)
+import Language.PureScript.TypeChecker.Kinds (elaborateKind, kindOf, unifyKinds)
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Roles
 import Language.PureScript.TypeChecker.Synonyms
@@ -168,12 +169,18 @@ entails
 entails SolverOptions{..} constraint context hints =
     solve constraint
   where
+    forClassNameM :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> m [TypeClassDict]
+    forClassNameM env ctx cn@C.Coercible kinds args =
+      solveCoercible env kinds args >>=
+        pure . fromMaybe (forClassName env ctx cn kinds args)
+    forClassNameM env ctx cn kinds args =
+      pure $ forClassName env ctx cn kinds args
+
     forClassName :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> [TypeClassDict]
     forClassName _ ctx cn@C.Warn _ [msg] =
       -- Prefer a warning dictionary in scope if there is one available.
       -- This allows us to defer a warning by propagating the constraint.
       findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope [] 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing]
-    forClassName env _ C.Coercible kinds args | Just dicts <- solveCoercible env kinds args = dicts
     forClassName _ _ C.IsSymbol _ args | Just dicts <- solveIsSymbol args = dicts
     forClassName _ _ C.SymbolCompare _ args | Just dicts <- solveSymbolCompare args = dicts
     forClassName _ _ C.SymbolAppend _ args | Just dicts <- solveSymbolAppend args = dicts
@@ -225,10 +232,12 @@ entails SolverOptions{..} constraint context hints =
                 Nothing -> throwError . errorMessage $ UnknownClass className'
                 Just tcd -> pure tcd
 
+            dicts <- lift . lift $ forClassNameM env (combineContexts context inferred) className' kinds'' tys''
+
             let instances = do
                   chain <- groupBy ((==) `on` tcdChain) $
                            sortBy (compare `on` (tcdChain &&& tcdIndex)) $
-                           forClassName env (combineContexts context inferred) className' kinds'' tys''
+                           dicts
                   -- process instances in a chain in index order
                   let found = for chain $ \tcd ->
                                 -- Make sure the type unifies with the type in the type instance definition
@@ -381,11 +390,11 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
 
-    solveCoercible :: Environment -> [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
-    solveCoercible env kinds [a, b] = do
+    solveCoercible :: Environment -> [SourceType] -> [SourceType] -> m (Maybe [TypeClassDict])
+    solveCoercible env kinds [a, b] = runMaybeT $ do
       let tySynMap = typeSynonyms env
           kindMap = types env
-          replaceTySyns = either (const Nothing) Just . replaceAllTypeSynonymsM tySynMap kindMap
+          replaceTySyns = lift . replaceAllTypeSynonymsM tySynMap kindMap
       a' <- replaceTySyns a
       b' <- replaceTySyns b
       -- Solving terminates when the two arguments are the same. Since we
@@ -394,18 +403,22 @@ entails SolverOptions{..} constraint context hints =
       if a' == b'
         then pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing]
         else do
+          lift $ do
+            (_, kind) <- kindOf a'
+            (_, kind') <- kindOf b'
+            unifyKinds kind kind'
           -- When solving must reduce and recurse, it doesn't matter whether we
           -- reduce the first or second argument -- if the constraint is
           -- solvable, either path will yield the same outcome. Consequently we
           -- just try the first argument first and the second argument second.
-          ws <- coercibleWanteds env a' b' <|> coercibleWanteds env b' a'
+          ws <- (MaybeT $ coercibleWanteds env a' b') <|> (MaybeT $ coercibleWanteds env b' a')
           pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] (Just ws)]
-    solveCoercible _ _ _ = Nothing
+    solveCoercible _ _ _ = pure Nothing
 
     -- | Take two types, @a@ and @b@ representing a desired constraint
     -- @Coercible a b@ and reduce them to a set of simpler wanted constraints
     -- whose satisfaction will yield the goal.
-    coercibleWanteds :: Environment -> SourceType -> SourceType -> Maybe [SourceConstraint]
+    coercibleWanteds :: Environment -> SourceType -> SourceType -> m (Maybe [SourceConstraint])
     coercibleWanteds env a b
       | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
       , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
@@ -413,21 +426,20 @@ entails SolverOptions{..} constraint context hints =
       , Just (bTyKind, _) <- M.lookup bTyName $ types env
       , (aks, kind) <- unapplyKinds aTyKind
       , (bks, _) <- unapplyKinds bTyKind
-      , i <- length aks - length axs
-      , j <- length bks - length bxs
-      , i > 0 && j > 0 = do
+      , length axs < length aks
+      , length bxs < length bks = do
           -- If both arguments have kind @k1 -> k2@ (e.g. @data D a b = D a@
           -- in the constraint @Coercible (D a) (D a')@), yield a new wanted
           -- constraint in terms of the types saturated with the same variables
           -- (e.g. @Coercible (D a t0) (D a' t0)@ in the exemple).
-          let aTyVars = S.fromList $ usedTypeVariables a
-              bTyVars = S.fromList $ usedTypeVariables b
-              saturate' = saturate $ aTyVars `S.union` bTyVars
-          pure [srcCoercibleConstraint kind (saturate' a i) (saturate' b j)]
+          tys <- traverse freshTypeWithKind aks
+          let a' = foldl' srcTypeApp a $ drop (length axs) tys
+              b' = foldl' srcTypeApp b $ drop (length bxs) tys
+          pure $ Just [srcCoercibleConstraint kind a' b']
       | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
       , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
       , not (null axs) && not (null bxs) && aTyName == bTyName
-      , Just (aTyKind, _) <- M.lookup aTyName (types env) = do
+      , Just (aTyKind, _) <- M.lookup aTyName (types env) = runMaybeT $ do
           -- If both arguments are applications of the same type constructor
           -- (e.g. @data D a b = D a@ in the constraint
           -- @Coercible (D a b) (D a' b')@), infer the roles of the type
@@ -445,13 +457,13 @@ entails SolverOptions{..} constraint context hints =
                   -- means there are cases we should be able to handle that
                   -- we currently can't, but is at least sound.
                   | ax == bx ->
-                      Just []
+                      pure []
                   | otherwise ->
-                      Nothing
+                      empty
                 Representational ->
-                  Just [srcCoercibleConstraint kx ax bx]
+                  pure [srcCoercibleConstraint kx ax bx]
                 Phantom ->
-                  Just []
+                  pure []
           fmap concat $ sequence $ zipWith4 f roles kinds axs bxs
       | (TypeConstructor _ tyName, _, xs) <- unapplyTypes a
       , Just (tvs, wrappedTy, _) <- lookupNewtypeConstructor env tyName = do
@@ -461,10 +473,10 @@ entails SolverOptions{..} constraint context hints =
           -- terms of that type with the type arguments substituted in (e.g.
           -- @Coercible (T[X/a]) b = Coercible X b@ in the example).
           let wrappedTySub = replaceAllTypeVars (zip tvs xs) wrappedTy
-          pure [srcCoercibleConstraint kindType wrappedTySub b]
+          pure $ Just [srcCoercibleConstraint kindType wrappedTySub b]
       | otherwise =
         -- In all other cases we can't solve the constraint.
-        Nothing
+        pure Nothing
 
     srcCoercibleConstraint :: SourceType -> SourceType -> SourceType -> SourceConstraint
     srcCoercibleConstraint k a b = srcConstraint C.Coercible [k] [a, b] Nothing

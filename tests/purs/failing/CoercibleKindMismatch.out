@@ -1,0 +1,27 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/CoercibleKindMismatch.purs:17:39 - 17:45 (line 17, column 39 - line 17, column 45)
+
+  Could not match kind
+  [33m      [0m
+  [33m  Type[0m
+  [33m      [0m
+  with kind
+  [33m              [0m
+  [33m  Type -> Type[0m
+  [33m              [0m
+
+while solving type class constraint
+[33m                              [0m
+[33m  Prim.Coerce.Coercible Unary [0m
+[33m                        Binary[0m
+[33m                              [0m
+while checking that type [33mforall (a :: Type) (b :: Type). Coercible @Type a b => a -> b[0m
+  is at least as general as type [33mProxy @(Type -> Type) Unary -> Proxy @(Type -> ...) Binary[0m
+while checking that expression [33mcoerce[0m
+  has type [33mProxy @(Type -> Type) Unary -> Proxy @(Type -> ...) Binary[0m
+in value declaration [33munaryToBinary[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+
