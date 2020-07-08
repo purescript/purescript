@@ -34,7 +34,7 @@ build-tools:
 library:
   source-dirs: src
   ghc-options: -Wall -O2
-  default-extensions: !include "../../default-extensions.yaml"
+  default-extensions: !include "default-extensions.yaml"
 
 tests:
   tests:
