@@ -273,6 +273,16 @@ pattern DataSymbol = ModuleName "Data.Symbol"
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
 pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 
+
+-- Data.Record
+
+pattern DataRecord :: ModuleName
+pattern DataRecord = ModuleName "Data.Record"
+
+getField :: Qualified Ident
+getField = Qualified (Just DataRecord) (Ident "getField")
+
+
 dataArray :: forall a. (IsString a) => a
 dataArray = "Data_Array"
 
