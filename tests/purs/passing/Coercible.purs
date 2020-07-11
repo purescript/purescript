@@ -163,4 +163,22 @@ type ContextualKeywords =
   , role :: String
   )
 
+data MutuallyRecursivePhantom1 a
+  = MutuallyRecursivePhantom1 (MutuallyRecursivePhantom2 a)
+
+data MutuallyRecursivePhantom2 a
+  = MutuallyRecursivePhantom2 (MutuallyRecursivePhantom1 a)
+
+mutuallyRecursivePhantom :: forall a b. MutuallyRecursivePhantom1 a -> MutuallyRecursivePhantom1 b
+mutuallyRecursivePhantom = coerce
+
+data MutuallyRecursiveRepresentational1 a
+  = MutuallyRecursiveRepresentational1 a (MutuallyRecursiveRepresentational2 a)
+
+data MutuallyRecursiveRepresentational2 a
+  = MutuallyRecursiveRepresentational2 (MutuallyRecursiveRepresentational1 a)
+
+mutuallyRecursiveRepresentational :: forall a. MutuallyRecursiveRepresentational1 a -> MutuallyRecursiveRepresentational1 (Id1 a)
+mutuallyRecursiveRepresentational = coerce
+
 main = log (coerce (NTString1 "Done") :: String)
