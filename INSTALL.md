@@ -46,23 +46,17 @@ If you don't have stack installed, please see the [stack install documentation](
 
 The PureScript REPL depends on the `curses` library (via the Haskell package
 `terminfo`). If you are having difficulty running the compiler, it may be
-because the `curses` library is missing.
+because the `curses` library is missing. This problem may appear as a `libtinfo`
+error:
+```
+error while loading shared libraries: libtinfo.so.5: cannot open shared object file: No such file or directory
+```
 
 On Linux, you will probably need to install `ncurses` manually. On Ubuntu, for
 example, this can be done by running:
 
 ```
 $ sudo apt install libncurses5-dev
-```
-
-Another `curses` dependency may be `libtinfo`. If you encounter this error:
-```
-error while loading shared libraries: libtinfo.so.5: cannot open shared object file: No such file or directory
-```
-
-The solution is to install that dependency. Here's the Ubuntu command for this:
-```
-sudo apt install libtinfo5
 ```
 
 ## EACCES error
@@ -72,4 +66,4 @@ If you encounter this error while trying to install via `npm`:
 Error: EACCES: permission denied
 ```
 
-The best solution is to install [Node.js and npm via a node version manager](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm#using-a-node-version-manager-to-install-nodejs-and-npm). This error is due to permissions issues when installing packages globally. You can read more about [this error here](https://docs.npmjs.com/getting-started/fixing-npm-permissions).
+The best solution is to install [Node.js and npm via a node version manager](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm#using-a-node-version-manager-to-install-nodejs-and-npm). This error is due to permissions issues when installing packages globally. You can read more about this error in npm's guide to [resolving EACCES permissions errors when installing packages globally](https://docs.npmjs.com/getting-started/fixing-npm-permissions).
