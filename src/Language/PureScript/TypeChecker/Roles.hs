@@ -45,15 +45,18 @@ instance Monoid RoleMap where
 
 type RoleEnv = M.Map (Qualified (ProperName 'TypeName)) [Role]
 
+typeKindRoles :: TypeKind -> Maybe [Role]
+typeKindRoles = \case
+  DataType args _ ->
+    Just $ map (\(_, _, role) -> role) args
+  ExternData roles ->
+    Just roles
+  _ ->
+    Nothing
+
 getRoleEnv :: Environment -> RoleEnv
 getRoleEnv env =
-  flip M.mapMaybe (types env) $ \case
-    (_, DataType args _) ->
-      Just $ map (\(_, _, role) -> role) args
-    (_, ExternData roles) ->
-      Just roles
-    _ ->
-      Nothing
+  M.mapMaybe (typeKindRoles . snd) (types env)
 
 updateRoleEnv
   :: Qualified (ProperName 'TypeName)
@@ -76,7 +79,7 @@ lookupRoles
   -> Qualified (ProperName 'TypeName)
   -> [Role]
 lookupRoles env tyName =
-  fromMaybe [] $ M.lookup tyName (getRoleEnv env)
+  fromMaybe [] $ M.lookup tyName (types env) >>= typeKindRoles . snd
 
 -- | This function does the following:
 --
