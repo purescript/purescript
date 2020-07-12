@@ -40,7 +40,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Roles
-import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds)
+import Language.PureScript.TypeChecker.Kinds (elaborateKind, kindOf, unifyKinds)
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Roles
 import Language.PureScript.TypeChecker.Synonyms
@@ -394,19 +394,16 @@ entails SolverOptions{..} constraint context hints =
     solveCoercible env kinds [a, b] = runMaybeT $ do
       let tySynMap = typeSynonyms env
           kindMap = types env
-          replaceTySyns = lift . replaceAllTypeSynonymsM tySynMap kindMap
-      a' <- replaceTySyns a
-      b' <- replaceTySyns b
+          replaceTySyns = replaceAllTypeSynonymsM tySynMap kindMap
+      (a', kind) <- lift $ replaceTySyns a >>= kindOf
+      (b', kind') <- lift $ replaceTySyns b >>= kindOf
+      lift $ unifyKinds kind kind'
       -- Solving terminates when the two arguments are the same. Since we
       -- currently don't support higher-rank arguments in instance heads, term
       -- equality is a sufficient notion of "the same".
       if a' == b'
         then pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing]
         else do
-          lift $ do
-            kind <- elaborateKind a'
-            kind' <- elaborateKind b'
-            unifyKinds kind kind'
           -- When solving must reduce and recurse, it doesn't matter whether we
           -- reduce the first or second argument -- if the constraint is
           -- solvable, either path will yield the same outcome. Consequently we

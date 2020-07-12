@@ -120,6 +120,11 @@ data Rec3 a = Rec3 {}
 rec3ToRec3 :: forall m n. Rec3 m -> Rec3 n
 rec3ToRec3 = coerce
 
+newtype Rec4 f = Rec4 (f {})
+
+unwrapRec4 :: forall f. Rec4 f -> f {}
+unwrapRec4 = coerce
+
 data Arr1 a b = Arr1 (Array a) (Array b)
 
 arr1ToArr1 :: Arr1 Int String -> Arr1 (Id1 Int) (Id2 String)
