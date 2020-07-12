@@ -40,7 +40,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Roles
-import Language.PureScript.TypeChecker.Kinds (elaborateKind, kindOf, unifyKinds)
+import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds)
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Roles
 import Language.PureScript.TypeChecker.Synonyms
@@ -404,8 +404,8 @@ entails SolverOptions{..} constraint context hints =
         then pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing]
         else do
           lift $ do
-            (_, kind) <- kindOf a'
-            (_, kind') <- kindOf b'
+            kind <- elaborateKind a'
+            kind' <- elaborateKind b'
             unifyKinds kind kind'
           -- When solving must reduce and recurse, it doesn't matter whether we
           -- reduce the first or second argument -- if the constraint is
