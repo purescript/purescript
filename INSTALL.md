@@ -46,21 +46,16 @@ If you don't have stack installed, please see the [stack install documentation](
 
 The PureScript REPL depends on the `curses` library (via the Haskell package
 `terminfo`). If you are having difficulty running the compiler, it may be
-because the `curses` library is missing.
+because the `curses` library is missing. This problem may appear as a `libtinfo`
+error:
+```
+error while loading shared libraries: libtinfo.so.5: cannot open shared object file: No such file or directory
+```
 
 On Linux, you will probably need to install `ncurses` manually. On Ubuntu, for
 example, this can be done by running:
 ```
-$ sudo apt install libncurses5-dev
-```
-
-When installing via `npm`, you may encounter this `libtinfo` error:
-```
-error while loading shared libraries: libtinfo.so.5: cannot open shared object file: No such file or directory
-```
-Fix this error on Ubuntu by running::
-```
-$ sudo apt install libtinfo5
+$ sudo apt install libtinfo5 libncurses5-dev
 ```
 
 ## EACCES error
