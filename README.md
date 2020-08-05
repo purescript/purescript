@@ -12,7 +12,7 @@ A small strongly typed programming language with expressive types that compiles 
 
 ## Resources
 
-- [PureScript book](https://leanpub.com/purescript/read)
+- [PureScript book](https://book.purescript.org/)
 - [Documentation](https://github.com/purescript/documentation)
 - [Try PureScript](http://try.purescript.org)
 - [Pursuit Package Index](http://pursuit.purescript.org/)
