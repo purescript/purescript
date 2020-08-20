@@ -1,4 +1,4 @@
--- @shouldWarnWith MissingNewtypeSuperclassInstance
+-- @shouldWarnWith MissingSuperclassInstance
 module Main where
 
 import Prelude

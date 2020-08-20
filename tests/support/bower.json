@@ -11,6 +11,7 @@
     "purescript-either": "4.0.0",
     "purescript-foldable-traversable": "4.0.0",
     "purescript-functions": "4.0.0",
+    "purescript-functors": "3.1.1",
     "purescript-gen": "2.0.0",
     "purescript-generics-rep": "6.0.0",
     "purescript-globals": "4.0.0",

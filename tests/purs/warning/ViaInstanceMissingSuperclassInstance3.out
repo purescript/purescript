@@ -1,0 +1,14 @@
+Warning found:
+at tests/purs/warning/ViaInstanceMissingSuperclassInstance3.purs:21:1 - 21:92 (line 21, column 1 - line 21, column 92)
+
+  The derived instance via [33mTuple w[0m for
+  [33m                               [0m
+  [33m  Main.MonadWriter w           [0m
+  [33m                   (MyWriter w)[0m
+  [33m                               [0m
+  implies a missing superclass instance for [33mMain.MonadTell[0m.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/MissingSuperclassInstance.md for more information,
+or to contribute content related to this warning.
+

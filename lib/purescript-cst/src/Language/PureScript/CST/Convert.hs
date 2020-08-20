@@ -479,12 +479,15 @@ convertDeclaration fileName decl = case decl of
           (convertType fileName <$> args)
           (AST.ExplicitInstance $ goInstanceBinding <$> maybe [] (NE.toList . snd) bd)
     uncurry goInst <$> zip [0..] (toList insts)
-  DeclDerive _ _ new (InstanceHead _ name _ ctrs cls args) -> do
+  DeclDerive _ _ strat (InstanceHead _ name _ ctrs cls args) -> do
     let
       name' = ident $ nameValue name
-      instTy
-        | isJust new = AST.NewtypeInstance
-        | otherwise = AST.DerivedInstance
+      instTy = case strat of
+        Just DeriveNewtype{} ->
+          AST.DerivedInstance (Just AST.DeriveNewtype)
+        Just (DeriveVia _ _ viaTy) ->
+          AST.DerivedInstance (Just (AST.DeriveVia $ convertType fileName viaTy))
+        _ -> AST.DerivedInstance Nothing
     pure $ AST.TypeInstanceDeclaration ann [name'] 0 name'
       (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
       (qualified cls)

@@ -35,7 +35,7 @@ import qualified Language.PureScript.Roles as R
 import Language.PureScript.PSString (PSString)
 }
 
-%expect 95
+%expect 98
 
 %name parseType type
 %name parseExpr expr
@@ -123,6 +123,7 @@ import Language.PureScript.PSString (PSString)
   'then'             { SourceToken _ (TokLowerName [] "then") }
   'true'             { SourceToken _ (TokLowerName [] "true") }
   'type'             { SourceToken _ (TokLowerName [] "type") }
+  'via'              { SourceToken _ (TokLowerName [] "via") }
   'where'            { SourceToken _ (TokLowerName [] "where") }
   '(->)'             { SourceToken _ (TokSymbolArr _) }
   '(..)'             { SourceToken _ (TokSymbolName [] "..") }
@@ -197,6 +198,7 @@ qualIdent :: { QualifiedName Ident }
   | 'nominal' {% toQualifiedName Ident $1 }
   | 'representational' {% toQualifiedName Ident $1 }
   | 'phantom' {% toQualifiedName Ident $1 }
+  | 'via' {% toQualifiedName Ident $1 }
 
 ident :: { Name Ident }
   : LOWER {% toName Ident $1 }
@@ -207,6 +209,7 @@ ident :: { Name Ident }
   | 'nominal' {% toName Ident $1 }
   | 'representational' {% toName Ident $1 }
   | 'phantom' {% toName Ident $1 }
+  | 'via' {% toName Ident $1 }
 
 qualOp :: { QualifiedOpName }
   : OPERATOR {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
@@ -267,6 +270,7 @@ label :: { Label }
   | 'then' { toLabel $1 }
   | 'true' { toLabel $1 }
   | 'type' { toLabel $1 }
+  | 'via' { toLabel $1 }
   | 'where' { toLabel $1 }
 
 hole :: { Name Ident }
@@ -672,7 +676,7 @@ decl :: { Declaration () }
   | 'newtype' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled (getProperName $2) $3 $4)) }
   | 'type' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled (getProperName $2) $3 $4)) }
   | 'derive' instHead { DeclDerive () $1 Nothing $2 }
-  | 'derive' 'newtype' instHead { DeclDerive () $1 (Just $2) $3 }
+  | 'derive' derivingStrategy instHead { DeclDerive () $1 (Just $2) $3 }
   | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
   | ident manyOrEmpty(binderAtom) guardedDecl { DeclValue () (ValueBindingFields $1 $2 $3) }
   | fixity { DeclFixity () $1 }
@@ -734,6 +738,10 @@ fundep :: { ClassFundep }
 
 classMember :: { Labeled (Name Ident) (Type ()) }
   : ident '::' type {% checkNoWildcards $3 *> pure (Labeled $1 $2 $3) }
+
+derivingStrategy :: { DerivingStrategy () }
+  : 'newtype' { DeriveNewtype () $1 }
+  | 'via' typeAtom { DeriveVia () $1 $2 }
 
 instHead :: { InstanceHead () }
   : 'instance' ident '::' constraints '=>' qualProperName manyOrEmpty(typeAtom)

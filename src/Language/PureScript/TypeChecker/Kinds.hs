@@ -17,12 +17,14 @@ module Language.PureScript.TypeChecker.Kinds
   , elaborateKind
   , checkConstraint
   , checkInstanceDeclaration
+  , checkViaKind
   , checkKindDeclaration
   , checkTypeKind
   , unknownsWithKinds
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
@@ -844,6 +846,22 @@ checkInstanceDeclaration moduleName (ann, constraints, clsName, args) = do
     let (allConstraints, (_, allKinds, allArgs)) = unapplyTypes <$> unapplyConstraints allWithVars
     varKinds <- traverse (traverse (fmap (replaceUnknownsWithVars unknownVars) . apply)) $ (snd <$> unknownVars) <> (first runProperName <$> freeVarsDict)
     pure (allConstraints, allKinds, allArgs, varKinds)
+
+checkViaKind
+  :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
+  => ModuleName
+  -> SourceSpan
+  -> Qualified (ProperName 'ClassName)
+  -> [SourceType]
+  -> SourceType
+  -> m ()
+checkViaKind moduleName ss className tys viaTy = do
+  let freeVars = ordNub $ freeTypeVariables viaTy ++ freeTypeVariables (last tys)
+  freeVarsDict <- for freeVars $ \v -> (ProperName v,) <$> freshKind ss
+  bindLocalTypeVariables moduleName freeVarsDict $ do
+    (_, viaKind) <- inferKind viaTy
+    (_, expectedKind) <- inferKind (last tys)
+    unifyKindsWithFailure (\_ _ -> throwError . errorMessage' ss $ InvalidViaKind className tys viaTy viaKind expectedKind) viaKind expectedKind
 
 checkKindDeclaration
   :: forall m. (MonadSupply m, MonadError MultipleErrors m, MonadState CheckState m)

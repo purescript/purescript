@@ -1,7 +1,7 @@
 Error found:
-at tests/purs/failing/NewtypeInstance3.purs:8:1 - 8:43 (line 8, column 1 - line 8, column 43)
+at tests/purs/failing/ViaInstanceNullaryTypeClass.purs:8:1 - 8:41 (line 8, column 1 - line 8, column 41)
 
-  Cannot derive newtype instance for
+  Cannot derive instance via [33mV[0m for
   [33m              [0m
   [33m  Main.Nullary[0m
   [33m              [0m
