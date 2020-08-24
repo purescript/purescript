@@ -15,9 +15,9 @@ See also <https://www.haskell.org/ghc/download_ghc_8_6_4.html> for more details 
 
 ## Official prebuilt binaries
 
-Each release comes with prebuilt x86-64 binary bundles for Linux, mac OS, and Windows. Users of other operating systems or architectures will likely need to build the compiler from source; see below.
+Each [release](https://github.com/purescript/purescript/releases) comes with prebuilt x86-64 binary bundles for Linux, mac OS, and Windows. Users of other operating systems or architectures will likely need to build the compiler from source; see below.
 
-To install a binary bundle, simply extract it and place the `purs` executable somewhere on your PATH.
+To install a binary bundle, simply extract it and place the `purs` executable somewhere on your PATH. 
 
 ## Other distributions
 
@@ -26,12 +26,15 @@ There are several other distributions of the PureScript compiler available, whic
 * NPM: `npm install -g purescript`
 * Homebrew (for macOS): `brew install purescript`
 * [PSVM](https://github.com/ThomasCrevoisier/psvm-js): `npm install -g psvm`
+* [Hackage](https://hackage.haskell.org/package/purescript): `cabal install purescript` or `stack install purescript`
 
 ## Compiling from source
 
 The easiest way is to use stack:
 
 ```
+$ git clone https://github.com/purescript/purescript.git purescript_compiler
+$ cd purescript_compiler
 $ stack update
 $ stack unpack purescript
 $ cd purescript-x.y.z  # (replace x.y.z with whichever version you just downloaded)
