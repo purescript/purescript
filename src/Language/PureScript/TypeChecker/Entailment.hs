@@ -418,7 +418,6 @@ entails SolverOptions{..} constraint context hints =
     coercibleWanteds :: Environment -> SourceType -> SourceType -> m (Maybe [SourceConstraint])
     coercibleWanteds env a b
       | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
-      , (TypeConstructor _ _, _, bxs) <- unapplyTypes b
       , (aTyKind, _) <- fromMaybe (internalError "coercibleWanteds: type lookup failed") $ M.lookup aTyName (types env)
       , (aks, kind) <- unapplyKinds aTyKind
       , length axs < length aks = do
@@ -426,9 +425,9 @@ entails SolverOptions{..} constraint context hints =
           -- in the constraint @Coercible (D a) (D a')@), yield a new wanted
           -- constraint in terms of the types saturated with the same variables
           -- (e.g. @Coercible (D a t0) (D a' t0)@ in the exemple).
-          tys <- traverse freshTypeWithKind aks
-          let a' = foldl' srcTypeApp a $ drop (length axs) tys
-              b' = foldl' srcTypeApp b $ drop (length bxs) tys
+          tys <- traverse freshTypeWithKind $ drop (length axs) aks
+          let a' = foldl' srcTypeApp a tys
+              b' = foldl' srcTypeApp b tys
           pure $ Just [srcCoercibleConstraint kind a' b']
       | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
       , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
