@@ -419,8 +419,8 @@ entails SolverOptions{..} constraint context hints =
     coercibleWanteds env a b
       | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
       , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
-      , Just (aTyKind, _) <- M.lookup aTyName $ types env
-      , Just (bTyKind, _) <- M.lookup bTyName $ types env
+      , (aTyKind, _) <- fromMaybe (internalError "coercibleWanteds: type lookup failed") $ M.lookup aTyName (types env)
+      , (bTyKind, _) <- fromMaybe (internalError "coercibleWanteds: type lookup failed") $ M.lookup bTyName (types env)
       , (aks, kind) <- unapplyKinds aTyKind
       , (bks, _) <- unapplyKinds bTyKind
       , length axs < length aks
@@ -436,7 +436,8 @@ entails SolverOptions{..} constraint context hints =
       | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
       , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
       , not (null axs) && not (null bxs) && aTyName == bTyName
-      , Just (aTyKind, _) <- M.lookup aTyName (types env) = runMaybeT $ do
+      , (aTyKind, _) <- fromMaybe (internalError "coercibleWanteds: type lookup failed") $ M.lookup aTyName (types env)
+      = runMaybeT $ do
           -- If both arguments are applications of the same type constructor
           -- (e.g. @data D a b = D a@ in the constraint
           -- @Coercible (D a b) (D a' b')@), infer the roles of the type
