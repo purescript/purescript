@@ -418,13 +418,10 @@ entails SolverOptions{..} constraint context hints =
     coercibleWanteds :: Environment -> SourceType -> SourceType -> m (Maybe [SourceConstraint])
     coercibleWanteds env a b
       | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
-      , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
+      , (TypeConstructor _ _, _, bxs) <- unapplyTypes b
       , (aTyKind, _) <- fromMaybe (internalError "coercibleWanteds: type lookup failed") $ M.lookup aTyName (types env)
-      , (bTyKind, _) <- fromMaybe (internalError "coercibleWanteds: type lookup failed") $ M.lookup bTyName (types env)
       , (aks, kind) <- unapplyKinds aTyKind
-      , (bks, _) <- unapplyKinds bTyKind
-      , length axs < length aks
-      , length bxs < length bks = do
+      , length axs < length aks = do
           -- If both arguments have kind @k1 -> k2@ (e.g. @data D a b = D a@
           -- in the constraint @Coercible (D a) (D a')@), yield a new wanted
           -- constraint in terms of the types saturated with the same variables
@@ -435,7 +432,7 @@ entails SolverOptions{..} constraint context hints =
           pure $ Just [srcCoercibleConstraint kind a' b']
       | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
       , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
-      , not (null axs) && not (null bxs) && aTyName == bTyName
+      , not (null axs) && aTyName == bTyName
       , (aTyKind, _) <- fromMaybe (internalError "coercibleWanteds: type lookup failed") $ M.lookup aTyName (types env)
       = runMaybeT $ do
           -- If both arguments are applications of the same type constructor
