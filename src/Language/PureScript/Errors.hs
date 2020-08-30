@@ -180,6 +180,7 @@ data SimpleErrorMessage
       Text -- ^ Type variable in question
       Role -- ^ inferred role
       Role -- ^ declared role
+  | InvalidCoercibleInstanceDeclaration [SourceType]
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -336,6 +337,7 @@ errorCode em = case unwrapErrorMessage em of
   VisibleQuantificationCheckFailureInType {} -> "VisibleQuantificationCheckFailureInType"
   UnsupportedTypeInKind {} -> "UnsupportedTypeInKind"
   RoleMismatch {} -> "RoleMismatch"
+  InvalidCoercibleInstanceDeclaration {} -> "InvalidCoercibleInstanceDeclaration"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -453,6 +455,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (MissingKindDeclaration sig nm ty) = MissingKindDeclaration sig nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
+  gSimple (InvalidCoercibleInstanceDeclaration tys) = InvalidCoercibleInstanceDeclaration <$> traverse f tys
   gSimple other = pure other
 
   gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
@@ -1291,6 +1294,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             "The annotation says " <> markCode (displayRole declared) <>
             " but the role " <> markCode (displayRole inferred) <>
             " is required."
+        ]
+
+    renderSimpleErrorMessage (InvalidCoercibleInstanceDeclaration tys) =
+      paras
+        [ line "Invalid type class instance declaration for"
+        , markCodeBox $ indent $ Box.hsep 1 Box.left
+            [ line (showQualified runProperName C.Coercible)
+            , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) tys)
+            ]
+        , line "Instance declarations of this type class are disallowed."
         ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
