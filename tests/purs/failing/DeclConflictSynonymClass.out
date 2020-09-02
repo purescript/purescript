@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/DeclConflictSynonymClass.purs:8:1 - 8:17 (line 8, column 1 - line 8, column 17)
+
+  Declaration for type [33mFail[0m conflicts with an existing type class of the same name.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/DeclConflict.md for more information,
+or to contribute content related to this error.
+

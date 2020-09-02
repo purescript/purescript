@@ -27,9 +27,13 @@ import qualified Data.Aeson as A
 import qualified Data.Text as T
 import qualified Data.Vector as V
 
-import qualified Language.PureScript as P
-
-import Text.ParserCombinators.ReadP (readP_to_S)
+import qualified Language.PureScript.AST as P
+import qualified Language.PureScript.CoreFn.FromJSON as P
+import qualified Language.PureScript.Crash as P
+import qualified Language.PureScript.Environment as P
+import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Types as P
+import qualified Paths_purescript as Paths
 
 import Web.Bower.PackageMeta hiding (Version, displayError)
 
@@ -40,7 +44,6 @@ import Language.PureScript.Docs.RenderedCode as ReExports
    Namespace(..), FixityAlias)
 
 type Type' = P.Type ()
-type Kind' = P.Kind ()
 type Constraint' = P.Constraint ()
 
 --------------------
@@ -158,39 +161,34 @@ data DeclarationInfo
   -- newtype) and its type arguments. Constructors are represented as child
   -- declarations.
   --
-  | DataDeclaration P.DataDeclType [(Text, Maybe Kind')]
+  | DataDeclaration P.DataDeclType [(Text, Maybe Type')]
 
   -- |
   -- A data type foreign import, with its kind.
   --
-  | ExternDataDeclaration Kind'
+  | ExternDataDeclaration Type'
 
   -- |
   -- A type synonym, with its type arguments and its type.
   --
-  | TypeSynonymDeclaration [(Text, Maybe Kind')] Type'
+  | TypeSynonymDeclaration [(Text, Maybe Type')] Type'
 
   -- |
   -- A type class, with its type arguments, its superclasses and functional
   -- dependencies. Instances and members are represented as child declarations.
   --
-  | TypeClassDeclaration [(Text, Maybe Kind')] [Constraint'] [([Text], [Text])]
+  | TypeClassDeclaration [(Text, Maybe Type')] [Constraint'] [([Text], [Text])]
 
   -- |
   -- An operator alias declaration, with the member the alias is for and the
   -- operator's fixity.
   --
   | AliasDeclaration P.Fixity FixityAlias
-
-  -- |
-  -- A kind declaration
-  --
-  | ExternKindDeclaration
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData DeclarationInfo
 
-convertFundepsToStrings :: [(Text, Maybe Kind')] -> [P.FunctionalDependency] -> [([Text], [Text])]
+convertFundepsToStrings :: [(Text, Maybe Type')] -> [P.FunctionalDependency] -> [([Text], [Text])]
 convertFundepsToStrings args fundeps =
   map (\(P.FunctionalDependency from to) -> toArgs from to) fundeps
   where
@@ -215,7 +213,6 @@ declInfoToString (ExternDataDeclaration _) = "externData"
 declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _ _) = "typeClass"
 declInfoToString (AliasDeclaration _ _) = "alias"
-declInfoToString ExternKindDeclaration = "kind"
 
 declInfoNamespace :: DeclarationInfo -> Namespace
 declInfoNamespace = \case
@@ -231,8 +228,6 @@ declInfoNamespace = \case
     TypeLevel
   AliasDeclaration _ alias ->
     either (const TypeLevel) (const ValueLevel) (P.disqualify alias)
-  ExternKindDeclaration{} ->
-    KindLevel
 
 isTypeClass :: Declaration -> Bool
 isTypeClass Declaration{..} =
@@ -264,12 +259,6 @@ isTypeAlias :: Declaration -> Bool
 isTypeAlias Declaration{..} =
   case declInfo of
     AliasDeclaration _ (P.Qualified _ d) -> isLeft d
-    _ -> False
-
-isKind :: Declaration -> Bool
-isKind Declaration{..} =
-  case declInfo of
-    ExternKindDeclaration{} -> True
     _ -> False
 
 -- | Discard any children which do not satisfy the given predicate.
@@ -559,13 +548,7 @@ instance A.FromJSON GithubUser where
   parseJSON = toAesonParser' asGithubUser
 
 asVersion :: Parse PackageError Version
-asVersion = withString (maybe (Left InvalidVersion) Right . parseVersion')
-
-parseVersion' :: String -> Maybe Version
-parseVersion' str =
-  case filter (null . snd) $ readP_to_S parseVersion str of
-    [(vers, "")] -> Just vers
-    _            -> Nothing
+asVersion = withString (maybe (Left InvalidVersion) Right . P.parseVersion')
 
 asModule :: Parse PackageError Module
 asModule =
@@ -635,7 +618,7 @@ asDeclarationInfo = do
       DataDeclaration <$> key "dataDeclType" asDataDeclType
                       <*> key "typeArguments" asTypeArguments
     "externData" ->
-      ExternDataDeclaration <$> key "kind" asKind
+      ExternDataDeclaration <$> key "kind" asType
     "typeSynonym" ->
       TypeSynonymDeclaration <$> key "arguments" asTypeArguments
                              <*> key "type" asType
@@ -646,18 +629,16 @@ asDeclarationInfo = do
     "alias" ->
       AliasDeclaration <$> key "fixity" asFixity
                        <*> key "alias" asFixityAlias
+    -- Backwards compat: kinds are extern data
     "kind" ->
-      pure ExternKindDeclaration
+      pure $ ExternDataDeclaration (P.kindType $> ())
     other ->
       throwCustomError (InvalidDeclarationType other)
 
-asTypeArguments :: Parse PackageError [(Text, Maybe Kind')]
+asTypeArguments :: Parse PackageError [(Text, Maybe Type')]
 asTypeArguments = eachInArray asTypeArgument
   where
-  asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asKind)
-
-asKind :: Parse PackageError Kind'
-asKind = fromAesonParser .! InvalidKind
+  asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asType)
 
 asType :: Parse e Type'
 asType = fromAesonParser
@@ -701,6 +682,7 @@ asSourcePos = P.SourcePos <$> nth 0 asIntegral
 
 asConstraint :: Parse PackageError Constraint'
 asConstraint = P.Constraint () <$> key "constraintClass" asQualifiedProperName
+                               <*> keyOrDefault "constraintKindArgs" [] (eachInArray asType)
                                <*> key "constraintArgs" (eachInArray asType)
                                <*> pure Nothing
 
@@ -773,7 +755,7 @@ instance A.ToJSON a => A.ToJSON (Package a) where
                                                   pkgResolvedDependencies
       , "github"               .= pkgGithub
       , "uploader"             .= pkgUploader
-      , "compilerVersion"      .= showVersion P.version
+      , "compilerVersion"      .= showVersion Paths.version
       ] ++
       fmap (\t -> "tagTime" .= formatTime t) (maybeToList pkgTagTime)
 
@@ -819,7 +801,6 @@ instance A.ToJSON DeclarationInfo where
       TypeSynonymDeclaration args ty -> ["arguments" .= args, "type" .= ty]
       TypeClassDeclaration args super fundeps -> ["arguments" .= args, "superclasses" .= super, "fundeps" .= fundeps]
       AliasDeclaration fixity alias -> ["fixity" .= fixity, "alias" .= alias]
-      ExternKindDeclaration -> []
 
 instance A.ToJSON ChildDeclarationInfo where
   toJSON info = A.object $ "declType" .= childDeclInfoToString info : props

@@ -11,7 +11,12 @@ import Data.Functor (($>))
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types
-import qualified Language.PureScript as P
+
+import qualified Language.PureScript.AST as P
+import qualified Language.PureScript.Comments as P
+import qualified Language.PureScript.Crash as P
+import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Types as P
 
 -- |
 -- Convert a single Module, but ignore re-exports; any re-exported types or
@@ -88,7 +93,6 @@ getDeclarationTitle (P.ValueDeclaration vd) = Just (P.showIdent (P.valdeclIdent 
 getDeclarationTitle (P.ExternDeclaration _ name _) = Just (P.showIdent name)
 getDeclarationTitle (P.DataDeclaration _ _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.ExternDataDeclaration _ name _) = Just (P.runProperName name)
-getDeclarationTitle (P.ExternKindDeclaration _ name) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeSynonymDeclaration _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ name _ _ _ _) = Just (P.showIdent name)
@@ -122,13 +126,12 @@ convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
   Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
   info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args)
-  children = map convertCtor (fmap (fmap (fmap ($> ()))) ctors)
-  convertCtor (ctor', tys) =
-    ChildDeclaration (P.runProperName ctor') Nothing Nothing (ChildDataConstructor tys)
+  children = map convertCtor ctors
+  convertCtor :: P.DataConstructorDeclaration -> ChildDeclaration
+  convertCtor P.DataConstructorDeclaration{..} =
+    ChildDeclaration (P.runProperName dataCtorName) (convertComments $ snd dataCtorAnn) Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
 convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
   basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
-convertDeclaration (P.ExternKindDeclaration sa _) title =
-  basicDeclaration sa title ExternKindDeclaration
 convertDeclaration (P.TypeSynonymDeclaration sa _ args ty) title =
   basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()))
 convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =

@@ -28,6 +28,7 @@ import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDic
 import Language.PureScript.Types
 import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.AST as A
+import qualified Language.PureScript.Constants.Prim as C
 
 -- | Desugars a module from AST to CoreFn representation.
 moduleToCoreFn :: Environment -> A.Module -> Module Ann
@@ -37,11 +38,22 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   let imports = mapMaybe importToCoreFn decls ++ fmap (ssAnn modSS,) (findQualModules decls)
       imports' = dedupeImports imports
       exps' = ordNub $ concatMap exportToCoreFn exps
+      reExps = M.map ordNub $ M.unionsWith (++) (mapMaybe (fmap reExportsToCoreFn . toReExportRef) exps)
       externs = ordNub $ mapMaybe externToCoreFn decls
       decls' = concatMap declToCoreFn decls
-  in Module modSS coms mn (spanName modSS) imports' exps' externs decls'
-
+  in Module modSS coms mn (spanName modSS) imports' exps' reExps externs decls'
   where
+  -- | Creates a map from a module name to the re-export references defined in
+  -- that module.
+  reExportsToCoreFn :: (ModuleName, A.DeclarationRef) -> M.Map ModuleName [Ident]
+  reExportsToCoreFn (mn', ref') = M.singleton mn' (exportToCoreFn ref')
+
+  toReExportRef :: A.DeclarationRef -> Maybe (ModuleName, A.DeclarationRef)
+  toReExportRef (A.ReExportRef _ src ref) =
+      fmap
+        (, ref)
+        (A.exportSourceImportedFrom src)
+  toReExportRef _ = Nothing
 
   -- | Remove duplicate imports
   dedupeImports :: [(Ann, ModuleName)] -> [(Ann, ModuleName)]
@@ -52,14 +64,16 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
 
   -- | Desugars member declarations from AST to CoreFn representation.
   declToCoreFn :: A.Declaration -> [Bind Ann]
-  declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [(ctor, _)]) =
-    [NonRec (ssA ss) (properToIdent ctor) $
+  declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [ctor]) =
+    [NonRec (ssA ss) (properToIdent $ A.dataCtorName ctor) $
       Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var (ssAnn ss) $ Qualified Nothing (Ident "x"))]
   declToCoreFn d@(A.DataDeclaration _ Newtype _ _ _) =
     error $ "Found newtype with multiple constructors: " ++ show d
   declToCoreFn (A.DataDeclaration (ss, com) Data tyName _ ctors) =
-    flip fmap ctors $ \(ctor, _) ->
-      let (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
+    flip fmap ctors $ \ctorDecl ->
+      let
+        ctor = A.dataCtorName ctorDecl
+        (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
       in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration ds) =
     concatMap declToCoreFn ds
@@ -85,6 +99,8 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     internalError "Abs with Binder argument was not desugared before exprToCoreFn mn"
   exprToCoreFn ss com ty (A.App v1 v2) =
     App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
+  exprToCoreFn ss com ty (A.Unused _) =
+    Var (ss, com, ty, Nothing) (Qualified (Just C.Prim) (Ident C.undefined))
   exprToCoreFn _ com ty (A.Var ss ident) =
     Var (ss, com, ty, getValueMeta ident) ident
   exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =
@@ -233,10 +249,14 @@ externToCoreFn _ = Nothing
 -- constructor, instances and values are flattened into one list.
 exportToCoreFn :: A.DeclarationRef -> [Ident]
 exportToCoreFn (A.TypeRef _ _ (Just dctors)) = fmap properToIdent dctors
+exportToCoreFn (A.TypeRef _ _ Nothing) = []
+exportToCoreFn (A.TypeOpRef _ _) = []
 exportToCoreFn (A.ValueRef _ name) = [name]
+exportToCoreFn (A.ValueOpRef _ _) = []
 exportToCoreFn (A.TypeClassRef _ name) = [properToIdent name]
 exportToCoreFn (A.TypeInstanceRef _ name) = [name]
-exportToCoreFn _ = []
+exportToCoreFn (A.ModuleRef _ _) = []
+exportToCoreFn (A.ReExportRef _ _ _) = []
 
 -- | Makes a typeclass dictionary constructor function. The returned expression
 -- is a function that accepts the superclass instances and member

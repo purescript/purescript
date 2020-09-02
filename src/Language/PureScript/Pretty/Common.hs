@@ -14,7 +14,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
-import Language.PureScript.Parser.Lexer (isUnquotedKey)
+import Language.PureScript.CST.Lexer (isUnquotedKey)
 
 import Text.PrettyPrint.Boxes hiding ((<>))
 import qualified Text.PrettyPrint.Boxes as Box
@@ -114,7 +114,7 @@ emptyPrinterState :: PrinterState
 emptyPrinterState = PrinterState { indent = 0 }
 
 -- |
--- Number of characters per identation level
+-- Number of characters per indentation level
 --
 blockIndent :: Int
 blockIndent = 4

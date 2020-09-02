@@ -40,7 +40,6 @@ succTestCases =
   , ("resolves a synonym reexport"
     , [(mn "A", P.TypeRef testSpan (P.ProperName "SynonymA") Nothing)], [synonymA `annExp` "A"])
   , ("resolves a class reexport", [(mn "A", P.TypeClassRef testSpan (P.ProperName "ClassA"))], [classA `annExp` "A"])
-  , ("resolves a kind reexport", [(mn "A", P.KindRef testSpan (P.ProperName "KindA"))], [kindA `annExp` "A"])
   ]
 
 failTestCases :: [(Text, Refs)]

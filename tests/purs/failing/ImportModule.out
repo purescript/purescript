@@ -1,0 +1,11 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ImportModule.purs:4:1 - 4:10 (line 4, column 1 - line 4, column 10)
+
+  Module [33mM1[0m was not found.
+  Make sure the source file exists, and that it has been provided as an input to the compiler.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ModuleNotFound.md for more information,
+or to contribute content related to this error.
+

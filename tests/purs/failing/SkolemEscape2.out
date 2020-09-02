@@ -1,0 +1,22 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/SkolemEscape2.purs:9:1 - 11:9 (line 9, column 1 - line 11, column 9)
+
+  The type variable [33mr[0m, bound at
+
+    tests/purs/failing/SkolemEscape2.purs:10:21 - 10:34 (line 10, column 21 - line 10, column 34)
+
+  has escaped its scope, appearing in the type
+  [33m                         [0m
+  [33m  t1 -> t2 (STRef r0 Int)[0m
+  [33m                         [0m
+
+in the expression [33m[33m\$0 ->                                        [0m[0m
+                  [33m[33m  ((bind $dictBind1) ((...) (...))) (\r ->    [0m[0m
+                  [33m[33m                                       (...) r[0m[0m
+                  [33m[33m                                    )         [0m[0m
+in value declaration [33mtest[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/EscapedSkolem.md for more information,
+or to contribute content related to this error.
+

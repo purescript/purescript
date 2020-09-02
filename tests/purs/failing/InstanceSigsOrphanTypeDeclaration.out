@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/InstanceSigsOrphanTypeDeclaration.purs:10:3 - 10:12 (line 10, column 3 - line 10, column 12)
+
+  The type declaration for [33mbar[0m should be followed by its definition.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/OrphanTypeDeclaration.md for more information,
+or to contribute content related to this error.
+

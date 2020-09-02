@@ -1,0 +1,22 @@
+Error 1 of 2:
+
+  in module [33mMultipleErrors2[0m
+  at tests/purs/failing/MultipleErrors2.purs:7:7 - 7:20 (line 7, column 7 - line 7, column 20)
+
+    Unknown value [33mitDoesntExist[0m
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+  or to contribute content related to this error.
+
+Error 2 of 2:
+
+  in module [33mMultipleErrors2[0m
+  at tests/purs/failing/MultipleErrors2.purs:9:7 - 9:22 (line 9, column 7 - line 9, column 22)
+
+    Unknown value [33mneitherDoesThis[0m
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+  or to contribute content related to this error.
+

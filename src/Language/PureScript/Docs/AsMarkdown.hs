@@ -1,15 +1,14 @@
 module Language.PureScript.Docs.AsMarkdown
-  ( renderModulesAsMarkdown
-  , Docs
+  ( Docs
   , runDocs
   , modulesAsMarkdown
+  , moduleAsMarkdown
   , codeToString
   ) where
 
 import Prelude.Compat
 
 import Control.Monad (unless, zipWithM_)
-import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Writer (Writer, tell, execWriter)
 
 import Data.Foldable (for_)
@@ -20,19 +19,7 @@ import qualified Data.Text as T
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Docs.Convert as Convert
 import qualified Language.PureScript.Docs.Render as Render
-
--- |
--- Take a list of modules and render them all in order, returning a single
--- Markdown-formatted Text.
---
-renderModulesAsMarkdown ::
-  (MonadError P.MultipleErrors m) =>
-  [P.Module] ->
-  m Text
-renderModulesAsMarkdown =
-  fmap (runDocs . modulesAsMarkdown) . Convert.convertModules Local
 
 modulesAsMarkdown :: [Module] -> Docs
 modulesAsMarkdown = mapM_ moduleAsMarkdown

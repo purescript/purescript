@@ -1,5 +1,4 @@
--- @shouldFailWith CycleInTypeSynonym
--- TODO: Should this have its own error, perhaps CycleInTypeClassDeclaration?
+-- @shouldFailWith CycleInTypeClassDeclaration
 module CycleInSuperclasses where
 
 import Prelude

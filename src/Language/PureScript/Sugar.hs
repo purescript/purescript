@@ -54,10 +54,11 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --
 desugar
   :: (MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => [ExternsFile]
+  => Env
+  -> [ExternsFile]
   -> [Module]
   -> m [Module]
-desugar externs =
+desugar env externs =
   map desugarSignedLiterals
     >>> traverse desugarObjectConstructors
     >=> traverse desugarDoModule
@@ -65,7 +66,7 @@ desugar externs =
     >=> map desugarLetPatternModule
     >>> traverse desugarCasesModule
     >=> traverse desugarTypeDeclarationsModule
-    >=> desugarImports externs
+    >=> desugarImports env
     >=> rebracket externs
     >=> traverse checkFixityExports
     >=> traverse (deriveInstances externs)

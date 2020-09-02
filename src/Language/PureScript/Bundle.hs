@@ -14,6 +14,7 @@ module Language.PureScript.Bundle
   , ErrorMessage(..)
   , printErrorMessage
   , getExportedIdentifiers
+  , Module
   ) where
 
 import Prelude.Compat
@@ -23,16 +24,23 @@ import Control.Monad
 import Control.Monad.Error.Class
 import Control.Arrow ((&&&))
 
+import Data.Aeson ((.=))
+import Data.Array ((!))
 import Data.Char (chr, digitToInt)
-import Data.Generics (everything, everywhere, mkQ, mkT)
+import Data.Foldable (fold)
+import Data.Generics (GenericM, everything, everythingWithContext, everywhere, gmapMo, mkMp, mkQ, mkT)
 import Data.Graph
-import Data.List (stripPrefix)
-import Data.Maybe (mapMaybe, catMaybes)
+import Data.List (stripPrefix, (\\))
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Data.Version (showVersion)
+import qualified Data.Aeson as A
+import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Text.Lazy as T
 
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
+import Language.JavaScript.Process.Minify
 
 import qualified Paths_purescript as Paths
 
@@ -66,6 +74,12 @@ showModuleType Foreign = "Foreign"
 -- | A module is identified by its module name and its type.
 data ModuleIdentifier = ModuleIdentifier String ModuleType deriving (Show, Eq, Ord)
 
+instance A.ToJSON ModuleIdentifier where
+  toJSON (ModuleIdentifier name mt) =
+    A.object [ "name" .= name
+             , "type" .= show mt
+             ]
+
 moduleName :: ModuleIdentifier -> String
 moduleName (ModuleIdentifier name _) = name
 
@@ -77,9 +91,14 @@ guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory f
     guessModuleType "foreign.js" = pure Foreign
     guessModuleType name = throwError $ UnsupportedModulePath name
 
--- | A piece of code is identified by its module and its name. These keys are used to label vertices
--- in the dependency graph.
-type Key = (ModuleIdentifier, String)
+data Visibility
+  = Public
+  | Internal
+  deriving (Show, Eq, Ord)
+
+-- | A piece of code is identified by its module, its name, and whether it is an internal variable
+-- or a public member. These keys are used to label vertices in the dependency graph.
+type Key = (ModuleIdentifier, String, Visibility)
 
 -- | An export is either a "regular export", which exports a name from the regular module we are in,
 -- or a reexport of a declaration in the corresponding foreign module.
@@ -101,14 +120,77 @@ data ExportType
 -- into the output during codegen.
 data ModuleElement
   = Require JSStatement String (Either String ModuleIdentifier)
-  | Member JSStatement Bool String JSExpression [Key]
+  | Member JSStatement Visibility String JSExpression [Key]
   | ExportsList [(ExportType, String, JSExpression, [Key])]
   | Other JSStatement
   | Skip JSStatement
   deriving (Show)
 
+instance A.ToJSON ModuleElement where
+  toJSON = \case
+    (Require _ name (Right target)) ->
+      A.object [ "type"   .= A.String "Require"
+               , "name"   .= name
+               , "target" .= target
+               ]
+    (Require _ name (Left targetPath)) ->
+      A.object [ "type"       .= A.String "Require"
+               , "name"       .= name
+               , "targetPath" .= targetPath
+               ]
+    (Member _ visibility name _ dependsOn) ->
+      A.object [ "type"       .= A.String "Member"
+               , "name"       .= name
+               , "visibility" .= show visibility
+               , "dependsOn"  .= map keyToJSON dependsOn
+               ]
+    (ExportsList exports) ->
+      A.object [ "type"    .= A.String "ExportsList"
+               , "exports" .= map exportToJSON exports
+               ]
+    (Other stmt) ->
+      A.object [ "type" .= A.String "Other"
+               , "js"   .= getFragment stmt
+               ]
+    (Skip stmt) ->
+      A.object [ "type" .= A.String "Skip"
+               , "js"   .= getFragment stmt
+               ]
+
+    where
+
+    keyToJSON (mid, member, visibility) =
+      A.object [ "module"     .= mid
+               , "member"     .= member
+               , "visibility" .= show visibility
+               ]
+
+    exportToJSON (RegularExport sourceName, name, _, dependsOn) =
+      A.object [ "type"       .= A.String "RegularExport"
+               , "name"       .= name
+               , "sourceName" .= sourceName
+               , "dependsOn"  .= map keyToJSON dependsOn
+               ]
+    exportToJSON (ForeignReexport, name, _, dependsOn) =
+      A.object [ "type"      .= A.String "ForeignReexport"
+               , "name"      .= name
+               , "dependsOn" .= map keyToJSON dependsOn
+               ]
+
+    getFragment = ellipsize . renderToText . minifyJS . flip JSAstStatement JSNoAnnot
+      where
+      ellipsize text = if T.compareLength text 20 == GT then T.take 19 text `T.snoc` ellipsis else text
+      ellipsis = '\x2026'
+
 -- | A module is just a list of elements of the types listed above.
 data Module = Module ModuleIdentifier (Maybe FilePath) [ModuleElement] deriving (Show)
+
+instance A.ToJSON Module where
+  toJSON (Module moduleId filePath elements) =
+    A.object [ "moduleId" .= moduleId
+             , "filePath" .= filePath
+             , "elements" .= elements
+             ]
 
 -- | Prepare an error message for consumption by humans.
 printErrorMessage :: ErrorMessage -> [String]
@@ -188,7 +270,7 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
   boundNames = mapMaybe toBoundName es
     where
     toBoundName :: ModuleElement -> Maybe String
-    toBoundName (Member _ _ nm _ _) = Just nm
+    toBoundName (Member _ Internal nm _ _) = Just nm
     toBoundName _ = Nothing
 
   -- | Calculate dependencies and add them to the current element.
@@ -199,24 +281,53 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       expand (ty, nm, n1, _) = (ty, nm, n1, ordNub (dependencies modulePath n1))
   expandDeps other = other
 
-  dependencies :: ModuleIdentifier -> JSExpression -> [(ModuleIdentifier, String)]
-  dependencies m = everything (++) (mkQ [] toReference)
+  dependencies :: ModuleIdentifier -> JSExpression -> [Key]
+  dependencies m = everythingWithContext boundNames (++) (mkQ (const [] &&& id) toReference)
     where
-    toReference :: JSExpression -> [(ModuleIdentifier, String)]
-    toReference (JSMemberDot mn _ nm)
+    toReference :: JSExpression -> [String] -> ([Key], [String])
+    toReference (JSMemberDot mn _ nm) bn
       | JSIdentifier _ mn' <- mn
       , JSIdentifier _ nm' <- nm
       , Just mid <- lookup mn' imports
-      = [(mid, nm')]
-    toReference (JSMemberSquare mn _ nm _)
+      = ([(mid, nm', Public)], bn)
+    toReference (JSMemberSquare mn _ nm _) bn
       | JSIdentifier _ mn' <- mn
       , Just nm' <- fromStringLiteral nm
       , Just mid <- lookup mn' imports
-      = [(mid, nm')]
-    toReference (JSIdentifier _ nm)
-      | nm `elem` boundNames
-      = [(m, nm)]
-    toReference _ = []
+      = ([(mid, nm', Public)], bn)
+    toReference (JSIdentifier _ nm) bn
+      | nm `elem` bn
+      -- only add a dependency if this name is still in the list of names
+      -- bound to the module level (i.e., hasn't been shadowed by a function
+      -- parameter)
+      = ([(m, nm, Internal)], bn)
+    toReference (JSObjectLiteral _ props _) bn
+      = let
+          shorthandNames =
+            filter (`elem` bn) $
+            -- only add a dependency if this name is still in the list of
+            -- names bound to the module level (i.e., hasn't been shadowed by a
+            -- function parameter)
+            mapMaybe unPropertyIdentRef $
+            trailingCommaList props
+        in
+          (map (\name -> (m, name, Internal)) shorthandNames, bn)
+    toReference (JSFunctionExpression _ _ _ params _ _) bn
+      = ([], bn \\ (mapMaybe unIdentifier $ commaList params))
+    toReference e bn
+      | Just nm <- exportsAccessor e
+      -- exports.foo means there's a dependency on the public member "foo" of
+      -- this module.
+      = ([(m, nm, Public)], bn)
+    toReference _ bn = ([], bn)
+
+    unIdentifier :: JSExpression -> Maybe String
+    unIdentifier (JSIdentifier _ name) = Just name
+    unIdentifier _ = Nothing
+
+    unPropertyIdentRef :: JSObjectProperty -> Maybe String
+    unPropertyIdentRef (JSPropertyIdentRef _ name) = Just name
+    unPropertyIdentRef _ = Nothing
 
 -- String literals include the quote chars
 fromStringLiteral :: JSExpression -> Maybe String
@@ -267,6 +378,7 @@ toModule mids mid filename top
   | JSAstProgram smts _ <- top = Module mid filename <$> traverse toModuleElement smts
   | otherwise = err InvalidTopLevel
   where
+  err :: ErrorMessage -> m a
   err = throwError . ErrorInModule mid
 
   toModuleElement :: JSStatement -> m ModuleElement
@@ -274,8 +386,8 @@ toModule mids mid filename top
     | Just (importName, importPath) <- matchRequire mids mid stmt
     = pure (Require stmt importName importPath)
   toModuleElement stmt
-    | Just (exported, name, decl) <- matchMember stmt
-    = pure (Member stmt exported name decl [])
+    | Just (visibility, name, decl) <- matchMember stmt
+    = pure (Member stmt visibility name decl [])
   toModuleElement stmt
     | Just props <- matchExportsAssignment stmt
     = ExportsList <$> traverse toExport (trailingCommaList props)
@@ -290,9 +402,13 @@ toModule mids mid filename top
       exportType (JSMemberDot f _ _)
         | JSIdentifier _ "$foreign" <- f
         = pure ForeignReexport
+        | JSIdentifier _ ident <- f
+        = pure (RegularExport ident)
       exportType (JSMemberSquare f _ _ _)
         | JSIdentifier _ "$foreign" <- f
         = pure ForeignReexport
+        | JSIdentifier _ ident <- f
+        = pure (RegularExport ident)
       exportType (JSIdentifier _ s) = pure (RegularExport s)
       exportType _ = err UnsupportedExport
 
@@ -304,7 +420,7 @@ toModule mids mid filename top
 --
 -- TODO: what if we assign to exports.foo and then later assign to
 -- module.exports (presumably overwriting exports.foo)?
-getExportedIdentifiers :: (MonadError ErrorMessage m)
+getExportedIdentifiers :: forall m. (MonadError ErrorMessage m)
                           => String
                           -> JSAST
                           -> m [String]
@@ -312,12 +428,13 @@ getExportedIdentifiers mname top
   | JSAstProgram stmts _ <- top = concat <$> traverse go stmts
   | otherwise = err InvalidTopLevel
   where
+  err :: ErrorMessage -> m a
   err = throwError . ErrorInModule (ModuleIdentifier mname Foreign)
 
   go stmt
     | Just props <- matchExportsAssignment stmt
     = traverse toIdent (trailingCommaList props)
-    | Just (True, name, _) <- matchMember stmt
+    | Just (Public, name, _) <- matchMember stmt
     = pure [name]
     | otherwise
     = pure []
@@ -349,31 +466,32 @@ matchRequire mids mid stmt
   = Nothing
 
 -- Matches JS member declarations.
-matchMember :: JSStatement -> Maybe (Bool, String, JSExpression)
+matchMember :: JSStatement -> Maybe (Visibility, String, JSExpression)
 matchMember stmt
   -- var foo = expr;
   | JSVariable _ jsInit _ <- stmt
   , [JSVarInitExpression var varInit] <- commaList jsInit
   , JSIdentifier _ name <- var
   , JSVarInit _ decl <- varInit
-  = Just (False, name, decl)
+  = Just (Internal, name, decl)
   -- exports.foo = expr; exports["foo"] = expr;
   | JSAssignStatement e (JSAssign _) decl _ <- stmt
-  , Just name <- accessor e
-  = Just (True, name, decl)
+  , Just name <- exportsAccessor e
+  = Just (Public, name, decl)
   | otherwise
   = Nothing
-  where
-  accessor :: JSExpression -> Maybe String
-  accessor (JSMemberDot exports _ nm)
-    | JSIdentifier _ "exports" <- exports
-    , JSIdentifier _ name <- nm
-    = Just name
-  accessor (JSMemberSquare exports _ nm _)
-    | JSIdentifier _ "exports" <- exports
-    , Just name <- fromStringLiteral nm
-    = Just name
-  accessor _ = Nothing
+
+-- Matches exports.* or exports["*"] expressions and returns the property name.
+exportsAccessor :: JSExpression -> Maybe String
+exportsAccessor (JSMemberDot exports _ nm)
+  | JSIdentifier _ "exports" <- exports
+  , JSIdentifier _ name <- nm
+  = Just name
+exportsAccessor (JSMemberSquare exports _ nm _)
+  | JSIdentifier _ "exports" <- exports
+  , Just name <- fromStringLiteral nm
+  = Just name
+exportsAccessor _ = Nothing
 
 -- Matches assignments to module.exports, like this:
 -- module.exports = { ... }
@@ -398,7 +516,7 @@ compile :: [Module] -> [ModuleIdentifier] -> [Module]
 compile modules [] = modules
 compile modules entryPoints = filteredModules
   where
-  (graph, _, vertexFor) = graphFromEdges verts
+  (graph, vertexToNode, vertexFor) = graphFromEdges verts
 
   -- | The vertex set
   verts :: [(ModuleElement, Key, [Key])]
@@ -408,32 +526,33 @@ compile modules entryPoints = filteredModules
     where
     -- | Create a set of vertices for a module element.
     --
-    -- Some special cases worth commenting on:
-    --
-    -- 1) Regular exports which simply export their own name do not count as dependencies.
-    --    Regular exports which rename and reexport an operator do count, however.
-    --
-    -- 2) Require statements don't contribute towards dependencies, since they effectively get
-    --    inlined wherever they are used inside other module elements.
+    -- Require statements don't contribute towards dependencies, since they effectively get
+    -- inlined wherever they are used inside other module elements.
     toVertices :: ModuleIdentifier -> ModuleElement -> [(ModuleElement, Key, [Key])]
-    toVertices p m@(Member _ _ nm _ deps) = [(m, (p, nm), deps)]
-    toVertices p m@(ExportsList exps) = mapMaybe toVertex exps
+    toVertices p m@(Member _ visibility nm _ deps) = [(m, (p, nm, visibility), deps)]
+    toVertices p m@(ExportsList exps) = map toVertex exps
       where
-      toVertex (ForeignReexport, nm, _, ks) = Just (m, (p, nm), ks)
-      toVertex (RegularExport nm, nm1, _, ks) | nm /= nm1 = Just (m, (p, nm1), ks)
-      toVertex _ = Nothing
+      toVertex (ForeignReexport, nm, _, ks) = (m, (p, nm, Public), ks)
+      toVertex (RegularExport _, nm, _, ks) = (m, (p, nm, Public), ks)
     toVertices _ _ = []
 
   -- | The set of vertices whose connected components we are interested in keeping.
   entryPointVertices :: [Vertex]
   entryPointVertices = catMaybes $ do
-    (_, k@(mid, _), _) <- verts
+    (_, k@(mid, _, Public), _) <- verts
     guard $ mid `elem` entryPoints
     return (vertexFor k)
 
   -- | The set of vertices reachable from an entry point
   reachableSet :: S.Set Vertex
   reachableSet = S.fromList (concatMap (reachable graph) entryPointVertices)
+
+  -- | A map from modules to the modules that are used by its reachable members.
+  moduleReferenceMap :: M.Map ModuleIdentifier (S.Set ModuleIdentifier)
+  moduleReferenceMap = M.fromAscListWith mappend $ map (vertToModule &&& vertToModuleRefs) $ S.toList reachableSet
+    where
+    vertToModuleRefs v = foldMap (S.singleton . vertToModule) $ graph ! v
+    vertToModule v = m where (_, (m, _, _), _) = vertexToNode v
 
   filteredModules :: [Module]
   filteredModules = map filterUsed modules
@@ -456,17 +575,21 @@ compile modules entryPoints = filteredModules
 
       -- | Filter out the exports for members which aren't used.
       filterExports :: ModuleElement -> ModuleElement
-      filterExports (ExportsList exps) = ExportsList (filter (\(_, nm, _, _) -> isKeyUsed (mid, nm)) exps)
+      filterExports (ExportsList exps) = ExportsList (filter (\(_, nm, _, _) -> isKeyUsed (mid, nm, Public)) exps)
       filterExports me = me
 
       isDeclUsed :: ModuleElement -> Bool
-      isDeclUsed (Member _ _ nm _ _) = isKeyUsed (mid, nm)
+      isDeclUsed (Member _ visibility nm _ _) = isKeyUsed (mid, nm, visibility)
+      isDeclUsed (Require _ _ (Right midRef)) = midRef `S.member` modulesReferenced
       isDeclUsed _ = True
 
       isKeyUsed :: Key -> Bool
       isKeyUsed k
         | Just me <- vertexFor k = me `S.member` reachableSet
         | otherwise = False
+
+      modulesReferenced :: S.Set ModuleIdentifier
+      modulesReferenced = fold $ M.lookup mid moduleReferenceMap
 
 -- | Topologically sort the module dependency graph, so that when we generate code, modules can be
 -- defined in the right order.
@@ -556,7 +679,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
   modulesJS = map moduleToJS ms
 
   moduleToJS :: Module -> ([JSStatement], [Either Int Int])
-  moduleToJS (Module mn _ ds) = (wrap (moduleName mn) (indent (concat jsDecls)), lengths)
+  moduleToJS (Module mid _ ds) = (wrap mid (indent (concat jsDecls)), lengths)
     where
     (jsDecls, lengths) = unzip $ map declToJS ds
 
@@ -572,7 +695,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
         JSVariable lfsp
           (cList [
             JSVarInitExpression (JSIdentifier sp nm)
-              (JSVarInit sp $ either require (moduleReference sp . moduleName) req )
+              (JSVarInit sp $ either require (innerModuleReference sp . moduleName) req )
           ]) (JSSemi JSNoAnnot)
       ]
     declToJS (ExportsList exps) = withLength $ map toExport exps
@@ -628,6 +751,12 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
     JSMemberSquare (JSIdentifier a optionsNamespace) JSNoAnnot
       (str mn) JSNoAnnot
 
+  innerModuleReference :: JSAnnot -> String -> JSExpression
+  innerModuleReference a mn =
+    JSMemberSquare (JSIdentifier a "$PS") JSNoAnnot
+      (str mn) JSNoAnnot
+
+
   str :: String -> JSExpression
   str s = JSStringLiteral JSNoAnnot $ "\"" ++ s ++ "\""
 
@@ -635,31 +764,54 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
   emptyObj :: JSAnnot -> JSExpression
   emptyObj a = JSObjectLiteral a (JSCTLNone JSLNil) JSNoAnnot
 
-  wrap :: String -> [JSStatement] -> [JSStatement]
-  wrap mn ds =
-    [
-    JSMethodCall (JSExpressionParen lf (JSFunctionExpression JSNoAnnot JSIdentNone JSNoAnnot
-                                                (JSLOne (JSIdentName JSNoAnnot "exports")) JSNoAnnot
-                                                (JSBlock sp (lfHead ds) lf)) -- \n not quite in right place
-                                    JSNoAnnot)
-                  JSNoAnnot
-                  (JSLOne (JSAssignExpression (moduleReference JSNoAnnot mn) (JSAssign sp)
-                            (JSExpressionBinary (moduleReference sp mn) (JSBinOpOr sp) (emptyObj sp))))
-                  JSNoAnnot
-                  (JSSemi JSNoAnnot)
-    ]
+  initializeObject :: JSAnnot -> (JSAnnot -> String -> JSExpression) -> String -> JSExpression
+  initializeObject a makeReference mn =
+    JSAssignExpression (makeReference a mn) (JSAssign sp)
+    $ JSExpressionBinary (makeReference sp mn) (JSBinOpOr sp)
+    $ emptyObj sp
+
+  -- Like `somewhere`, but stops after the first successful transformation
+  firstwhere :: MonadPlus m => GenericM m -> GenericM m
+  firstwhere f x = f x `mplus` gmapMo (firstwhere f) x
+
+  prependWhitespace :: String -> [JSStatement] -> [JSStatement]
+  prependWhitespace val = fromMaybe <*> firstwhere (mkMp $ Just . reannotate)
     where
-      lfHead (h:t) = addAnn (WhiteSpace tokenPosnEmpty "\n  ") h : t
-      lfHead x = x
+    reannotate (JSAnnot rpos annots) = JSAnnot rpos (ws : annots)
+    reannotate _ = JSAnnot tokenPosnEmpty [ws]
 
-      addAnn :: CommentAnnotation -> JSStatement -> JSStatement
-      addAnn a (JSExpressionStatement (JSStringLiteral ann s) _) =
-        JSExpressionStatement (JSStringLiteral (appendAnn a ann) s) (JSSemi JSNoAnnot)
-      addAnn _ x = x
+    ws = WhiteSpace tokenPosnEmpty val
 
-      appendAnn a JSNoAnnot = JSAnnot tokenPosnEmpty [a]
-      appendAnn a (JSAnnot _ anns) = JSAnnot tokenPosnEmpty (a:anns ++ [WhiteSpace tokenPosnEmpty "  "])
-      appendAnn a JSAnnotSpace = JSAnnot tokenPosnEmpty [a]
+  iife :: [JSStatement] -> String -> JSExpression -> JSStatement
+  iife body param arg =
+    JSMethodCall (JSExpressionParen lf (JSFunctionExpression JSNoAnnot JSIdentNone JSNoAnnot (JSLOne (JSIdentifier JSNoAnnot param)) JSNoAnnot
+                                                             (JSBlock sp (prependWhitespace "\n  " body) lf))
+                                    JSNoAnnot)
+                 JSNoAnnot
+                 (JSLOne arg)
+                 JSNoAnnot
+                 (JSSemi JSNoAnnot)
+
+  wrap :: ModuleIdentifier -> [JSStatement] -> [JSStatement]
+  wrap (ModuleIdentifier mn mtype) ds =
+    case mtype of
+      Regular -> [iife (addModuleExports ds) "$PS" (JSIdentifier JSNoAnnot optionsNamespace)]
+      Foreign -> [iife ds "exports" (initializeObject JSNoAnnot moduleReference mn)]
+    where
+      -- Insert the exports var after a directive prologue, if one is present.
+      -- Per ECMA-262 5.1, "A Directive Prologue is the longest sequence of
+      -- ExpressionStatement productions [...] where each ExpressionStatement
+      -- [...] consists entirely of a StringLiteral [...]."
+      -- (http://ecma-international.org/ecma-262/5.1/#sec-14.1)
+      addModuleExports :: [JSStatement] -> [JSStatement]
+      addModuleExports (x:xs) | isDirective x = x : addModuleExports xs
+      addModuleExports xs
+        = JSExpressionStatement (initializeObject lfsp innerModuleReference mn) (JSSemi JSNoAnnot)
+        : JSVariable lfsp (JSLOne $ JSVarInitExpression (JSIdentifier sp "exports") $ JSVarInit sp (innerModuleReference sp mn)) (JSSemi JSNoAnnot)
+        : xs
+
+      isDirective (JSExpressionStatement (JSStringLiteral _ _) _) = True
+      isDirective _ = False
 
   runMain :: String -> [JSStatement]
   runMain mn =
@@ -687,8 +839,9 @@ bundleSM :: (MonadError ErrorMessage m)
        -> Maybe String -- ^ An optional main module.
        -> String -- ^ The namespace (e.g. PS).
        -> Maybe FilePath -- ^ The output file name (if there is one - in which case generate source map)
+       -> Maybe ([Module] -> m ()) -- ^ Optionally report the parsed modules prior to DCE -- used by "bundle --debug"
        -> m (Maybe SourceMapping, String)
-bundleSM inputStrs entryPoints mainModule namespace outFilename = do
+bundleSM inputStrs entryPoints mainModule namespace outFilename reportRawModules = do
   let mid (a,_,_) = a
   forM_ mainModule $ \mname ->
     when (mname `notElem` map (moduleName . mid) inputStrs) (throwError (MissingMainModule mname))
@@ -701,6 +854,8 @@ bundleSM inputStrs entryPoints mainModule namespace outFilename = do
   let mids = S.fromList (map (moduleName . mid) input)
 
   modules <- traverse (fmap withDeps . (\(a,fn,c) -> toModule mids a fn c)) input
+
+  forM_ reportRawModules ($ modules)
 
   let compiled = compile modules entryPoints
       sorted   = sortModules (filter (not . isModuleEmpty) compiled)
@@ -716,4 +871,4 @@ bundle :: (MonadError ErrorMessage m)
        -> Maybe String -- ^ An optional main module.
        -> String -- ^ The namespace (e.g. PS).
        -> m String
-bundle inputStrs entryPoints mainModule namespace = snd <$> bundleSM (map (\(a,b) -> (a,Nothing,b)) inputStrs) entryPoints mainModule namespace Nothing
+bundle inputStrs entryPoints mainModule namespace = snd <$> bundleSM (map (\(a,b) -> (a,Nothing,b)) inputStrs) entryPoints mainModule namespace Nothing Nothing

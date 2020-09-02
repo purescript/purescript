@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/LetPatterns1.purs:8:7 - 8:14 (line 8, column 7 - line 8, column 14)
+
+  Unable to parse module:
+  Expected pattern, saw expression
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

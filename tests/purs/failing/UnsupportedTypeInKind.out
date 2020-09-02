@@ -1,0 +1,14 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/UnsupportedTypeInKind.purs:7:28 - 7:38 (line 7, column 28 - line 7, column 38)
+
+  The type:
+
+    [33mOk => Type[0m
+
+  is not supported in kinds.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnsupportedTypeInKind.md for more information,
+or to contribute content related to this error.
+

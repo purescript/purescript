@@ -16,111 +16,129 @@
 
 module Language.PureScript.Ide.Filter
        ( Filter
-       , declarationTypeFilter
-       , namespaceFilter
        , moduleFilter
+       , namespaceFilter
+       , exactFilter
        , prefixFilter
-       , equalityFilter
+       , declarationTypeFilter
        , applyFilters
        ) where
 
-import           Protolude                     hiding (isPrefixOf)
+import           Protolude                     hiding (isPrefixOf, Prefix)
 
+import           Data.Bifunctor (first)
 import           Data.Aeson
-import           Data.List.NonEmpty            (NonEmpty)
 import           Data.Text                     (isPrefixOf)
-import qualified Language.PureScript.Ide.Filter.Declaration as D
+import qualified Data.Set as Set
+import qualified Data.Map as Map
+import           Language.PureScript.Ide.Filter.Declaration (DeclarationType, declarationType)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import qualified Language.PureScript           as P
 
-newtype Filter = Filter (Endo [Module])
-  deriving (Semigroup, Monoid)
+newtype Filter = Filter (Either (Set P.ModuleName) DeclarationFilter)
+  deriving Show
 
-type Module = (P.ModuleName, [IdeDeclarationAnn])
+unFilter :: Filter -> Either (Set P.ModuleName) DeclarationFilter
+unFilter (Filter f) = f
 
-mkFilter :: ([Module] -> [Module]) -> Filter
-mkFilter = Filter . Endo
+data DeclarationFilter
+  = Prefix Text
+  | Exact Text
+  | Namespace (Set IdeNamespace)
+  | DeclType (Set DeclarationType)
+  deriving Show
+
+-- | Only keeps Declarations in the given modules
+moduleFilter :: Set P.ModuleName -> Filter
+moduleFilter = Filter . Left
 
 -- | Only keeps Identifiers in the given Namespaces
-namespaceFilter :: NonEmpty IdeNamespace -> Filter
-namespaceFilter namespaces =
-  mkFilter (filterModuleDecls filterNamespaces)
-  where
-    filterNamespaces :: IdeDeclaration -> Bool
-    filterNamespaces decl = elem (namespaceForDeclaration decl) namespaces
+namespaceFilter :: Set IdeNamespace -> Filter
+namespaceFilter nss = Filter (Right (Namespace nss))
 
--- | Only keeps the given Modules
-moduleFilter :: [P.ModuleName] -> Filter
-moduleFilter =
-    mkFilter . moduleFilter'
-
-moduleFilter' :: [P.ModuleName] -> [Module] -> [Module]
-moduleFilter' moduleIdents = filter (flip elem moduleIdents . fst)
+-- | Only keeps Identifiers that are equal to the search string
+exactFilter :: Text -> Filter
+exactFilter t = Filter (Right (Exact t))
 
 -- | Only keeps Identifiers that start with the given prefix
 prefixFilter :: Text -> Filter
-prefixFilter "" = mkFilter identity
-prefixFilter t =
-  mkFilter $ declarationFilter prefix t
-  where
-    prefix :: IdeDeclaration -> Text -> Bool
-    prefix ed search = search `isPrefixOf` identifierFromIdeDeclaration ed
-
--- | Only keeps Identifiers that are equal to the search string
-equalityFilter :: Text -> Filter
-equalityFilter =
-  mkFilter . declarationFilter equality
-  where
-    equality :: IdeDeclaration -> Text -> Bool
-    equality ed search = identifierFromIdeDeclaration ed == search
-
-declarationFilter :: (IdeDeclaration -> Text -> Bool) -> Text -> [Module] -> [Module]
-declarationFilter predicate search =
-  filterModuleDecls (flip predicate search)
+prefixFilter t = Filter (Right (Prefix t))
 
 -- | Only keeps Identifiers in the given type declarations
-declarationTypeFilter :: [D.IdeDeclaration] -> Filter
-declarationTypeFilter [] = mkFilter identity
-declarationTypeFilter decls =
-    mkFilter $ filterModuleDecls filterDecls
-    where
-      filterDecls :: IdeDeclaration -> Bool
-      filterDecls decl = D.typeDeclarationForDeclaration decl `elem` decls
+declarationTypeFilter :: Set DeclarationType -> Filter
+declarationTypeFilter dts = Filter (Right (DeclType dts))
 
-filterModuleDecls :: (IdeDeclaration -> Bool) -> [Module] -> [Module]
-filterModuleDecls predicate =
-  filter (not . null . snd) . fmap filterDecls
+optimizeFilters :: [Filter] -> (Maybe (Set P.ModuleName), [DeclarationFilter])
+optimizeFilters = first smashModuleFilters . partitionEithers . map unFilter
   where
-    filterDecls (moduleIdent, decls) = (moduleIdent, filter (predicate . discardAnn) decls)
+    smashModuleFilters [] =
+      Nothing
+    smashModuleFilters (x:xs) =
+      Just (foldr Set.intersection x xs)
 
-runFilter :: Filter -> [Module] -> [Module]
-runFilter (Filter f) = appEndo f
+applyFilters :: [Filter] -> ModuleMap [IdeDeclarationAnn] -> ModuleMap [IdeDeclarationAnn]
+applyFilters fs modules = case optimizeFilters fs of
+  (Nothing, declarationFilters) ->
+    applyDeclarationFilters declarationFilters modules
+  (Just moduleFilter', declarationFilters) ->
+    applyDeclarationFilters declarationFilters (Map.restrictKeys modules moduleFilter')
 
-applyFilters :: [Filter] -> [Module] -> [Module]
-applyFilters = runFilter . fold
+applyDeclarationFilters
+  :: [DeclarationFilter]
+  -> ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
+applyDeclarationFilters fs =
+  Map.filter (not . null)
+  . Map.map (foldr (.) identity (map applyDeclarationFilter fs))
+
+applyDeclarationFilter
+  :: DeclarationFilter
+  -> [IdeDeclarationAnn]
+  -> [IdeDeclarationAnn]
+applyDeclarationFilter f = case f of
+  Prefix prefix -> prefixFilter' prefix
+  Exact t -> exactFilter' t
+  Namespace namespaces -> namespaceFilter' namespaces
+  DeclType dts -> declarationTypeFilter' dts
+
+namespaceFilter' :: Set IdeNamespace -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
+namespaceFilter' namespaces =
+  filter (\decl -> elem (namespaceForDeclaration (discardAnn decl)) namespaces)
+
+exactFilter' :: Text -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
+exactFilter' search =
+  filter (\decl -> identifierFromIdeDeclaration (discardAnn decl) == search)
+
+prefixFilter' :: Text -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
+prefixFilter' prefix =
+  filter (\decl -> prefix `isPrefixOf` identifierFromIdeDeclaration (discardAnn decl))
+
+declarationTypeFilter' :: Set DeclarationType -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
+declarationTypeFilter' declTypes =
+  filter (\decl -> declarationType (discardAnn decl) `Set.member` declTypes)
 
 instance FromJSON Filter where
   parseJSON = withObject "filter" $ \o -> do
     (filter' :: Text) <- o .: "filter"
     case filter' of
-      "exact" -> do
-        params <- o .: "params"
-        search <- params .: "search"
-        return $ equalityFilter search
-      "prefix" -> do
-        params <- o.: "params"
-        search <- params .: "search"
-        return $ prefixFilter search
       "modules" -> do
         params <- o .: "params"
         modules <- map P.moduleNameFromString <$> params .: "modules"
-        return $ moduleFilter modules
+        pure (moduleFilter (Set.fromList modules))
+      "exact" -> do
+        params <- o .: "params"
+        search <- params .: "search"
+        pure (exactFilter search)
+      "prefix" -> do
+        params <- o.: "params"
+        search <- params .: "search"
+        pure (prefixFilter search)
       "namespace" -> do
         params <- o .: "params"
         namespaces <- params .: "namespaces"
-        return $ namespaceFilter namespaces
+        pure (namespaceFilter (Set.fromList namespaces))
       "declarations" -> do
         declarations <- o.: "params"
-        return $ declarationTypeFilter declarations
+        pure (declarationTypeFilter (Set.fromList declarations))
       _ -> mzero

@@ -28,8 +28,9 @@ import           Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT
 import           Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Names as N
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 
 import           Language.PureScript.Interactive.Completion   as Interactive
 import           Language.PureScript.Interactive.IO           as Interactive
@@ -75,7 +76,7 @@ rebuild loadedExterns m = do
 
 -- | Build the collection of modules from scratch. This is usually done on startup.
 make
-  :: [(FilePath, P.Module)]
+  :: [(FilePath, CST.PartialResult P.Module)]
   -> P.Make ([P.ExternsFile], P.Environment)
 make ms = do
     foreignFiles <- P.inferForeignModules filePathMap
@@ -90,7 +91,7 @@ make ms = do
                          False
 
     filePathMap :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
-    filePathMap = M.fromList $ map (\(fp, m) -> (P.getModuleName m, Right fp)) ms
+    filePathMap = M.fromList $ map (\(fp, m) -> (P.getModuleName $ CST.resPartial m, Right fp)) ms
 
 -- | Performs a PSCi command
 handleCommand
@@ -127,7 +128,7 @@ handleReloadState reload = do
   files <- liftIO $ concat <$> traverse glob globs
   e <- runExceptT $ do
     modules <- ExceptT . liftIO $ loadAllModules files
-    (externs, _) <- ExceptT . liftIO . runMake . make $ modules
+    (externs, _) <- ExceptT . liftIO . runMake . make $ fmap CST.pureResult <$> modules
     return (map snd modules, externs)
   case e of
     Left errs -> printErrors errs
@@ -221,8 +222,6 @@ handleShowImportedModules print' = do
     Just $ N.runIdent ident
   showRef (P.ModuleRef _ name) =
     Just $ "module " <> N.runModuleName name
-  showRef (P.KindRef _ pn) =
-    Just $ "kind " <> N.runProperName pn
   showRef (P.ReExportRef _ _ _) =
     Nothing
 
@@ -273,8 +272,8 @@ handleTypeOf print' val = do
   case e of
     Left errs -> printErrors errs
     Right (_, env') ->
-      case M.lookup (P.mkQualified (P.Ident "it") (P.ModuleName [P.ProperName "$PSCI"])) (P.names env') of
-        Just (ty, _, _) -> print' . P.prettyPrintType $ ty
+      case M.lookup (P.mkQualified (P.Ident "it") (P.ModuleName "$PSCI")) (P.names env') of
+        Just (ty, _, _) -> print' . P.prettyPrintType maxBound $ ty
         Nothing -> print' "Could not find type"
 
 -- | Takes a type and prints its kind
@@ -286,7 +285,7 @@ handleKindOf
 handleKindOf print' typ = do
   st <- get
   let m = createTemporaryModuleForKind st typ
-      mName = P.ModuleName [P.ProperName "$PSCI"]
+      mName = P.ModuleName "$PSCI"
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
@@ -294,13 +293,13 @@ handleKindOf print' typ = do
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
-              k   = check (P.kindOf typ') chk
+              k   = check (snd <$> P.kindOf typ') chk
 
               check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
               check sew = fst . runWriter . runExceptT . runStateT sew
           case k of
             Left err        -> printErrors err
-            Right (kind, _) -> print' . T.unpack . P.prettyPrintKind $ kind
+            Right (kind, _) -> print' . P.prettyPrintType 1024 $ kind
         Nothing -> print' "Could not find kind"
 
 -- | Browse a module and displays its signature

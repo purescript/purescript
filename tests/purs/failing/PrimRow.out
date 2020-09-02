@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/PrimRow.purs:8:6 - 8:42 (line 8, column 6 - line 8, column 42)
+
+  Unknown type class [33mCons[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+or to contribute content related to this error.
+

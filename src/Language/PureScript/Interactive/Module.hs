@@ -2,12 +2,12 @@ module Language.PureScript.Interactive.Module where
 
 import           Prelude.Compat
 
-import           Control.Monad
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive.Types
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath (pathSeparator, makeRelative)
-import           System.IO.UTF8 (readUTF8FileT)
+import           System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
 
 -- * Support Module
 
@@ -16,8 +16,8 @@ supportModuleName :: P.ModuleName
 supportModuleName = fst initialInteractivePrint
 
 -- | Checks if the Console module is defined
-supportModuleIsDefined :: [P.Module] -> Bool
-supportModuleIsDefined = any ((== supportModuleName) . P.getModuleName)
+supportModuleIsDefined :: [P.ModuleName] -> Bool
+supportModuleIsDefined = any ((== supportModuleName))
 
 -- * Module Management
 
@@ -27,17 +27,15 @@ loadModule filename = do
   pwd <- getCurrentDirectory
   content <- readUTF8FileT filename
   return $
-    either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd}) (Right . map snd) $
-      P.parseModulesFromFiles id [(filename, content)]
+    either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd}) (Right . map (snd . snd)) $
+      CST.parseFromFiles id [(filename, content)]
 
 -- | Load all modules.
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
 loadAllModules files = do
   pwd <- getCurrentDirectory
-  filesAndContent <- forM files $ \filename -> do
-    content <- readUTF8FileT filename
-    return (filename, content)
-  return $ P.parseModulesFromFiles (makeRelative pwd) filesAndContent
+  filesAndContent <- readUTF8FilesT files
+  return $ fmap (fmap snd) <$> CST.parseFromFiles (makeRelative pwd) filesAndContent
 
 -- |
 -- Makes a volatile module to execute the current expression.
@@ -47,18 +45,18 @@ createTemporaryModule exec st val =
   let
     imports       = psciImportedModules st
     lets          = psciLetBindings st
-    moduleName    = P.ModuleName [P.ProperName "$PSCI"]
-    effModuleName = P.moduleNameFromString "Effect"
-    effImport     = (effModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Effect"]))
-    supportImport = (fst (psciInteractivePrint st), P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
-    eval          = P.Var internalSpan (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (snd (psciInteractivePrint st)))
+    moduleName    = P.ModuleName "$PSCI"
+    effModuleName = P.ModuleName "Effect"
+    effImport     = (effModuleName, P.Implicit, Just (P.ModuleName "$Effect"))
+    supportImport = (fst (psciInteractivePrint st), P.Implicit, Just (P.ModuleName "$Support"))
+    eval          = P.Var internalSpan (P.Qualified (Just (P.ModuleName "$Support")) (snd (psciInteractivePrint st)))
     mainValue     = P.App eval (P.Var internalSpan (P.Qualified Nothing (P.Ident "it")))
     itDecl        = P.ValueDecl (internalSpan, []) (P.Ident "it") P.Public [] [P.MkUnguarded val]
     typeDecl      = P.TypeDeclaration
                       (P.TypeDeclarationData (internalSpan, []) (P.Ident "$main")
                         (P.srcTypeApp
                           (P.srcTypeConstructor
-                            (P.Qualified (Just (P.ModuleName [P.ProperName "$Effect"])) (P.ProperName "Effect")))
+                            (P.Qualified (Just (P.ModuleName "$Effect")) (P.ProperName "Effect")))
                                   P.srcTypeWildcard))
     mainDecl      = P.ValueDecl (internalSpan, []) (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]
@@ -77,7 +75,7 @@ createTemporaryModuleForKind st typ =
   let
     imports    = psciImportedModules st
     lets       = psciLetBindings st
-    moduleName = P.ModuleName [P.ProperName "$PSCI"]
+    moduleName = P.ModuleName "$PSCI"
     itDecl     = P.TypeSynonymDeclaration (internalSpan, []) (P.ProperName "IT") [] typ
   in
     P.Module internalSpan [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
@@ -89,7 +87,7 @@ createTemporaryModuleForImports :: PSCiState -> P.Module
 createTemporaryModuleForImports st =
   let
     imports    = psciImportedModules st
-    moduleName = P.ModuleName [P.ProperName "$PSCI"]
+    moduleName = P.ModuleName "$PSCI"
   in
     P.Module internalSpan [] moduleName (importDecl `map` imports) Nothing
 

@@ -2,9 +2,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 
 module Command.Compile (command) where
+
+import Prelude
 
 import           Control.Applicative
 import           Control.Monad
@@ -14,10 +15,10 @@ import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Data.List (intercalate)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Traversable (for)
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Make
 import qualified Options.Applicative as Opts
@@ -25,8 +26,8 @@ import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitSuccess, exitFailure)
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath.Glob (glob)
-import           System.IO (hPutStr, hPutStrLn, stderr)
-import           System.IO.UTF8 (readUTF8FileT)
+import           System.IO (hPutStr, hPutStrLn, stderr, stdout)
+import           System.IO.UTF8 (readUTF8FilesT)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
@@ -36,37 +37,37 @@ data PSCMakeOptions = PSCMakeOptions
   , pscmJSONErrors   :: Bool
   }
 
--- | Argumnets: verbose, use JSON, warnings, errors
+-- | Arguments: verbose, use JSON, warnings, errors
 printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
 printWarningsAndErrors verbose False warnings errors = do
   pwd <- getCurrentDirectory
-  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stderr
+  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stdout
   let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd }
   when (P.nonEmpty warnings) $
-    hPutStrLn stderr (P.prettyPrintMultipleWarnings ppeOpts warnings)
+    putStrLn (P.prettyPrintMultipleWarnings ppeOpts warnings)
   case errors of
     Left errs -> do
-      hPutStrLn stderr (P.prettyPrintMultipleErrors ppeOpts errs)
+      putStrLn (P.prettyPrintMultipleErrors ppeOpts errs)
       exitFailure
     Right _ -> return ()
 printWarningsAndErrors verbose True warnings errors = do
-  hPutStrLn stderr . LBU8.toString . A.encode $
+  putStrLn . LBU8.toString . A.encode $
     JSONResult (toJSONErrors verbose P.Warning warnings)
                (either (toJSONErrors verbose P.Error) (const []) errors)
   either (const exitFailure) (const (return ())) errors
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
-  input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
-  when (null input && not pscmJSONErrors) $ do
+  input <- globWarningOnMisses warnFileTypeNotFound pscmInput
+  when (null input) $ do
     hPutStr stderr $ unlines [ "purs compile: No input files."
                              , "Usage: For basic information, try the `--help' option."
                              ]
     exitFailure
-  moduleFiles <- readInput input
+  moduleFiles <- readUTF8FilesT input
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
-    ms <- P.parseModulesFromFiles id moduleFiles
-    let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, Right fp)) ms
+    ms <- CST.parseModulesFromFiles id moduleFiles
+    let filePathMap = M.fromList $ map (\(fp, pm) -> (P.getModuleName $ CST.resPartial pm, Right fp)) ms
     foreigns <- inferForeignModules filePathMap
     let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
     P.make makeActions (map snd ms)
@@ -84,9 +85,6 @@ globWarningOnMisses warn = concatMapM globWithWarning
     when (null paths) $ warn pattern'
     return paths
   concatMapM f = fmap concat . mapM f
-
-readInput :: [FilePath] -> IO [(FilePath, Text)]
-readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readUTF8FileT inFile
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $

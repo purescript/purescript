@@ -38,7 +38,6 @@ module Language.PureScript.Docs.RenderedCode.Types
  , typeCtor
  , typeOp
  , typeVar
- , kind
  , alias
  , aliasName
  ) where
@@ -58,7 +57,6 @@ import qualified Data.Text.Encoding as TE
 
 import Language.PureScript.Names
 import Language.PureScript.AST (Associativity(..))
-import Language.PureScript.Crash (internalError)
 
 -- | Given a list of actions, attempt them all, returning the first success.
 -- If all the actions fail, 'tryAll' returns the first argument.
@@ -170,7 +168,6 @@ instance A.FromJSON Link where
 data Namespace
   = ValueLevel
   | TypeLevel
-  | KindLevel
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData Namespace
@@ -184,7 +181,6 @@ asNamespace =
     [ withText $ \case
         "ValueLevel" -> Right ValueLevel
         "TypeLevel" -> Right TypeLevel
-        "KindLevel" -> Right KindLevel
         _ -> Left ""
     ]
 
@@ -234,12 +230,10 @@ asRenderedCodeElement =
   backwardsCompat =
     [ oldAsIdent
     , oldAsCtor
-    , oldAsKind
     ]
 
   oldAsIdent = firstEq "ident" (Symbol ValueLevel <$> nth 1 asText <*> nth 2 (Link <$> asContainingModule))
   oldAsCtor = firstEq "ctor" (Symbol TypeLevel <$> nth 1 asText <*> nth 2 (Link <$> asContainingModule))
-  oldAsKind = firstEq "kind" (Symbol KindLevel <$> nth 1 asText <*> pure (Link ThisModule))
 
 -- |
 -- A type representing a highly simplified version of PureScript code, intended
@@ -335,10 +329,6 @@ typeOp (fromQualified -> (mn, name)) =
 typeVar :: Text -> RenderedCode
 typeVar x = RC [Symbol TypeLevel x NoLink]
 
-kind :: Qualified (ProperName 'KindName) -> RenderedCode
-kind (fromQualified -> (mn, name)) =
-  RC [Symbol KindLevel (runProperName name) (Link mn)]
-
 type FixityAlias = Qualified (Either (ProperName 'TypeName) (Either Ident (ProperName 'ConstructorName)))
 
 alias :: FixityAlias -> RenderedCode
@@ -364,8 +354,6 @@ aliasName for name' =
         ident (Qualified Nothing (Ident name))
       TypeLevel ->
         typeCtor (Qualified Nothing (ProperName name))
-      KindLevel ->
-        internalError "Kind aliases are not supported"
 
 -- | Converts a FixityAlias into a different representation which is more
 -- useful to other functions in this module.

@@ -1,0 +1,11 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ImportExplicit.purs:4:12 - 4:17 (line 4, column 12 - line 4, column 17)
+
+  Cannot import type [33mX[0m from module [33mM1[0m
+  It either does not exist or the module does not export it.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownImport.md for more information,
+or to contribute content related to this error.
+

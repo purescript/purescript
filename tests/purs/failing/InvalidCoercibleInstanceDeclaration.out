@@ -1,0 +1,14 @@
+Error found:
+at tests/purs/failing/InvalidCoercibleInstanceDeclaration.purs:8:1 - 8:36 (line 8, column 1 - line 8, column 36)
+
+  Invalid type class instance declaration for
+  [33m                         [0m
+  [33m  Prim.Coerce.Coercible D[0m
+  [33m                        D[0m
+  [33m                         [0m
+  Instance declarations of this type class are disallowed.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/InvalidCoercibleInstanceDeclaration.md for more information,
+or to contribute content related to this error.
+

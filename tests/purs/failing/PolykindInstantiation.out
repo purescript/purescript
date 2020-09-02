@@ -1,0 +1,22 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/PolykindInstantiation.purs:8:33 - 8:38 (line 8, column 33 - line 8, column 38)
+
+  Could not match kind
+  [33m        [0m
+  [33m  Symbol[0m
+  [33m        [0m
+  with kind
+  [33m      [0m
+  [33m  Type[0m
+  [33m      [0m
+
+while checking that type [33m"foo"[0m
+  has kind [33mType[0m
+while inferring the kind of [33mF Proxy "foo"[0m
+while inferring the kind of [33mProxy (F Proxy "foo")[0m
+in value declaration [33mtest2[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

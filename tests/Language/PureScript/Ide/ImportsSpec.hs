@@ -3,9 +3,10 @@
 module Language.PureScript.Ide.ImportsSpec where
 
 import           Protolude hiding (moduleName)
-import           Data.Maybe                      (fromJust)
+import           Data.Maybe (fromJust)
+import qualified Data.Set as Set
 
-import qualified Language.PureScript             as P
+import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Command as Command
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Imports
@@ -48,9 +49,9 @@ syntaxErrorFile =
   ]
 
 testSliceImportSection :: [Text] -> (P.ModuleName, [Text], [Import], [Text])
-testSliceImportSection = fromRight . sliceImportSection
+testSliceImportSection = unsafeFromRight . sliceImportSection
   where
-    fromRight = fromJust . rightToMaybe
+    unsafeFromRight = fromJust . rightToMaybe
 
 withImports :: [Text] -> [Text]
 withImports is =
@@ -71,9 +72,9 @@ spec = do
   describe "determining the importsection" $ do
     let moduleSkeleton imports =
           Right (P.moduleNameFromString "Main", take 1 simpleFile, imports, drop 2 simpleFile)
-    it "slices a file without imports and adds a newline after the module declaration" $
+    it "slices a file without imports" $
       shouldBe (sliceImportSection noImportsFile)
-          (Right (P.moduleNameFromString "Main", take 1 noImportsFile ++ [""], [], drop 1 noImportsFile))
+          (Right (P.moduleNameFromString "Main", take 1 noImportsFile, [], drop 1 noImportsFile))
 
     it "handles a file with syntax errors just fine" $
       shouldBe (sliceImportSection syntaxErrorFile)
@@ -119,8 +120,6 @@ spec = do
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideDtor i t Nothing)) mn q is)
         addTypeImport i mn q is =
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideType i Nothing [])) mn q is)
-        addKindImport i mn q is =
-          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideKind i)) mn q is)
         qualify s = Just (Test.mn s)
     it "adds an implicit unqualified import to a file without any imports" $
       shouldBe
@@ -195,20 +194,6 @@ spec = do
         [ "import Prelude"
         , ""
         , "import Data.Array (head, tail) as Array"
-        ]
-    it "adds a kind to an explicit import list" $
-      shouldBe
-        (addKindImport "Effect" (P.moduleNameFromString "Control.Monad.Eff") Nothing simpleFileImports)
-        [ "import Prelude"
-        , ""
-        , "import Control.Monad.Eff (kind Effect)"
-        ]
-    it "adds a kind to an explicit qualified import list" $
-      shouldBe
-        (addKindImport "Effect" (P.moduleNameFromString "Control.Monad.Eff") (qualify "Eff") simpleFileImports)
-        [ "import Prelude"
-        , ""
-        , "import Control.Monad.Eff (kind Effect) as Eff"
         ]
     it "adds an operator to an explicit import list" $
       shouldBe
@@ -346,11 +331,16 @@ addExplicitImport i =
 
 addExplicitImportFiltered :: Text -> [P.ModuleName] -> Command
 addExplicitImportFiltered i ms =
-  Command.Import ("src" </> "ImportsSpec.purs") Nothing [moduleFilter ms] (Command.AddImportForIdentifier i Nothing)
+  Command.Import ("src" </> "ImportsSpec.purs") Nothing [moduleFilter (Set.fromList ms)] (Command.AddImportForIdentifier i Nothing)
 
 importShouldBe :: [Text] -> [Text] -> Expectation
 importShouldBe res importSection =
-  res `shouldBe` [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId x = x"]
+  res `shouldBe`
+    [ "module ImportsSpec where" ]
+    ++ (if null importSection then [] else "" : importSection)
+    ++ [ ""
+       , "myId x = x"
+       ]
 
 runIdeLoaded :: Command -> IO (Either IdeError Success)
 runIdeLoaded c = do

@@ -31,4 +31,11 @@ class Clazz (a :: Type) where
 instance clazzString :: Clazz String where
   def = "test"
 
+type IsType a = ((a) :: Type)
+
+type TestRecord a = Record (a :: IsType a)
+
+test5 :: Test TestRecord
+test5 = { a: "test" }
+
 main = log "Done"

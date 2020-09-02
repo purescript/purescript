@@ -13,11 +13,11 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DataKinds #-}
 
 module Command.Hierarchy (command) where
 
+import           Prelude
 import           Protolude (catMaybes)
 
 import           Control.Applicative (optional)
@@ -31,24 +31,25 @@ import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
 import           System.Exit (exitFailure, exitSuccess)
 import           System.IO (hPutStr, stderr)
-import           System.IO.UTF8 (readUTF8FileT)
+import           System.IO.UTF8 (readUTF8FilesT)
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
 
 data HierarchyOptions = HierarchyOptions
-  { _hierachyInput   :: FilePath
+  { _hierarchyInput   :: FilePath
   , _hierarchyOutput :: Maybe FilePath
   }
 
-readInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
-readInput paths = do
-  content <- mapM (\path -> (path, ) <$> readUTF8FileT path) paths
-  return $ map snd <$> P.parseModulesFromFiles id content
+parseInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
+parseInput paths = do
+  content <- readUTF8FilesT paths
+  return $ map (snd . snd) <$> CST.parseFromFiles id content
 
 compile :: HierarchyOptions -> IO ()
 compile (HierarchyOptions inputGlob mOutput) = do
   input <- glob inputGlob
-  modules <- readInput input
+  modules <- parseInput input
   case modules of
     Left errs -> hPutStr stderr (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
     Right ms -> do

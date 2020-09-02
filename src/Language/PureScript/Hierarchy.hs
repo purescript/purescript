@@ -54,8 +54,8 @@ prettyPrint (SuperMap (Right (super, sub))) =
   "  " <> P.runProperName super <> " -> " <> P.runProperName sub <> ";"
 
 runModuleName :: P.ModuleName -> GraphName
-runModuleName (P.ModuleName pns) =
-  GraphName $ T.intercalate "_" (P.runProperName <$> pns)
+runModuleName (P.ModuleName name) =
+  GraphName $ T.replace "." "_" name
 
 typeClasses :: Functor f => f P.Module -> f (Maybe Graph)
 typeClasses =
@@ -80,6 +80,6 @@ typeClassEpilogue = "\n}"
 
 superClasses :: P.Declaration -> [SuperMap]
 superClasses (P.TypeClassDeclaration _ sub _ supers@(_:_) _ _) =
-  fmap (\(P.Constraint _ (P.Qualified _ super) _ _) -> SuperMap (Right (super, sub))) supers
+  fmap (\(P.Constraint _ (P.Qualified _ super) _ _ _) -> SuperMap (Right (super, sub))) supers
 superClasses (P.TypeClassDeclaration _ sub _ _ _ _) = [SuperMap (Left sub)]
 superClasses _ = []

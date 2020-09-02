@@ -18,6 +18,7 @@ import Control.Monad.Supply.Class
 import Data.List ((\\), intersect)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Maybe (fromMaybe, isNothing)
 import Data.String (fromString)
 import Data.Text (Text)
@@ -37,7 +38,7 @@ import Language.PureScript.Names
 import Language.PureScript.Options
 import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.Traversals (sndM)
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 
 import System.FilePath.Posix ((</>))
 
@@ -49,15 +50,19 @@ moduleToJs
   => Module Ann
   -> Maybe AST
   -> m [AST]
-moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
+moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
-    jsImports <- traverse (importToJs mnLookup)
-      . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- traverse (traverse optimize) jsDecls
+    let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
+    let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
+          `S.union` M.keysSet reExps
+    jsImports <- traverse (importToJs mnLookup)
+      . filter (flip S.member usedModuleNames)
+      . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
     let strict = AST.StringLiteral Nothing "use strict"
@@ -66,8 +71,10 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
+    let reExps' = M.toList (M.withoutKeys reExps (S.fromList C.primModules))
     let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToJs) standardExps
                                ++ map (mkString . runIdent &&& foreignIdent) foreignExps
+                               ++ concatMap (reExportPairs mnLookup) reExps'
     return $ moduleBody ++ [AST.Assignment Nothing (accessorString "exports" (AST.Var Nothing "module")) exps']
 
   where
@@ -76,6 +83,21 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   getNames :: Bind Ann -> [Ident]
   getNames (NonRec _ ident _) = [ident]
   getNames (Rec vals) = map (snd . fst) vals
+
+  -- | Generate code in the JavaScript IR for re-exported declarations, prepending
+  -- the module name from whence it was imported.
+  reExportPairs :: M.Map ModuleName (Ann, ModuleName) -> (ModuleName, [Ident]) -> [(PSString, AST)]
+  reExportPairs mnLookup (mn', idents) =
+    let toExportedMember :: Ident -> AST
+        toExportedMember =
+          maybe
+            (AST.Var Nothing . identToJs)
+            (flip accessor . AST.Var Nothing . moduleNameToJs . snd)
+            (M.lookup mn' mnLookup)
+    in
+      map
+        (mkString . runIdent &&& toExportedMember)
+        idents
 
   -- | Creates alternative names for each module to ensure they don't collide
   -- with declaration names.
@@ -92,8 +114,8 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
     go acc _ [] = acc
 
     freshModuleName :: Integer -> ModuleName -> [Ident] -> ModuleName
-    freshModuleName i mn'@(ModuleName pns) used =
-      let newName = ModuleName $ init pns ++ [ProperName $ runProperName (last pns) <> "_" <> T.pack (show i)]
+    freshModuleName i mn'@(ModuleName name) used =
+      let newName = ModuleName $ name <> "_" <> T.pack (show i)
       in if Ident (runModuleName newName) `elem` used
          then freshModuleName (i + 1) mn' used
          else newName
@@ -125,6 +147,15 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
       let (_,mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
       in Qualified (Just mnSafe) a
     renameQual q = q
+
+  -- |
+  -- Find the set of ModuleNames referenced by an AST.
+  --
+  findModules :: M.Map Text ModuleName -> AST -> S.Set ModuleName
+  findModules mnReverseLookup = AST.everything mappend go
+    where
+    go (AST.Var _ name) = foldMap S.singleton $ M.lookup name mnReverseLookup
+    go _ = mempty
 
   -- |
   -- Generate code in the simplified JavaScript intermediate representation for a declaration
@@ -294,7 +325,7 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable that may have a qualified name.
   qualifiedToJS :: (a -> Ident) -> Qualified a -> AST
-  qualifiedToJS f (Qualified (Just (ModuleName [ProperName mn'])) a) | mn' == C.prim = AST.Var Nothing . runIdent $ f a
+  qualifiedToJS f (Qualified (Just C.Prim) a) = AST.Var Nothing . runIdent $ f a
   qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (AST.Var Nothing (moduleNameToJs mn'))
   qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToJs (f a)
 

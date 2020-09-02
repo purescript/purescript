@@ -7,7 +7,7 @@ data X a = X
 
 x :: forall a. X a
 x = X
-	 
+
 type Y = { x :: X Int }
 
 test :: forall m. Monad m => m Y

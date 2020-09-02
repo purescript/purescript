@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ExportExplicit3.purs:8:9 - 8:12 (line 8, column 9 - line 8, column 12)
+
+  Unknown data constructor [33mM.Z[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+or to contribute content related to this error.
+

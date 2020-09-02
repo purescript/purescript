@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/1825.purs:8:11 - 8:12 (line 8, column 11 - line 8, column 12)
+
+  Unknown value [33ma[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+or to contribute content related to this error.
+

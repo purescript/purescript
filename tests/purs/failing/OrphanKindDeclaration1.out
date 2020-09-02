@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/OrphanKindDeclaration1.purs:4:1 - 4:17 (line 4, column 1 - line 4, column 17)
+
+  The kind declaration for [33mFoo[0m should be followed by its definition.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/OrphanKindDeclaration.md for more information,
+or to contribute content related to this error.
+

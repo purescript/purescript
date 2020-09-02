@@ -1,7 +1,1 @@
-{
-  "canonicalDir": "bower_components/purescript-prelude",
-  "pkgMeta": {
-    "dependencies": {}
-  },
-  "dependencies": {}
-}
+{}

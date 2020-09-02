@@ -1,7 +1,10 @@
-## This script can be run on any supported OS to create a binary .tar.gz
-## bundle.
-## For Windows, msysgit contains all of the pieces needed to run this script.
-set -e
+#!/bin/bash
+
+# This script can be run on any supported OS to create a binary .tar.gz
+# bundle. For Windows, msysgit contains all of the pieces needed to run this
+# script.
+
+set -ex
 
 OS=$1
 
@@ -13,21 +16,17 @@ fi
 
 pushd $(stack path --project-root)
 
-LOCAL_INSTALL_ROOT=$(stack path --local-install-root)
-
-if [ "$OS" = "win64" ]
-then
-  BIN_EXT=".exe"
-else
-  BIN_EXT=""
-fi
-
 # Make the staging directory
 mkdir -p bundle/build/purescript
 
-# Strip the binaries, and copy them to the staging directory
-BIN=purs
-FULL_BIN="$LOCAL_INSTALL_ROOT/bin/${BIN}${BIN_EXT}"
+# Strip the binary, and copy it to the staging directory
+if [ "$OS" = "win64" ]
+then
+  BIN="purs.exe"
+else
+  BIN="purs"
+fi
+FULL_BIN="$(stack path --local-install-root)/bin/$BIN"
 if [ "$OS" != "win64" ]
 then
   strip "$FULL_BIN"
@@ -39,7 +38,7 @@ cp bundle/README         bundle/build/purescript/
 cp LICENSE               bundle/build/purescript/
 cp INSTALL.md            bundle/build/purescript/
 
-stack list-dependencies >bundle/build/purescript/dependencies.txt
+stack ls dependencies >bundle/build/purescript/dependencies.txt
 
 # Make the binary bundle
 pushd bundle/build > /dev/null
@@ -58,6 +57,6 @@ fi
 $SHASUM bundle/${OS}.tar.gz > bundle/${OS}.sha
 
 # Remove the staging directory
-rm -rf build/
+rm -r bundle/build
 
 popd > /dev/null

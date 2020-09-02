@@ -47,7 +47,7 @@ spec = describe "Finding Usages" $ do
                     , usage (Test.mn "FindUsage.Definition") "usageId" IdeNSValue
                     ]
       usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "12:11-12:18")
-      usage2 `shouldBeUsage` ("src" </> "FindUsage" </> "Definition.purs", "13:18-13:18")
+      usage2 `shouldBeUsage` ("src" </> "FindUsage" </> "Definition.purs", "13:18-13:25")
     it "finds a simple recursive usage" $ do
       ([_, Right (UsagesResult [usage1])], _) <- Test.inProject $
         Test.runIde [ load ["FindUsage.Recursive"]
@@ -77,6 +77,4 @@ spec = describe "Finding Usages" $ do
         Test.runIde [ load ["FindUsage", "FindUsage.Definition", "FindUsage.Reexport"]
                     , usage (Test.mn "FindUsage.Reexport") "toBeReexported" IdeNSValue
                     ]
-        -- TODO(Christoph): Interesting parser bug here. It seems the position
-        -- of the last token in the file has the wrong ending span
-      usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "12:19-12:19")
+      usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "12:19-12:33")

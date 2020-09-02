@@ -1,9 +1,9 @@
 module Main where
-	
+
 import Effect.Console (log)
 
 data T a = T
-	 
+
 ti :: T Int
 ti = T
 

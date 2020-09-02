@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/3689.purs:5:5 - 5:10 (line 5, column 5 - line 5, column 10)
+
+  Unable to parse module:
+  Unexpected quoted label in record pun, perhaps due to a missing ':'
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

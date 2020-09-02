@@ -1,0 +1,13 @@
+Error found:
+at tests/purs/failing/NewtypeInstance3.purs:8:1 - 8:43 (line 8, column 1 - line 8, column 43)
+
+  Cannot derive newtype instance for
+  [33m               [0m
+  [33m  Main.Nullary [0m
+  [33m               [0m
+  Make sure this is a newtype.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/InvalidNewtypeInstance.md for more information,
+or to contribute content related to this error.
+

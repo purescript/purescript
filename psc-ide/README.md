@@ -23,12 +23,7 @@ It supports the following options:
 - `--output-directory`: Specify where to look for compiled output inside your
   project directory. Defaults to `output/`, relative to either the current
   directory or the directory specified by `-d`.
-- `--polling`: Uses polling instead of file system events to watch the externs
-  files. This flag is reversed on Windows and polling is the default.
 - `--log-level`: Can be set to one of "all", "none", "debug" and "perf"
-- `--no-watch`: Disables the filewatcher
-- `--editor-mode`: Rather than watch externs files, expect an editor to report
-  changed source files.
 - `--version`: Output psc-ide version
 
 ## Issuing queries
@@ -37,7 +32,7 @@ After you started the server you can start issuing requests using
 `purs ide client`. Make sure you start by loading the modules before you try to
 query them.
 
-`purs ide` expects the built externs.json inside the output folder of your
+`purs ide` expects the built externs inside the output folder of your
 project after running `pulp build` or `purs compile` respectively.
 
 (If you changed the port of the server you can change the port for
