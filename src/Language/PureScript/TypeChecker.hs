@@ -595,6 +595,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       checkClassMembersAreExported e
       checkClassesAreExported e
       checkSuperClassesAreExported e
+      checkDataConstructorsAreExported e
     return $ Module ss coms mn decls' (Just exps)
   where
   qualify' :: a -> Qualified a
@@ -732,3 +733,19 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     extractMemberName (TypeDeclaration td) = tydeclIdent td
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
+
+  -- | If any data constructors of a type are exported, we require all its data constructors to be exported.
+  checkDataConstructorsAreExported :: DeclarationRef -> m ()
+  checkDataConstructorsAreExported dr@(TypeRef ss' name (Just exportedDataConstructorsNames))
+    | not (null exportedDataConstructorsNames) = do
+      env <- getEnv
+      let dataConstructorNames = fromMaybe [] $
+            M.lookup (mkQualified name mn) (types env) >>= getDataConstructorNames . snd
+          missingDataConstructorsNames = dataConstructorNames \\ exportedDataConstructorsNames
+      unless (null missingDataConstructorsNames) $
+        throwError . errorMessage' ss' $ TransitiveDctorExportError dr missingDataConstructorsNames
+      where
+      getDataConstructorNames :: TypeKind -> Maybe [ProperName 'ConstructorName]
+      getDataConstructorNames (DataType _ constructors) = Just $ fst <$> constructors
+      getDataConstructorNames _ = Nothing
+  checkDataConstructorsAreExported _ = return ()

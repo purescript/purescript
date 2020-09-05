@@ -130,7 +130,7 @@ data SimpleErrorMessage
   | InvalidNewtype (ProperName 'TypeName)
   | InvalidInstanceHead SourceType
   | TransitiveExportError DeclarationRef [DeclarationRef]
-  | TransitiveDctorExportError DeclarationRef (ProperName 'ConstructorName)
+  | TransitiveDctorExportError DeclarationRef [ProperName 'ConstructorName]
   | ShadowedName Ident
   | ShadowedTypeVar Text
   | UnusedTypeVar Text
@@ -1030,9 +1030,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "An export for " <> markCode (prettyPrintExport x) <> " requires the following to also be exported: "
             , indent $ paras $ map (line . markCode . prettyPrintExport) ys
             ]
-    renderSimpleErrorMessage (TransitiveDctorExportError x ctor) =
-      paras [ line $ "An export for " <> markCode (prettyPrintExport x) <> " requires the following data constructor to also be exported: "
-            , indent $ line $ markCode $ runProperName ctor
+    renderSimpleErrorMessage (TransitiveDctorExportError x ctors) =
+      paras [ line $ "An export for " <> markCode (prettyPrintExport x) <> " requires the following data constructor" <> (if length ctors == 1 then "" else "s") <> " to also be exported: "
+            , indent $ paras $ map (line . markCode . runProperName) ctors
             ]
     renderSimpleErrorMessage (ShadowedName nm) =
       line $ "Name " <> markCode (showIdent nm) <> " was shadowed."
