@@ -714,6 +714,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
 
+  -- | If any data constructors of a type are exported, we require all its data constructors to be exported.
   checkDataConstructorsAreExported :: DeclarationRef -> m ()
   checkDataConstructorsAreExported dr@(TypeRef ss' name (Just exportedDataConstructorsNames))
     | not (null exportedDataConstructorsNames) = do
