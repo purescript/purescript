@@ -14,7 +14,6 @@ at tests/purs/failing/KindError.purs:6:35 - 6:36 (line 6, column 35 - line 6, co
 while checking that type [33mf[0m
   has kind [33mt0 -> t1[0m
 while inferring the kind of [33mf a[0m
-while inferring the kind of [33mf a -> KindError f a[0m
 in type constructor [33mKindError[0m
 
 where [33mt0[0m is an unknown type

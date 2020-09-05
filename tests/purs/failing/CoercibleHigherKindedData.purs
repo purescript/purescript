@@ -1,4 +1,4 @@
--- @shouldFailWith KindsDoNotUnify
+-- @shouldFailWith NoInstanceFound
 module Main where
 
 import Safe.Coerce (coerce)
@@ -6,10 +6,8 @@ import Safe.Coerce (coerce)
 data Unary a
 data Binary a b
 
-data Proxy :: forall k. k -> Type
 data Proxy a = Proxy
-
 type role Proxy representational
 
-unaryToBinary :: Proxy Unary -> Proxy Binary
+unaryToBinary :: forall a. Proxy Unary -> Proxy (Binary a)
 unaryToBinary = coerce

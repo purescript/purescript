@@ -125,6 +125,11 @@ newtype Rec4 f = Rec4 (f {})
 unwrapRec4 :: forall f. Rec4 f -> f {}
 unwrapRec4 = coerce
 
+newtype Rec5 a f = Rec5 (f {})
+
+apRec4ToApRec5 :: forall a. Ap Rec4 Id1 -> Ap (Rec5 a) Id1
+apRec4ToApRec5 = coerce
+
 data Arr1 a b = Arr1 (Array a) (Array b)
 
 arr1ToArr1 :: Arr1 Int String -> Arr1 (Id1 Int) (Id2 String)
