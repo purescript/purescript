@@ -18,13 +18,18 @@ nt2ToNT1 :: NTString2 -> NTString1
 nt2ToNT1 = coerce
 
 newtype Id1 a = Id1 a
-newtype Id2 a = Id2 a
+newtype Id2 b = Id2 b
 
 id1ToId2 :: forall a. Id1 a -> Id2 a
 id1ToId2 = coerce
 
 id12ToId21 :: forall b. Id1 (Id2 b) -> Id2 (Id1 b)
 id12ToId21 = coerce
+
+newtype Ap f a = Ap (f a)
+
+apId1ToApId2 :: forall a. Ap Id1 a -> Ap Id2 a
+apId1ToApId2 = coerce
 
 newtype Phantom1 a b = Phantom1 a
 
@@ -114,6 +119,16 @@ data Rec3 a = Rec3 {}
 
 rec3ToRec3 :: forall m n. Rec3 m -> Rec3 n
 rec3ToRec3 = coerce
+
+newtype Rec4 f = Rec4 (f {})
+
+unwrapRec4 :: forall f. Rec4 f -> f {}
+unwrapRec4 = coerce
+
+newtype Rec5 a f = Rec5 (f {})
+
+apRec4ToApRec5 :: forall a. Ap Rec4 Id1 -> Ap (Rec5 a) Id1
+apRec4ToApRec5 = coerce
 
 data Arr1 a b = Arr1 (Array a) (Array b)
 

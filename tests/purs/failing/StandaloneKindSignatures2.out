@@ -14,7 +14,6 @@ at tests/purs/failing/StandaloneKindSignatures2.purs:8:35 - 8:36 (line 8, column
 while checking that type [33mb[0m
   has kind [33mk1[0m
 while inferring the kind of [33mPair a b[0m
-while inferring the kind of [33mPair a b -> Pair' @k1 @k2 a b[0m
 in type constructor [33mPair'[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,

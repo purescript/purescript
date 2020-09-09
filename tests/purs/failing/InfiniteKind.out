@@ -10,7 +10,6 @@ at tests/purs/failing/InfiniteKind.purs:5:17 - 5:18 (line 5, column 17 - line 5,
 while checking that type [33ma[0m
   has kind [33mt0[0m
 while inferring the kind of [33ma a[0m
-while inferring the kind of [33ma a -> F a[0m
 in type constructor [33mF[0m
 
 where [33mt0[0m is an unknown type

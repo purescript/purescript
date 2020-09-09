@@ -14,7 +14,6 @@ at tests/purs/failing/3275-DataBindingGroupErrorPos.purs:7:19 - 7:22 (line 7, co
 while checking that type [33mBar a[0m
   has kind [33mt0 -> t1[0m
 while inferring the kind of [33mBar a a[0m
-while inferring the kind of [33mBar a a -> Foo a[0m
 in data binding group Bar, Foo
 
 where [33mt0[0m is an unknown type
