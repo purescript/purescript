@@ -4,6 +4,20 @@ import Coercible.Lib
 
 import Effect.Console (log)
 import Safe.Coerce (coerce)
+import Type.Proxy (Proxy)
+import Prim.Coerce (class Coercible)
+
+refl :: forall a. a -> a
+refl = coerce
+
+symm :: forall a b. Coercible a b => b -> a
+symm = coerce
+
+trans :: forall b a c. Coercible a b => Coercible b c => Proxy b -> a -> c
+trans _ = coerce
+
+trans' :: forall b a c. Coercible a b => Coercible b c => Proxy b -> c -> a
+trans' _ = coerce
 
 type SynString = String
 
