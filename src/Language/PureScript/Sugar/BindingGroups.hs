@@ -67,12 +67,12 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
-        kindDecls = fmap (,True) $ filter isKindDecl ds
-        dataDecls = fmap (,False) $ filter (\a -> isDataDecl a || isExternDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
+        kindDecls = fmap (,True) $ filter (\a -> isKindDecl a || isExternDataDecl a) ds
+        dataDecls = fmap (,False) $ filter (\a -> isDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
         kindSigs = fmap (declTypeName . fst) kindDecls
         typeSyns = fmap declTypeName $ filter isTypeSynonymDecl ds
-        allProperNames = fmap (declTypeName . fst) dataDecls
         allDecls = kindDecls ++ dataDecls
+        allProperNames = fmap (declTypeName . fst) allDecls
         mkVert (d, isSig) =
           let names = usedTypeNames moduleName d `intersect` allProperNames
               name = declTypeName d
@@ -226,6 +226,7 @@ toDataBindingGroup (CyclicSCC ds')
   | otherwise = return . DataBindingGroupDeclaration $ NEL.fromList ds'
   where
   kindDecl (KindDeclaration sa _ pn _) = [(fst sa, Qualified Nothing pn)]
+  kindDecl (ExternDataDeclaration sa pn _) = [(fst sa, Qualified Nothing pn)]
   kindDecl _ = []
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
