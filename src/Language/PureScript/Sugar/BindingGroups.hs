@@ -79,7 +79,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
               -- If a dependency has a kind signature, than that's all we need to depend on, except
               -- in the case that we are defining a kind signature and using a type synonym. In order
               -- to expand the type synonym, we must depend on the synonym declaration itself.
-              deps = fmap (\n -> (n, n `elem` kindSigs && (isSig && not (n `elem` typeSyns)))) names
+              deps = fmap (\n -> (n, n `elem` kindSigs && (not isSig || not (n `elem` typeSyns)))) names
               self | not isSig && name `elem` kindSigs = [(name, True)]
                    | otherwise = []
           in (d, (name, isSig), self ++ deps)
