@@ -401,7 +401,7 @@ entails SolverOptions{..} constraint context hints =
       -- higher-rank arguments in instance heads, term equality is a sufficient
       -- notion of "the same".
       let coercibleDictsInScope = findDicts ctx C.Coercible Nothing
-      if a' == b' || any ((||) <$> isCoercibleDictInScope a b <*> isSymmetricCoercibleDictInScope a b) coercibleDictsInScope
+      if a' == b' || any ((||) <$> isCoercibleDictInScope a' b' <*> isSymmetricCoercibleDictInScope a' b') coercibleDictsInScope
         then pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing]
         else do
           -- When solving must reduce and recurse, it doesn't matter whether we

@@ -16,8 +16,11 @@ symm = coerce
 trans :: forall b a c. Coercible a b => Coercible b c => Proxy b -> a -> c
 trans _ = coerce
 
-trans' :: forall b a c. Coercible a b => Coercible b c => Proxy b -> c -> a
+trans' :: forall b a c. Coercible a b => Coercible c b => Proxy b -> a -> c
 trans' _ = coerce
+
+transSymm :: forall b a c. Coercible a b => Coercible b c => Proxy b -> c -> a
+transSymm _ = coerce
 
 type SynString = String
 
@@ -25,6 +28,12 @@ newtype NTString1 = NTString1 SynString
 
 nt1ToString :: NTString1 -> String
 nt1ToString = coerce
+
+toNT1 :: forall a. Coercible a String => a -> NTString1
+toNT1 = coerce
+
+toNT1Array :: forall a. Coercible a (Array String) => a -> Array NTString1
+toNT1Array = coerce
 
 newtype NTString2 = NTString2 String
 
