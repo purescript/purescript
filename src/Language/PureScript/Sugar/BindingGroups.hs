@@ -28,6 +28,11 @@ import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Types
 
+data VertexType
+  = VertexDefinition
+  | VertexKindSignature
+  deriving (Eq, Ord, Show)
+
 -- |
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
 --
@@ -67,22 +72,27 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
-        kindDecls = fmap (,True) $ filter isKindDecl ds
-        dataDecls = fmap (,False) $ filter (\a -> isDataDecl a || isExternDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
+        kindDecls = fmap (,VertexKindSignature) $ filter (\a -> isKindDecl a || isExternDataDecl a) ds
+        dataDecls = fmap (,VertexDefinition) $ filter (\a -> isDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
         kindSigs = fmap (declTypeName . fst) kindDecls
         typeSyns = fmap declTypeName $ filter isTypeSynonymDecl ds
-        allProperNames = fmap (declTypeName . fst) dataDecls
         allDecls = kindDecls ++ dataDecls
-        mkVert (d, isSig) =
+        allProperNames = fmap (declTypeName . fst) allDecls
+        mkVert (d, vty) =
           let names = usedTypeNames moduleName d `intersect` allProperNames
               name = declTypeName d
               -- If a dependency has a kind signature, than that's all we need to depend on, except
               -- in the case that we are defining a kind signature and using a type synonym. In order
               -- to expand the type synonym, we must depend on the synonym declaration itself.
-              deps = fmap (\n -> (n, n `elem` kindSigs && (isSig && not (n `elem` typeSyns)))) names
-              self | not isSig && name `elem` kindSigs = [(name, True)]
-                   | otherwise = []
-          in (d, (name, isSig), self ++ deps)
+              vtype n
+                | vty == VertexKindSignature && n `elem` typeSyns = VertexDefinition
+                | n `elem` kindSigs = VertexKindSignature
+                | otherwise = VertexDefinition
+              deps = fmap (\n -> (n, vtype n)) names
+              self
+                | vty == VertexDefinition && name `elem` kindSigs = [(name, VertexKindSignature)]
+                | otherwise = []
+          in (d, (name, vty), self ++ deps)
         dataVerts = fmap mkVert allDecls
     dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
     let allIdents = fmap valdeclIdent values
@@ -226,6 +236,7 @@ toDataBindingGroup (CyclicSCC ds')
   | otherwise = return . DataBindingGroupDeclaration $ NEL.fromList ds'
   where
   kindDecl (KindDeclaration sa _ pn _) = [(fst sa, Qualified Nothing pn)]
+  kindDecl (ExternDataDeclaration sa pn _) = [(fst sa, Qualified Nothing pn)]
   kindDecl _ = []
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
