@@ -10,12 +10,6 @@ import Prelude.Compat
 
 import Control.Monad (unless)
 import Control.Monad.Error.Class (MonadError(..))
-import Data.Foldable (traverse_)
-import Data.Function (on)
-import Data.List (find, partition)
-import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NEL
-import Data.Maybe (mapMaybe)
 
 import Language.PureScript.AST
 import Language.PureScript.Names
@@ -33,7 +27,7 @@ desugarTypeDeclarationsModule
 desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
   rethrow (addHint (ErrorInModule name)) $ do
     checkKindDeclarations ds
-    checkRoleDeclarations
+    checkRoleDeclarations Nothing ds
     Module modSS coms name <$> desugarTypeDeclarations ds <*> pure exps
   where
 
@@ -79,67 +73,38 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
   checkKindDeclarations (_ : rest) = checkKindDeclarations rest
   checkKindDeclarations [] = return ()
 
-  checkRoleDeclarations :: m ()
-  checkRoleDeclarations = do
-    ds' <- checkDuplicateRoleDeclarations
-         . groupRoleDeclarations
-         $ mapMaybe fromRoleDeclaration ds
-    checkUnsupportedRoleDeclarations ds'
-    checkOrphanRoleDeclarations ds'
-    checkRoleDeclarationsArity ds'
+  checkRoleDeclarations :: Maybe Declaration -> [Declaration] -> m ()
+  checkRoleDeclarations Nothing (RoleDeclaration RoleDeclarationData{..} : _) =
+    throwError . errorMessage' (fst rdeclSourceAnn) $ OrphanRoleDeclaration rdeclIdent
+  checkRoleDeclarations (Just (RoleDeclaration (RoleDeclarationData _ name' _))) ((RoleDeclaration (RoleDeclarationData{..})) : _) | name' == rdeclIdent =
+    throwError . errorMessage' (fst rdeclSourceAnn) $ DuplicateRoleDeclaration rdeclIdent
+  checkRoleDeclarations (Just d) (rd@(RoleDeclaration (RoleDeclarationData{..})) : rest) = do
+    unless (matchesDeclaration d) . throwError . errorMessage' (fst rdeclSourceAnn) $ OrphanRoleDeclaration rdeclIdent
+    unless (isSupported d) . throwError . errorMessage' (fst rdeclSourceAnn) $ UnsupportedRoleDeclaration
+    checkRoleDeclarationArity d
+    checkRoleDeclarations (Just rd) rest
     where
-    fromRoleDeclaration :: Declaration -> Maybe (RoleDeclarationData, Maybe Declaration)
-    fromRoleDeclaration (RoleDeclaration rdd@RoleDeclarationData{..}) =
-      Just (rdd, find (byName rdeclIdent) ds)
-    fromRoleDeclaration _ = Nothing
-
-    byName :: ProperName 'TypeName -> Declaration -> Bool
-    byName name' (DataDeclaration _ _ name'' _ _) = name' == name''
-    byName name' (ExternDataDeclaration _ name'' _) = name' == name''
-    byName name' (TypeSynonymDeclaration _ name'' _ _) = name' == name''
-    byName name' (TypeClassDeclaration _ name'' _ _ _ _) = name' == coerceProperName name''
-    byName _ _ = False
-
-    groupRoleDeclarations
-      :: [(RoleDeclarationData, Maybe Declaration)]
-      -> [(NEL.NonEmpty RoleDeclarationData, Maybe Declaration)]
-    groupRoleDeclarations ((rdd, d) : rest) =
-      let (duplicates, rest') = partition (((==) `on` rdeclIdent . fst) (rdd, d)) rest
-      in (rdd :| map fst duplicates, d) : groupRoleDeclarations rest'
-    groupRoleDeclarations [] = []
-
-    checkDuplicateRoleDeclarations
-      :: [(NEL.NonEmpty RoleDeclarationData, Maybe Declaration)]
-      -> m [(RoleDeclarationData, Maybe Declaration)]
-    checkDuplicateRoleDeclarations = traverse $ \case
-      (rdd :| [], d) -> return (rdd, d)
-      (RoleDeclarationData{..} :| _ : _, _) ->
-        throwError . errorMessage' (fst rdeclSourceAnn) $ DuplicateRoleDeclaration rdeclIdent
-
-    checkUnsupportedRoleDeclarations :: [(RoleDeclarationData, Maybe Declaration)] -> m ()
-    checkUnsupportedRoleDeclarations = traverse_ $ \case
-      (RoleDeclarationData{..}, Just TypeSynonymDeclaration{}) ->
-        throwError . errorMessage' (fst rdeclSourceAnn) $ UnsupportedRoleDeclaration
-      (RoleDeclarationData{..}, Just TypeClassDeclaration{}) ->
-        throwError . errorMessage' (fst rdeclSourceAnn) $ UnsupportedRoleDeclaration
-      _ -> return ()
-
-    checkOrphanRoleDeclarations :: [(RoleDeclarationData, Maybe Declaration)] -> m ()
-    checkOrphanRoleDeclarations = traverse_ $ \case
-      (RoleDeclarationData{..}, Nothing) ->
-        throwError . errorMessage' (fst rdeclSourceAnn) $ OrphanRoleDeclaration rdeclIdent
-      _ -> return ()
-
-    checkRoleDeclarationsArity :: [(RoleDeclarationData, Maybe Declaration)] -> m ()
-    checkRoleDeclarationsArity = traverse_ $ \case
-      (rdd, Just (DataDeclaration _ _ _ args _)) ->
-        throwRoleDeclarationArityMismatch rdd $ length args
-      (rdd, Just (ExternDataDeclaration _ _ kind)) ->
-        throwRoleDeclarationArityMismatch rdd $ kindArity kind
-      _ -> return ()
-      where
-      throwRoleDeclarationArityMismatch RoleDeclarationData{..} expected = do
-        let actual = length rdeclRoles
-        unless (expected == actual) $
-          throwError . errorMessage' (fst rdeclSourceAnn) $
-            RoleDeclarationArityMismatch rdeclIdent expected actual
+    isSupported :: Declaration -> Bool
+    isSupported (DataDeclaration{}) = True
+    isSupported (ExternDataDeclaration{}) = True
+    isSupported _ = False
+    matchesDeclaration :: Declaration -> Bool
+    matchesDeclaration (DataDeclaration _ _ name' _ _) = rdeclIdent == name'
+    matchesDeclaration (ExternDataDeclaration _ name' _) = rdeclIdent == name'
+    matchesDeclaration (TypeSynonymDeclaration _ name' _ _) = rdeclIdent == name'
+    matchesDeclaration (TypeClassDeclaration _ name' _ _ _ _) = rdeclIdent == coerceProperName name'
+    matchesDeclaration _ = False
+    checkRoleDeclarationArity :: Declaration -> m ()
+    checkRoleDeclarationArity (DataDeclaration _ _ _ args _) =
+      throwRoleDeclarationArityMismatch $ length args
+    checkRoleDeclarationArity (ExternDataDeclaration _ _ kind) =
+      throwRoleDeclarationArityMismatch $ kindArity kind
+    checkRoleDeclarationArity _ = return ()
+    throwRoleDeclarationArityMismatch :: Int -> m ()
+    throwRoleDeclarationArityMismatch expected = do
+      let actual = length rdeclRoles
+      unless (expected == actual) $
+        throwError . errorMessage' (fst rdeclSourceAnn) $
+          RoleDeclarationArityMismatch rdeclIdent expected actual
+  checkRoleDeclarations _ (d : rest) = checkRoleDeclarations (Just d) rest
+  checkRoleDeclarations _ [] = return ()
