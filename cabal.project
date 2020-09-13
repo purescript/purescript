@@ -1,0 +1,20 @@
+packages:
+  purescript.cabal
+  lib/purescript-ast/purescript-ast.cabal
+  lib/purescript-cst/purescript-cst.cabal
+
+-- Print test output to the terminal immediately rather than waiting for the
+-- test suite to finish running.
+test-show-details: streaming
+
+-- Disable optimization by default when building as a local package (i.e.
+-- during development).
+optimization: False
+
+package aeson-pretty
+  -- avoid installing the aeson-pretty CLI tool, since we only want the library
+  flags: +lib-only
+
+package these
+  -- switch these flags off to avoid dependencies we don't need
+  flags: -assoc -quickcheck

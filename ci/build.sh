@@ -24,7 +24,7 @@ STACK="stack --no-terminal --jobs=2"
 STACK_OPTS="--test"
 if [ "$CI_RELEASE" = "true" ]
 then
-  STACK_OPTS="$STACK_OPTS --flag=purescript:RELEASE"
+  STACK_OPTS="$STACK_OPTS --ghc-options=-O2 --flag=purescript:RELEASE"
 else
   STACK_OPTS="$STACK_OPTS --fast"
 fi
