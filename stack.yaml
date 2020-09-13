@@ -1,5 +1,5 @@
 resolver: lts-13.26
-pvp-bounds: upper
+pvp-bounds: both
 packages:
 - '.'
 - lib/purescript-ast
