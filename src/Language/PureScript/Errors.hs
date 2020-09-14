@@ -72,6 +72,7 @@ data SimpleErrorMessage
   | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
   | OrphanKindDeclaration (ProperName 'TypeName)
+  | OrphanRoleDeclaration (ProperName 'TypeName)
   | RedefinedIdent Ident
   | OverlappingNamesInLet
   | UnknownName (Qualified Name)
@@ -181,6 +182,9 @@ data SimpleErrorMessage
       Role -- ^ inferred role
       Role -- ^ declared role
   | InvalidCoercibleInstanceDeclaration [SourceType]
+  | UnsupportedRoleDeclaration
+  | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
+  | DuplicateRoleDeclaration (ProperName 'TypeName)
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -237,6 +241,7 @@ errorCode em = case unwrapErrorMessage em of
   MultipleTypeOpFixities{} -> "MultipleTypeOpFixities"
   OrphanTypeDeclaration{} -> "OrphanTypeDeclaration"
   OrphanKindDeclaration{} -> "OrphanKindDeclaration"
+  OrphanRoleDeclaration{} -> "OrphanRoleDeclaration"
   RedefinedIdent{} -> "RedefinedIdent"
   OverlappingNamesInLet -> "OverlappingNamesInLet"
   UnknownName{} -> "UnknownName"
@@ -338,6 +343,9 @@ errorCode em = case unwrapErrorMessage em of
   UnsupportedTypeInKind {} -> "UnsupportedTypeInKind"
   RoleMismatch {} -> "RoleMismatch"
   InvalidCoercibleInstanceDeclaration {} -> "InvalidCoercibleInstanceDeclaration"
+  UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
+  RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
+  DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -711,6 +719,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "The type declaration for " <> markCode (showIdent nm) <> " should be followed by its definition."
     renderSimpleErrorMessage (OrphanKindDeclaration nm) =
       line $ "The kind declaration for " <> markCode (runProperName nm) <> " should be followed by its definition."
+    renderSimpleErrorMessage (OrphanRoleDeclaration nm) =
+      line $ "The role declaration for " <> markCode (runProperName nm) <> " should follow its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
@@ -1305,6 +1315,25 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
         , line "Instance declarations of this type class are disallowed."
         ]
+
+    renderSimpleErrorMessage UnsupportedRoleDeclaration =
+      line $ "Role declarations are only supported for data types, not for type synonyms nor type classes."
+
+    renderSimpleErrorMessage (RoleDeclarationArityMismatch name expected actual) =
+      line $ T.intercalate " "
+        [ "The type"
+        , markCode (runProperName name)
+        , "expects"
+        , T.pack (show expected)
+        , if expected == 1 then "argument" else "arguments"
+        , "but its role declaration lists"
+            <> if actual > expected then "" else " only"
+        , T.pack (show actual)
+        , if actual > 1 then "roles" else "role"
+        ] <> "."
+
+    renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
+      line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
