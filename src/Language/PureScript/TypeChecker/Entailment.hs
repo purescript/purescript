@@ -12,7 +12,7 @@ module Language.PureScript.TypeChecker.Entailment
   ) where
 
 import Prelude.Compat
-import Protolude (guarded, ordNub)
+import Protolude (ordNub)
 
 import Control.Applicative ((<|>), empty)
 import Control.Arrow (second, (&&&))
@@ -397,38 +397,22 @@ entails SolverOptions{..} constraint context hints =
       (b', kind') <- kindOf b
       lift $ unifyKinds kind kind'
       -- Solving terminates when the two arguments are the same or if a
-      -- dictionary is already in scope. Since we currently don't support
-      -- higher-rank arguments in instance heads, term equality is a sufficient
-      -- notion of "the same".
+      -- dictionary for a symmetric constraint is already in scope.
+      -- Since we currently don't support higher-rank arguments in instance
+      -- heads, term equality is a sufficient notion of "the same".
       let coercibleDictsInScope = findDicts ctx C.Coercible Nothing
-      if a' == b' || any ((||) <$> isCoercibleDictInScope a' b' <*> isSymmetricCoercibleDictInScope a' b') coercibleDictsInScope
+      if a' == b' || any (isSymmetricCoercibleDictInScope a' b') coercibleDictsInScope
         then pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing]
         else do
           -- When solving must reduce and recurse, it doesn't matter whether we
           -- reduce the first or second argument -- if the constraint is
           -- solvable, either path will yield the same outcome. Consequently we
           -- just try the first argument first and the second argument second.
-          -- If both path fail to yield subgoals we try to make some progress
-          -- regardless by transitivity.
-          subst <- lift $ gets checkSubstitution
-          let k = substituteType subst kind
-          ws <- MaybeT (coercibleWanteds env a' b')
-            <|> MaybeT (coercibleWanteds env b' a')
-            <|> guarded (not . null) (mapMaybe (srcCoercibleTransitiveConstraint k a' b') coercibleDictsInScope)
+          ws <- (MaybeT $ coercibleWanteds env a' b') <|> (MaybeT $ coercibleWanteds env b' a')
           pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] (Just ws)]
     solveCoercible _ _ _ _ = pure Nothing
 
-    isCoercibleDictInScope a b TypeClassDictionaryInScope{..} = tcdInstanceTypes == [a, b]
-
     isSymmetricCoercibleDictInScope a b TypeClassDictionaryInScope{..} = tcdInstanceTypes == [b, a]
-
-    srcCoercibleTransitiveConstraint k a b TypeClassDictionaryInScope{..}
-      | [a', b'] <- tcdInstanceTypes =
-            guard (a' == a && b' /= b) $> srcCoercibleConstraint k b' b
-        <|> guard (b' == b && a' /= a) $> srcCoercibleConstraint k a a'
-        <|> guard (a' == b && b' /= a) $> srcCoercibleConstraint k a b'
-        <|> guard (b' == a && a' /= b) $> srcCoercibleConstraint k a' b
-      | otherwise = empty
 
     -- | Take two types, @a@ and @b@ representing a desired constraint
     -- @Coercible a b@ and reduce them to a set of simpler wanted constraints
