@@ -7,9 +7,13 @@ packages:
 -- test suite to finish running.
 test-show-details: streaming
 
--- Disable optimization by default when building as a local package (i.e.
--- during development).
-optimization: False
+-- Enable advanced optimizations when building. It is recommended to disable
+-- this during development; you can do this by creating a cabal.project.local
+-- file with the contents:
+--
+--   optimization: False
+--
+optimization: 2
 
 package aeson-pretty
   -- avoid installing the aeson-pretty CLI tool, since we only want the library
