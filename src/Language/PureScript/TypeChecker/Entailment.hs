@@ -427,6 +427,21 @@ entails SolverOptions{..} constraint context hints =
           let a' = foldl' srcTypeApp a tys
               b' = foldl' srcTypeApp b tys
           pure $ Just [srcCoercibleConstraint kind a' b']
+      -- If both arguments have kind @Row k@, yield new wanted constraints
+      -- in terms of pairs of types with the same label in both rows (e.g.
+      -- @Coercible D D'@ given @Coercible ( label :: D ) ( label :: D' )@)
+      -- and fail when some labels are exclusive to one row (e.g. @extra@
+      -- in the constraint @Coercible () ( extra :: D )@) or when the tails
+      -- don’t unify (e.g. @()@ and @r@ in @Coercible () ( | r )@ or
+      -- @r@ and @s@ in @Coercible ( | r ) ( | s )@).
+      | RCons _ _ ty _ <- a = do
+          k <- elaborateKind ty
+          case alignRowsWith (srcCoercibleConstraint k) a b of
+            (constraints, (([], tail1), ([], tail2))) -> do
+              rethrow (const . errorMessage . NoInstanceFound $ srcCoercibleConstraint (kindRow k) a b) $ unifyTypes tail1 tail2
+              pure $ Just constraints
+            (_, (rl1, rl2)) ->
+              throwError . errorMessage $ TypesDoNotUnify (rowFromList rl1) (rowFromList rl2)
       | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
       , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
       , not (null axs) && aTyName == bTyName

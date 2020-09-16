@@ -424,6 +424,13 @@ coercible = primClassOf (P.primSubName "Coerce") "Coercible" $ T.unlines
   , "This rule may seem puzzling since it is impossible to apply `coerce` to a term"
   , "of type `NT1` but it is necessary to coerce types with higher kinded parameters."
   , ""
+  , "Fifth, every pair of rows can be coerced if they have the same labels"
+  , "and the corresponding types for each label are coercible:"
+  , ""
+  , "    instance coercibleRow :: Coercible a b => Coercible ( label :: a ) ( label :: b )"
+  , ""
+  , "Closed rows can't be coerced to open rows and open rows can only be"
+  , "coerced to open rows with the same row variable."
   ]
 
 kindOrdering :: Declaration
