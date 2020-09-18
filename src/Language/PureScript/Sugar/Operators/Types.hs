@@ -31,4 +31,4 @@ matchTypeOperators ss = matchOperators isBinOp extractOp fromOp reapply id
   fromOp _ = Nothing
 
   reapply :: a -> Qualified (OpName 'TypeOpName) -> SourceType -> SourceType -> SourceType
-  reapply _ = srcBinaryNoParensType . srcTypeOp
+  reapply _ op t1 t2 = srcTypeApp (srcTypeApp (TypeOp (ss, []) op) t1) t2
