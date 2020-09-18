@@ -1,6 +1,5 @@
 module Language.PureScript.Sugar.Names
   ( desugarImports
-  , desugarImportsWithEnv
   , Env
   , externsEnv
   , primEnv
@@ -13,7 +12,7 @@ module Language.PureScript.Sugar.Names
 import Prelude.Compat
 import Protolude (ordNub, sortBy, on)
 
-import Control.Arrow (first)
+import Control.Arrow (first, second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
@@ -41,39 +40,30 @@ import Language.PureScript.Types
 --
 desugarImports
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => Env
-  -> [Module]
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadState (Env, M.Map ModuleName UsedImports) m)
+  => [Module]
   -> m [Module]
-desugarImports env modules =
-  fmap snd (desugarImportsWithEnv env modules)
-
-desugarImportsWithEnv
-  :: forall m
-  . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => Env
-  -> [Module]
-  -> m (Env, [Module])
-desugarImportsWithEnv e modules = do
-  (modules', env') <- first reverse <$> foldM updateEnv ([], e) modules
-  (env',) <$> traverse (renameInModule' env') modules'
+desugarImports modules = do
+  modules' <- reverse <$> foldM updateEnv [] modules
+  traverse renameInModule' modules'
   where
-  updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
-  updateEnv (ms, env) m@(Module ss _ mn _ refs) = do
+  updateEnv :: [Module] -> Module -> m [Module]
+  updateEnv ms m@(Module ss _ mn _ refs) = do
     members <- findExportable m
-    let env' = M.insert mn (ss, nullImports, members) env
+    env' <- gets $ M.insert mn (ss, nullImports, members) . fst
     (m', imps) <- resolveImports env' m
     exps <- maybe (return members) (resolveExports env' ss mn imps members) refs
-    return (m' : ms, M.insert mn (ss, imps, exps) env)
+    modify . first $ M.insert mn (ss, imps, exps)
+    return $ m' : ms
 
-  renameInModule' :: Env -> Module -> m Module
-  renameInModule' env m@(Module _ _ mn _ _) =
+  renameInModule' :: Module -> m Module
+  renameInModule' m@(Module _ _ mn _ _) =
     warnAndRethrow (addHint (ErrorInModule mn)) $ do
+      env <- gets fst
       let (_, imps, exps) = fromMaybe (internalError "Module is missing in renameInModule'") $ M.lookup mn env
       (m', used) <- flip runStateT M.empty $ renameInModule imps m
-      let m'' = elaborateExports exps m'
-      lintImports m'' env used
-      return m''
+      modify . second $ M.alter (Just . maybe used (M.unionWith (<>) used)) mn
+      return $ elaborateExports exps m'
 
 -- | Create an environment from a collection of externs files
 externsEnv
