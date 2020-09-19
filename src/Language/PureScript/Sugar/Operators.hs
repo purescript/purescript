@@ -167,10 +167,10 @@ rebracketFiltered pred_ externs modules = do
     goBinder pos other = return (pos, other)
 
     goType :: SourceSpan -> SourceType -> m SourceType
-    goType pos (BinaryNoParensType ann (TypeOp ann2 op) lhs rhs) =
+    goType pos (TypeOp ann2 op) =
       case op `M.lookup` typeAliased of
         Just alias ->
-          return $ TypeApp ann (TypeApp ann (TypeConstructor ann2 alias) lhs) rhs
+          return $ TypeConstructor ann2 alias
         Nothing ->
           throwError . errorMessage' pos $ UnknownName $ fmap TyOpName op
     goType _ other = return other
