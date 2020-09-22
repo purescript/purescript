@@ -44,9 +44,9 @@ type Desugar = StateT MemberMap
 desugarTypeClasses
   :: (MonadSupply m, MonadError MultipleErrors m)
   => [ExternsFile]
-  -> [Module]
-  -> m [Module]
-desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModule
+  -> Module
+  -> m Module
+desugarTypeClasses externs = flip evalStateT initialState . desugarModule
   where
   initialState :: MemberMap
   initialState =

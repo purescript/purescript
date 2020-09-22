@@ -78,18 +78,15 @@ rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
   lint withPrim
 
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
-    runStateT (desugar externs [withPrim]) (exEnv, mempty) >>= \case
-      ([desugared], (exEnv', usedImportsByModuleName)) -> do
-        (checked, CheckState{..}) <- runStateT (typeCheckModule desugared) $ emptyCheckState env
-        let usedImports = fold $ M.lookup moduleName usedImportsByModuleName
-            usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
-              M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkCoercedNewtypeCtorsImports
-        -- Imports cannot be linted before type checking because we need to
-        -- known which newtype constructors are used to solve Coercible
-        -- constraints in order to not report them as unused.
-        censor (addHint (ErrorInModule moduleName)) $ lintImports checked exEnv' usedImports'
-        return (checked, checkEnv)
-      _ -> internalError "desugar did not return a singleton"
+    (desugared, (exEnv', usedImports)) <- runStateT (desugar externs withPrim) (exEnv, mempty)
+    (checked, CheckState{..}) <- runStateT (typeCheckModule desugared) $ emptyCheckState env
+    let usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
+          M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkCoercedNewtypeCtorsImports
+    -- Imports cannot be linted before type checking because we need to
+    -- known which newtype constructors are used to solve Coercible
+    -- constraints in order to not report them as unused.
+    censor (addHint (ErrorInModule moduleName)) $ lintImports checked exEnv' usedImports'
+    return (checked, checkEnv)
 
   -- desugar case declarations *after* type- and exhaustiveness checking
   -- since pattern guards introduces cases which the exhaustiveness checker

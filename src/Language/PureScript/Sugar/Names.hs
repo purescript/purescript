@@ -35,26 +35,23 @@ import Language.PureScript.Traversals
 import Language.PureScript.Types
 
 -- |
--- Replaces all local names with qualified names within a list of modules. The
--- modules should be topologically sorted beforehand.
+-- Replaces all local names with qualified names.
 --
 desugarImports
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadState (Env, M.Map ModuleName UsedImports) m)
-  => [Module]
-  -> m [Module]
-desugarImports modules = do
-  modules' <- reverse <$> foldM updateEnv [] modules
-  traverse renameInModule' modules'
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadState (Env, UsedImports) m)
+  => Module
+  -> m Module
+desugarImports = updateEnv >=> renameInModule'
   where
-  updateEnv :: [Module] -> Module -> m [Module]
-  updateEnv ms m@(Module ss _ mn _ refs) = do
+  updateEnv :: Module -> m Module
+  updateEnv m@(Module ss _ mn _ refs) = do
     members <- findExportable m
     env' <- gets $ M.insert mn (ss, nullImports, members) . fst
     (m', imps) <- resolveImports env' m
     exps <- maybe (return members) (resolveExports env' ss mn imps members) refs
     modify . first $ M.insert mn (ss, imps, exps)
-    return $ m' : ms
+    return m'
 
   renameInModule' :: Module -> m Module
   renameInModule' m@(Module _ _ mn _ _) =
@@ -62,7 +59,7 @@ desugarImports modules = do
       env <- gets fst
       let (_, imps, exps) = fromMaybe (internalError "Module is missing in renameInModule'") $ M.lookup mn env
       (m', used) <- flip runStateT M.empty $ renameInModule imps m
-      modify . second $ M.alter (Just . maybe used (M.unionWith (<>) used)) mn
+      modify . second $ M.unionWith (<>) used
       return $ elaborateExports exps m'
 
 -- | Create an environment from a collection of externs files

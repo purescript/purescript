@@ -10,15 +10,10 @@ import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Writer.Class (MonadWriter)
 
-import Data.List (map)
-import Data.Traversable (traverse)
-import Data.Map (Map)
-
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Externs
 import Language.PureScript.Linter.Imports
-import Language.PureScript.Names
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.DoNotation as S
@@ -60,21 +55,21 @@ desugar
   :: MonadSupply m
   => MonadError MultipleErrors m
   => MonadWriter MultipleErrors m
-  => MonadState (Env, Map ModuleName UsedImports) m
+  => MonadState (Env, UsedImports) m
   => [ExternsFile]
-  -> [Module]
-  -> m [Module]
+  -> Module
+  -> m Module
 desugar externs =
-  map desugarSignedLiterals
-    >>> traverse desugarObjectConstructors
-    >=> traverse desugarDoModule
-    >=> traverse desugarAdoModule
-    >=> map desugarLetPatternModule
-    >>> traverse desugarCasesModule
-    >=> traverse desugarTypeDeclarationsModule
+  desugarSignedLiterals
+    >>> desugarObjectConstructors
+    >=> desugarDoModule
+    >=> desugarAdoModule
+    >=> desugarLetPatternModule
+    >>> desugarCasesModule
+    >=> desugarTypeDeclarationsModule
     >=> desugarImports
     >=> rebracket externs
-    >=> traverse checkFixityExports
-    >=> traverse (deriveInstances externs)
+    >=> checkFixityExports
+    >=> deriveInstances externs
     >=> desugarTypeClasses externs
-    >=> traverse createBindingGroupsModule
+    >=> createBindingGroupsModule
