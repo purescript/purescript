@@ -648,14 +648,22 @@ deriveNewtype ss mn syns kinds ds tyConNm tyConArgs unwrappedTy = do
     go _ = internalError "deriveNewtype go: expected DataDeclaration"
 
 findTypeDecl
-  :: (MonadError MultipleErrors m)
+  :: forall m
+   . (MonadError MultipleErrors m)
   => SourceSpan
   -> ProperName 'TypeName
   -> [Declaration]
   -> m Declaration
-findTypeDecl ss tyConNm = maybe (throwError . errorMessage' ss $ CannotFindDerivingType tyConNm) return . find isTypeDecl
+findTypeDecl ss tyConNm = go . find isTypeDecl
   where
+  go :: Maybe Declaration -> m Declaration
+  go (Just (TypeSynonymDeclaration _ _ _ _)) =
+    throwError . errorMessage' ss $ TypeSynonymInstance 
+  go (Just decl) = return decl
+  go _ = throwError . errorMessage' ss $ CannotFindDerivingType tyConNm
+
   isTypeDecl :: Declaration -> Bool
+  isTypeDecl (TypeSynonymDeclaration _ nm _ _) | nm == tyConNm = True
   isTypeDecl (DataDeclaration _ _ nm _ _) | nm == tyConNm = True
   isTypeDecl _ = False
 

@@ -1,4 +1,4 @@
--- @shouldFailWith CannotFindDerivingType
+-- @shouldFailWith TypeSynonymInstance
 module Main where
 
 import Prelude
