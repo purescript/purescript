@@ -378,7 +378,7 @@ debugTypes = go <=< M.toList . types
       decl = case which of
         DataType _ _      -> "data"
         TypeSynonym       -> "type"
-        ExternData        -> "extern"
+        ExternData _      -> "extern"
         LocalTypeVariable -> "local"
         ScopedTypeVar     -> "scoped"
     guard (not (isPrefixOf "Prim" name))

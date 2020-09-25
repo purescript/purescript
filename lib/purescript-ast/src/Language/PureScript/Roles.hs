@@ -5,6 +5,7 @@
 --
 module Language.PureScript.Roles
   ( Role(..)
+  , displayRole
   ) where
 
 import Prelude.Compat
@@ -13,6 +14,7 @@ import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
+import Data.Text (Text)
 import GHC.Generics (Generic)
 
 -- |
@@ -33,3 +35,9 @@ instance NFData Role
 instance Serialise Role
 
 $(A.deriveJSON A.defaultOptions ''Role)
+
+displayRole :: Role -> Text
+displayRole r = case r of
+  Nominal -> "nominal"
+  Representational -> "representational"
+  Phantom -> "phantom"

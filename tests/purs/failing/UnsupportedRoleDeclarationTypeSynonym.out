@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/UnsupportedRoleDeclarationTypeSynonym.purs:7:1 - 7:20 (line 7, column 1 - line 7, column 20)
+
+  Role declarations are only supported for data types, not for type synonyms nor type classes.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnsupportedRoleDeclaration.md for more information,
+or to contribute content related to this error.
+

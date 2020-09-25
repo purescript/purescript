@@ -1,0 +1,13 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/TransitiveDctorExportError.purs:2:1 - 4:15 (line 2, column 1 - line 4, column 15)
+
+  An export for [33mT[0m requires the following data constructor to also be exported:
+
+    [33mB[0m
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/TransitiveDctorExportError.md for more information,
+or to contribute content related to this error.
+

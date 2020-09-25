@@ -25,6 +25,7 @@ import Language.PureScript.Names as P
 import Language.PureScript.Options as P
 import Language.PureScript.Pretty as P
 import Language.PureScript.Renamer as P
+import Language.PureScript.Roles as P
 import Language.PureScript.Sugar as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Types as P

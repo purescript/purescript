@@ -18,13 +18,18 @@ nt2ToNT1 :: NTString2 -> NTString1
 nt2ToNT1 = coerce
 
 newtype Id1 a = Id1 a
-newtype Id2 a = Id2 a
+newtype Id2 b = Id2 b
 
 id1ToId2 :: forall a. Id1 a -> Id2 a
 id1ToId2 = coerce
 
 id12ToId21 :: forall b. Id1 (Id2 b) -> Id2 (Id1 b)
 id12ToId21 = coerce
+
+newtype Ap f a = Ap (f a)
+
+apId1ToApId2 :: forall a. Ap Id1 a -> Ap Id2 a
+apId1ToApId2 = coerce
 
 newtype Phantom1 a b = Phantom1 a
 
@@ -115,6 +120,31 @@ data Rec3 a = Rec3 {}
 rec3ToRec3 :: forall m n. Rec3 m -> Rec3 n
 rec3ToRec3 = coerce
 
+newtype Rec4 f = Rec4 (f {})
+
+unwrapRec4 :: forall f. Rec4 f -> f {}
+unwrapRec4 = coerce
+
+newtype Rec5 a f = Rec5 (f {})
+
+apRec4ToApRec5 :: forall a. Ap Rec4 Id1 -> Ap (Rec5 a) Id1
+apRec4ToApRec5 = coerce
+
+type Rec6 a = { f :: a }
+
+rec6ToRec6 :: Rec6 Int -> Rec6 (Id1 Int)
+rec6ToRec6 = coerce
+
+type Rec7 a b = { f :: a, g :: Int, h :: b }
+
+rec7ToRec7 :: Rec7 Int (Phantom2 String) -> Rec7 (Id1 Int) (Phantom2 Int)
+rec7ToRec7 = coerce
+
+type Rec8 r a = { f :: a | r }
+
+rec8ToRec8 :: ∀ r. Rec8 r Int -> Rec8 r (Id1 Int)
+rec8ToRec8 = coerce
+
 data Arr1 a b = Arr1 (Array a) (Array b)
 
 arr1ToArr1 :: Arr1 Int String -> Arr1 (Id1 Int) (Id2 String)
@@ -144,6 +174,17 @@ type role MyMap nominal representational
 mapToMap :: MyMap String String -> MyMap String NTString1
 mapToMap = coerce
 
+class Unary a
+
+data Constrained1 a b = Constrained1 (Unary a => b)
+
+constrained1ToConstrained1 :: forall a b. Constrained1 a b -> Constrained1 a (Id1 b)
+constrained1ToConstrained1 = coerce
+
+data Constrained2 a = Constrained2 a (forall a. Unary a => a)
+
+type role Constrained2 representational
+
 -- "role" should only be a reserved word after "type"
 testRoleNotReserved :: String -> String
 testRoleNotReserved role = role
@@ -162,5 +203,23 @@ type ContextualKeywords =
   , representational :: String
   , role :: String
   )
+
+data MutuallyRecursivePhantom1 a
+  = MutuallyRecursivePhantom1 (MutuallyRecursivePhantom2 a)
+
+data MutuallyRecursivePhantom2 a
+  = MutuallyRecursivePhantom2 (MutuallyRecursivePhantom1 a)
+
+mutuallyRecursivePhantom :: forall a b. MutuallyRecursivePhantom1 a -> MutuallyRecursivePhantom1 b
+mutuallyRecursivePhantom = coerce
+
+data MutuallyRecursiveRepresentational1 a
+  = MutuallyRecursiveRepresentational1 a (MutuallyRecursiveRepresentational2 a)
+
+data MutuallyRecursiveRepresentational2 a
+  = MutuallyRecursiveRepresentational2 (MutuallyRecursiveRepresentational1 a)
+
+mutuallyRecursiveRepresentational :: forall a. MutuallyRecursiveRepresentational1 a -> MutuallyRecursiveRepresentational1 (Id1 a)
+mutuallyRecursiveRepresentational = coerce
 
 main = log (coerce (NTString1 "Done") :: String)
