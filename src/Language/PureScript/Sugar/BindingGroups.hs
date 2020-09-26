@@ -12,13 +12,13 @@ module Language.PureScript.Sugar.BindingGroups
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Monad ((<=<))
+import Control.Monad ((<=<), guard)
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (intersect)
 import Data.Foldable (find)
-import Data.Maybe (isJust, isNothing, mapMaybe)
+import Data.Maybe (isJust, mapMaybe)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
 
@@ -228,12 +228,13 @@ toDataBindingGroup
   => SCC (Declaration, (ProperName 'TypeName, VertexType), [(ProperName 'TypeName, VertexType)])
   -> m Declaration
 toDataBindingGroup (AcyclicSCC (d, _, _)) = return d
-toDataBindingGroup (CyclicSCC [(d, _, _)]) = case isTypeSynonym d of
-  Just pn -> throwError . errorMessage' (declSourceSpan d) $ CycleInTypeSynonym (Just pn)
-  _ -> return d
 toDataBindingGroup (CyclicSCC ds')
   | kds@((ss, _):_) <- concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
-  | isNothing . depsTerminate [] [] $ getName <$> ds' = throwError . errorMessage' (declSourceSpan (getDecl (head ds'))) $ CycleInTypeSynonym Nothing
+  | not (null typeSynonymCycles) =
+      throwError
+        . MultipleErrors
+        . fmap (\syns -> ErrorMessage [positionedError . declSourceSpan . getDecl $ head syns] . CycleInTypeSynonym $ fmap (fst . getName) syns)
+        $ typeSynonymCycles
   | otherwise = return . DataBindingGroupDeclaration . NEL.fromList $ getDecl <$> ds'
   where
   kindDecl (KindDeclaration sa _ pn _) = [(fst sa, Qualified Nothing pn)]
@@ -244,16 +245,15 @@ toDataBindingGroup (CyclicSCC ds')
   getName (_, name, _) = name
   lookupVert name = find ((==) name . getName) ds'
 
-  depsTerminate seen _ [] = Just seen
-  depsTerminate seen stop (n : ns)
-    | n `elem` seen = depsTerminate seen stop ns
-    | n `elem` stop = Nothing
-    | Just (decl, _, deps) <- lookupVert n
-    , isJust $ isTypeSynonym decl = do
-        seen' <- depsTerminate seen (n : stop) deps
-        depsTerminate (n : seen') stop ns
-    | otherwise =
-        depsTerminate (n : seen) stop ns
+  onlySynonyms (decl, name, deps) = do
+    guard . isJust $ isTypeSynonym decl
+    pure (decl, name, filter (maybe False (isJust . isTypeSynonym . getDecl) . lookupVert) deps)
+
+  isCycle (CyclicSCC c) = Just c
+  isCycle _ = Nothing
+
+  typeSynonymCycles =
+    mapMaybe isCycle . stronglyConnCompR . mapMaybe onlySynonyms $ ds'
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
 isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn
