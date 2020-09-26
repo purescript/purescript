@@ -405,8 +405,8 @@ typeCheckAll moduleName _ = traverse go
         Just typeClass -> do
           checkInstanceArity dictName className typeClass tys
           (deps', kinds', tys', vars) <- withFreshSubstitution $ checkInstanceDeclaration moduleName (sa, deps, className, tys)
-          sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys')
           tys'' <- traverse replaceAllTypeSynonyms tys'
+          sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys'')
           let nonOrphanModules = findNonOrphanModules className typeClass tys''
           checkOrphanInstance dictName className tys'' nonOrphanModules
           let qualifiedChain = Qualified (Just moduleName) <$> ch
