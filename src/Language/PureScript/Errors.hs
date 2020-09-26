@@ -91,7 +91,7 @@ data SimpleErrorMessage
   | InvalidDoBind
   | InvalidDoLet
   | CycleInDeclaration Ident
-  | CycleInTypeSynonym (Maybe (ProperName 'TypeName))
+  | CycleInTypeSynonym [ProperName 'TypeName]
   | CycleInTypeClassDeclaration [Qualified (ProperName 'ClassName)]
   | CycleInKindDeclaration [Qualified (ProperName 'TypeName)]
   | CycleInModules [ModuleName]
@@ -772,13 +772,18 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
           paras [ line "There is a cycle in module dependencies in these modules: "
                 , indent $ paras (map (line . markCode . runModuleName) mns)
                 ]
-    renderSimpleErrorMessage (CycleInTypeSynonym name) =
-      paras [ line $ case name of
-                       Just pn -> "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
-                       Nothing -> "A cycle appears in a set of type synonym definitions."
-            , line "Cycles are disallowed because they can lead to loops in the type checker."
+    renderSimpleErrorMessage (CycleInTypeSynonym names) =
+      paras $ cycleError <>
+            [ line "Cycles are disallowed because they can lead to loops in the type checker."
             , line "Consider using a 'newtype' instead."
             ]
+      where
+      cycleError = case names of
+        []   -> pure . line $ "A cycle appears in a set of type synonym definitions."
+        [pn] -> pure . line $ "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
+        _    -> [ line " A cycle appears in a set of type synonym definitions:"
+                , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName) names)) <> "}"
+                ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration [name]) =
       paras [ line $ "A type class '" <> markCode (runProperName (disqualify name)) <> "' may not have itself as a superclass." ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration names) =

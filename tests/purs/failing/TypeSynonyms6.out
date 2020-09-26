@@ -1,9 +1,9 @@
 Error found:
-at tests/purs/failing/TypeSynonyms.purs:6:1 - 6:19 (line 6, column 1 - line 6, column 19)
+at tests/purs/failing/TypeSynonyms6.purs:4:1 - 4:11 (line 4, column 1 - line 4, column 11)
 
    A cycle appears in a set of type synonym definitions:
 
-    {[33mT1[0m, [33mT2[0m}
+    {[33mA[0m, [33mB[0m}
 
   Cycles are disallowed because they can lead to loops in the type checker.
   Consider using a 'newtype' instead.
