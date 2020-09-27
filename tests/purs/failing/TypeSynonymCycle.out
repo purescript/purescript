@@ -1,5 +1,5 @@
 Error found:
-at tests/purs/failing/TypeSynonyms6.purs:4:1 - 4:11 (line 4, column 1 - line 4, column 11)
+at tests/purs/failing/TypeSynonymCycle.purs:4:1 - 4:11 (line 4, column 1 - line 4, column 11)
 
    A cycle appears in a set of type synonym definitions:
 

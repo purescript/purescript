@@ -226,10 +226,7 @@ checkTypeClassInstance cls i = check where
   check = \case
     TypeVar _ _ -> return ()
     TypeLevelString _ _ -> return ()
-    TypeConstructor _ ctor -> do
-      env <- getEnv
-      when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
-      return ()
+    TypeConstructor _ _ -> return ()
     TypeApp _ t1 t2 -> check t1 >> check t2
     KindApp _ t k -> check t >> check k
     KindedType _ t _ -> check t
@@ -408,14 +405,15 @@ typeCheckAll moduleName _ = traverse go
         Just typeClass -> do
           checkInstanceArity dictName className typeClass tys
           (deps', kinds', tys', vars) <- withFreshSubstitution $ checkInstanceDeclaration moduleName (sa, deps, className, tys)
-          sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys')
-          let nonOrphanModules = findNonOrphanModules className typeClass tys'
-          checkOrphanInstance dictName className tys' nonOrphanModules
+          tys'' <- traverse replaceAllTypeSynonyms tys'
+          sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys'')
+          let nonOrphanModules = findNonOrphanModules className typeClass tys''
+          checkOrphanInstance dictName className tys'' nonOrphanModules
           let qualifiedChain = Qualified (Just moduleName) <$> ch
-          checkOverlappingInstance qualifiedChain dictName className typeClass tys' nonOrphanModules
+          checkOverlappingInstance qualifiedChain dictName className typeClass tys'' nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
-          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className vars kinds' tys' (Just deps'')
+          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className vars kinds' tys'' (Just deps'')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 

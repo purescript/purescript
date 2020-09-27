@@ -126,7 +126,6 @@ data SimpleErrorMessage
   | ExprDoesNotHaveType Expr SourceType
   | PropertyIsMissing Label
   | AdditionalProperty Label
-  | TypeSynonymInstance
   | OrphanInstance Ident (Qualified (ProperName 'ClassName)) (S.Set ModuleName) [SourceType]
   | InvalidNewtype (ProperName 'TypeName)
   | InvalidInstanceHead SourceType
@@ -294,7 +293,6 @@ errorCode em = case unwrapErrorMessage em of
   ExprDoesNotHaveType{} -> "ExprDoesNotHaveType"
   PropertyIsMissing{} -> "PropertyIsMissing"
   AdditionalProperty{} -> "AdditionalProperty"
-  TypeSynonymInstance -> "TypeSynonymInstance"
   OrphanInstance{} -> "OrphanInstance"
   InvalidNewtype{} -> "InvalidNewtype"
   InvalidInstanceHead{} -> "InvalidInstanceHead"
@@ -1012,8 +1010,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Type of expression lacks required label " <> markCode (prettyPrintLabel prop) <> "."
     renderSimpleErrorMessage (AdditionalProperty prop) =
       line $ "Type of expression contains additional label " <> markCode (prettyPrintLabel prop) <> "."
-    renderSimpleErrorMessage TypeSynonymInstance =
-      line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm nonOrphanModules ts) =
       paras [ line $ "Orphan instance " <> markCode (showIdent nm) <> " found for "
             , markCodeBox $ indent $ Box.hsep 1 Box.left
