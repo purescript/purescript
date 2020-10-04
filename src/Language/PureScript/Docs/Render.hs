@@ -82,7 +82,7 @@ renderDeclaration Declaration{..} =
 
 data RenderedChildDeclaration
   = RenderedAsCode RenderedCode
-  | RenderedAsStructure [(Text, RenderedCode)]
+  | RenderedAsStructure [(ChildInstanceChainInfo, RenderedCode)]
   deriving (Show, Eq, Ord)
 
 renderChildDeclaration :: ChildDeclaration -> RenderedChildDeclaration
@@ -110,9 +110,9 @@ renderChildDeclaration ChildDeclaration{..} =
 
     mapSnd f (a, b) = (a, f b)
     
-    renderInstanceChain :: ChildInstanceChainInfo -> (Text, RenderedCode)
+    renderInstanceChain :: ChildInstanceChainInfo -> (ChildInstanceChainInfo, RenderedCode)
     renderInstanceChain inst =
-      (icTitle inst, mintersperse sp $ renderChildInstance $ inst)
+      (inst, mintersperse sp $ renderChildInstance $ inst)
 
 renderChildInstance :: ChildInstanceChainInfo -> [RenderedCode]
 renderChildInstance (ChildInstanceChainInfo{..}) =

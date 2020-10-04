@@ -182,8 +182,10 @@ renderChildren r xs = ul $ mapM_ item xs
       case Render.renderChildDeclaration decl of
         Render.RenderedAsCode renderedCode -> renderCode renderedCode
         Render.RenderedAsStructure struct -> 
-            ul $ for_ struct $ \(title, el) ->
-              li ! A.id (v (T.drop 1 (subFragement decl title))) $ (renderCode el)
+            ul $ for_ struct $ \(instChainEl, el) -> do
+              li ! A.id (v (T.drop 1 (subFragement decl (icTitle instChainEl)))) $ (renderCode el)
+              for_ (icComments instChainEl) $ \coms ->
+                H.div ! A.class_ "decl__child__comments" $ renderMarkdown coms
       for_ (cdeclComments decl) $ \coms ->
         H.div ! A.class_ "decl__child_comments" $ renderMarkdown coms
 

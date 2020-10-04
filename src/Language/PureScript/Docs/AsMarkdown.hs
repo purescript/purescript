@@ -12,6 +12,7 @@ import Control.Monad (unless, zipWithM_)
 import Control.Monad.Writer (Writer, tell, execWriter)
 
 import Data.Foldable (for_)
+import Data.Maybe (fromMaybe)
 import Data.List (partition)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -45,14 +46,14 @@ declAsMarkdown decl@Declaration{..} = do
   let (instances, children) = partition (isChildInstance . cdeclInfo) declChildren
   fencedBlock $ do
     tell' (codeToString $ Render.renderDeclaration decl)
-    zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
+    zipWithM_ (\f c -> childToString f c) (First : repeat NotFirst) children
   spacer
 
   for_ declComments tell'
 
   unless (null instances) $ do
     headerLevel 5 "Instances"
-    fencedBlock $ mapM_ (tell' . childToString NotFirst) instances
+    mapM_ (childToString NotFirst) instances
     spacer
 
   where
@@ -82,22 +83,31 @@ codeToString = outputWith elemAsMarkdown
 --     P.Infixr -> "right-associative"
 --     P.Infix  -> "non-associative"
 
-childToString :: First -> ChildDeclaration -> Text
+childToString :: First -> ChildDeclaration -> Docs
 childToString f decl@ChildDeclaration{..} =
   case cdeclInfo of
     ChildDataConstructor _ ->
       let c = if f == First then "=" else "|"
-      in  "  " <> c <> " " <> str
+      in  fencedBlock $ do
+        tell' $ "  " <> c <> " " 
+        str
     ChildTypeClassMember _ ->
-      "  " <> str
+      fencedBlock $ do
+        tell' $ "  " 
+        str
     ChildInstanceChain  _ ->
       str
     ChildPartOfInstanceChain _ ->
-      str
+      fencedBlock $ str
   where
   str = case  Render.renderChildDeclaration decl of 
-      Render.RenderedAsCode code -> codeToString code
-      Render.RenderedAsStructure structure -> T.unlines $ ("    - "<>) <$> codeToString <$> snd <$> structure
+      Render.RenderedAsCode code -> tell' $ codeToString code
+      Render.RenderedAsStructure structure -> mapM_ chainInstanceToString structure
+
+  chainInstanceToString :: (ChildInstanceChainInfo, RenderedCode) -> Docs
+  chainInstanceToString (inst, code) = do
+    fencedBlock $ tell' $ codeToString code
+    mapM_ tell' $ icComments inst
 
 data First
   = First
