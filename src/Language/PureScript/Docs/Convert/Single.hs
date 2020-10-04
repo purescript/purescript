@@ -41,6 +41,7 @@ data AugmentType
   -- ^ Augment documentation for a type class
   | AugmentType
   -- ^ Augment documentation for a type constructor
+  deriving (Show)
 
 -- | The data type for an intermediate stage which we go through during
 -- converting.
@@ -82,23 +83,25 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
   where
   go ds (parentTitles, a) =
     map (\d ->
-      if any (matches d) parentTitles
-        then augmentWith a d
-        else d) ds
+      case find (matches d) (Tr.traceShow (parentTitles) parentTitles) of
+        Just match -> Tr.traceShow match $ augmentWith match a d
+        Nothing -> d) ds
 
   matches d (name, AugmentType) = isType d && declTitle d == name
   matches d (name, AugmentClass) = isTypeClass d && declTitle d == name
 
-  augmentWith (AugmentChild child) d =
+  augmentWith _ (AugmentChild child) d =
     d { declChildren = declChildren d ++ [child] }
-  augmentWith (AugmentChain chainId instanceChainInfo) d =
-    d {declChildren = augmentChildInstance chainId instanceChainInfo (declChildren d) }
+  augmentWith (_, AugmentClass) (AugmentChain chainId instanceChainInfo) d =
+    d { declChildren = augmentChildInstance chainId instanceChainInfo (declChildren d) }
+  augmentWith (_, AugmentType) (AugmentChain chainId instanceChainInfo) d = 
+    d { declChildren = declChildren d ++ [ChildDeclaration (titleForInstanceChain chainId) Nothing Nothing (ChildPartOfInstanceChain instanceChainInfo)]}
   
-  titleForInstanceChain = T.intercalate " > "
+  titleForInstanceChain = T.intercalate "-else-"
 
   augmentChildInstance chainId instanceChainInfo [] = [ChildDeclaration (titleForInstanceChain chainId) Nothing Nothing (ChildInstanceChain [instanceChainInfo])]
   augmentChildInstance chainId instanceChainInfo (ChildDeclaration name comment span (ChildInstanceChain chain) : rest) =
-    if traceShow ("compare", chainId, name) (titleForInstanceChain chainId == name) then
+    if titleForInstanceChain chainId == name then
       (ChildDeclaration name comment span (ChildInstanceChain (chain ++ [instanceChainInfo])) : rest)
     else
       (ChildDeclaration name comment span (ChildInstanceChain chain) : augmentChildInstance chainId instanceChainInfo rest)
@@ -160,7 +163,7 @@ convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
     ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember (ty $> ()))
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."
-convertDeclaration (P.TypeInstanceDeclaration (ss, com) instanceChain idx ident constraints className tys _) title =
+convertDeclaration (P.TypeInstanceDeclaration (ss, com) instanceChain _ _ constraints className tys _) title =
   Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChain (P.runIdent <$> instanceChain) instanceChainDecl))
   where
   classNameString = unQual className
@@ -170,7 +173,7 @@ convertDeclaration (P.TypeInstanceDeclaration (ss, com) instanceChain idx ident 
   extractProperNames (P.TypeConstructor _ n) = [unQual n]
   extractProperNames _ = []
 
-  instanceChainDecl = ChildInstanceChainInfo (Tr.traceShow ("declaration ", title, P.runIdent <$> instanceChain) title) (convertComments com) (Just ss) (fmap ($> ()) constraints) (classApp $> ())
+  instanceChainDecl = ChildInstanceChainInfo title (convertComments com) (Just ss) (fmap ($> ()) constraints) (classApp $> ())
 
   classApp = foldl' P.srcTypeApp (P.srcTypeConstructor (fmap P.coerceProperName className)) tys
 convertDeclaration (P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _) title =

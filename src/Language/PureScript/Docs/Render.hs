@@ -91,7 +91,7 @@ renderChildDeclaration :: ChildDeclaration -> RenderedChildDeclaration
 renderChildDeclaration ChildDeclaration{..} =
   traceShowId $ case cdeclInfo of
     ChildInstanceChain instances ->
-      RenderedAsStructure $ renderInstanceChain <$> instances
+      RenderedAsStructure $ intersperseElse (renderInstanceChain <$> instances)
         -- List.intersperse keywordElse $ mintersperse sp <$> renderChildInstance <$> instances
     ChildPartOfInstanceChain childInstance ->
       RenderedAsCode $ mintersperse sp $ renderChildInstance childInstance
@@ -108,6 +108,12 @@ renderChildDeclaration ChildDeclaration{..} =
         ]
 
   where
+    intersperseElse :: [(a, RenderedCode)] -> [(a, RenderedCode)]
+    intersperseElse = zipWith ($) $ id : repeat (mapSnd $ ((keywordElse <> sp) <>))
+
+    mapSnd f (a, b) = (a, f b)
+    
+    renderInstanceChain :: ChildInstanceChainInfo -> (Text, RenderedCode)
     renderInstanceChain inst =
       (icTitle inst, mintersperse sp $ renderChildInstance $ inst)
 
