@@ -12,8 +12,6 @@ module Language.PureScript.Docs.Render where
 import Prelude.Compat
 
 import Data.Maybe (maybeToList)
-import Debug.Trace (traceShowId)
-import qualified Data.List as List
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -89,10 +87,9 @@ data RenderedChildDeclaration
 
 renderChildDeclaration :: ChildDeclaration -> RenderedChildDeclaration
 renderChildDeclaration ChildDeclaration{..} =
-  traceShowId $ case cdeclInfo of
+  case cdeclInfo of
     ChildInstanceChain instances ->
       RenderedAsStructure $ intersperseElse (renderInstanceChain <$> instances)
-        -- List.intersperse keywordElse $ mintersperse sp <$> renderChildInstance <$> instances
     ChildPartOfInstanceChain childInstance ->
       RenderedAsCode $ mintersperse sp $ renderChildInstance childInstance
     ChildDataConstructor args ->
