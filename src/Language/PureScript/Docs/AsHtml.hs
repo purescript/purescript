@@ -190,7 +190,7 @@ renderChildren r xs = ul $ mapM_ item xs
         H.div ! A.class_ "decl__child_comments" $ renderMarkdown coms
 
   fragment decl = makeFragment (childDeclInfoNamespace (cdeclInfo decl)) (cdeclTitle decl)
-  subFragement decl title = makeFragment (childDeclInfoNamespace (cdeclInfo decl)) title
+  subFragement decl subTitle = makeFragment (childDeclInfoNamespace (cdeclInfo decl)) subTitle
   renderCode = code . codeAsHtml r 
   --codes = code <$> codeAsHtml r <$> Render.renderChildDeclaration codes
 

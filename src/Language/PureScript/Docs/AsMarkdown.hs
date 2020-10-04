@@ -12,7 +12,6 @@ import Control.Monad (unless, zipWithM_)
 import Control.Monad.Writer (Writer, tell, execWriter)
 
 import Data.Foldable (for_)
-import Data.Maybe (fromMaybe)
 import Data.List (partition)
 import Data.Text (Text)
 import qualified Data.Text as T
