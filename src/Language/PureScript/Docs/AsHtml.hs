@@ -179,15 +179,18 @@ renderChildren r xs = ul $ mapM_ item xs
   where
   item decl =
     li ! A.id (v (T.drop 1 (fragment decl))) $ do
-      case renderCode decl of
-        [el] -> el
-        els -> ul $ for_ els $ \el ->
-            li el
+      case Render.renderChildDeclaration decl of
+        Render.RenderedAsCode renderedCode -> renderCode renderedCode
+        Render.RenderedAsStructure struct -> 
+            ul $ for_ struct $ \(title, el) ->
+              li ! A.id (v (T.drop 1 (subFragement decl title))) $ (renderCode el)
       for_ (cdeclComments decl) $ \coms ->
         H.div ! A.class_ "decl__child_comments" $ renderMarkdown coms
 
   fragment decl = makeFragment (childDeclInfoNamespace (cdeclInfo decl)) (cdeclTitle decl)
-  renderCode codes = code <$> codeAsHtml r <$> Render.renderChildDeclaration codes
+  subFragement decl title = makeFragment (childDeclInfoNamespace (cdeclInfo decl)) title
+  renderCode = code . codeAsHtml r 
+  --codes = code <$> codeAsHtml r <$> Render.renderChildDeclaration codes
 
 codeAsHtml :: HtmlRenderContext -> RenderedCode -> Html
 codeAsHtml r = outputWith elemAsHtml

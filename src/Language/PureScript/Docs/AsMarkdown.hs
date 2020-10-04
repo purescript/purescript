@@ -95,7 +95,9 @@ childToString f decl@ChildDeclaration{..} =
     ChildPartOfInstanceChain _ ->
       str
   where
-  str = T.unlines $  ("    - "<>) <$> codeToString <$> Render.renderChildDeclaration decl
+  str = case  Render.renderChildDeclaration decl of 
+      Render.RenderedAsCode code -> codeToString code
+      Render.RenderedAsStructure structure -> T.unlines $ ("    - "<>) <$> codeToString <$> snd <$> structure
 
 data First
   = First

@@ -82,22 +82,34 @@ renderDeclaration Declaration{..} =
       , aliasName for declTitle
       ]
 
-renderChildDeclaration :: ChildDeclaration -> [RenderedCode]
+data RenderedChildDeclaration
+  = RenderedAsCode RenderedCode
+  | RenderedAsStructure [(Text, RenderedCode)]
+  deriving (Show, Eq, Ord)
+
+renderChildDeclaration :: ChildDeclaration -> RenderedChildDeclaration
 renderChildDeclaration ChildDeclaration{..} =
   traceShowId $ case cdeclInfo of
     ChildInstanceChain instances ->
-      List.intersperse keywordElse $ mintersperse sp <$> renderChildInstance <$> instances
+      RenderedAsStructure $ renderInstanceChain <$> instances
+        -- List.intersperse keywordElse $ mintersperse sp <$> renderChildInstance <$> instances
     ChildPartOfInstanceChain childInstance ->
-      [mintersperse sp $ renderChildInstance childInstance]
+      RenderedAsCode $ mintersperse sp $ renderChildInstance childInstance
     ChildDataConstructor args ->
-      [mintersperse sp $ [ dataCtor' cdeclTitle ]
-        ++ map renderTypeAtom args]
+      RenderedAsCode $ mintersperse sp $ 
+        [ dataCtor' cdeclTitle ]
+        ++ map renderTypeAtom args
 
     ChildTypeClassMember ty ->
-      [ mintersperse sp $ [ ident' cdeclTitle
-      , syntax "::"
-      , renderType ty
-      ]]
+      RenderedAsCode $ mintersperse sp $ 
+        [ ident' cdeclTitle
+        , syntax "::"
+        , renderType ty
+        ]
+
+  where
+    renderInstanceChain inst =
+      (icTitle inst, mintersperse sp $ renderChildInstance $ inst)
 
 renderChildInstance :: ChildInstanceChainInfo -> [RenderedCode]
 renderChildInstance (ChildInstanceChainInfo{..}) =
