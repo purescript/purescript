@@ -12,6 +12,8 @@ module Language.PureScript.Docs.Render where
 import Prelude.Compat
 
 import Data.Maybe (maybeToList)
+import Debug.Trace (traceShowId)
+import qualified Data.List as List
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -80,20 +82,26 @@ renderDeclaration Declaration{..} =
       , aliasName for declTitle
       ]
 
-renderChildDeclaration :: ChildDeclaration -> RenderedCode
+renderChildDeclaration :: ChildDeclaration -> [RenderedCode]
 renderChildDeclaration ChildDeclaration{..} =
-  mintersperse sp $ case cdeclInfo of
-    ChildInstance constraints ty ->
-      maybeToList (renderConstraints constraints) ++ [ renderType ty ]
+  traceShowId $ case cdeclInfo of
+    ChildInstanceChain instances ->
+      List.intersperse keywordElse $ mintersperse sp <$> renderChildInstance <$> instances
+    ChildPartOfInstanceChain childInstance ->
+      [mintersperse sp $ renderChildInstance childInstance]
     ChildDataConstructor args ->
-      [ dataCtor' cdeclTitle ]
-      ++ map renderTypeAtom args
+      [mintersperse sp $ [ dataCtor' cdeclTitle ]
+        ++ map renderTypeAtom args]
 
     ChildTypeClassMember ty ->
-      [ ident' cdeclTitle
+      [ mintersperse sp $ [ ident' cdeclTitle
       , syntax "::"
       , renderType ty
-      ]
+      ]]
+
+renderChildInstance :: ChildInstanceChainInfo -> [RenderedCode]
+renderChildInstance (ChildInstanceChainInfo{..}) =
+  [ ident' icTitle, syntax "::" ] ++ maybeToList (renderConstraints icConstraint) ++ [ renderType icType ]
 
 renderConstraint :: Constraint' -> RenderedCode
 renderConstraint (P.Constraint ann pn kinds tys _) =

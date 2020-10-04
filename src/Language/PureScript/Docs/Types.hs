@@ -278,9 +278,17 @@ instance NFData ChildDeclaration
 
 data ChildDeclarationInfo
   -- |
-  -- A type instance declaration, with its dependencies and its type.
+  -- A type instance declaration on the type class side.
+  -- For example: `class Data.Either.Inject` would have `[Inject a a, Inject a (Either a b), ...]
   --
-  = ChildInstance [Constraint'] Type'
+  = ChildInstanceChain [ChildInstanceChainInfo]
+
+  -- |
+  -- A instance declaration on the data-type side.
+  -- For example: `Maybe` would have ChildInstanceChainInfo `Functor Maybe`
+  --
+  | ChildPartOfInstanceChain ChildInstanceChainInfo
+
 
   -- |
   -- A data constructor, with its type arguments.
@@ -297,10 +305,23 @@ data ChildDeclarationInfo
 
 instance NFData ChildDeclarationInfo
 
+data ChildInstanceChainInfo =
+  ChildInstanceChainInfo 
+    { icTitle :: Text
+    , icComments :: Maybe Text
+    , icSourceSpan :: Maybe P.SourceSpan
+    , icConstraint :: [Constraint']
+    , icType :: Type' 
+    }
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData ChildInstanceChainInfo
+
 childDeclInfoToString :: ChildDeclarationInfo -> Text
-childDeclInfoToString (ChildInstance _ _)      = "instance"
-childDeclInfoToString (ChildDataConstructor _) = "dataConstructor"
-childDeclInfoToString (ChildTypeClassMember _) = "typeClassMember"
+childDeclInfoToString (ChildInstanceChain _)       = "instanceChain"
+childDeclInfoToString (ChildPartOfInstanceChain _) = "partOfInstanceChain"
+childDeclInfoToString (ChildDataConstructor _)     = "dataConstructor"
+childDeclInfoToString (ChildTypeClassMember _)     = "typeClassMember"
 
 childDeclInfoNamespace :: ChildDeclarationInfo -> Namespace
 childDeclInfoNamespace =
@@ -309,7 +330,9 @@ childDeclInfoNamespace =
   -- to update this, instead of having this function (possibly incorrectly)
   -- just return ValueLevel for the new constructor.
   \case
-    ChildInstance{} ->
+    ChildInstanceChain{} ->
+      ValueLevel
+    ChildPartOfInstanceChain{} ->
       ValueLevel
     ChildDataConstructor{} ->
       ValueLevel
@@ -667,14 +690,30 @@ asChildDeclarationInfo = do
   ty <- key "declType" asText
   case ty of
     "instance" ->
-      ChildInstance <$> key "dependencies" (eachInArray asConstraint)
-                    <*> key "type" asType
+      -- This is the legacy case.
+      -- New compilers will generate "instanceChain" and "partofInstanceChain" respectively.
+      -- Old compilers don't expose information about instance chains in the docs. 
+      -- Therefore we assume the instance is not part of a chain.
+      ChildInstanceChain .  (: []) <$> asChildInstanceInfo
+    
+    "instanceChain" ->
+        ChildInstanceChain <$> key "instances" (eachInArray asChildInstanceInfo)
+    "partOfInstanceChain" ->
+        ChildPartOfInstanceChain <$> key "instance" asChildInstanceInfo
     "dataConstructor" ->
       ChildDataConstructor <$> key "arguments" (eachInArray asType)
     "typeClassMember" ->
       ChildTypeClassMember <$> key "type" asType
     other ->
       throwCustomError $ InvalidChildDeclarationType other
+
+asChildInstanceInfo :: Parse PackageError ChildInstanceChainInfo
+asChildInstanceInfo = ChildInstanceChainInfo 
+  <$> key "title" asText
+  <*> key "comments" (perhaps asText)
+  <*> key "sourceSpan" (perhaps asSourceSpan)
+  <*> key "dependencies" (eachInArray asConstraint)
+  <*> key "type" asType
 
 asSourcePos :: Parse e P.SourcePos
 asSourcePos = P.SourcePos <$> nth 0 asIntegral
@@ -806,9 +845,19 @@ instance A.ToJSON ChildDeclarationInfo where
   toJSON info = A.object $ "declType" .= childDeclInfoToString info : props
     where
     props = case info of
-      ChildInstance deps ty     -> ["dependencies" .= deps, "type" .= ty]
+      ChildInstanceChain instances -> ["instances" .= instances]
+      ChildPartOfInstanceChain childInstance -> ["instance" .= childInstance]
       ChildDataConstructor args -> ["arguments" .= args]
       ChildTypeClassMember ty   -> ["type" .= ty]
+
+instance A.ToJSON ChildInstanceChainInfo where
+  toJSON ChildInstanceChainInfo{..} = 
+    A.object [ "title" .= icTitle
+             , "comments" .= icComments
+             , "sourceSpan" .= icSourceSpan
+             , "dependencies" .= icConstraint
+             , "type" .= icType
+             ]
 
 instance A.ToJSON GithubUser where
   toJSON = A.toJSON . runGithubUser

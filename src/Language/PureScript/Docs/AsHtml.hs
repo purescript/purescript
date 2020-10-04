@@ -179,12 +179,15 @@ renderChildren r xs = ul $ mapM_ item xs
   where
   item decl =
     li ! A.id (v (T.drop 1 (fragment decl))) $ do
-      renderCode decl
+      case renderCode decl of
+        [el] -> el
+        els -> ul $ for_ els $ \el ->
+            li el
       for_ (cdeclComments decl) $ \coms ->
         H.div ! A.class_ "decl__child_comments" $ renderMarkdown coms
 
   fragment decl = makeFragment (childDeclInfoNamespace (cdeclInfo decl)) (cdeclTitle decl)
-  renderCode = code . codeAsHtml r . Render.renderChildDeclaration
+  renderCode codes = code <$> codeAsHtml r <$> Render.renderChildDeclaration codes
 
 codeAsHtml :: HtmlRenderContext -> RenderedCode -> Html
 codeAsHtml r = outputWith elemAsHtml
@@ -329,7 +332,8 @@ partitionChildren =
   where
   go (instances, dctors, members) rcd =
     case cdeclInfo rcd of
-      ChildInstance _ _      -> (rcd : instances, dctors, members)
+      ChildInstanceChain _      -> (rcd : instances, dctors, members)
+      ChildPartOfInstanceChain _ -> (rcd : instances, dctors, members)
       ChildDataConstructor _ -> (instances, rcd : dctors, members)
       ChildTypeClassMember _ -> (instances, dctors, rcd : members)
 

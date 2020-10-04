@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 module Language.PureScript.Docs.Convert.Single
   ( convertSingleModule
   , convertComments
@@ -17,6 +18,8 @@ import qualified Language.PureScript.Comments as P
 import qualified Language.PureScript.Crash as P
 import qualified Language.PureScript.Names as P
 import qualified Language.PureScript.Types as P
+
+import qualified Debug.Trace as Tr
 
 -- |
 -- Convert a single Module, but ignore re-exports; any re-exported types or
@@ -69,6 +72,7 @@ type IntermediateDeclaration
 -- module is an instance of a type class also defined in that module).
 data DeclarationAugment
   = AugmentChild ChildDeclaration
+  | AugmentChain [Text] ChildInstanceChainInfo
 
 -- | Augment top-level declarations; the second pass. See the comments under
 -- the type synonym IntermediateDeclaration for more information.
@@ -87,6 +91,18 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
 
   augmentWith (AugmentChild child) d =
     d { declChildren = declChildren d ++ [child] }
+  augmentWith (AugmentChain chainId instanceChainInfo) d =
+    d {declChildren = augmentChildInstance chainId instanceChainInfo (declChildren d) }
+  
+  titleForInstanceChain = T.intercalate " > "
+
+  augmentChildInstance chainId instanceChainInfo [] = [ChildDeclaration (titleForInstanceChain chainId) Nothing Nothing (ChildInstanceChain [instanceChainInfo])]
+  augmentChildInstance chainId instanceChainInfo (ChildDeclaration name comment span (ChildInstanceChain chain) : rest) =
+    if traceShow ("compare", chainId, name) (titleForInstanceChain chainId == name) then
+      (ChildDeclaration name comment span (ChildInstanceChain (chain ++ [instanceChainInfo])) : rest)
+    else
+      (ChildDeclaration name comment span (ChildInstanceChain chain) : augmentChildInstance chainId instanceChainInfo rest)
+  augmentChildInstance chainId instanceChainInfo (a : tail) = a : augmentChildInstance chainId instanceChainInfo tail
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
 getDeclarationTitle (P.ValueDeclaration vd) = Just (P.showIdent (P.valdeclIdent vd))
@@ -144,8 +160,8 @@ convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
     ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember (ty $> ()))
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."
-convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ constraints className tys _) title =
-  Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
+convertDeclaration (P.TypeInstanceDeclaration (ss, com) instanceChain idx ident constraints className tys _) title =
+  Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChain (P.runIdent <$> instanceChain) instanceChainDecl))
   where
   classNameString = unQual className
   typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
@@ -154,7 +170,8 @@ convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ constraints classN
   extractProperNames (P.TypeConstructor _ n) = [unQual n]
   extractProperNames _ = []
 
-  childDecl = ChildDeclaration title (convertComments com) (Just ss) (ChildInstance (fmap ($> ()) constraints) (classApp $> ()))
+  instanceChainDecl = ChildInstanceChainInfo (Tr.traceShow ("declaration ", title, P.runIdent <$> instanceChain) title) (convertComments com) (Just ss) (fmap ($> ()) constraints) (classApp $> ())
+
   classApp = foldl' P.srcTypeApp (P.srcTypeConstructor (fmap P.coerceProperName className)) tys
 convertDeclaration (P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
   Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Right alias)))

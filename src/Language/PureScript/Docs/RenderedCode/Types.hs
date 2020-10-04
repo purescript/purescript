@@ -33,6 +33,7 @@ module Language.PureScript.Docs.RenderedCode.Types
  , keywordFixity
  , keywordKind
  , keywordAs
+ , keywordElse
  , ident
  , dataCtor
  , typeCtor
@@ -309,6 +310,9 @@ keywordKind = keyword "kind"
 
 keywordAs :: RenderedCode
 keywordAs = keyword "as"
+
+keywordElse :: RenderedCode
+keywordElse = keyword "else"
 
 ident :: Qualified Ident -> RenderedCode
 ident (fromQualified -> (mn, name)) =

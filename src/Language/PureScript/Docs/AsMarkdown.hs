@@ -56,7 +56,8 @@ declAsMarkdown decl@Declaration{..} = do
     spacer
 
   where
-  isChildInstance (ChildInstance _ _) = True
+  isChildInstance (ChildInstanceChain _ ) = True
+  isChildInstance (ChildPartOfInstanceChain _) = True
   isChildInstance _ = False
 
 codeToString :: RenderedCode -> Text
@@ -89,10 +90,12 @@ childToString f decl@ChildDeclaration{..} =
       in  "  " <> c <> " " <> str
     ChildTypeClassMember _ ->
       "  " <> str
-    ChildInstance _ _ ->
+    ChildInstanceChain  _ ->
+      str
+    ChildPartOfInstanceChain _ ->
       str
   where
-  str = codeToString $ Render.renderChildDeclaration decl
+  str = T.unlines $  ("    - "<>) <$> codeToString <$> Render.renderChildDeclaration decl
 
 data First
   = First
