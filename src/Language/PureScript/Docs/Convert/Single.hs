@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 module Language.PureScript.Docs.Convert.Single
   ( convertSingleModule
   , convertComments
@@ -18,8 +17,6 @@ import qualified Language.PureScript.Comments as P
 import qualified Language.PureScript.Crash as P
 import qualified Language.PureScript.Names as P
 import qualified Language.PureScript.Types as P
-
-import qualified Debug.Trace as Tr
 
 -- |
 -- Convert a single Module, but ignore re-exports; any re-exported types or
@@ -41,7 +38,6 @@ data AugmentType
   -- ^ Augment documentation for a type class
   | AugmentType
   -- ^ Augment documentation for a type constructor
-  deriving (Show)
 
 -- | The data type for an intermediate stage which we go through during
 -- converting.
@@ -73,7 +69,13 @@ type IntermediateDeclaration
 -- module is an instance of a type class also defined in that module).
 data DeclarationAugment
   = AugmentChild ChildDeclaration
+  -- ^ Augments a declaration (like type class or type) 
+  --   with a child declaration (like a constuctor or type class function)
   | AugmentChain [Text] ChildInstanceChainInfo
+  -- ^ Augments a declaration with a type class instance chain element.
+  -- A instance declaration with no chain is treated as a chain with one element.
+  -- The first parameter is the `chainId` and consists of the names of the instance declarations.
+  -- `instance a :: ... else instance b :: ...` would have `chainId` `["a", "b"]`
 
 -- | Augment top-level declarations; the second pass. See the comments under
 -- the type synonym IntermediateDeclaration for more information.
@@ -83,8 +85,8 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
   where
   go ds (parentTitles, a) =
     map (\d ->
-      case find (matches d) (Tr.traceShow (parentTitles) parentTitles) of
-        Just match -> Tr.traceShow match $ augmentWith match a d
+      case find (matches d) parentTitles of
+        Just match ->  augmentWith match a d
         Nothing -> d) ds
 
   matches d (name, AugmentType) = isType d && declTitle d == name
