@@ -84,6 +84,9 @@ rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
         let usedImports = fold $ M.lookup moduleName usedImportsByModuleName
             usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
               M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkCoercedNewtypeCtorsImports
+        -- Imports cannot be linted before type checking because we need to
+        -- known which newtype constructors are used to solve Coercible
+        -- constraints in order to not report them as unused.
         censor (addHint (ErrorInModule moduleName)) $ lintImports checked exEnv' usedImports'
         return (checked, checkEnv)
       _ -> internalError "desugar did not return a singleton"

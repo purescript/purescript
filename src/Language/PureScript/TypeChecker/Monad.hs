@@ -79,7 +79,8 @@ data CheckState = CheckState
   -- since this way, we can provide good error messages
   -- during instance resolution.
   , checkCoercedNewtypeCtorsImports :: S.Set (ModuleName, Qualified (ProperName 'ConstructorName))
-  -- ^ Newtype constructors imports required to solve Coercible constraints
+  -- ^ Newtype constructors imports required to solve Coercible constraints.
+  -- We have to keep track of them so that we don't emit unused import warnings.
   }
 
 -- | Create an empty @CheckState@
