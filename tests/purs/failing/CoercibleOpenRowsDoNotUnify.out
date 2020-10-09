@@ -3,14 +3,10 @@ in module [33mMain[0m
 at tests/purs/failing/CoercibleOpenRowsDoNotUnify.purs:7:12 - 7:18 (line 7, column 12 - line 7, column 18)
 
   No type class instance was found for
-  [33m                                  [0m
-  [33m  Prim.Coerce.Coercible ( x :: Int[0m
-  [33m                        | r0      [0m
-  [33m                        )         [0m
-  [33m                        ( x :: Int[0m
-  [33m                        | s1      [0m
-  [33m                        )         [0m
-  [33m                                  [0m
+  [33m                          [0m
+  [33m  Prim.Coerce.Coercible r0[0m
+  [33m                        s1[0m
+  [33m                          [0m
 
 while solving type class constraint
 [33m                                  [0m
