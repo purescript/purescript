@@ -21,15 +21,15 @@ extra-source-files:
   - README.md
 dependencies:
   - array
-  - base >=4.11 && <4.13
+  - base >=4.11 && <4.14
   - containers
   - dlist
   - purescript-ast
   - scientific >=0.3.4.9 && <0.4
-  - semigroups >=0.16.2 && <0.19
+  - semigroups >=0.16.2 && <0.20
   - text
 build-tools:
-  - happy ==1.19.9
+  - happy ==1.20.0
 
 library:
   source-dirs: src

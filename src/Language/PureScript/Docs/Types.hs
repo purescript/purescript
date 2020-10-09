@@ -6,7 +6,7 @@ module Language.PureScript.Docs.Types
   )
   where
 
-import Protolude hiding (to, from)
+import Protolude hiding (to, from, unlines)
 import Prelude (String, unlines, lookup)
 
 import GHC.Generics (Generic)
