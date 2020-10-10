@@ -21,6 +21,7 @@ import Control.Monad.Writer.Class (MonadWriter(..), censor)
 import Data.Foldable (for_, traverse_, toList)
 import Data.List (nub, nubBy, (\\), sort, group, intersect)
 import Data.Maybe
+import Data.Either (partitionEithers)
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
@@ -596,8 +597,9 @@ typeCheckModule (Module _ _ _ _ Nothing) =
   internalError "exports should have been elaborated before typeCheckModule"
 typeCheckModule (Module ss coms mn decls (Just exps)) =
   warnAndRethrow (addHint (ErrorInModule mn)) $ do
-    modify (\s -> s { checkCurrentModule = Just mn })
-    decls' <- typeCheckAll mn exps decls
+    let (decls', imports) = partitionEithers $ fromImportDecl <$> decls
+    modify (\s -> s { checkCurrentModule = Just mn, checkCurrentModuleImports = imports })
+    decls'' <- typeCheckAll mn exps decls'
     checkSuperClassesAreExported <- getSuperClassExportCheck
     for_ exps $ \e -> do
       checkTypesAreExported e
@@ -605,8 +607,18 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       checkClassesAreExported e
       checkSuperClassesAreExported e
       checkDataConstructorsAreExported e
-    return $ Module ss coms mn decls' (Just exps)
+    return $ Module ss coms mn (map toImportDecl imports ++ decls'') (Just exps)
   where
+
+  fromImportDecl :: Declaration -> Either Declaration (SourceAnn, ModuleName, ImportDeclarationType, Maybe ModuleName)
+  fromImportDecl (ImportDeclaration sa moduleName importDeclarationType asModuleName) =
+    Right (sa, moduleName, importDeclarationType, asModuleName)
+  fromImportDecl decl = Left decl
+
+  toImportDecl :: (SourceAnn, ModuleName, ImportDeclarationType, Maybe ModuleName) -> Declaration
+  toImportDecl (sa, moduleName, importDeclarationType, asModuleName) =
+    ImportDeclaration sa moduleName importDeclarationType asModuleName
+
   qualify' :: a -> Qualified a
   qualify' = Qualified (Just mn)
 

@@ -25,8 +25,8 @@ import Control.Monad.Writer
 import Data.Foldable (for_, fold, foldl', toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (minimumBy, groupBy, nubBy, sortBy, zipWith4)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.List (find, groupBy, minimumBy, nubBy, sortBy, zipWith4)
+import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (for)
@@ -472,21 +472,57 @@ entails SolverOptions{..} constraint context hints =
                 Phantom ->
                   pure []
           fmap concat $ sequence $ zipWith4 f roles kinds axs bxs
-      | (TypeConstructor _ tyName, _, xs) <- unapplyTypes a
-      , Just (tvs, wrappedTy, _) <- lookupNewtypeConstructor env tyName = do
-          -- If the first argument is a newtype applied to some other types
-          -- (e.g. @newtype T a = T a@ in @Coercible (T X) b@), look up the
-          -- type of its wrapped field and yield a new wanted constraint in
-          -- terms of that type with the type arguments substituted in (e.g.
-          -- @Coercible (T[X/a]) b = Coercible X b@ in the example).
-          let wrappedTySub = replaceAllTypeVars (zip tvs xs) wrappedTy
-          pure $ Just [srcCoercibleConstraint kindType wrappedTySub b]
+      | (TypeConstructor _ newtypeName, _, xs) <- unapplyTypes a = do
+        (currentModuleName, currentModuleImports) <- gets $ checkCurrentModule &&& checkCurrentModuleImports
+        case lookupNewtypeConstructor env currentModuleName currentModuleImports newtypeName of
+          Just (fromModuleName, newtypeCtorName, tvs, wrappedTy, _) -> do
+            for_ fromModuleName $ flip insertCoercedNewtypeCtorImport newtypeCtorName
+            -- If the first argument is a newtype applied to some other types
+            -- (e.g. @newtype T a = T a@ in @Coercible (T X) b@), look up the
+            -- type of its wrapped field and yield a new wanted constraint in
+            -- terms of that type with the type arguments substituted in (e.g.
+            -- @Coercible (T[X/a]) b = Coercible X b@ in the example).
+            let wrappedTySub = replaceAllTypeVars (zip tvs xs) wrappedTy
+            pure $ Just [srcCoercibleConstraint kindType wrappedTySub b]
+          _ -> pure Nothing
       | otherwise =
         -- In all other cases we can't solve the constraint.
         pure Nothing
 
     srcCoercibleConstraint :: SourceType -> SourceType -> SourceType -> SourceConstraint
     srcCoercibleConstraint k a b = srcConstraint C.Coercible [k] [a, b] Nothing
+
+    -- | Looks up a given name and, if it names a newtype, returns the names of the
+    -- type's parameters, the type the newtype wraps and the names of the type's
+    -- fields.
+    lookupNewtypeConstructor
+      :: Environment
+      -> Maybe ModuleName
+      -> [(SourceAnn, ModuleName, ImportDeclarationType, Maybe ModuleName)]
+      -> Qualified (ProperName 'TypeName)
+      -> Maybe (Maybe ModuleName, Qualified (ProperName 'ConstructorName), [Text], SourceType, [Ident])
+    lookupNewtypeConstructor env currentModuleName currentModuleImports qualifiedNewtypeName@(Qualified newtypeModuleName newtypeName) = do
+      let fromModule = find isNewtypeCtorInScope currentModuleImports
+          fromModuleName = (\(_, n, _, _) -> n) <$> fromModule
+          asModuleName = (\(_, _, _, n) -> n) =<< fromModule
+      guard $ newtypeModuleName == currentModuleName || isJust fromModule
+      (_, DataType tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
+      (Newtype, _, _, ids) <- M.lookup (Qualified newtypeModuleName ctorName) (dataConstructors env)
+      pure (fromModuleName, Qualified asModuleName ctorName, map (\(name, _, _) -> name) tvs, wrappedTy, ids)
+      where
+      isNewtypeCtorInScope (_, fromModuleName, importDeclType, _) =
+        newtypeModuleName == Just fromModuleName && case importDeclType of
+          Implicit -> True
+          Explicit refs -> any isNewtypeCtorRef refs
+          Hiding refs -> not $ any isNewtypeCtorRef refs
+      isNewtypeCtorRef = \case
+        TypeRef _ importedTyName Nothing -> importedTyName == newtypeName
+        TypeRef _ importedTyName (Just [_]) -> importedTyName == newtypeName
+        _ -> False
+
+    insertCoercedNewtypeCtorImport :: MonadState CheckState m => ModuleName -> Qualified (ProperName 'ConstructorName) -> m ()
+    insertCoercedNewtypeCtorImport fromModuleName newtypeCtor = modify $ \s ->
+      s { checkCoercedNewtypeCtorsImports = S.insert (fromModuleName, newtypeCtor) $ checkCoercedNewtypeCtorsImports s }
 
     solveIsSymbol :: [SourceType] -> Maybe [TypeClassDict]
     solveIsSymbol [TypeLevelString ann sym] = Just [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [] [] [TypeLevelString ann sym] Nothing]

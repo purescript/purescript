@@ -5,16 +5,20 @@ module Language.PureScript.Sugar (desugar, module S) where
 
 import Control.Category ((>>>))
 import Control.Monad
-import Control.Monad.Error.Class (MonadError())
-import Control.Monad.Supply.Class
-import Control.Monad.Writer.Class (MonadWriter())
+import Control.Monad.Error.Class (MonadError)
+import Control.Monad.Supply.Class (MonadSupply)
+import Control.Monad.State.Class (MonadState)
+import Control.Monad.Writer.Class (MonadWriter)
 
 import Data.List (map)
 import Data.Traversable (traverse)
+import Data.Map (Map)
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Externs
+import Language.PureScript.Linter.Imports
+import Language.PureScript.Names
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.DoNotation as S
@@ -53,12 +57,14 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --  * Group mutually recursive value and data declarations into binding groups.
 --
 desugar
-  :: (MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => Env
-  -> [ExternsFile]
+  :: MonadSupply m
+  => MonadError MultipleErrors m
+  => MonadWriter MultipleErrors m
+  => MonadState (Env, Map ModuleName UsedImports) m
+  => [ExternsFile]
   -> [Module]
   -> m [Module]
-desugar env externs =
+desugar externs =
   map desugarSignedLiterals
     >>> traverse desugarObjectConstructors
     >=> traverse desugarDoModule
@@ -66,7 +72,7 @@ desugar env externs =
     >=> map desugarLetPatternModule
     >>> traverse desugarCasesModule
     >=> traverse desugarTypeDeclarationsModule
-    >=> desugarImports env
+    >=> desugarImports
     >=> rebracket externs
     >=> traverse checkFixityExports
     >=> traverse (deriveInstances externs)

@@ -16,10 +16,11 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Supply
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
-import           Control.Monad.Writer.Class (MonadWriter(..))
+import           Control.Monad.Trans.State (runStateT)
+import           Control.Monad.Writer.Class (MonadWriter(..), censor)
 import           Control.Monad.Writer.Strict (runWriterT)
 import           Data.Function (on)
-import           Data.Foldable (for_)
+import           Data.Foldable (fold, for_)
 import           Data.List (foldl', sortBy)
 import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (fromMaybe)
@@ -75,9 +76,19 @@ rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
       withPrim = importPrim m
   lint withPrim
+
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
-    desugar exEnv externs [withPrim] >>= \case
-      [desugared] -> runCheck' (emptyCheckState env) $ typeCheckModule desugared
+    runStateT (desugar externs [withPrim]) (exEnv, mempty) >>= \case
+      ([desugared], (exEnv', usedImportsByModuleName)) -> do
+        (checked, CheckState{..}) <- runStateT (typeCheckModule desugared) $ emptyCheckState env
+        let usedImports = fold $ M.lookup moduleName usedImportsByModuleName
+            usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
+              M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkCoercedNewtypeCtorsImports
+        -- Imports cannot be linted before type checking because we need to
+        -- known which newtype constructors are used to solve Coercible
+        -- constraints in order to not report them as unused.
+        censor (addHint (ErrorInModule moduleName)) $ lintImports checked exEnv' usedImports'
+        return (checked, checkEnv)
       _ -> internalError "desugar did not return a singleton"
 
   -- desugar case declarations *after* type- and exhaustiveness checking

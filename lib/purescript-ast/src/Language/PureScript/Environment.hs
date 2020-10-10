@@ -590,21 +590,6 @@ primTypeErrorClasses =
         [("message", Just kindDoc)] [] [] [] True)
     ]
 
--- | Looks up a given name and, if it names a newtype, returns the names of the
--- type's parameters, the type the newtype wraps and the names of the type's
--- fields.
-lookupNewtypeConstructor :: Environment -> Qualified (ProperName 'TypeName) -> Maybe ([Text], SourceType, [Ident])
-lookupNewtypeConstructor env ty@(Qualified mn _) =
-  M.lookup ty (types env) >>= \case
-    (_, DataType tvs [(ctor, [wrappedTy])]) ->
-      M.lookup (Qualified mn ctor) (dataConstructors env) >>= \case
-        (Newtype, _, _, ids) ->
-          pure (map (\(name, _, _) -> name) tvs, wrappedTy, ids)
-        _ ->
-          Nothing
-    _ ->
-      Nothing
-
 -- | Finds information about data constructors from the current environment.
 lookupConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
 lookupConstructor env ctor =

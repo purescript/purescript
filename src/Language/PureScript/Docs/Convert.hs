@@ -100,7 +100,7 @@ partiallyDesugar externs env = evalSupplyT 0 . desugar'
       >=> map P.desugarLetPatternModule
       >>> traverse P.desugarCasesModule
       >=> traverse P.desugarTypeDeclarationsModule
-      >=> fmap fst . runWriterT . P.desugarImports env
+      >=> fmap fst . runWriterT . flip evalStateT (env, mempty) . P.desugarImports
       >=> P.rebracketFiltered isInstanceDecl externs
 
   isInstanceDecl (P.TypeInstanceDeclaration {}) = True
