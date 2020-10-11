@@ -4,6 +4,13 @@ import Coercible.Lib
 
 import Effect.Console (log)
 import Safe.Coerce (coerce)
+import Prim.Coerce (class Coercible)
+
+refl :: forall a. a -> a
+refl = coerce
+
+symm :: forall a b. Coercible a b => b -> a
+symm = coerce
 
 type SynString = String
 

@@ -171,7 +171,7 @@ entails SolverOptions{..} constraint context hints =
   where
     forClassNameM :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> m [TypeClassDict]
     forClassNameM env ctx cn@C.Coercible kinds args =
-      solveCoercible env kinds args >>=
+      solveCoercible env ctx kinds args >>=
         pure . fromMaybe (forClassName env ctx cn kinds args)
     forClassNameM env ctx cn kinds args =
       pure $ forClassName env ctx cn kinds args
@@ -390,16 +390,18 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
 
-    solveCoercible :: Environment -> [SourceType] -> [SourceType] -> m (Maybe [TypeClassDict])
-    solveCoercible env kinds [a, b] = runMaybeT $ do
+    solveCoercible :: Environment -> InstanceContext -> [SourceType] -> [SourceType] -> m (Maybe [TypeClassDict])
+    solveCoercible env ctx kinds [a, b] = runMaybeT $ do
       let kindOf = lift . (sequence . (id &&& elaborateKind)) <=< replaceAllTypeSynonyms
       (a', kind) <- kindOf a
       (b', kind') <- kindOf b
       lift $ unifyKinds kind kind'
-      -- Solving terminates when the two arguments are the same. Since we
-      -- currently don't support higher-rank arguments in instance heads, term
-      -- equality is a sufficient notion of "the same".
-      if a' == b'
+      -- Solving terminates when the two arguments are the same or if a
+      -- dictionary for a symmetric constraint is already in scope.
+      -- Since we currently don't support higher-rank arguments in instance
+      -- heads, term equality is a sufficient notion of "the same".
+      let coercibleDictsInScope = findDicts ctx C.Coercible Nothing
+      if a' == b' || any (isSymmetricCoercibleDictInScope a' b') coercibleDictsInScope
         then pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing]
         else do
           -- When solving must reduce and recurse, it doesn't matter whether we
@@ -408,7 +410,9 @@ entails SolverOptions{..} constraint context hints =
           -- just try the first argument first and the second argument second.
           ws <- (MaybeT $ coercibleWanteds env a' b') <|> (MaybeT $ coercibleWanteds env b' a')
           pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] (Just ws)]
-    solveCoercible _ _ _ = pure Nothing
+    solveCoercible _ _ _ _ = pure Nothing
+
+    isSymmetricCoercibleDictInScope a b TypeClassDictionaryInScope{..} = tcdInstanceTypes == [b, a]
 
     -- | Take two types, @a@ and @b@ representing a desired constraint
     -- @Coercible a b@ and reduce them to a set of simpler wanted constraints
