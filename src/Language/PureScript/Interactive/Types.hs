@@ -120,7 +120,7 @@ psciImportedModuleNames st =
 -- ensure that completions remain accurate.
 updateImportExports :: PSCiState -> PSCiState
 updateImportExports st@(PSCiState modules lets externs iprint _ _) =
-  case createEnv (map snd externs) >>= flip desugarModule [temporaryModule] of
+  case createEnv (map snd externs) >>= flip desugarModule temporaryModule of
     Left _          -> st -- TODO: can this fail and what should we do?
     Right env  ->
       case M.lookup temporaryName env of
@@ -128,7 +128,7 @@ updateImportExports st@(PSCiState modules lets externs iprint _ _) =
         _                 -> st -- impossible
   where
 
-  desugarModule :: P.Env -> [P.Module] -> Either P.MultipleErrors P.Env
+  desugarModule :: P.Env -> P.Module -> Either P.MultipleErrors P.Env
   desugarModule e = runExceptT =<< fmap (fst . fst) . runWriterT . flip execStateT (e, mempty) . P.desugarImports
 
   createEnv :: [P.ExternsFile] -> Either P.MultipleErrors P.Env
