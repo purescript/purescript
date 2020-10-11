@@ -131,6 +131,7 @@ data SimpleErrorMessage
   | InvalidInstanceHead SourceType
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | TransitiveDctorExportError DeclarationRef [ProperName 'ConstructorName]
+  | HiddenConstructors DeclarationRef (Qualified (ProperName 'ClassName))
   | ShadowedName Ident
   | ShadowedTypeVar Text
   | UnusedTypeVar Text
@@ -298,6 +299,7 @@ errorCode em = case unwrapErrorMessage em of
   InvalidInstanceHead{} -> "InvalidInstanceHead"
   TransitiveExportError{} -> "TransitiveExportError"
   TransitiveDctorExportError{} -> "TransitiveDctorExportError"
+  HiddenConstructors{} -> "HiddenConstructors"
   ShadowedName{} -> "ShadowedName"
   ShadowedTypeVar{} -> "ShadowedTypeVar"
   UnusedTypeVar{} -> "UnusedTypeVar"
@@ -1044,6 +1046,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (TransitiveDctorExportError x ctors) =
       paras [ line $ "An export for " <> markCode (prettyPrintExport x) <> " requires the following data constructor" <> (if length ctors == 1 then "" else "s") <> " to also be exported: "
             , indent $ paras $ map (line . markCode . runProperName) ctors
+            ]
+    renderSimpleErrorMessage (HiddenConstructors x className) =
+      paras [ line $ "An export for " <> markCode (prettyPrintExport x) <> " hides data constructors but the type declares an instance of " <> markCode (showQualified runProperName className) <> "."
+            , line "Such instance allows to match and construct values of this type, effectively making the constructors public."
             ]
     renderSimpleErrorMessage (ShadowedName nm) =
       line $ "Name " <> markCode (showIdent nm) <> " was shadowed."

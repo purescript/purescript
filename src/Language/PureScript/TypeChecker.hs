@@ -29,6 +29,8 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Language.PureScript.AST
+import qualified Language.PureScript.Constants.Data.Generic.Rep as DataGenericRep
+import qualified Language.PureScript.Constants.Data.Newtype as DataNewtype
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -755,10 +757,20 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
 
-  -- | If any data constructors of a type are exported, we require all its data constructors to be exported.
+  -- If a type is exported without data constructors, we warn on `Generic` or `Newtype` instances.
+  -- On the other hand if any data constructors are exported, we require all of them to be exported.
   checkDataConstructorsAreExported :: DeclarationRef -> m ()
-  checkDataConstructorsAreExported dr@(TypeRef ss' name (Just exportedDataConstructorsNames))
-    | not (null exportedDataConstructorsNames) = do
+  checkDataConstructorsAreExported dr@(TypeRef ss' name (fromMaybe [] -> exportedDataConstructorsNames))
+    | null exportedDataConstructorsNames = for_
+      [ DataGenericRep.Generic
+      , DataNewtype.Newtype
+      ] $ \className -> do
+        env <- getEnv
+        let dicts = foldMap (foldMap NEL.toList) $
+              M.lookup (Just mn) (typeClassDictionaries env) >>= M.lookup className
+        when (any isDictOfTypeRef dicts) $
+          tell . errorMessage' ss' $ HiddenConstructors dr className
+    | otherwise = do
       env <- getEnv
       let dataConstructorNames = fromMaybe [] $
             M.lookup (mkQualified name mn) (types env) >>= getDataConstructorNames . snd
@@ -766,6 +778,12 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       unless (null missingDataConstructorsNames) $
         throwError . errorMessage' ss' $ TransitiveDctorExportError dr missingDataConstructorsNames
       where
+      isDictOfTypeRef :: TypeClassDictionaryInScope a -> Bool
+      isDictOfTypeRef dict
+        | (TypeConstructor _ qualTyName, _, _) : _ <- unapplyTypes <$> tcdInstanceTypes dict
+        , qualTyName == Qualified (Just mn) name
+        = True
+      isDictOfTypeRef _ = False
       getDataConstructorNames :: TypeKind -> Maybe [ProperName 'ConstructorName]
       getDataConstructorNames (DataType _ constructors) = Just $ fst <$> constructors
       getDataConstructorNames _ = Nothing
