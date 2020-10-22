@@ -3,15 +3,11 @@ module Language.PureScript.Sugar.Accessor (desugarAccessorModule) where
 
 import Prelude.Compat
 
-import Data.List (groupBy, concatMap)
-import Data.Function (on)
 import Data.Monoid (Any(..))
 import Control.Monad.Writer
 
 import Language.PureScript.AST
 import Language.PureScript.Types
-import Language.PureScript.Crash
-import Language.PureScript.AST.SourcePos
 import Language.PureScript.Externs
 import Language.PureScript.Names
 import qualified Language.PureScript.Constants as C
