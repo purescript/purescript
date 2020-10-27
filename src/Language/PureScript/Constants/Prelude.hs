@@ -273,14 +273,73 @@ pattern DataSymbol = ModuleName "Data.Symbol"
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
 pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 
+pattern IsSymbolIdent :: Qualified Ident
+pattern IsSymbolIdent = Qualified (Just DataSymbol) (Ident "IsSymbol")
+
+
+typ :: forall a. (IsString a) => a
+typ = "Type"
+
+kindBoolean :: forall a. (IsString a) => a
+kindBoolean = "Boolean"
+
+kindOrdering :: forall a. (IsString a) => a
+kindOrdering = "Ordering"
+
+kindRowList :: forall a. (IsString a) => a
+kindRowList = "RowList"
+
+symbol :: forall a. (IsString a) => a
+symbol = "Symbol"
+
+doc :: forall a. (IsString a) => a
+doc = "Doc"
+
+-- Modules
+
+prim :: forall a. (IsString a) => a
+prim = "Prim"
+
+moduleBoolean :: forall a. (IsString a) => a
+moduleBoolean = "Boolean"
+
+moduleOrdering :: forall a. (IsString a) => a
+moduleOrdering = "Ordering"
+
+moduleRow :: forall a. (IsString a) => a
+moduleRow = "Row"
+
+moduleRowList :: forall a. (IsString a) => a
+moduleRowList = "RowList"
+
+moduleSymbol :: forall a. (IsString a) => a
+moduleSymbol = "Symbol"
+
+typeError :: forall a. (IsString a) => a
+typeError = "TypeError"
+
+pattern SProxyType :: Qualified (ProperName 'TypeName)
+pattern SProxyType = Qualified (Just DataSymbol) (ProperName "SProxy")
+
+pattern SProxy :: Qualified (ProperName 'ConstructorName)
+pattern SProxy = Qualified (Just DataSymbol) (ProperName "SProxy")
+
+pattern SProxyIdent :: Qualified Ident
+pattern SProxyIdent = Qualified (Just DataSymbol) (Ident "SProxy")
 
 -- Data.Record
 
 pattern DataRecord :: ModuleName
 pattern DataRecord = ModuleName "Data.Record"
 
+pattern DataRecord_getField :: Qualified Ident
+pattern DataRecord_getField = Qualified (Just DataRecord) (Ident "getField")
+
+pattern DataRecord_hasFieldRecord :: Qualified Ident
+pattern DataRecord_hasFieldRecord = Qualified (Just DataRecord) (Ident "hasFieldRecord")
+
 getField :: Qualified Ident
-getField = Qualified (Just DataRecord) (Ident "getField")
+getField = DataRecord_getField
 
 
 dataArray :: forall a. (IsString a) => a

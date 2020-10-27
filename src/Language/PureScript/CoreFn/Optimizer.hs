@@ -24,7 +24,7 @@ optimizeModuleDecls :: [Bind Ann] -> [Bind Ann]
 optimizeModuleDecls = map transformBinds
   where
   (transformBinds, _, _) = everywhereOnValues identity transformExprs identity
-  transformExprs = optimizeUnusedPartialFn . optimizeClosedRecordUpdate
+  transformExprs = optimizeUnusedPartialFn . optimizeClosedRecordUpdate . optimizeRecordGetField
 
 optimizeClosedRecordUpdate :: Expr Ann -> Expr Ann
 optimizeClosedRecordUpdate ou@(ObjectUpdate a@(_, _, Just t, _) r updatedFields) =
@@ -54,3 +54,26 @@ optimizeUnusedPartialFn (Let _
   (App _ (App _ (Var _ (Qualified _ UnusedIdent)) _) originalCoreFn)) =
   originalCoreFn
 optimizeUnusedPartialFn e = e
+
+-- | Optimize
+-- `Data_Record.getField(Data_Record.hasFieldRecord(new Data_Symbol.IsSymbol(function() { return "f"; }))())(Data_Symbol.SProxy.value)(x)`
+-- into
+-- `x.f`
+optimizeRecordGetField :: Expr a -> Expr a
+optimizeRecordGetField
+  (App ann
+    (App _
+      (App _
+        (Var _ C.DataRecord_getField)
+        (App _
+          (App _
+            (Var _ C.DataRecord_hasFieldRecord)
+            (App _
+              (Var _ C.IsSymbolIdent)
+              (Abs _ _
+                (Literal _ (StringLiteral label)))))
+          _))
+      (Var _ C.SProxyIdent))
+    object) =
+  Accessor ann label object
+optimizeRecordGetField e = e
