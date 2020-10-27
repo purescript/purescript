@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/2109-discard.purs:7:3 - 7:12 (line 7, column 3 - line 7, column 12)
+
+  Unknown value [33mdiscard[0m. You're probably using do-notation, which the compiler replaces with calls to the [33mdiscard[0m function. Please import [33mdiscard[0m from module [33mPrelude[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+or to contribute content related to this error.
+
