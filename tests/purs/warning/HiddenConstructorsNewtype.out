@@ -1,0 +1,11 @@
+Warning found:
+in module [33mMain[0m
+at tests/purs/warning/HiddenConstructorsNewtype.purs:2:1 - 8:44 (line 2, column 1 - line 8, column 44)
+
+  An export for [33mN[0m hides data constructors but the type declares an instance of [33mData.Newtype.Newtype[0m.
+  Such instance allows to match and construct values of this type, effectively making the constructors public.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/HiddenConstructors.md for more information,
+or to contribute content related to this warning.
+

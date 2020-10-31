@@ -10,8 +10,7 @@ at tests/purs/failing/InfiniteKind2.purs:5:23 - 5:27 (line 5, column 23 - line 5
 while checking that type [33mTree[0m
   has kind [33mt0[0m
 while inferring the kind of [33mm Tree[0m
-while inferring the kind of [33mm Tree -> Tree m[0m
-in type constructor [33mTree[0m
+in data binding group Tree
 
 where [33mt0[0m is an unknown type
 

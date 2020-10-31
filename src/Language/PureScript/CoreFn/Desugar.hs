@@ -38,11 +38,22 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   let imports = mapMaybe importToCoreFn decls ++ fmap (ssAnn modSS,) (findQualModules decls)
       imports' = dedupeImports imports
       exps' = ordNub $ concatMap exportToCoreFn exps
+      reExps = M.map ordNub $ M.unionsWith (++) (mapMaybe (fmap reExportsToCoreFn . toReExportRef) exps)
       externs = ordNub $ mapMaybe externToCoreFn decls
       decls' = concatMap declToCoreFn decls
-  in Module modSS coms mn (spanName modSS) imports' exps' externs decls'
-
+  in Module modSS coms mn (spanName modSS) imports' exps' reExps externs decls'
   where
+  -- | Creates a map from a module name to the re-export references defined in
+  -- that module.
+  reExportsToCoreFn :: (ModuleName, A.DeclarationRef) -> M.Map ModuleName [Ident]
+  reExportsToCoreFn (mn', ref') = M.singleton mn' (exportToCoreFn ref')
+
+  toReExportRef :: A.DeclarationRef -> Maybe (ModuleName, A.DeclarationRef)
+  toReExportRef (A.ReExportRef _ src ref) =
+      fmap
+        (, ref)
+        (A.exportSourceImportedFrom src)
+  toReExportRef _ = Nothing
 
   -- | Remove duplicate imports
   dedupeImports :: [(Ann, ModuleName)] -> [(Ann, ModuleName)]
@@ -238,10 +249,14 @@ externToCoreFn _ = Nothing
 -- constructor, instances and values are flattened into one list.
 exportToCoreFn :: A.DeclarationRef -> [Ident]
 exportToCoreFn (A.TypeRef _ _ (Just dctors)) = fmap properToIdent dctors
+exportToCoreFn (A.TypeRef _ _ Nothing) = []
+exportToCoreFn (A.TypeOpRef _ _) = []
 exportToCoreFn (A.ValueRef _ name) = [name]
+exportToCoreFn (A.ValueOpRef _ _) = []
 exportToCoreFn (A.TypeClassRef _ name) = [properToIdent name]
 exportToCoreFn (A.TypeInstanceRef _ name) = [name]
-exportToCoreFn _ = []
+exportToCoreFn (A.ModuleRef _ _) = []
+exportToCoreFn (A.ReExportRef _ _ _) = []
 
 -- | Makes a typeclass dictionary constructor function. The returned expression
 -- is a function that accepts the superclass instances and member

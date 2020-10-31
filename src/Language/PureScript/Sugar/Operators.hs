@@ -34,7 +34,6 @@ import Data.Function (on)
 import Data.Functor.Identity (Identity(..), runIdentity)
 import Data.List (groupBy, sortBy)
 import Data.Maybe (mapMaybe, listToMaybe)
-import Data.Traversable (for)
 import qualified Data.Map as M
 
 import qualified Language.PureScript.Constants.Prelude as C
@@ -67,8 +66,8 @@ rebracket
   :: forall m
    . MonadError MultipleErrors m
   => [ExternsFile]
-  -> [Module]
-  -> m [Module]
+  -> Module
+  -> m Module
 rebracket =
   rebracketFiltered (const True)
 
@@ -84,13 +83,13 @@ rebracketFiltered
    . MonadError MultipleErrors m
   => (Declaration -> Bool)
   -> [ExternsFile]
-  -> [Module]
-  -> m [Module]
-rebracketFiltered pred_ externs modules = do
+  -> Module
+  -> m Module
+rebracketFiltered pred_ externs m = do
   let (valueFixities, typeFixities) =
         partitionEithers
           $ concatMap externsFixities externs
-          ++ concatMap collectFixities modules
+          ++ collectFixities m
 
   ensureNoDuplicates' MultipleValueOpFixities valueFixities
   ensureNoDuplicates' MultipleTypeOpFixities typeFixities
@@ -100,9 +99,8 @@ rebracketFiltered pred_ externs modules = do
   let typeOpTable = customOperatorTable' typeFixities
   let typeAliased = M.fromList (map makeLookupEntry typeFixities)
 
-  for modules
-    $ renameAliasedOperators valueAliased typeAliased
-    <=< rebracketModule pred_ valueOpTable typeOpTable
+  rebracketModule pred_ valueOpTable typeOpTable m >>=
+    renameAliasedOperators valueAliased typeAliased
 
   where
 
@@ -167,10 +165,10 @@ rebracketFiltered pred_ externs modules = do
     goBinder pos other = return (pos, other)
 
     goType :: SourceSpan -> SourceType -> m SourceType
-    goType pos (BinaryNoParensType ann (TypeOp ann2 op) lhs rhs) =
+    goType pos (TypeOp ann2 op) =
       case op `M.lookup` typeAliased of
         Just alias ->
-          return $ TypeApp ann (TypeApp ann (TypeConstructor ann2 alias) lhs) rhs
+          return $ TypeConstructor ann2 alias
         Nothing ->
           throwError . errorMessage' pos $ UnknownName $ fmap TyOpName op
     goType _ other = return other
@@ -383,7 +381,7 @@ checkFixityExports m@(Module ss _ mn ds (Just exps)) =
       Right ctor ->
         unless (anyTypeRef (maybe False (elem ctor) . snd))
           . throwError . errorMessage' ss
-          $ TransitiveDctorExportError dr ctor
+          $ TransitiveDctorExportError dr [ctor]
   checkRef dr@(TypeOpRef ss' op) =
     for_ (getTypeOpAlias op) $ \ty ->
       unless (anyTypeRef ((== ty) . fst))

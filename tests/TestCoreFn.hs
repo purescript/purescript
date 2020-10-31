@@ -10,6 +10,7 @@ import Prelude.Compat
 
 import Data.Aeson
 import Data.Aeson.Types as Aeson
+import Data.Map as M
 import Data.Version
 
 import Language.PureScript.AST.Literals
@@ -49,7 +50,7 @@ spec = context "CoreFnFromJsonTest" $ do
 
   specify "should parse version" $ do
     let v = Version [0, 13, 6] []
-        m = Module ss [] mn mp [] [] [] []
+        m = Module ss [] mn mp [] [] M.empty [] []
         r = fst <$> parseModule (moduleToJSON v m)
     r `shouldSatisfy` isSuccess
     case r of
@@ -57,42 +58,50 @@ spec = context "CoreFnFromJsonTest" $ do
       Aeson.Success v' -> v' `shouldBe` v
 
   specify "should parse an empty module" $ do
-    let r = parseMod $ Module ss [] mn mp [] [] [] []
+    let r = parseMod $ Module ss [] mn mp [] [] M.empty [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
       Aeson.Success m -> moduleName m `shouldBe` mn
 
   specify "should parse source span" $ do
-    let r = parseMod $ Module ss [] mn mp [] [] [] []
+    let r = parseMod $ Module ss [] mn mp [] [] M.empty [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
       Aeson.Success m -> moduleSourceSpan m `shouldBe` ss
 
   specify "should parse module path" $ do
-    let r = parseMod $ Module ss [] mn mp [] [] [] []
+    let r = parseMod $ Module ss [] mn mp [] [] M.empty [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
       Aeson.Success m -> modulePath m `shouldBe` mp
 
   specify "should parse imports" $ do
-    let r = parseMod $ Module ss [] mn mp [(ann, mn)] [] [] []
+    let r = parseMod $ Module ss [] mn mp [(ann, mn)] [] M.empty [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
       Aeson.Success m -> moduleImports m `shouldBe` [(ann, mn)]
 
   specify "should parse exports" $ do
-    let r = parseMod $ Module ss [] mn mp [] [Ident "exp"] [] []
+    let r = parseMod $ Module ss [] mn mp [] [Ident "exp"] M.empty [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
       Aeson.Success m -> moduleExports m `shouldBe` [Ident "exp"]
 
+  specify "should parse re-exports" $ do
+    let r = parseMod $ Module ss [] mn mp [] [] (M.singleton (ModuleName "Example.A") [Ident "exp"]) [] []
+    r `shouldSatisfy` isSuccess
+    case r of
+      Error _   -> return ()
+      Aeson.Success m -> moduleReExports m `shouldBe` M.singleton (ModuleName "Example.A") [Ident "exp"]
+
+
   specify "should parse foreign" $ do
-    let r = parseMod $ Module ss [] mn mp [] [] [Ident "exp"] []
+    let r = parseMod $ Module ss [] mn mp [] [] M.empty [Ident "exp"] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
@@ -100,7 +109,7 @@ spec = context "CoreFnFromJsonTest" $ do
 
   context "Expr" $ do
     specify "should parse literals" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "x1") $ Literal ann (NumericLiteral (Left 1))
                 , NonRec ann (Ident "x2") $ Literal ann (NumericLiteral (Right 1.0))
                 , NonRec ann (Ident "x3") $ Literal ann (StringLiteral (mkString "abc"))
@@ -112,18 +121,18 @@ spec = context "CoreFnFromJsonTest" $ do
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse Constructor" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "constructor") $ Constructor ann (ProperName "Either") (ProperName "Left") [Ident "value0"] ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse Accessor" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "x") $
                     Accessor ann (mkString "field") (Literal ann $ ObjectLiteral [(mkString "field", Literal ann (NumericLiteral (Left 1)))]) ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse ObjectUpdate" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "objectUpdate") $
                     ObjectUpdate ann
                       (Literal ann $ ObjectLiteral [(mkString "field", Literal ann (StringLiteral (mkString "abc")))])
@@ -132,14 +141,14 @@ spec = context "CoreFnFromJsonTest" $ do
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse Abs" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "abs")
                     $ Abs ann (Ident "x") (Var ann (Qualified (Just mn) (Ident "x")))
                 ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse App" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "app")
                     $ App ann
                         (Abs ann (Ident "x") (Var ann (Qualified Nothing (Ident "x"))))
@@ -148,7 +157,7 @@ spec = context "CoreFnFromJsonTest" $ do
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse Case" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
                     Case ann [Var ann (Qualified Nothing (Ident "x"))]
                       [ CaseAlternative
@@ -159,7 +168,7 @@ spec = context "CoreFnFromJsonTest" $ do
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse Case with guards" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
                     Case ann [Var ann (Qualified Nothing (Ident "x"))]
                       [ CaseAlternative
@@ -170,7 +179,7 @@ spec = context "CoreFnFromJsonTest" $ do
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse Let" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
                     Let ann
                       [ Rec [((ann, Ident "a"), Var ann (Qualified Nothing (Ident "x")))] ]
@@ -180,28 +189,28 @@ spec = context "CoreFnFromJsonTest" $ do
 
   context "Meta" $ do
     specify "should parse IsConstructor" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec (ss, [], Nothing, Just (IsConstructor ProductType [Ident "x"])) (Ident "x") $
                   Literal (ss, [], Nothing, Just (IsConstructor SumType [])) (CharLiteral 'a')
                 ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse IsNewtype" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec (ss, [], Nothing, Just IsNewtype) (Ident "x") $
                   Literal ann (CharLiteral 'a')
                 ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse IsTypeClassConstructor" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec (ss, [], Nothing, Just IsTypeClassConstructor) (Ident "x") $
                   Literal ann (CharLiteral 'a')
                 ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse IsForeign" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec (ss, [], Nothing, Just IsForeign) (Ident "x") $
                   Literal ann (CharLiteral 'a')
                 ]
@@ -209,7 +218,7 @@ spec = context "CoreFnFromJsonTest" $ do
 
   context "Binders" $ do
     specify "should parse LiteralBinder" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
                     Case ann [Var ann (Qualified Nothing (Ident "x"))]
                       [ CaseAlternative
@@ -220,7 +229,7 @@ spec = context "CoreFnFromJsonTest" $ do
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse VarBinder" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
                     Case ann [Var ann (Qualified Nothing (Ident "x"))]
                       [ CaseAlternative
@@ -236,7 +245,7 @@ spec = context "CoreFnFromJsonTest" $ do
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse NamedBinder" $ do
-      let m = Module ss [] mn mp [] [] []
+      let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
                     Case ann [Var ann (Qualified Nothing (Ident "x"))]
                       [ CaseAlternative
@@ -248,9 +257,9 @@ spec = context "CoreFnFromJsonTest" $ do
 
   context "Comments" $ do
     specify "should parse LineComment" $ do
-      let m = Module ss [ LineComment "line" ] mn mp [] [] [] []
+      let m = Module ss [ LineComment "line" ] mn mp [] [] M.empty [] []
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse BlockComment" $ do
-      let m = Module ss [ BlockComment "block" ] mn mp [] [] [] []
+      let m = Module ss [ BlockComment "block" ] mn mp [] [] M.empty [] []
       parseMod m `shouldSatisfy` isSuccess

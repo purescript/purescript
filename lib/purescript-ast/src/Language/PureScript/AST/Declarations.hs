@@ -80,6 +80,7 @@ data ErrorMessageHint
   | ErrorInTypeDeclaration Ident
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
   | ErrorInKindDeclaration (ProperName 'TypeName)
+  | ErrorInRoleDeclaration (ProperName 'TypeName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint SourceConstraint
   | PositionedError (NEL.NonEmpty SourceSpan)
@@ -192,6 +193,28 @@ instance Eq DeclarationRef where
   (ModuleRef _ name) == (ModuleRef _ name') = name == name'
   (ReExportRef _ mn ref) == (ReExportRef _ mn' ref') = mn == mn' && ref == ref'
   _ == _ = False
+
+instance Ord DeclarationRef where
+  TypeRef _ name dctors `compare` TypeRef _ name' dctors' = compare name name' <> compare dctors dctors'
+  TypeOpRef _ name `compare` TypeOpRef _ name' = compare name name'
+  ValueRef _ name `compare` ValueRef _ name' = compare name name'
+  ValueOpRef _ name `compare` ValueOpRef _ name' = compare name name'
+  TypeClassRef _ name `compare` TypeClassRef _ name' = compare name name'
+  TypeInstanceRef _ name `compare` TypeInstanceRef _ name' = compare name name'
+  ModuleRef _ name `compare` ModuleRef _ name' = compare name name'
+  ReExportRef _ mn ref `compare` ReExportRef _ mn' ref' = compare mn mn' <> compare ref ref'
+  compare ref ref' =
+    compare (orderOf ref) (orderOf ref')
+      where
+        orderOf :: DeclarationRef -> Int
+        orderOf TypeRef{} = 0
+        orderOf TypeOpRef{} = 1
+        orderOf ValueRef{} = 2
+        orderOf ValueOpRef{} = 3
+        orderOf TypeClassRef{} = 4
+        orderOf TypeInstanceRef{} = 5
+        orderOf ModuleRef{} = 6
+        orderOf ReExportRef{} = 7
 
 data ExportSource =
   ExportSource
@@ -358,6 +381,9 @@ data DataConstructorDeclaration = DataConstructorDeclaration
   , dataCtorName :: !(ProperName 'ConstructorName)
   , dataCtorFields :: ![(Ident, SourceType)]
   } deriving (Show, Eq)
+
+mapDataCtorFields :: ([(Ident, SourceType)] -> [(Ident, SourceType)]) -> DataConstructorDeclaration -> DataConstructorDeclaration
+mapDataCtorFields f DataConstructorDeclaration{..} = DataConstructorDeclaration { dataCtorFields = f dataCtorFields, .. }
 
 traverseDataCtorFields :: Monad m => ([(Ident, SourceType)] -> m [(Ident, SourceType)]) -> DataConstructorDeclaration -> m DataConstructorDeclaration
 traverseDataCtorFields f DataConstructorDeclaration{..} = DataConstructorDeclaration dataCtorAnn dataCtorName <$> f dataCtorFields

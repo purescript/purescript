@@ -1,0 +1,15 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/CoercibleRoleMismatch1.purs:4:1 - 4:29 (line 4, column 1 - line 4, column 29)
+
+  Role mismatch for the type parameter [33ma[0m:
+
+    The annotation says [33mphantom[0m but the role [33mrepresentational[0m is required.
+
+
+in role declaration for [33mIdentity[0m
+in type constructor [33mIdentity[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/RoleMismatch.md for more information,
+or to contribute content related to this error.
+

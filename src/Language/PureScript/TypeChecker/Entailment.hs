@@ -14,18 +14,19 @@ module Language.PureScript.TypeChecker.Entailment
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Applicative ((<|>))
+import Control.Applicative ((<|>), empty)
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
+import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Writer
 
-import Data.Foldable (for_, fold, toList)
+import Data.Foldable (for_, fold, foldl', toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (minimumBy, groupBy, nubBy, sortBy)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.List (find, groupBy, minimumBy, nubBy, sortBy, zipWith4)
+import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (for)
@@ -168,12 +169,18 @@ entails
 entails SolverOptions{..} constraint context hints =
     solve constraint
   where
+    forClassNameM :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> m [TypeClassDict]
+    forClassNameM env ctx cn@C.Coercible kinds args =
+      solveCoercible env ctx kinds args >>=
+        pure . fromMaybe (forClassName env ctx cn kinds args)
+    forClassNameM env ctx cn kinds args =
+      pure $ forClassName env ctx cn kinds args
+
     forClassName :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> [TypeClassDict]
     forClassName _ ctx cn@C.Warn _ [msg] =
       -- Prefer a warning dictionary in scope if there is one available.
       -- This allows us to defer a warning by propagating the constraint.
       findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope [] 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing]
-    forClassName env _ C.Coercible _ args | Just dicts <- solveCoercible env args = dicts
     forClassName _ _ C.IsSymbol _ args | Just dicts <- solveIsSymbol args = dicts
     forClassName _ _ C.SymbolCompare _ args | Just dicts <- solveSymbolCompare args = dicts
     forClassName _ _ C.SymbolAppend _ args | Just dicts <- solveSymbolAppend args = dicts
@@ -225,10 +232,12 @@ entails SolverOptions{..} constraint context hints =
                 Nothing -> throwError . errorMessage $ UnknownClass className'
                 Just tcd -> pure tcd
 
+            dicts <- lift . lift $ forClassNameM env (combineContexts context inferred) className' kinds'' tys''
+
             let instances = do
                   chain <- groupBy ((==) `on` tcdChain) $
                            sortBy (compare `on` (tcdChain &&& tcdIndex)) $
-                           forClassName env (combineContexts context inferred) className' kinds'' tys''
+                           dicts
                   -- process instances in a chain in index order
                   let found = for chain $ \tcd ->
                                 -- Make sure the type unifies with the type in the type instance definition
@@ -381,80 +390,143 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
 
-    solveCoercible :: Environment -> [SourceType] -> Maybe [TypeClassDict]
-    solveCoercible env [a, b] = do
-      let tySynMap = typeSynonyms env
-          kindMap = types env
-          replaceTySyns = either (const Nothing) Just . replaceAllTypeSynonymsM tySynMap kindMap
-      a' <- replaceTySyns a
-      b' <- replaceTySyns b
-      -- Solving terminates when the two arguments are the same. Since we
-      -- currently don't support higher-rank arguments in instance heads, term
-      -- equality is a sufficient notion of "the same".
-      if a' == b'
-        then pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] [] [a, b] Nothing]
+    solveCoercible :: Environment -> InstanceContext -> [SourceType] -> [SourceType] -> m (Maybe [TypeClassDict])
+    solveCoercible env ctx kinds [a, b] = runMaybeT $ do
+      let kindOf = lift . (sequence . (id &&& elaborateKind)) <=< replaceAllTypeSynonyms
+      (a', kind) <- kindOf a
+      (b', kind') <- kindOf b
+      lift $ unifyKinds kind kind'
+      -- Solving terminates when the two arguments are the same or if a
+      -- dictionary for a symmetric constraint is already in scope.
+      -- Since we currently don't support higher-rank arguments in instance
+      -- heads, term equality is a sufficient notion of "the same".
+      let coercibleDictsInScope = findDicts ctx C.Coercible Nothing
+      if a' == b' || any (isSymmetricCoercibleDictInScope a' b') coercibleDictsInScope
+        then pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing]
         else do
           -- When solving must reduce and recurse, it doesn't matter whether we
           -- reduce the first or second argument -- if the constraint is
           -- solvable, either path will yield the same outcome. Consequently we
           -- just try the first argument first and the second argument second.
-          ws <- coercibleWanteds env a' b' <|> coercibleWanteds env b' a'
-          pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] [] [a, b] (Just ws)]
-    solveCoercible _ _ = Nothing
+          ws <- (MaybeT $ coercibleWanteds env a' b') <|> (MaybeT $ coercibleWanteds env b' a')
+          pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] (Just ws)]
+    solveCoercible _ _ _ _ = pure Nothing
+
+    isSymmetricCoercibleDictInScope a b TypeClassDictionaryInScope{..} = tcdInstanceTypes == [b, a]
 
     -- | Take two types, @a@ and @b@ representing a desired constraint
     -- @Coercible a b@ and reduce them to a set of simpler wanted constraints
     -- whose satisfaction will yield the goal.
-    coercibleWanteds :: Environment -> SourceType -> SourceType -> Maybe [SourceConstraint]
-    coercibleWanteds env a b = case a of
-      TypeConstructor _ tyName -> do
-        -- If the first argument is a plain newtype (e.g. @newtype T = T U@ and
-        -- the constraint @Coercible T b@), look up the type of its wrapped
-        -- field and yield a new wanted constraint in terms of that type
-        -- (@Coercible U b@ in the example).
-        (_, wrappedTy, _) <- lookupNewtypeConstructor env tyName
-        pure [Constraint nullSourceAnn C.Coercible [] [wrappedTy, b] Nothing]
-      t
-        | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
-        , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
-        , not (null axs) && not (null bxs) && aTyName == bTyName
-        , tyRoles <- inferRoles env aTyName -> do
-            -- If both arguments are applications of the same type constructor
-            -- (e.g. @data D a b = D a@ in the constraint
-            -- @Coercible (D a b) (D a' b')@), infer the roles of the type
-            -- constructor's arguments and generate wanted constraints
-            -- appropriately (e.g. here @a@ is representational and @b@ is
-            -- phantom, yielding @Coercible a a'@).
-            let k role ax bx = case role of
-                  Nominal
-                    -- If we had first-class equality constraints, we'd just
-                    -- emit one of the form @(a ~ b)@ here and let the solver
-                    -- recurse. Since we don't we must compare the types at
-                    -- this point and fail if they don't match. This likely
-                    -- means there are cases we should be able to handle that
-                    -- we currently can't, but is at least sound.
-                    | ax == bx ->
-                        Just []
-                    | otherwise ->
-                        Nothing
-                  Representational ->
-                    Just [Constraint nullSourceAnn C.Coercible [] [ax, bx] Nothing]
-                  Phantom ->
-                    Just []
-            fmap concat $ sequence $ zipWith3 k tyRoles axs bxs
-        | (TypeConstructor _ tyName, _, xs) <- unapplyTypes t
-        , not $ null xs
-        , Just (tvs, wrappedTy, _) <- lookupNewtypeConstructor env tyName -> do
+    coercibleWanteds :: Environment -> SourceType -> SourceType -> m (Maybe [SourceConstraint])
+    coercibleWanteds env a b
+      | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
+      , (aTyKind, _) <- fromMaybe (internalError "coercibleWanteds: type lookup failed") $ M.lookup aTyName (types env)
+      , (aks, kind) <- unapplyKinds aTyKind
+      , length axs < length aks = do
+          -- If both arguments have kind @k1 -> k2@ (e.g. @data D a b = D a@
+          -- in the constraint @Coercible (D a) (D a')@), yield a new wanted
+          -- constraint in terms of the types saturated with the same variables
+          -- (e.g. @Coercible (D a t0) (D a' t0)@ in the exemple).
+          tys <- traverse freshTypeWithKind $ drop (length axs) aks
+          let a' = foldl' srcTypeApp a tys
+              b' = foldl' srcTypeApp b tys
+          pure $ Just [srcCoercibleConstraint kind a' b']
+      -- If both arguments have kind @Row k@, yield new wanted constraints
+      -- in terms of pairs of types with the same label in both rows (e.g.
+      -- @Coercible D D'@ given @Coercible ( label :: D ) ( label :: D' )@)
+      -- and fail when some labels are exclusive to one row (e.g. @extra@
+      -- in the constraint @Coercible () ( extra :: D )@) or when the tails
+      -- don’t unify (e.g. @()@ and @r@ in @Coercible () ( | r )@ or
+      -- @r@ and @s@ in @Coercible ( | r ) ( | s )@).
+      | RCons _ _ ty _ <- a = do
+          k <- elaborateKind ty
+          case alignRowsWith (srcCoercibleConstraint k) a b of
+            (constraints, (([], tail1), ([], tail2))) -> do
+              rethrow (const . errorMessage . NoInstanceFound $ srcCoercibleConstraint (kindRow k) a b) $ unifyTypes tail1 tail2
+              pure $ Just constraints
+            (_, (rl1, rl2)) ->
+              throwError . errorMessage $ TypesDoNotUnify (rowFromList rl1) (rowFromList rl2)
+      | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
+      , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
+      , not (null axs) && aTyName == bTyName
+      , (aTyKind, _) <- fromMaybe (internalError "coercibleWanteds: type lookup failed") $ M.lookup aTyName (types env)
+      = runMaybeT $ do
+          -- If both arguments are applications of the same type constructor
+          -- (e.g. @data D a b = D a@ in the constraint
+          -- @Coercible (D a b) (D a' b')@), infer the roles of the type
+          -- constructor's arguments and generate wanted constraints
+          -- appropriately (e.g. here @a@ is representational and @b@ is
+          -- phantom, yielding @Coercible a a'@).
+          let roles = lookupRoles env aTyName
+              kinds = fst $ unapplyKinds aTyKind
+              f role kx ax bx = case role of
+                Nominal
+                  -- If we had first-class equality constraints, we'd just
+                  -- emit one of the form @(a ~ b)@ here and let the solver
+                  -- recurse. Since we don't we must compare the types at
+                  -- this point and fail if they don't match. This likely
+                  -- means there are cases we should be able to handle that
+                  -- we currently can't, but is at least sound.
+                  | ax == bx ->
+                      pure []
+                  | otherwise ->
+                      empty
+                Representational ->
+                  pure [srcCoercibleConstraint kx ax bx]
+                Phantom ->
+                  pure []
+          fmap concat $ sequence $ zipWith4 f roles kinds axs bxs
+      | (TypeConstructor _ newtypeName, _, xs) <- unapplyTypes a = do
+        (currentModuleName, currentModuleImports) <- gets $ checkCurrentModule &&& checkCurrentModuleImports
+        case lookupNewtypeConstructor env currentModuleName currentModuleImports newtypeName of
+          Just (fromModuleName, newtypeCtorName, tvs, wrappedTy, _) -> do
+            for_ fromModuleName $ flip insertCoercedNewtypeCtorImport newtypeCtorName
             -- If the first argument is a newtype applied to some other types
             -- (e.g. @newtype T a = T a@ in @Coercible (T X) b@), look up the
             -- type of its wrapped field and yield a new wanted constraint in
             -- terms of that type with the type arguments substituted in (e.g.
             -- @Coercible (T[X/a]) b = Coercible X b@ in the example).
             let wrappedTySub = replaceAllTypeVars (zip tvs xs) wrappedTy
-            pure [Constraint nullSourceAnn C.Coercible [] [wrappedTySub, b] Nothing]
-      _ ->
+            pure $ Just [srcCoercibleConstraint kindType wrappedTySub b]
+          _ -> pure Nothing
+      | otherwise =
         -- In all other cases we can't solve the constraint.
-        Nothing
+        pure Nothing
+
+    srcCoercibleConstraint :: SourceType -> SourceType -> SourceType -> SourceConstraint
+    srcCoercibleConstraint k a b = srcConstraint C.Coercible [k] [a, b] Nothing
+
+    -- | Looks up a given name and, if it names a newtype, returns the names of the
+    -- type's parameters, the type the newtype wraps and the names of the type's
+    -- fields.
+    lookupNewtypeConstructor
+      :: Environment
+      -> Maybe ModuleName
+      -> [(SourceAnn, ModuleName, ImportDeclarationType, Maybe ModuleName)]
+      -> Qualified (ProperName 'TypeName)
+      -> Maybe (Maybe ModuleName, Qualified (ProperName 'ConstructorName), [Text], SourceType, [Ident])
+    lookupNewtypeConstructor env currentModuleName currentModuleImports qualifiedNewtypeName@(Qualified newtypeModuleName newtypeName) = do
+      let fromModule = find isNewtypeCtorInScope currentModuleImports
+          fromModuleName = (\(_, n, _, _) -> n) <$> fromModule
+          asModuleName = (\(_, _, _, n) -> n) =<< fromModule
+      guard $ newtypeModuleName == currentModuleName || isJust fromModule
+      (_, DataType tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
+      (Newtype, _, _, ids) <- M.lookup (Qualified newtypeModuleName ctorName) (dataConstructors env)
+      pure (fromModuleName, Qualified asModuleName ctorName, map (\(name, _, _) -> name) tvs, wrappedTy, ids)
+      where
+      isNewtypeCtorInScope (_, fromModuleName, importDeclType, _) =
+        newtypeModuleName == Just fromModuleName && case importDeclType of
+          Implicit -> True
+          Explicit refs -> any isNewtypeCtorRef refs
+          Hiding refs -> not $ any isNewtypeCtorRef refs
+      isNewtypeCtorRef = \case
+        TypeRef _ importedTyName Nothing -> importedTyName == newtypeName
+        TypeRef _ importedTyName (Just [_]) -> importedTyName == newtypeName
+        _ -> False
+
+    insertCoercedNewtypeCtorImport :: MonadState CheckState m => ModuleName -> Qualified (ProperName 'ConstructorName) -> m ()
+    insertCoercedNewtypeCtorImport fromModuleName newtypeCtor = modify $ \s ->
+      s { checkCoercedNewtypeCtorsImports = S.insert (fromModuleName, newtypeCtor) $ checkCoercedNewtypeCtorsImports s }
 
     solveIsSymbol :: [SourceType] -> Maybe [TypeClassDict]
     solveIsSymbol [TypeLevelString ann sym] = Just [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [] [] [TypeLevelString ann sym] Nothing]

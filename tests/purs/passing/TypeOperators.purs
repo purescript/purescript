@@ -14,6 +14,9 @@ testPrecedence1 x = x
 testPrecedence2 ∷ ∀ f g. f ~> g → f ~> g
 testPrecedence2 nat fx = nat fx
 
+testParens ∷ ∀ f g. (~>) f g → (~>) f g
+testParens nat = nat
+
 swap ∷ ∀ a b. a /\ b → b /\ a
 swap (a /\ b) = b /\ a
 
