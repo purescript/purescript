@@ -10,6 +10,7 @@ import Control.Monad.Writer.Class
 import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Control.Monad ((<=<))
 
 import Language.PureScript.AST
@@ -271,7 +272,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
     removeAndWarn :: SourceSpan -> S.Set Ident -> (S.Set Ident, MultipleErrors) -> (S.Set Ident, MultipleErrors)
     removeAndWarn ss newNames (used, errors) =
       let filteredUsed = used `S.difference` newNames
-          warnUnused = newNames `S.difference` used
+          warnUnused = S.filter (not . Text.isPrefixOf "_" . runIdent) (newNames `S.difference` used)
           combinedErrors = if not $ S.null warnUnused then errors <> (mconcat $ map (errorMessage' ss . UnusedName) $ S.toList warnUnused) else errors
       in
         (filteredUsed, combinedErrors)
