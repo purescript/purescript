@@ -50,6 +50,7 @@ printToken' showLayout = \case
   TokBackslash             -> "\\"
   TokLowerName qual name   -> printQual qual <> name
   TokUpperName qual name   -> printQual qual <> name
+  TokNegate                -> "-"
   TokOperator qual sym     -> printQual qual <> sym
   TokSymbolName qual sym   -> printQual qual <> "(" <> sym <> ")"
   TokSymbolArr Unicode     -> "(→)"

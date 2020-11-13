@@ -35,7 +35,7 @@ import qualified Language.PureScript.Roles as R
 import Language.PureScript.PSString (PSString)
 }
 
-%expect 95
+%expect 96
 
 %name parseType type
 %name parseExpr expr
@@ -91,6 +91,7 @@ import Language.PureScript.PSString (PSString)
   '-'                { SourceToken _ (TokOperator [] "-") }
   '@'                { SourceToken _ (TokOperator [] "@") }
   '#'                { SourceToken _ (TokOperator [] "#") }
+  OP_NEGATE          { SourceToken _ TokNegate }
   'ado'              { SourceToken _ (TokLowerName _ "ado") }
   'as'               { SourceToken _ (TokLowerName [] "as") }
   'case'             { SourceToken _ (TokLowerName [] "case") }
@@ -213,6 +214,7 @@ qualOp :: { QualifiedOpName }
   | QUAL_OPERATOR {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
   | '<=' {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
   | '-' {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
+  | OP_NEGATE {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
   | '#' {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
   | ':' {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
 
@@ -220,6 +222,7 @@ op :: { OpName }
   : OPERATOR {% opName <\$> toName N.OpName $1 }
   | '<=' {% opName <\$> toName N.OpName $1 }
   | '-' {% opName <\$> toName N.OpName $1 }
+  | OP_NEGATE {% opName <\$> toName N.OpName $1 }
   | '#' {% opName <\$> toName N.OpName $1 }
   | ':' {% opName <\$> toName N.OpName $1 }
 
@@ -380,6 +383,7 @@ exprBacktick :: { Expr () }
 
 expr3 :: { Expr () }
   : expr4 { $1 }
+  | OP_NEGATE expr3 { ExprNegate () $1 $2 }
   | '-' expr3 { ExprNegate () $1 $2 }
 
 expr4 :: { Expr () }
@@ -569,9 +573,10 @@ binder1 :: { Binder () }
   | binder1 qualOp binder2 { BinderOp () $1 (getQualifiedOpName $2) $3 }
 
 binder2 :: { Binder () }
-  : many(binderAtom) {% toBinderConstructor $1 }
+  : many(binderAtomNoNeg) {% toBinderConstructor $1 }
+  | binderNegative { $1 }
 
-binderAtom :: { Binder () }
+binderAtomNoNeg :: { Binder () }
   : '_' { BinderWildcard () $1 }
   | ident { BinderVar () $1 }
   | ident '@' binderAtom { BinderNamed () $1 $2 $3 }
@@ -580,10 +585,16 @@ binderAtom :: { Binder () }
   | char { uncurry (BinderChar ()) $1 }
   | string { uncurry (BinderString ()) $1 }
   | number { uncurry (BinderNumber () Nothing) $1 }
-  | '-' number { uncurry (BinderNumber () (Just $1)) $2 }
   | delim('[', binder, ',', ']') { BinderArray () $1 }
   | delim('{', recordBinder, ',', '}') { BinderRecord () $1 }
   | '(' binder ')' { BinderParens () (Wrapped $1 $2 $3) }
+
+binderNegative :: { Binder () }
+  : OP_NEGATE number { uncurry (BinderNumber () (Just $1)) $2 }
+
+binderAtom :: { Binder () }
+  : binderAtomNoNeg { $1 }
+  | binderNegative { $1 }
 
 recordBinder :: { RecordLabeled (Binder ()) }
   : label {% fmap RecordPun . toName Ident $ lblTok $1 }

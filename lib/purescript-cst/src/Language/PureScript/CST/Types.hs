@@ -66,6 +66,7 @@ data Token
   | TokBackslash
   | TokLowerName ![Text] !Text
   | TokUpperName ![Text] !Text
+  | TokNegate -- Only used for '-' when it immediately precedes a digit. TokOperators may end up being negations as well.
   | TokOperator ![Text] !Text
   | TokSymbolName ![Text] !Text
   | TokSymbolArr !SourceStyle

@@ -50,6 +50,7 @@ tokenDelta = \case
   TokBackslash             -> (0, 1)
   TokLowerName qual name   -> (0, qualDelta qual + Text.length name)
   TokUpperName qual name   -> (0, qualDelta qual + Text.length name)
+  TokNegate                -> (0, 1)
   TokOperator qual sym     -> (0, qualDelta qual + Text.length sym)
   TokSymbolName qual sym   -> (0, qualDelta qual + Text.length sym + 2)
   TokSymbolArr Unicode     -> (0, 3)

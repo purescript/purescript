@@ -146,6 +146,7 @@ toQualifiedName k tok = case tokValue tok of
     | otherwise -> addFailure [tok] ErrKeywordVar $> QualifiedName tok Nothing (k "<unexpected>")
   TokUpperName q a  -> flip (QualifiedName tok) (k a) <$> toModuleName tok q
   TokSymbolName q a -> flip (QualifiedName tok) (k a) <$> toModuleName tok q
+  TokNegate         -> pure (QualifiedName tok Nothing (k "-"))
   TokOperator q a   -> flip (QualifiedName tok) (k a) <$> toModuleName tok q
   _                 -> internalError $ "Invalid qualified name: " <> show tok
 
@@ -158,6 +159,7 @@ toName k tok = case tokValue tok of
   TokRawString _ -> parseFail tok ErrQuotedPun
   TokUpperName [] a  -> pure $ Name tok (k a)
   TokSymbolName [] a -> pure $ Name tok (k a)
+  TokNegate          -> pure $ Name tok (k "-")
   TokOperator [] a   -> pure $ Name tok (k a)
   TokHole a          -> pure $ Name tok (k a)
   _                  -> internalError $ "Invalid name: " <> show tok

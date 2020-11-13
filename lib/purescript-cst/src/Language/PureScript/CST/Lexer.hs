@@ -12,7 +12,7 @@ import Control.Monad (join)
 import qualified Data.Char as Char
 import qualified Data.DList as DList
 import Data.Foldable (foldl')
-import Data.Functor (($>))
+import Data.Functor (($>), (<&>))
 import qualified Data.Scientific as Sci
 import Data.String (fromString)
 import Data.Text (Text)
@@ -328,7 +328,11 @@ token = peek >>= maybe (pure TokEof) k0
   operator :: [Text] -> [Char] -> Lexer Token
   operator qual pre = do
     rest <- nextWhile isSymbolChar
-    pure . TokOperator (reverse qual) $ Text.pack pre <> rest
+    if null qual && pre == "-" && Text.null rest
+    then peek <&> \case
+      Just ch | isDigitChar ch -> TokNegate
+      _                        -> TokOperator [] "-"
+    else pure . TokOperator (reverse qual) $ Text.pack pre <> rest
 
   {-
     moduleName
