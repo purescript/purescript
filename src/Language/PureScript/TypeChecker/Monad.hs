@@ -392,7 +392,7 @@ debugTypes = go <=< M.toList . types
       ppTy = prettyPrintType 100 srcTy
       name = showQualified runProperName qual
       decl = case which of
-        DataType _ _      -> "data"
+        DataType _ _ _    -> "data"
         TypeSynonym       -> "type"
         ExternData _      -> "extern"
         LocalTypeVariable -> "local"

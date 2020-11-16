@@ -76,7 +76,7 @@ findTypeDeclaration'
   -> First DataType
 findTypeDeclaration' t ExternsFile{..} =
   First $ head $ mapMaybe (\case
-            EDType tn _ (P.DataType typeVars ctors)
+            EDType tn _ (P.DataType _ typeVars ctors)
               | tn == t -> Just (typeVars, ctors)
             _ -> Nothing) efDeclarations
 

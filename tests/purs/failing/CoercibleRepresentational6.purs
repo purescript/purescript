@@ -1,4 +1,4 @@
--- @shouldFailWith NoInstanceFound
+-- @shouldFailWith CannotUnwrapHiddenNewtypeConstructor
 module Main where
 
 import Safe.Coerce (coerce)

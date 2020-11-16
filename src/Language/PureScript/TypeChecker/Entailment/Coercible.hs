@@ -649,9 +649,8 @@ lookupNewtypeConstructor
   :: Environment
   -> Qualified (ProperName 'TypeName)
   -> Maybe ([Text], ProperName 'ConstructorName, SourceType)
-lookupNewtypeConstructor env qualifiedNewtypeName@(Qualified newtypeModuleName _) = do
-  (_, DataType tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
-  (Newtype, _, _, _) <- M.lookup (Qualified newtypeModuleName ctorName) (dataConstructors env)
+lookupNewtypeConstructor env qualifiedNewtypeName = do
+  (_, DataType Newtype tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
   pure (map (\(name, _, _) -> name) tvs, ctorName, wrappedTy)
 
 -- | Behaves like 'lookupNewtypeConstructor' but also returns whether the

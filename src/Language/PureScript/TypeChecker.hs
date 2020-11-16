@@ -63,7 +63,7 @@ addDataType moduleName dtype name args dctors ctorKind = do
   let mapDataCtor (DataConstructorDeclaration _ ctorName vars) = (ctorName, snd <$> vars)
       qualName = (Qualified (Just moduleName) name)
       hasSig = qualName `M.member` types env
-  putEnv $ env { types = M.insert qualName (ctorKind, DataType args (map (mapDataCtor . fst) dctors)) (types env) }
+  putEnv $ env { types = M.insert qualName (ctorKind, DataType dtype args (map (mapDataCtor . fst) dctors)) (types env) }
   unless (hasSig || not (containsForAll ctorKind)) $ do
     tell . errorMessage $ MissingKindDeclaration (if dtype == Newtype then NewtypeSig else DataSig) name ctorKind
   for_ dctors $ \(DataConstructorDeclaration _ dctor fields, polyType) ->
@@ -805,6 +805,6 @@ typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
         = True
       isDictOfTypeRef _ = False
       getDataConstructorNames :: TypeKind -> Maybe [ProperName 'ConstructorName]
-      getDataConstructorNames (DataType _ constructors) = Just $ fst <$> constructors
+      getDataConstructorNames (DataType _ _ constructors) = Just $ fst <$> constructors
       getDataConstructorNames _ = Nothing
   checkDataConstructorsAreExported _ = return ()
