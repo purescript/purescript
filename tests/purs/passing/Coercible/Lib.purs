@@ -1,9 +1,12 @@
 module Coercible.Lib
-  ( NTLib1 (..)
-  , NTLib2 (..)
+  ( module Coercible.Lib2
+  , NTLib1 (..)
+  , NTLib3 (..)
   ) where
+
+import Coercible.Lib2
 
 newtype NTLib1 a = NTLib1 a
 
-newtype NTLib2 a b = NTLib2 a
-type role NTLib2 representational representational
+newtype NTLib3 a b = NTLib3 a
+type role NTLib3 representational representational

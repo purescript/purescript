@@ -1,6 +1,6 @@
 module Main where
 
-import Coercible.Lib (NTLib1(..), NTLib2)
+import Coercible.Lib (NTLib1(..), NTLib2(..), NTLib3)
 
 import Effect.Console (log)
 import Prim.Coerce (class Coercible)
@@ -97,7 +97,10 @@ ntFn1ToNTFn2 = coerce
 libExposedCtorToId2 :: forall z. NTLib1 z -> Id2 z
 libExposedCtorToId2 = coerce
 
-libHiddenCtorRepresentational :: forall a b. Coercible (NTLib2 a a) (NTLib2 a b) => NTLib2 a a -> NTLib2 a b
+libReExportedCtorToId2 :: forall z. NTLib2 z -> Id2 z
+libReExportedCtorToId2 = coerce
+
+libHiddenCtorRepresentational :: forall a b. Coercible (NTLib3 a a) (NTLib3 a b) => NTLib3 a a -> NTLib3 a b
 libHiddenCtorRepresentational = coerce
 
 newtype Roles1 a b c = Roles1 (Phantom1 b c)

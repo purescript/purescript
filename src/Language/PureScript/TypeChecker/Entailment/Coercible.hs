@@ -654,22 +654,32 @@ lookupNewtypeConstructor env qualifiedNewtypeName@(Qualified newtypeModuleName _
 lookupNewtypeConstructorInScope
   :: Environment
   -> Maybe ModuleName
-  -> [(SourceAnn, ModuleName, ImportDeclarationType, Maybe ModuleName)]
+  -> [ ( SourceAnn
+       , ModuleName
+       , ImportDeclarationType
+       , Maybe ModuleName
+       , M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
+       )
+     ]
   -> Qualified (ProperName 'TypeName)
   -> Maybe (Maybe ModuleName, [Text], Qualified (ProperName 'ConstructorName), SourceType)
 lookupNewtypeConstructorInScope env currentModuleName currentModuleImports qualifiedNewtypeName@(Qualified newtypeModuleName newtypeName) = do
-  let fromModule = find isNewtypeCtorInScope currentModuleImports
-      fromModuleName = (\(_, n, _, _) -> n) <$> fromModule
-      asModuleName = (\(_, _, _, n) -> n) =<< fromModule
-  guard $ newtypeModuleName == currentModuleName || isJust fromModule
+  let fromModule = find isNewtypeCtorImported currentModuleImports
+      fromModuleName = (\(_, n, _, _, _) -> n) <$> fromModule
+      asModuleName = (\(_, _, _, n, _) -> n) =<< fromModule
+      isDefinedInCurrentModule = newtypeModuleName == currentModuleName
+      isImported = isJust fromModule
+  guard $ isDefinedInCurrentModule || isImported
   (tvs, ctorName, wrappedTy) <- lookupNewtypeConstructor env qualifiedNewtypeName
   pure (fromModuleName, tvs, Qualified asModuleName ctorName, wrappedTy)
   where
-  isNewtypeCtorInScope (_, fromModuleName, importDeclType, _) =
-    newtypeModuleName == Just fromModuleName && case importDeclType of
-      Implicit -> True
-      Explicit refs -> any isNewtypeCtorRef refs
-      Hiding refs -> not $ any isNewtypeCtorRef refs
+  isNewtypeCtorImported (_, _, importDeclType, _, exportedTypes) =
+    case M.lookup newtypeName exportedTypes of
+      Just ([_], _) -> case importDeclType of
+        Implicit -> True
+        Explicit refs -> any isNewtypeCtorRef refs
+        Hiding refs -> not $ any isNewtypeCtorRef refs
+      _ -> False
   isNewtypeCtorRef = \case
     TypeRef _ importedTyName Nothing -> importedTyName == newtypeName
     TypeRef _ importedTyName (Just [_]) -> importedTyName == newtypeName

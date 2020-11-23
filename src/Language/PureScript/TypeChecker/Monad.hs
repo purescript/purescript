@@ -69,8 +69,18 @@ data CheckState = CheckState
   -- ^ The next skolem scope constant
   , checkCurrentModule :: Maybe ModuleName
   -- ^ The current module
-  , checkCurrentModuleImports :: [(SourceAnn, ModuleName, ImportDeclarationType, Maybe ModuleName)]
-  -- ^ The current module imports
+  , checkCurrentModuleImports ::
+      [ ( SourceAnn
+        , ModuleName
+        , ImportDeclarationType
+        , Maybe ModuleName
+        , M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
+        )
+      ]
+  -- ^ The current module imports and their exported types.
+  -- Newtype constructors have to be in scope for some Coercible constraints to
+  -- be solvable, so we need to know which constructors are imported and whether
+  -- they are actually defined in or re-exported from the imported modules.
   , checkSubstitution :: Substitution
   -- ^ The current substitution
   , checkHints :: [ErrorMessageHint]
