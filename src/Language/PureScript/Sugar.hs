@@ -71,5 +71,5 @@ desugar externs =
     >=> rebracket externs
     >=> checkFixityExports
     >=> deriveInstances externs
-    >=> desugarTypeClasses externs
+    >=> (\(syns, kinds, mod) -> desugarTypeClasses externs syns kinds mod)
     >=> createBindingGroupsModule

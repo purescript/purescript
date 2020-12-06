@@ -72,9 +72,10 @@ deriveInstances
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => [ExternsFile]
   -> Module
-  -> m Module
-deriveInstances externs (Module ss coms mn ds exts) =
-    Module ss coms mn <$> mapM (deriveInstance mn synonyms kinds instanceData ds) ds <*> pure exts
+  -> m (SynonymMap, KindMap, Module)
+deriveInstances externs (Module ss coms mn ds exts) = do
+    ds' <- mapM (deriveInstance mn synonyms kinds instanceData ds) ds
+    pure (synonyms, kinds, Module ss coms mn ds' exts)
   where
     kinds :: KindMap
     kinds = mempty
