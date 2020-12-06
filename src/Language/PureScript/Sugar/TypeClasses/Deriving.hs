@@ -227,7 +227,9 @@ deriveNewtypeInstance ss mn syns kinds ndis className ds tys tyConNm dargs = do
       case stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped' of
         Just wrapped'' -> do
           let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
-          return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
+          wrapped''' <- replaceAllTypeSynonymsM syns kinds $ replaceAllTypeVars subst wrapped''
+          tys' <- mapM (replaceAllTypeSynonymsM syns kinds) tys
+          return (DeferredDictionary className (init tys' ++ [wrapped''']))
         Nothing -> throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
     go _ = throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 
