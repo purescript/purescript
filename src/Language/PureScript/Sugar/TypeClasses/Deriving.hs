@@ -12,7 +12,7 @@ import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.Foldable (for_)
 import           Data.List (foldl', find, sortBy, unzip5)
 import qualified Data.Map as M
-import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Maybe (fromMaybe)
 import           Data.Ord (comparing)
 import qualified Data.Set as S
 import           Data.Text (Text)
@@ -71,29 +71,13 @@ deriveInstances
   :: forall m
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => [ExternsFile]
+  -> SynonymMap
+  -> KindMap
   -> Module
-  -> m (SynonymMap, KindMap, Module)
-deriveInstances externs (Module ss coms mn ds exts) = do
-    ds' <- mapM (deriveInstance mn synonyms kinds instanceData ds) ds
-    pure (synonyms, kinds, Module ss coms mn ds' exts)
+  -> m Module
+deriveInstances externs syns kinds (Module ss coms mn ds exts) =
+    Module ss coms mn <$> mapM (deriveInstance mn syns kinds instanceData ds) ds <*> pure exts
   where
-    kinds :: KindMap
-    kinds = mempty
-
-    -- We need to collect type synonym information, since synonyms will not be
-    -- removed until later, during type checking.
-    synonyms :: SynonymMap
-    synonyms =
-        M.fromList $ (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
-                  ++ mapMaybe fromLocalDecl ds
-      where
-        fromExternsDecl mn' (EDTypeSynonym name args ty) = Just (Qualified (Just mn') name, (args, ty))
-        fromExternsDecl _ _ = Nothing
-
-        fromLocalDecl (TypeSynonymDeclaration _ name args ty) =
-          Just (Qualified (Just mn) name, (args, ty))
-        fromLocalDecl _ = Nothing
-
     instanceData :: NewtypeDerivedInstances
     instanceData =
         foldMap (\ExternsFile{..} -> foldMap (fromExternsDecl efModuleName) efDeclarations) externs <> foldMap fromLocalDecl ds
