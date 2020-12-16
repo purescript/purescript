@@ -35,6 +35,7 @@ library:
   source-dirs: src
   ghc-options: -Wall -O2
   default-extensions: !include "default-extensions.yaml"
+  other-modules: Data.Text.PureScript
 
 tests:
   tests:
