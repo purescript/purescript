@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/2109-negate.purs:4:5 - 4:7 (line 4, column 5 - line 4, column 7)
+
+  Unknown value [33mnegate[0m. You're probably using numeric negation (the unary [33m-[0m operator), which the compiler replaces with calls to the [33mnegate[0m function. Please import [33mnegate[0m from module [33mPrelude[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+or to contribute content related to this error.
+
