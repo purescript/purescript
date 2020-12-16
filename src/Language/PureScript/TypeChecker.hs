@@ -151,8 +151,8 @@ addTypeClass
   -> m ()
 addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
   env <- getEnv
-  let newClass = mkNewClass env
-      qualName = fmap coerceProperName qualifiedClassName
+  newClass <- mkNewClass
+  let qualName = fmap coerceProperName qualifiedClassName
       hasSig = qualName `M.member` types env
   unless (hasSig || not (containsForAll kind)) $ do
     tell . errorMessage $ MissingKindDeclaration ClassSig (disqualify qualName) kind
@@ -163,11 +163,14 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
     classMembers :: [(Ident, SourceType)]
     classMembers = map toPair ds
 
-    mkNewClass :: Environment -> TypeClassData
-    mkNewClass env = makeTypeClassData args classMembers implies dependencies ctIsEmpty
+    mkNewClass :: m TypeClassData
+    mkNewClass = do
+      env <- getEnv
+      implies' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms implies
+      let ctIsEmpty = null classMembers && all (typeClassIsEmpty . findSuperClass env) implies'
+      pure $ makeTypeClassData args classMembers implies' dependencies ctIsEmpty
       where
-      ctIsEmpty = null classMembers && all (typeClassIsEmpty . findSuperClass) implies
-      findSuperClass c = case M.lookup (constraintClass c) (typeClasses env) of
+      findSuperClass env c = case M.lookup (constraintClass c) (typeClasses env) of
         Just tcd -> tcd
         Nothing -> internalError "Unknown super class in TypeClassDeclaration"
 
