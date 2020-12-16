@@ -12,7 +12,7 @@ import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.Foldable (for_)
 import           Data.List (foldl', find, sortBy, unzip5)
 import qualified Data.Map as M
-import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Maybe (fromMaybe)
 import           Data.Ord (comparing)
 import qualified Data.Set as S
 import           Data.Text (Text)
@@ -71,28 +71,13 @@ deriveInstances
   :: forall m
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => [ExternsFile]
+  -> SynonymMap
+  -> KindMap
   -> Module
   -> m Module
-deriveInstances externs (Module ss coms mn ds exts) =
-    Module ss coms mn <$> mapM (deriveInstance mn synonyms kinds instanceData ds) ds <*> pure exts
+deriveInstances externs syns kinds (Module ss coms mn ds exts) =
+    Module ss coms mn <$> mapM (deriveInstance mn syns kinds instanceData ds) ds <*> pure exts
   where
-    kinds :: KindMap
-    kinds = mempty
-
-    -- We need to collect type synonym information, since synonyms will not be
-    -- removed until later, during type checking.
-    synonyms :: SynonymMap
-    synonyms =
-        M.fromList $ (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
-                  ++ mapMaybe fromLocalDecl ds
-      where
-        fromExternsDecl mn' (EDTypeSynonym name args ty) = Just (Qualified (Just mn') name, (args, ty))
-        fromExternsDecl _ _ = Nothing
-
-        fromLocalDecl (TypeSynonymDeclaration _ name args ty) =
-          Just (Qualified (Just mn) name, (args, ty))
-        fromLocalDecl _ = Nothing
-
     instanceData :: NewtypeDerivedInstances
     instanceData =
         foldMap (\ExternsFile{..} -> foldMap (fromExternsDecl efModuleName) efDeclarations) externs <> foldMap fromLocalDecl ds
@@ -226,7 +211,9 @@ deriveNewtypeInstance ss mn syns kinds ndis className ds tys tyConNm dargs = do
       case stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped' of
         Just wrapped'' -> do
           let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
-          return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
+          wrapped''' <- replaceAllTypeSynonymsM syns kinds $ replaceAllTypeVars subst wrapped''
+          tys' <- mapM (replaceAllTypeSynonymsM syns kinds) tys
+          return (DeferredDictionary className (init tys' ++ [wrapped''']))
         Nothing -> throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
     go _ = throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 
