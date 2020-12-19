@@ -631,16 +631,16 @@ unwrapNewtype env = go (0 :: Int) where
         -- another rule.
         , isMonoType wrappedTy -> do
             when (not inScope) $ do
-              tell [CannotUnwrapHiddenNewtypeConstructor newtypeCtorName]
+              tell [MissingConstructorImportForCoercible newtypeCtorName]
               throwError CannotUnwrapConstructor
-            for_ fromModuleName $ flip insertCoercedNewtypeCtorImport newtypeCtorName
+            for_ fromModuleName $ flip addConstructorImportForCoercible newtypeCtorName
             let wrappedTySub = replaceAllTypeVars (zip tvs xs) wrappedTy
             ExceptT (go (n + 1) wrappedTySub) `catchError` \case
               CannotUnwrapInfiniteNewtypeChain -> throwError CannotUnwrapInfiniteNewtypeChain
               CannotUnwrapConstructor -> pure wrappedTySub
       _ -> throwError CannotUnwrapConstructor
-  insertCoercedNewtypeCtorImport fromModuleName newtypeCtorName = modify $ \st ->
-    st { checkCoercedNewtypeCtorsImports = S.insert (fromModuleName, newtypeCtorName) $ checkCoercedNewtypeCtorsImports st }
+  addConstructorImportForCoercible fromModuleName newtypeCtorName = modify $ \st ->
+    st { checkConstructorImportsForCoercible = S.insert (fromModuleName, newtypeCtorName) $ checkConstructorImportsForCoercible st }
 
 -- | Looks up a given name and, if it names a newtype, returns the names of the
 -- type's parameters, the type the newtype wraps and the names of the type's

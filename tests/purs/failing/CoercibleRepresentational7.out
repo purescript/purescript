@@ -2,7 +2,8 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/CoercibleRepresentational7.purs:8:10 - 8:16 (line 8, column 10 - line 8, column 16)
 
-  The newtype constructor [33mN[0m is not in scope, it should be imported to allow coercions to and from its representation.
+  The newtype constructor [33mN[0m is not in scope.
+  It should be imported to allow coercions to and from its representation.
 
 while solving type class constraint
 [33m                              [0m
@@ -18,6 +19,6 @@ in value declaration [33munwrap[0m
 where [33ma0[0m is a rigid type variable
         bound at (line 8, column 10 - line 8, column 16)
 
-See https://github.com/purescript/documentation/blob/master/errors/CannotUnwrapHiddenNewtypeConstructor.md for more information,
+See https://github.com/purescript/documentation/blob/master/errors/MissingConstructorImportForCoercible.md for more information,
 or to contribute content related to this error.
 
