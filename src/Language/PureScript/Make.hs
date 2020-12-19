@@ -79,7 +79,8 @@ rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
 
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     (desugared, (exEnv', usedImports)) <- runStateT (desugar externs withPrim) (exEnv, mempty)
-    (checked, CheckState{..}) <- runStateT (typeCheckModule desugared) $ emptyCheckState env
+    let modulesExports = (\(_, _, exports) -> exports) <$> exEnv'
+    (checked, CheckState{..}) <- runStateT (typeCheckModule modulesExports desugared) $ emptyCheckState env
     let usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
           M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkCoercedNewtypeCtorsImports
     -- Imports cannot be linted before type checking because we need to

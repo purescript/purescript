@@ -20,6 +20,8 @@ module Language.PureScript.TypeChecker.Kinds
   , checkKindDeclaration
   , checkTypeKind
   , unknownsWithKinds
+  , freshKind
+  , freshKindWithKind
   ) where
 
 import Prelude.Compat

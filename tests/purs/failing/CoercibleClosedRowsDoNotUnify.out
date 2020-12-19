@@ -17,10 +17,10 @@ at tests/purs/failing/CoercibleClosedRowsDoNotUnify.purs:7:12 - 7:18 (line 7, co
 
 while solving type class constraint
 [33m                                     [0m
-[33m  Prim.Coerce.Coercible ( x :: Int   [0m
-[33m                        )            [0m
-[33m                        ( y :: String[0m
-[33m                        )            [0m
+[33m  Prim.Coerce.Coercible { x :: Int   [0m
+[33m                        }            [0m
+[33m                        { y :: String[0m
+[33m                        }            [0m
 [33m                                     [0m
 while checking that type [33mforall (a :: Type) (b :: Type). Coercible @Type a b => a -> b[0m
   is at least as general as type [33m{ x :: Int      [0m

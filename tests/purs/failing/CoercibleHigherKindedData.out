@@ -9,6 +9,11 @@ at tests/purs/failing/CoercibleHigherKindedData.purs:13:17 - 13:23 (line 13, col
   [33m                                              [0m
   The instance head contains unknown type variables. Consider adding a type annotation.
 
+while solving type class constraint
+[33m                                                                 [0m
+[33m  Prim.Coerce.Coercible (Proxy @(t0 -> Type) (Unary @t0))        [0m
+[33m                        (Proxy @(t1 -> Type) (Binary @t2 @t1 a3))[0m
+[33m                                                                 [0m
 while checking that type [33mforall (a :: Type) (b :: Type). Coercible @Type a b => a -> b[0m
   is at least as general as type [33mProxy @(t0 -> Type) (Unary @t0) -> Proxy @(t1 -> Type) (... @t1 a3)[0m
 while checking that expression [33mcoerce[0m

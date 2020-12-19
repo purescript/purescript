@@ -107,6 +107,7 @@ data SimpleErrorMessage
   | AmbiguousTypeVariables SourceType [Int]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
+  | PossiblyInfiniteCoercibleInstance
   | CannotDerive (Qualified (ProperName 'ClassName)) [SourceType]
   | InvalidDerivedInstance (Qualified (ProperName 'ClassName)) [SourceType] Int
   | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [SourceType] SourceType
@@ -276,6 +277,7 @@ errorCode em = case unwrapErrorMessage em of
   AmbiguousTypeVariables{} -> "AmbiguousTypeVariables"
   UnknownClass{} -> "UnknownClass"
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
+  PossiblyInfiniteCoercibleInstance -> "PossiblyInfiniteCoercibleInstance"
   CannotDerive{} -> "CannotDerive"
   InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
   MissingNewtypeSuperclassInstance{} -> "MissingNewtypeSuperclassInstance"
@@ -911,6 +913,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 ]
             , line "is possibly infinite."
             ]
+    renderSimpleErrorMessage PossiblyInfiniteCoercibleInstance =
+      line $ "A " <> markCode "Coercible" <> " instance is possibly infinite."
     renderSimpleErrorMessage (CannotDerive nm ts) =
       paras [ line "Cannot derive a type class instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
@@ -1615,6 +1619,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       where
       isUnifyHint ErrorUnifyingTypes{} = True
       isUnifyHint _ = False
+    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _)) = stripFirst isSolverHint
+      where
+      isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
+      isSolverHint _ = False
     stripRedundantHints NoInstanceFound{} = stripFirst isSolverHint
       where
       isSolverHint ErrorSolvingConstraint{} = True

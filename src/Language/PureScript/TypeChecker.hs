@@ -37,6 +37,7 @@ import Language.PureScript.Errors
 import Language.PureScript.Linter
 import Language.PureScript.Names
 import Language.PureScript.Roles
+import Language.PureScript.Sugar.Names.Env (Exports(..))
 import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
 import Language.PureScript.TypeChecker.Roles as T
@@ -596,11 +597,12 @@ checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 typeCheckModule
   :: forall m
    . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => Module
+  => M.Map ModuleName Exports
+  -> Module
   -> m Module
-typeCheckModule (Module _ _ _ _ Nothing) =
+typeCheckModule _ (Module _ _ _ _ Nothing) =
   internalError "exports should have been elaborated before typeCheckModule"
-typeCheckModule (Module ss coms mn decls (Just exps)) =
+typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
   warnAndRethrow (addHint (ErrorInModule mn)) $ do
     let (decls', imports) = partitionEithers $ fromImportDecl <$> decls
     modify (\s -> s { checkCurrentModule = Just mn, checkCurrentModuleImports = imports })
@@ -615,13 +617,28 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     return $ Module ss coms mn (map toImportDecl imports ++ decls'') (Just exps)
   where
 
-  fromImportDecl :: Declaration -> Either Declaration (SourceAnn, ModuleName, ImportDeclarationType, Maybe ModuleName)
+  fromImportDecl
+    :: Declaration
+    -> Either Declaration
+              ( SourceAnn
+              , ModuleName
+              , ImportDeclarationType
+              , Maybe ModuleName
+              , M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
+              )
   fromImportDecl (ImportDeclaration sa moduleName importDeclarationType asModuleName) =
-    Right (sa, moduleName, importDeclarationType, asModuleName)
+    Right (sa, moduleName, importDeclarationType, asModuleName, foldMap exportedTypes $ M.lookup moduleName modulesExports)
   fromImportDecl decl = Left decl
 
-  toImportDecl :: (SourceAnn, ModuleName, ImportDeclarationType, Maybe ModuleName) -> Declaration
-  toImportDecl (sa, moduleName, importDeclarationType, asModuleName) =
+  toImportDecl
+    :: ( SourceAnn
+       , ModuleName
+       , ImportDeclarationType
+       , Maybe ModuleName
+       , M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
+       )
+    -> Declaration
+  toImportDecl (sa, moduleName, importDeclarationType, asModuleName, _) =
     ImportDeclaration sa moduleName importDeclarationType asModuleName
 
   qualify' :: a -> Qualified a

@@ -1,10 +1,11 @@
 module Main where
 
-import Coercible.Lib
+import Coercible.Lib (NTLib1(..), NTLib2(..), NTLib3)
 
 import Effect.Console (log)
-import Safe.Coerce (coerce)
 import Prim.Coerce (class Coercible)
+import Safe.Coerce (coerce)
+import Type.Proxy (Proxy)
 
 refl :: forall a. a -> a
 refl = coerce
@@ -12,12 +13,33 @@ refl = coerce
 symm :: forall a b. Coercible a b => b -> a
 symm = coerce
 
+trans :: forall a b c. Coercible a b => Coercible b c => Proxy b -> a -> c
+trans _ = coerce
+
+trans' :: forall a b c. Coercible a b => Coercible c b => Proxy b -> a -> c
+trans' _ = coerce
+
+trans'' :: forall a b c d. Coercible a c => Coercible a d => Coercible d b => Proxy c -> Proxy d -> a -> b
+trans'' _ _ = coerce
+
+transSymm :: forall a b c. Coercible a b => Coercible b c => Proxy b -> c -> a
+transSymm _ = coerce
+
 type SynString = String
 
 newtype NTString1 = NTString1 SynString
 
 nt1ToString :: NTString1 -> String
 nt1ToString = coerce
+
+stringToNt1 :: String -> NTString1
+stringToNt1 = coerce
+
+toNT1 :: forall a. Coercible a String => a -> NTString1
+toNT1 = coerce
+
+toNT1Array :: forall a. Coercible a (Array String) => a -> Array NTString1
+toNT1Array = coerce
 
 newtype NTString2 = NTString2 String
 
@@ -34,6 +56,9 @@ id12ToId21 :: forall b. Id1 (Id2 b) -> Id2 (Id1 b)
 id12ToId21 = coerce
 
 newtype Ap f a = Ap (f a)
+
+apId1ToApId1 :: forall a b. Coercible a b => Ap Id1 a -> Ap Id1 b
+apId1ToApId1 = coerce
 
 apId1ToApId2 :: forall a. Ap Id1 a -> Ap Id2 a
 apId1ToApId2 = coerce
@@ -69,8 +94,14 @@ newtype NTFn2 x a b = NTFn2 (a -> x -> b)
 ntFn1ToNTFn2 :: forall a b. NTFn1 a b -> NTFn2 Int a b
 ntFn1ToNTFn2 = coerce
 
-libExposedCtorToId2 :: forall z. NTLib z -> Id2 z
+libExposedCtorToId2 :: forall z. NTLib1 z -> Id2 z
 libExposedCtorToId2 = coerce
+
+libReExportedCtorToId2 :: forall z. NTLib2 z -> Id2 z
+libReExportedCtorToId2 = coerce
+
+libHiddenCtorRepresentational :: forall a b. Coercible (NTLib3 a a) (NTLib3 a b) => NTLib3 a a -> NTLib3 a b
+libHiddenCtorRepresentational = coerce
 
 newtype Roles1 a b c = Roles1 (Phantom1 b c)
 
@@ -81,6 +112,15 @@ data D a b = D a
 
 underD :: D NTString1 Boolean -> D NTString2 Int
 underD = coerce
+
+givenCanonicalSameTyVarEq :: forall a b c d e. Coercible a (D b c) => Coercible a (D d e) => Proxy a -> b -> d
+givenCanonicalSameTyVarEq _ = coerce
+
+givenCanonicalDiffTyVarEq1 :: forall a b c d e. Coercible a (D b c) => Coercible b d => a -> D d e
+givenCanonicalDiffTyVarEq1 = coerce
+
+givenCanonicalDiffTyVarEq2 :: forall f g a b. Coercible a (f b) => Coercible f g => Proxy f -> a -> g b
+givenCanonicalDiffTyVarEq2 _ = coerce
 
 newtype NTD a b c d = NTD (D b d)
 
@@ -149,8 +189,11 @@ rec7ToRec7 = coerce
 
 type Rec8 r a = { f :: a | r }
 
-rec8ToRec8 :: ∀ r. Rec8 r Int -> Rec8 r (Id1 Int)
+rec8ToRec8 :: forall r. Rec8 r Int -> Rec8 r (Id1 Int)
 rec8ToRec8 = coerce
+
+rec8ToRec8' :: forall r s. Coercible r s => Rec8 r Int -> Rec8 s (Id1 Int)
+rec8ToRec8' = coerce
 
 data Arr1 a b = Arr1 (Array a) (Array b)
 
@@ -178,8 +221,11 @@ data MyMap k v = MyMap k v
 
 type role MyMap nominal representational
 
-mapToMap :: MyMap String String -> MyMap String NTString1
+mapToMap :: forall k1 k2 a b. Coercible (MyMap k1 a) (MyMap k2 b) => MyMap k1 a -> MyMap k2 b
 mapToMap = coerce
+
+mapStringToMapString :: MyMap String String -> MyMap String NTString1
+mapStringToMapString = mapToMap
 
 class Unary a
 
@@ -210,6 +256,13 @@ type ContextualKeywords =
   , representational :: String
   , role :: String
   )
+
+newtype RecursiveRepresentational a
+  = RecursiveRepresentational (RecursiveRepresentational a)
+type role RecursiveRepresentational representational
+
+recursiveRepresentational :: forall a b. Coercible a b => RecursiveRepresentational a -> RecursiveRepresentational b
+recursiveRepresentational = coerce
 
 data MutuallyRecursivePhantom1 a
   = MutuallyRecursivePhantom1 (MutuallyRecursivePhantom2 a)
