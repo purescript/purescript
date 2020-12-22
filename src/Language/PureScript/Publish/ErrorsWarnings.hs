@@ -228,8 +228,8 @@ spdxExamples =
     [ "* \"MIT\""
     , "* \"Apache-2.0\""
     , "* \"BSD-2-Clause\""
-    , "* \"GPL-2.0+\""
-    , "* \"(GPL-3.0 OR MIT)\""
+    , "* \"GPL-2.0-or-later\""
+    , "* \"(GPL-3.0-only OR MIT)\""
     ]
 
 displayRepositoryError :: RepositoryFieldError -> Box
