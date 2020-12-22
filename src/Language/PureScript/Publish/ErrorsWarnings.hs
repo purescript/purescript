@@ -166,32 +166,32 @@ displayUserError e = case e of
     displayRepositoryError err
   NoLicenseSpecified ->
     vcat $
-      [ para (concat
-          [ "No license is specified in package manifest. Please add one, using the "
-          , "SPDX license expression format. For example, any of the "
-          , "following would be acceptable:"
-          ])
+      [ para
+          "No license is specified in package manifest. Please add a \
+          \\"license\" property with a SPDX license expression. For example, \
+          \any of the following would be acceptable:"
       , spacer
       ] ++ spdxExamples ++
       [ spacer
-      , para (
-          "Note that distributing code without a license means that nobody "
-          ++ "will (legally) be able to use it."
-          )
+      , para
+          "See https://spdx.org/licenses/ for a full list of licenses. For more \
+          \information on SPDX license expressions, see https://spdx.org/ids-how"
       , spacer
-      , para (concat
-          [ "It is also recommended to add a LICENSE file to the repository, "
-          , "including your name and the current year, although this is not "
-          , "necessary."
-          ])
+      , para
+          "Note that distributing code without a license means that nobody will \
+          \(legally) be able to use it."
+      , spacer
+      , para
+          "It is also recommended to add a LICENSE file to the repository, \
+          \including your name and the current year, although this is not necessary."
       ]
   InvalidLicense ->
     vcat $
-      [ para (concat
-          [ "The license specified in package manifest is not a valid SPDX license "
-          , "expression. Please use the SPDX license expression format. For "
-          , "example, any of the following would be acceptable:"
-          ])
+      [ para
+          "The license specified in package manifest is not a valid SPDX \
+          \license expression. Please update the \"license\" property so that \
+          \it is a valid SPDX license expression. For example, any of the \
+          \following would be acceptable:"
       , spacer
       ] ++
       spdxExamples
