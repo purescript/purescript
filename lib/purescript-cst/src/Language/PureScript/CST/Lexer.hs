@@ -322,7 +322,7 @@ token = peek >>= maybe (pure TokEof) k0
         peek >>= \case
           Just ')'
             | isReservedSymbol chs -> throw ErrReservedSymbol
-            | otherwise -> next $> TokSymbolName qual chs
+            | otherwise -> next $> TokSymbolName (reverse qual) chs
           Just ch2 -> throw $ ErrLexeme (Just [ch2]) []
           Nothing  -> throw ErrEof
     Just ch -> throw $ ErrLexeme (Just [ch]) []
