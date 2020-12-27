@@ -13,5 +13,11 @@
   },
   "purescript-newtype": {
     "path": "../../../support/bower_components/purescript-newtype"
+  },
+  "purescript-safe-coerce": {
+    "path": "../../../support/bower_components/purescript-safe-coerce"
+  },
+  "purescript-unsafe-coerce": {
+    "path": "../../../support/bower_components/purescript-unsafe-coerce"
   }
 }

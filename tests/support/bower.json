@@ -12,7 +12,6 @@
     "purescript-foldable-traversable": "4.0.0",
     "purescript-functions": "4.0.0",
     "purescript-gen": "2.0.0",
-    "purescript-generics-rep": "6.0.0",
     "purescript-globals": "4.0.0",
     "purescript-identity": "4.0.0",
     "purescript-integers": "4.0.0",
@@ -21,25 +20,28 @@
     "purescript-lists": "5.0.0",
     "purescript-math": "2.1.1",
     "purescript-maybe": "4.0.0",
-    "purescript-newtype": "3.0.0",
+    "purescript-newtype": "#debb7bdf5d712fb568eee16fae896fd2bc6087d0",
     "purescript-nonempty": "5.0.0",
     "purescript-partial": "2.0.0",
-    "purescript-prelude": "#c932361d008379958f14ca8cc2fe32e06cc2647d",
-    "purescript-proxy": "3.0.0",
+    "purescript-prelude": "#d3cdad16a1479403a3f14f94190868ba5e25c657",
     "purescript-psci-support": "4.0.0",
     "purescript-refs": "4.1.0",
-    "purescript-safe-coerce": "0.0.2",
+    "purescript-safe-coerce": "#46b3171f71ca5052de6411e383bef6abe80b3f86",
     "purescript-st": "4.0.0",
     "purescript-strings": "4.0.0",
     "purescript-tailrec": "4.0.0",
     "purescript-tuples": "5.0.0",
-    "purescript-type-equality": "3.0.0",
-    "purescript-typelevel-prelude": "#52ac4bcf9a38941606b3d928127089bd363ee946",
+    "purescript-type-equality": "#8be8f46e70074dd3ace313bd15227f26166e9675",
+    "purescript-typelevel-prelude": "#e1b1c9a73f5407c2b1b197d4776d8939129a2444",
     "purescript-unfoldable": "4.0.0",
-    "purescript-unsafe-coerce": "4.0.0"
+    "purescript-unsafe-coerce": "#76f1d3494a571b97a07f893a1e766f01f86f46f1"
   },
   "resolutions": {
-    "purescript-prelude": "c932361d008379958f14ca8cc2fe32e06cc2647d",
-    "purescript-typelevel-prelude": "52ac4bcf9a38941606b3d928127089bd363ee946"
+    "purescript-newtype": "debb7bdf5d712fb568eee16fae896fd2bc6087d0",
+    "purescript-prelude": "d3cdad16a1479403a3f14f94190868ba5e25c657",
+    "purescript-safe-coerce": "46b3171f71ca5052de6411e383bef6abe80b3f86",
+    "purescript-type-equality": "8be8f46e70074dd3ace313bd15227f26166e9675",
+    "purescript-typelevel-prelude": "e1b1c9a73f5407c2b1b197d4776d8939129a2444",
+    "purescript-unsafe-coerce": "76f1d3494a571b97a07f893a1e766f01f86f46f1"
   }
 }

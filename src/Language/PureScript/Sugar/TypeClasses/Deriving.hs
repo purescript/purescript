@@ -146,8 +146,8 @@ deriveInstance mn syns kinds _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm 
       [wrappedTy, unwrappedTy]
         | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor wrappedTy
         , mn == fromMaybe mn mn'
-        -> do (inst, actualUnwrappedTy) <- deriveNewtype ss mn syns kinds ds tyCon args unwrappedTy
-              return $ TypeInstanceDeclaration sa ch idx nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance inst)
+        -> do actualUnwrappedTy <- deriveNewtype ss syns kinds ds tyCon args unwrappedTy
+              return $ TypeInstanceDeclaration sa ch idx nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance [])
         | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys wrappedTy
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 2
   | className == DataGenericRep.Generic
@@ -558,39 +558,26 @@ deriveNewtype
   :: forall m
    . (MonadError MultipleErrors m, MonadSupply m)
   => SourceSpan
-  -> ModuleName
   -> SynonymMap
   -> KindMap
   -> [Declaration]
   -> ProperName 'TypeName
   -> [SourceType]
   -> SourceType
-  -> m ([Declaration], SourceType)
-deriveNewtype ss mn syns kinds ds tyConNm tyConArgs unwrappedTy = do
+  -> m SourceType
+deriveNewtype ss syns kinds ds tyConNm tyConArgs unwrappedTy = do
     checkIsWildcard ss tyConNm unwrappedTy
     go =<< findTypeDecl ss tyConNm ds
   where
-    go :: Declaration -> m ([Declaration], SourceType)
+    go :: Declaration -> m SourceType
     go (DataDeclaration (ss', _) Data name _ _) =
       throwError . errorMessage' ss' $ CannotDeriveNewtypeForData name
-    go (DataDeclaration (ss', _) Newtype name args dctors) = do
+    go (DataDeclaration _ Newtype name args dctors) = do
       checkNewtype name dctors
-      wrappedIdent <- freshIdent "n"
-      unwrappedIdent <- freshIdent "a"
-      let (DataConstructorDeclaration _ ctorName [(_, ty)]) = head dctors
+      let (DataConstructorDeclaration _ _ [(_, ty)]) = head dctors
       ty' <- replaceAllTypeSynonymsM syns kinds ty
-      let inst =
-            [ ValueDecl (ss', []) (Ident "wrap") Public [] $ unguarded $
-                Constructor ss' (Qualified (Just mn) ctorName)
-            , ValueDecl (ss', []) (Ident "unwrap") Public [] $ unguarded $
-                lamCase ss' wrappedIdent
-                  [ CaseAlternative
-                      [ConstructorBinder ss' (Qualified (Just mn) ctorName) [VarBinder ss' unwrappedIdent]]
-                      (unguarded (Var ss' (Qualified Nothing unwrappedIdent)))
-                  ]
-            ]
-          subst = zipWith ((,) . fst) args tyConArgs
-      return (inst, replaceAllTypeVars subst ty')
+      let subst = zipWith ((,) . fst) args tyConArgs
+      return $ replaceAllTypeVars subst ty'
     go _ = internalError "deriveNewtype go: expected DataDeclaration"
 
 findTypeDecl
