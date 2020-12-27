@@ -1,5 +1,5 @@
 module Language.PureScript.Make.BuildPlan
-  ( BuildPlan(bpEnv, bpPrebuilt), Prebuilt(..)
+  ( BuildPlan(bpEnv)
   , BuildJobResult(..)
   , buildJobSuccess
   , buildJobFailure
