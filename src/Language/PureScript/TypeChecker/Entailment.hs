@@ -394,16 +394,16 @@ entails SolverOptions{..} constraint context hints =
                  | otherwise -> Nothing
       GivenSolverState{ inertGivens } <- execStateT (solveGivens env) $
         initialGivenSolverState givens
-      (WantedSolverState{ inertWanteds }, reasons) <- runWriterT . execStateT (solveWanteds env) $
+      (WantedSolverState{ inertWanteds }, hints') <- runWriterT . execStateT (solveWanteds env) $
         initialWantedSolverState inertGivens a b
       -- Solving fails when there's irreducible wanteds left.
       --
       -- We report the first residual constraint instead of the initial wanted,
       -- unless we just swapped its arguments.
       --
-      -- We may have collected specific reasons for the solving failure though,
-      -- in that case we report the first one instead.
-      maybe id (const . errorMessage) (listToMaybe reasons) `rethrow` case inertWanteds of
+      -- We may have collected hints for the solving failure along the way, in
+      -- which case we decorate the error with the first one.
+      maybe id addHint (listToMaybe hints') `rethrow` case inertWanteds of
         [] -> pure $ Just [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing]
         (k, a', b') : _ | a' == b && b' == a -> throwError $ insoluble k b' a'
         (k, a', b') : _ -> throwError $ insoluble k a' b'

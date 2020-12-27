@@ -186,7 +186,6 @@ data SimpleErrorMessage
   | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
-  | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -349,7 +348,6 @@ errorCode em = case unwrapErrorMessage em of
   UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
-  MissingConstructorImportForCoercible {} -> "MissingConstructorImportForCoercible"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1350,12 +1348,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
       line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
 
-    renderSimpleErrorMessage (MissingConstructorImportForCoercible name) =
-      paras
-        [ line $ "The newtype constructor " <> markCode (showQualified runProperName name) <> " is not in scope."
-        , line "It should be imported to allow coercions to and from its representation."
-        ]
-
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
       let (row1Box, row2Box) = printRows t1 t2
@@ -1507,6 +1499,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
                 ]
             ]
+    renderHint (MissingConstructorImportForCoercible name) detail =
+      paras
+        [ detail
+        , Box.moveUp 1 $ Box.moveRight 2 $ line $ "Solving this instance requires the newtype constructor " <> markCode (showQualified runProperName name) <> " to be in scope."
+        ]
     renderHint (PositionedError srcSpan) detail =
       paras [ line $ "at " <> displaySourceSpan relPath (NEL.head srcSpan)
             , detail
@@ -1627,7 +1624,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       where
       isUnifyHint ErrorUnifyingTypes{} = True
       isUnifyHint _ = False
-    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _)) = stripFirst isSolverHint
+    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _)) = filter (not . isSolverHint)
       where
       isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
       isSolverHint _ = False

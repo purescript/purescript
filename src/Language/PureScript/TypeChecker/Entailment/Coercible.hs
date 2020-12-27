@@ -207,7 +207,7 @@ initialWantedSolverState givens a b =
 -- @Coercible Boolean Char@.
 solveWanteds
   :: MonadError MultipleErrors m
-  => MonadWriter [SimpleErrorMessage] m
+  => MonadWriter [ErrorMessageHint] m
   => MonadState CheckState m
   => Environment
   -> StateT WantedSolverState m ()
@@ -479,7 +479,7 @@ data Canonicalized
 -- simpler constraints whose satisfaction will imply the goal.
 canon
   :: MonadError MultipleErrors m
-  => MonadWriter [SimpleErrorMessage] m
+  => MonadWriter [ErrorMessageHint] m
   => MonadState CheckState m
   => Environment
   -> Maybe [(SourceType, SourceType, SourceType)]
@@ -614,7 +614,7 @@ data UnwrapNewtypeError
 -- substituted in (e.g. @N[D/a] = D@ given @newtype N a = N a@ and @data D = D@).
 unwrapNewtype
   :: MonadState CheckState m
-  => MonadWriter [SimpleErrorMessage] m
+  => MonadWriter [ErrorMessageHint] m
   => Environment
   -> SourceType
   -> m (Either UnwrapNewtypeError SourceType)
@@ -694,7 +694,7 @@ lookupNewtypeConstructorInScope env currentModuleName currentModuleImports quali
 -- @Coercible a b@ if unwraping the newtype yields @a@.
 canonNewtypeLeft
   :: MonadState CheckState m
-  => MonadWriter [SimpleErrorMessage] m
+  => MonadWriter [ErrorMessageHint] m
   => Environment
   -> SourceType
   -> SourceType
@@ -709,7 +709,7 @@ canonNewtypeLeft env a b =
 -- @Coercible a b@ if unwraping the newtype yields @b@.
 canonNewtypeRight
   :: MonadState CheckState m
-  => MonadWriter [SimpleErrorMessage] m
+  => MonadWriter [ErrorMessageHint] m
   => Environment
   -> SourceType
   -> SourceType

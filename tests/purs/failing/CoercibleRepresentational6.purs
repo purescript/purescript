@@ -1,4 +1,4 @@
--- @shouldFailWith MissingConstructorImportForCoercible
+-- @shouldFailWith NoInstanceFound
 module Main where
 
 import Safe.Coerce (coerce)
