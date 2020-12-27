@@ -34,7 +34,7 @@
     "purescript-type-equality": "#8be8f46e70074dd3ace313bd15227f26166e9675",
     "purescript-typelevel-prelude": "#e1b1c9a73f5407c2b1b197d4776d8939129a2444",
     "purescript-unfoldable": "4.0.0",
-    "purescript-unsafe-coerce": "master"
+    "purescript-unsafe-coerce": "#76f1d3494a571b97a07f893a1e766f01f86f46f1"
   },
   "resolutions": {
     "purescript-newtype": "debb7bdf5d712fb568eee16fae896fd2bc6087d0",
@@ -42,6 +42,6 @@
     "purescript-safe-coerce": "46b3171f71ca5052de6411e383bef6abe80b3f86",
     "purescript-type-equality": "8be8f46e70074dd3ace313bd15227f26166e9675",
     "purescript-typelevel-prelude": "e1b1c9a73f5407c2b1b197d4776d8939129a2444",
-    "purescript-unsafe-coerce": "master"
+    "purescript-unsafe-coerce": "76f1d3494a571b97a07f893a1e766f01f86f46f1"
   }
 }
