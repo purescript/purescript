@@ -206,7 +206,7 @@ instance Serialise NameKind
 
 -- | The kinds of a type
 data TypeKind
-  = DataType [(Text, Maybe SourceType, Role)] [(ProperName 'ConstructorName, [SourceType])]
+  = DataType DataDeclType [(Text, Maybe SourceType, Role)] [(ProperName 'ConstructorName, [SourceType])]
   -- ^ Data type
   | TypeSynonym
   -- ^ Type synonym

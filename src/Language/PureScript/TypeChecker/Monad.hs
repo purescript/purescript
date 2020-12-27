@@ -88,7 +88,7 @@ data CheckState = CheckState
   -- This goes into state, rather than using 'rethrow',
   -- since this way, we can provide good error messages
   -- during instance resolution.
-  , checkCoercedNewtypeCtorsImports :: S.Set (ModuleName, Qualified (ProperName 'ConstructorName))
+  , checkConstructorImportsForCoercible :: S.Set (ModuleName, Qualified (ProperName 'ConstructorName))
   -- ^ Newtype constructors imports required to solve Coercible constraints.
   -- We have to keep track of them so that we don't emit unused import warnings.
   }
@@ -392,7 +392,7 @@ debugTypes = go <=< M.toList . types
       ppTy = prettyPrintType 100 srcTy
       name = showQualified runProperName qual
       decl = case which of
-        DataType _ _      -> "data"
+        DataType _ _ _    -> "data"
         TypeSynonym       -> "type"
         ExternData _      -> "extern"
         LocalTypeVariable -> "local"

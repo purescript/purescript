@@ -24,7 +24,7 @@ import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
 import Data.List (minimumBy, groupBy, nubBy, sortBy)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (for)
@@ -394,13 +394,17 @@ entails SolverOptions{..} constraint context hints =
                  | otherwise -> Nothing
       GivenSolverState{ inertGivens } <- execStateT (solveGivens env) $
         initialGivenSolverState givens
-      WantedSolverState{ inertWanteds } <- execStateT (solveWanteds env) $
+      (WantedSolverState{ inertWanteds }, hints') <- runWriterT . execStateT (solveWanteds env) $
         initialWantedSolverState inertGivens a b
-      case inertWanteds of
+      -- Solving fails when there's irreducible wanteds left.
+      --
+      -- We report the first residual constraint instead of the initial wanted,
+      -- unless we just swapped its arguments.
+      --
+      -- We may have collected hints for the solving failure along the way, in
+      -- which case we decorate the error with the first one.
+      maybe id addHint (listToMaybe hints') `rethrow` case inertWanteds of
         [] -> pure $ Just [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing]
-      -- Solving fails when there's irreducible wanteds left. We report the
-      -- first residual constraint instead of the initial wanted, unless we
-      -- just swapped its arguments.
         (k, a', b') : _ | a' == b && b' == a -> throwError $ insoluble k b' a'
         (k, a', b') : _ -> throwError $ insoluble k a' b'
     solveCoercible _ _ _ _ = pure Nothing

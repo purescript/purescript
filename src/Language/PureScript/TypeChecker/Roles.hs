@@ -47,7 +47,7 @@ type RoleEnv = M.Map (Qualified (ProperName 'TypeName)) [Role]
 
 typeKindRoles :: TypeKind -> Maybe [Role]
 typeKindRoles = \case
-  DataType args _ ->
+  DataType _ args _ ->
     Just $ map (\(_, _, role) -> role) args
   ExternData roles ->
     Just roles

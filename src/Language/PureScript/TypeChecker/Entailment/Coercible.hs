@@ -23,7 +23,7 @@ import Control.Monad.State (MonadState, StateT, get, gets, modify, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import Control.Monad.Writer.Strict (Writer, execWriter, runWriter, tell)
+import Control.Monad.Writer.Strict (MonadWriter, Writer, execWriter, runWriter, runWriterT, tell)
 import Data.Either (partitionEithers)
 import Data.Foldable (fold, foldl', for_, toList)
 import Data.Functor (($>))
@@ -37,7 +37,7 @@ import qualified Data.Set as S
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Errors
+import Language.PureScript.Errors hiding (inScope)
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Kinds hiding (kindOf)
 import Language.PureScript.TypeChecker.Monad
@@ -130,7 +130,7 @@ solveGivens env = go (0 :: Int) where
       given : unsolved -> do
         (k, a, b) <- lift $ unify given
         GivenSolverState{..} <- get
-        lift (canon env Nothing k a b `catchError` recover) >>= \case
+        lift (fst <$> runWriterT (canon env Nothing k a b `catchError` recover)) >>= \case
           Irreducible -> case interact env (a, b) inertGivens of
             Just (Simplified (a', b')) ->
               put $ GivenSolverState { unsolvedGivens = (a', b') : unsolved, .. }
@@ -207,6 +207,7 @@ initialWantedSolverState givens a b =
 -- @Coercible Boolean Char@.
 solveWanteds
   :: MonadError MultipleErrors m
+  => MonadWriter [ErrorMessageHint] m
   => MonadState CheckState m
   => Environment
   -> StateT WantedSolverState m ()
@@ -478,6 +479,7 @@ data Canonicalized
 -- simpler constraints whose satisfaction will imply the goal.
 canon
   :: MonadError MultipleErrors m
+  => MonadWriter [ErrorMessageHint] m
   => MonadState CheckState m
   => Environment
   -> Maybe [(SourceType, SourceType, SourceType)]
@@ -612,6 +614,7 @@ data UnwrapNewtypeError
 -- substituted in (e.g. @N[D/a] = D@ given @newtype N a = N a@ and @data D = D@).
 unwrapNewtype
   :: MonadState CheckState m
+  => MonadWriter [ErrorMessageHint] m
   => Environment
   -> SourceType
   -> m (Either UnwrapNewtypeError SourceType)
@@ -621,20 +624,23 @@ unwrapNewtype env = go (0 :: Int) where
     (currentModuleName, currentModuleImports) <- gets $ checkCurrentModule &&& checkCurrentModuleImports
     case unapplyTypes ty of
       (TypeConstructor _ newtypeName, _, xs)
-        | Just (fromModuleName, tvs, newtypeCtorName, wrappedTy) <-
+        | Just (inScope, fromModuleName, tvs, newtypeCtorName, wrappedTy) <-
             lookupNewtypeConstructorInScope env currentModuleName currentModuleImports newtypeName
         -- We refuse to unwrap newtypes over polytypes because we don't know how
         -- to canonicalize them yet and we'd rather try to make progress with
         -- another rule.
         , isMonoType wrappedTy -> do
-            for_ fromModuleName $ flip insertCoercedNewtypeCtorImport newtypeCtorName
+            when (not inScope) $ do
+              tell [MissingConstructorImportForCoercible newtypeCtorName]
+              throwError CannotUnwrapConstructor
+            for_ fromModuleName $ flip addConstructorImportForCoercible newtypeCtorName
             let wrappedTySub = replaceAllTypeVars (zip tvs xs) wrappedTy
             ExceptT (go (n + 1) wrappedTySub) `catchError` \case
               CannotUnwrapInfiniteNewtypeChain -> throwError CannotUnwrapInfiniteNewtypeChain
               CannotUnwrapConstructor -> pure wrappedTySub
       _ -> throwError CannotUnwrapConstructor
-  insertCoercedNewtypeCtorImport fromModuleName newtypeCtorName = modify $ \st ->
-    st { checkCoercedNewtypeCtorsImports = S.insert (fromModuleName, newtypeCtorName) $ checkCoercedNewtypeCtorsImports st }
+  addConstructorImportForCoercible fromModuleName newtypeCtorName = modify $ \st ->
+    st { checkConstructorImportsForCoercible = S.insert (fromModuleName, newtypeCtorName) $ checkConstructorImportsForCoercible st }
 
 -- | Looks up a given name and, if it names a newtype, returns the names of the
 -- type's parameters, the type the newtype wraps and the names of the type's
@@ -643,13 +649,12 @@ lookupNewtypeConstructor
   :: Environment
   -> Qualified (ProperName 'TypeName)
   -> Maybe ([Text], ProperName 'ConstructorName, SourceType)
-lookupNewtypeConstructor env qualifiedNewtypeName@(Qualified newtypeModuleName _) = do
-  (_, DataType tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
-  (Newtype, _, _, _) <- M.lookup (Qualified newtypeModuleName ctorName) (dataConstructors env)
+lookupNewtypeConstructor env qualifiedNewtypeName = do
+  (_, DataType Newtype tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
   pure (map (\(name, _, _) -> name) tvs, ctorName, wrappedTy)
 
--- | Behaves like 'lookupNewtypeConstructor', but fails unless the newtype
--- constructor is in scope and returns the module from which it is imported, or
+-- | Behaves like 'lookupNewtypeConstructor' but also returns whether the
+-- newtype constructor is in scope and the module from which it is imported, or
 -- 'Nothing' if it is defined in the current module.
 lookupNewtypeConstructorInScope
   :: Environment
@@ -662,16 +667,16 @@ lookupNewtypeConstructorInScope
        )
      ]
   -> Qualified (ProperName 'TypeName)
-  -> Maybe (Maybe ModuleName, [Text], Qualified (ProperName 'ConstructorName), SourceType)
+  -> Maybe (Bool, Maybe ModuleName, [Text], Qualified (ProperName 'ConstructorName), SourceType)
 lookupNewtypeConstructorInScope env currentModuleName currentModuleImports qualifiedNewtypeName@(Qualified newtypeModuleName newtypeName) = do
   let fromModule = find isNewtypeCtorImported currentModuleImports
       fromModuleName = (\(_, n, _, _, _) -> n) <$> fromModule
       asModuleName = (\(_, _, _, n, _) -> n) =<< fromModule
       isDefinedInCurrentModule = newtypeModuleName == currentModuleName
       isImported = isJust fromModule
-  guard $ isDefinedInCurrentModule || isImported
+      inScope = isDefinedInCurrentModule || isImported
   (tvs, ctorName, wrappedTy) <- lookupNewtypeConstructor env qualifiedNewtypeName
-  pure (fromModuleName, tvs, Qualified asModuleName ctorName, wrappedTy)
+  pure (inScope, fromModuleName, tvs, Qualified asModuleName ctorName, wrappedTy)
   where
   isNewtypeCtorImported (_, _, importDeclType, _, exportedTypes) =
     case M.lookup newtypeName exportedTypes of
@@ -689,6 +694,7 @@ lookupNewtypeConstructorInScope env currentModuleName currentModuleImports quali
 -- @Coercible a b@ if unwraping the newtype yields @a@.
 canonNewtypeLeft
   :: MonadState CheckState m
+  => MonadWriter [ErrorMessageHint] m
   => Environment
   -> SourceType
   -> SourceType
@@ -703,6 +709,7 @@ canonNewtypeLeft env a b =
 -- @Coercible a b@ if unwraping the newtype yields @b@.
 canonNewtypeRight
   :: MonadState CheckState m
+  => MonadWriter [ErrorMessageHint] m
   => Environment
   -> SourceType
   -> SourceType

@@ -67,7 +67,7 @@ getConstructors env defmn n = extractConstructors lnte
   where
 
   extractConstructors :: Maybe (SourceType, TypeKind) -> [(ProperName 'ConstructorName, [SourceType])]
-  extractConstructors (Just (_, DataType _ pt)) = pt
+  extractConstructors (Just (_, DataType _ _ pt)) = pt
   extractConstructors _ = internalError "Data name not in the scope of the current environment in extractConstructors"
 
   lnte :: Maybe (SourceType, TypeKind)

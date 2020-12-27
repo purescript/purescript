@@ -226,7 +226,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       Just (kind, TypeSynonym)
         | Just (args, synTy) <- Qualified (Just mn) pn `M.lookup` typeSynonyms env -> [ EDType pn kind TypeSynonym, EDTypeSynonym pn args synTy ]
       Just (kind, ExternData rs) -> [ EDType pn kind (ExternData rs) ]
-      Just (kind, tk@(DataType _ tys)) ->
+      Just (kind, tk@(DataType _ _ tys)) ->
         EDType pn kind tk : [ EDDataConstructor dctor dty pn ty args
                             | dctor <- fromMaybe (map fst tys) dctors
                             , (dty, _, ty, args) <- maybeToList (Qualified (Just mn) dctor `M.lookup` dataConstructors env)

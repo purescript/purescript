@@ -83,6 +83,7 @@ data ErrorMessageHint
   | ErrorInRoleDeclaration (ProperName 'TypeName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint SourceConstraint
+  | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   | PositionedError (NEL.NonEmpty SourceSpan)
   deriving (Show)
 

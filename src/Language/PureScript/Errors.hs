@@ -1499,6 +1499,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
                 ]
             ]
+    renderHint (MissingConstructorImportForCoercible name) detail =
+      paras
+        [ detail
+        , Box.moveUp 1 $ Box.moveRight 2 $ line $ "Solving this instance requires the newtype constructor " <> markCode (showQualified runProperName name) <> " to be in scope."
+        ]
     renderHint (PositionedError srcSpan) detail =
       paras [ line $ "at " <> displaySourceSpan relPath (NEL.head srcSpan)
             , detail
@@ -1619,7 +1624,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       where
       isUnifyHint ErrorUnifyingTypes{} = True
       isUnifyHint _ = False
-    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _)) = stripFirst isSolverHint
+    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _)) = filter (not . isSolverHint)
       where
       isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
       isSolverHint _ = False
