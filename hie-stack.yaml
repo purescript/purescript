@@ -1,0 +1,52 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "purescript:lib"
+
+    - path: "./app/Main.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Command/Bundle.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Command/Compile.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Command/Docs.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Command/Docs/Html.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Command/Docs/Markdown.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Command/Graph.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Command/Hierarchy.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Command/Ide.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Command/Publish.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Command/REPL.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./app/Version.hs"
+      component: "purescript:exe:purs"
+
+    - path: "./tests"
+      component: "purescript:test:tests"
+
+    - path: "lib/purescript-ast/src"
+      component: "purescript-ast:lib"
+
+    - path: "lib/purescript-cst/src"
+      component: "purescript-cst:lib"
+
+    - path: "lib/purescript-cst/tests"
+      component: "purescript-cst:test:tests"

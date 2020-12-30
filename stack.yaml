@@ -8,6 +8,7 @@ ghc-options:
   # Build with advanced optimizations enabled by default
   "$locals": -O2
 extra-deps:
+- hsc2hs-0.68.7
 - serialise-0.2.2.0
 - cborg-0.2.2.0
 - happy-1.19.9

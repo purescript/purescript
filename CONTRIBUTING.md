@@ -41,6 +41,10 @@ stack test --fast --test-arguments="-p 1110.purs"
 
 This will run whatever test uses the example file `1110.purs`.
 
+### Setting up HLS
+
+The project contains a running haskell-language-server via `shell.nix`. If you want to compile less, enter `set up iohk hydra nix binary cache` into your favourite search engine. Make sure to switch your IDE to `haskell-language-server`, not HIE (which is default under vscode when this document was written).
+
 ### Adding Dependencies
 
 Because the PureScript compiler is distributed in binary form, we include the licenses of all dependencies, including transitive ones, in the LICENSE file. Therefore, whenever the dependencies change, the LICENSE file should be updated.
