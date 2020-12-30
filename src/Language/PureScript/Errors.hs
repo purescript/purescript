@@ -72,6 +72,7 @@ data SimpleErrorMessage
   | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
   | OrphanKindDeclaration (ProperName 'TypeName)
+  | OrphanRoleDeclaration (ProperName 'TypeName)
   | RedefinedIdent Ident
   | OverlappingNamesInLet
   | UnknownName (Qualified Name)
@@ -90,7 +91,7 @@ data SimpleErrorMessage
   | InvalidDoBind
   | InvalidDoLet
   | CycleInDeclaration Ident
-  | CycleInTypeSynonym (Maybe (ProperName 'TypeName))
+  | CycleInTypeSynonym [ProperName 'TypeName]
   | CycleInTypeClassDeclaration [Qualified (ProperName 'ClassName)]
   | CycleInKindDeclaration [Qualified (ProperName 'TypeName)]
   | CycleInModules [ModuleName]
@@ -106,6 +107,7 @@ data SimpleErrorMessage
   | AmbiguousTypeVariables SourceType [Int]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
+  | PossiblyInfiniteCoercibleInstance
   | CannotDerive (Qualified (ProperName 'ClassName)) [SourceType]
   | InvalidDerivedInstance (Qualified (ProperName 'ClassName)) [SourceType] Int
   | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [SourceType] SourceType
@@ -125,12 +127,12 @@ data SimpleErrorMessage
   | ExprDoesNotHaveType Expr SourceType
   | PropertyIsMissing Label
   | AdditionalProperty Label
-  | TypeSynonymInstance
   | OrphanInstance Ident (Qualified (ProperName 'ClassName)) (S.Set ModuleName) [SourceType]
   | InvalidNewtype (ProperName 'TypeName)
   | InvalidInstanceHead SourceType
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | TransitiveDctorExportError DeclarationRef [ProperName 'ConstructorName]
+  | HiddenConstructors DeclarationRef (Qualified (ProperName 'ClassName))
   | ShadowedName Ident
   | ShadowedTypeVar Text
   | UnusedTypeVar Text
@@ -181,6 +183,9 @@ data SimpleErrorMessage
       Role -- ^ inferred role
       Role -- ^ declared role
   | InvalidCoercibleInstanceDeclaration [SourceType]
+  | UnsupportedRoleDeclaration
+  | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
+  | DuplicateRoleDeclaration (ProperName 'TypeName)
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -237,6 +242,7 @@ errorCode em = case unwrapErrorMessage em of
   MultipleTypeOpFixities{} -> "MultipleTypeOpFixities"
   OrphanTypeDeclaration{} -> "OrphanTypeDeclaration"
   OrphanKindDeclaration{} -> "OrphanKindDeclaration"
+  OrphanRoleDeclaration{} -> "OrphanRoleDeclaration"
   RedefinedIdent{} -> "RedefinedIdent"
   OverlappingNamesInLet -> "OverlappingNamesInLet"
   UnknownName{} -> "UnknownName"
@@ -271,6 +277,7 @@ errorCode em = case unwrapErrorMessage em of
   AmbiguousTypeVariables{} -> "AmbiguousTypeVariables"
   UnknownClass{} -> "UnknownClass"
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
+  PossiblyInfiniteCoercibleInstance -> "PossiblyInfiniteCoercibleInstance"
   CannotDerive{} -> "CannotDerive"
   InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
   MissingNewtypeSuperclassInstance{} -> "MissingNewtypeSuperclassInstance"
@@ -289,12 +296,12 @@ errorCode em = case unwrapErrorMessage em of
   ExprDoesNotHaveType{} -> "ExprDoesNotHaveType"
   PropertyIsMissing{} -> "PropertyIsMissing"
   AdditionalProperty{} -> "AdditionalProperty"
-  TypeSynonymInstance -> "TypeSynonymInstance"
   OrphanInstance{} -> "OrphanInstance"
   InvalidNewtype{} -> "InvalidNewtype"
   InvalidInstanceHead{} -> "InvalidInstanceHead"
   TransitiveExportError{} -> "TransitiveExportError"
   TransitiveDctorExportError{} -> "TransitiveDctorExportError"
+  HiddenConstructors{} -> "HiddenConstructors"
   ShadowedName{} -> "ShadowedName"
   ShadowedTypeVar{} -> "ShadowedTypeVar"
   UnusedTypeVar{} -> "UnusedTypeVar"
@@ -338,6 +345,9 @@ errorCode em = case unwrapErrorMessage em of
   UnsupportedTypeInKind {} -> "UnsupportedTypeInKind"
   RoleMismatch {} -> "RoleMismatch"
   InvalidCoercibleInstanceDeclaration {} -> "InvalidCoercibleInstanceDeclaration"
+  UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
+  RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
+  DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -711,10 +721,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "The type declaration for " <> markCode (showIdent nm) <> " should be followed by its definition."
     renderSimpleErrorMessage (OrphanKindDeclaration nm) =
       line $ "The kind declaration for " <> markCode (runProperName nm) <> " should be followed by its definition."
+    renderSimpleErrorMessage (OrphanRoleDeclaration nm) =
+      line $ "The role declaration for " <> markCode (runProperName nm) <> " should follow its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
       line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
+    renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i == C.negate =
+      line $ "Unknown " <> printName name <> ". You're probably using numeric negation (the unary " <> markCode "-" <> " operator), which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name) =
       line $ "Unknown " <> printName name
     renderSimpleErrorMessage (UnknownImport mn name) =
@@ -762,13 +776,18 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
           paras [ line "There is a cycle in module dependencies in these modules: "
                 , indent $ paras (map (line . markCode . runModuleName) mns)
                 ]
-    renderSimpleErrorMessage (CycleInTypeSynonym name) =
-      paras [ line $ case name of
-                       Just pn -> "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
-                       Nothing -> "A cycle appears in a set of type synonym definitions."
-            , line "Cycles are disallowed because they can lead to loops in the type checker."
+    renderSimpleErrorMessage (CycleInTypeSynonym names) =
+      paras $ cycleError <>
+            [ line "Cycles are disallowed because they can lead to loops in the type checker."
             , line "Consider using a 'newtype' instead."
             ]
+      where
+      cycleError = case names of
+        []   -> pure . line $ "A cycle appears in a set of type synonym definitions."
+        [pn] -> pure . line $ "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
+        _    -> [ line " A cycle appears in a set of type synonym definitions:"
+                , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName) names)) <> "}"
+                ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration [name]) =
       paras [ line $ "A type class '" <> markCode (runProperName (disqualify name)) <> "' may not have itself as a superclass." ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration names) =
@@ -894,6 +913,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 ]
             , line "is possibly infinite."
             ]
+    renderSimpleErrorMessage PossiblyInfiniteCoercibleInstance =
+      line $ "A " <> markCode "Coercible" <> " instance is possibly infinite."
     renderSimpleErrorMessage (CannotDerive nm ts) =
       paras [ line "Cannot derive a type class instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
@@ -997,8 +1018,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Type of expression lacks required label " <> markCode (prettyPrintLabel prop) <> "."
     renderSimpleErrorMessage (AdditionalProperty prop) =
       line $ "Type of expression contains additional label " <> markCode (prettyPrintLabel prop) <> "."
-    renderSimpleErrorMessage TypeSynonymInstance =
-      line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm nonOrphanModules ts) =
       paras [ line $ "Orphan instance " <> markCode (showIdent nm) <> " found for "
             , markCodeBox $ indent $ Box.hsep 1 Box.left
@@ -1033,6 +1052,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (TransitiveDctorExportError x ctors) =
       paras [ line $ "An export for " <> markCode (prettyPrintExport x) <> " requires the following data constructor" <> (if length ctors == 1 then "" else "s") <> " to also be exported: "
             , indent $ paras $ map (line . markCode . runProperName) ctors
+            ]
+    renderSimpleErrorMessage (HiddenConstructors x className) =
+      paras [ line $ "An export for " <> markCode (prettyPrintExport x) <> " hides data constructors but the type declares an instance of " <> markCode (showQualified runProperName className) <> "."
+            , line "Such instance allows to match and construct values of this type, effectively making the constructors public."
             ]
     renderSimpleErrorMessage (ShadowedName nm) =
       line $ "Name " <> markCode (showIdent nm) <> " was shadowed."
@@ -1306,6 +1329,25 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         , line "Instance declarations of this type class are disallowed."
         ]
 
+    renderSimpleErrorMessage UnsupportedRoleDeclaration =
+      line $ "Role declarations are only supported for data types, not for type synonyms nor type classes."
+
+    renderSimpleErrorMessage (RoleDeclarationArityMismatch name expected actual) =
+      line $ T.intercalate " "
+        [ "The type"
+        , markCode (runProperName name)
+        , "expects"
+        , T.pack (show expected)
+        , if expected == 1 then "argument" else "arguments"
+        , "but its role declaration lists"
+            <> if actual > expected then "" else " only"
+        , T.pack (show actual)
+        , if actual > 1 then "roles" else "role"
+        ] <> "."
+
+    renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
+      line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
+
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
       let (row1Box, row2Box) = printRows t1 t2
@@ -1457,6 +1499,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
                 ]
             ]
+    renderHint (MissingConstructorImportForCoercible name) detail =
+      paras
+        [ detail
+        , Box.moveUp 1 $ Box.moveRight 2 $ line $ "Solving this instance requires the newtype constructor " <> markCode (showQualified runProperName name) <> " to be in scope."
+        ]
     renderHint (PositionedError srcSpan) detail =
       paras [ line $ "at " <> displaySourceSpan relPath (NEL.head srcSpan)
             , detail
@@ -1577,6 +1624,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       where
       isUnifyHint ErrorUnifyingTypes{} = True
       isUnifyHint _ = False
+    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _)) = filter (not . isSolverHint)
+      where
+      isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
+      isSolverHint _ = False
     stripRedundantHints NoInstanceFound{} = stripFirst isSolverHint
       where
       isSolverHint ErrorSolvingConstraint{} = True

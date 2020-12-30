@@ -85,6 +85,7 @@ library
     Language.PureScript.CST.Types
     Language.PureScript.CST.Utils
   other-modules:
+    Data.Text.PureScript
     Paths_purescript_cst
   autogen-modules:
     Paths_purescript_cst

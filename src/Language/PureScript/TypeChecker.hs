@@ -21,6 +21,7 @@ import Control.Monad.Writer.Class (MonadWriter(..), censor)
 import Data.Foldable (for_, traverse_, toList)
 import Data.List (nub, nubBy, (\\), sort, group, intersect)
 import Data.Maybe
+import Data.Either (partitionEithers)
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
@@ -28,12 +29,15 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Language.PureScript.AST
+import qualified Language.PureScript.Constants.Data.Generic.Rep as DataGenericRep
+import qualified Language.PureScript.Constants.Data.Newtype as DataNewtype
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Linter
 import Language.PureScript.Names
 import Language.PureScript.Roles
+import Language.PureScript.Sugar.Names.Env (Exports(..))
 import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
 import Language.PureScript.TypeChecker.Roles as T
@@ -59,7 +63,7 @@ addDataType moduleName dtype name args dctors ctorKind = do
   let mapDataCtor (DataConstructorDeclaration _ ctorName vars) = (ctorName, snd <$> vars)
       qualName = (Qualified (Just moduleName) name)
       hasSig = qualName `M.member` types env
-  putEnv $ env { types = M.insert qualName (ctorKind, DataType args (map (mapDataCtor . fst) dctors)) (types env) }
+  putEnv $ env { types = M.insert qualName (ctorKind, DataType dtype args (map (mapDataCtor . fst) dctors)) (types env) }
   unless (hasSig || not (containsForAll ctorKind)) $ do
     tell . errorMessage $ MissingKindDeclaration (if dtype == Newtype then NewtypeSig else DataSig) name ctorKind
   for_ dctors $ \(DataConstructorDeclaration _ dctor fields, polyType) ->
@@ -148,8 +152,8 @@ addTypeClass
   -> m ()
 addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
   env <- getEnv
-  let newClass = mkNewClass env
-      qualName = fmap coerceProperName qualifiedClassName
+  newClass <- mkNewClass
+  let qualName = fmap coerceProperName qualifiedClassName
       hasSig = qualName `M.member` types env
   unless (hasSig || not (containsForAll kind)) $ do
     tell . errorMessage $ MissingKindDeclaration ClassSig (disqualify qualName) kind
@@ -160,11 +164,14 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
     classMembers :: [(Ident, SourceType)]
     classMembers = map toPair ds
 
-    mkNewClass :: Environment -> TypeClassData
-    mkNewClass env = makeTypeClassData args classMembers implies dependencies ctIsEmpty
+    mkNewClass :: m TypeClassData
+    mkNewClass = do
+      env <- getEnv
+      implies' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms implies
+      let ctIsEmpty = null classMembers && all (typeClassIsEmpty . findSuperClass env) implies'
+      pure $ makeTypeClassData args classMembers implies' dependencies ctIsEmpty
       where
-      ctIsEmpty = null classMembers && all (typeClassIsEmpty . findSuperClass) implies
-      findSuperClass c = case M.lookup (constraintClass c) (typeClasses env) of
+      findSuperClass env c = case M.lookup (constraintClass c) (typeClasses env) of
         Just tcd -> tcd
         Nothing -> internalError "Unknown super class in TypeClassDeclaration"
 
@@ -226,10 +233,7 @@ checkTypeClassInstance cls i = check where
   check = \case
     TypeVar _ _ -> return ()
     TypeLevelString _ _ -> return ()
-    TypeConstructor _ ctor -> do
-      env <- getEnv
-      when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
-      return ()
+    TypeConstructor _ _ -> return ()
     TypeApp _ t1 t2 -> check t1 >> check t2
     KindApp _ t k -> check t >> check k
     KindedType _ t _ -> check t
@@ -408,14 +412,15 @@ typeCheckAll moduleName _ = traverse go
         Just typeClass -> do
           checkInstanceArity dictName className typeClass tys
           (deps', kinds', tys', vars) <- withFreshSubstitution $ checkInstanceDeclaration moduleName (sa, deps, className, tys)
-          sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys')
-          let nonOrphanModules = findNonOrphanModules className typeClass tys'
-          checkOrphanInstance dictName className tys' nonOrphanModules
+          tys'' <- traverse replaceAllTypeSynonyms tys'
+          sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys'')
+          let nonOrphanModules = findNonOrphanModules className typeClass tys''
+          checkOrphanInstance dictName className tys'' nonOrphanModules
           let qualifiedChain = Qualified (Just moduleName) <$> ch
-          checkOverlappingInstance qualifiedChain dictName className typeClass tys' nonOrphanModules
+          checkOverlappingInstance qualifiedChain dictName className typeClass tys'' nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
-          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className vars kinds' tys' (Just deps'')
+          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className vars kinds' tys'' (Just deps'')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 
@@ -592,14 +597,16 @@ checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 typeCheckModule
   :: forall m
    . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => Module
+  => M.Map ModuleName Exports
+  -> Module
   -> m Module
-typeCheckModule (Module _ _ _ _ Nothing) =
+typeCheckModule _ (Module _ _ _ _ Nothing) =
   internalError "exports should have been elaborated before typeCheckModule"
-typeCheckModule (Module ss coms mn decls (Just exps)) =
+typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
   warnAndRethrow (addHint (ErrorInModule mn)) $ do
-    modify (\s -> s { checkCurrentModule = Just mn })
-    decls' <- typeCheckAll mn exps decls
+    let (decls', imports) = partitionEithers $ fromImportDecl <$> decls
+    modify (\s -> s { checkCurrentModule = Just mn, checkCurrentModuleImports = imports })
+    decls'' <- typeCheckAll mn exps decls'
     checkSuperClassesAreExported <- getSuperClassExportCheck
     for_ exps $ \e -> do
       checkTypesAreExported e
@@ -607,8 +614,33 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       checkClassesAreExported e
       checkSuperClassesAreExported e
       checkDataConstructorsAreExported e
-    return $ Module ss coms mn decls' (Just exps)
+    return $ Module ss coms mn (map toImportDecl imports ++ decls'') (Just exps)
   where
+
+  fromImportDecl
+    :: Declaration
+    -> Either Declaration
+              ( SourceAnn
+              , ModuleName
+              , ImportDeclarationType
+              , Maybe ModuleName
+              , M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
+              )
+  fromImportDecl (ImportDeclaration sa moduleName importDeclarationType asModuleName) =
+    Right (sa, moduleName, importDeclarationType, asModuleName, foldMap exportedTypes $ M.lookup moduleName modulesExports)
+  fromImportDecl decl = Left decl
+
+  toImportDecl
+    :: ( SourceAnn
+       , ModuleName
+       , ImportDeclarationType
+       , Maybe ModuleName
+       , M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
+       )
+    -> Declaration
+  toImportDecl (sa, moduleName, importDeclarationType, asModuleName, _) =
+    ImportDeclaration sa moduleName importDeclarationType asModuleName
+
   qualify' :: a -> Qualified a
   qualify' = Qualified (Just mn)
 
@@ -745,10 +777,20 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
 
-  -- | If any data constructors of a type are exported, we require all its data constructors to be exported.
+  -- If a type is exported without data constructors, we warn on `Generic` or `Newtype` instances.
+  -- On the other hand if any data constructors are exported, we require all of them to be exported.
   checkDataConstructorsAreExported :: DeclarationRef -> m ()
-  checkDataConstructorsAreExported dr@(TypeRef ss' name (Just exportedDataConstructorsNames))
-    | not (null exportedDataConstructorsNames) = do
+  checkDataConstructorsAreExported dr@(TypeRef ss' name (fromMaybe [] -> exportedDataConstructorsNames))
+    | null exportedDataConstructorsNames = for_
+      [ DataGenericRep.Generic
+      , DataNewtype.Newtype
+      ] $ \className -> do
+        env <- getEnv
+        let dicts = foldMap (foldMap NEL.toList) $
+              M.lookup (Just mn) (typeClassDictionaries env) >>= M.lookup className
+        when (any isDictOfTypeRef dicts) $
+          tell . errorMessage' ss' $ HiddenConstructors dr className
+    | otherwise = do
       env <- getEnv
       let dataConstructorNames = fromMaybe [] $
             M.lookup (mkQualified name mn) (types env) >>= getDataConstructorNames . snd
@@ -756,7 +798,13 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       unless (null missingDataConstructorsNames) $
         throwError . errorMessage' ss' $ TransitiveDctorExportError dr missingDataConstructorsNames
       where
+      isDictOfTypeRef :: TypeClassDictionaryInScope a -> Bool
+      isDictOfTypeRef dict
+        | (TypeConstructor _ qualTyName, _, _) : _ <- unapplyTypes <$> tcdInstanceTypes dict
+        , qualTyName == Qualified (Just mn) name
+        = True
+      isDictOfTypeRef _ = False
       getDataConstructorNames :: TypeKind -> Maybe [ProperName 'ConstructorName]
-      getDataConstructorNames (DataType _ constructors) = Just $ fst <$> constructors
+      getDataConstructorNames (DataType _ _ constructors) = Just $ fst <$> constructors
       getDataConstructorNames _ = Nothing
   checkDataConstructorsAreExported _ = return ()

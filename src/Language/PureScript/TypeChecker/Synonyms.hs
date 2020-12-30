@@ -36,10 +36,10 @@ replaceAllTypeSynonyms'
 replaceAllTypeSynonyms' syns kinds = everywhereOnTypesTopDownM try
   where
   try :: SourceType -> Either MultipleErrors SourceType
-  try t = fromMaybe t <$> go 0 [] [] t
+  try t = fromMaybe t <$> go (fst $ getAnnForType t) 0 [] [] t
 
-  go :: Int -> [SourceType] -> [SourceType] -> SourceType -> Either MultipleErrors (Maybe SourceType)
-  go c kargs args (TypeConstructor _ ctor)
+  go :: SourceSpan -> Int -> [SourceType] -> [SourceType] -> SourceType -> Either MultipleErrors (Maybe SourceType)
+  go ss c kargs args (TypeConstructor _ ctor)
     | Just (synArgs, body) <- M.lookup ctor syns
     , c == length synArgs
     , kindArgs <- lookupKindArgs ctor
@@ -48,10 +48,10 @@ replaceAllTypeSynonyms' syns kinds = everywhereOnTypesTopDownM try
       in Just <$> try repl
     | Just (synArgs, _) <- M.lookup ctor syns
     , length synArgs > c
-    = throwError . errorMessage $ PartiallyAppliedSynonym ctor
-  go c kargs args (TypeApp _ f arg) = go (c + 1) kargs (arg : args) f
-  go c kargs args (KindApp _ f arg) = go c (arg : kargs) args f
-  go _ _ _ _ = return Nothing
+    = throwError . errorMessage' ss $ PartiallyAppliedSynonym ctor
+  go ss c kargs args (TypeApp _ f arg) = go ss (c + 1) kargs (arg : args) f
+  go ss c kargs args (KindApp _ f arg) = go ss c (arg : kargs) args f
+  go _ _ _ _ _ = return Nothing
 
   lookupKindArgs :: Qualified (ProperName 'TypeName) -> [Text]
   lookupKindArgs ctor = fromMaybe [] $ fmap (fmap (fst . snd) . fst) . completeBinderList . fst =<< M.lookup ctor kinds

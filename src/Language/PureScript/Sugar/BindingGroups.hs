@@ -12,11 +12,12 @@ module Language.PureScript.Sugar.BindingGroups
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Monad ((<=<))
+import Control.Monad ((<=<), guard)
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (intersect)
+import Data.Foldable (find)
 import Data.Maybe (isJust, mapMaybe)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
@@ -94,7 +95,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
                 | otherwise = []
           in (d, (name, vty), self ++ deps)
         dataVerts = fmap mkVert allDecls
-    dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
+    dataBindingGroupDecls <- parU (stronglyConnCompR dataVerts) toDataBindingGroup
     let allIdents = fmap valdeclIdent values
         valueVerts = fmap (\d -> (d, valdeclIdent d, usedIdents moduleName d `intersect` allIdents)) values
     bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
@@ -224,20 +225,35 @@ toBindingGroup moduleName (CyclicSCC ds') = do
 
 toDataBindingGroup
   :: MonadError MultipleErrors m
-  => SCC Declaration
+  => SCC (Declaration, (ProperName 'TypeName, VertexType), [(ProperName 'TypeName, VertexType)])
   -> m Declaration
-toDataBindingGroup (AcyclicSCC d) = return d
-toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
-  Just pn -> throwError . errorMessage' (declSourceSpan d) $ CycleInTypeSynonym (Just pn)
-  _ -> return d
+toDataBindingGroup (AcyclicSCC (d, _, _)) = return d
 toDataBindingGroup (CyclicSCC ds')
-  | all (isJust . isTypeSynonym) ds' = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeSynonym Nothing
-  | kds@((ss, _):_) <- concatMap kindDecl ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
-  | otherwise = return . DataBindingGroupDeclaration $ NEL.fromList ds'
+  | kds@((ss, _):_) <- concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
+  | not (null typeSynonymCycles) =
+      throwError
+        . MultipleErrors
+        . fmap (\syns -> ErrorMessage [positionedError . declSourceSpan . getDecl $ head syns] . CycleInTypeSynonym $ fmap (fst . getName) syns)
+        $ typeSynonymCycles
+  | otherwise = return . DataBindingGroupDeclaration . NEL.fromList $ getDecl <$> ds'
   where
   kindDecl (KindDeclaration sa _ pn _) = [(fst sa, Qualified Nothing pn)]
   kindDecl (ExternDataDeclaration sa pn _) = [(fst sa, Qualified Nothing pn)]
   kindDecl _ = []
+
+  getDecl (decl, _, _) = decl
+  getName (_, name, _) = name
+  lookupVert name = find ((==) name . getName) ds'
+
+  onlySynonyms (decl, name, deps) = do
+    guard . isJust $ isTypeSynonym decl
+    pure (decl, name, filter (maybe False (isJust . isTypeSynonym . getDecl) . lookupVert) deps)
+
+  isCycle (CyclicSCC c) = Just c
+  isCycle _ = Nothing
+
+  typeSynonymCycles =
+    mapMaybe isCycle . stronglyConnCompR . mapMaybe onlySynonyms $ ds'
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
 isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn

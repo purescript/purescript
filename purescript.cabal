@@ -1,7 +1,8 @@
 cabal-version:  2.4
 
 name:           purescript
-version:        0.13.8
+-- note: when updating the version, update the prerelease identifier in app/Version.hs too!
+version:        0.14.0-rc5
 synopsis:       PureScript Programming Language Compiler
 description:    A small strongly, statically typed programming language with expressive types, inspired by Haskell and compiling to JavaScript.
 category:       Language
@@ -190,6 +191,8 @@ library
     Language.PureScript.CodeGen.JS
     Language.PureScript.CodeGen.JS.Common
     Language.PureScript.CodeGen.JS.Printer
+    Language.PureScript.Constants.Data.Generic.Rep
+    Language.PureScript.Constants.Data.Newtype
     Language.PureScript.Constants.Prelude
     Language.PureScript.CoreFn
     Language.PureScript.CoreFn.Ann
@@ -302,6 +305,7 @@ library
     Language.PureScript.Sugar.TypeDeclarations
     Language.PureScript.TypeChecker
     Language.PureScript.TypeChecker.Entailment
+    Language.PureScript.TypeChecker.Entailment.Coercible
     Language.PureScript.TypeChecker.Kinds
     Language.PureScript.TypeChecker.Monad
     Language.PureScript.TypeChecker.Roles
@@ -312,6 +316,7 @@ library
     Language.PureScript.TypeChecker.TypeSearch
     Language.PureScript.TypeChecker.Unify
     System.IO.UTF8
+
   other-modules:
     Paths_purescript
   autogen-modules:

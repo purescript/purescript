@@ -12,10 +12,10 @@ at tests/purs/failing/CoercibleKindMismatch.purs:14:39 - 14:45 (line 14, column 
   [33m             [0m
 
 while solving type class constraint
-[33m                                        [0m
-[33m  Prim.Coerce.Coercible (Unary @t0)     [0m
-[33m                        (Binary @t1 @t2)[0m
-[33m                                        [0m
+[33m                                                                    [0m
+[33m  Prim.Coerce.Coercible (Proxy @(t0 -> Type) (Unary @t0))           [0m
+[33m                        (Proxy @(t1 -> t2 -> Type) (Binary @t1 @t2))[0m
+[33m                                                                    [0m
 while checking that type [33mforall (a :: Type) (b :: Type). Coercible @Type a b => a -> b[0m
   is at least as general as type [33mProxy @(t0 -> Type) (Unary @t0) -> Proxy @(t1 -> ...) (Binary @t1 @t2)[0m
 while checking that expression [33mcoerce[0m

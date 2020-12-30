@@ -4,23 +4,23 @@ import Prelude
 import Effect.Console (log)
 import Prim.Symbol (class Compare)
 import Prim.Ordering (kind Ordering, LT, EQ, GT)
-import Type.Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Type.Data.Symbol (compare) as Symbol
-import Type.Data.Ordering (OProxy(..), reflectOrdering)
+import Type.Data.Ordering (reflectOrdering)
 
-symA :: SProxy "A"
-symA = SProxy
+symA :: Proxy "A"
+symA = Proxy
 
-symB :: SProxy "B"
-symB = SProxy
+symB :: Proxy "B"
+symB = Proxy
 
-egLT :: OProxy LT
+egLT :: Proxy LT
 egLT = Symbol.compare symA symB
 
-egEQ :: OProxy EQ
+egEQ :: Proxy EQ
 egEQ = Symbol.compare symA symA
 
-egGT :: OProxy GT
+egGT :: Proxy GT
 egGT = Symbol.compare symB symA
 
 main = do

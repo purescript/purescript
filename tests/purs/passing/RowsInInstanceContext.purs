@@ -3,7 +3,6 @@ module Main where
 import Prelude
 import Effect (Effect)
 import Effect.Console (log)
-import Data.Newtype (class Newtype, unwrap)
 
 class TypeEquals a b | a -> b, b -> a where
   coerce :: a -> b
@@ -15,9 +14,13 @@ instance refl :: TypeEquals a a where
 
 newtype RecordNewtype = RecordNewtype { x :: String }
 
+class OldStyleNewtype t a where
+  wrap :: a -> t
+  unwrap :: t -> a
+
 instance newtypeRecordNewtype ::
   TypeEquals inner { x :: String }
-    => Newtype RecordNewtype inner where
+    => OldStyleNewtype RecordNewtype inner where
   wrap = RecordNewtype <<< coerce
   unwrap (RecordNewtype rec) = coerceBack rec
 
