@@ -43,7 +43,16 @@ This will run whatever test uses the example file `1110.purs`.
 
 ### Setting up HLS
 
-The project contains a running haskell-language-server via `shell.nix`. If you want to compile less, enter `set up iohk hydra nix binary cache` into your favourite search engine. Make sure to switch your IDE to `haskell-language-server`, not HIE (which is default under vscode when this document was written).
+The project contains a running haskell-language-server via `shell.nix`.
+
+- Optional: enter `set up iohk hydra nix binary cache` into your favourite search engine.
+- Switch your IDE to `haskell-language-server`, not HIE (which is default under vscode when this document was written).
+- Execute `ln -s hie-cabal.yaml hie.yaml`
+
+Or for stack:
+
+- Set up HLS
+- `ln -s hie-stack.yaml hie.yaml`
 
 ### Adding Dependencies
 
