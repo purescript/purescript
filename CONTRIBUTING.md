@@ -41,7 +41,13 @@ stack test --fast --test-arguments="-p 1110.purs"
 
 This will run whatever test uses the example file `1110.purs`.
 
-### Setting up HLS
+### Setting up Haskell IDE Support
+
+#### Manual installation
+
+Follow the instructions from the `haskell-language-server` readme.
+
+#### Via shell.nix
 
 The project contains a running haskell-language-server via `shell.nix`.
 
@@ -49,10 +55,16 @@ The project contains a running haskell-language-server via `shell.nix`.
 - Switch your IDE to `haskell-language-server`, not HIE (which is default under vscode when this document was written).
 - Execute `ln -s hie-cabal.yaml hie.yaml`
 
-Or for stack:
+If the nix setup breaks, open an issue and ping `@reactormonk`.
 
-- Set up HLS
+#### Cradle configuration
+For stack:
+
 - `ln -s hie-stack.yaml hie.yaml`
+
+For cabal:
+
+- `ln -s hie-cabal.yaml hie.yaml`
 
 ### Adding Dependencies
 

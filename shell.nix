@@ -1,3 +1,5 @@
+# For local development setup purposes only. 
+
 { # Fetch the latest haskell.nix and import its default.nix
   haskellNix ? import (builtins.fetchTarball "https://github.com/input-output-hk/haskell.nix/archive/master.tar.gz") {}
 
@@ -16,7 +18,20 @@
 }:
 
 let
-  hsPkgs = import ./default.nix { inherit pkgs; };
+  hsPkgs = pkgs.haskell-nix.project {
+    # 'cleanGit' cleans a source directory based on the files known by git
+    src = pkgs.haskell-nix.haskellLib.cleanGit {
+      name = "haskell-nix-project";
+      src = ./.;
+    };
+
+    projectFileName = "stack.yaml";
+
+    materialized = ./.nix/stack.materialized;
+
+    # Specify the GHC version to use.
+    # compiler-nix-name = "ghc8102"; # Not required for `stack.yaml` based projects.
+  };
   index-state =
     let
       parseIndexState = rawCabalProject:
@@ -29,7 +44,7 @@ let
         lib.lists.head (indexState ++ [ null ]);
     in
     parseIndexState (builtins.readFile ./cabal.project);
-  morePackages = import ./nix/hls.nix { haskell-nix = pkgs.haskell-nix; fetchFromGitHub = pkgs.fetchFromGitHub; checkMaterialization = false; index-state = index-state; };
+  morePackages = import ./.nix/hls.nix { haskell-nix = pkgs.haskell-nix; fetchFromGitHub = pkgs.fetchFromGitHub; checkMaterialization = false; index-state = index-state; };
 in
   hsPkgs.shellFor {
     # Include only the *local* packages of your project.

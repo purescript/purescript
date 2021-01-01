@@ -26,6 +26,8 @@ tests/support/package-lock.json
 .psc-package/
 tags
 TAGS
+hie.yaml
+hie.log
 
 # Profiling related
 *.aux
