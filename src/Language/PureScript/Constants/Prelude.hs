@@ -240,6 +240,15 @@ mkEffectFn = "mkEffectFn"
 runEffectFn :: forall a. (IsString a) => a
 runEffectFn = "runEffectFn"
 
+runSTFn :: forall a. (IsString a) => a
+runSTFn = "runSTFn"
+
+mkSTFn :: forall a. (IsString a) => a
+mkSTFn = "mkSTFn"
+
+runSTFn :: forall a. (IsString a) => a
+runSTFn = "runSTFn"
+
 -- Type Class Dictionary Names
 
 data EffectDictionaries = EffectDictionaries
@@ -408,6 +417,9 @@ controlMonadEffUncurried = "Control_Monad_Eff_Uncurried"
 
 effectUncurried :: forall a. (IsString a) => a
 effectUncurried = "Effect_Uncurried"
+
+controlMonadStUncurried :: forall a. (IsString a) => a
+controlMonadStUncurried = "Control_Monad_ST_Uncurried"
 
 dataBounded :: forall a. (IsString a) => a
 dataBounded = "Data_Bounded"
