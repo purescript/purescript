@@ -189,6 +189,8 @@ library
     Language.PureScript.CodeGen.JS.Common
     Language.PureScript.CodeGen.JS.Printer
     Language.PureScript.Constants.Prelude
+    Language.PureScript.Constants.Data.Generic.Rep
+    Language.PureScript.Constants.Data.Newtype
     Language.PureScript.CoreFn
     Language.PureScript.CoreFn.Ann
     Language.PureScript.CoreFn.Binders
@@ -300,6 +302,7 @@ library
     Language.PureScript.Sugar.TypeDeclarations
     Language.PureScript.TypeChecker
     Language.PureScript.TypeChecker.Entailment
+    Language.PureScript.TypeChecker.Entailment.Coercible
     Language.PureScript.TypeChecker.Kinds
     Language.PureScript.TypeChecker.Monad
     Language.PureScript.TypeChecker.Roles
