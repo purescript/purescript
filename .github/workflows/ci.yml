@@ -25,7 +25,7 @@ jobs:
       # see https://docs.github.com/en/free-pro-team@latest/actions/reference/context-and-expression-syntax-for-github-actions#runner-context
       - name: Set STACK_ROOT to ~/.stack (Windows only)
         if: runner.os == 'Windows'
-        run: echo "STACK_ROOT=$HOME/.stack" >> $GITHUB_ENV
+        run: echo "STACK_ROOT=~/.stack" >> $GITHUB_ENV
 
       # We set LF endings so that the Windows environment is consistent with Appveyor
       # See here for context: https://github.com/actions/checkout/issues/135
