@@ -18,7 +18,7 @@ jobs:
       matrix:
         os: [ ubuntu-16.04, macOS-latest, windows-latest ]
     steps:
-      - name: Add '$HOME/.local/bin/ to PATH
+      - name: Add "$HOME/.local/bin/" to PATH
         run: echo "$HOME/.local/bin/" >> $GITHUB_PATH
 
       # Only needed for Windows os. For correct way of referring to OS,
