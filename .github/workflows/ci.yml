@@ -10,9 +10,9 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false # when true, one job's failure will cancel other jobs
       matrix:
         os: [ ubuntu-16.04, macOS-latest, windows-latest ]
-        fail-fast: [false] # when true, one job's failure will cancel other jobs
     steps:
       - name: Add '$HOME/.local/bin/ to PATH
         run: echo "$HOME/.local/bin/" >> $GITHUB_PATH
