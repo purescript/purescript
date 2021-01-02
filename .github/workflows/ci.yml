@@ -34,6 +34,12 @@ jobs:
 
       - uses: actions/checkout@v2
 
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.stack
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-1
+
       - name: Setup node
         uses: actions/setup-node@v1
         with:
