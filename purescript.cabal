@@ -103,8 +103,6 @@ common defaults
     --    dependencies (because of `pvp-bounds: both` in stack.yaml).
     -- 4. Copy the version bounds from the library's build-depends section
     --    to here.
-    -- 5. Delete `cabal.project.freeze` and run `cabal freeze` to regenerate
-    --    it.
     --
     -- This procedure allows us to take advantage of Stackage snapshots to
     -- easily perform updates, while also ensuring that the compiler will be
