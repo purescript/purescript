@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-16.04, macOS-latest, windows-latest ]
+        fail-fast: false # when true, one job's failure will cancel other jobs
+    steps:
+      - name: Add '$HOME/.local/bin/ to PATH
+        run: echo "$HOME/.local/bin/" >> $GITHUB_PATH
+
+      # NB: We install gnu-tar because BSD tar is buggy on Github's MacOS machines,
+      # and it breaks the cache: https://github.com/actions/cache/issues/403
+      - name: Install GNU tar (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install gnu-tar
+          echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
+
+      - uses: actions/checkout@v2
+
+      - name: Setup node
+        uses: actions/setup-node@v1
+        with:
+          node-version: "10"
+
+      - name: Setup Haskell
+        uses: haskell/actions/setup@v1
+        with:
+          enable-stack: true
+          stack-version: '2.1.1'
+
+      - name: Install hlint
+        run: BIN_DIR="$HOME/.local/bin/" BUILD_DIR="$HOME/hlint" ci/install-hlint.sh
+
+      - name: Print Stack info
+        run: |
+          stack --version
+          stack --no-terminal setup
+          stack path
+
+      - name: Install Bower
+        run: npm install -g bower # for psc-docs / psc-publish tests
+
+      - name: Run "hlint --git"
+        run: hlint --git
+
+      - name: Run tests
+        run: ./ci/build.sh
