@@ -56,9 +56,17 @@ jobs:
 
       - name: Print Stack info
         run: |
+          echo "::group::stack --version"
           stack --version
+          echo "::endgroup::"
+
+          echo "::group::stack --no-terminal setup"
           stack --no-terminal setup
+          echo "::endgroup::"
+
+          echo "::group::stack path"
           stack path
+          echo "::endgroup::"
 
       - name: Install Bower
         run: npm install -g bower # for psc-docs / psc-publish tests
