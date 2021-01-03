@@ -73,11 +73,20 @@ jobs:
           stack --version
           echo "::endgroup::"
 
+          echo "::group::stack path (before setup)"
+          stack path --stack-root
+          echo ""
+          echo "Current STACK_ROOT=$STACK_ROOT"
+          STACK_ROOT=$HOME/.stack
+          echo "Updated STACK_ROOT=$STACK_ROOT"
+          stack path --stack-root
+          echo "::endgroup::"
+
           echo "::group::stack --no-terminal setup"
           stack --no-terminal setup
           echo "::endgroup::"
 
-          echo "::group::stack path"
+          echo "::group::stack path  (after setup)"
           stack path
           echo "::endgroup::"
 
