@@ -31,11 +31,26 @@ jobs:
 
       - uses: actions/checkout@v2
 
+      # Caching
+      # `haskell/actions/setup` will overwrite the STACK_ROOT variable
+      # to "C:\sr" on Windows and `$HOME/.stack` on non-Windows OS.
+      # If we overwrite STACK_ROOT at a later step on the Windows build,
+      # it seems like we still have to repeat some of our work later on in
+      # the `stack setup` step
+      # Rather than overwriting that variable, we will use the OS-specific
+      # STACK_ROOT setting `haskell/actions/setup` specifies
       - uses: actions/cache@v2
+        if: runner.os != 'Windows'
         with:
           path: |
             ~/.stack
           key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-2
+      - uses: actions/cache@v2
+        if: runner.os == 'Windows'
+        with:
+          path: |
+            C:\sr
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-3
 
       - name: Setup node
         uses: actions/setup-node@v1
@@ -47,14 +62,6 @@ jobs:
         with:
           enable-stack: true
           stack-version: '2.1.1'
-
-      # Only needed for Windows OS. For correct way of referring to OS,
-      # see https://docs.github.com/en/free-pro-team@latest/actions/reference/context-and-expression-syntax-for-github-actions#runner-context
-      # Note: we must set the `STACK_ROOT` variable AFTER running the
-      # Setup Haskell step because it will set `STACK_ROOT` to `C:\sr`
-      - name: Set STACK_ROOT to $HOME/.stack (Windows only)
-        if: runner.os == 'Windows'
-        run: echo "STACK_ROOT=$HOME\.stack" >> $GITHUB_ENV
 
       - name: Install hlint
         run: BIN_DIR="$HOME/.local/bin/" BUILD_DIR="$HOME/hlint" ci/install-hlint.sh
