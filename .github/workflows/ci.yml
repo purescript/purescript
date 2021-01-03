@@ -73,21 +73,21 @@ jobs:
           stack --version
           echo "::endgroup::"
 
-          echo "::group::stack path (before setup)"
+          echo "::group::stack --no-terminal setup"
+          stack --no-terminal setup
+          echo "::endgroup::"
+
+          echo "::group::stack path"
+          stack path
+          echo "::endgroup::"
+
+          echo "::group::Printing various things"
           stack path --stack-root
           echo ""
           echo "Current STACK_ROOT=$STACK_ROOT"
           STACK_ROOT=$HOME/.stack
           echo "Updated STACK_ROOT=$STACK_ROOT"
           stack path --stack-root
-          echo "::endgroup::"
-
-          echo "::group::stack --no-terminal setup"
-          stack --no-terminal setup
-          echo "::endgroup::"
-
-          echo "::group::stack path  (after setup)"
-          stack path
           echo "::endgroup::"
 
       - name: Install Bower
