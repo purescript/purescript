@@ -32,13 +32,13 @@ jobs:
       - uses: actions/checkout@v2
 
       # Caching
+      #
       # `haskell/actions/setup` will overwrite the STACK_ROOT variable
       # to "C:\sr" on Windows and `$HOME/.stack` on non-Windows OS.
-      # If we overwrite STACK_ROOT at a later step on the Windows build,
-      # it seems like we still have to repeat some of our work later on in
-      # the `stack setup` step
-      # Rather than overwriting that variable, we will use the OS-specific
-      # STACK_ROOT setting `haskell/actions/setup` specifies
+      # So, we use OS-specific caching rules to workaround this difference
+      # between OSes.
+      # For Windows, we also cache the folder that stores the GHC we use
+      # as well as other programs it uses.
       - name: Cache ~/.stack on non-Windows OS
         uses: actions/cache@v2
         if: runner.os != 'Windows'
@@ -52,6 +52,7 @@ jobs:
         with:
           path: |
             C:\sr
+            $HOME\AppData\Local\Programs\stack\x86_64-windows
           key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-3
 
       - name: Setup node
