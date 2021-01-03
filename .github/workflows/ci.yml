@@ -39,13 +39,15 @@ jobs:
       # the `stack setup` step
       # Rather than overwriting that variable, we will use the OS-specific
       # STACK_ROOT setting `haskell/actions/setup` specifies
-      - uses: actions/cache@v2
+      - name: Cache ~/.stack on non-Windows OS
+        uses: actions/cache@v2
         if: runner.os != 'Windows'
         with:
           path: |
             ~/.stack
           key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-2
-      - uses: actions/cache@v2
+      - name: Cache C:\sr on Windows OS
+        uses: actions/cache@v2
         if: runner.os == 'Windows'
         with:
           path: |
