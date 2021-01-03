@@ -10,9 +10,6 @@ defaults:
   run:
     shell: bash
 
-env:
-  STACK_ROOT: $HOME/.stack
-
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -23,6 +20,13 @@ jobs:
     steps:
       - name: Add "$HOME/.local/bin/" to PATH
         run: echo "$HOME/.local/bin/" >> $GITHUB_PATH
+
+      # Only needed for Windows os. For correct way of referring to OS,
+      # see https://docs.github.com/en/free-pro-team@latest/actions/reference/context-and-expression-syntax-for-github-actions#runner-context
+      - name: Set STACK_ROOT to $HOME/.stack (Windows only)
+        if: runner.os == 'Windows'
+        run: echo "STACK_ROOT=$HOME/.stack" >> $GITHUB_ENV
+        shell: powershell
 
       - name: Print STACK_ROOT to console
         run: echo $STACK_ROOT
