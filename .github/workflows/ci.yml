@@ -63,6 +63,12 @@ jobs:
         if: runner.os == 'Windows'
         run: echo "STACK_ROOT=$HOME\.stack" >> $GITHUB_ENV
 
+      - name: Compare $HOME and ~ on Windows
+        if: runner.os == 'Windows'
+        run: |
+          echo $HOME/.stack
+          echo ~/.stack
+
       - name: Install hlint
         run: BIN_DIR="$HOME/.local/bin/" BUILD_DIR="$HOME/hlint" ci/install-hlint.sh
 
