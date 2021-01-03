@@ -42,7 +42,7 @@ jobs:
         with:
           path: |
             ~/.stack
-          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-1
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-2
 
       - name: Setup node
         uses: actions/setup-node@v1
