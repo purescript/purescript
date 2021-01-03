@@ -25,7 +25,7 @@ jobs:
       # see https://docs.github.com/en/free-pro-team@latest/actions/reference/context-and-expression-syntax-for-github-actions#runner-context
       - name: Set STACK_ROOT to $HOME/.stack (Windows only)
         if: runner.os == 'Windows'
-        run: echo "STACK_ROOT=C:Users\runneradmin\.stack" >> $GITHUB_ENV
+        run: echo "STACK_ROOT=C:\Users\runneradmin\.stack" >> $GITHUB_ENV
 
       - name: Print STACK_ROOT to console
         run: echo $STACK_ROOT
