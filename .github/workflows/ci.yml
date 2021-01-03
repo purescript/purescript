@@ -21,13 +21,6 @@ jobs:
       - name: Add "$HOME/.local/bin/" to PATH
         run: echo "$HOME/.local/bin/" >> $GITHUB_PATH
 
-      # We set LF endings so that the Windows environment is consistent with Appveyor
-      # See here for context: https://github.com/actions/checkout/issues/135
-      - name: Set git to use LF
-        run: |
-          git config --global core.autocrlf false
-          git config --global core.eol lf
-
       # NB: We install gnu-tar because BSD tar is buggy on Github's MacOS machines,
       # and it breaks the cache: https://github.com/actions/cache/issues/403
       - name: Install GNU tar (macOS)
