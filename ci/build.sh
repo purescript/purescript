@@ -49,7 +49,7 @@ $STACK build --only-snapshot $STACK_OPTS
 
 echo "::endgroup::"
 
-echo "::group::Build source distributions"
+echo "::group::Build"
 
 # Test in a source distribution (see above)
 $STACK sdist lib/purescript-ast --tar-dir sdist-test/lib/purescript-ast
@@ -61,7 +61,7 @@ tar -xzf sdist-test/purescript-*.tar.gz -C sdist-test --strip-components=1
 
 echo "::endgroup::"
 
-echo "::group::Test in a source distribution"
+echo "::group::Test"
 
 pushd sdist-test
 $STACK build --pedantic $STACK_OPTS
