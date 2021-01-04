@@ -1,0 +1,169 @@
+name: release
+
+on:
+  push:
+    tags:
+      - '*'
+
+defaults:
+  run:
+    shell: bash # Windows' default shell is PowerShell
+
+env:
+  CI_RELEASE: true
+
+jobs:
+  draft_release:
+    name: Create release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          body: ""
+          draft: false
+          prerelease: false
+          commitish: master
+
+  build_release:
+    name: Build/upload release
+    needs: draft_release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-16.04, macOS-latest, windows-latest ]
+    steps:
+      - name: Add "$HOME/.local/bin/" to PATH
+        run: echo "$HOME/.local/bin/" >> $GITHUB_PATH
+
+      # NB: We install gnu-tar because BSD tar is buggy on Github's macos machines,
+      # and it breaks the cache: https://github.com/actions/cache/issues/403
+      - name: Install GNU tar (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install gnu-tar
+          echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
+
+      - uses: actions/checkout@v2
+
+      # Caching
+      #
+      # `haskell/actions/setup` will overwrite the STACK_ROOT variable
+      # to "C:\sr" on Windows and `$HOME/.stack` on non-Windows OS.
+      # So, we use OS-specific caching rules to workaround this difference
+      # between OSes.
+      # For Windows, we also cache the folder that stores the GHC we use
+      # as well as other programs it uses.
+      - name: Cache ~/.stack on non-Windows OS
+        uses: actions/cache@v2
+        if: runner.os != 'Windows'
+        with:
+          path: |
+            ~/.stack
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-2
+      - name: Cache C:\sr on Windows OS
+        uses: actions/cache@v2
+        if: runner.os == 'Windows'
+        with:
+          # Cache both STACK_ROOT and the folder containing
+          # Stack-related files
+          path: |
+            C:\sr
+            $HOME\AppData\Local\Programs\stack\x86_64-windows
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-4
+
+      - name: Setup node
+        uses: actions/setup-node@v1
+        with:
+          node-version: "10"
+
+      - name: Setup Haskell
+        uses: haskell/actions/setup@v1
+        with:
+          enable-stack: true
+          stack-version: '2.1.1'
+          ghc-version: '8.6.5'
+
+      - name: Install hlint
+        run: BIN_DIR="$HOME/.local/bin/" BUILD_DIR="$HOME/hlint" ci/install-hlint.sh
+
+      - name: Print Stack info
+        run: |
+          echo "::group::stack --version"
+          stack --version
+          echo "::endgroup::"
+
+          echo "::group::stack --no-terminal setup"
+          stack --no-terminal setup
+          echo "::endgroup::"
+
+          echo "::group::stack path"
+          stack path
+          echo "::endgroup::"
+
+      - name: Install Bower
+        run: npm install -g bower # for psc-docs / psc-publish tests
+
+      - name: Run "hlint --git"
+        run: hlint --git
+
+      - name: Run tests
+        run: ./ci/build.sh
+
+      - name: Create Binary
+        run: |
+          pushd sdist-test
+          bundle/build.sh $(ci/convert-os-name.sh ${{ runner.os }})
+          popd
+
+      - name: Upload Release Asset (Binary)
+        id: upload-release-asset-binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.draft_release.outputs.upload_url }}
+          asset_path: ./bundle/${{ runner.os }}.tar.gz
+          asset_name: ${{ runner.os }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Release Asset (SHA)
+        id: upload-release-asset-sha
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.draft_release.outputs.upload_url }}
+          asset_path: ./${{ runner.os }}.tar.gz
+          asset_name: ${{ runner.os }}.tar.gz
+          asset_content_type: text/plain
+
+  # npm_publish:
+  #   name: Publish package on npm
+  #   needs: build_release
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - uses: actions/setup-node@v2
+  #       with:
+  #         node-version: 14
+  #     - name: Publish to NPM
+  #       env:
+  #         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+  #       run: |
+  #         sed -e "s/NPM_VERSION/$(./scripts/get-version)/g" -i npm/package.json
+  #         sed -e "s/PACKAGE_VERSION/$(./scripts/get-version)/g" -i npm/install.js
+  #         cd npm
+  #         cp ../README.md ./README.md
+  #         cp ../CONTRIBUTING.md ./CONTRIBUTING.md
+  #         cp ../LICENSE ./LICENSE
+  #         npm install
+  #         npm publish --non-interactive --access public
