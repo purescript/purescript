@@ -55,7 +55,7 @@ jobs:
           path: |
             C:\sr
             $HOME\AppData\Local\Programs\stack\x86_64-windows
-          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-3
+          key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-4
 
       - name: Setup node
         uses: actions/setup-node@v1
@@ -67,6 +67,7 @@ jobs:
         with:
           enable-stack: true
           stack-version: '2.1.1'
+          ghc-version: '8.6.5'
 
       - name: Install hlint
         run: BIN_DIR="$HOME/.local/bin/" BUILD_DIR="$HOME/hlint" ci/install-hlint.sh
