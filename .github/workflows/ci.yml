@@ -50,6 +50,8 @@ jobs:
         uses: actions/cache@v2
         if: runner.os == 'Windows'
         with:
+          # Cache both STACK_ROOT and the folder containing
+          # Stack-related files
           path: |
             C:\sr
             $HOME\AppData\Local\Programs\stack\x86_64-windows
