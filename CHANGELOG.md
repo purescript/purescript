@@ -1494,10 +1494,6 @@ There's no way to retrieve these yet, but we will extend the protocol soon.
 - Add test case for #2756 (@int-index)
 - Some code cleanup in the module imports phase (@matthewleon)
 
-## [v0.11.0-rc.1](https://github.com/purescript/purescript/releases/tag/v0.11.0-rc.1) - 2017-03-19
-
-Release candidate. Use 0.11.0 instead.
-
 ## [v0.10.7](https://github.com/purescript/purescript/releases/tag/v0.10.7) - 2017-02-11
 
 This release contains a bug fix for a bug in `psc-bundle` which was introduced in 0.10.6.
@@ -1900,10 +1896,6 @@ See the following examples for more information:
 - Fixing imports (@charleso)
 - Export `desugarDecl` from `Sugar.ObjectWildcards` (@rvion)
 - Remove legacy `ObjectGetter` and update doc (@rvion)
-
-## [v0.10.0-rc.1](https://github.com/purescript/purescript/releases/tag/v0.10.0-rc.1) - 2016-09-24
-
-
 
 ## [v0.9.3](https://github.com/purescript/purescript/releases/tag/v0.9.3) - 2016-08-01
 
@@ -2422,10 +2414,6 @@ _None_, but there are lots of new warnings related to upcoming breaking changes 
 - Distinguish between the different ProperNames (@garyb)
 - Warn about unspecified constructors in type imports (@garyb)
 - Fix warning about values missing from virtual modules (@garyb)
-
-## [v0.8.0-RC1](https://github.com/purescript/purescript/releases/tag/v0.8.0-RC1) - 2015-12-16
-
-
 
 ## [v0.7.6.1](https://github.com/purescript/purescript/releases/tag/v0.7.6.1) - 2015-11-18
 
