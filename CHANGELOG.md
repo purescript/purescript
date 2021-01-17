@@ -12,26 +12,6 @@ Bugfixes:
 
 Other improvements:
 
-## [v0.14.0-rc5](https://github.com/purescript/purescript/releases/tag/v0.14.0-rc5) - 2020-12-27
-
-_Release candidate for use in preparing for the upcoming v0.14.0 release. Release notes coming soon._
-
-## [v0.14.0-rc4](https://github.com/purescript/purescript/releases/tag/v0.14.0-rc4) - 2020-12-19
-
-_Release candidate for use in preparing for the upcoming v0.14.0 release. Release notes coming soon._
-
-## [v0.14.0-rc3](https://github.com/purescript/purescript/releases/tag/v0.14.0-rc3) - 2020-10-11
-
-
-
-## [v0.14.0-rc2](https://github.com/purescript/purescript/releases/tag/v0.14.0-rc2) - 2020-09-17
-
-_Release candidate for use in preparing for the upcoming v0.14.0 release. Release notes coming soon._
-
-## [v0.14.0-rc.1](https://github.com/purescript/purescript/releases/tag/v0.14.0-rc.1) - 2020-09-16
-
-_Release candidate for use in preparing for the upcoming v0.14.0 release. Release notes coming soon._
-
 ## [v0.13.8](https://github.com/purescript/purescript/releases/tag/v0.13.8) - 2020-05-23
 
 **Bug Fixes**
@@ -76,7 +56,7 @@ _Release candidate for use in preparing for the upcoming v0.14.0 release. Releas
     ...
   }
   ```
-  
+
   Each property in the returned object has exactly two properties; `path`,
   which is a string containing the file path relative to the directory where
   the command was run, and `depends`, which is an array of the names of all
@@ -159,7 +139,7 @@ error messages. It now prints correctly escaped code based on PureScript's lexic
 Previously the compiler would emit a unique variable name that went unused.
 
 * Output docs.json files for Prim modules (#3769, @f-f)
- 
+
   This change allows downstream tools such as spago to obtain documentation data for Prim modules.
 Please note, however, that the API for the docs.json files is unstable and may change without warning.
 
@@ -179,7 +159,7 @@ This is a small bugfix release to address some issues which were introduced in 0
 * Fix incorrect unused import warnings when kinds are re-exported (#3744, @hdgarrood)
 
   Fixes a bug in which unused import warnings were generated for kinds which were re-exported (and therefore should have been considered "used").
-  
+
 **Other**
 
 * Fix Haddock markup error preventing Haddock docs being generated (#3745, @cdepillabout)
@@ -296,11 +276,11 @@ This is a small bugfix release to address some issues which were introduced in 0
 * Eliminate empty type class dictionaries in generated code (#2768, @LiamGoodacre)
 
   Empty type class dictionaries &mdash; dictionaries which do not contain any type class member implementations at runtime &mdash; are often used to provide evidence at compile-time to justify that a particular operation will not fail; for example, `Prim.Row.Cons` can be used to justify that we can expect a record to contain a particular field with a particular type.  Unfortunately, constructing empty dictionaries can be costly, especially in more complex scenarios such as type-level programming. This release implements a new optimization which avoids the need to build empty dictionaries at runtime by instead inserting `undefined` into the generated code. This optimization can both reduce code size and improve performance in certain contexts.
-  
+
 * Render doc-comments for data constructors and type class members in HTML documentation (#3507, @marcosh)
 
   Documentation comments for data constructors and type class members are now picked up by `purs docs`, and will soon start appearing in Pursuit too. For example:
-  
+
   ```purescript
   -- | Doc-comments like this one were always rendered in Pursuit
   data Maybe a =
@@ -308,17 +288,17 @@ This is a small bugfix release to address some issues which were introduced in 0
     = Just a
     -- | And this one (for Nothing)
     | Nothing
-    
+
   -- | Doc-comments like this one were always rendered in Pursuit
   class Eq a where
     -- | Now this one (for the `eq` method) will be rendered too
     eq :: a -> a -> Boolean
   ```
-  
+
 * Show diffs of rows in errors and hints (#3392, @dariooddenino)
 
   In type mismatches between rows, we now elide common labels so that the problem is easier to identify. For example, consider the following code, which has a type error due to the types of the `b` fields in the two records not matching:
-  
+
   ```purescript
   foo =
     { a: 1, b: "hi", c: 3, d: 4, e: 5 }
@@ -327,24 +307,24 @@ This is a small bugfix release to address some issues which were introduced in 0
   baz =
     [ foo, bar ]
   ```
-  
+
   Previously, the type error would include the entirety of each record type:
-  
+
   ```
   Could not match type
-          
+
     String
-          
+
   with type
-       
+
     Int
 
-  while trying to match type ( a :: Int   
+  while trying to match type ( a :: Int
                              , b :: String
-                             , c :: Int   
-                             , d :: Int   
-                             , e :: Int   
-                             )            
+                             , c :: Int
+                             , d :: Int
+                             , e :: Int
+                             )
   with type ( a :: Int
             , b :: Int
             , c :: Int
@@ -352,29 +332,29 @@ This is a small bugfix release to address some issues which were introduced in 0
             , e :: Int
             )
   ```
-  
+
   This can become quite difficult to read in the case of large record types. Now, we get this:
-  
+
   ```
   Could not match type
-          
+
     String
-          
+
   with type
-       
+
     Int
-       
-  while trying to match type                
+
+  while trying to match type
                              ( b :: String
-                             ...          
-                             )            
-                                          
-  with type             
+                             ...
+                             )
+
+  with type
               ( b :: Int
-              ...       
-              ) 
+              ...
+              )
   ```
-  
+
 **Bug fixes**
 
 * Remove more dead code in `purs bundle` (#3551, @rhendric)
@@ -384,7 +364,7 @@ This is a small bugfix release to address some issues which were introduced in 0
 * Fix parsing of comma-separated guards in let statements (#3713, @natefaubion)
 
   The 0.13 parser would previously choke on guards separated by commas in let statements within do/ado blocks, such as
-  
+
   ```purescript
   test = ado
     let
@@ -396,9 +376,9 @@ This is a small bugfix release to address some issues which were introduced in 0
     in
       foo
   ```
-  
+
   This has now been fixed.
-  
+
 **Other**
 
 * Add placeholder purs.bin to fix npm installs (#3695, @hdgarrood)
@@ -552,11 +532,11 @@ now produces
 
 ```
   Could not match type
-  
+
     String
-  
+
   with type
-  
+
     Id (Id (Id (... ...)))
 ```
 
@@ -656,9 +636,9 @@ now produces a more informative error, which no longer confusingly refers to typ
 - Improve error message for missing node.js in the repl (#3456, @justinwoo)
 - Add `Boolean` kind to `Prim.Boolean` (#3389, @justinwoo)
 - Link to documentation repo as docs for non-Prim built-in types/kinds (#3460, @JordanMartinez)
-- PSCi: Support multiple command types in paste-mode (#3471, @LiamGoodacre) 
-- Add `row:column` printing for source positions in error messages (#3473, @justinwoo) 
-- Add `:print` directive for customizable repl printing (#3478, @hdgarrood) 
+- PSCi: Support multiple command types in paste-mode (#3471, @LiamGoodacre)
+- Add `row:column` printing for source positions in error messages (#3473, @justinwoo)
+- Add `:print` directive for customizable repl printing (#3478, @hdgarrood)
 - Implement qualified `do` (#3373, @pkamenarsky)
 - Add better source positions to kind errors (#3495, @natefaubion)
 
@@ -670,15 +650,15 @@ now produces a more informative error, which no longer confusingly refers to typ
 - Fix issue where `Partial` can foil TCO optimizations (#3218, @matthewleon)
 - Fix quoting of record labels in error messages (#3480, @hdgarrood)
 - Prevent invalid JS being generated from awkward record labels (#3486, @hdgarrood)
-- Fix unnecessary quoting of reserved names when used as labels (#3487, @hdgarrood) 
+- Fix unnecessary quoting of reserved names when used as labels (#3487, @hdgarrood)
 - Fix source spans for binding groups (#3462, @LiamGoodacre)
-- Fix kind error for recursive data type (#3511, @natefaubion) 
+- Fix kind error for recursive data type (#3511, @natefaubion)
 
 **Other (internals)**
 
 - Add annotations to `Type` and `Kind` (#3484, @natefaubion)
 - Use handwritten JSON instances for `Type`/`Kind` (#3496, @natefaubion)
-- Remove pretty print constructors from `Type` (#3498, @natefaubion) 
+- Remove pretty print constructors from `Type` (#3498, @natefaubion)
 - Add JSON compatibility tests (#3497, @hdgarrood)
 - Remove the concept of the 'current module' in Docs (#3506, @hdgarrood)
 
@@ -694,7 +674,7 @@ now produces a more informative error, which no longer confusingly refers to typ
 
 * Fixes errors spans for `CannotFindDerivingType` (#3425, @kRITZCREEK)
 * Fixes a traversal bug where `ObjectNestedUpdate` was surviving desugaring (#3388, @natefaubion)
-* Fixes type operators reexports (#3410, @natefaubion) 
+* Fixes type operators reexports (#3410, @natefaubion)
 * Fixes ST magic-do and inlining (#3444, @natefaubion)
 * Fixes missing span information when using do-syntax without importing `bind` or `discard` (#3418, @natefaubion)
 * Fixes missing span information when shadowing an open import with a module definition (#3417, @natefaubion)
@@ -702,7 +682,7 @@ now produces a more informative error, which no longer confusingly refers to typ
 
 **Other**
 
-* Fix test-support dependency versions and update psci browse test (#3374, @LiamGoodacre) 
+* Fix test-support dependency versions and update psci browse test (#3374, @LiamGoodacre)
 * Changes to build with GHC 8.4.3 (#3372, @kRITZCREEK)
 * Set --haddock flag based on BUILD_TYPE (#3409, @justinwoo)
 * Use `microlens-platform` instead of `lens` (#3400, @joneshf)
@@ -904,7 +884,7 @@ now produces a more informative error, which no longer confusingly refers to typ
 - Added current output path to missing output error message from `purs ide` (#3311, @rgrinberg)
 - Improved parser error messages for `.purs-repl` (#3248, @rndnoise)
 - `require` in generated JavaScript now includes full `index.js` file paths (#2621, @chexxor)
-- Added more compiler-solved type classes and supporting types and kinds to `Prim`: 
+- Added more compiler-solved type classes and supporting types and kinds to `Prim`:
     - `Prim.Ordering` module with `kind Ordering`, `type LT`, `type EQ`, `type GT`
     - `Prim.RowList` module with `class RowToList`, `kind RowList`, `type Nil`, `type Cons`
     - `Prim.Symbol` module with `class Compare`, `class Append`, `class Cons`
@@ -984,7 +964,7 @@ now produces a more informative error, which no longer confusingly refers to typ
 - Add an "editor mode" (@kRITZCREEK)
 
   When the `editor-mode` flag is specified at startup the server will not start afile watcher process any more. Instead it only reloads after successful rebuild commands. This is a lot less fragile than relying on the file system APIs, but will mean that a manual load needs to be triggered after builds that didn't go through `purs ide`.
-  
+
 - `purs ide` now groups `hiding` imports with implicit ones (@kRITZCREEK)
 - Return documentation comments in `purs ide` completions (@nwolverson)
 - Add an `actualFile` parameter to the rebuild command (@kRITZCREEK)
@@ -1226,7 +1206,7 @@ This allows us to quantify types over labels appearing at the front of a row typ
 
 - Enable TCO for variable intros and assignments #2779 (@paf31)
 - Fixed special case in codegen for guards #2787 (@paf31)
- 
+
 **Docs generation**
 
 - Wrap decl title in span for better double-click selection #2786 (@rightfold)
@@ -1310,7 +1290,7 @@ duplicate xs = do
 
 will now raise an error. The compiler allows values of certain types to be discarded,
 based on the `Discard` class in `Control.Bind`. The only type which can be discarded is
-`Unit`, but the feature was implemented using a type class to enable support for 
+`Unit`, but the feature was implemented using a type class to enable support for
 alternative preludes.
 
 **No more dependency on the Bower executable**
@@ -1403,7 +1383,7 @@ Let expressions and `where` clauses can now use binders on the left hand side of
 a declaration:
 
 ```purescript
-map f xs = 
+map f xs =
   let { head, tail } = uncons xs
   in [f head] <> map f tail
 ```
@@ -1600,7 +1580,7 @@ The `Functor` type class can now be derived using the standard `derive instance`
 ``` purescript
 newtype F a = F { foo :: Array a, bar :: a }
 
-derive instance functorF :: Functor F 
+derive instance functorF :: Functor F
 ```
 
 **User-Defined Kinds**
@@ -1622,7 +1602,7 @@ foreign import data Cons :: Symbol -> SymbolList -> SymbolList
 
 Note that kind arguments are not supported.
 
-User defined kinds can be imported/exported using the `kind` prefix, for example: 
+User defined kinds can be imported/exported using the `kind` prefix, for example:
 
 ``` purescript
 import Type.SymbolList (kind SymbolList)
@@ -1712,7 +1692,7 @@ The use of `String` has been replaced by `Text` in the compiler, resulting in so
 
 **Type Class Warning (@joneshf)**
 
-A warning was added for shadowed type variables in type class declarations. 
+A warning was added for shadowed type variables in type class declarations.
 
 **Bug Fixes**
 - `psc-package`: display full path in 'packages.json does not exist' error messsage (@andyarvanitis)
@@ -1831,8 +1811,8 @@ Note that the second type argument should be specified as a wildcard, and will b
 The `Prim` module now defines the `TypeString` and `TypeConcat` type constructors, which can be used to build more descriptive error messages which can depend on types, using the `Fail` constraint:
 
 ``` purescript
-instance cannotShowFunctions 
-    :: Fail ("Function type " <> TypeString (a -> b) <> " cannot be shown.") 
+instance cannotShowFunctions
+    :: Fail ("Function type " <> TypeString (a -> b) <> " cannot be shown.")
     => Show (a -> b) where
   show _ = "unreachable"
 
@@ -1984,9 +1964,9 @@ See https://github.com/paf31/psci-experiment for a demonstration.
 
 ## [v0.9.1](https://github.com/purescript/purescript/releases/tag/v0.9.1) - 2016-06-01
 
-PureScript 0.9.1 is a major stable release of the compiler. It removes features which were deprecated in the 0.8.x series, and contains several useful enhancements and bug fixes. 
+PureScript 0.9.1 is a major stable release of the compiler. It removes features which were deprecated in the 0.8.x series, and contains several useful enhancements and bug fixes.
 
-This release will be accompanied by new releases of the core libraries and a compatible version of Pulp, which have been updated to work with this version. 
+This release will be accompanied by new releases of the core libraries and a compatible version of Pulp, which have been updated to work with this version.
 
 Due to the relatively large number of breaking changes, library authors are advised that they will probably need to update their libraries to maintain compatibility. Users may prefer to continue using version 0.8.5 until their dependencies have been updated.
 
@@ -2045,20 +2025,20 @@ All operators must be defined as aliases from now on. That is, it is no longer v
 
 **Other**
 - Deprecated class import/export syntax has been removed (@LiamGoodacre). Classes are now imported using the `class` keyword, and exported similarly:
-  
+
   ``` purescript
   import Prelude (class Show, show)
   ```
 - Remove support for `=` in record binders (@paf31).
-  
-  Record binders such as 
-  
+
+  Record binders such as
+
   ``` purescript
   f { x = 0 } = true
   ```
-  
+
   are no longer supported. Record binders must now use `:` instead:
-  
+
   ``` purescript
   f { x: 0 } = true
   ```
@@ -2174,40 +2154,40 @@ This release is provided so that library developers can test the new compiler fe
 
 **New Features**
 - Fast recompilation for single files in `psc-ide-server` #1712 (@kRITZCREEK, @paf31)
-  
+
   The [`pscid`](https://github.com/kRITZCREEK/pscid) project makes use of this to watch files as you work and raise errors and warnings when they occur with near instant feedback.
 - Operator aliases can now be declared for types #416 (@garyb)
-  
+
   ``` purescript
   infixr 6 type Natural as ~>
   ```
 - Underscore wildcards can now be used in `case` and `if` expressions #1558 (@garyb)
-  
+
   ``` purescript
   case _ of
     Something -> ...
   ```
-  
+
   ``` purescript
   -- underscores can optionally be used in any part of an `if` expression
   cond = if _ then _ else _
   picker = if _ then "x" else "y"
   ```
 - Typed holes #1283 (@garyb)
-  
+
   ``` purescript
   example :: forall a. Maybe a -> Unit
   example ma = ?umm
   ```
-  
+
   ```
   Hole 'umm' has the inferred type
-  
+
     Unit
-  
+
   in value declaration example
   ```
-  
+
   You can use any identifier name after the question mark and that will be used to label the hole in the raised error message.
 
 **Breaking changes**
@@ -2239,7 +2219,7 @@ This is an interim bug fix release before 0.9.0.
 
 **Enhancements**
 - Check that FFI imports match with implementations (@hdgarrood)
-  
+
   This is technically a breaking change, since some existing code might fail to compile if it has missing FFI code (`purescript-dom` is an example), but these libraries should be fixed soon.
 - Import helper commands in psc-ide (@kRITZCREEK)
 
@@ -2260,18 +2240,18 @@ This is an interim bug fix release before 0.9.0.
 
 **Enhancements**
 - Infer types with class constraints (@paf31)
-  
+
   For example, this simple code would previously have failed with a confusing `NoInstanceFound` error:
-  
+
   ``` purescript
   add x y = x + y
   ```
-  
+
   The compiler will now infer the most general type, namely `forall a. (Semiring a) => a -> a -> a`.
-  
+
   Note that constraints can only be inferred if they only mention type variables; inference of arbitrary types in constraints is not (yet) supported. So, for example, you would still have to write a type signature for a function which had a constraint such as `(MonadEff (console :: CONSOLE | eff) m)`.
 - Default require path to `../` (@nwolverson)
-  
+
   The previous default behavior was no require path prefix, which was confusing for some workflows. The new default is `../`, which is the prefix used in `purs-loader`. This option will be removed completely in 0.9.
 - Expose hiding import suggestion in JSON (@nwolverson)
 - Error on missing `LICENSE` file or missing license field in `bower.json` (@faineance)
@@ -2306,49 +2286,49 @@ _None_
 
 **Enhancements**
 - `psc-ide` is now distributed with the compiler! (@kRITZCREEK)
-  
+
   The `psc-ide-server` and `psc-ide-client` executables are now maintained and
   distributed alongside the compiler. This will ensure that the externs file
   format used by `psc-ide-server` is kept in sync with changes in the compiler.
 - Source maps (@nwolverson)
-  
+
   Source maps can be generated using the `--source-maps` flag. See the
   [example repository](https://github.com/nwolverson/purescript-sourcemap-test) for a full demonstration of source maps using Webpack.
 - Operator aliases for data constructors (@garyb)
-  
+
   Aliases can now be defined for data constructors. For example:
-  
+
   ``` purescript
   data List a = Nil | Cons a (List a)
-  
+
   infixr 6 Cons as :
   ```
-  
+
   Here, the `:` operator can be used as a function to replace the `Cons` constructor,
   _and also in binders_.
 - `Eq` and `Ord` deriving (@paf31)
-  
+
   `Eq` and `Ord` instances can now be derived, using the `derive instance` syntax:
-  
+
   ``` purescript
   derive instance eqList  :: (Eq  a) => Eq  (List a)
   derive instance ordList :: (Ord a) => Ord (List a)
   ```
 - Types are now inferred in `psc-docs` and `psc-publish` (@hdgarrood)
-  
+
   If type annotations are missing in source files, they will be inferred by
   `psc-docs` and `psc-publish` before documentation generation.
 - Initial version of new syntax for operator sections (#1846, @paf31)
-  
+
   Operator sections can now be written using underscores. For example:
-  
+
   ``` purescript
   decrementAll :: Array Int -> Array Int
   decrementAll = map (_ - 1)
   ```
-  
+
   which is equivalent to:
-  
+
   ``` purescript
   decrementAll :: Array Int -> Array Int
   decrementAll = map (\x -> x - 1)
@@ -2356,7 +2336,7 @@ _None_
 
 **Bug Fixes**
 - Allow one open import without warning (@garyb)
-  
+
   Warnings for open imports were a pain point for some users after the 0.8 release.
   This change allows a single open import without a warning. This is still safe
   in the presence of dependency updates, and does not lead to ambiguity for editor
@@ -2461,7 +2441,7 @@ This release includes some updates to generic deriving which require updating to
 
 **Features**
 - Field puns, fix #921 (@balajirrao)
-  
+
   It is now possble to construct objects by using values in scope with the same name as the field labels. For example, the expression `{ foo, bar }` is equivalent to `{ foo: foo, bar: bar }`. Patterns desugar in the same way.
 
 **Enhancements**
@@ -2528,20 +2508,20 @@ _None!_
 - Externs files are now saved as JSON (@paf31)
 - Support for parallel builds has been added (@paf31)
   Builds will now use multiple cores by default, but the number of capabilities can be modified by passing the `-N` option to the GHC runtime:
-  
+
   ``` text
   psc <input files> +RTS -N8
   ```
 - Binders can now be given type annotations (@5outh)
-  
+
   For example:
-  
+
   ``` purescript
   example = do
     n :: Int <- get
     put (n + 1)
   ```
-  
+
   This can be useful when disambiguating types.
 - There is a new warning for missing type signatures on top-level declarations (@paf31)
 - There are new warnings for shadowed and unused type variables (@garyb)
@@ -2602,17 +2582,17 @@ Later we might revisit this decision and allow the user to express classes like 
 
 **Major Features**
 - @gbaz has implemented **generic deriving**. This allows instances for the `Generic` class in the `purescript-generics` package to be derived by the compiler.
-  
+
   A `Generic` instance can be derived as follows:
-  
+
   ``` purescript
   data Example = Foo String | Bar Int | Baz Boolean
-  
+
   derive instance genericExample :: Generic Example
   ```
-  
+
   `purescript-generics` provides examples of usage, such as `gShow`, `gEq` and `gCompare`, for printing, equality tests and comparison respectively.
-  
+
   See #1138.
 - @garyb has implemented a test for **orphan instances** which will now cause the build to fail with an error. See #1247
 
@@ -2652,7 +2632,7 @@ Functionally equivalent to v0.7.2. This release fixes a version incompatibility 
 - Exhaustivity checker was extended to report errors about redundant cases #1289 (@nicodelpiano)
 - Improved triggering of suggestion for errors about using `(<<<)` instead of `(.)` #1284 (@mjgpy3)
 - Only show the module name rather than the filename for pattern errors #1296 (@nicodelpiano)
-- Error reporting in `psc-bundle` was improved #1307 (@hdgarrood) 
+- Error reporting in `psc-bundle` was improved #1307 (@hdgarrood)
 - `psc-publish` code is now part of the library module #1304 (@hdgarrood)
 - `psc-publish` now has `--version` and `--help` options #1300 (@garyb)
 - `psc-publish` now has a `--dry-run` option for checking whether the module can be published #1308 (@hdgarrood)
@@ -2671,7 +2651,7 @@ Minor fixes after 0.7.0:
 
 Enhancements
 - @nicodelpiano has added exhaustivity checking as a new warning type. Incomplete pattern matches will now generate warnings like this:
-  
+
   ``` text
   Warning in module Data.Either.Unsafe:
     Warning in value declaration fromRight:
@@ -2686,7 +2666,7 @@ Enhancements
 
 **Introduction**
 
-This release ("MELTDOWN") aims to handle as many planned breaking changes as possible, to ease the upgrade path before 1.0. It is necessary to upgrade almost all PureScript code to compile with this release. 
+This release ("MELTDOWN") aims to handle as many planned breaking changes as possible, to ease the upgrade path before 1.0. It is necessary to upgrade almost all PureScript code to compile with this release.
 
 The latest versions of the core libraries have all been updated to compile with this release. Older versions of the core libraries will not work with this release, and the latest versions of libraries will not build with older compiler releases.
 
@@ -2862,7 +2842,7 @@ map :: forall a b. (a -> b) -> List a -> List b
 map f = go
   where
   go Nil = Nil
-  go (Cons x xs) = Cons (f x) (map f xs) 
+  go (Cons x xs) = Cons (f x) (map f xs)
 ```
 
 To give a type to `go`, we could previously use type wildcards:
@@ -2951,8 +2931,8 @@ tail :: forall a. [a] -> [a]
 
 **Enhancements**
 - The record part of a record updater can now be made into a wildcard, e.g. `_ { foo = 1 }` (@garyb)
-- Extended infix expressions are now supported, (@paf31) e.g. 
-  
+- Extended infix expressions are now supported, (@paf31) e.g.
+
   ```
   [1, 2, 3] `zipWith (+)` [4, 5, 6]
   ```
@@ -2964,19 +2944,19 @@ tail :: forall a. [a] -> [a]
 
 **Enhancements**
 - Lightweight record constructors are now supported (@garyb):
-  
+
   ``` purescript
   person :: Maybe String -> Maybe Number -> Maybe Address -> Maybe Person
   person = { name: _, age: _, location: _ } <$> name <*> age <*> location
   ```
 - Field accessor sections are now supported (@garyb):
-  
+
   ``` purescript
   getPersonName :: Maybe String
   getPersonName = (.name) <$> getPersonInfo
   ```
 - Syntactic sugar has been introduced for object update functions:
-  
+
   ``` purescript
   updateName :: Person -> String -> Person
   updateName person = person { name = _ }
@@ -3014,7 +2994,7 @@ Various small bug fixes.
 - The lexer was separated from the parser, and now supports explicit comments in the AST. Documentation generated by `psc-docs` now contains any inline comments which precede the corresponding declaration, and generated code preserves the same comments. (@paf31)
 - PureScript now builds on GHC 7.6.\* again. (@dylex)
 - Proper names can now contain underscores. (@dylex)
-- Several auto-completion improvements and fixes in PSCI. (@vkorablin) 
+- Several auto-completion improvements and fixes in PSCI. (@vkorablin)
 
 **Libraries**
 - The Prelude now contains a `pureST` function to run `ST` computations in a pure context. (@KMahoney)
@@ -3026,11 +3006,11 @@ Various small bug fixes.
 
 **Breaking Changes**
 - Command line options with multiplicity 1 now require an equals symbol, e.g.
-  
+
   ```
   psc --main=Main --browser-namespace=PS
   ```
-  
+
   The Grunt and Gulp plugins already support this format.
 
 **Enhancements**
@@ -3066,7 +3046,7 @@ positive _ = false
 but this is not:
 
 ``` haskell
-positive n | n > 0 
+positive n | n > 0
   = true
 positive _ = false
 ```
@@ -3182,7 +3162,7 @@ This incremental release is provided to provide bug fixes and features required 
 **Breaking Changes**
 - Support for blocks has been removed. (paf31)
 - Type class instances must now be named (paf31)
-  
+
   ```
   instance showNumber :: Show Number where
     ...
@@ -3231,7 +3211,7 @@ This incremental release is provided to provide bug fixes and features required 
 - The escape check was removed, since it was too restrictive (paf31)
 - The binary operator reordering step was greatly simplified (paf31)
 **The Object type constructor can now be referenced explicitly as `Prim.Object` (with kind `# * -> *`) (paf31)**
-- Optimizations are now enabled by default and can be disabled with the `--no-tco` and `--no-magic-do` flags (garyb) 
+- Optimizations are now enabled by default and can be disabled with the `--no-tco` and `--no-magic-do` flags (garyb)
 - Unary minus and signed numeric literals are now supported again (paf31, garyb)
 - Type errors have been simplified, the full trace can be enabled with `--verbose-errors` or `-v` (paf31)
 - Error messages now display source positions (paf31, garyb)
@@ -3270,4 +3250,3 @@ This incremental release is provided to provide bug fixes and features required 
 
 **Documentation**
 - There is a new `hierarchy` executable which will generate `.dot` diagrams based on the type class hierarchy of a module. The Prelude docs have been updated to include such a type class diagram. (joneshf)
-
