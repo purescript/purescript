@@ -10,6 +10,11 @@ New features:
 
 Bugfixes:
 
+* Only include direct dependencies in the output for `purs graph` (#3993, @colinwahl)
+
+Fixes a bug where the transitive closure of a module's dependencies
+where included in the `depends` field in the output for `purs graph`.
+
 Other improvements:
 
 ## [v0.13.8](https://github.com/purescript/purescript/releases/tag/v0.13.8) - 2020-05-23
