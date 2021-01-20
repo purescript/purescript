@@ -68,7 +68,7 @@ updateReExports externs withPackage = execState action
 
   traversalOrder :: [P.ModuleName]
   traversalOrder =
-    case P.sortModules externsSignature externs of
+    case P.sortModules P.Transitive externsSignature externs of
       Right (es, _) -> map P.efModuleName es
       Left errs -> internalError $
         "failed to sortModules: " ++

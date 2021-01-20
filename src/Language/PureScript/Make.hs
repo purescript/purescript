@@ -131,7 +131,7 @@ make ma@MakeActions{..} ms = do
   checkModuleNames
   cacheDb <- readCacheDb
 
-  (sorted, graph) <- sortModules (moduleSignature . CST.resPartial) ms
+  (sorted, graph) <- sortModules Transitive (moduleSignature . CST.resPartial) ms
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
