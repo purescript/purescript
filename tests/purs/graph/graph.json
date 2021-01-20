@@ -1,1 +1,1 @@
-{"Module2":{"path":"tests/purs/graph/src/Module2.purs","depends":[]},"Module":{"path":"tests/purs/graph/src/Module.purs","depends":["Module2"]}}
+{"Module2":{"path":"tests/purs/graph/src/Module2.purs","depends":["Module3"]},"Module3":{"path":"tests/purs/graph/src/Module3.purs","depends":[]},"Module":{"path":"tests/purs/graph/src/Module.purs","depends":["Module2"]}}
