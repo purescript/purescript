@@ -1,6 +1,7 @@
 -- | Provides the ability to sort modules based on module dependencies
 module Language.PureScript.ModuleDependencies
-  ( sortModules
+  ( DependencyDepth(..)
+  , sortModules
   , ModuleGraph
   , ModuleSignature(..)
   , moduleSignature
@@ -8,6 +9,7 @@ module Language.PureScript.ModuleDependencies
 
 import           Protolude hiding (head)
 
+import           Data.Array ((!))
 import           Data.Graph
 import qualified Data.Set as S
 import           Language.PureScript.AST
@@ -26,16 +28,19 @@ data ModuleSignature = ModuleSignature
   , sigImports :: [(ModuleName, SourceSpan)]
   }
 
+data DependencyDepth = Direct | Transitive
+
 -- | Sort a collection of modules based on module dependencies.
 --
 -- Reports an error if the module graph contains a cycle.
 sortModules
   :: forall m a
    . MonadError MultipleErrors m
-  => (a -> ModuleSignature)
+  => DependencyDepth
+  -> (a -> ModuleSignature)
   -> [a]
   -> m ([a], ModuleGraph)
-sortModules toSig ms = do
+sortModules dependencyDepth toSig ms = do
     let
       ms' = (\m -> (m, toSig m)) <$> ms
       mns = S.fromList $ map (sigModuleName . snd) ms'
@@ -44,7 +49,9 @@ sortModules toSig ms = do
     let (graph, fromVertex, toVertex) = graphFromEdges verts
         moduleGraph = do (_, mn, _) <- verts
                          let v       = fromMaybe (internalError "sortModules: vertex not found") (toVertex mn)
-                             deps    = reachable graph v
+                             deps    = case dependencyDepth of
+                                         Direct -> graph ! v
+                                         Transitive -> reachable graph v
                              toKey i = case fromVertex i of (_, key, _) -> key
                          return (mn, filter (/= mn) (map toKey deps))
     return (fst <$> ms'', moduleGraph)
