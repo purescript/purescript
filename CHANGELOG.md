@@ -18,12 +18,318 @@ New features:
 
 Bugfixes:
 
-* Only include direct dependencies in the output for `purs graph` (#3993, @colinwahl)
-
-Fixes a bug where the transitive closure of a module's dependencies
-where included in the `depends` field in the output for `purs graph`.
-
 Other improvements:
+
+## v0.14.0
+
+### Polykinds
+
+Polymorphic kinds, based on the [Kind Inference for Datatypes](https://richarde.dev/papers/2020/kind-inference/kind-inference.pdf) paper (#3779, #3831, #3929, @natefaubion)
+
+#### Type In Type
+
+The type-checker now supports `TypeInType` (or `Type :: Type`), so the old `Kind` data type and namespace is now gone. Kinds and types are the same and exist in the same namespace.
+
+Previously one could do:
+
+```purescript
+foreign import kind Boolean
+foreign import data True :: Boolean
+foreign import data False :: Boolean
+```
+
+Where the kind `Boolean` and type `Boolean` were two different things. This is no longer the case. The `Prim` kind `Boolean` is now removed, and you can just use `Prim` type `Boolean` in the same way. This is a breaking change.
+
+The compiler still supports the old `foreign import kind` syntax but it warns that it's deprecated.
+
+```purescript
+foreign import kind Foo
+```
+
+> Foreign kind imports are deprecated and will be removed in a future release. Use empty 'data' instead.
+
+It is treated internally as:
+
+```purescript
+data Foo
+```
+
+Likewise, `kind` imports and exports are deprecated and treated the same as a type import or export.
+
+> Kind imports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead.
+
+The special unary `#` syntax for row kinds is still supported, but deprecated and will warn. There is now `Prim.Row :: Type -> Type` which can be used like a normal type constructor.
+
+> Unary '#' syntax for row kinds is deprecated and will be removed in a future release. Use the 'Row' kind instead.
+
+All of these deprecations have suggested fixes in the JSON output, so tools like [`purescript-suggest`](https://github.com/nwolverson/purescript-suggest) (or your IDE plugin) can automatically apply them.
+
+#### Kind Signatures
+
+With PolyKinds, all type-level declarations are generalized.
+
+```purescript
+data Proxy a = Proxy
+```
+
+Previously, this had the `Type`-defaulted kind `Type -> Type`. Now this will be generalized to `forall k. k -> Type`. Such signature can be written with a kind signature declarations, similar to [standalone kind signatures](https://ryanglscott.github.io/2020/01/05/five-benefits-to-using-standalonekindsignatures/) in GHC.
+
+```purescript
+data Proxy :: forall k. k -> Type
+data Proxy a = Proxy
+```
+
+In GHC, all signatures use the `type` prefix, but we reuse the same keyword as the subsequent declaration because we already have `foreign import data` (rather than `foreign import type`) and because it makes things align nicer. Signatures have the same rule as value-level signatures, so they must always be followed by the "real" declaration.
+
+It's better to be explicit about polymorphism by writing signatures. Since we don't really quantify over free type variables, it's also necessary in the case that two poly-kinded arguments must have the same kind. The compiler will warn about missing kind signatures when polymorphic kinds are inferred.
+
+Classes can have signatures too, but they must end with the new `Constraint` kind instead of `Type`. For example, `Prim.Row.Cons` now has the signature:
+
+```purescript
+class Cons :: forall k. Symbol -> k -> Row k -> Row k -> Constraint
+```
+
+### Safe zero-cost coercions
+
+Coercible constraints, based on the [Safe Zero-cost Coercions for Haskell](https://www.microsoft.com/en-us/research/uploads/prod/2018/05/coercible-JFP.pdf) paper (#3351, #3810, #3896, #3873, #3860, #3905, #3893, #3909, #3931, #3906, #3881, #3878, #3937, #3930, #3955, #3927, @lunaris, @rhendric, @kl0tl, @hdgarrood)
+
+`Prim.Coerce.Coercible` is a new compiler-solved class, used to relate types with the same runtime representation. One can use `Safe.Coerce.coerce` (from the new [`safe-coerce`](https://github.com/purescript/purescript-safe-coerce) library) instead of `Unsafe.Coerce.unsafeCoerce` to safely turn a `a` into a `b` when `Coercible a b` holds.
+
+Coercible constraints are solved according to the following rules:
+
+* Coercible constraints are _reflexive_, `Coercible a a` holds, _symmetric_, `Coercible a b` implies `Coercible b a`, and _transitive_, `Coercible a b` and `Coercible b c` imply `Coercible a c`.
+
+* Newtypes can be freely wrapped and unwrapped when their constructor is in scope:
+
+```purescript
+newtype Age = Age Int
+```
+
+`Coercible Int Age` and `Coercible Age Int` hold since `Age` has the same runtime representation than `Int`.
+
+Newtype constructors have to be in scope to preserve abstraction. It's common to declare a newtype to encode some invariants (non emptiness of arrays with `Data.Array.NonEmpty.NonEmptyArray` for example), hide its constructor and export smart constructors instead. Without this restriction, the guarantees provided by such newtypes would be void.
+
+* Terms of different data types are not coercible:
+
+```purescript
+data Maybe a = Nothing | Just a
+data Either a b = Left a | Right b
+```
+
+`Coercible (Maybe b) (Either a b)` does not hold. Those types don't share a common runtime representation so coercing between them would be unsafe.
+
+* Terms of the same data types may be coercible, depending on the _roles_ of their parameters. There’s three roles, from most to least restrictive: _nominal_, _representational_ and _phantom_. The primitives `->`, `Array` and `Record` types have _representational_ parameters and roles are otherwise inferred based on their appearance in the right hand side of a data type declaration.
+
+* Coercible has kind `forall k. k -> Constraint`, it is _polykinded_, so we can also coerce more than types of kind `Type`:
+
+  * Rows are coercible when they have the same labels, when the corresponding pairs of types are coercible and when their tails are coercible: `Coercible ( label :: a | r ) ( label :: b | s )` holds when `Coercible a b` and `Coercible r s` do.
+
+  * Higher kinded types are coercible if they are coercible when fully saturated: `Coercible (f :: _ -> Type) (g :: _ -> Type)` holds when `Coercible (f a) (g a)` does.
+
+#### Role inference
+
+```purescript
+foreign import data Effect :: Type -> Type
+```
+
+Parameters of foreign data types are _nominal_ since we do not have enough information to safely choose a less restrictive role. Nominal parameters are only coercible to themselves.
+
+```purescript
+data Maybe a = Nothing | Just a
+```
+
+When a parameter appears under at least one of the constructors, its role is _representational_. Representational parameters of higher kinded types have to be coercible for those types to be coercible: `Coercible (Maybe a) (Maybe b)` holds only when `Coercible a b` does.
+
+This rule must be amended for parameters appearing in the arguments of a type variable. Because it could be instantiated to anything we have to be conservative and infer _nominal_, the most restrictive role, instead of _representational_: `Coercible (a -> f b) (a -> f c)` does not hold.
+
+```purescript
+data Proxy a = Proxy
+```
+
+When a parameter does not appear at all under any constructor, its role is _phantom_. Phantom parameters are coercible to anything: `Coercible (Proxy a) (Proxy b)` holds for all `a` and `b`.
+
+```purescript
+newtype First a = First (Maybe a)
+```
+
+When a parameter appears in the arguments of another type we infer its role from the declaration of that type: `Coercible (First a) (First b)` holds when `Coercible a b` does, even when the newtype constructor is out of scope, because the parameter of `Maybe` is _representational_.
+
+We cannot infer the role of parameters in recursive position, so we default to _phantom_ but usually end up with something else because we keep the most restrictive role a parameter appears at:
+
+```purescript
+data List a = Nil | Cons a (List a)
+```
+
+The parameter appears at _representational_ (under the `Cons` constructor) and _phantom_ (in recursive position) roles so we infer _representational_: `Coercible (List a) (List b)` holds when `Coercible a b` does.
+
+```purescript
+newtype Mu f = In (f (Mu f))
+```
+
+The parameter appears at _representational_ (under the `In` constructor) and _nominal_ (as argument to itself) roles so we infer _nominal_: `Coercible (Mu f) (Mu g)` does not hold, unless `g` is actually `f`.
+
+#### Role annotations
+
+Inferring _nominal_ roles for foreign data types is safe but can be too constraining sometimes. For example this prevents to coerce `Effect Age` to `Effect Int`, even though they actually have the same runtime representation.
+
+The roles of foreign data types can thus be loosened with explicit role annotations, similar to the [RoleAnnotations](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#role-annotations) GHC extension.
+
+Here’s the annotation we added to `Effect` for example:
+
+```purescript
+type role Effect representational
+```
+
+Conversely, we might want to strengthen the roles of parameters with invariants invisible to the type system. Maps are the canonical example of this: the shape of their underlying tree rely on the `Ord` instance of their keys, but the `Ord` instance of a newtype may behave differently than the one of the wrapped type so it would be unsafe to allow coercions between `Map k1 a` and `Map k2 a`, even when `Coercible k1 k2` holds.
+
+In order to forbid such unsafe coercion we added a _nominal_ annotation to the first parameter of `Map`:
+
+```purescript
+type role Map nominal representational
+```
+
+Annotated roles are compared against the roles inferred by the compiler so it is not possible to compromise safety by ascribing too permissive roles, except for foreign types.
+
+### Other changes
+
+#### Breaking
+
+* Add compiler support for `Coercible` based `Newtype` (#3975, @fsoikin)
+
+We added a `Coercible` superclass to `Data.Newtype.Newtype` in order to implement `unwrap`, `wrap` and most newtype combinators with `coerce`. This is a breaking change for non derived instances because the `Newtype` class has no members anymore and can now only be implemented for representationally equal types (those satisfying the new superclass constraint).
+
+* Reform handling of quote characters in raw strings (#3961, @rhendric)
+
+Quotes behaved rather unexpectedly in various edge cases inside raw strings. This clears things up by enforcing the following specification:
+
+```
+'"""' '"'{0,2} ([^"]+ '"'{1,2})* [^"]* '"""'
+```
+
+Meaning that raw strings can contain up to two successive quotes, any number of times, but three successive quotes are not allowed inside.
+
+* Unsupport bare negative literals as equational binders (#3956, @rhendric)
+
+It used to be possible to match on negative litterals, such as `-1`, but this prevented parsing matches on constructors aliased to `-`. The compiler will reject matches on _bare_ negative litterals, but they can still be matched by wrapping them in parentheses.
+
+* Forbid partial data constructors exports (#3872, @kl0tl)
+
+Exporting only some of the constructors of a type meant that changes internal to a module, such that adding or removing an unexported constructor, could cause unexhaustive pattern matches errors in downstream code. Partial explicit export lists will have to be completed with the missing constructors or replaced by implicit export lists.
+
+* Print compile errors to stdout, progress messages to stderr (#3839, @JordanMartinez)
+
+The compiler used to print errors to stderr, which is especially annoying when piping its output to another program with the `--json-errors` flag. Stderr is really for diagnostics about the execution of a program, whereas its expected output ought to be printed to stdout.
+
+#### Fixes
+
+* Only include direct dependencies in the output for `purs graph` instead of their transitive closure (#3993, @colinwahl)
+
+* Fix the reversal of the qualifier of qualified operators (#3971, @rhendric)
+
+Qualified operators, for instance `Data.Array.(!)`, were interpreted with a reversed qualifier, like `Array.Data.(!)`.
+
+* Check all recursive paths in data binding groups (#3936, @natefaubion)
+
+The compiler was not catching recursive type synonyms when some recursive paths were guarded by data types or newtypes.
+
+* Desugar type operator aliases inside parens (#3935, @natefaubion)
+
+The compiler did not accept type operators inside parens in prefix position, except `(->)`.
+
+* Pin language-javascript to a specific version (#3904, @hdgarrood)
+
+Allowing the compiler to be built against various versions of `language-javascript` meant that multiple builds of the same version of the compiler could accept different syntaxes for JavaScript foreign modules, depending on how they were built.
+
+#### Improvements
+
+* Improve error message when `negate` isn't imported (#3952, @mhmdanas)
+
+This shows a specific message when using negative litterals but `Data.Ring.negate` is out of scope, similar to the messages shown when using do notation if `Control.Bind.bind` and `Control.Bind.discard` are out of scope.
+
+* Add source spans to `PartiallyAppliedSynonym` errors (#3951, @rhendric)
+
+`PartiallyAppliedSynonym` errors were usually rethrown with the appropriate source span, but not when deriving instances. This annotates those errors with the source span of the partially applied synonyms themselves, which is more robust and accurate than rethrowing the error with an approximate source span.
+
+* Allow type synonyms in instances heads and superclass constraints (#3539, #3966, #3965, @garyb, @kl0tl)
+
+This allows declarations such as
+
+```purescript
+newtype App a = App (ReaderT Env Aff a)
+derive newtype instance monadAskApp :: MonadAsk Env App
+```
+
+or
+
+```purescript
+class (Monad m, MonadAsk Env m) <= MonadAskEnv m
+```
+
+where `Env` is a type synonym.
+
+* Improve incremental rebuilds time for modules with large dependencies (#3899, @milesfrain)
+
+#### Other
+
+* Warn against exported types with hidden constructors but `Generic` or `Newtype` instances (#3907, @kl0tl)
+
+Types with hidden constructors are supposed to be opaque outside of their module of definition but `Generic` and `Newtype` instances allow to construct them with `Data.Generic.Rep.to` or `Data.Newtype.wrap` and examine their content with `Data.Generic.Rep.from` or `Data.Newtype.unwrap`, thus making void any invariant those types may witness.
+
+* Have module re-exports appear in generated code (#3883, @citizengabe)
+
+This is the first step towards smarter incremental rebuilds, which could skip rebuilding downstream modules when the interface of a module did not change (see #3724).
+
+* Add a printer for CST modules (#3887, @kritzcreek)
+
+* Deprecate constraints in foreign imports (#3829, @kl0tl)
+
+Constrained foreign imports leak instances dictionaries, hindering the compiler ability to optimize their representation. Manipulating dictionaries in foreign code should be avoided and foreign imports should accept the class members they need as additional arguments instead of being constrained.
+
+* Deprecate primes (the `'` character) in identifiers exported from foreign modules (#3792, @kl0tl)
+
+We are going to output ES modules instead of CommonJS in the next breaking release but named exports of ES modules, unlike CommonJS exports, have to be valid JavaScript identifiers and so cannot contain primes.
+
+#### Docs
+
+* Generate a changelog from the GitHub releases and add a pull request template (#3989, @JordanMartinez)
+
+* Detail license related error messages and fix incorrect SPDX sample licenses (#3970, @fsoikin)
+
+* Remove a spurious doc comment on the CoreFn Module type (#3552, @jmackie)
+
+* Add a link to the releases page (#3920, @milesfrain)
+
+* Update CONTRIBUTING.md (#3924, @hdgarrood)
+
+* Add troubleshooting steps for libtinfo and EACCES errors (#3903, @milesfrain)
+
+* Update an outdated link to the book (#3916, @sumew)
+
+#### Internal
+
+* Simplify the `Ord` instances of some AST types (#3902, @milesfrain)
+
+* Update the desugaring pipeline to work on individual modules (#3944, @kl0tl)
+
+* Remove the unmaintained and ignored core libraries tests (#3861, @kl0tl)
+
+* Configure Travis to run `hlint` (#3816, #3864, @joneshf, @hdgarrood)
+
+* Remove support for the legacy Bower resolutions format in `purs publish` (#3847, @kl0tl)
+
+* Add GitHub issue templates for bugs and proposals (#3853, @joneshf)
+
+* Add support for Happy >=1.19.10 (#3837, @arrowd)
+
+* Use the same default extensions in all packages (#3823, #3908, @natefaubion, @i-am-the-slime)
+
+* Relax `purescript-ast` dependency on `microlens-platform` to `microlens` (#3817, @joneshf)
+
+* Extract the AST and CST types, and related functions, into their own `purescript-ast` and `purescript-cst` packages for ease of consumption by external tooling (#3793, #3821, #3826, @joneshf, @natefaubion)
+
+* Fix various typos in documentation, comments and bindings names (#3795, @mhmdanas)
+
+* Add golden tests for errors and warnings (#3774, #3811, #3808, #3846, @dariooddenino, @rhendric, @kl0tl)
 
 * More descriptive protocol errors from the ide server (@kritzcreek)
 
