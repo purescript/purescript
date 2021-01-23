@@ -26,6 +26,24 @@ Other improvements:
 
 Polymorphic kinds, based on the [Kind Inference for Datatypes](https://richarde.dev/papers/2020/kind-inference/kind-inference.pdf) paper (#3779, #3831, #3929, @natefaubion)
 
+Kinds are to types what types are to terms (except that kinds are actually themselves types now) but whereas we have polymorphic types, kinds were monorphic.
+
+This means that we were not able to abstract over kinds, leading for instance to a proliferation of proxy types:
+
+```purescript
+data Proxy (a :: Type) = Proxy
+```
+
+```purescript
+data SProxy (a :: Symbol) = SProxy
+```
+
+```purescript
+data RProxy (row :: # Type) = RProxy
+```
+
+Now we can have a single proxy type, whose parameter has a polymorphic kind.
+
 #### Type In Type
 
 The type-checker now supports `TypeInType` (or `Type :: Type`), so the old `Kind` data type and namespace is now gone. Kinds and types are the same and exist in the same namespace.
@@ -97,7 +115,11 @@ Coercible constraints, based on the [Safe Zero-cost Coercions for Haskell](https
 
 Coercible constraints are solved according to the following rules:
 
-* Coercible constraints are _reflexive_, `Coercible a a` holds, _symmetric_, `Coercible a b` implies `Coercible b a`, and _transitive_, `Coercible a b` and `Coercible b c` imply `Coercible a c`.
+* _reflexivity_: `Coercible a a` holds.
+
+* _symmetry_: `Coercible a b` implies `Coercible b a`.
+
+* _transitivity_: `Coercible a b` and `Coercible b c` imply `Coercible a c`.
 
 * Newtypes can be freely wrapped and unwrapped when their constructor is in scope:
 
@@ -196,7 +218,18 @@ Annotated roles are compared against the roles inferred by the compiler so it is
 
 * Add compiler support for `Coercible` based `Newtype` (#3975, @fsoikin)
 
-We added a `Coercible` superclass to `Data.Newtype.Newtype` in order to implement `unwrap`, `wrap` and most newtype combinators with `coerce`. This is a breaking change for non derived instances because the `Newtype` class has no members anymore and can now only be implemented for representationally equal types (those satisfying the new superclass constraint).
+We added a `Coercible` superclass to `Data.Newtype.Newtype` in order to implement `unwrap`, `wrap` and most newtype combinators with `coerce` (see https://github.com/purescript/purescript-newtype/pull/22). This is only a breaking change for non derived instances because the `Newtype` class has no members anymore and can now only be implemented for representationally equal types (those satisfying the new superclass constraint).
+
+For example the instance for `newtype Additive a = Additive a` no longer implements `unwrap` and `wrap`:
+
+```diff
++instance newtypeAdditive :: Newtype (Additive a) a
+-instance newtypeAdditive :: Newtype (Additive a) a where
+-  wrap = Additive
+-  unwrap (Additive a) = a
+```
+
+Derived instances don't require any modifications.
 
 * Reform handling of quote characters in raw strings (#3961, @rhendric)
 
@@ -255,6 +288,7 @@ This shows a specific message when using negative litterals but `Data.Ring.negat
 This allows declarations such as
 
 ```purescript
+type Env = { port :: Int }
 newtype App a = App (ReaderT Env Aff a)
 derive newtype instance monadAskApp :: MonadAsk Env App
 ```
@@ -264,8 +298,6 @@ or
 ```purescript
 class (Monad m, MonadAsk Env m) <= MonadAskEnv m
 ```
-
-where `Env` is a type synonym.
 
 * Improve incremental rebuilds time for modules with large dependencies (#3899, @milesfrain)
 
