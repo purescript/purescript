@@ -134,12 +134,17 @@ make ma@MakeActions{..} ms = do
   (sorted, graph) <- sortModules Transitive (moduleSignature . CST.resPartial) ms
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
+  -- Fork and let a separate thread handle the cache
+  rChan <- C.newChan
+  buildPlan' <- BuildPlan.setResultChannel buildPlan (Just rChan)
+  doneMVar <- C.newEmptyMVar
+  _ <- fork $ handleCache rChan cacheDb newCacheDb doneMVar
 
-  let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
+  let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan' . getModuleName . CST.resPartial) sorted
   for_ toBeRebuilt $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-    buildModule buildPlan moduleName
+    buildModule buildPlan' moduleName
       (spanName . getModuleSourceSpan . CST.resPartial $ m)
       (fst $ CST.resFull m)
       (fmap importPrim . snd $ CST.resFull m)
@@ -156,10 +161,12 @@ make ma@MakeActions{..} ms = do
         BuildJobSkipped ->
           Left mempty
     in
-      M.mapEither splitResults <$> BuildPlan.collectResults buildPlan
+      M.mapEither splitResults <$> BuildPlan.collectResults buildPlan'
 
-  -- Write the updated build cache database to disk
-  writeCacheDb $ Cache.removeModules (M.keysSet failures) newCacheDb
+  -- Notify the cache handler that we are done
+  _ <- BuildPlan.setResultChannel buildPlan' Nothing
+  -- And wait for it to save everything
+  _ <- C.takeMVar doneMVar
 
   -- If generating docs, also generate them for the Prim modules
   outputPrimDocs
@@ -235,6 +242,22 @@ make ma@MakeActions{..} ms = do
         Nothing -> return BuildJobSkipped
 
     BuildPlan.markComplete buildPlan moduleName result
+
+  handleCache :: ResultChannel -> Cache.CacheDb -> Cache.CacheDb -> MVar () -> m ()
+  handleCache rChan curDB finalDB doneMVar = do
+    r <- readChan rChan
+    case r of
+      Nothing -> do -- We are done
+        C.putMVar doneMVar ()
+        return ()
+      Just (mn, BuildJobSucceeded _ _) -> do -- Job succeeded - update cache key
+        let newDB = Cache.updateModule mn curDB finalDB
+        writeCacheDb newDB
+        handleCache rChan newDB finalDB doneMVar
+      Just (mn, _) -> do -- Job failed - remove cache key
+        let newDB = Cache.removeModule mn curDB
+        writeCacheDb newDB
+        handleCache rChan newDB finalDB doneMVar
 
 -- | Infer the module name for a module by looking for the same filename with
 -- a .js extension.

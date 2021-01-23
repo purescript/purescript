@@ -19,6 +19,7 @@ module Language.PureScript.Make.Monad
   , writeCborFile
   , writeCborFileIO
   , copyFile
+  , renameFile
   ) where
 
 import           Prelude
@@ -184,6 +185,11 @@ copyFile src dest =
   makeIO ("copy file: " <> Text.pack src <> " -> " <> Text.pack dest) $ do
     createParentDirectory dest
     Directory.copyFile src dest
+
+renameFile :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> FilePath -> m ()
+renameFile src dest =
+  makeIO ("rename file: " <> Text.pack src <> " -> " <> Text.pack dest) $ do
+    Directory.renameFile src dest
 
 createParentDirectory :: FilePath -> IO ()
 createParentDirectory = createDirectoryIfMissing True . takeDirectory

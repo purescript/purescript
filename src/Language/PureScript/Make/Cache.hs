@@ -6,7 +6,8 @@ module Language.PureScript.Make.Cache
   , CacheDb
   , CacheInfo(..)
   , checkChanged
-  , removeModules
+  , removeModule
+  , updateModule
   , normaliseForCache
   ) where
 
@@ -24,7 +25,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Monoid (All(..))
-import Data.Set (Set)
 import Data.Text (Text)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.These (These(..))
@@ -128,10 +128,17 @@ checkChanged cacheDb mn basePath currentInfo = do
 
   pure (CacheInfo newInfo, getAll isUpToDate)
 
--- | Remove any modules from the given set from the cache database; used when
--- they failed to build.
-removeModules :: Set ModuleName -> CacheDb -> CacheDb
-removeModules moduleNames = flip Map.withoutKeys moduleNames
+-- | Removes the given module from the cache database; used when
+-- it failed to build.
+removeModule :: ModuleName -> CacheDb -> CacheDb
+removeModule = Map.delete
+
+-- | Moves cache info between databases; used when a module was built successfully
+updateModule :: ModuleName -> CacheDb -> CacheDb -> CacheDb
+updateModule mn cur new =
+  case Map.lookup mn new of
+    Just r -> Map.insert mn r cur
+    Nothing -> Map.delete mn cur
 
 -- | 1. Any path that is beneath our current working directory will be
 -- stored as a normalised relative path
