@@ -124,7 +124,8 @@ couldn't be extracted from a source file.
     "end": [3, 1]
     },
   "documentation": "A filtering function",
-  "exportedFrom": ["Data.Array"]
+  "exportedFrom": ["Data.Array"],
+  "declarationType": "value",
   }
 ]
 ```

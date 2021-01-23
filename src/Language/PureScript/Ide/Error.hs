@@ -66,9 +66,27 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
     insertTSCompletions _ _ _ v = v
 
     identCompletion (P.Qualified mn i, ty) =
-      Completion (maybe "" P.runModuleName mn) i (prettyPrintTypeSingleLine ty) (prettyPrintTypeSingleLine ty) Nothing Nothing (maybe [] (\x -> [x]) mn)
+      Completion     
+        { complModule = maybe "" P.runModuleName mn
+        , complIdentifier = i
+        , complType = prettyPrintTypeSingleLine ty
+        , complExpandedType = prettyPrintTypeSingleLine ty
+        , complLocation = Nothing
+        , complDocumentation = Nothing
+        , complExportedFrom = maybe [] (\x -> [x]) mn
+        , complDeclarationType = Nothing
+        }
     fieldCompletion (label, ty) =
-      Completion "" ("_." <> P.prettyPrintLabel label) (prettyPrintTypeSingleLine ty) (prettyPrintTypeSingleLine ty) Nothing Nothing []
+      Completion 
+        { complModule = ""
+        , complIdentifier = ("_." <> P.prettyPrintLabel label)
+        , complType = prettyPrintTypeSingleLine ty
+        , complExpandedType = prettyPrintTypeSingleLine ty
+        , complLocation = Nothing
+        , complDocumentation = Nothing
+        , complExportedFrom = []
+        , complDeclarationType = Nothing
+        }
 
 textError :: IdeError -> Text
 textError (GeneralError msg)          = msg

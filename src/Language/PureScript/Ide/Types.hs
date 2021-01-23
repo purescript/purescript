@@ -222,6 +222,7 @@ data Completion = Completion
   , complLocation :: Maybe P.SourceSpan
   , complDocumentation :: Maybe Text
   , complExportedFrom :: [P.ModuleName]
+  , complDeclarationType :: Maybe Text -- Use a real type instead?
   } deriving (Show, Eq, Ord)
 
 instance ToJSON Completion where
@@ -234,6 +235,7 @@ instance ToJSON Completion where
       , "definedAt" .= complLocation
       , "documentation" .= complDocumentation
       , "exportedFrom" .= map P.runModuleName complExportedFrom
+      , "declarationType" .= complDeclarationType
       ]
 
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
@@ -244,6 +246,17 @@ identifierFromDeclarationRef = \case
   P.ValueOpRef _ op -> P.showOp op
   P.TypeOpRef _ op -> P.showOp op
   _ -> ""
+
+declarationTypeFromIdeDeclaration :: IdeDeclaration -> Text
+declarationTypeFromIdeDeclaration = \case
+  IdeDeclValue _ -> "value"
+  IdeDeclType _ -> "type"
+  IdeDeclTypeSynonym _ -> "typeSynonym"
+  IdeDeclDataConstructor _ -> "dataConstructor"
+  IdeDeclTypeClass _ -> "typeClass"
+  IdeDeclValueOperator _ -> "valueOperator"
+  IdeDeclTypeOperator _ -> "typeOperator"
+  IdeDeclModule _ -> "moduleName"
 
 data Success =
   CompletionResult [Completion]

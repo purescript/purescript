@@ -86,3 +86,61 @@ spec = describe "Applying completion options" $ do
                   , typ "member"
                   ]
     result `shouldSatisfy` \res -> complDocumentation res == Just "doc for member\n"
+
+  it "includes declarationType in completions for values" $ do
+    ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpec"]
+                  , typ "exampleValue"
+                  ]
+    result `shouldSatisfy` \res -> complDeclarationType res == Just "value"
+
+  it "includes declarationType in completions for functions" $ do
+    ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpec"]
+                  , typ "exampleFunction"
+                  ]
+    result `shouldSatisfy` \res -> complDeclarationType res == Just "value"
+
+  it "includes declarationType in completions for inferred values" $ do
+    ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpec"]
+                  , typ "exampleInferredString"
+                  ]
+    result `shouldSatisfy` \res -> complDeclarationType res == Just "value"
+
+  it "includes declarationType in completions for operators" $ do
+    ([_, (Right (CompletionResult results))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpec"]
+                  , typ "\\°/"
+                  ]
+    length results `shouldBe` 2
+    results `shouldSatisfy` 
+      any (\res -> complDeclarationType res == Just "valueOperator")
+    results `shouldSatisfy` 
+      any (\res -> complDeclarationType res == Just "typeOperator")
+
+  it "includes declarationType in completions for type constructors with \
+      \conflicting names" $ do
+    ([_, (Right (CompletionResult results))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpec"]
+                  , typ "ExampleTypeConstructor"
+                  ]
+    length results `shouldBe` 2
+    results `shouldSatisfy` 
+      any (\res -> complDeclarationType res == Just "dataConstructor")
+    results `shouldSatisfy` 
+      any (\res -> complDeclarationType res == Just "type")
+
+  it "includes declarationType in completions for type classes" $ do
+    ([_, (Right (CompletionResult [result]))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpec"]
+                  , typ "ExampleClass"
+                  ]
+    result `shouldSatisfy` \res -> complDeclarationType res == Just "typeClass"
+
+  it "includes declarationType in completions for type class members" $ do
+    ([_, (Right (CompletionResult [result]))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpec"]
+                  , typ "exampleMember"
+                  ]
+    result `shouldSatisfy` \res -> complDeclarationType res == Just "value"
