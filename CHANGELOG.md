@@ -8,6 +8,14 @@ Breaking changes:
 
 New features:
 
+* Extend ImportCompletion with declarationType (#3997, @i-am-the-slime)
+
+  By exposing the declaration type (value, type, typeclass, etc.) 
+  downstream tooling can annotate imports with this info so users know what they
+  are about to import. The info can also be mapped to a namespace filter to 
+  allow importing identifiers that appear more than once in a source file which
+  throws an exception without such a filter. 
+
 Bugfixes:
 
 * Only include direct dependencies in the output for `purs graph` (#3993, @colinwahl)

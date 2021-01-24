@@ -2,14 +2,12 @@
 
 module Language.PureScript.Ide.Filter.Declaration
        ( DeclarationType(..)
-       , declarationType
        ) where
 
 import           Protolude                     hiding (isPrefixOf)
 
 import           Control.Monad.Fail (fail)
 import           Data.Aeson
-import qualified Language.PureScript.Ide.Types as PI
 
 data DeclarationType
   = Value
@@ -35,13 +33,13 @@ instance FromJSON DeclarationType where
       "module"            -> pure Module
       s                   -> fail ("Unknown declaration type: " <> show s)
 
-declarationType :: PI.IdeDeclaration -> DeclarationType
-declarationType decl = case decl of
-  PI.IdeDeclValue _ -> Value
-  PI.IdeDeclType _ -> Type
-  PI.IdeDeclTypeSynonym _ -> Synonym
-  PI.IdeDeclDataConstructor _ -> DataConstructor
-  PI.IdeDeclTypeClass _ -> TypeClass
-  PI.IdeDeclValueOperator _ -> ValueOperator
-  PI.IdeDeclTypeOperator _ -> TypeOperator
-  PI.IdeDeclModule _ -> Module
+instance ToJSON DeclarationType where
+  toJSON dt = toJSON $ case dt of
+    Value           -> "value" :: Text
+    Type            -> "type"
+    Synonym         -> "synonym"
+    DataConstructor -> "dataconstructor"
+    TypeClass       -> "typeclass"
+    ValueOperator   -> "valueoperator"
+    TypeOperator    -> "typeoperator"
+    Module          -> "module"

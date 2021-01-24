@@ -130,6 +130,8 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl), mns) =
 
     complDocumentation = _annDocumentation ann
 
+    complDeclarationType = Just (declarationType decl)
+
     showFixity p a r o =
       let asso = case a of
             P.Infix -> "infix"
