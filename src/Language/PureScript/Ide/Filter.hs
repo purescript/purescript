@@ -31,7 +31,7 @@ import           Data.Aeson
 import           Data.Text                     (isPrefixOf)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
-import           Language.PureScript.Ide.Filter.Declaration (DeclarationType, declarationType)
+import           Language.PureScript.Ide.Filter.Declaration (DeclarationType)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import qualified Language.PureScript           as P

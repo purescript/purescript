@@ -107,14 +107,10 @@ The `complete` command looks up possible completions/corrections.
 
 The following format is returned as the Result:
 
-The `definedAt`, `documentation`, as well as the `declarationType` field might 
-be `null` if they couldn't be extracted from a source file. The 
-`declarationType` represents if a given declaration is a `value`, `type`, 
-`typeSynonym`, `dataConstructor`, `typeClass`, `valueOperator`, `typeOperator`, 
-or a `moduleName`. This information helps users in subsequent import commands.
-It increases their confidence that what they're about to import is actually what
-they meant and allows to produce namespace filters to import identifiers that
-have multiple meanings in their source file.
+The `definedAt`, `documentation`, as well as the `declarationType` field might
+be `null` if they couldn't be extracted from a source file. See the
+[Declaration Type Filter](#declaration-type-filter) further down for all
+possible values of declaration types and how to use this information.
 
 ```json
 [

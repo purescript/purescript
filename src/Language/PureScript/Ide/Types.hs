@@ -15,6 +15,7 @@ import           Data.Time.Clock (UTCTime)
 import qualified Data.Map.Lazy as M
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Errors.JSON as P
+import           Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
 import           Lens.Micro.Platform hiding ((.=))
 
 type ModuleIdent = Text
@@ -222,7 +223,7 @@ data Completion = Completion
   , complLocation :: Maybe P.SourceSpan
   , complDocumentation :: Maybe Text
   , complExportedFrom :: [P.ModuleName]
-  , complDeclarationType :: Maybe Text -- Use a real type instead?
+  , complDeclarationType :: Maybe DeclarationType
   } deriving (Show, Eq, Ord)
 
 instance ToJSON Completion where
@@ -247,17 +248,16 @@ identifierFromDeclarationRef = \case
   P.TypeOpRef _ op -> P.showOp op
   _ -> ""
 
-declarationTypeFromIdeDeclaration :: IdeDeclaration -> Text
-declarationTypeFromIdeDeclaration = \case
-  IdeDeclValue _ -> "value"
-  IdeDeclType _ -> "type"
-  IdeDeclTypeSynonym _ -> "typeSynonym"
-  IdeDeclDataConstructor _ -> "dataConstructor"
-  IdeDeclTypeClass _ -> "typeClass"
-  IdeDeclValueOperator _ -> "valueOperator"
-  IdeDeclTypeOperator _ -> "typeOperator"
-  IdeDeclModule _ -> "moduleName"
-
+declarationType :: IdeDeclaration -> DeclarationType
+declarationType decl = case decl of
+  IdeDeclValue _ -> Value
+  IdeDeclType _ -> Type
+  IdeDeclTypeSynonym _ -> Synonym
+  IdeDeclDataConstructor _ -> DataConstructor
+  IdeDeclTypeClass _ -> TypeClass
+  IdeDeclValueOperator _ -> ValueOperator
+  IdeDeclTypeOperator _ -> TypeOperator
+  IdeDeclModule _ -> Module
 data Success =
   CompletionResult [Completion]
   | TextResult Text
