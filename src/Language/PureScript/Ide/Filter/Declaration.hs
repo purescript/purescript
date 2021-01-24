@@ -7,6 +7,7 @@ module Language.PureScript.Ide.Filter.Declaration
 
 import           Protolude                     hiding (isPrefixOf)
 
+import           Control.Monad.Fail (fail)
 import           Data.Aeson
 import qualified Language.PureScript.Ide.Types as PI
 
@@ -32,7 +33,7 @@ instance FromJSON DeclarationType where
       "valueoperator"     -> pure ValueOperator
       "typeoperator"      -> pure TypeOperator
       "module"            -> pure Module
-      _                   -> mzero
+      s                   -> fail ("Unknown declaration type: " <> show s)
 
 declarationType :: PI.IdeDeclaration -> DeclarationType
 declarationType decl = case decl of

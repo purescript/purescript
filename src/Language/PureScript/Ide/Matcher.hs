@@ -24,6 +24,7 @@ module Language.PureScript.Ide.Matcher
 
 import           Protolude
 
+import           Control.Monad.Fail (fail)
 import           Data.Aeson
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
@@ -49,7 +50,7 @@ instance FromJSON (Matcher IdeDeclarationAnn) where
         distanceMatcher
           <$> params .: "search"
           <*> params .: "maximumDistance"
-      Just _ -> mzero
+      Just s -> fail ("Unknown matcher: " <> show s)
       Nothing -> return mempty
 
 -- | Matches any occurrence of the search string with intersections

@@ -189,7 +189,7 @@ startServer port env = Network.withSocketsDo $ do
         Left err -> $(logError) err
         Right (cmd, h) -> do
           case decodeT cmd of
-            Just cmd' -> do
+            Right cmd' -> do
               let message duration =
                     "Command "
                       <> commandName cmd'
@@ -210,10 +210,11 @@ startServer port env = Network.withSocketsDo $ do
                   Right r  -> Aeson.encode r
                   Left err -> Aeson.encode err
               liftIO (hFlush stdout)
-            Nothing -> do
-              $(logError) ("Parsing the command failed. Command: " <> cmd)
+            Left err -> do
+              let errMsg = "Parsing the command failed with:\n" <> err <> "\nCommand: " <> cmd
+              $(logError) errMsg
               liftIO $ do
-                catchGoneHandle (T.hPutStrLn h (encodeT (GeneralError "Error parsing Command.")))
+                catchGoneHandle (T.hPutStrLn h (encodeT (GeneralError errMsg)))
                 hFlush stdout
           liftIO $ catchGoneHandle (hClose h)
 
