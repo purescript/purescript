@@ -6,6 +6,7 @@ module Language.PureScript.Ide.Filter.Declaration
 
 import           Protolude                     hiding (isPrefixOf)
 
+import           Control.Monad.Fail (fail)
 import           Data.Aeson
 
 data DeclarationType
@@ -30,7 +31,8 @@ instance FromJSON DeclarationType where
       "valueoperator"     -> pure ValueOperator
       "typeoperator"      -> pure TypeOperator
       "module"            -> pure Module
-      _                   -> mzero
+      s                   -> fail ("Unknown declaration type: " <> show s)
+
 instance ToJSON DeclarationType where
   toJSON dt = toJSON $ case dt of
     Value           -> "value" :: Text

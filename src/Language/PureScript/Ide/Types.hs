@@ -8,6 +8,7 @@ module Language.PureScript.Ide.Types where
 import           Protolude hiding (moduleName)
 
 import           Control.Concurrent.STM (TVar)
+import           Control.Monad.Fail (fail)
 import           Data.Aeson (ToJSON, FromJSON, (.=))
 import qualified Data.Aeson as Aeson
 import           Data.IORef (IORef)
@@ -314,12 +315,11 @@ data IdeNamespace = IdeNSValue | IdeNSType | IdeNSModule
   deriving (Show, Eq, Ord, Generic, NFData)
 
 instance FromJSON IdeNamespace where
-  parseJSON (Aeson.String s) = case s of
+  parseJSON = Aeson.withText "Namespace" $ \case
     "value" -> pure IdeNSValue
     "type" -> pure IdeNSType
     "module" -> pure IdeNSModule
-    _       -> mzero
-  parseJSON _ = mzero
+    s -> fail ("Unknown namespace: " <> show s)
 
 -- | A name tagged with a namespace
 data IdeNamespaced = IdeNamespaced IdeNamespace Text

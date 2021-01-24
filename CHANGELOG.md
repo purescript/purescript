@@ -25,6 +25,8 @@ where included in the `depends` field in the output for `purs graph`.
 
 Other improvements:
 
+* More descriptive protocol errors from the ide server (@kritzcreek)
+
 ## [v0.13.8](https://github.com/purescript/purescript/releases/tag/v0.13.8) - 2020-05-23
 
 **Bug Fixes**
