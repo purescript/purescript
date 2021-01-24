@@ -316,9 +316,6 @@ addImportForIdentifier fp ident qual filters = do
           Right <$> addExplicitImport fp decl m1 qual
         -- Here we need the user to specify whether they wanted a 
         -- dataconstructor or a type
-
-        -- TODO: With the new namespace filter, this can actually be a
-        -- request for the user to specify which of the two was wanted.
         Nothing ->
           throwError (GeneralError "Undecidable between type and dataconstructor")
 
