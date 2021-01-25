@@ -26,19 +26,13 @@ Other improvements:
 
 Polymorphic kinds, based on the [Kind Inference for Datatypes](https://richarde.dev/papers/2020/kind-inference/kind-inference.pdf) paper (#3779, #3831, #3929, @natefaubion)
 
-Kinds are to types what types are to terms (except that kinds are actually themselves types now) but whereas we have polymorphic types, kinds were monorphic.
+Kinds are to types what types are to terms (although kinds are themselves types now), but whereas we have polymorphic types, kinds were monomorphic.
 
-This means that we were not able to abstract over kinds, leading for instance to a proliferation of proxy types:
+This meant that we were not able to abstract over kinds, leading for instance to a proliferation of proxy types:
 
 ```purescript
 data Proxy (a :: Type) = Proxy
-```
-
-```purescript
 data SProxy (a :: Symbol) = SProxy
-```
-
-```purescript
 data RProxy (row :: # Type) = RProxy
 ```
 
@@ -113,90 +107,23 @@ Coercible constraints, based on the [Safe Zero-cost Coercions for Haskell](https
 
 `Prim.Coerce.Coercible` is a new compiler-solved class, used to relate types with the same runtime representation. One can use `Safe.Coerce.coerce` (from the new [`safe-coerce`](https://github.com/purescript/purescript-safe-coerce) library) instead of `Unsafe.Coerce.unsafeCoerce` to safely turn a `a` into a `b` when `Coercible a b` holds.
 
-Coercible constraints are solved according to the following rules:
+#### Roles
 
-* _reflexivity_: `Coercible a a` holds.
+Types parameters now have _roles_, which depend on how they affect the runtime representation of their type. There's three roles, from most to least restrictive: _nominal_, _representational_ and _phantom_.
 
-* _symmetry_: `Coercible a b` implies `Coercible b a`.
+* _nominal_ parameters are only coercible to themselves.
 
-* _transitivity_: `Coercible a b` and `Coercible b c` imply `Coercible a c`.
+* _representational_ parameters are coercible when a Coercible constraint holds.
 
-* Newtypes can be freely wrapped and unwrapped when their constructor is in scope:
-
-```purescript
-newtype Age = Age Int
-```
-
-`Coercible Int Age` and `Coercible Age Int` hold since `Age` has the same runtime representation than `Int`.
-
-Newtype constructors have to be in scope to preserve abstraction. It's common to declare a newtype to encode some invariants (non emptiness of arrays with `Data.Array.NonEmpty.NonEmptyArray` for example), hide its constructor and export smart constructors instead. Without this restriction, the guarantees provided by such newtypes would be void.
-
-* Terms of different data types are not coercible:
-
-```purescript
-data Maybe a = Nothing | Just a
-data Either a b = Left a | Right b
-```
-
-`Coercible (Maybe b) (Either a b)` does not hold. Those types don't share a common runtime representation so coercing between them would be unsafe.
-
-* Terms of the same data types may be coercible, depending on the _roles_ of their parameters. There’s three roles, from most to least restrictive: _nominal_, _representational_ and _phantom_. The primitives `->`, `Array` and `Record` types have _representational_ parameters and roles are otherwise inferred based on their appearance in the right hand side of a data type declaration.
-
-* Coercible has kind `forall k. k -> Constraint`, it is _polykinded_, so we can also coerce more than types of kind `Type`:
-
-  * Rows are coercible when they have the same labels, when the corresponding pairs of types are coercible and when their tails are coercible: `Coercible ( label :: a | r ) ( label :: b | s )` holds when `Coercible a b` and `Coercible r s` do.
-
-  * Higher kinded types are coercible if they are coercible when fully saturated: `Coercible (f :: _ -> Type) (g :: _ -> Type)` holds when `Coercible (f a) (g a)` does.
-
-#### Role inference
-
-```purescript
-foreign import data Effect :: Type -> Type
-```
-
-Parameters of foreign data types are _nominal_ since we do not have enough information to safely choose a less restrictive role. Nominal parameters are only coercible to themselves.
-
-```purescript
-data Maybe a = Nothing | Just a
-```
-
-When a parameter appears under at least one of the constructors, its role is _representational_. Representational parameters of higher kinded types have to be coercible for those types to be coercible: `Coercible (Maybe a) (Maybe b)` holds only when `Coercible a b` does.
-
-This rule must be amended for parameters appearing in the arguments of a type variable. Because it could be instantiated to anything we have to be conservative and infer _nominal_, the most restrictive role, instead of _representational_: `Coercible (a -> f b) (a -> f c)` does not hold.
-
-```purescript
-data Proxy a = Proxy
-```
-
-When a parameter does not appear at all under any constructor, its role is _phantom_. Phantom parameters are coercible to anything: `Coercible (Proxy a) (Proxy b)` holds for all `a` and `b`.
-
-```purescript
-newtype First a = First (Maybe a)
-```
-
-When a parameter appears in the arguments of another type we infer its role from the declaration of that type: `Coercible (First a) (First b)` holds when `Coercible a b` does, even when the newtype constructor is out of scope, because the parameter of `Maybe` is _representational_.
-
-We cannot infer the role of parameters in recursive position, so we default to _phantom_ but usually end up with something else because we keep the most restrictive role a parameter appears at:
-
-```purescript
-data List a = Nil | Cons a (List a)
-```
-
-The parameter appears at _representational_ (under the `Cons` constructor) and _phantom_ (in recursive position) roles so we infer _representational_: `Coercible (List a) (List b)` holds when `Coercible a b` does.
-
-```purescript
-newtype Mu f = In (f (Mu f))
-```
-
-The parameter appears at _representational_ (under the `In` constructor) and _nominal_ (as argument to itself) roles so we infer _nominal_: `Coercible (Mu f) (Mu g)` does not hold, unless `g` is actually `f`.
+* _phantom_ parameters are coercible to anything.
 
 #### Role annotations
 
-Inferring _nominal_ roles for foreign data types is safe but can be too constraining sometimes. For example this prevents to coerce `Effect Age` to `Effect Int`, even though they actually have the same runtime representation.
+The compiler infers _nominal_ roles for foreign data types, which is safe but can be too constraining sometimes. For example this prevents to coerce `Effect Age` to `Effect Int`, even though they actually have the same runtime representation.
 
 The roles of foreign data types can thus be loosened with explicit role annotations, similar to the [RoleAnnotations](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#role-annotations) GHC extension.
 
-Here’s the annotation we added to `Effect` for example:
+Here's the annotation we added to `Effect`:
 
 ```purescript
 type role Effect representational
