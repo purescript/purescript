@@ -109,7 +109,7 @@ Coercible constraints, based on the [Safe Zero-cost Coercions for Haskell](https
 
 #### Roles
 
-Types parameters now have _roles_, which depend on how they affect the runtime representation of their type. There's three roles, from most to least restrictive: _nominal_, _representational_ and _phantom_.
+Types parameters now have _roles_, which depend on how they affect the runtime representation of their type. There's three roles, from most to least restrictive:
 
 * _nominal_ parameters are only coercible to themselves.
 
