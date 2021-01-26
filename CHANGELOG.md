@@ -34,6 +34,7 @@ This meant that we were not able to abstract over kinds, leading for instance to
 data Proxy (a :: Type) = Proxy
 data SProxy (a :: Symbol) = SProxy
 data RProxy (row :: # Type) = RProxy
+data RLProxy (row :: RowList) = RLProxy
 ```
 
 Now we can have a single proxy type, whose parameter has a polymorphic kind.
@@ -65,6 +66,8 @@ It is treated internally as:
 ```purescript
 data Foo
 ```
+
+Note that `foreign import data` declarations are not deprecated. They are still necessary to define types with kinds other than `Type` since constructors are not lifted as in GHC with [DataKinds](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#extension-DataKinds).
 
 Likewise, `kind` imports and exports are deprecated and treated the same as a type import or export.
 
@@ -129,7 +132,7 @@ Here's the annotation we added to `Effect`:
 type role Effect representational
 ```
 
-Conversely, we might want to strengthen the roles of parameters with invariants invisible to the type system. Maps are the canonical example of this: the shape of their underlying tree rely on the `Ord` instance of their keys, but the `Ord` instance of a newtype may behave differently than the one of the wrapped type so it would be unsafe to allow coercions between `Map k1 a` and `Map k2 a`, even when `Coercible k1 k2` holds.
+Conversely, we might want to strengthen the roles of parameters with invariants invisible to the type system. Maps are the canonical example of this: the shape of their underlying tree rely on the `Ord` instance of their keys, but the `Ord` instance of a newtype may behave differently than the one of the wrapped type so it would be unsafe to allow coercions between `Map k1 a` and `Map k2 a` when `Coercible k1 k2` holds.
 
 In order to forbid such unsafe coercion we added a _nominal_ annotation to the first parameter of `Map`:
 
