@@ -98,10 +98,11 @@ In GHC, all signatures use the `type` prefix, but we reuse the same keyword as t
 
 It's better to be explicit about polymorphism by writing signatures. Since we don't really quantify over free type variables, it's also necessary in the case that two poly-kinded arguments must have the same kind. The compiler will warn about missing kind signatures when polymorphic kinds are inferred.
 
-Classes can have signatures too, but they must end with the new `Constraint` kind instead of `Type`. For example, `Prim.Row.Cons` now has the signature:
+Classes can have signatures too, but they must end with the new `Constraint` kind instead of `Type`. For example, here's the new definition of `Prim.Row.Cons`:
 
 ```purescript
 class Cons :: forall k. Symbol -> k -> Row k -> Row k -> Constraint
+class Cons label a tail row | label a tail -> row, label row -> a tail
 ```
 
 ### Safe zero-cost coercions
@@ -132,7 +133,7 @@ Here's the annotation we added to `Effect`:
 type role Effect representational
 ```
 
-Conversely, we might want to strengthen the roles of parameters with invariants invisible to the type system. Maps are the canonical example of this: the shape of their underlying tree rely on the `Ord` instance of their keys, but the `Ord` instance of a newtype may behave differently than the one of the wrapped type so it would be unsafe to allow coercions between `Map k1 a` and `Map k2 a` when `Coercible k1 k2` holds.
+Conversely, we might want to strengthen the roles of parameters with invariants invisible to the type system. Maps are the canonical example of this: the shape of their underlying tree rely on the `Ord` instance of their keys, but the `Ord` instance of a newtype may behave differently than the one of the wrapped type so it would be unsafe to allow coercions between `Map k1 a` and `Map k2 a`, even when `Coercible k1 k2` holds.
 
 In order to forbid such unsafe coercion we added a _nominal_ annotation to the first parameter of `Map`:
 
@@ -173,11 +174,11 @@ Meaning that raw strings can contain up to two successive quotes, any number of 
 
 * Unsupport bare negative literals as equational binders (#3956, @rhendric)
 
-It used to be possible to match on negative litterals, such as `-1`, but this prevented parsing matches on constructors aliased to `-`. The compiler will reject matches on _bare_ negative litterals, but they can still be matched by wrapping them in parentheses.
+It used to be possible to match on negative literals, such as `-1`, but this prevented parsing matches on constructors aliased to `-`. The compiler will reject matches on _bare_ negative literals, but they can still be matched by wrapping them in parentheses.
 
 * Forbid partial data constructors exports (#3872, @kl0tl)
 
-Exporting only some of the constructors of a type meant that changes internal to a module, such that adding or removing an unexported constructor, could cause unexhaustive pattern matches errors in downstream code. Partial explicit export lists will have to be completed with the missing constructors or replaced by implicit export lists.
+Exporting only some of the constructors of a type meant that changes internal to a module, such as adding or removing an unexported constructor, could cause unexhaustive pattern match errors in downstream code. Partial explicit export lists will have to be completed with the missing constructors or replaced by implicit export lists.
 
 * Print compile errors to stdout, progress messages to stderr (#3839, @JordanMartinez)
 
@@ -205,9 +206,17 @@ Allowing the compiler to be built against various versions of `language-javascri
 
 #### Improvements
 
+* Improves protocol errors from the IDE server (#3998, @kritzcreek)
+
+The IDE server now respond with more descriptive error messages when failing to parse a command. This should make it easier to contribute fixes to the various clients.
+
+* Extend ImportCompletion with declarationType (#3997, @i-am-the-slime)
+
+By exposing the declaration type (value, type, typeclass, etc.) downstream tooling can annotate imports with this info so users know what they are about to import. The info can also be mapped to a namespace filter to allow importing identifiers that appear more than once in a source file which throws an exception without such a filter.
+
 * Improve error message when `negate` isn't imported (#3952, @mhmdanas)
 
-This shows a specific message when using negative litterals but `Data.Ring.negate` is out of scope, similar to the messages shown when using do notation if `Control.Bind.bind` and `Control.Bind.discard` are out of scope.
+This shows a specific message when using negative literals but `Data.Ring.negate` is out of scope, similar to the messages shown when using do notation if `Control.Bind.bind` and `Control.Bind.discard` are out of scope.
 
 * Add source spans to `PartiallyAppliedSynonym` errors (#3951, @rhendric)
 
