@@ -35,3 +35,6 @@ TAGS
 *.ps
 *.svg
 tests/purs/make/
+
+# Don't ignore logo.svg
+!logo.svg

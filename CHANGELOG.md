@@ -23,6 +23,8 @@ Bugfixes:
 Fixes a bug where the transitive closure of a module's dependencies
 where included in the `depends` field in the output for `purs graph`.
 
+* Replace PNG logo with SVG and use system color theme (#4002, @ptrfrncsmrph)
+
 Other improvements:
 
 * More descriptive protocol errors from the ide server (@kritzcreek)
