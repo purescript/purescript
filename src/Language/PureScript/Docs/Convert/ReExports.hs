@@ -68,7 +68,7 @@ updateReExports externs withPackage = execState action
 
   traversalOrder :: [P.ModuleName]
   traversalOrder =
-    case P.sortModules externsSignature externs of
+    case P.sortModules P.Transitive externsSignature externs of
       Right (es, _) -> map P.efModuleName es
       Left errs -> internalError $
         "failed to sortModules: " ++
@@ -135,14 +135,13 @@ collectDeclarations reExports = do
   typeClasses <- collect lookupTypeClassDeclaration expTCs
   types <- collect lookupTypeDeclaration expTypes
   typeOps <- collect lookupTypeOpDeclaration expTypeOps
-  kinds <- collect lookupKindDeclaration expKinds
 
   (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
 
   let filteredTypes = filterDataConstructors expCtors types
   let filteredClasses = filterTypeClassMembers (Map.keys expVals) classes
 
-  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals, valOps, typeOps, kinds]))
+  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals, valOps, typeOps]))
 
   where
 
@@ -171,9 +170,6 @@ collectDeclarations reExports = do
   expTypeOps :: Map (P.OpName 'P.TypeOpName) P.ExportSource
   expTypeOps = mkExportMap P.getTypeOpRef
 
-  expKinds :: Map (P.ProperName 'P.KindName) P.ExportSource
-  expKinds = mkExportMap P.getKindRef
-
   mkExportMap :: Ord name => (P.DeclarationRef -> Maybe name) -> Map name P.ExportSource
   mkExportMap f =
     Map.fromList $
@@ -183,6 +179,7 @@ collectDeclarations reExports = do
   expCtors = concatMap (fromMaybe [] . (>>= snd) . P.getTypeRef . snd) reExports
 
 lookupValueDeclaration ::
+  forall m.
   (MonadState (Map P.ModuleName Module) m,
    MonadReader P.ModuleName m) =>
   P.ModuleName ->
@@ -194,6 +191,7 @@ lookupValueDeclaration importedFrom ident = do
     rs =
       filter (\d -> declTitle d == P.showIdent ident
                     && (isValue d || isValueAlias d)) decls
+    errOther :: Show a => a -> m b
     errOther other =
       internalErrorInModule
         ("lookupValueDeclaration: unexpected result:\n" ++
@@ -311,24 +309,6 @@ lookupTypeClassDeclaration importedFrom tyClass = do
         ("lookupTypeClassDeclaration: unexpected result for "
          ++ show tyClass ++ ": "
          ++ (unlines . map show) other)
-
-lookupKindDeclaration
-  :: (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m)
-  => P.ModuleName
-  -> P.ProperName 'P.KindName
-  -> m (P.ModuleName, [Declaration])
-lookupKindDeclaration importedFrom kind = do
-  decls <- lookupModuleDeclarations "lookupKindDeclaration" importedFrom
-  let
-    ds = filter (\d -> declTitle d == P.runProperName kind
-                       && isKind d)
-                decls
-  case ds of
-    [d] ->
-      pure (importedFrom, [d])
-    other ->
-      internalErrorInModule
-        ("lookupKindDeclaration: unexpected result: " ++ show other)
 
 -- |
 -- Get the full list of declarations for a particular module out of the
@@ -530,7 +510,7 @@ typeClassConstraintFor :: Declaration -> Maybe Constraint'
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ _ ->
-      Just (P.Constraint () (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
+      Just (P.Constraint () (P.Qualified Nothing (P.ProperName declTitle)) [] (mkConstraint tyArgs) Nothing)
     _ ->
       Nothing
   where

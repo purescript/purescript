@@ -1,0 +1,12 @@
+Error found:
+at tests/purs/failing/MissingFFIImplementations.purs:2:1 - 5:29 (line 2, column 1 - line 5, column 29)
+
+  The following values are not defined in the foreign module for module [33mMain[0m:
+
+    no
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/MissingFFIImplementations.md for more information,
+or to contribute content related to this error.
+

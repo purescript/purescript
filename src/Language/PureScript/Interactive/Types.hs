@@ -35,7 +35,9 @@ import qualified Language.PureScript as P
 import qualified Data.Map as M
 import           Data.List (foldl')
 import           Language.PureScript.Sugar.Names.Env (nullImports, primExports)
+import           Control.Monad (foldM)
 import           Control.Monad.Trans.Except (runExceptT)
+import           Control.Monad.Trans.State (execStateT)
 import           Control.Monad.Writer.Strict (runWriterT)
 
 
@@ -118,25 +120,27 @@ psciImportedModuleNames st =
 -- ensure that completions remain accurate.
 updateImportExports :: PSCiState -> PSCiState
 updateImportExports st@(PSCiState modules lets externs iprint _ _) =
-  case desugarModule [temporaryModule] of
+  case createEnv (map snd externs) >>= flip desugarModule temporaryModule of
     Left _          -> st -- TODO: can this fail and what should we do?
-    Right (env, _)  ->
+    Right env  ->
       case M.lookup temporaryName env of
         Just (_, is, es)  -> PSCiState modules lets externs iprint is es
         _                 -> st -- impossible
   where
 
-  desugarModule :: [P.Module] -> Either P.MultipleErrors (P.Env, [P.Module])
-  desugarModule = runExceptT =<< hushWarnings . P.desugarImportsWithEnv (map snd externs)
-  hushWarnings  = fmap fst . runWriterT
+  desugarModule :: P.Env -> P.Module -> Either P.MultipleErrors P.Env
+  desugarModule e = runExceptT =<< fmap (fst . fst) . runWriterT . flip execStateT (e, mempty) . P.desugarImports
+
+  createEnv :: [P.ExternsFile] -> Either P.MultipleErrors P.Env
+  createEnv = runExceptT =<< fmap fst . runWriterT . foldM P.externsEnv P.primEnv
 
   temporaryName :: P.ModuleName
-  temporaryName = P.ModuleName [P.ProperName "$PSCI"]
+  temporaryName = P.ModuleName "$PSCI"
 
   temporaryModule :: P.Module
   temporaryModule =
     let
-      prim = (P.ModuleName [P.ProperName "Prim"], P.Implicit, Nothing)
+      prim = (P.ModuleName "Prim", P.Implicit, Nothing)
       decl = (importDecl `map` (prim : modules)) ++ lets
     in
       P.Module internalSpan [] temporaryName decl Nothing

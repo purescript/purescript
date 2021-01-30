@@ -60,7 +60,7 @@ desugarGuardedExprs
 desugarGuardedExprs ss (Case scrut alternatives)
   | any (not . isTrivialExpr) scrut = do
     -- in case the scrutinee is non trivial (e.g. not a Var or Literal)
-    -- we may evaluate the scrutinee more than once when a guard occurrs.
+    -- we may evaluate the scrutinee more than once when a guard occurs.
     -- We bind the scrutinee to Vars here to mitigate this case.
     (scrut', scrut_decls) <- unzip <$> forM scrut (\e -> do
       scrut_id <- freshIdent'
@@ -171,8 +171,8 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           -- if the binder is a var binder we must not add
           -- the fail case as it results in unreachable
           -- alternative
-          alt_fail' | all isIrrefutable vb = []
-                    | otherwise = alt_fail
+          alt_fail' n | all isIrrefutable vb = []
+                      | otherwise = alt_fail n
 
 
           -- we are here:
@@ -186,18 +186,18 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           --
         in Case scrut
             (CaseAlternative vb [MkUnguarded (desugarGuard gs e alt_fail)]
-              : alt_fail')
+              : (alt_fail' (length scrut)))
 
       return [ CaseAlternative scrut_nullbinder [MkUnguarded rhs]]
 
-    desugarGuard :: [Guard] -> Expr -> [CaseAlternative] -> Expr
+    desugarGuard :: [Guard] -> Expr -> (Int ->[CaseAlternative]) -> Expr
     desugarGuard [] e _ = e
     desugarGuard (ConditionGuard c : gs) e match_failed
       | isTrueExpr c = desugarGuard gs e match_failed
       | otherwise =
         Case [c]
           (CaseAlternative [LiteralBinder ss (BooleanLiteral True)]
-            [MkUnguarded (desugarGuard gs e match_failed)] : match_failed)
+            [MkUnguarded (desugarGuard gs e match_failed)] : match_failed 1)
 
     desugarGuard (PatternGuard vb g : gs) e match_failed =
       Case [g]
@@ -206,7 +206,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
       where
         -- don't consider match_failed case if the binder is irrefutable
         match_failed' | isIrrefutable vb = []
-                      | otherwise        = match_failed
+                      | otherwise        = match_failed 1
 
     -- we generate a let-binding for the remaining guards
     -- and alternatives. A CaseAlternative is passed (or in
@@ -215,7 +215,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
     desugarAltOutOfLine :: [Binder]
                         -> [GuardedExpr]
                         -> [CaseAlternative]
-                        -> ([CaseAlternative] -> Expr)
+                        -> ((Int -> [CaseAlternative]) -> Expr)
                         -> m Expr
     desugarAltOutOfLine alt_binder rem_guarded rem_alts mk_body
       | Just rem_case <- mkCaseOfRemainingGuardsAndAlts = do
@@ -228,7 +228,8 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           goto_rem_case :: Expr
           goto_rem_case = Var ss (Qualified Nothing rem_case_id)
             `App` Literal ss (BooleanLiteral True)
-          alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto_rem_case]]
+          alt_fail :: Int -> [CaseAlternative]
+          alt_fail n = [CaseAlternative (replicate n NullBinder) [MkUnguarded goto_rem_case]]
 
         pure $ Let FromLet [
           ValueDecl (ss, []) rem_case_id Private []
@@ -236,7 +237,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           ] (mk_body alt_fail)
 
       | otherwise
-      = pure $ mk_body []
+      = pure $ mk_body (const [])
       where
         mkCaseOfRemainingGuardsAndAlts
           | not (null rem_guarded)
@@ -251,7 +252,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
 
     -- case expressions with a single alternative which have
     -- a NullBinder occur frequently after desugaring
-    -- complex guards. This function removes these superflous
+    -- complex guards. This function removes these superfluous
     -- cases.
     optimize :: Expr -> Expr
     optimize (Case _ [CaseAlternative vb [MkUnguarded v]])
@@ -266,8 +267,8 @@ desugarGuardedExprs ss (Case scrut alternatives) =
     alts' <- desugarAlternatives alternatives
     return $ optimize (Case scrut alts')
 
-desugarGuardedExprs ss (TypedValue infered e ty) =
-  TypedValue infered <$> desugarGuardedExprs ss e <*> pure ty
+desugarGuardedExprs ss (TypedValue inferred e ty) =
+  TypedValue inferred <$> desugarGuardedExprs ss e <*> pure ty
 
 desugarGuardedExprs _ (PositionedValue ss comms e) =
   PositionedValue ss comms <$> desugarGuardedExprs ss e
@@ -405,7 +406,7 @@ makeCaseDeclaration ss ident alternatives = do
   argName _ = freshIdent'
 
   -- Combine two lists of potential names from two case alternatives
-  -- by zipping correspoding columns.
+  -- by zipping corresponding columns.
   resolveNames :: [Maybe Ident] -> [Maybe Ident] -> [Maybe Ident]
   resolveNames = zipWith resolveName
 

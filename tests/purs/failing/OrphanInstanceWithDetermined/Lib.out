@@ -1,0 +1,22 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/OrphanInstanceWithDetermined.purs:5:1 - 5:25 (line 5, column 1 - line 5, column 25)
+
+  Orphan instance [33mcflr[0m found for
+  [33m         [0m
+  [33m  Lib.C F[0m
+  [33m        L[0m
+  [33m        R[0m
+  [33m         [0m
+  This problem can be resolved by declaring the instance in [33mLib[0m, or by defining the instance on a newtype wrapper.
+
+in type class instance
+[33m         [0m
+[33m  Lib.C F[0m
+[33m        L[0m
+[33m        R[0m
+[33m         [0m
+
+See https://github.com/purescript/documentation/blob/master/errors/OrphanInstance.md for more information,
+or to contribute content related to this error.
+

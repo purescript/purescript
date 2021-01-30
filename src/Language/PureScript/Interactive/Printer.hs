@@ -25,6 +25,8 @@ printModuleSignatures moduleName P.Environment{..} =
     let moduleNamesIdent = byModuleName names
         moduleTypeClasses = byModuleName typeClasses
         moduleTypes = byModuleName types
+
+        byModuleName :: M.Map (P.Qualified a) b -> [P.Qualified a]
         byModuleName = filter ((== Just moduleName) . P.getQual) . M.keys
 
   in
@@ -61,7 +63,7 @@ printModuleSignatures moduleName P.Environment{..} =
                     if null typeClassSuperclasses
                     then Box.text ""
                     else Box.text "("
-                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Constraint _ (P.Qualified _ pn) lt _) -> textT (P.runProperName pn) Box.<+> Box.hcat Box.left (map (P.typeAtomAsBox maxBound) lt)) typeClassSuperclasses)
+                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Constraint _ (P.Qualified _ pn) _ lt _) -> textT (P.runProperName pn) Box.<+> Box.hcat Box.left (map (P.typeAtomAsBox maxBound) lt)) typeClassSuperclasses)
                          Box.<> Box.text ") <= "
                 className =
                     textT (P.runProperName name)
@@ -79,16 +81,16 @@ printModuleSignatures moduleName P.Environment{..} =
 
 
         findType
-          :: M.Map (P.Qualified (P.ProperName 'P.TypeName)) (P.SourceKind, P.TypeKind)
+          :: M.Map (P.Qualified (P.ProperName 'P.TypeName)) (P.SourceType, P.TypeKind)
           -> P.Qualified (P.ProperName 'P.TypeName)
-          -> (P.Qualified (P.ProperName 'P.TypeName), Maybe (P.SourceKind, P.TypeKind))
+          -> (P.Qualified (P.ProperName 'P.TypeName), Maybe (P.SourceType, P.TypeKind))
         findType envTypes name = (name, M.lookup name envTypes)
 
         showType
           :: M.Map (P.Qualified (P.ProperName 'P.ClassName)) P.TypeClassData
           -> M.Map (P.Qualified (P.ProperName 'P.ConstructorName)) (P.DataDeclType, P.ProperName 'P.TypeName, P.SourceType, [P.Ident])
-          -> M.Map (P.Qualified (P.ProperName 'P.TypeName)) ([(Text, Maybe P.SourceKind)], P.SourceType)
-          -> (P.Qualified (P.ProperName 'P.TypeName), Maybe (P.SourceKind, P.TypeKind))
+          -> M.Map (P.Qualified (P.ProperName 'P.TypeName)) ([(Text, Maybe P.SourceType)], P.SourceType)
+          -> (P.Qualified (P.ProperName 'P.TypeName), Maybe (P.SourceType, P.TypeKind))
           -> Maybe Box.Box
         showType typeClassesEnv dataConstructorsEnv typeSynonymsEnv (n@(P.Qualified modul name), typ) =
           case (typ, M.lookup n typeSynonymsEnv) of
@@ -101,7 +103,7 @@ printModuleSignatures moduleName P.Environment{..} =
                     textT ("type " <> P.runProperName name <> foldMap ((" " <>) . fst) typevars)
                     Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox maxBound dtType)
 
-            (Just (_, P.DataType typevars pt), _) ->
+            (Just (_, P.DataType _ typevars pt), _) ->
               let prefix =
                     case pt of
                       [(dtProperName,_)] ->
@@ -111,7 +113,7 @@ printModuleSignatures moduleName P.Environment{..} =
                       _ -> "data"
 
               in
-                Just $ textT (prefix <> " " <> P.runProperName name <> foldMap ((" " <>) . fst) typevars) Box.// printCons pt
+                Just $ textT (prefix <> " " <> P.runProperName name <> foldMap ((" " <>) . (\(v, _, _) -> v)) typevars) Box.// printCons pt
 
             _ ->
               Nothing

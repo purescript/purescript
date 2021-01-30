@@ -17,6 +17,7 @@
 
 module Command.Hierarchy (command) where
 
+import           Prelude
 import           Protolude (catMaybes)
 
 import           Control.Applicative (optional)
@@ -36,14 +37,14 @@ import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
 
 data HierarchyOptions = HierarchyOptions
-  { _hierachyInput   :: FilePath
+  { _hierarchyInput   :: FilePath
   , _hierarchyOutput :: Maybe FilePath
   }
 
 parseInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
 parseInput paths = do
   content <- readUTF8FilesT paths
-  return $ map snd <$> CST.parseFromFiles id content
+  return $ map (snd . snd) <$> CST.parseFromFiles id content
 
 compile :: HierarchyOptions -> IO ()
 compile (HierarchyOptions inputGlob mOutput) = do

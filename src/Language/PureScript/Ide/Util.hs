@@ -33,6 +33,7 @@ import           Protolude                           hiding (decodeUtf8,
                                                       encodeUtf8, to)
 
 import           Data.Aeson
+import qualified Data.Text                           as T
 import qualified Data.Text.Lazy                      as TL
 import           Data.Text.Lazy.Encoding             as TLE
 import qualified Language.PureScript                 as P
@@ -52,7 +53,6 @@ identifierFromIdeDeclaration d = case d of
   IdeDeclTypeClass tc -> tc ^. ideTCName . properNameT
   IdeDeclValueOperator op -> op ^. ideValueOpName & P.runOpName
   IdeDeclTypeOperator op -> op ^. ideTypeOpName & P.runOpName
-  IdeDeclKind name -> P.runProperName name
   IdeDeclModule name -> P.runModuleName name
 
 namespaceForDeclaration :: IdeDeclaration -> IdeNamespace
@@ -64,7 +64,6 @@ namespaceForDeclaration d = case d of
   IdeDeclTypeClass _ -> IdeNSType
   IdeDeclValueOperator _ -> IdeNSValue
   IdeDeclTypeOperator _ -> IdeNSType
-  IdeDeclKind _ -> IdeNSKind
   IdeDeclModule _ -> IdeNSModule
 
 discardAnn :: IdeDeclarationAnn -> IdeDeclaration
@@ -89,8 +88,8 @@ typeOperatorAliasT i =
 encodeT :: (ToJSON a) => a -> Text
 encodeT = TL.toStrict . TLE.decodeUtf8 . encode
 
-decodeT :: (FromJSON a) => Text -> Maybe a
-decodeT = decode . TLE.encodeUtf8 . TL.fromStrict
+decodeT :: (FromJSON a) => Text -> Either Text a
+decodeT = first T.pack . eitherDecode . TLE.encodeUtf8 . TL.fromStrict
 
 properNameT :: Getting r (P.ProperName a) Text
 properNameT = to P.runProperName

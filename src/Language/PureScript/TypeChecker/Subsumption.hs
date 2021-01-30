@@ -75,14 +75,15 @@ subsumes'
   -> SourceType
   -> SourceType
   -> m (Coercion mode)
-subsumes' mode (ForAll _ ident _ ty1 _) ty2 = do
-  replaced <- replaceVarWithUnknown ident ty1
+subsumes' mode (ForAll _ ident mbK ty1 _) ty2 = do
+  u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
+  let replaced = replaceTypeVars ident u ty1
   subsumes' mode replaced ty2
-subsumes' mode ty1 (ForAll _ ident _ ty2 sco) =
+subsumes' mode ty1 (ForAll _ ident mbK ty2 sco) =
   case sco of
     Just sco' -> do
       sko <- newSkolemConstant
-      let sk = skolemize NullSourceAnn ident sko sco' ty2
+      let sk = skolemize NullSourceAnn ident mbK sko sco' ty2
       subsumes' mode ty1 sk
     Nothing -> internalError "subsumes: unspecified skolem scope"
 subsumes' mode (TypeApp _ (TypeApp _ f1 arg1) ret1) (TypeApp _ (TypeApp _ f2 arg2) ret2) | eqType f1 tyFunction && eqType f2 tyFunction = do
@@ -108,9 +109,9 @@ subsumes' mode (TypeApp _ f1 r1) (TypeApp _ f2 r2) | eqType f1 tyRecord && eqTyp
     -- every property in ts2 must appear in ts1. If not, then the candidate expression is missing a required property.
     -- Conversely, when r2 is empty, every property in ts1 must appear in ts2, or else the expression has
     -- an additional property which is not allowed.
-    when (eqType r1' $ REmpty ())
+    when (isREmpty r1')
       (for_ (firstMissingProp ts2' ts1') (throwError . errorMessage . PropertyIsMissing . rowListLabel))
-    when (eqType r2' $ REmpty ())
+    when (isREmpty r2')
       (for_ (firstMissingProp ts1' ts2') (throwError . errorMessage . AdditionalProperty . rowListLabel))
     -- Check subsumption for common labels
     sequence_ common

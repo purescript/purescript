@@ -1,5 +1,5 @@
 module Language.PureScript.Make.BuildPlan
-  ( BuildPlan()
+  ( BuildPlan(bpEnv)
   , BuildJobResult(..)
   , buildJobSuccess
   , buildJobFailure
@@ -14,13 +14,13 @@ import           Prelude
 
 import           Control.Concurrent.Async.Lifted as A
 import           Control.Concurrent.Lifted as C
+import           Control.Monad.Base (liftBase)
 import           Control.Monad hiding (sequence)
-import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import           Data.Foldable (foldl')
 import qualified Data.Map as M
-import           Data.Maybe (catMaybes, fromMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Time.Clock (UTCTime)
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
@@ -28,13 +28,17 @@ import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs
 import           Language.PureScript.Make.Actions as Actions
+import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names (ModuleName)
+import           Language.PureScript.Sugar.Names.Env
+import           System.Directory (getCurrentDirectory)
 
 -- | The BuildPlan tracks information about our build progress, and holds all
 -- prebuilt modules for incremental builds.
 data BuildPlan = BuildPlan
   { bpPrebuilt :: M.Map ModuleName Prebuilt
   , bpBuildJobs :: M.Map ModuleName BuildJob
+  , bpEnv :: C.MVar Env
   }
 
 data Prebuilt = Prebuilt
@@ -64,6 +68,20 @@ buildJobSuccess _ = Nothing
 buildJobFailure :: BuildJobResult -> Maybe MultipleErrors
 buildJobFailure (BuildJobFailed errors) = Just errors
 buildJobFailure _ = Nothing
+
+-- | Information obtained about a particular module while constructing a build
+-- plan; used to decide whether a module needs rebuilding.
+data RebuildStatus = RebuildStatus
+  { statusModuleName :: ModuleName
+  , statusRebuildNever :: Bool
+  , statusNewCacheInfo :: Maybe CacheInfo
+    -- ^ New cache info for this module which should be stored for subsequent
+    -- incremental builds. A value of Nothing indicates that cache info for
+    -- this module should not be stored in the build cache, because it is being
+    -- rebuilt according to a RebuildPolicy instead.
+  , statusPrebuilt :: Maybe Prebuilt
+    -- ^ Prebuilt externs and timestamp for this module, if any.
+  }
 
 -- | Called when we finished compiling a module and want to report back the
 -- compilation result, as well as any potential errors that were thrown.
@@ -115,32 +133,69 @@ getResult buildPlan moduleName =
 construct
   :: forall m. (Monad m, MonadBaseControl IO m)
   => MakeActions m
+  -> CacheDb
   -> ([CST.PartialResult Module], [(ModuleName, [ModuleName])])
-  -> m BuildPlan
-construct MakeActions{..} (sorted, graph) = do
-  prebuilt <- foldl' collectPrebuiltModules M.empty . catMaybes <$> A.forConcurrently sorted findExistingExtern
-  let toBeRebuilt = filter (not . flip M.member prebuilt . getModuleName . CST.resPartial) sorted
-  buildJobs <- foldM makeBuildJob M.empty (map (getModuleName . CST.resPartial) toBeRebuilt)
-  pure $ BuildPlan prebuilt buildJobs
+  -> m (BuildPlan, CacheDb)
+construct MakeActions{..} cacheDb (sorted, graph) = do
+  let sortedModuleNames = map (getModuleName . CST.resPartial) sorted
+  rebuildStatuses <- A.forConcurrently sortedModuleNames getRebuildStatus
+  let prebuilt =
+        foldl' collectPrebuiltModules M.empty $
+          mapMaybe (\s -> (statusModuleName s, statusRebuildNever s,) <$> statusPrebuilt s) rebuildStatuses
+  let toBeRebuilt = filter (not . flip M.member prebuilt) sortedModuleNames
+  buildJobs <- foldM makeBuildJob M.empty toBeRebuilt
+  env <- C.newMVar primEnv
+  pure
+    ( BuildPlan prebuilt buildJobs env
+    , let
+        update = flip $ \s ->
+          M.alter (const (statusNewCacheInfo s)) (statusModuleName s)
+      in
+        foldl' update cacheDb rebuildStatuses
+    )
   where
     makeBuildJob prev moduleName = do
       buildJob <- BuildJob <$> C.newEmptyMVar
       pure (M.insert moduleName buildJob prev)
 
-    findExistingExtern :: CST.PartialResult Module -> m (Maybe (ModuleName, Bool, Prebuilt))
-    findExistingExtern (getModuleName . CST.resPartial -> moduleName) = runMaybeT $ do
-      inputTimestamp <- lift $ getInputTimestamp moduleName
-      (rebuildNever, existingTimestamp) <-
-        case inputTimestamp of
-          Left RebuildNever ->
-            fmap (True,) $ MaybeT $ getOutputTimestamp moduleName
-          Right (Just t1) -> do
-            outputTimestamp <- MaybeT $ getOutputTimestamp moduleName
-            guard (t1 < outputTimestamp)
-            pure (False, outputTimestamp)
-          _ -> mzero
-      externsFile <- MaybeT $ decodeExterns . snd <$> readExterns moduleName
-      pure (moduleName, rebuildNever, Prebuilt existingTimestamp externsFile)
+    getRebuildStatus :: ModuleName -> m RebuildStatus
+    getRebuildStatus moduleName = do
+      inputInfo <- getInputTimestampsAndHashes moduleName
+      case inputInfo of
+        Left RebuildNever -> do
+          prebuilt <- findExistingExtern moduleName
+          pure (RebuildStatus
+            { statusModuleName = moduleName
+            , statusRebuildNever = True
+            , statusPrebuilt = prebuilt
+            , statusNewCacheInfo = Nothing
+            })
+        Left RebuildAlways -> do
+          pure (RebuildStatus
+            { statusModuleName = moduleName
+            , statusRebuildNever = False
+            , statusPrebuilt = Nothing
+            , statusNewCacheInfo = Nothing
+            })
+        Right cacheInfo -> do
+          cwd <- liftBase getCurrentDirectory
+          (newCacheInfo, isUpToDate) <- checkChanged cacheDb moduleName cwd cacheInfo
+          prebuilt <-
+            if isUpToDate
+              then findExistingExtern moduleName
+              else pure Nothing
+          pure (RebuildStatus
+            { statusModuleName = moduleName
+            , statusRebuildNever = False
+            , statusPrebuilt = prebuilt
+            , statusNewCacheInfo = Just newCacheInfo
+            })
+
+    findExistingExtern :: ModuleName -> m (Maybe Prebuilt)
+    findExistingExtern moduleName = runMaybeT $ do
+      timestamp <- MaybeT $ getOutputTimestamp moduleName
+      externs <- MaybeT $ snd <$> readExterns moduleName
+      pure (Prebuilt timestamp externs)
 
     collectPrebuiltModules :: M.Map ModuleName Prebuilt -> (ModuleName, Bool, Prebuilt) -> M.Map ModuleName Prebuilt
     collectPrebuiltModules prev (moduleName, rebuildNever, pb)

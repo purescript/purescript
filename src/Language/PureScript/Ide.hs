@@ -43,7 +43,7 @@ import           System.Directory (getCurrentDirectory, getDirectoryContents, do
 import           System.FilePath ((</>), normalise)
 import           System.FilePath.Glob (glob)
 
--- | Accepts a Commmand and runs it against psc-ide's State. This is the main
+-- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.
 handleCommand
   :: (Ide m, MonadLogger m, MonadError IdeError m)
@@ -51,7 +51,8 @@ handleCommand
   -> m Success
 handleCommand c = case c of
   Load [] ->
-    findAvailableExterns >>= loadModulesAsync
+    -- Clearing the State before populating it to avoid a space leak
+    resetIdeState *> findAvailableExterns >>= loadModulesAsync
   Load modules ->
     loadModulesAsync modules
   LoadSync [] ->
@@ -153,8 +154,8 @@ caseSplit l b e csa t = do
   patterns <- CS.makePattern l b e csa <$> CS.caseSplit t
   pure (MultilineTextResult patterns)
 
--- | Finds all the externs.json files inside the output folder and returns the
--- corresponding Modulenames
+-- | Finds all the externs inside the output folder and returns the
+-- corresponding module names
 findAvailableExterns :: (Ide m, MonadError IdeError m) => m [P.ModuleName]
 findAvailableExterns = do
   oDir <- outputDirectory
@@ -165,13 +166,13 @@ findAvailableExterns = do
     moduleNames <- filterM (containsExterns oDir) directories
     pure (P.moduleNameFromString . toS <$> moduleNames)
   where
-    -- Takes the output directory and a filepath like "Monad.Control.Eff" and
-    -- looks up, whether that folder contains an externs.json
+    -- Takes the output directory and a filepath like "Data.Array" and
+    -- looks up, whether that folder contains an externs file
     containsExterns :: FilePath -> FilePath -> IO Bool
     containsExterns oDir d
       | d `elem` [".", ".."] = pure False
       | otherwise = do
-          let file = oDir </> d </> "externs.json"
+          let file = oDir </> d </> P.externsFileName
           doesFileExist file
 
 -- | Finds all matches for the globs specified at the commandline
@@ -210,7 +211,7 @@ loadModules moduleNames = do
   -- We resolve all the modulenames to externs files and load these into memory.
   oDir <- outputDirectory
   let efPaths =
-        map (\mn -> oDir </> toS (P.runModuleName mn) </> "externs.json") moduleNames
+        map (\mn -> oDir </> toS (P.runModuleName mn) </> P.externsFileName) moduleNames
   efiles <- traverse readExternFile efPaths
   traverse_ insertExterns efiles
 

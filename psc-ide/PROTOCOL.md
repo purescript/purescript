@@ -107,8 +107,10 @@ The `complete` command looks up possible completions/corrections.
 
 The following format is returned as the Result:
 
-Both the `definedAt` aswell as the `documentation` field might be `null` if they
-couldn't be extracted from a source file.
+The `definedAt`, `documentation`, as well as the `declarationType` field might
+be `null` if they couldn't be extracted from a source file. See the
+[Declaration Type Filter](#declaration-type-filter) further down for all
+possible values of declaration types and how to use this information.
 
 ```json
 [
@@ -124,7 +126,8 @@ couldn't be extracted from a source file.
     "end": [3, 1]
     },
   "documentation": "A filtering function",
-  "exportedFrom": ["Data.Array"]
+  "exportedFrom": ["Data.Array"],
+  "declarationType": "value",
   }
 ]
 ```
@@ -435,7 +438,7 @@ The list availableModules command returns a list of strings.
 
 #### Imports
 
-The list commmand can also list the imports for a given file.
+The list command can also list the imports for a given file.
 
 ```json
 {
@@ -623,7 +626,7 @@ A filter which allows to filter type declarations. Valid type declarations are
 ## Matcher:
 
 ### Flex matcher
-Matches any occurence of the search string with intersections
+Matches any occurrence of the search string with intersections
 
 The scoring measures how far the matches span the string, where
 closer is better. The matches then get sorted with highest score first.

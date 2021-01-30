@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/DuplicateRoleDeclaration.purs:6:1 - 6:20 (line 6, column 1 - line 6, column 20)
+
+  Duplicate role declaration for [33mA[0m.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/DuplicateRoleDeclaration.md for more information,
+or to contribute content related to this error.
+

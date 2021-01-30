@@ -34,6 +34,12 @@ clunky1 a b | x <- max a b
             = x
 clunky1 a _ = a
 
+clunky1_refutable :: Int -> Int -> Int
+clunky1_refutable 0 a | x <- max a a
+                      , x > 5
+                      = x
+clunky1_refutable a _ = a
+
 clunky2 :: Int -> Int -> Int
 clunky2 a b | x <- max a b
             , x > 5
@@ -41,7 +47,7 @@ clunky2 a b | x <- max a b
             | otherwise
             = a + b
 
--- pattern guards on case epxressions
+-- pattern guards on case expressions
 clunky_case1 :: Int -> Int -> Int
 clunky_case1 a b =
   case unit of

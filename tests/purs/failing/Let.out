@@ -1,0 +1,9 @@
+Error found:
+at tests/purs/failing/Let.purs:6:12 - 6:17 (line 6, column 12 - line 6, column 17)
+
+  The value of [33mx[0m is undefined here, so this reference is not allowed.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CycleInDeclaration.md for more information,
+or to contribute content related to this error.
+

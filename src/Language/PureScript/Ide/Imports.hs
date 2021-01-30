@@ -37,7 +37,7 @@ import qualified Data.List.NonEmpty                 as NE
 import qualified Data.Map                           as Map
 import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
-import qualified Language.PureScript.Constants      as C
+import qualified Language.PureScript.Constants.Prim as C
 import qualified Language.PureScript.CST            as CST
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
@@ -222,8 +222,6 @@ addExplicitImport' decl moduleName qualifier imports =
       P.ValueOpRef ideSpan (op ^. ideValueOpName)
     refFromDeclaration (IdeDeclTypeOperator op) =
       P.TypeOpRef ideSpan (op ^. ideTypeOpName)
-    refFromDeclaration (IdeDeclKind kn) =
-      P.KindRef ideSpan kn
     refFromDeclaration d =
       P.ValueRef ideSpan (P.Ident (identifierFromIdeDeclaration d))
 
@@ -231,7 +229,7 @@ addExplicitImport' decl moduleName qualifier imports =
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
     insertDeclIntoImport :: IdeDeclaration -> Import -> Import
     insertDeclIntoImport decl' (Import mn (P.Explicit refs) qual) =
-      Import mn (P.Explicit (sortBy P.compDecRef (insertDeclIntoRefs decl' refs))) qual
+      Import mn (P.Explicit (sort (insertDeclIntoRefs decl' refs))) qual
     insertDeclIntoImport _ is = is
 
     insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]
@@ -303,7 +301,7 @@ addImportForIdentifier fp ident qual filters = do
     -- This case comes up for newtypes and dataconstructors. Because values and
     -- types don't share a namespace we can get multiple matches from the same
     -- module. This also happens for parameterized types, as these generate both
-    -- a type aswell as a type synonym.
+    -- a type as well as a type synonym.
 
     ms@[Match (m1, d1), Match (m2, d2)] ->
       if m1 /= m2
@@ -316,16 +314,13 @@ addImportForIdentifier fp ident qual filters = do
         -- worst
         Just decl ->
           Right <$> addExplicitImport fp decl m1 qual
-        -- Here we need the user to specify whether he wanted a dataconstructor
-        -- or a type
-
-        -- TODO: With the new namespace filter, this can actually be a
-        -- request for the user to specify which of the two was wanted.
+        -- Here we need the user to specify whether they wanted a 
+        -- dataconstructor or a type
         Nothing ->
           throwError (GeneralError "Undecidable between type and dataconstructor")
 
     -- Multiple matches were found so we need to ask the user to clarify which
-    -- module he meant
+    -- module they meant
     xs ->
       pure (Left xs)
     where
@@ -371,7 +366,7 @@ answerRequest outfp rs  =
 -- | Test and ghci helper
 parseImport :: Text -> Maybe Import
 parseImport t =
-  case fmap (CST.convertImportDecl "<purs-ide>")
+  case fmap (CST.convertImportDecl "<purs-ide>" . snd)
         $ CST.runTokenParser CST.parseImportDeclP
         $ CST.lex t of
     Right (_, mn, idt, mmn) ->

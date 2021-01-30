@@ -1,4 +1,4 @@
-module M1 (X(X), Z(..), foo) where
+module M1 (X(X, Y), Z(..), foo) where
 
 data X = X | Y
 data Z = Z

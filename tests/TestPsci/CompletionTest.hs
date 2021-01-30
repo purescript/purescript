@@ -60,7 +60,7 @@ completionTestData supportModuleNames =
 
   -- :kind should complete next word from types in scope
   , (":kind Str", [":kind String"])
-  , (":kind ST.", [":kind ST.ST"]) -- import Control.Monad.ST as ST
+  , (":kind ST.", [":kind ST.Region", ":kind ST.ST"]) -- import Control.Monad.ST as ST
   , (":kind STRef.", [":kind STRef.STRef"]) -- import Control.Monad.ST.Ref as STRef
   , (":kind Effect.", [])
 

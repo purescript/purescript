@@ -2,10 +2,16 @@ resolver: lts-13.26
 pvp-bounds: upper
 packages:
 - '.'
+- lib/purescript-ast
+- lib/purescript-cst
 extra-deps:
+- serialise-0.2.2.0
+- cborg-0.2.2.0
 - happy-1.19.9
-- language-javascript-0.6.0.13
+- language-javascript-0.7.0.0
 - network-3.0.1.1
+- these-1.0.1
+- semialign-1
 nix:
   enable: false
   packages:
@@ -17,3 +23,6 @@ nix:
 flags:
   aeson-pretty:
     lib-only: true
+  these:
+    assoc: false
+    quickcheck: false

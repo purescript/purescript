@@ -19,7 +19,7 @@ ctorOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 ctorOperator =
   ideValueOp ":" (P.Qualified (Just (mn "Test")) (Right "Cons")) 2 Nothing
 
-typeOperator :: Maybe P.SourceKind -> IdeDeclarationAnn
+typeOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 typeOperator =
   ideTypeOp ":" (P.Qualified (Just (mn "Test")) "List") 2 Nothing
 
@@ -58,6 +58,10 @@ ef = P.ExternsFile
       (P.Qualified (Just (mn "ClassModule")) (P.ProperName "MyClass"))
       -- , edInstanceName =
       (P.Ident "myClassInstance")
+      -- . edInstanceForAll =
+      []
+      -- , edInstanceKinds =
+      mempty
       -- , edInstanceTypes =
       mempty
       -- , edInstanceConstraints =

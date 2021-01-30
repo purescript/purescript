@@ -12,11 +12,12 @@ module Language.PureScript.Sugar.BindingGroups
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Monad ((<=<))
+import Control.Monad ((<=<), guard)
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (intersect)
+import Data.Foldable (find)
 import Data.Maybe (isJust, mapMaybe)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
@@ -27,6 +28,11 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Types
+
+data VertexType
+  = VertexDefinition
+  | VertexKindSignature
+  deriving (Eq, Ord, Show)
 
 -- |
 -- Replace all sets of mutually-recursive declarations in a module with binding groups
@@ -67,19 +73,36 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
-        dataDecls = filter isDataDecl ds
-        allProperNames = fmap declTypeName dataDecls
-        dataVerts = fmap (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
-    dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
+        kindDecls = fmap (,VertexKindSignature) $ filter (\a -> isKindDecl a || isExternDataDecl a) ds
+        dataDecls = fmap (,VertexDefinition) $ filter (\a -> isDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
+        kindSigs = fmap (declTypeName . fst) kindDecls
+        typeSyns = fmap declTypeName $ filter isTypeSynonymDecl ds
+        allDecls = kindDecls ++ dataDecls
+        allProperNames = fmap (declTypeName . fst) allDecls
+        mkVert (d, vty) =
+          let names = usedTypeNames moduleName d `intersect` allProperNames
+              name = declTypeName d
+              -- If a dependency has a kind signature, than that's all we need to depend on, except
+              -- in the case that we are defining a kind signature and using a type synonym. In order
+              -- to expand the type synonym, we must depend on the synonym declaration itself.
+              vtype n
+                | vty == VertexKindSignature && n `elem` typeSyns = VertexDefinition
+                | n `elem` kindSigs = VertexKindSignature
+                | otherwise = VertexDefinition
+              deps = fmap (\n -> (n, vtype n)) names
+              self
+                | vty == VertexDefinition && name `elem` kindSigs = [(name, VertexKindSignature)]
+                | otherwise = []
+          in (d, (name, vty), self ++ deps)
+        dataVerts = fmap mkVert allDecls
+    dataBindingGroupDecls <- parU (stronglyConnCompR dataVerts) toDataBindingGroup
     let allIdents = fmap valdeclIdent values
         valueVerts = fmap (\d -> (d, valdeclIdent d, usedIdents moduleName d `intersect` allIdents)) values
     bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
-             filter isExternKindDecl ds ++
-             filter isExternDataDecl ds ++
+             filter isRoleDecl ds ++
              dataBindingGroupDecls ++
-             filter isTypeClassDeclaration ds ++
-             filter isTypeClassInstanceDeclaration ds ++
+             filter isTypeClassInstanceDecl ds ++
              filter isFixityDecl ds ++
              filter isExternDecl ds ++
              bindingGroupDecls
@@ -134,23 +157,34 @@ usedImmediateIdents moduleName =
   usedNamesE scope _ = (scope, [])
 
 usedTypeNames :: ModuleName -> Declaration -> [ProperName 'TypeName]
-usedTypeNames moduleName =
-  let (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
-  in ordNub . f
+usedTypeNames moduleName = go
   where
+  (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
+
+  go :: Declaration -> [ProperName 'TypeName]
+  go decl = ordNub (f decl <> usedNamesForTypeClassDeps decl)
+
   usedNames :: SourceType -> [ProperName 'TypeName]
-  usedNames (ConstrainedType _ con _) =
-    case con of
-      (Constraint _ (Qualified (Just moduleName') name) _ _)
-        | moduleName == moduleName' -> [coerceProperName name]
-      _ -> []
+  usedNames (ConstrainedType _ con _) = usedConstraint con
   usedNames (TypeConstructor _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' = [name]
   usedNames _ = []
 
+  usedConstraint :: SourceConstraint -> [ProperName 'TypeName]
+  usedConstraint (Constraint _ (Qualified (Just moduleName') name) _ _ _)
+    | moduleName == moduleName' = [coerceProperName name]
+  usedConstraint _ = []
+
+  usedNamesForTypeClassDeps :: Declaration -> [ProperName 'TypeName]
+  usedNamesForTypeClassDeps (TypeClassDeclaration _ _ _ deps _ _) = foldMap usedConstraint deps
+  usedNamesForTypeClassDeps _ = []
+
 declTypeName :: Declaration -> ProperName 'TypeName
 declTypeName (DataDeclaration _ _ pn _ _) = pn
+declTypeName (ExternDataDeclaration _ pn _) = pn
 declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
+declTypeName (TypeClassDeclaration _ pn _ _ _ _) = coerceProperName pn
+declTypeName (KindDeclaration _ _ pn _) = pn
 declTypeName _ = internalError "Expected DataDeclaration"
 
 -- |
@@ -191,15 +225,35 @@ toBindingGroup moduleName (CyclicSCC ds') = do
 
 toDataBindingGroup
   :: MonadError MultipleErrors m
-  => SCC Declaration
+  => SCC (Declaration, (ProperName 'TypeName, VertexType), [(ProperName 'TypeName, VertexType)])
   -> m Declaration
-toDataBindingGroup (AcyclicSCC d) = return d
-toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
-  Just pn -> throwError . errorMessage' (declSourceSpan d) $ CycleInTypeSynonym (Just pn)
-  _ -> return d
+toDataBindingGroup (AcyclicSCC (d, _, _)) = return d
 toDataBindingGroup (CyclicSCC ds')
-  | all (isJust . isTypeSynonym) ds' = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeSynonym Nothing
-  | otherwise = return . DataBindingGroupDeclaration $ NEL.fromList ds'
+  | kds@((ss, _):_) <- concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
+  | not (null typeSynonymCycles) =
+      throwError
+        . MultipleErrors
+        . fmap (\syns -> ErrorMessage [positionedError . declSourceSpan . getDecl $ head syns] . CycleInTypeSynonym $ fmap (fst . getName) syns)
+        $ typeSynonymCycles
+  | otherwise = return . DataBindingGroupDeclaration . NEL.fromList $ getDecl <$> ds'
+  where
+  kindDecl (KindDeclaration sa _ pn _) = [(fst sa, Qualified Nothing pn)]
+  kindDecl (ExternDataDeclaration sa pn _) = [(fst sa, Qualified Nothing pn)]
+  kindDecl _ = []
+
+  getDecl (decl, _, _) = decl
+  getName (_, name, _) = name
+  lookupVert name = find ((==) name . getName) ds'
+
+  onlySynonyms (decl, name, deps) = do
+    guard . isJust $ isTypeSynonym decl
+    pure (decl, name, filter (maybe False (isJust . isTypeSynonym . getDecl) . lookupVert) deps)
+
+  isCycle (CyclicSCC c) = Just c
+  isCycle _ = Nothing
+
+  typeSynonymCycles =
+    mapMaybe isCycle . stronglyConnCompR . mapMaybe onlySynonyms $ ds'
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
 isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn

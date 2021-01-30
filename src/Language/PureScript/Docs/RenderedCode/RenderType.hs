@@ -17,7 +17,6 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
 import Language.PureScript.Crash
-import Language.PureScript.Kinds
 import Language.PureScript.Label
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Types
@@ -26,7 +25,6 @@ import Language.PureScript.PSString (prettyPrintString)
 
 import Language.PureScript.Docs.RenderedCode.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
-import Language.PureScript.Docs.RenderedCode.RenderKind (renderKind)
 
 typeLiterals :: Pattern () PrettyPrintType RenderedCode
 typeLiterals = mkPattern match
@@ -55,8 +53,8 @@ typeLiterals = mkPattern match
     Nothing
 
 renderConstraint :: PrettyPrintConstraint -> RenderedCode
-renderConstraint (pn, tys) =
-  let instApp = foldl PPTypeApp (PPTypeConstructor (fmap coerceProperName pn)) tys
+renderConstraint (pn, ks, tys) =
+  let instApp = foldl PPTypeApp (foldl (\a b -> PPTypeApp a (PPKindArg b)) (PPTypeConstructor (fmap coerceProperName pn)) ks) tys
   in  renderType' instApp
 
 renderConstraints :: PrettyPrintConstraint -> RenderedCode -> RenderedCode
@@ -94,16 +92,22 @@ typeApp = mkPattern match
   match (PPTypeApp f x) = Just (f, x)
   match _ = Nothing
 
+kindArg :: Pattern () PrettyPrintType ((), PrettyPrintType)
+kindArg = mkPattern match
+  where
+  match (PPKindArg ty) = Just ((), ty)
+  match _ = Nothing
+
 appliedFunction :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
 appliedFunction = mkPattern match
   where
   match (PPFunction arg ret) = Just (arg, ret)
   match _ = Nothing
 
-kinded :: Pattern () PrettyPrintType (Kind (), PrettyPrintType)
+kinded :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
 kinded = mkPattern match
   where
-  match (PPKindedType t k) = Just (k, t)
+  match (PPKindedType t k) = Just (t, k)
   match _ = Nothing
 
 constrained :: Pattern () PrettyPrintType (PrettyPrintConstraint, PrettyPrintType)
@@ -128,15 +132,16 @@ matchType = buildPrettyPrinter operators matchTypeAtom
   where
   operators :: OperatorTable () PrettyPrintType RenderedCode
   operators =
-    OperatorTable [ [ AssocL typeApp $ \f x -> f <> sp <> x ]
+    OperatorTable [ [ Wrap kindArg $ \_ ty -> syntax "@" <> ty ]
+                  , [ AssocL typeApp $ \f x -> f <> sp <> x ]
                   , [ AssocR appliedFunction $ \arg ret -> mintersperse sp [arg, syntax "->", ret] ]
                   , [ Wrap constrained $ \deps ty -> renderConstraints deps ty ]
                   , [ Wrap forall_ $ \tyVars ty -> mconcat [ keywordForall, sp, renderTypeVars tyVars, syntax ".", sp, ty ] ]
-                  , [ Wrap kinded $ \k ty -> mintersperse sp [ty, syntax "::", renderKind k] ]
+                  , [ Wrap kinded $ \ty k -> mintersperse sp [renderType' ty, syntax "::", k] ]
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
-forall_ :: Pattern () PrettyPrintType ([(Text, Maybe (Kind ()))], PrettyPrintType)
+forall_ :: Pattern () PrettyPrintType ([(Text, Maybe PrettyPrintType)], PrettyPrintType)
 forall_ = mkPattern match
   where
   match (PPForAll mbKindedIdents ty) = Just (mbKindedIdents, ty)
@@ -153,13 +158,13 @@ renderType'
   = fromMaybe (internalError "Incomplete pattern")
   . PA.pattern matchType ()
 
-renderTypeVars :: [(Text, Maybe (Kind a))] -> RenderedCode
+renderTypeVars :: [(Text, Maybe PrettyPrintType)] -> RenderedCode
 renderTypeVars tyVars = mintersperse sp (map renderTypeVar tyVars)
 
-renderTypeVar :: (Text, Maybe (Kind a)) -> RenderedCode
+renderTypeVar :: (Text, Maybe PrettyPrintType) -> RenderedCode
 renderTypeVar (v, mbK) = case mbK of
   Nothing -> typeVar v
-  Just k -> mintersperse sp [ mconcat [syntax "(", typeVar v], syntax "::", mconcat [renderKind k, syntax ")"] ]
+  Just k -> mintersperse sp [ mconcat [syntax "(", typeVar v], syntax "::", mconcat [renderType' k, syntax ")"] ]
 
 -- |
 -- Render code representing a Type, as it should appear inside parentheses

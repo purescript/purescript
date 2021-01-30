@@ -32,7 +32,7 @@ main = testSpec "hierarchy" $ do
         let mainModule = P.Module
               (P.internalModuleSourceSpan "<hierarchy>")
               []
-              (P.ModuleName [P.ProperName "Main"])
+              (P.ModuleName "Main")
               []
               Nothing
 
@@ -53,14 +53,14 @@ main = testSpec "hierarchy" $ do
                  (P.internalModuleSourceSpan "<B>", [])
                  (P.ProperName "B")
                  []
-                 [P.srcConstraint (P.Qualified Nothing $ P.ProperName "A") [] Nothing]
+                 [P.srcConstraint (P.Qualified Nothing $ P.ProperName "A") [] [] Nothing]
                  []
                  []
               ]
         let mainModule = P.Module
               (P.internalModuleSourceSpan "<hierarchy>")
               []
-              (P.ModuleName [P.ProperName "Main"])
+              (P.ModuleName "Main")
               declarations
               Nothing
 

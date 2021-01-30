@@ -1,3 +1,3 @@
-module M1 (X(X)) where
+module M1 (X) where
 
 data X = X | Y

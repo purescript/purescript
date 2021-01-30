@@ -2,6 +2,8 @@
 
 module Command.Publish (command) where
 
+import Prelude
+
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy.Char8 as BL

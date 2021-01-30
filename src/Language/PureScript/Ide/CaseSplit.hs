@@ -44,7 +44,7 @@ explicitAnnotations = WildcardAnnotations True
 noAnnotations :: WildcardAnnotations
 noAnnotations = WildcardAnnotations False
 
-type DataType = ([(Text, Maybe P.SourceKind)], [(P.ProperName 'P.ConstructorName, [P.SourceType])])
+type DataType = ([(Text, Maybe P.SourceType, P.Role)], [(P.ProperName 'P.ConstructorName, [P.SourceType])])
 
 caseSplit
   :: (Ide m, MonadError IdeError m)
@@ -54,7 +54,7 @@ caseSplit q = do
   type' <- parseType' q
   (tc, args) <- splitTypeConstructor type'
   (typeVars, ctors) <- findTypeDeclaration tc
-  let applyTypeVars = P.everywhereOnTypes (P.replaceAllTypeVars (zip (map fst typeVars) args))
+  let applyTypeVars = P.everywhereOnTypes (P.replaceAllTypeVars (zip (map (\(name, _, _) -> name) typeVars) args))
   let appliedCtors = map (second (map applyTypeVars)) ctors
   pure appliedCtors
 
@@ -76,7 +76,7 @@ findTypeDeclaration'
   -> First DataType
 findTypeDeclaration' t ExternsFile{..} =
   First $ head $ mapMaybe (\case
-            EDType tn _ (P.DataType typeVars ctors)
+            EDType tn _ (P.DataType _ typeVars ctors)
               | tn == t -> Just (typeVars, ctors)
             _ -> Nothing) efDeclarations
 
@@ -125,14 +125,14 @@ parseType' :: (MonadError IdeError m) =>
               Text -> m P.SourceType
 parseType' s =
   case CST.runTokenParser CST.parseType $ CST.lex s of
-    Right type' -> pure $ CST.convertType "<purs-ide>" type'
+    Right type' -> pure $ CST.convertType "<purs-ide>" $ snd type'
     Left err ->
       throwError (GeneralError ("Parsing the splittype failed with:"
                                 <> show err))
 
 parseTypeDeclaration' :: (MonadError IdeError m) => Text -> m (P.Ident, P.SourceType)
 parseTypeDeclaration' s =
-  let x = fmap (CST.convertDeclaration "<purs-ide>")
+  let x = fmap (CST.convertDeclaration "<purs-ide>" . snd)
         $ CST.runTokenParser CST.parseDecl
         $ CST.lex s
   in

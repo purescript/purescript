@@ -1,5 +1,5 @@
 name: purescript
-version: '0.13.3'
+version: '0.14.0-rc5' # note: when updating this, update the prerelease identifier in app/Version.hs too!
 synopsis: PureScript Programming Language Compiler
 description: A small strongly, statically typed programming language with expressive
   types, inspired by Haskell and compiling to JavaScript.
@@ -23,6 +23,7 @@ extra-source-files:
   - tests/purs/**/*.js
   - tests/purs/**/*.purs
   - tests/purs/**/*.json
+  - tests/purs/**/*.out
   - tests/json-compat/**/*.json
   - tests/support/*.json
   - tests/support/setup-win.cmd
@@ -48,23 +49,26 @@ dependencies:
   - bower-json >=1.0.0.1 && <1.1
   - boxes >=0.1.4 && <0.2.0
   - bytestring
-  - Cabal >= 2.2
+  - Cabal >= 2.2 && <3.0
+  - cborg
+  - serialise
   - cheapskate >=0.1 && <0.2
   - clock
   - containers
+  - cryptonite >=0.25
   - data-ordlist >=0.4.7.0
   - deepseq
   - directory >=1.2.3
-  - dlist
   - edit-distance
   - file-embed
   - filepath
   - fsnotify >=0.2.1
   - Glob >=0.9 && <0.10
-  - haskeline >=0.7.0.0
-  - language-javascript >=0.6.0.13
+  - haskeline >=0.7.0.0 && <0.8.0.0
+  - language-javascript ==0.7.0.0 # important: keep this pinned to a single specific version, since it's effectively part of the compiler's public API.
   - lifted-async >=0.10.0.3 && <0.10.1
   - lifted-base >=0.2.3 && <0.2.4
+  - memory >=0.14 && <0.15
   - microlens-platform >=0.3.9.0 && <0.4
   - monad-control >=1.0.0.0 && <1.1
   - monad-logger >=0.3 && <0.4
@@ -73,17 +77,20 @@ dependencies:
   - parsec >=3.1.10
   - pattern-arrows >=0.0.2 && <0.1
   - process >=1.2.0 && <1.7
-  - protolude >=0.1.6
+  - protolude >=0.1.6 && <0.2.4
+  - purescript-ast
+  - purescript-cst
   - regex-tdfa
   - safe >=0.3.9 && <0.4
-  - scientific >=0.3.4.9 && <0.4
   - semigroups >=0.16.2 && <0.19
+  - semialign >=1 && <1.1
   - sourcemap >=0.1.6
   - split
   - stm >=0.2.4.0
   - stringsearch
   - syb
   - text
+  - these >= 1 && <1.1
   - time
   - transformers >=0.3.0 && <0.6
   - transformers-base >=0.4.0 && <0.5
@@ -98,27 +105,7 @@ library:
   source-dirs: src
   ghc-options: -Wall -O2
   other-modules: Paths_purescript
-  default-extensions:
-    - ConstraintKinds
-    - DataKinds
-    - DeriveFunctor
-    - DeriveFoldable
-    - DeriveTraversable
-    - DeriveGeneric
-    - EmptyDataDecls
-    - FlexibleContexts
-    - KindSignatures
-    - LambdaCase
-    - MultiParamTypeClasses
-    - NoImplicitPrelude
-    - PatternGuards
-    - PatternSynonyms
-    - RankNTypes
-    - RecordWildCards
-    - OverloadedStrings
-    - ScopedTypeVariables
-    - TupleSections
-    - ViewPatterns
+  default-extensions: !include "./default-extensions.yaml"
 
 executables:
   purs:
@@ -131,6 +118,7 @@ executables:
       - Command.Docs
       - Command.Docs.Html
       - Command.Docs.Markdown
+      - Command.Graph
       - Command.Hierarchy
       - Command.Ide
       - Command.Publish
@@ -156,6 +144,7 @@ executables:
       else:
         dependencies:
         - gitrev >=1.2.0 && <1.4
+    default-extensions: !include "./default-extensions.yaml"
 
 tests:
   tests:
@@ -171,8 +160,8 @@ tests:
       - hspec
       - hspec-discover
       - HUnit
-    default-extensions:
-      - NoImplicitPrelude
+      - regex-base
+    default-extensions: !include "./default-extensions.yaml"
 
 flags:
   release:

@@ -11,7 +11,6 @@ import Data.Functor (($>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Language.PureScript.Docs.Types
 
 import qualified Language.PureScript.Crash as P
@@ -22,6 +21,7 @@ primModules :: [Module]
 primModules =
   [ primDocsModule
   , primBooleanDocsModule
+  , primCoerceDocsModule
   , primOrderingDocsModule
   , primRowDocsModule
   , primRowListDocsModule
@@ -35,7 +35,7 @@ primDocsModule = Module
   , modComments = Just $ T.unlines
       [ "The `Prim` module is embedded in the PureScript compiler in order to provide compiler support for certain types &mdash; for example, value literals, or syntax sugar. It is implicitly imported unqualified in every module except those that list it as a qualified import."
       , ""
-      , "`Prim` does not include additional built-in types and kinds that are defined deeper in the compiler. For example, row kinds (e.g. `# Type`, which is the kind of types such as `(name :: String, age :: Int)`), Type wildcards (e.g. `f :: _ -> Int`), and Quantified Types. Rather, these are documented in [the PureScript language reference](https://github.com/purescript/documentation/blob/master/language/Types.md)."
+      , "`Prim` does not include additional built-in types and kinds that are defined deeper in the compiler such as Type wildcards (e.g. `f :: _ -> Int`) and Quantified Types. Rather, these are documented in [the PureScript language reference](https://github.com/purescript/documentation/blob/master/language/Types.md)."
       ]
   , modDeclarations =
       [ function
@@ -48,7 +48,9 @@ primDocsModule = Module
       , boolean
       , partial
       , kindType
+      , kindConstraint
       , kindSymbol
+      , kindRow
       ]
   , modReExports = []
   }
@@ -58,9 +60,18 @@ primBooleanDocsModule = Module
   { modName = P.moduleNameFromString "Prim.Boolean"
   , modComments = Just "The Prim.Boolean module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level `Boolean` data structure."
   , modDeclarations =
-      [ kindBoolean
-      , booleanTrue
+      [ booleanTrue
       , booleanFalse
+      ]
+  , modReExports = []
+  }
+
+primCoerceDocsModule :: Module
+primCoerceDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.Coerce"
+  , modComments = Just "The Prim.Coerce module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with types that have provably-identical runtime representations."
+  , modDeclarations =
+      [ coercible
       ]
   , modReExports = []
   }
@@ -149,29 +160,10 @@ unsafeLookupOf k m errorMsg name = go name
   fromJust' (Just x) = x
   fromJust' _ = P.internalError $ errorMsg ++ show name
 
-primKindOf
-  :: NameGen 'P.KindName
-  -> Text
-  -> Text
-  -> Declaration
-primKindOf g title comments =
-  if Set.member (g title) P.allPrimKinds
-     then Declaration
-          { declTitle = title
-          , declComments = Just comments
-          , declSourceSpan = Nothing
-          , declChildren = []
-          , declInfo = ExternKindDeclaration
-          }
-    else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
-
-primKind :: Text -> Text -> Declaration
-primKind = primKindOf P.primName
-
 lookupPrimTypeKindOf
   :: NameGen 'P.TypeName
   -> Text
-  -> Kind'
+  -> Type'
 lookupPrimTypeKindOf k = ($> ()) . fst . unsafeLookupOf k
   ( P.primTypes <>
     P.primBooleanTypes <>
@@ -198,6 +190,7 @@ primTypeOf gen title comments = Declaration
 lookupPrimClassOf :: NameGen 'P.ClassName -> Text -> P.TypeClassData
 lookupPrimClassOf g = unsafeLookupOf g
   ( P.primClasses <>
+    P.primCoerceClasses <>
     P.primRowClasses <>
     P.primRowListClasses <>
     P.primSymbolClasses <>
@@ -224,17 +217,36 @@ primClassOf gen title comments = Declaration
   }
 
 kindType :: Declaration
-kindType = primKind "Type" $ T.unlines
+kindType = primType "Type" $ T.unlines
   [ "`Type` is the kind of all proper types: those that classify value-level terms."
   , "For example the type `Boolean` has kind `Type`; denoted by `Boolean :: Type`."
   ]
 
+kindConstraint :: Declaration
+kindConstraint = primType "Constraint" $ T.unlines
+  [ "`Constraint` is the kind of type class constraints."
+  , "For example, a type class declaration like this:"
+  , ""
+  , "    class Semigroup a where"
+  , "      append :: a -> a -> a"
+  , ""
+  , "has the kind signature:"
+  , ""
+  , "    class Semigroup :: Type -> Constraint"
+  ]
+
 kindSymbol :: Declaration
-kindSymbol = primKind "Symbol" $ T.unlines
+kindSymbol = primType "Symbol" $ T.unlines
   [ "`Symbol` is the kind of type-level strings."
   , ""
   , "Construct types of this kind using the same literal syntax as documented"
   , "for strings."
+  ]
+
+kindRow :: Declaration
+kindRow = primType "Row" $ T.unlines
+  [ "`Row` is the kind constructor of label-indexed types which map type-level strings to other types."
+  , "For example, the kind of `Record` is `Row Type -> Type`, mapping field names to values."
   ]
 
 function :: Declaration
@@ -351,11 +363,6 @@ partial = primClass "Partial" $ T.unlines
   , "[purescript-partial](https://pursuit.purescript.org/packages/purescript-partial/)."
   ]
 
-kindBoolean :: Declaration
-kindBoolean = primKindOf (P.primSubName "Boolean") "Boolean" $ T.unlines
-  [ "The `Boolean` kind provides True/False types at the type level"
-  ]
-
 booleanTrue :: Declaration
 booleanTrue = primTypeOf (P.primSubName "Boolean") "True" $ T.unlines
   [ "The 'True' boolean type."
@@ -366,9 +373,79 @@ booleanFalse = primTypeOf (P.primSubName "Boolean") "False" $ T.unlines
   [ "The 'False' boolean type."
   ]
 
+coercible :: Declaration
+coercible = primClassOf (P.primSubName "Coerce") "Coercible" $ T.unlines
+  [ "Coercible is a two-parameter type class that has instances for types `a`"
+  , "and `b` if the compiler can infer that they have the same representation."
+  , "This class does not have regular instances; instead they are created"
+  , "on-the-fly during type-checking according to a set of rules."
+  , ""
+  , "First, Coercible obeys reflexivity - any type has the same representation"
+  , "as itself:"
+  , ""
+  , "    instance coercibleReflexive :: Coercible a a"
+  , ""
+  , "Second, Coercible obeys symmetry - if a type `a` can be coerced to some"
+  , "other type `b`, then `b` can also be coerced back to `a`:"
+  , ""
+  , "    instance coercibleSymmetric :: Coercible a b => Coercible b a"
+  , ""
+  , "Third, Coercible obeys transitivity - if a type `a` can be coerced to some"
+  , "other type `b` which can be coerced to some other type `c`, then `a` can"
+  , "also be coerced to `c`:"
+  , ""
+  , "    instance coercibleTransitive :: (Coercible a b, Coercible b c) => Coercible a c"
+  , ""
+  , "Fourth, for every type constructor there is an instance that allows one"
+  , "to coerce under the type constructor (`data` or `newtype`). For example,"
+  , "given a definition:"
+  , ""
+  , "data D a b = D a"
+  , ""
+  , "there is an instance:"
+  , ""
+  , "    instance coercibleConstructor :: Coercible a a' => Coercible (D a b) (D a' b')"
+  , ""
+  , "Note that, since the type variable `a` plays a role in `D`'s representation,"
+  , "we require that the types `a` and `a'` are themselves `Coercible`. However,"
+  , "since the variable `b` does not play a part in `D`'s representation (a type"
+  , "such as `b` is thus typically referred to as a \"phantom\" type), `b` and `b'`"
+  , "can differ arbitrarily."
+  , ""
+  , "Fifth, for every `newtype NT = MkNT T`, there is a pair of instances which"
+  , "permit coercion in and out of the `newtype`:"
+  , ""
+  , "    instance coercibleNewtypeLeft  :: Coercible a T => Coercible a NT"
+  , "    instance coercibleNewtypeRight :: Coercible T b => Coercible NT b"
+  , ""
+  , "To prevent breaking abstractions, these instances are only usable if the"
+  , "constructor `MkNT` is in scope."
+  , ""
+  , "Sixth, every pair of unsaturated type constructors can be coerced if"
+  , "there is an instance for the fully saturated types. For example,"
+  , "given the definitions:"
+  , ""
+  , "newtype NT1 a = MkNT1 a"
+  , "newtype NT2 a b = MkNT2 b"
+  , ""
+  , "there is an instance:"
+  , ""
+  , "    instance coercibleUnsaturedTypes :: Coercible (NT1 b) (NT2 a b) => Coercible NT1 (NT2 a)"
+  , ""
+  , "This rule may seem puzzling since it is impossible to apply `coerce` to a term"
+  , "of type `NT1` but it is necessary to coerce types with higher kinded parameters."
+  , ""
+  , "Seventh, every pair of rows can be coerced if they have the same labels,"
+  , "the corresponding types for each label and their tails are coercible:"
+  , ""
+  , "    instance coercibleRow :: (Coercible a b, Coercible r s) => Coercible ( label :: a | r ) ( label :: b | s )"
+  , ""
+  , "Closed rows can't be coerced to open rows."
+  ]
+
 kindOrdering :: Declaration
-kindOrdering = primKindOf (P.primSubName "Ordering") "Ordering" $ T.unlines
-  [ "The `Ordering` kind represents the three possibilites of comparing two"
+kindOrdering = primTypeOf (P.primSubName "Ordering") "Ordering" $ T.unlines
+  [ "The `Ordering` kind represents the three possibilities of comparing two"
   , "types of the same kind: `LT` (less than), `EQ` (equal to), and"
   , "`GT` (greater than)."
   ]
@@ -414,7 +491,7 @@ rowCons = primClassOf (P.primSubName "Row") "Cons" $ T.unlines
   ]
 
 kindRowList :: Declaration
-kindRowList = primKindOf (P.primSubName "RowList") "RowList" $ T.unlines
+kindRowList = primTypeOf (P.primSubName "RowList") "RowList" $ T.unlines
   [ "A type level list representation of a row of types."
   ]
 
@@ -474,10 +551,10 @@ warn = primClassOf (P.primSubName "TypeError") "Warn" $ T.unlines
   ]
 
 kindDoc :: Declaration
-kindDoc = primKindOf (P.primSubName "TypeError") "Doc" $ T.unlines
+kindDoc = primTypeOf (P.primSubName "TypeError") "Doc" $ T.unlines
   [ "`Doc` is the kind of type-level documents."
   , ""
-  , "This kind is used with the `Fail` and `Warn` type clases."
+  , "This kind is used with the `Fail` and `Warn` type classes."
   , "Build up a `Doc` with `Text`, `Quote`, `QuoteLabel`, `Beside`, and `Above`."
   ]
 

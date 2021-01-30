@@ -1,6 +1,8 @@
 
 module Command.Docs (command, infoModList) where
 
+import Prelude
+
 import           Command.Docs.Html
 import           Command.Docs.Markdown
 import           Control.Applicative

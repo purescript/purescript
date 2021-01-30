@@ -1,40 +1,45 @@
 module Language.PureScript.Ide.Prim (idePrimDeclarations) where
 
 import           Protolude
+
+import qualified Data.Text as T
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 import qualified Language.PureScript.Environment as PEnv
 import           Language.PureScript.Ide.Types
 
 idePrimDeclarations :: ModuleMap [IdeDeclarationAnn]
 idePrimDeclarations = Map.fromList
   [ ( C.Prim
-    , mconcat [primTypes, primKinds, primClasses]
+    , mconcat [primTypes, primClasses]
     )
   , ( C.PrimBoolean
-    , mconcat [primBooleanTypes, primBooleanKinds]
+    , mconcat [primBooleanTypes]
     )
   , ( C.PrimOrdering
-    , mconcat [primOrderingTypes, primOrderingKinds]
+    , mconcat [primOrderingTypes]
     )
   , ( C.PrimRow
     , mconcat [primRowTypes, primRowClasses]
     )
   , ( C.PrimRowList
-    , mconcat [primRowListTypes, primRowListClasses, primRowListKinds]
+    , mconcat [primRowListTypes, primRowListClasses]
     )
   , ( C.PrimSymbol
     , mconcat [primSymbolTypes, primSymbolClasses]
     )
   , ( C.PrimTypeError
-    , mconcat [primTypeErrorTypes, primTypeErrorClasses, primTypeErrorKinds]
+    , mconcat [primTypeErrorTypes, primTypeErrorClasses]
     )
   ]
   where
-    annType tys = foreach (Map.toList tys) $ \(tn, (kind, _)) ->
-      IdeDeclarationAnn emptyAnn (IdeDeclType (IdeType (P.disqualify tn) kind []))
+    annType tys = flip mapMaybe (Map.toList tys) $ \(tn, (kind, _)) -> do
+      let name = P.disqualify tn
+      -- We need to remove the ClassName$Dict synonyms, because we
+      -- don't want them to show up in completions
+      guard (isNothing (T.find (== '$') (P.runProperName name)))
+      Just (IdeDeclarationAnn emptyAnn (IdeDeclType (IdeType name kind [])))
     annClass cls = foreach (Map.toList cls) $ \(cn, _) ->
       -- Dummy kind and instances here, but we primarily care about the name completion
       IdeDeclarationAnn emptyAnn (IdeDeclTypeClass (IdeTypeClass (P.disqualify cn) P.kindType []) )
@@ -57,18 +62,3 @@ idePrimDeclarations = Map.fromList
     primRowListClasses = annClass PEnv.primRowListClasses
     primSymbolClasses = annClass PEnv.primSymbolClasses
     primTypeErrorClasses = annClass PEnv.primTypeErrorClasses
-
-    primKinds = foreach (Set.toList PEnv.primKinds) $ \kn ->
-      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
-
-    primBooleanKinds = foreach (Set.toList PEnv.primBooleanKinds) $ \kn ->
-      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
-
-    primOrderingKinds = foreach (Set.toList PEnv.primOrderingKinds) $ \kn ->
-      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
-
-    primRowListKinds = foreach (Set.toList PEnv.primRowListKinds) $ \kn ->
-      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
-
-    primTypeErrorKinds = foreach (Set.toList PEnv.primTypeErrorKinds) $ \kn ->
-      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))

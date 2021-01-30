@@ -1,0 +1,21 @@
+Error found:
+in module [33mDiffKindsSameName[0m
+at tests/purs/failing/DiffKindsSameName.purs:13:18 - 13:31 (line 13, column 18 - line 13, column 31)
+
+  Could not match kind
+  [33m          [0m
+  [33m  DemoKind[0m
+  [33m          [0m
+  with kind
+  [33m          [0m
+  [33m  DemoKind[0m
+  [33m          [0m
+
+while checking that type [33mDemoData[0m
+  has kind [33mDemoKind[0m
+while inferring the kind of [33mAProxy DemoData[0m
+in value declaration [33mbProxy[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

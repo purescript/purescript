@@ -1,0 +1,20 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/TypeSynonyms7.purs:8:1 - 9:14 (line 8, column 1 - line 9, column 14)
+
+  Type class instance head is invalid due to use of type
+  [33m            [0m
+  [33m  ( x :: Int[0m
+  [33m  | r       [0m
+  [33m  )         [0m
+  [33m            [0m
+  All types appearing in instance declarations must be of the form T a_1 .. a_n, where each type a_i is of the same form, unless the type is fully determined by other type class arguments via functional dependencies.
+
+in type class instance
+[33m                      [0m
+[33m  Data.Show.Show (X r)[0m
+[33m                      [0m
+
+See https://github.com/purescript/documentation/blob/master/errors/InvalidInstanceHead.md for more information,
+or to contribute content related to this error.
+

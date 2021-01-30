@@ -1,0 +1,16 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/LetPatterns3.purs:11:7 - 11:8 (line 11, column 7 - line 11, column 8)
+
+  Data constructor [33mMain.X[0m was given 0 arguments in a case expression, but expected 1 arguments.
+  This problem can be fixed by giving [33mMain.X[0m 1 arguments.
+
+while inferring the type of [33m\$0 ->          [0m
+                            [33m  \b ->         [0m
+                            [33m    case $0 b of[0m
+                            [33m      X b -> ...[0m
+in value declaration [33mx[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/IncorrectConstructorArity.md for more information,
+or to contribute content related to this error.
+

@@ -12,7 +12,7 @@ import Language.PureScript.CoreFn.Traversals
 import Language.PureScript.Names (Ident(UnusedIdent), Qualified(Qualified))
 import Language.PureScript.Label
 import Language.PureScript.Types
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 
 -- |
 -- CoreFn optimization pass.
@@ -42,7 +42,7 @@ closedRecordFields (TypeApp _ (TypeConstructor _ C.Record) row) =
   collect row
   where
     collect :: Type a -> Maybe [Label]
-    collect (REmpty _) = Just []
+    collect (REmptyKinded _ _) = Just []
     collect (RCons _ l _ r) = collect r >>= return . (l :)
     collect _ = Nothing
 closedRecordFields _ = Nothing

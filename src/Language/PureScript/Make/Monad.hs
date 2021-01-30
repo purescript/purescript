@@ -5,11 +5,28 @@ module Language.PureScript.Make.Monad
     Make(..)
   , runMake
   , makeIO
+  , getTimestamp
+  , getTimestampMaybe
   , readTextFile
+  , readJSONFile
+  , readJSONFileIO
+  , readCborFile
+  , readCborFileIO
+  , readExternsFile
+  , hashFile
+  , writeTextFile
+  , writeJSONFile
+  , writeCborFile
+  , writeCborFileIO
+  , copyFile
   ) where
 
 import           Prelude
 
+import           Codec.Serialise (Serialise)
+import qualified Codec.Serialise as Serialise
+import           Control.Exception (fromException, tryJust)
+import           Control.Monad (join, guard)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
@@ -18,11 +35,20 @@ import           Control.Monad.Reader (MonadReader(..), ReaderT(..))
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Except
 import           Control.Monad.Writer.Class (MonadWriter(..))
-import qualified Data.ByteString.Lazy as B
-import           Language.PureScript.AST
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString as B
+import           Data.Text (Text)
+import qualified Data.Text as Text
+import           Data.Time.Clock (UTCTime)
 import           Language.PureScript.Errors
+import           Language.PureScript.Externs (ExternsFile, externsIsCurrentVersion)
+import           Language.PureScript.Make.Cache (ContentHash, hash)
 import           Language.PureScript.Options
-import           System.IO.Error (tryIOError)
+import           System.Directory (createDirectoryIfMissing, getModificationTime)
+import qualified System.Directory as Directory
+import           System.FilePath (takeDirectory)
+import           System.IO.Error (tryIOError, isDoesNotExistError)
+import           System.IO.UTF8 (readUTF8FileT)
 
 -- | A monad for running make actions
 newtype Make a = Make
@@ -41,14 +67,123 @@ instance MonadBaseControl IO Make where
 runMake :: Options -> Make a -> IO (Either MultipleErrors a, MultipleErrors)
 runMake opts = runLogger' . runExceptT . flip runReaderT opts . unMake
 
--- | Run an 'IO' action in the 'Make' monad, by specifying how IO errors should
--- be rendered as 'ErrorMessage' values.
-makeIO :: (IOError -> ErrorMessage) -> IO a -> Make a
-makeIO f io = do
-  e <- liftIO $ tryIOError io
-  either (throwError . singleError . f) return e
+-- | Run an 'IO' action in the 'Make' monad. The 'String' argument should
+-- describe what we were trying to do; it is used for rendering errors in the
+-- case that an IOException is thrown.
+makeIO :: (MonadIO m, MonadError MultipleErrors m) => Text -> IO a -> m a
+makeIO description io = do
+  res <- liftIO (tryIOError io)
+  either (throwError . singleError . ErrorMessage [] . FileIOError description) pure res
 
--- | Read a text file in the 'Make' monad, capturing any errors using the
+-- | Get a file's modification time in the 'Make' monad, capturing any errors
+-- using the 'MonadError' instance.
+getTimestamp :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> m UTCTime
+getTimestamp path =
+  makeIO ("get a timestamp for file: " <> Text.pack path) $ getModificationTime path
+
+-- | Get a file's modification time in the 'Make' monad, returning Nothing if
+-- the file does not exist.
+getTimestampMaybe :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> m (Maybe UTCTime)
+getTimestampMaybe path =
+  makeIO ("get a timestamp for file: " <> Text.pack path) $ catchDoesNotExist $ getModificationTime path
+
+-- | Read a text file strictly in the 'Make' monad, capturing any errors using
+-- the 'MonadError' instance.
+readTextFile :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> m Text
+readTextFile path =
+  makeIO ("read file: " <> Text.pack path) $
+    readUTF8FileT path
+
+-- | Read a JSON file in the 'Make' monad, returning 'Nothing' if the file does
+-- not exist or could not be parsed. Errors are captured using the 'MonadError'
+-- instance.
+readJSONFile :: (MonadIO m, MonadError MultipleErrors m) => Aeson.FromJSON a => FilePath -> m (Maybe a)
+readJSONFile path =
+  makeIO ("read JSON file: " <> Text.pack path) (readJSONFileIO path)
+
+readJSONFileIO :: Aeson.FromJSON a => FilePath -> IO (Maybe a)
+readJSONFileIO path = do
+  r <- catchDoesNotExist $ Aeson.decodeFileStrict' path
+  return $ join r
+
+-- | Read a Cbor encoded file in the 'Make' monad, returning
+-- 'Nothing' if the file does not exist or could not be parsed. Errors
+-- are captured using the 'MonadError' instance.
+readCborFile :: (MonadIO m, MonadError MultipleErrors m) => Serialise a => FilePath -> m (Maybe a)
+readCborFile path =
+  makeIO ("read Binary file: " <> Text.pack path) (readCborFileIO path)
+
+readCborFileIO :: Serialise a => FilePath -> IO (Maybe a)
+readCborFileIO path = do
+  r <- catchDoesNotExist $ catchDeserialiseFailure $ Serialise.readFileDeserialise path
+  return (join r)
+
+-- | Read an externs file, returning 'Nothing' if the file does not exist,
+-- could not be parsed, or was generated by a different version of the
+-- compiler.
+readExternsFile :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> m (Maybe ExternsFile)
+readExternsFile path = do
+  mexterns <- readCborFile path
+  return $ do
+    externs <- mexterns
+    guard $ externsIsCurrentVersion externs
+    return externs
+
+hashFile :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> m ContentHash
+hashFile path = do
+  makeIO ("hash file: " <> Text.pack path)
+    (hash <$> B.readFile path)
+
+-- | If the provided action threw an 'isDoesNotExist' error, catch it and
+-- return Nothing. Otherwise return Just the result of the inner action.
+catchDoesNotExist :: IO a -> IO (Maybe a)
+catchDoesNotExist inner = do
+  r <- tryJust (guard . isDoesNotExistError) inner
+  case r of
+    Left () ->
+      return Nothing
+    Right x ->
+      return (Just x)
+
+catchDeserialiseFailure :: IO a -> IO (Maybe a)
+catchDeserialiseFailure inner = do
+  r <- tryJust fromException inner
+  case r of
+    Left (_ :: Serialise.DeserialiseFailure) ->
+      return Nothing
+    Right x ->
+      return (Just x)
+
+-- | Write a text file in the 'Make' monad, capturing any errors using the
 -- 'MonadError' instance.
-readTextFile :: FilePath -> Make B.ByteString
-readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ B.readFile path
+writeTextFile :: FilePath -> B.ByteString -> Make ()
+writeTextFile path text = makeIO ("write file: " <> Text.pack path) $ do
+  createParentDirectory path
+  B.writeFile path text
+
+-- | Write a JSON file in the 'Make' monad, capturing any errors using the
+-- 'MonadError' instance.
+writeJSONFile :: (MonadIO m, MonadError MultipleErrors m) => Aeson.ToJSON a => FilePath -> a -> m ()
+writeJSONFile path value = makeIO ("write JSON file: " <> Text.pack path) $ do
+  createParentDirectory path
+  Aeson.encodeFile path value
+
+writeCborFile :: (MonadIO m, MonadError MultipleErrors m) => Serialise a => FilePath -> a -> m ()
+writeCborFile path value =
+  makeIO ("write Cbor file: " <> Text.pack path) (writeCborFileIO path value)
+
+writeCborFileIO :: Serialise a => FilePath -> a -> IO ()
+writeCborFileIO path value = do
+  createParentDirectory path
+  Serialise.writeFileSerialise path value
+
+-- | Copy a file in the 'Make' monad, capturing any errors using the
+-- 'MonadError' instance.
+copyFile :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> FilePath -> m ()
+copyFile src dest =
+  makeIO ("copy file: " <> Text.pack src <> " -> " <> Text.pack dest) $ do
+    createParentDirectory dest
+    Directory.copyFile src dest
+
+createParentDirectory :: FilePath -> IO ()
+createParentDirectory = createDirectoryIfMissing True . takeDirectory

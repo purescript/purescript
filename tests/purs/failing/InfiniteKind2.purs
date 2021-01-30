@@ -2,4 +2,4 @@
 
 module InfiniteKind2 where
 
-data Tree m a = Tree a (m (Tree a))
+data Tree m = Tree (m Tree)

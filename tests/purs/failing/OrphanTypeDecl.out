@@ -1,0 +1,10 @@
+Error found:
+in module [33mOrphanTypeDecl[0m
+at tests/purs/failing/OrphanTypeDecl.purs:4:1 - 4:24 (line 4, column 1 - line 4, column 24)
+
+  The type declaration for [33mfn[0m should be followed by its definition.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/OrphanTypeDeclaration.md for more information,
+or to contribute content related to this error.
+

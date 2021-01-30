@@ -38,10 +38,10 @@ data Meta
 --
 data ConstructorType
   -- |
-  -- The constructor is for a type with a single construcor
+  -- The constructor is for a type with a single constructor
   --
   = ProductType
   -- |
-  -- The constructor is for a type with multiple construcors
+  -- The constructor is for a type with multiple constructors
   --
   | SumType deriving (Show, Eq, Ord)

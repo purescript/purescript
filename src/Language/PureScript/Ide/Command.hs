@@ -16,6 +16,7 @@ module Language.PureScript.Ide.Command where
 
 import           Protolude
 
+import           Control.Monad.Fail (fail)
 import           Data.Aeson
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -103,7 +104,7 @@ instance FromJSON ImportCommand where
           <$> (o .: "identifier")
           <*> (fmap P.moduleNameFromString <$> o .:? "qualifier")
 
-      _ -> mzero
+      s -> fail ("Unknown import command: " <> show s)
 
 data ListType = LoadedModules | Imports FilePath | AvailableModules
 
@@ -114,7 +115,7 @@ instance FromJSON ListType where
       "import" -> Imports <$> o .: "file"
       "loadedModules" -> pure LoadedModules
       "availableModules" -> pure AvailableModules
-      _ -> mzero
+      s -> fail ("Unknown list type: " <> show s)
 
 instance FromJSON Command where
   parseJSON = withObject "command" $ \o -> do
@@ -175,10 +176,14 @@ instance FromJSON Command where
           <$> params .: "file"
           <*> params .:? "actualFile"
           <*> (parseCodegenTargets =<< params .:? "codegen" .!= [ "js" ])
-      _ -> mzero
+      c -> fail ("Unknown command: " <> show c)
     where
-      parseCodegenTargets =
-        maybe mzero (pure . Set.fromList) . traverse (flip Map.lookup P.codegenTargets)
+      parseCodegenTargets ts =
+        case traverse (\t -> Map.lookup t P.codegenTargets) ts of
+          Nothing ->
+            fail ("Failed to parse codegen targets: " <> show ts)
+          Just ts' ->
+            pure (Set.fromList ts')
 
       mkAnnotations True = explicitAnnotations
       mkAnnotations False = noAnnotations

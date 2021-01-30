@@ -1,0 +1,24 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/KindError.purs:6:35 - 6:36 (line 6, column 35 - line 6, column 36)
+
+  Could not match kind
+  [33m      [0m
+  [33m  Type[0m
+  [33m      [0m
+  with kind
+  [33m          [0m
+  [33m  t8 -> t9[0m
+  [33m          [0m
+
+while checking that type [33mf[0m
+  has kind [33mt0 -> t1[0m
+while inferring the kind of [33mf a[0m
+in type constructor [33mKindError[0m
+
+where [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

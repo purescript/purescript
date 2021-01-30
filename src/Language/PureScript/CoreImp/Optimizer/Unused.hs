@@ -8,7 +8,7 @@ import Prelude.Compat
 
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 
 removeCodeAfterReturnStatements :: AST -> AST
 removeCodeAfterReturnStatements = everywhere (removeFromBlock go)

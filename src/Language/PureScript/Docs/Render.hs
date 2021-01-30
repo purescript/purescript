@@ -40,7 +40,7 @@ renderDeclaration Declaration{..} =
       [ keywordData
       , renderType (P.TypeConstructor () (notQualified declTitle))
       , syntax "::"
-      , renderKind kind'
+      , renderType kind'
       ]
     TypeSynonymDeclaration args ty ->
       [ keywordType
@@ -80,11 +80,6 @@ renderDeclaration Declaration{..} =
       , aliasName for declTitle
       ]
 
-    ExternKindDeclaration ->
-      [ keywordKind
-      , kind (notQualified declTitle)
-      ]
-
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
 renderChildDeclaration ChildDeclaration{..} =
   mintersperse sp $ case cdeclInfo of
@@ -101,8 +96,8 @@ renderChildDeclaration ChildDeclaration{..} =
       ]
 
 renderConstraint :: Constraint' -> RenderedCode
-renderConstraint (P.Constraint ann pn tys _) =
-  renderType $ foldl (P.TypeApp ann) (P.TypeConstructor ann (fmap P.coerceProperName pn)) tys
+renderConstraint (P.Constraint ann pn kinds tys _) =
+  renderType $ foldl (P.TypeApp ann) (foldl (P.KindApp ann) (P.TypeConstructor ann (fmap P.coerceProperName pn)) kinds) tys
 
 renderConstraints :: [Constraint'] -> Maybe RenderedCode
 renderConstraints constraints
@@ -125,12 +120,12 @@ ident' = ident . P.Qualified Nothing . P.Ident
 dataCtor' :: Text -> RenderedCode
 dataCtor' = dataCtor . notQualified
 
-typeApp :: Text -> [(Text, Maybe Kind')] -> Type'
+typeApp :: Text -> [(Text, Maybe Type')] -> Type'
 typeApp title typeArgs =
   foldl (P.TypeApp ())
         (P.TypeConstructor () (notQualified title))
         (map toTypeVar typeArgs)
 
-toTypeVar :: (Text, Maybe Kind') -> Type'
+toTypeVar :: (Text, Maybe Type') -> Type'
 toTypeVar (s, Nothing) = P.TypeVar () s
 toTypeVar (s, Just k) = P.KindedType () (P.TypeVar () s) k

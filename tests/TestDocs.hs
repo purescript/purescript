@@ -191,7 +191,7 @@ displayAssertion = \case
     " should be empty"
   ShouldHaveClassMethodDocComment mn decl method excerpt ->
     "the string " <> T.pack (show excerpt) <> " should appear in the" <>
-    " doc-comment for class method " <> T.pack (show method) <> " for " <> showQual mn decl 
+    " doc-comment for class method " <> T.pack (show method) <> " for " <> showQual mn decl
   ShouldNotHaveClassMethodDocComment mn decl method ->
     "Doc-comments for class method " <> T.pack (show method) <> " for " <> showQual mn decl <>
     " should be empty"
@@ -608,7 +608,7 @@ testCases =
 
   , ("Clash",
       [ ShouldBeDocumented (n "Clash1") "value" []
-      , ShouldBeDocumented (n "Clash1") "Type" []
+      , ShouldBeDocumented (n "Clash1") "Type'" []
       , ShouldBeDocumented (n "Clash1") "TypeClass" ["typeClassMember"]
       ])
 

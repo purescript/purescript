@@ -12,7 +12,7 @@ import Control.Monad.Writer.Class
 
 import Data.Function (on)
 import Data.Foldable (for_)
-import Data.List (find, intersect, groupBy, sortBy, (\\))
+import Data.List (find, intersect, groupBy, sort, sortBy, (\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid (Sum(..))
 import Data.Traversable (forM)
@@ -27,7 +27,7 @@ import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Common (warnDuplicateRefs)
 import Language.PureScript.Sugar.Names.Env
 import Language.PureScript.Sugar.Names.Imports
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 
 -- |
 -- Map of module name to list of imported names from that module which have
@@ -142,7 +142,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
   -- Checks whether a module is the Prim module - used to suppress any checks
   -- made, as Prim is always implicitly imported.
   isPrim :: ModuleName -> Bool
-  isPrim = (== ModuleName [ProperName C.prim])
+  isPrim = (== C.Prim)
 
   -- Creates a map of virtual modules mapped to all the declarations that
   -- import to that module, with the corresponding source span, import type,
@@ -202,7 +202,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
 
 
 -- Replace explicit type refs with data constructor lists from listing the
--- used constructors explicity `T(X, Y, [...])` to `T(..)` for suggestion
+-- used constructors explicitly `T(X, Y, [...])` to `T(..)` for suggestion
 -- message.
 -- Done everywhere when suggesting a completely new explicit imports list, otherwise
 -- maintain the existing form.
@@ -279,7 +279,7 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
           isMatch _ _ = False
 
   unused :: m Bool
-  unused = warn (UnusedImport mni)
+  unused = warn (UnusedImport mni qualifierName)
 
   warn :: SimpleErrorMessage -> m Bool
   warn err = tell (errorMessage' ss err) >> return True
@@ -328,14 +328,13 @@ findUsedRefs ss env mni qn names =
     valueOpRefs = ValueOpRef ss <$> mapMaybe (getValOpName <=< disqualifyFor qn) names
     typeOpRefs = TypeOpRef ss <$> mapMaybe (getTypeOpName <=< disqualifyFor qn) names
     types = mapMaybe (getTypeName <=< disqualifyFor qn) names
-    kindRefs = KindRef ss <$> mapMaybe (getKindName <=< disqualifyFor qn) names
     dctors = mapMaybe (getDctorName <=< disqualifyFor qn) names
     typesWithDctors = reconstructTypeRefs dctors
     typesWithoutDctors = filter (`M.notMember` typesWithDctors) types
     typesRefs
       = map (flip (TypeRef ss) (Just [])) typesWithoutDctors
       ++ map (\(ty, ds) -> TypeRef ss ty (Just ds)) (M.toList typesWithDctors)
-  in sortBy compDecRef $ classRefs ++ typeOpRefs ++ typesRefs ++ kindRefs ++ valueRefs ++ valueOpRefs
+  in sort $ classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
 
   where
 

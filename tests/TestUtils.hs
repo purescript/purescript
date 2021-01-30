@@ -15,6 +15,7 @@ import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
+import Control.Monad.Writer.Class (tell)
 import Control.Exception
 import Data.Char (isSpace)
 import Data.Function (on)
@@ -85,7 +86,7 @@ getSupportModuleTuples = do
   fileContents <- readInput pursFiles
   modules <- runExceptT $ ExceptT . return $ CST.parseFromFiles id fileContents
   case modules of
-    Right ms -> return ms
+    Right ms -> return (fmap (fmap snd) ms)
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
 
 getSupportModuleNames :: IO [T.Text]
@@ -121,7 +122,7 @@ setupSupportModules = do
 getTestFiles :: FilePath -> IO [[FilePath]]
 getTestFiles testDir = do
   cwd <- getCurrentDirectory
-  let dir = cwd </> "tests" </> "purs" </> testDir
+  let dir = "tests" </> "purs" </> testDir
   testsInPath <- getFiles dir <$> testGlob dir
   let rerunPath = dir </> "RerunCompilerTests.txt"
   hasRerunFile <- doesFileExist rerunPath
@@ -169,7 +170,9 @@ compile
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
 compile supportModules supportExterns supportForeigns inputFiles check = runTest $ do
   fs <- liftIO $ readInput inputFiles
-  ms <- CST.parseFromFiles id fs
+  msWithWarnings <- CST.parseFromFiles id fs
+  tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
+  let ms = fmap snd <$> msWithWarnings
   foreigns <- inferForeignModules ms
   liftIO (check (map snd ms))
   let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
@@ -198,13 +201,13 @@ checkMain ms =
 
 makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
 makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
-                               { P.getInputTimestamp = getInputTimestamp
+                               { P.getInputTimestampsAndHashes = getInputTimestampsAndHashes
                                , P.getOutputTimestamp = getOutputTimestamp
                                , P.progress = const (pure ())
                                }
   where
-  getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
-  getInputTimestamp mn
+  getInputTimestampsAndHashes :: P.ModuleName -> P.Make (Either P.RebuildPolicy a)
+  getInputTimestampsAndHashes mn
     | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
     | otherwise = return (Left P.RebuildAlways)
     where

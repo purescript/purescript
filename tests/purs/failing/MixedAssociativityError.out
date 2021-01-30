@@ -1,0 +1,14 @@
+Error found:
+at tests/purs/failing/MixedAssociativityError.purs:6:15 - 6:18 (line 6, column 15 - line 6, column 18)
+
+  Cannot parse an expression that uses operators of the same precedence but mixed associativity:
+
+    [33mData.Functor.(<$>)[0m is [33minfixl[0m
+    [33mData.Eq.(==)[0m is [33minfix[0m
+
+  Use parentheses to resolve this ambiguity.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/MixedAssociativityError.md for more information,
+or to contribute content related to this error.
+

@@ -35,13 +35,12 @@ import qualified Language.PureScript.Types as P
 convertModule ::
   MonadError P.MultipleErrors m =>
   [P.ExternsFile] ->
+  P.Env ->
   P.Environment ->
   P.Module ->
   m Module
-convertModule externs checkEnv m =
-  partiallyDesugar externs [m] >>= \case
-    [m'] -> pure (insertValueTypes checkEnv (convertSingleModule m'))
-    _ -> P.internalError "partiallyDesugar did not return a singleton"
+convertModule externs env checkEnv =
+  fmap (insertValueTypes checkEnv . convertSingleModule) . partiallyDesugar externs env
 
 -- |
 -- Updates all the types of the ValueDeclarations inside the module based on
@@ -77,7 +76,7 @@ insertValueTypes env m =
 
 runParser :: CST.Parser a -> Text -> Either String a
 runParser p =
-  first (CST.prettyPrintError . NE.head)
+  bimap (CST.prettyPrintError . NE.head) snd
     . CST.runTokenParser p
     . CST.lex
 
@@ -88,20 +87,19 @@ runParser p =
 partiallyDesugar ::
   (MonadError P.MultipleErrors m) =>
   [P.ExternsFile] ->
-  [P.Module] ->
-  m [P.Module]
-partiallyDesugar externs = evalSupplyT 0 . desugar'
+  P.Env ->
+  P.Module ->
+  m P.Module
+partiallyDesugar externs env = evalSupplyT 0 . desugar'
   where
   desugar' =
-    traverse P.desugarDoModule
-      >=> traverse P.desugarAdoModule
-      >=> map P.desugarLetPatternModule
-      >>> traverse P.desugarCasesModule
-      >=> traverse P.desugarTypeDeclarationsModule
-      >=> ignoreWarnings . P.desugarImports externs
+    P.desugarDoModule
+      >=> P.desugarAdoModule
+      >=> P.desugarLetPatternModule
+      >>> P.desugarCasesModule
+      >=> P.desugarTypeDeclarationsModule
+      >=> fmap fst . runWriterT . flip evalStateT (env, mempty) . P.desugarImports
       >=> P.rebracketFiltered isInstanceDecl externs
-
-  ignoreWarnings = fmap fst . runWriterT
 
   isInstanceDecl (P.TypeInstanceDeclaration {}) = True
   isInstanceDecl _ = False
