@@ -4,17 +4,22 @@ import Prelude
 import Prim.Row
 import Effect
 import Effect.Console
-import Unsafe.Coerce (unsafeCoerce)
 
-solveUnionBackwardsNil :: Record _ -> Record _
-solveUnionBackwardsNil = (unsafeCoerce :: forall r. Union r () () => {} -> Record r)
+data Proxy a = Proxy
 
-solveUnionBackwardsCons :: Record _ -> Record _
-solveUnionBackwardsCons = (unsafeCoerce :: forall r. Union r ( a :: Int ) ( a :: Int, b :: String ) => { b :: String } -> Record r)
+solve :: forall l r u. Union l r u => Proxy r -> Proxy u -> Proxy l
+solve _ _ = Proxy
 
-solveUnionBackwardsDblCons :: Record _ -> Record _
-solveUnionBackwardsDblCons =
-  (unsafeCoerce :: forall r. Union r ( a :: Int, a :: String ) ( a :: String, a :: Int, a :: String ) => { a :: String } -> Record r)
+solveUnionBackwardsNil :: Proxy _
+solveUnionBackwardsNil = solve (Proxy :: Proxy ()) (Proxy :: Proxy ())
+
+{-
+solveUnionBackwardsCons :: Proxy _
+solveUnionBackwardsCons =solve (Proxy :: Proxy ( a :: Int )) (Proxy :: Proxy ( a :: Int, b :: String ))
+
+solveUnionBackwardsDblCons :: Proxy _
+solveUnionBackwardsDblCons = solve (Proxy :: Proxy ( a :: Int, a :: String )) (Proxy :: Proxy ( a :: String, a :: Int, a :: String ))
+-}
 
 foreign import merge
   :: forall r1 r2 r3
