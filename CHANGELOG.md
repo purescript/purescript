@@ -27,6 +27,11 @@ Other improvements:
 
 * More descriptive protocol errors from the ide server (@kritzcreek)
 
+* Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
+
+  The previous `logo.png` was not legible against a dark background (#4001).
+
+
 ## [v0.13.8](https://github.com/purescript/purescript/releases/tag/v0.13.8) - 2020-05-23
 
 **Bug Fixes**
