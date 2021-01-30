@@ -488,8 +488,8 @@ entails SolverOptions{..} constraint context hints =
             -- If the right hand side and output are closed rows, then we can
             -- compute the left hand side by subtracting the right hand side
             -- from the output.
-            _ | (right, REmpty _) <- rowToList r
-              , (output, restu@(REmpty _)) <- rowToList u ->
+            _ | (right, rightu@(REmptyKinded _ _)) <- rowToList r
+              , (output, restu@(REmptyKinded _ _)) <- rowToList u ->
               let
                 -- Partition the output rows into those that belong in right
                 -- (taken off the end) and those that must end up in left.
@@ -502,7 +502,7 @@ entails SolverOptions{..} constraint context hints =
                   foldr grabLabel ([], [], fmap rowListLabel right) output
               in ( (null leftover)
                  , rowFromList (outL, restu)
-                 , rowFromList (outR, restu)
+                 , rowFromList (outR, rightu)
                  , u
                  , Nothing
                  , []

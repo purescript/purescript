@@ -13,13 +13,11 @@ solve _ _ = Proxy
 solveUnionBackwardsNil :: Proxy _
 solveUnionBackwardsNil = solve (Proxy :: Proxy ()) (Proxy :: Proxy ())
 
-{-
 solveUnionBackwardsCons :: Proxy _
-solveUnionBackwardsCons =solve (Proxy :: Proxy ( a :: Int )) (Proxy :: Proxy ( a :: Int, b :: String ))
+solveUnionBackwardsCons = solve (Proxy  :: Proxy ( a :: Int )) (Proxy :: Proxy ( a :: Int, b :: String ))
 
 solveUnionBackwardsDblCons :: Proxy _
-solveUnionBackwardsDblCons = solve (Proxy :: Proxy ( a :: Int, a :: String )) (Proxy :: Proxy ( a :: String, a :: Int, a :: String ))
--}
+solveUnionBackwardsDblCons = solve (Proxy :: Proxy ( a :: Int, a :: String )) (Proxy :: Proxy ( a :: Boolean, a :: Int, a :: String ))
 
 foreign import merge
   :: forall r1 r2 r3
