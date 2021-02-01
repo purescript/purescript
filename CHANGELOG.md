@@ -14,6 +14,8 @@ Bugfixes:
 
 Other improvements:
 
+* Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
+
 ## v0.14.0
 
 ### Polykinds
