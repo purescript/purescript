@@ -6,7 +6,6 @@ import Prelude.Compat
 
 import Test.Hspec
 
-import           Control.Monad (mapM_)
 import           Control.Monad.Trans.State.Strict (evalStateT)
 import           Data.List (sort)
 import qualified Data.Text as T

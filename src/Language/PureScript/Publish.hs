@@ -19,7 +19,7 @@ module Language.PureScript.Publish
   , getModules
   ) where
 
-import Protolude hiding (stdin)
+import Protolude hiding (stdin, lines)
 
 import Control.Arrow ((***))
 import Control.Category ((>>>))
@@ -27,16 +27,14 @@ import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
 import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, key, asString, withString)
 import qualified Data.ByteString.Lazy as BL
-import Data.Char (isSpace)
 import Data.String (String, lines)
 import Data.List (stripPrefix, (\\))
-import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Version
 import qualified Distribution.SPDX as SPDX
-import qualified Distribution.Parsec.Class as CabalParsec
+import qualified Distribution.Parsec as CabalParsec
 
 import System.Directory (doesFileExist)
 import System.FilePath.Glob (globDir1)
