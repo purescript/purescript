@@ -67,7 +67,7 @@ It is treated internally as:
 data Foo
 ```
 
-Note that `foreign import data` declarations are not deprecated. They are still necessary to define types with kinds other than `Type` since constructors are not lifted as in GHC with [DataKinds](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#extension-DataKinds).
+Note that `foreign import data` declarations are not deprecated. They are still necessary to define types with kinds other than `Type` since constructors are not lifted as in GHC with [DataKinds](https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/data_kinds.html#extension-DataKinds).
 
 Likewise, `kind` imports and exports are deprecated and treated the same as a type import or export.
 
@@ -125,7 +125,7 @@ Types parameters now have _roles_, which depend on how they affect the runtime r
 
 The compiler infers _nominal_ roles for foreign data types, which is safe but can be too constraining sometimes. For example this prevents the coercion of `Effect Age` to `Effect Int`, even though they have the same runtime representation.
 
-The roles of foreign data types can thus be loosened with explicit role annotations, similar to the [RoleAnnotations](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#role-annotations) GHC extension.
+The roles of foreign data types can thus be loosened with explicit role annotations, similar to the [RoleAnnotations](https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html#extension-RoleAnnotations) GHC extension.
 
 Here's the annotation we added to `Effect`:
 
