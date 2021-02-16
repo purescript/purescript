@@ -26,7 +26,7 @@ Other improvements:
 
 Polymorphic kinds, based on the [Kind Inference for Datatypes](https://richarde.dev/papers/2020/kind-inference/kind-inference.pdf) paper (#3779, #3831, #3929, @natefaubion)
 
-Kinds are to types what types are to terms (although kinds are themselves types now), but whereas we have polymorphic types, kinds were monomorphic.
+Just as types classify terms, kinds classify types. But while we have polymorphic types, kinds were previously monomorphic.
 
 This meant that we were not able to abstract over kinds, leading for instance to a proliferation of proxy types:
 
@@ -113,17 +113,17 @@ Coercible constraints, based on the [Safe Zero-cost Coercions for Haskell](https
 
 #### Roles
 
-Types parameters now have _roles_, which depend on how they affect the runtime representation of their type. There's three roles, from most to least restrictive:
+Types parameters now have _roles_, which depend on how they affect the runtime representation of their type. There are three roles, from most to least restrictive:
 
-* _nominal_ parameters are only coercible to themselves.
+* _nominal_ parameters can only be coerced to themselves.
 
-* _representational_ parameters are coercible when a Coercible constraint holds.
+* _representational_ parameters can only be coerced to each other when a Coercible constraint holds.
 
-* _phantom_ parameters are coercible to anything.
+* _phantom_ parameters can be coerced to anything.
 
 #### Role annotations
 
-The compiler infers _nominal_ roles for foreign data types, which is safe but can be too constraining sometimes. For example this prevents to coerce `Effect Age` to `Effect Int`, even though they actually have the same runtime representation.
+The compiler infers _nominal_ roles for foreign data types, which is safe but can be too constraining sometimes. For example this prevents the coercion of `Effect Age` to `Effect Int`, even though they have the same runtime representation.
 
 The roles of foreign data types can thus be loosened with explicit role annotations, similar to the [RoleAnnotations](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#role-annotations) GHC extension.
 
@@ -182,7 +182,7 @@ Exporting only some of the constructors of a type meant that changes internal to
 
 * Print compile errors to stdout, progress messages to stderr (#3839, @JordanMartinez)
 
-The compiler used to print errors to stderr, which is especially annoying when piping its output to another program with the `--json-errors` flag. Stderr is really for diagnostics about the execution of a program, whereas its expected output ought to be printed to stdout.
+Compiler errors and warnings arising from your code are now printed to stdout rather than stderr, and progress messages such as "Compiling Data.Array" are now printed to stderr rather than stdout. Warnings and errors arising from incorrect use of the CLI, such as specifying input files which don't exist or specifying globs which don't match any files, are still printed to stderr (as they were before). This change is useful when using the `--json-errors` flag, since you can now pipe JSON errors into other programs without having to perform awkward gymnastics such as `2>&1`.
 
 #### Fixes
 
@@ -210,7 +210,7 @@ Allowing the compiler to be built against various versions of `language-javascri
 
 The IDE server now respond with more descriptive error messages when failing to parse a command. This should make it easier to contribute fixes to the various clients.
 
-* Extend ImportCompletion with declarationType (#3997, @i-am-the-slime)
+* Extend IDE ImportCompletion with declarationType (#3997, @i-am-the-slime)
 
 By exposing the declaration type (value, type, typeclass, etc.) downstream tooling can annotate imports with this info so users know what they are about to import. The info can also be mapped to a namespace filter to allow importing identifiers that appear more than once in a source file which throws an exception without such a filter.
 
@@ -238,7 +238,7 @@ or
 class (Monad m, MonadAsk Env m) <= MonadAskEnv m
 ```
 
-* Improve incremental rebuilds time for modules with large dependencies (#3899, @milesfrain)
+* Improve incremental rebuild times for modules with large dependencies (#3899, @milesfrain)
 
 #### Other
 
@@ -254,7 +254,7 @@ This is the first step towards smarter incremental rebuilds, which could skip re
 
 * Deprecate constraints in foreign imports (#3829, @kl0tl)
 
-Constrained foreign imports leak instances dictionaries, hindering the compiler ability to optimize their representation. Manipulating dictionaries in foreign code should be avoided and foreign imports should accept the class members they need as additional arguments instead of being constrained.
+Constrained foreign imports leak instance dictionaries, hindering the compiler ability to optimize their representation. Manipulating dictionaries in foreign code should be avoided and foreign imports should accept the class members they need as additional arguments instead of being constrained.
 
 * Deprecate primes (the `'` character) in identifiers exported from foreign modules (#3792, @kl0tl)
 
