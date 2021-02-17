@@ -39,9 +39,9 @@ data RLProxy (row :: RowList) = RLProxy
 
 Now we can have a single proxy type, whose parameter has a polymorphic kind.
 
-#### Type In Type
+#### Type :: Type
 
-The type-checker now supports `TypeInType` (or `Type :: Type`), so the old `Kind` data type and namespace is now gone. Kinds and types are the same and exist in the same namespace.
+The old `Kind` data type and namespace is gone. Kinds and types are the same and exist in the same namespace.
 
 Previously one could do:
 
