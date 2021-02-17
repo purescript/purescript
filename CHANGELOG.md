@@ -8,14 +8,6 @@ Breaking changes:
 
 New features:
 
-* Extend ImportCompletion with declarationType (#3997, @i-am-the-slime)
-
-  By exposing the declaration type (value, type, typeclass, etc.) 
-  downstream tooling can annotate imports with this info so users know what they
-  are about to import. The info can also be mapped to a namespace filter to 
-  allow importing identifiers that appear more than once in a source file which
-  throws an exception without such a filter. 
-
 Bugfixes:
 
 Other improvements:
@@ -107,7 +99,7 @@ class Cons label a tail row | label a tail -> row, label row -> a tail
 
 ### Safe zero-cost coercions
 
-Coercible constraints, based on the [Safe Zero-cost Coercions for Haskell](https://www.microsoft.com/en-us/research/uploads/prod/2018/05/coercible-JFP.pdf) paper (#3351, #3810, #3896, #3873, #3860, #3905, #3893, #3909, #3931, #3906, #3881, #3878, #3937, #3930, #3955, #3927, @lunaris, @rhendric, @kl0tl, @hdgarrood)
+Coercible constraints, based on the [Safe Zero-cost Coercions for Haskell](https://www.microsoft.com/en-us/research/uploads/prod/2018/05/coercible-JFP.pdf) paper (#3351, #3810, #3896, #3873, #3860, #3905, #3893, #3909, #3931, #3906, #3881, #3878, #3937, #3930, #3955, #3927, #3999, @lunaris, @rhendric, @kl0tl, @hdgarrood)
 
 `Prim.Coerce.Coercible` is a new compiler-solved class, used to relate types with the same runtime representation. One can use `Safe.Coerce.coerce` (from the new [`safe-coerce`](https://github.com/purescript/purescript-safe-coerce) library) instead of `Unsafe.Coerce.unsafeCoerce` to safely turn a `a` into a `b` when `Coercible a b` holds.
 
