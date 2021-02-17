@@ -182,6 +182,7 @@ prettyPrintString s = "\"" <> foldMap encodeChar (decodeStringEither s) <> "\""
       , Char.ConnectorPunctuation
       , Char.DashPunctuation
       , Char.OpenPunctuation
+      , Char.ClosePunctuation
       , Char.InitialQuote
       , Char.FinalQuote
       , Char.OtherPunctuation
