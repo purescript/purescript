@@ -16,7 +16,7 @@ Other improvements:
 
 ### Polykinds
 
-Polymorphic kinds, based on the [Kind Inference for Datatypes](https://richarde.dev/papers/2020/kind-inference/kind-inference.pdf) paper (#3779, #3831, #3929, @natefaubion)
+Polymorphic kinds, based on the [Kind Inference for Datatypes](https://richarde.dev/papers/2020/kind-inference/kind-inference.pdf) paper (#3779, #3831, #3929, #4007, @natefaubion, @kl0tl)
 
 Just as types classify terms, kinds classify types. But while we have polymorphic types, kinds were previously monomorphic.
 
