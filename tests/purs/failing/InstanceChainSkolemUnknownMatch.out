@@ -3,11 +3,11 @@ in module [33mInstanceChainSkolemUnknownMatch[0m
 at tests/purs/failing/InstanceChainSkolemUnknownMatch.purs:14:13 - 14:36 (line 14, column 13 - line 14, column 36)
 
   No type class instance was found for
-  [33m                                                        [0m
-  [33m  InstanceChainSkolemUnknownMatch.Same (Proxy @Type t3) [0m
-  [33m                                       (Proxy @Type Int)[0m
-  [33m                                       t4               [0m
-  [33m                                                        [0m
+  [33m                                                  [0m
+  [33m  InstanceChainSkolemUnknownMatch.Same (Proxy t3) [0m
+  [33m                                       (Proxy Int)[0m
+  [33m                                       t4         [0m
+  [33m                                                  [0m
   The instance head contains unknown type variables. Consider adding a type annotation.
 
 while applying a function [33msame[0m
