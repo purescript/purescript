@@ -99,7 +99,7 @@ class Cons label a tail row | label a tail -> row, label row -> a tail
 
 ### Safe zero-cost coercions
 
-Coercible constraints, based on the [Safe Zero-cost Coercions for Haskell](https://www.microsoft.com/en-us/research/uploads/prod/2018/05/coercible-JFP.pdf) paper (#3351, #3810, #3896, #3873, #3860, #3905, #3893, #3909, #3931, #3906, #3881, #3878, #3937, #3930, #3955, #3927, #3999, @lunaris, @rhendric, @kl0tl, @hdgarrood)
+Coercible constraints, based on the [Safe Zero-cost Coercions for Haskell](https://www.microsoft.com/en-us/research/uploads/prod/2018/05/coercible-JFP.pdf) paper (#3351, #3810, #3896, #3873, #3860, #3905, #3893, #3909, #3931, #3906, #3881, #3878, #3937, #3930, #3955, #3927, #3999, #4000, @lunaris, @rhendric, @kl0tl, @hdgarrood)
 
 `Prim.Coerce.Coercible` is a new compiler-solved class, used to relate types with the same runtime representation. One can use `Safe.Coerce.coerce` (from the new [`safe-coerce`](https://github.com/purescript/purescript-safe-coerce) library) instead of `Unsafe.Coerce.unsafeCoerce` to safely turn a `a` into a `b` when `Coercible a b` holds.
 
