@@ -10,6 +10,8 @@ New features:
 
 Bugfixes:
 
+* Make close punctuation printable in errors (#3982, @rhendric)
+
 Other improvements:
 
 ## v0.14.0
