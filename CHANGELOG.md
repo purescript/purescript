@@ -12,6 +12,8 @@ Bugfixes:
 
 * Make close punctuation printable in errors (#3982, @rhendric)
 
+* Use type annotation hint only when needed (#4025, @rhendric)
+
 Other improvements:
 
 ## v0.14.0

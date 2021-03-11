@@ -23,7 +23,7 @@ import Control.Monad.Writer
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (minimumBy, groupBy, nubBy, sortBy)
+import Data.List (findIndices, minimumBy, groupBy, nubBy, sortBy)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -224,6 +224,7 @@ entails SolverOptions{..} constraint context hints =
             TypeClassData
               { typeClassDependencies
               , typeClassIsEmpty
+              , typeClassCoveringSets
               } <- case M.lookup className' classesInScope of
                 Nothing -> throwError . errorMessage $ UnknownClass className'
                 Just tcd -> pure tcd
@@ -245,7 +246,7 @@ entails SolverOptions{..} constraint context hints =
                     Right _               -> []          -- all apart
                     Left Nothing          -> []          -- last unknown
                     Left (Just substsTcd) -> [substsTcd] -- found a match
-            solution <- lift . lift $ unique kinds'' tys'' instances
+            solution <- lift . lift $ unique kinds'' tys'' instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
@@ -323,16 +324,16 @@ entails SolverOptions{..} constraint context hints =
                       (substituteType currentSubst . replaceAllTypeVars (M.toList subst) $ instKind)
                       (substituteType currentSubst tyKind)
 
-            unique :: [SourceType] -> [SourceType] -> [(a, TypeClassDict)] -> m (EntailsResult a)
-            unique kindArgs tyArgs []
+            unique :: [SourceType] -> [SourceType] -> [(a, TypeClassDict)] -> Bool -> m (EntailsResult a)
+            unique kindArgs tyArgs [] unks
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
               | solverShouldGeneralize && ((null kindArgs && null tyArgs) || any canBeGeneralized kindArgs || any canBeGeneralized tyArgs) =
                   return (Unsolved (srcConstraint className' kindArgs tyArgs conInfo))
-              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' kindArgs tyArgs conInfo)
-            unique _ _ [(a, dict)] = return $ Solved a dict
-            unique _ tyArgs tcds
+              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' kindArgs tyArgs conInfo) unks
+            unique _ _ [(a, dict)] _ = return $ Solved a dict
+            unique _ tyArgs tcds _
               | pairwiseAny overlapping (map snd tcds) =
                   throwError . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
@@ -380,6 +381,10 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal nullSourceSpan (ObjectLiteral fields))
+
+            unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
+            unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)
+              where unkIndices = findIndices containsUnknowns tyArgs
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr

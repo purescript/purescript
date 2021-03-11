@@ -8,7 +8,6 @@ at tests/purs/failing/InstanceChainSkolemUnknownMatch.purs:14:13 - 14:36 (line 1
   [33m                                       (Proxy Int)[0m
   [33m                                       t4         [0m
   [33m                                                  [0m
-  The instance head contains unknown type variables. Consider adding a type annotation.
 
 while applying a function [33msame[0m
   of type [33mSame @Type @Type t0 t1 t2 => t0 -> t1 -> SProxy t2[0m
