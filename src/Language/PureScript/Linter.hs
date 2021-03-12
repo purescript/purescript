@@ -178,12 +178,12 @@ lintUnused (Module modSS _ mn modDecls exports) =
         let allExprs = concatMap unguard $ valdeclExpression vd
             bindNewNames = S.fromList (concatMap binderNames $ valdeclBinders vd)
             ss = declSourceSpan d
-            (vars, errs) = removeAndWarn ss bindNewNames $ combineAll $ map (go ss) allExprs
+            (vars, errs) = removeAndWarn ss bindNewNames $ mconcat $ map (go ss) allExprs
             errs' = addHint (ErrorInValueDeclaration $ valdeclIdent vd) errs
         in
           (vars, errs')
 
-    goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance decls)) = combineAll $ map goDecl decls
+    goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
     goDecl _ = mempty
 
     go :: SourceSpan -> Expr -> (S.Set Ident, MultipleErrors)
@@ -192,60 +192,68 @@ lintUnused (Module modSS _ mn modDecls exports) =
 
     go ss (Let _ ds e) =
       let letNames = S.fromList $ concatMap declIdents ds
-      in removeAndWarn ss letNames $ combineAll (go ss e : map underDecl ds)
+      in removeAndWarn ss letNames $ mconcat (go ss e : map underDecl ds)
     go ss (Abs binder v1) =
       let newNames = S.fromList (binderNames binder)
       in
       removeAndWarn ss newNames $ go ss v1
 
     go ss (UnaryMinus _ v1) = go ss v1
-    go ss (BinaryNoParens v0 v1 v2) = go ss v0 `combine` go ss v1 `combine` go ss v2
+    go ss (BinaryNoParens v0 v1 v2) = go ss v0 <> go ss v1 <> go ss v2
     go ss (Parens v1) = go ss v1
     go ss (TypeClassDictionaryConstructorApp _ v1) = go ss v1
     go ss (Accessor _ v1) = go ss v1
 
-    go ss (ObjectUpdate obj vs) = combineAll (go ss obj : map (go ss . snd) vs)
-    go ss (ObjectUpdateNested obj vs) = go ss obj `combine` goTree vs
+    go ss (ObjectUpdate obj vs) = mconcat (go ss obj : map (go ss . snd) vs)
+    go ss (ObjectUpdateNested obj vs) = go ss obj <> goTree vs
       where
-        goTree (PathTree tree) = combineAll $ map (goNode . snd) (runAssocList tree)
+        goTree (PathTree tree) = mconcat $ map (goNode . snd) (runAssocList tree)
         goNode (Leaf val) = go ss val
         goNode (Branch val) = goTree val
 
-    go ss (App v1 v2) = go ss v1 `combine` go ss v2
+    go ss (App v1 v2) = go ss v1 <> go ss v2
     go ss (Unused v) = go ss v
-    go ss (IfThenElse v1 v2 v3) = go ss v1 `combine` go ss v2 `combine` go ss v3
+    go ss (IfThenElse v1 v2 v3) = go ss v1 <> go ss v2 <> go ss v3
     go ss (Case vs alts) =
       let f (CaseAlternative binders gexprs) =
             let bindNewNames = S.fromList (concatMap binderNames binders)
                 allExprs = concatMap unguard gexprs
             in
-                removeAndWarn ss bindNewNames $ combineAll $ map (go ss) allExprs
+                removeAndWarn ss bindNewNames $ mconcat $ map (go ss) allExprs
       in
-      combineAll $ map (go ss) vs ++ map f alts
+      mconcat $ map (go ss) vs ++ map f alts
 
     go ss (TypedValue _ v1 _) = go ss v1
     go ss (Do _ es) = doElts ss es Nothing
     go ss (Ado _ es v1) = doElts ss es (Just v1)
 
-    go ss (Literal _ (ArrayLiteral es)) = combineAll $ map (go ss) es
-    go ss (Literal _ (ObjectLiteral oo)) = combineAll $ map (go ss . snd) oo
+    go ss (Literal _ (ArrayLiteral es)) = mconcat $ map (go ss) es
+    go ss (Literal _ (ObjectLiteral oo)) = mconcat $ map (go ss . snd) oo
 
     go _ (PositionedValue ss' _ v1) = go ss' v1
 
-    go _ _ = (mempty, mempty)
+    go _ (Literal _ _) = mempty
+    go _ (Op _ _) = mempty
+    go _ (Constructor _ _) = mempty
+    go _ (TypeClassDictionary _ _ _) = mempty
+    go _ (TypeClassDictionaryAccessor _ _) = mempty
+    go _ (DeferredDictionary _ _) = mempty
+    go _ AnonymousArgument = mempty
+    go _ (Hole _) = mempty
+
 
     doElts :: SourceSpan -> [DoNotationElement] -> Maybe Expr -> (S.Set Ident, MultipleErrors)
-    doElts ss' (DoNotationValue e : rest) v = go ss' e `combine` doElts ss' rest v
+    doElts ss' (DoNotationValue e : rest) v = go ss' e <> doElts ss' rest v
     doElts ss' (DoNotationBind binder e : rest) v =
       let bindNewNames = S.fromList (binderNames binder)
-      in go ss' e `combine` removeAndWarn ss' bindNewNames (doElts ss' rest v)
+      in go ss' e <> removeAndWarn ss' bindNewNames (doElts ss' rest v)
 
     doElts ss' (DoNotationLet ds : rest) v =
       let letNewNames = S.fromList $ concatMap declIdents ds
-          declRes = foldr1 combine (map underDecl ds)
-      in removeAndWarn ss' letNewNames $ declRes `combine` doElts ss' rest v
+          declRes = foldr1 (<>) (map underDecl ds)
+      in removeAndWarn ss' letNewNames $ declRes <> doElts ss' rest v
     doElts _ (PositionedDoNotationElement ss'' _ e : rest) v = doElts ss'' (e : rest) v
-    doElts ss' [] (Just e) = go ss' e `combine` (rebindable, mempty)
+    doElts ss' [] (Just e) = go ss' e <> (rebindable, mempty)
     doElts _ [] Nothing = (rebindable, mempty)
 
     declIdents :: Declaration -> [Ident]
@@ -259,7 +267,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
           allExprs = concatMap unguard gexprs
           ss = declSourceSpan d
       in
-          removeAndWarn ss bindNewNames $ foldr1 combine $ map (go ss) allExprs
+          removeAndWarn ss bindNewNames $ foldr1 (<>) $ map (go ss) allExprs
     -- let {x} = e  -- no binding to check inside e
     underDecl d@(BoundValueDeclaration _ _ expr) =
       go (declSourceSpan d) expr
@@ -276,12 +284,3 @@ lintUnused (Module modSS _ mn modDecls exports) =
           combinedErrors = if not $ S.null warnUnused then errors <> (mconcat $ map (errorMessage' ss . UnusedName) $ S.toList warnUnused) else errors
       in
         (filteredUsed, combinedErrors)
-
-    combine ::
-      (S.Set Ident, MultipleErrors) ->
-      (S.Set Ident, MultipleErrors) ->
-      (S.Set Ident, MultipleErrors)
-    combine (a, b) (c, d) = (S.union a c, b <> d)
-
-    combineAll :: [(S.Set Ident, MultipleErrors)] -> (S.Set Ident, MultipleErrors)
-    combineAll = foldr combine mempty
