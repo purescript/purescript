@@ -186,7 +186,7 @@ sortExterns
   -> m [P.ExternsFile]
 sortExterns m ex = do
   sorted' <- runExceptT
-           . P.sortModules P.moduleSignature
+           . P.sortModules P.Transitive P.moduleSignature
            . (:) m
            . map mkShallowModule
            . M.elems

@@ -32,7 +32,7 @@ graph input = do
   Make.runMake Options.defaultOptions $ do
     ms <- CST.parseModulesFromFiles id moduleFiles
     let parsedModuleSig = Dependencies.moduleSignature . CST.resPartial
-    (_sorted, moduleGraph) <- Dependencies.sortModules (parsedModuleSig . snd) ms
+    (_sorted, moduleGraph) <- Dependencies.sortModules Dependencies.Direct (parsedModuleSig . snd) ms
     let pathMap = Map.fromList $
           map (\(p, m) -> (Dependencies.sigModuleName (parsedModuleSig m), p)) ms
     pure (moduleGraphToJSON pathMap moduleGraph)

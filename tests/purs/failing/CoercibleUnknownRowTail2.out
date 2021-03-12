@@ -1,0 +1,46 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/CoercibleUnknownRowTail2.purs:7:9 - 7:30 (line 7, column 9 - line 7, column 30)
+
+  No type class instance was found for
+  [33m                                  [0m
+  [33m  Prim.Coerce.Coercible ( b :: Int[0m
+  [33m                        )         [0m
+  [33m                        t0        [0m
+  [33m                                  [0m
+  The instance head contains unknown type variables. Consider adding a type annotation.
+
+while solving type class constraint
+[33m                                  [0m
+[33m  Prim.Coerce.Coercible { a :: Int[0m
+[33m                        , b :: Int[0m
+[33m                        }         [0m
+[33m                        { a :: Int[0m
+[33m                        | t0      [0m
+[33m                        }         [0m
+[33m                                  [0m
+while applying a function [33mcoerce[0m
+  of type [33mCoercible @Type t1 t2 => t1 -> t2[0m
+  to argument [33m{ a: 0[0m
+              [33m, b: 1[0m
+              [33m}     [0m
+while checking that expression [33mcoerce { a: 0[0m
+                               [33m       , b: 1[0m
+                               [33m       }     [0m
+  has type [33m{ a :: Int[0m
+           [33m| t0      [0m
+           [33m}         [0m
+while checking type of property accessor [33m(coerce { a: ...[0m
+                                         [33m        , b: ...[0m
+                                         [33m        }       [0m
+                                         [33m)               [0m
+                                         [33m.a              [0m
+in value declaration [33mzero[0m
+
+where [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
+      [33mt2[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

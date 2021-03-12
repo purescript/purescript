@@ -581,6 +581,16 @@ canonRow
 canonRow a b
   | RCons{} <- a =
       case alignRowsWith (,) a b of
+        -- We throw early when a bare unknown remains on either side after
+        -- aligning the rows because we don't know how to canonicalize them yet
+        -- and the unification error thrown when the rows are misaligned should
+        -- not mention unknowns.
+        (_, (([], u@TUnknown{}), rl2)) -> do
+          k <- elaborateKind u
+          throwError $ insoluble k u (rowFromList rl2)
+        (_, (rl1, ([], u@TUnknown{}))) -> do
+          k <- elaborateKind u
+          throwError $ insoluble k (rowFromList rl1) u
         (deriveds, (([], tail1), ([], tail2))) -> do
           pure . Canonicalized . S.fromList $ (tail1, tail2) : deriveds
         (_, (rl1, rl2)) ->
@@ -725,7 +735,7 @@ canonNewtypeRight env =
 --
 -- @
 -- data D a b c = D a b
--- type role D nominal representational
+-- type role D nominal representational phantom
 -- @
 --
 -- We can decompose @Coercible (D a b d) (D a c e)@ into @Coercible b c@, but
@@ -861,7 +871,7 @@ canonNewtypeDecompositionFailure a b
 
 -- | Constraints of the form @Coercible tv1 tv2@ may be irreducibles, but only
 -- when the variables are lexicographically ordered. Reordering variables is
--- neessary to prevent loops.
+-- necessary to prevent loops.
 --
 -- For instance the declaration:
 --
