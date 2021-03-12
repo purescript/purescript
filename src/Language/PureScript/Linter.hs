@@ -23,7 +23,7 @@ import qualified Language.PureScript.Constants.Prelude as C
 
 -- | Lint the PureScript AST.
 -- |
--- | Right now, this pass only performs a shadowing check.
+-- | Right now, this pass performs a shadowing check and a check for unused bindings.
 lint :: forall m. (MonadWriter MultipleErrors m) => Module -> m ()
 lint modl@(Module _ _ mn ds _) = do
   lintUnused modl
