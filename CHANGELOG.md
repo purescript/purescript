@@ -12,6 +12,8 @@ Bugfixes:
 
 * Make close punctuation printable in errors (#3982, @rhendric)
 
+* Desugar type operators in top-level kind signatures (#4027, @natefaubion)
+
 Other improvements:
 
 ## v0.14.0
