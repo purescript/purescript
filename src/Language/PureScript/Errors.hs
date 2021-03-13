@@ -103,7 +103,9 @@ data SimpleErrorMessage
   | KindsDoNotUnify SourceType SourceType
   | ConstrainedTypeUnified SourceType SourceType
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
-  | NoInstanceFound SourceConstraint Bool
+  | NoInstanceFound
+      SourceConstraint -- ^ constraint that could not be solved
+      Bool -- ^ whether eliminating unknowns with annotations might help
   | AmbiguousTypeVariables SourceType [Int]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
