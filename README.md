@@ -1,4 +1,4 @@
-[![PureScript](logo.png)](http://purescript.org)
+<img src="logo.png" alt="PureScript" width="392">
 
 A small strongly typed programming language with expressive types that compiles to JavaScript, written in and inspired by Haskell.
 

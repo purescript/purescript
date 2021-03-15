@@ -14,6 +14,10 @@ Bugfixes:
 
 Other improvements:
 
+* Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
+
+  The previous `logo.png` was not legible against a dark background (#4001).
+
 ## v0.14.0
 
 ### Polykinds
@@ -297,6 +301,7 @@ We are going to output ES modules instead of CommonJS in the next breaking relea
 * Add golden tests for errors and warnings (#3774, #3811, #3808, #3846, @dariooddenino, @rhendric, @kl0tl)
 
 * More descriptive protocol errors from the ide server (@kritzcreek)
+
 
 ## [v0.13.8](https://github.com/purescript/purescript/releases/tag/v0.13.8) - 2020-05-23
 
