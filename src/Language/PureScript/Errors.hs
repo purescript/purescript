@@ -846,7 +846,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "Overlapping type class instances found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , line "The following instances were found:"
             , indent $ paras (map (line . showQualified showIdent) ds)
@@ -882,7 +882,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
                     | any containsUnknowns ts
@@ -909,7 +909,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "Type class instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , line "is possibly infinite."
             ]
@@ -919,7 +919,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "Cannot derive a type class instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , line "since instances of this type class are not derivable."
             ]
@@ -927,7 +927,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "Cannot derive newtype instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , line "Make sure this is a newtype."
             ]
@@ -935,7 +935,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "The derived newtype instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName cl)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , line $ "does not include a derived superclass instance for " <> markCode (showQualified runProperName su) <> "."
             ]
@@ -943,7 +943,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "The derived newtype instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName cl)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , line $ "implies an superclass instance for " <> markCode (showQualified runProperName su) <> " which could not be verified."
             ]
@@ -951,7 +951,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "Cannot derive the type class instance"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , line $ fold $
                 [ "because the "
@@ -967,7 +967,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "Cannot derive the type class instance"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , "because the type"
             , markCodeBox $ indent $ prettyType ty
@@ -1022,7 +1022,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "Orphan instance " <> markCode (showIdent nm) <> " found for "
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName cnm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , Box.vcat Box.left $ case modulesToList of
                 [] -> [ line "There is nowhere this instance can be placed without being an orphan."
@@ -1324,7 +1324,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         [ line "Invalid type class instance declaration for"
         , markCodeBox $ indent $ Box.hsep 1 Box.left
             [ line (showQualified runProperName C.Coercible)
-            , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) tys)
+            , Box.vcat Box.left (map prettyTypeAtom tys)
             ]
         , line "Instance declarations of this type class are disallowed."
         ]
@@ -1589,6 +1589,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
   prettyTypeWithDepth depth
     | full = typeAsBox depth
     | otherwise = typeAsBox depth . eraseForAllKindAnnotations . eraseKindApps
+
+  prettyTypeAtom :: Type a -> Box.Box
+  prettyTypeAtom
+    | full = typeAtomAsBox prettyDepth
+    | otherwise = typeAtomAsBox prettyDepth . eraseForAllKindAnnotations . eraseKindApps
 
   levelText :: Text
   levelText = case level of

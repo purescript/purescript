@@ -1,7 +1,6 @@
 ---
 name: Compiler proposal
 about: A concrete suggestion to change the PureScript compiler
-title: 'Proposal:'
 labels: enhancement
 assignees: ''
 
