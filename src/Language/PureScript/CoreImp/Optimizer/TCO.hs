@@ -49,37 +49,16 @@ tco = everywhere convert where
   collectAllFunctionArgs allArgs f body = (allArgs, body, f)
 
   isTailRecursive :: Text -> AST -> Bool
-  isTailRecursive ident js = countSelfReferences js > 0 && allInTailPosition js where
-    countSelfReferences = everything (+) match where
-      match :: AST -> Int
-      match (Var _ ident') | ident == ident' = 1
-      match _ = 0
+  isTailRecursive ident js = anyInTailPosition js where
 
-    allInTailPosition (Return _ expr)
-      | isSelfCall ident expr = countSelfReferences expr == 1
-      | otherwise = countSelfReferences expr == 0
-    allInTailPosition (While _ js1 body)
-      = countSelfReferences js1 == 0 && allInTailPosition body
-    allInTailPosition (For _ _ js1 js2 body)
-      = countSelfReferences js1 == 0 && countSelfReferences js2 == 0 && allInTailPosition body
-    allInTailPosition (ForIn _ _ js1 body)
-      = countSelfReferences js1 == 0 && allInTailPosition body
-    allInTailPosition (IfElse _ js1 body el)
-      = countSelfReferences js1 == 0 && allInTailPosition body && all allInTailPosition el
-    allInTailPosition (Block _ body)
-      = all allInTailPosition body
-    allInTailPosition (Throw _ js1)
-      = countSelfReferences js1 == 0
-    allInTailPosition (ReturnNoResult _)
-      = True
-    allInTailPosition (VariableIntroduction _ _ js1)
-      = all ((== 0) . countSelfReferences) js1
-    allInTailPosition (Assignment _ _ js1)
-      = countSelfReferences js1 == 0
-    allInTailPosition (Comment _ _ js1)
-      = allInTailPosition js1
-    allInTailPosition _
-      = False
+    anyInTailPosition :: AST -> Bool
+    anyInTailPosition (Return _ expr) = isSelfCall ident expr
+    anyInTailPosition (While _ _ body) = anyInTailPosition body
+    anyInTailPosition (For _ _ _ _ body) = anyInTailPosition body
+    anyInTailPosition (ForIn _ _ _ body) = anyInTailPosition body
+    anyInTailPosition (IfElse _ _ body el) = anyInTailPosition body || any anyInTailPosition el
+    anyInTailPosition (Block _ body) = any anyInTailPosition body
+    anyInTailPosition _ = False
 
   toLoop :: Text -> [Text] -> [Text] -> AST -> AST
   toLoop ident outerArgs innerArgs js =
