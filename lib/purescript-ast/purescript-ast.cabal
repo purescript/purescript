@@ -1,0 +1,100 @@
+cabal-version: 2.4
+
+name:           purescript-ast
+version:        0.1.0.0
+synopsis:       PureScript Programming Language Abstract Syntax Tree
+description:    Defines the underlying syntax of the PureScript Programming Language.
+category:       Language
+stability:      experimental
+homepage:       https://www.purescript.org/
+bug-reports:    https://github.com/purescript/purescript/issues
+author:         Phil Freeman <paf31@cantab.net>
+maintainer:     Gary Burgess <gary.burgess@gmail.com>, Hardy Jones <jones3.hardy@gmail.com>, Harry Garrood <harry@garrood.me>, Christoph Hegemann <christoph.hegemann1337@gmail.com>, Liam Goodacre <goodacre.liam@gmail.com>, Nathan Faubion <nathan@n-son.com>
+
+copyright:      (c) 2013-17 Phil Freeman, (c) 2014-19 Gary Burgess, (c) other contributors (see CONTRIBUTORS.md)
+license:        BSD-3-Clause
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/purescript/purescript
+
+common defaults
+  ghc-options: -Wall
+  default-language: Haskell2010
+  default-extensions:
+    BangPatterns
+    ConstraintKinds
+    DataKinds
+    DefaultSignatures
+    DeriveFunctor
+    DeriveFoldable
+    DeriveTraversable
+    DeriveGeneric
+    DerivingStrategies
+    EmptyDataDecls
+    FlexibleContexts
+    FlexibleInstances
+    GeneralizedNewtypeDeriving
+    KindSignatures
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    NoImplicitPrelude
+    PatternGuards
+    PatternSynonyms
+    RankNTypes
+    RecordWildCards
+    OverloadedStrings
+    ScopedTypeVariables
+    TupleSections
+    TypeFamilies
+    ViewPatterns
+  build-depends:
+    aeson >=1.0 && <1.5,
+    base >=4.11 && <4.13,
+    base-compat >=0.6.0,
+    bytestring >=0.10.8.2 && <0.11,
+    containers >=0.6.0.1 && <0.7,
+    deepseq >=1.4.4.0 && <1.5,
+    filepath >=1.4.2.1 && <1.5,
+    microlens >=0.4.10 && <0.5,
+    mtl >=2.1.0 && <2.3.0,
+    protolude >=0.1.6 && <0.2.4,
+    scientific >=0.3.4.9 && <0.4,
+    serialise >=0.2.2.0 && <0.3,
+    text >=1.2.3.1 && <1.3,
+    vector >=0.12.0.3 && <0.13
+
+library
+  import: defaults
+  hs-source-dirs: src
+  exposed-modules:
+    Control.Monad.Supply
+    Control.Monad.Supply.Class
+    Language.PureScript.AST
+    Language.PureScript.AST.Binders
+    Language.PureScript.AST.Declarations
+    Language.PureScript.AST.Exported
+    Language.PureScript.AST.Literals
+    Language.PureScript.AST.Operators
+    Language.PureScript.AST.SourcePos
+    Language.PureScript.AST.Traversals
+    Language.PureScript.Comments
+    Language.PureScript.Constants.Prim
+    Language.PureScript.Crash
+    Language.PureScript.Environment
+    Language.PureScript.Label
+    Language.PureScript.Names
+    Language.PureScript.PSString
+    Language.PureScript.Roles
+    Language.PureScript.Traversals
+    Language.PureScript.TypeClassDictionaries
+    Language.PureScript.Types
+  other-modules:
+    Paths_purescript_ast
+  autogen-modules:
+    Paths_purescript_ast
