@@ -1,9 +1,12 @@
-resolver: nightly-2021-02-12
-pvp-bounds: upper
+resolver: lts-17.6
+pvp-bounds: both
 packages:
 - '.'
 - lib/purescript-ast
 - lib/purescript-cst
+ghc-options:
+  # Build with advanced optimizations enabled by default
+  "$locals": -O2
 extra-deps:
 - language-javascript-0.7.0.0
 nix:
