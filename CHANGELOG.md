@@ -8,6 +8,17 @@ Breaking changes:
 
 New features:
 
+* Support TCO for functions with tail-recursive inner functions (#3958, @rhendric)
+
+  Adds support for optimizing functions that contain local functions which call
+  the outer function in tail position, as long as those functions themselves
+  are only called from tail position, either in the outer function or in other
+  such functions.
+
+  This enables hand-written mutually-tail-recursive function groups to be
+  optimized, but more critically, it also means that case guards which desugar
+  to use local functions don't break TCO.
+
 Bugfixes:
 
 * Make close punctuation printable in errors (#3982, @rhendric)
