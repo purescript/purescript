@@ -1,0 +1,405 @@
+cabal-version:  2.4
+
+name:           purescript
+-- note: When updating the prerelease identifier, update it in app/Version.hs too!
+version:        0.14.0
+synopsis:       PureScript Programming Language Compiler
+description:    A small strongly, statically typed programming language with expressive types, inspired by Haskell and compiling to JavaScript.
+category:       Language
+stability:      experimental
+homepage:       http://www.purescript.org/
+bug-reports:    https://github.com/purescript/purescript/issues
+author:         Phil Freeman <paf31@cantab.net>
+maintainer:     Gary Burgess <gary.burgess@gmail.com>, Hardy Jones <jones3.hardy@gmail.com>, Harry Garrood <harry@garrood.me>, Christoph Hegemann <christoph.hegemann1337@gmail.com>, Liam Goodacre <goodacre.liam@gmail.com>, Nathan Faubion <nathan@n-son.com>
+
+copyright:      (c) 2013-17 Phil Freeman, (c) 2014-19 Gary Burgess, (c) other contributors (see CONTRIBUTORS.md)
+license:        BSD-3-Clause
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+  app/static/*.html
+  app/static/*.css
+  app/static/*.js
+  app/static/*.less
+  bundle/build.sh
+  bundle/README
+  tests/purs/**/*.js
+  tests/purs/**/*.purs
+  tests/purs/**/*.json
+  tests/purs/**/*.out
+  tests/json-compat/**/*.json
+  tests/support/*.json
+  tests/support/setup-win.cmd
+  tests/support/psci/**/*.purs
+  tests/support/psci/**/*.edit
+  tests/support/pscide/src/**/*.purs
+  tests/support/pscide/src/**/*.js
+  tests/support/pscide/src/**/*.fail
+  stack.yaml
+  README.md
+  INSTALL.md
+  CONTRIBUTORS.md
+  CONTRIBUTING.md
+
+source-repository head
+  type: git
+  location: https://github.com/purescript/purescript
+
+flag release
+  description: Mark this build as a release build: prevents inclusion of extra info e.g. commit SHA in --version output)
+
+  manual: False
+  default: False
+
+common defaults
+  default-language: Haskell2010
+  default-extensions:
+    BangPatterns
+    ConstraintKinds
+    DataKinds
+    DefaultSignatures
+    DeriveFunctor
+    DeriveFoldable
+    DeriveTraversable
+    DeriveGeneric
+    DerivingStrategies
+    EmptyDataDecls
+    FlexibleContexts
+    FlexibleInstances
+    GeneralizedNewtypeDeriving
+    KindSignatures
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    NoImplicitPrelude
+    PatternGuards
+    PatternSynonyms
+    RankNTypes
+    RecordWildCards
+    OverloadedStrings
+    ScopedTypeVariables
+    TupleSections
+    TypeFamilies
+    ViewPatterns
+  build-tool-depends:
+    happy:happy ==1.19.9
+  build-depends:
+    -- NOTE: Please do not edit these version constraints manually. They are
+    -- deliberately made narrow because changing the dependency versions in
+    -- use can often result in changes in the compiler's behaviour. The
+    -- PureScript compiler is an executable first and foremost, and only
+    -- incidentally a library, and supporting a wide range of dependencies is
+    -- not a goal.
+    --
+    -- These version ranges are generated from taking a Stackage snapshot and
+    -- then generating PVP-compliant bounds based on that snapshot. You can
+    -- update to a newer snapshot as follows:
+    --
+    -- 1. Remove all version constraints from this cabal file (apart from
+    --    language-javascript).
+    -- 2. Update stack.yaml as required to select a new snapshot, and check
+    --    everything builds correctly with stack.
+    -- 3. Run `stack sdist`; this will produce a source distribution including
+    --    a modified version of the cabal file, which includes bounds for all
+    --    dependencies (because of `pvp-bounds: both` in stack.yaml).
+    -- 4. Copy the version bounds from the library's build-depends section
+    --    to here.
+    --
+    -- This procedure allows us to take advantage of Stackage snapshots to
+    -- easily perform updates, while also ensuring that the compiler will be
+    -- built with (almost) the same install plan for both cabal and stack
+    -- users.
+    --
+    -- We need to be especially careful with language-javascript because it
+    -- is part of the compiler's public API; all FFI modules must be parseable
+    -- by language-javascript otherwise the compiler will reject them. It
+    -- should always be pinned to a single specific version.
+    aeson >=1.4.2.0 && <1.5,
+    aeson-better-errors >=0.9.1.0 && <0.10,
+    aeson-pretty >=0.8.7 && <0.9,
+    ansi-terminal >=0.8.2 && <0.9,
+    array >=0.5.3.0 && <0.6,
+    base >=4.12.0.0 && <4.13,
+    base-compat >=0.10.5 && <0.11,
+    blaze-html >=0.9.1.1 && <0.10,
+    bower-json >=1.0.0.1 && <1.1,
+    boxes >=0.1.5 && <0.2,
+    bytestring >=0.10.8.2 && <0.11,
+    Cabal >=2.4.1.0 && <2.5,
+    cborg >=0.2.2.0 && <0.3,
+    serialise >=0.2.2.0 && <0.3,
+    cheapskate >=0.1.1.1 && <0.2,
+    clock >=0.7.2 && <0.8,
+    containers >=0.6.0.1 && <0.7,
+    cryptonite ==0.25.*,
+    data-ordlist >=0.4.7.0 && <0.5,
+    deepseq >=1.4.4.0 && <1.5,
+    directory >=1.3.3.0 && <1.4,
+    dlist >=0.8.0.6 && <0.9,
+    edit-distance >=0.2.2.1 && <0.3,
+    file-embed >=0.0.11 && <0.1,
+    filepath >=1.4.2.1 && <1.5,
+    fsnotify >=0.3.0.1 && <0.4,
+    Glob >=0.9.3 && <0.10,
+    haskeline >=0.7.5.0 && <0.8,
+    language-javascript ==0.7.0.0,
+    lifted-async >=0.10.0.4 && <0.11,
+    lifted-base >=0.2.3.12 && <0.3,
+    memory >=0.14.18 && <0.15,
+    microlens >=0.4.10 && <0.5,
+    microlens-platform >=0.3.11 && <0.4,
+    monad-control >=1.0.2.3 && <1.1,
+    monad-logger >=0.3.30 && <0.4,
+    mtl >=2.2.2 && <2.3,
+    parallel >=3.2.2.0 && <3.3,
+    parsec >=3.1.13.0 && <3.2,
+    pattern-arrows >=0.0.2 && <0.1,
+    process >=1.6.5.0 && <1.7,
+    protolude >=0.2.3 && <0.3,
+    purescript-ast >=0.1.0.0 && <0.2,
+    purescript-cst >=0.1.0.0 && <0.2,
+    regex-tdfa >=1.2.3.2 && <1.3,
+    safe >=0.3.17 && <0.4,
+    scientific >=0.3.6.2 && <0.4,
+    semigroups >=0.18.5 && <0.19,
+    semialign >=1 && <1.1,
+    sourcemap >=0.1.6 && <0.2,
+    split >=0.2.3.3 && <0.3,
+    stm >=2.5.0.0 && <2.6,
+    stringsearch >=0.3.6.6 && <0.4,
+    syb >=0.7.1 && <0.8,
+    text >=1.2.3.1 && <1.3,
+    these >=1.0.1 && <1.1,
+    time >=1.8.0.2 && <1.9,
+    transformers >=0.5.6.2 && <0.6,
+    transformers-base >=0.4.5.2 && <0.5,
+    transformers-compat >=0.6.5 && <0.7,
+    unordered-containers >=0.2.10.0 && <0.3,
+    utf8-string >=1.0.1.1 && <1.1,
+    vector >=0.12.0.3 && <0.13
+
+library
+  import: defaults
+  hs-source-dirs: src
+  exposed-modules:
+    Control.Monad.Logger
+    Language.PureScript
+    Language.PureScript.Bundle
+    Language.PureScript.CodeGen
+    Language.PureScript.CodeGen.JS
+    Language.PureScript.CodeGen.JS.Common
+    Language.PureScript.CodeGen.JS.Printer
+    Language.PureScript.Constants.Prelude
+    Language.PureScript.Constants.Data.Generic.Rep
+    Language.PureScript.Constants.Data.Newtype
+    Language.PureScript.CoreFn
+    Language.PureScript.CoreFn.Ann
+    Language.PureScript.CoreFn.Binders
+    Language.PureScript.CoreFn.Desugar
+    Language.PureScript.CoreFn.Expr
+    Language.PureScript.CoreFn.FromJSON
+    Language.PureScript.CoreFn.Meta
+    Language.PureScript.CoreFn.Module
+    Language.PureScript.CoreFn.Optimizer
+    Language.PureScript.CoreFn.ToJSON
+    Language.PureScript.CoreFn.Traversals
+    Language.PureScript.CoreImp
+    Language.PureScript.CoreImp.AST
+    Language.PureScript.CoreImp.Optimizer
+    Language.PureScript.CoreImp.Optimizer.Blocks
+    Language.PureScript.CoreImp.Optimizer.Common
+    Language.PureScript.CoreImp.Optimizer.Inliner
+    Language.PureScript.CoreImp.Optimizer.MagicDo
+    Language.PureScript.CoreImp.Optimizer.TCO
+    Language.PureScript.CoreImp.Optimizer.Unused
+    Language.PureScript.CST
+    Language.PureScript.Docs
+    Language.PureScript.Docs.AsHtml
+    Language.PureScript.Docs.AsMarkdown
+    Language.PureScript.Docs.Collect
+    Language.PureScript.Docs.Convert
+    Language.PureScript.Docs.Convert.ReExports
+    Language.PureScript.Docs.Convert.Single
+    Language.PureScript.Docs.Css
+    Language.PureScript.Docs.Prim
+    Language.PureScript.Docs.Render
+    Language.PureScript.Docs.RenderedCode
+    Language.PureScript.Docs.RenderedCode.RenderType
+    Language.PureScript.Docs.RenderedCode.Types
+    Language.PureScript.Docs.Tags
+    Language.PureScript.Docs.Types
+    Language.PureScript.Docs.Utils.MonoidExtras
+    Language.PureScript.Errors
+    Language.PureScript.Errors.JSON
+    Language.PureScript.Externs
+    Language.PureScript.Graph
+    Language.PureScript.Hierarchy
+    Language.PureScript.Ide
+    Language.PureScript.Ide.CaseSplit
+    Language.PureScript.Ide.Command
+    Language.PureScript.Ide.Completion
+    Language.PureScript.Ide.Error
+    Language.PureScript.Ide.Externs
+    Language.PureScript.Ide.Filter
+    Language.PureScript.Ide.Filter.Declaration
+    Language.PureScript.Ide.Imports
+    Language.PureScript.Ide.Logging
+    Language.PureScript.Ide.Matcher
+    Language.PureScript.Ide.Prim
+    Language.PureScript.Ide.Rebuild
+    Language.PureScript.Ide.Reexports
+    Language.PureScript.Ide.SourceFile
+    Language.PureScript.Ide.State
+    Language.PureScript.Ide.Types
+    Language.PureScript.Ide.Usage
+    Language.PureScript.Ide.Util
+    Language.PureScript.Interactive
+    Language.PureScript.Interactive.Completion
+    Language.PureScript.Interactive.Directive
+    Language.PureScript.Interactive.IO
+    Language.PureScript.Interactive.Message
+    Language.PureScript.Interactive.Module
+    Language.PureScript.Interactive.Parser
+    Language.PureScript.Interactive.Printer
+    Language.PureScript.Interactive.Types
+    Language.PureScript.Linter
+    Language.PureScript.Linter.Exhaustive
+    Language.PureScript.Linter.Imports
+    Language.PureScript.Make
+    Language.PureScript.Make.Actions
+    Language.PureScript.Make.BuildPlan
+    Language.PureScript.Make.Cache
+    Language.PureScript.Make.Monad
+    Language.PureScript.ModuleDependencies
+    Language.PureScript.Options
+    Language.PureScript.Pretty
+    Language.PureScript.Pretty.Common
+    Language.PureScript.Pretty.Types
+    Language.PureScript.Pretty.Values
+    Language.PureScript.Publish
+    Language.PureScript.Publish.BoxesHelpers
+    Language.PureScript.Publish.ErrorsWarnings
+    Language.PureScript.Publish.Utils
+    Language.PureScript.Renamer
+    Language.PureScript.Sugar
+    Language.PureScript.Sugar.AdoNotation
+    Language.PureScript.Sugar.BindingGroups
+    Language.PureScript.Sugar.CaseDeclarations
+    Language.PureScript.Sugar.DoNotation
+    Language.PureScript.Sugar.LetPattern
+    Language.PureScript.Sugar.Names
+    Language.PureScript.Sugar.Names.Common
+    Language.PureScript.Sugar.Names.Env
+    Language.PureScript.Sugar.Names.Exports
+    Language.PureScript.Sugar.Names.Imports
+    Language.PureScript.Sugar.ObjectWildcards
+    Language.PureScript.Sugar.Operators
+    Language.PureScript.Sugar.Operators.Binders
+    Language.PureScript.Sugar.Operators.Common
+    Language.PureScript.Sugar.Operators.Expr
+    Language.PureScript.Sugar.Operators.Types
+    Language.PureScript.Sugar.TypeClasses
+    Language.PureScript.Sugar.TypeClasses.Deriving
+    Language.PureScript.Sugar.TypeDeclarations
+    Language.PureScript.TypeChecker
+    Language.PureScript.TypeChecker.Entailment
+    Language.PureScript.TypeChecker.Entailment.Coercible
+    Language.PureScript.TypeChecker.Kinds
+    Language.PureScript.TypeChecker.Monad
+    Language.PureScript.TypeChecker.Roles
+    Language.PureScript.TypeChecker.Skolems
+    Language.PureScript.TypeChecker.Subsumption
+    Language.PureScript.TypeChecker.Synonyms
+    Language.PureScript.TypeChecker.Types
+    Language.PureScript.TypeChecker.TypeSearch
+    Language.PureScript.TypeChecker.Unify
+    System.IO.UTF8
+  other-modules:
+    Paths_purescript
+  autogen-modules:
+    Paths_purescript
+
+executable purs
+  import: defaults
+  hs-source-dirs: app
+  main-is: Main.hs
+  ghc-options: -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      ansi-wl-pprint >=0.6.8.2 && < 0.7
+    , file-embed ==0.0.11
+    , http-types >=0.12.3 && < 0.13
+    , network >= 3.0.1.1 && <3.1
+    , optparse-applicative >=0.13.0 && <0.15
+    , purescript
+    , wai ==3.*
+    , wai-websockets ==3.*
+    , warp ==3.*
+    , websockets >=0.9 && <0.13
+  if flag(release)
+    cpp-options: -DRELEASE
+  else
+    build-depends:
+      gitrev >=1.2.0 && <1.4
+  other-modules:
+    Command.Bundle
+    Command.Compile
+    Command.Docs
+    Command.Docs.Html
+    Command.Docs.Markdown
+    Command.Graph
+    Command.Hierarchy
+    Command.Ide
+    Command.Publish
+    Command.REPL
+    Version
+    Paths_purescript
+  autogen-modules:
+    Paths_purescript
+
+test-suite tests
+  import: defaults
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests
+  main-is: Main.hs
+  build-depends:
+      purescript
+    , tasty
+    , tasty-golden
+    , tasty-hspec
+    , tasty-quickcheck
+    , hspec
+    , HUnit
+    , regex-base
+  build-tool-depends:
+      hspec-discover:hspec-discover -any
+    -- we need the compiler's executable available for the ide tests
+    , purescript:purs -any
+  other-modules:
+    Language.PureScript.Ide.CompletionSpec
+    Language.PureScript.Ide.FilterSpec
+    Language.PureScript.Ide.ImportsSpec
+    Language.PureScript.Ide.MatcherSpec
+    Language.PureScript.Ide.RebuildSpec
+    Language.PureScript.Ide.ReexportsSpec
+    Language.PureScript.Ide.SourceFileSpec
+    Language.PureScript.Ide.StateSpec
+    Language.PureScript.Ide.Test
+    Language.PureScript.Ide.UsageSpec
+    PscIdeSpec
+    TestBundle
+    TestCompiler
+    TestCoreFn
+    TestDocs
+    TestGraph
+    TestHierarchy
+    TestIde
+    TestMake
+    TestPrimDocs
+    TestPsci
+    TestPsci.CommandTest
+    TestPsci.CompletionTest
+    TestPsci.EvalTest
+    TestPsci.TestEnv
+    TestPscPublish
+    TestUtils
+    Paths_purescript
