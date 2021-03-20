@@ -51,6 +51,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@fehrenbach](https://github.com/fehrenbach) | Stefan Fehrenbach | [MIT license](http://opensource.org/licenses/MIT) |
 | [@felixSchl](https://github.com/felixSchl) | Felix Schlitter | [MIT license](http://opensource.org/licenses/MIT) |
 | [@FrigoEU](https://github.com/FrigoEU) | Simon Van Casteren | [MIT license](http://opensource.org/licenses/MIT) |
+| [@fsoikin](https://github.com/fsoikin) | Fyodor Soikin | [MIT license](http://opensource.org/licenses/MIT) |
 | [@garyb](https://github.com/garyb) | Gary Burgess | [MIT license](http://opensource.org/licenses/MIT) |
 | [@hdgarrood](https://github.com/hdgarrood) | Harry Garrood | [MIT license](http://opensource.org/licenses/MIT) |
 | [@houli](https://github.com/houli) | Eoin Houlihan | [MIT license](http://opensource.org/licenses/MIT) |
@@ -77,6 +78,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@mgmeier](https://github.com/mgmeier) | Michael Gilliland | [MIT license](http://opensource.org/licenses/MIT) |
 | [@michaelficarra](https://github.com/michaelficarra) | Michael Ficarra | [MIT license](http://opensource.org/licenses/MIT) |
 | [@MichaelXavier](https://github.com/MichaelXavier) | Michael Xavier | MIT license |
+| [@milesfrain](https://github.com/milesfrain) | Miles Frain | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mjgpy3](https://github.com/mjgpy3) | Michael Gilliland | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mpietrzak](https://github.com/mpietrzak) | Maciej Pietrzak | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mrhania](https://github.com/mrhania) | Łukasz Hanuszczak | [MIT license](http://opensource.org/licenses/MIT) |
@@ -95,7 +97,9 @@ If you would prefer to use different terms, please use the section below instead
 | [@phiggins](https://github.com/phiggins) | Pete Higgins | [MIT license](http://opensource.org/licenses/MIT) |
 | [@philopon](https://github.com/philopon) | Hirotomo Moriwaki | [MIT license](http://opensource.org/licenses/MIT) |
 | [@pseudonom](https://github.com/pseudonom) | Eric Easley | [MIT license](http://opensource.org/licenses/MIT) |
+| [@ptrfrncsmrph](https://github.com/ptrfrncsmrph) | Peter Murphy | [MIT license](http://opensource.org/licenses/MIT) |
 | [@quesebifurcan](https://github.com/quesebifurcan) | Fredrik Wallberg | [MIT license](http://opensource.org/licenses/MIT) |
+| [@radrow](https://github.com/radrow) | Radosław Rowicki | [MIT license](http://opensource.org/licenses/MIT) |
 | [@rhendric](https://github.com/rhendric) | Ryan Hendrickson | [MIT license](http://opensource.org/licenses/MIT) |
 | [@rightfold](https://github.com/rightfold) | rightfold | [MIT license](https://opensource.org/licenses/MIT) |
 | [@rndnoise](https://www.github.com/rndnoise) | rndnoise | [MIT license](http://opensource.org/licenses/MIT) |
@@ -148,6 +152,7 @@ If you would prefer to use different terms, please use the section below instead
 | :------- | :--- | :------ |
 | [@charleso](https://github.com/charleso) | Charles O'Farrell | My existing contributions to the PureScript compiler and all future contributions to the PureScript compiler until further notice, are Copyright Charles O'Farrell, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). |
 | [@chrissmoak](https://github.com/chrissmoak) | Chris Smoak | My existing contributions to the PureScript compiler and all future contributions to the PureScript compiler until further notice, are Copyright Chris Smoak, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). |
+| [@citizengabe](https://github.com/citizengabe) | Gabe Johnson | All contributions I have or will make using the @citizengabe GitHub account are during employment at [CitizenNet Inc.](#companies) who owns the copyright. All of my existing or future contributions made using the @gabejohnson GitHub account are personal contributions and subject to the terms specified [above](#contributors-using-standard-terms). |
 | [@dylex](https://github.com/dylex) | Dylan Simon | My existing and all future contributions to the PureScript compiler until further notice are Copyright Dylan Simon, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). |
 | [@leighman](http://github.com/leighman) | Jack Leigh | My existing contributions and all future contributions until further notice are Copyright Jack Leigh, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). |
 | [@nagisa](https://github.com/nagisa) | nagisa | I hereby release my [only contribution](https://github.com/purescript/purescript/commit/80287a5d0de619862d3b4cda9c1ee276d18fdcd8) into public domain. |
@@ -157,5 +162,7 @@ If you would prefer to use different terms, please use the section below instead
 
 | Username | Company | Terms |
 | :------- | :--- | :------ |
+| [@citizennet](https://github.com/citizennet) | CitizenNet Inc. | Our existing contributions to the PureScript compiler and all future contributions to the PureScript compiler until further notice, are Copyright CitizenNet Inc., and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). - [@dbenyamin-cn](https://github.com/dbenyamin-cn) |
 | [@slamdata](https://github.com/slamdata) | SlamData, Inc. | Speaking on behalf of SlamData for SlamData employees, our existing contributions and all future contributions to the PureScript compiler are, until further notice, Copyright SlamData Inc., and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). - @jdegoes |
 | [@qfpl](https://github.com/qfpl) | qfpl @ Data61 / CSIRO | Our existing contributions to the PureScript compiler and all future contributions to the PureScript compiler until further notice, are Copyright Data61 / CSIRO, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). - [@lightandlight](https://github.com/lightandlight) |
+| [@aeternity](https://aeternity.com/) | Aeternity Establishment | Our existing contributions to the PureScript compiler and all future contributions to the PureScript compiler until further notice, are Copyright Aeternity Establishment, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). |

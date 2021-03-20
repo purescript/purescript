@@ -16,6 +16,7 @@ import Control.Monad.Writer.Class (MonadWriter(..), censor)
 import Data.List (intercalate)
 import Data.Maybe
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Text (Text, isPrefixOf, unpack)
 import qualified Data.List.NonEmpty as NEL
 
@@ -68,6 +69,18 @@ data CheckState = CheckState
   -- ^ The next skolem scope constant
   , checkCurrentModule :: Maybe ModuleName
   -- ^ The current module
+  , checkCurrentModuleImports ::
+      [ ( SourceAnn
+        , ModuleName
+        , ImportDeclarationType
+        , Maybe ModuleName
+        , M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
+        )
+      ]
+  -- ^ The current module imports and their exported types.
+  -- Newtype constructors have to be in scope for some Coercible constraints to
+  -- be solvable, so we need to know which constructors are imported and whether
+  -- they are actually defined in or re-exported from the imported modules.
   , checkSubstitution :: Substitution
   -- ^ The current substitution
   , checkHints :: [ErrorMessageHint]
@@ -75,11 +88,14 @@ data CheckState = CheckState
   -- This goes into state, rather than using 'rethrow',
   -- since this way, we can provide good error messages
   -- during instance resolution.
+  , checkConstructorImportsForCoercible :: S.Set (ModuleName, Qualified (ProperName 'ConstructorName))
+  -- ^ Newtype constructors imports required to solve Coercible constraints.
+  -- We have to keep track of them so that we don't emit unused import warnings.
   }
 
 -- | Create an empty @CheckState@
 emptyCheckState :: Environment -> CheckState
-emptyCheckState env = CheckState env 0 0 0 Nothing emptySubstitution []
+emptyCheckState env = CheckState env 0 0 0 Nothing [] emptySubstitution [] mempty
 
 -- | Unification variables
 type Unknown = Int
@@ -376,9 +392,9 @@ debugTypes = go <=< M.toList . types
       ppTy = prettyPrintType 100 srcTy
       name = showQualified runProperName qual
       decl = case which of
-        DataType _ _      -> "data"
+        DataType _ _ _    -> "data"
         TypeSynonym       -> "type"
-        ExternData        -> "extern"
+        ExternData _      -> "extern"
         LocalTypeVariable -> "local"
         ScopedTypeVar     -> "scoped"
     guard (not (isPrefixOf "Prim" name))

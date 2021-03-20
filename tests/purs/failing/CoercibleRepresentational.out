@@ -8,7 +8,12 @@ at tests/purs/failing/CoercibleRepresentational.purs:11:20 - 11:26 (line 11, col
   [33m                        b3[0m
   [33m                          [0m
 
-while checking that type [33mforall (a :: Type) (b :: Type). Coercible a b => a -> b[0m
+while solving type class constraint
+[33m                                        [0m
+[33m  Prim.Coerce.Coercible (Phantom @t0 a1)[0m
+[33m                        (Phantom @t2 b3)[0m
+[33m                                        [0m
+while checking that type [33mforall (a :: Type) (b :: Type). Coercible @Type a b => a -> b[0m
   is at least as general as type [33mPhantom @t0 a1 -> Phantom @t2 b3[0m
 while checking that expression [33mcoerce[0m
   has type [33mPhantom @t0 a1 -> Phantom @t2 b3[0m

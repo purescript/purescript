@@ -33,7 +33,6 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Names
-import Language.PureScript.Roles
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
@@ -115,11 +114,6 @@ data ExternsDeclaration =
       , edTypeKind                :: SourceType
       , edTypeDeclarationKind     :: TypeKind
       }
-  -- | A role declaration
-  | EDRole
-      { edRoleTypeName            :: ProperName 'TypeName
-      , edRoleRoles               :: [Role]
-      }
   -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
@@ -175,7 +169,6 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   where
   applyDecl :: Environment -> ExternsDeclaration -> Environment
   applyDecl env (EDType pn kind tyKind) = env { types = M.insert (qual pn) (kind, tyKind) (types env) }
-  applyDecl env (EDRole pn roles) = env { roleDeclarations = M.insert (qual pn) roles (roleDeclarations env) }
   applyDecl env (EDTypeSynonym pn args ty) = env { typeSynonyms = M.insert (qual pn) (args, ty) (typeSynonyms env) }
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
@@ -206,7 +199,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   efImports       = mapMaybe importDecl ds
   efFixities      = mapMaybe fixityDecl ds
   efTypeFixities  = mapMaybe typeFixityDecl ds
-  efDeclarations  = concatMap toExternsDeclaration efExports ++ mapMaybe roleDecl ds
+  efDeclarations  = concatMap toExternsDeclaration efExports
   efSourceSpan    = ss
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
@@ -226,18 +219,14 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   importDecl (ImportDeclaration _ m mt qmn) = Just (ExternsImport m mt qmn)
   importDecl _ = Nothing
 
-  roleDecl :: Declaration -> Maybe ExternsDeclaration
-  roleDecl (RoleDeclaration (RoleDeclarationData _ name roles)) = Just (EDRole name roles)
-  roleDecl _ = Nothing
-
   toExternsDeclaration :: DeclarationRef -> [ExternsDeclaration]
   toExternsDeclaration (TypeRef _ pn dctors) =
     case Qualified (Just mn) pn `M.lookup` types env of
       Nothing -> internalError "toExternsDeclaration: no kind in toExternsDeclaration"
       Just (kind, TypeSynonym)
         | Just (args, synTy) <- Qualified (Just mn) pn `M.lookup` typeSynonyms env -> [ EDType pn kind TypeSynonym, EDTypeSynonym pn args synTy ]
-      Just (kind, ExternData) -> [ EDType pn kind ExternData ]
-      Just (kind, tk@(DataType _ tys)) ->
+      Just (kind, ExternData rs) -> [ EDType pn kind (ExternData rs) ]
+      Just (kind, tk@(DataType _ _ tys)) ->
         EDType pn kind tk : [ EDDataConstructor dctor dty pn ty args
                             | dctor <- fromMaybe (map fst tys) dctors
                             , (dty, _, ty, args) <- maybeToList (Qualified (Just mn) dctor `M.lookup` dataConstructors env)
@@ -249,10 +238,10 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   toExternsDeclaration (TypeClassRef _ className)
     | let dictName = dictSynonymName . coerceProperName $ className
     , Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
-    , Just (kind, ExternData) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
+    , Just (kind, ExternData rs) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
     , Just (synKind, TypeSynonym) <- Qualified (Just mn) dictName `M.lookup` types env
     , Just (synArgs, synTy) <- Qualified (Just mn) dictName `M.lookup` typeSynonyms env
-    = [ EDType (coerceProperName className) kind ExternData
+    = [ EDType (coerceProperName className) kind (ExternData rs)
       , EDType dictName synKind TypeSynonym
       , EDTypeSynonym dictName synArgs synTy
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty

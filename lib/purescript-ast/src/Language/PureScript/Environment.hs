@@ -36,7 +36,10 @@ data Environment = Environment
   -- ^ Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
   , roleDeclarations :: M.Map (Qualified (ProperName 'TypeName)) [Role]
-  -- ^ Explicit role declarations currently in scope.
+  -- ^ Explicit role declarations currently in scope. Note that this field is
+  -- only used to store declared roles temporarily until they can be checked;
+  -- to find a type's real checked and/or inferred roles, refer to the TypeKind
+  -- in the `types` field.
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceType)], SourceType)
   -- ^ Type synonyms currently in scope
   , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
@@ -100,17 +103,7 @@ instance A.ToJSON FunctionalDependency where
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
-initEnvironment = Environment M.empty allPrimTypes M.empty primRoles M.empty M.empty allPrimClasses
-
--- |
--- A lookup table of role definitions for primitive types whose constructors
--- won't be present in any environment.
-primRoles :: M.Map (Qualified (ProperName 'TypeName)) [Role]
-primRoles = M.fromList
-  [ (primName "Function", [Representational, Representational])
-  , (primName "Array", [Representational])
-  , (primName "Record", [Representational])
-  ]
+initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty M.empty allPrimClasses
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
@@ -213,11 +206,11 @@ instance Serialise NameKind
 
 -- | The kinds of a type
 data TypeKind
-  = DataType [(Text, Maybe SourceType)] [(ProperName 'ConstructorName, [SourceType])]
+  = DataType DataDeclType [(Text, Maybe SourceType, Role)] [(ProperName 'ConstructorName, [SourceType])]
   -- ^ Data type
   | TypeSynonym
   -- ^ Type synonym
-  | ExternData
+  | ExternData [Role]
   -- ^ Foreign data
   | LocalTypeVariable
   -- ^ A local type variable
@@ -227,29 +220,6 @@ data TypeKind
 
 instance NFData TypeKind
 instance Serialise TypeKind
-
-instance A.ToJSON TypeKind where
-  toJSON (DataType args ctors) =
-    A.object [ T.pack "DataType" .= A.object ["args" .= args, "ctors" .= ctors] ]
-  toJSON TypeSynonym       = A.toJSON (T.pack "TypeSynonym")
-  toJSON ExternData        = A.toJSON (T.pack "ExternData")
-  toJSON LocalTypeVariable = A.toJSON (T.pack "LocalTypeVariable")
-  toJSON ScopedTypeVar     = A.toJSON (T.pack "ScopedTypeVar")
-
-instance A.FromJSON TypeKind where
-  parseJSON (A.Object o) = do
-    args <- o .: "DataType"
-    A.withObject "args" (\o1 ->
-      DataType <$> o1 .: "args"
-               <*> o1 .: "ctors") args
-  parseJSON (A.String s) =
-    case s of
-      "TypeSynonym"       -> pure TypeSynonym
-      "ExternData"        -> pure ExternData
-      "LocalTypeVariable" -> pure LocalTypeVariable
-      "ScopedTypeVar"     -> pure ScopedTypeVar
-      _ -> fail "Unknown TypeKind"
-  parseJSON _ = fail "Invalid TypeKind"
 
 -- | The type ('data' or 'newtype') of a data type declaration
 data DataDeclType
@@ -387,9 +357,11 @@ function t1 t2 = TypeApp nullSourceAnn (TypeApp nullSourceAnn tyFunction t1) t2
 infixr 4 -:>
 
 primClass :: Qualified (ProperName 'TypeName) -> (SourceType -> SourceType) -> [(Qualified (ProperName 'TypeName), (SourceType, TypeKind))]
-primClass name mkTy =
-  [ (name, (mkTy kindConstraint, ExternData))
-  , (dictSynonymName <$> name, (mkTy kindType, TypeSynonym))
+primClass name mkKind =
+  [ let k = mkKind kindConstraint
+    in (name, (k, ExternData (nominalRolesForKind k)))
+  , let k = mkKind kindType
+    in (dictSynonymName <$> name, (k, TypeSynonym))
   ]
 
 -- | The primitive types in the external environment with their
@@ -398,19 +370,19 @@ primClass name mkTy =
 primTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primTypes =
   M.fromList
-    [ (primName "Type",             (kindType, ExternData))
-    , (primName "Constraint",       (kindType, ExternData))
-    , (primName "Symbol",           (kindType, ExternData))
-    , (primName "Row",              (kindType -:> kindType, ExternData))
-    , (primName "Function",         (kindType -:> kindType -:> kindType, ExternData))
-    , (primName "Array",            (kindType -:> kindType, ExternData))
-    , (primName "Record",           (kindRow kindType -:> kindType, ExternData))
-    , (primName "String",           (kindType, ExternData))
-    , (primName "Char",             (kindType, ExternData))
-    , (primName "Number",           (kindType, ExternData))
-    , (primName "Int",              (kindType, ExternData))
-    , (primName "Boolean",          (kindType, ExternData))
-    , (primName "Partial",          (kindConstraint, ExternData))
+    [ (primName "Type",             (kindType, ExternData []))
+    , (primName "Constraint",       (kindType, ExternData []))
+    , (primName "Symbol",           (kindType, ExternData []))
+    , (primName "Row",              (kindType -:> kindType, ExternData [Phantom]))
+    , (primName "Function",         (kindType -:> kindType -:> kindType, ExternData [Representational, Representational]))
+    , (primName "Array",            (kindType -:> kindType, ExternData [Representational]))
+    , (primName "Record",           (kindRow kindType -:> kindType, ExternData [Representational]))
+    , (primName "String",           (kindType, ExternData []))
+    , (primName "Char",             (kindType, ExternData []))
+    , (primName "Number",           (kindType, ExternData []))
+    , (primName "Int",              (kindType, ExternData []))
+    , (primName "Boolean",          (kindType, ExternData []))
+    , (primName "Partial",          (kindConstraint, ExternData []))
     ]
 
 -- | This 'Map' contains all of the prim types from all Prim modules.
@@ -429,23 +401,23 @@ allPrimTypes = M.unions
 primBooleanTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primBooleanTypes =
   M.fromList
-    [ (primSubName C.moduleBoolean "True", (tyBoolean, ExternData))
-    , (primSubName C.moduleBoolean "False", (tyBoolean, ExternData))
+    [ (primSubName C.moduleBoolean "True", (tyBoolean, ExternData []))
+    , (primSubName C.moduleBoolean "False", (tyBoolean, ExternData []))
     ]
 
 primCoerceTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primCoerceTypes =
   M.fromList $ mconcat
-    [ primClass (primSubName C.moduleCoerce "Coercible") (\kind -> kindType -:> kindType -:> kind)
+    [ primClass (primSubName C.moduleCoerce "Coercible") (\kind -> tyForall "k" kindType $ tyVar "k" -:> tyVar "k" -:> kind)
     ]
 
 primOrderingTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primOrderingTypes =
   M.fromList
-    [ (primSubName C.moduleOrdering "Ordering", (kindType, ExternData))
-    , (primSubName C.moduleOrdering "LT", (kindOrdering, ExternData))
-    , (primSubName C.moduleOrdering "EQ", (kindOrdering, ExternData))
-    , (primSubName C.moduleOrdering "GT", (kindOrdering, ExternData))
+    [ (primSubName C.moduleOrdering "Ordering", (kindType, ExternData []))
+    , (primSubName C.moduleOrdering "LT", (kindOrdering, ExternData []))
+    , (primSubName C.moduleOrdering "EQ", (kindOrdering, ExternData []))
+    , (primSubName C.moduleOrdering "GT", (kindOrdering, ExternData []))
     ]
 
 primRowTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
@@ -460,9 +432,9 @@ primRowTypes =
 primRowListTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primRowListTypes =
   M.fromList $
-    [ (primSubName C.moduleRowList "RowList", (kindType -:> kindType, ExternData))
-    , (primSubName C.moduleRowList "Cons", (tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRowList (tyVar "k") -:> kindRowList (tyVar "k"), ExternData))
-    , (primSubName C.moduleRowList "Nil", (tyForall "k" kindType $ kindRowList (tyVar "k"), ExternData))
+    [ (primSubName C.moduleRowList "RowList", (kindType -:> kindType, ExternData [Phantom]))
+    , (primSubName C.moduleRowList "Cons", (tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRowList (tyVar "k") -:> kindRowList (tyVar "k"), ExternData [Phantom, Phantom, Phantom]))
+    , (primSubName C.moduleRowList "Nil", (tyForall "k" kindType $ kindRowList (tyVar "k"), ExternData []))
     ] <> mconcat
     [ primClass (primSubName C.moduleRowList "RowToList")  (\kind -> tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRowList (tyVar "k") -:> kind)
     ]
@@ -478,14 +450,14 @@ primSymbolTypes =
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primTypeErrorTypes =
   M.fromList $
-    [ (primSubName C.typeError "Doc", (kindType, ExternData))
-    , (primSubName C.typeError "Fail", (kindDoc -:> kindConstraint, ExternData))
-    , (primSubName C.typeError "Warn", (kindDoc -:> kindConstraint, ExternData))
-    , (primSubName C.typeError "Text", (kindSymbol -:> kindDoc, ExternData))
-    , (primSubName C.typeError "Quote", (kindType -:> kindDoc, ExternData))
-    , (primSubName C.typeError "QuoteLabel", (kindSymbol -:> kindDoc, ExternData))
-    , (primSubName C.typeError "Beside", (kindDoc -:> kindDoc -:> kindDoc, ExternData))
-    , (primSubName C.typeError "Above", (kindDoc -:> kindDoc -:> kindDoc, ExternData))
+    [ (primSubName C.typeError "Doc", (kindType, ExternData []))
+    , (primSubName C.typeError "Fail", (kindDoc -:> kindConstraint, ExternData [Nominal]))
+    , (primSubName C.typeError "Warn", (kindDoc -:> kindConstraint, ExternData [Nominal]))
+    , (primSubName C.typeError "Text", (kindSymbol -:> kindDoc, ExternData [Phantom]))
+    , (primSubName C.typeError "Quote", (kindType -:> kindDoc, ExternData [Phantom]))
+    , (primSubName C.typeError "QuoteLabel", (kindSymbol -:> kindDoc, ExternData [Phantom]))
+    , (primSubName C.typeError "Beside", (kindDoc -:> kindDoc -:> kindDoc, ExternData [Phantom, Phantom]))
+    , (primSubName C.typeError "Above", (kindDoc -:> kindDoc -:> kindDoc, ExternData [Phantom, Phantom]))
     ] <> mconcat
     [ primClass (primSubName C.typeError "Fail") (\kind -> kindDoc -:> kind)
     , primClass (primSubName C.typeError "Warn") (\kind -> kindDoc -:> kind)
@@ -513,9 +485,10 @@ allPrimClasses = M.unions
 primCoerceClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primCoerceClasses =
   M.fromList
+    -- class Coercible (a :: k) (b :: k)
     [ (primSubName C.moduleCoerce "Coercible", makeTypeClassData
-        [ ("a", Just kindType)
-        , ("b", Just kindType)
+        [ ("a", Just (tyVar "k"))
+        , ("b", Just (tyVar "k"))
         ] [] [] [] True)
     ]
 
@@ -617,21 +590,6 @@ primTypeErrorClasses =
         [("message", Just kindDoc)] [] [] [] True)
     ]
 
--- | Looks up a given name and, if it names a newtype, returns the names of the
--- type's parameters, the type the newtype wraps and the names of the type's
--- fields.
-lookupNewtypeConstructor :: Environment -> Qualified (ProperName 'TypeName) -> Maybe ([Text], SourceType, [Ident])
-lookupNewtypeConstructor env ty@(Qualified mn _) =
-  M.lookup ty (types env) >>= \case
-    (_, DataType tvs [(ctor, [wrappedTy])]) ->
-      M.lookup (Qualified mn ctor) (dataConstructors env) >>= \case
-        (Newtype, _, _, ids) ->
-          pure (map fst tvs, wrappedTy, ids)
-        _ ->
-          Nothing
-    _ ->
-      Nothing
-
 -- | Finds information about data constructors from the current environment.
 lookupConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
 lookupConstructor env ctor =
@@ -655,3 +613,19 @@ dictSynonymName = ProperName . dictSynonymName' . runProperName
 
 isDictSynonym :: ProperName a -> Bool
 isDictSynonym = T.isSuffixOf "$Dict" . runProperName
+
+-- |
+-- Given the kind of a type, generate a list @Nominal@ roles. This is used for
+-- opaque foreign types as well as type classes.
+nominalRolesForKind :: Type a -> [Role]
+nominalRolesForKind k = replicate (kindArity k) Nominal
+
+kindArity :: Type a -> Int
+kindArity = length . fst . unapplyKinds
+
+unapplyKinds :: Type a -> ([Type a], Type a)
+unapplyKinds = go [] where
+  go kinds (TypeApp _ (TypeApp _ fn k1) k2)
+    | eqType fn tyFunction = go (k1 : kinds) k2
+  go kinds (ForAll _ _ _ k _) = go kinds k
+  go kinds k = (reverse kinds, k)

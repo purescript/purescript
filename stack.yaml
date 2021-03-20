@@ -1,9 +1,12 @@
 resolver: lts-13.26
-pvp-bounds: upper
+pvp-bounds: both
 packages:
 - '.'
 - lib/purescript-ast
 - lib/purescript-cst
+ghc-options:
+  # Build with advanced optimizations enabled by default
+  "$locals": -O2
 extra-deps:
 - serialise-0.2.2.0
 - cborg-0.2.2.0

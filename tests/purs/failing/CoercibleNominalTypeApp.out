@@ -2,18 +2,26 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/CoercibleNominalTypeApp.purs:13:8 - 13:14 (line 13, column 8 - line 13, column 14)
 
-  No type class instance was found for
-  [33m                                              [0m
-  [33m  Prim.Coerce.Coercible (G @Type Maybe Int)   [0m
-  [33m                        (G @Type Maybe String)[0m
-  [33m                                              [0m
+  Could not match type
+  [33m     [0m
+  [33m  Int[0m
+  [33m     [0m
+  with type
+  [33m        [0m
+  [33m  String[0m
+  [33m        [0m
 
-while checking that type [33mforall (a :: Type) (b :: Type). Coercible a b => a -> b[0m
+while solving type class constraint
+[33m                                              [0m
+[33m  Prim.Coerce.Coercible (G @Type Maybe Int)   [0m
+[33m                        (G @Type Maybe String)[0m
+[33m                                              [0m
+while checking that type [33mforall (a :: Type) (b :: Type). Coercible @Type a b => a -> b[0m
   is at least as general as type [33mG @Type Maybe Int -> G @Type Maybe String[0m
 while checking that expression [33mcoerce[0m
   has type [33mG @Type Maybe Int -> G @Type Maybe String[0m
 in value declaration [33mgToG[0m
 
-See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
 or to contribute content related to this error.
 

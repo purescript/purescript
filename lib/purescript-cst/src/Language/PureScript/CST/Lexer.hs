@@ -17,6 +17,7 @@ import qualified Data.Scientific as Sci
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.PureScript as Text
 import Language.PureScript.CST.Errors
 import Language.PureScript.CST.Monad hiding (token)
 import Language.PureScript.CST.Layout
@@ -119,6 +120,12 @@ next = Parser $ \inp _ ksucc ->
 nextWhile :: (Char -> Bool) -> Lexer Text
 nextWhile p = Parser $ \inp _ ksucc -> do
   let (chs, inp') = Text.span p inp
+  ksucc inp' chs
+
+{-# INLINE nextWhile' #-}
+nextWhile' :: Int -> (Char -> Bool) -> Lexer Text
+nextWhile' n p = Parser $ \inp _ ksucc -> do
+  let (chs, inp') = Text.spanUpTo n p inp
   ksucc inp' chs
 
 {-# INLINE peek #-}
@@ -315,7 +322,7 @@ token = peek >>= maybe (pure TokEof) k0
         peek >>= \case
           Just ')'
             | isReservedSymbol chs -> throw ErrReservedSymbol
-            | otherwise -> next $> TokSymbolName qual chs
+            | otherwise -> next $> TokSymbolName (reverse qual) chs
           Just ch2 -> throw $ ErrLexeme (Just [ch2]) []
           Nothing  -> throw ErrEof
     Just ch -> throw $ ErrLexeme (Just [ch]) []
@@ -428,15 +435,15 @@ token = peek >>= maybe (pure TokEof) k0
 
     string
       : '"' stringPart* '"'
-      | '"""' .* '"""'
+      | '"""' '"'{0,2} ([^"]+ '"'{1,2})* [^"]* '"""'
 
-    This assumes maximal munch for quotes. A raw string literal can end with
-    any number of quotes, where the last 3 are considered the closing
-    delimiter.
+    A raw string literal can't contain any sequence of 3 or more quotes,
+    although sequences of 1 or 2 quotes are allowed anywhere, including at the
+    beginning or the end.
   -}
   string :: Lexer Token
   string = do
-    quotes1 <- nextWhile (== '"')
+    quotes1 <- nextWhile' 7 (== '"')
     case Text.length quotes1 of
       0 -> do
         let
@@ -467,19 +474,18 @@ token = peek >>= maybe (pure TokEof) k0
         go "" mempty
       1 ->
         pure $ TokString "" ""
-      n | n >= 5 -> do
-        let str = Text.take 5 quotes1
-        pure $ TokString str (fromString (Text.unpack str))
+      n | n >= 5 ->
+        pure $ TokRawString $ Text.drop 5 quotes1
       _ -> do
         let
           go acc = do
             chs <- nextWhile (/= '"')
-            quotes2 <- nextWhile (== '"')
+            quotes2 <- nextWhile' 5 (== '"')
             case Text.length quotes2 of
               0          -> throw ErrEof
               n | n >= 3 -> pure $ TokRawString $ acc <> chs <> Text.drop 3 quotes2
               _          -> go (acc <> chs <> quotes2)
-        go ""
+        go $ Text.drop 2 quotes1
 
   {-
     escape

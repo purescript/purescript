@@ -15,7 +15,7 @@ See also <https://www.haskell.org/ghc/download_ghc_8_6_4.html> for more details 
 
 ## Official prebuilt binaries
 
-Each release comes with prebuilt x86-64 binary bundles for Linux, mac OS, and Windows. Users of other operating systems or architectures will likely need to build the compiler from source; see below.
+Each [release](https://github.com/purescript/purescript/releases) comes with prebuilt x86-64 binary bundles for Linux, mac OS, and Windows. Users of other operating systems or architectures will likely need to build the compiler from source; see below.
 
 To install a binary bundle, simply extract it and place the `purs` executable somewhere on your PATH.
 
@@ -46,11 +46,23 @@ If you don't have stack installed, please see the [stack install documentation](
 
 The PureScript REPL depends on the `curses` library (via the Haskell package
 `terminfo`). If you are having difficulty running the compiler, it may be
-because the `curses` library is missing.
+because the `curses` library is missing. This problem may appear as a `libtinfo`
+error:
+```
+error while loading shared libraries: libtinfo.so.5: cannot open shared object file: No such file or directory
+```
 
 On Linux, you will probably need to install `ncurses` manually. On Ubuntu, for
 example, this can be done by running:
+```
+$ sudo apt install libtinfo5 libncurses5-dev
+```
 
+## EACCES error
+
+If you encounter this error while trying to install via `npm`:
 ```
-$ sudo apt-get install libncurses5-dev
+Error: EACCES: permission denied
 ```
+
+The best solution is to install [Node.js and npm via a node version manager](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm#using-a-node-version-manager-to-install-nodejs-and-npm). This error is due to permissions issues when installing packages globally. You can read more about this error in npm's guide to [resolving EACCES permissions errors when installing packages globally](https://docs.npmjs.com/getting-started/fixing-npm-permissions).

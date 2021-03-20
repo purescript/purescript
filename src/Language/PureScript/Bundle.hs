@@ -479,9 +479,13 @@ toModule mids mid filename top
       expressionExportType (JSMemberDot f _ _)
         | JSIdentifier _ "$foreign" <- f
         = pure ForeignReexport
+        | JSIdentifier _ ident <- f
+        = pure (RegularExport ident)
       expressionExportType (JSMemberSquare f _ _ _)
         | JSIdentifier _ "$foreign" <- f
         = pure ForeignReexport
+        | JSIdentifier _ ident <- f
+        = pure (RegularExport ident)
       expressionExportType (JSIdentifier _ s) = pure (RegularExport s)
       expressionExportType _ = err UnsupportedExport
 

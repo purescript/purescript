@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/2109-bind.purs:8:3 - 8:14 (line 8, column 3 - line 8, column 14)
+
+  Unknown value [33mbind[0m. You're probably using do-notation, which the compiler replaces with calls to the [33mbind[0m function. Please import [33mbind[0m from module [33mPrelude[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+or to contribute content related to this error.
+

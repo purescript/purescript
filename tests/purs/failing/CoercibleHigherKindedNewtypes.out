@@ -1,0 +1,24 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/CoercibleHigherKindedNewtypes.purs:13:8 - 13:14 (line 13, column 8 - line 13, column 14)
+
+  No type class instance was found for
+  [33m                              [0m
+  [33m  Prim.Coerce.Coercible Int   [0m
+  [33m                        String[0m
+  [33m                              [0m
+
+while solving type class constraint
+[33m                                                      [0m
+[33m  Prim.Coerce.Coercible (Ap @Type @Type N1 Int String)[0m
+[33m                        (Ap @Type @Type N2 Int String)[0m
+[33m                                                      [0m
+while checking that type [33mforall (a :: Type) (b :: Type). Coercible @Type a b => a -> b[0m
+  is at least as general as type [33mAp @Type @Type N1 Int String -> Ap @Type @Type N2 Int String[0m
+while checking that expression [33mcoerce[0m
+  has type [33mAp @Type @Type N1 Int String -> Ap @Type @Type N2 Int String[0m
+in value declaration [33mswap[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

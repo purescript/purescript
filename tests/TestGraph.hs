@@ -22,7 +22,7 @@ spec = do
   let baseDir = "tests/purs/graph/"
   let sourcesDir = baseDir <> "src/"
   it "should match the graph fixture" $ do
-    let modulePaths = (sourcesDir <>) <$> ["Module.purs", "Module2.purs"]
+    let modulePaths = (sourcesDir <>) <$> ["Module.purs", "Module2.purs", "Module3.purs"]
     let graphFixtureName = "graph.json"
 
     graphFixture <- readUTF8FileT (baseDir <> graphFixtureName)

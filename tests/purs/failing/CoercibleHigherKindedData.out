@@ -1,0 +1,33 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/CoercibleHigherKindedData.purs:13:17 - 13:23 (line 13, column 17 - line 13, column 23)
+
+  No type class instance was found for
+  [33m                                      [0m
+  [33m  Prim.Coerce.Coercible (Unary t5)    [0m
+  [33m                        (Binary a3 t5)[0m
+  [33m                                      [0m
+  The instance head contains unknown type variables. Consider adding a type annotation.
+
+while solving type class constraint
+[33m                                                                 [0m
+[33m  Prim.Coerce.Coercible (Proxy @(t0 -> Type) (Unary @t0))        [0m
+[33m                        (Proxy @(t1 -> Type) (Binary @t2 @t1 a3))[0m
+[33m                                                                 [0m
+while checking that type [33mforall (a :: Type) (b :: Type). Coercible @Type a b => a -> b[0m
+  is at least as general as type [33mProxy @(t0 -> Type) (Unary @t0) -> Proxy @(t1 -> Type) (... @t1 a3)[0m
+while checking that expression [33mcoerce[0m
+  has type [33mProxy @(t0 -> Type) (Unary @t0) -> Proxy @(t1 -> Type) (... @t1 a3)[0m
+in value declaration [33munaryToBinary[0m
+
+where [33ma3[0m is a rigid type variable
+        bound at (line 13, column 17 - line 13, column 23)
+      [33mt0[0m is an unknown type
+      [33mt2[0m is an unknown type
+      [33mt1[0m is an unknown type
+      [33mt4[0m is an unknown type
+      [33mt5[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

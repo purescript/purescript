@@ -20,10 +20,13 @@ module Language.PureScript.TypeChecker.Kinds
   , checkKindDeclaration
   , checkTypeKind
   , unknownsWithKinds
+  , freshKind
+  , freshKindWithKind
   ) where
 
 import Prelude.Compat
 
+import Control.Arrow ((***))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
@@ -602,15 +605,17 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
           tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . fst) tyCtor tyArgs'
           ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (nullSourceAnn,) tyArgs'
       for ctors $ \ctor ->
-        fmap ((ctor,) . mkForAll ctorBinders) $ inferDataConstructor tyCtor' ctor
+        fmap (mkForAll ctorBinders) <$> inferDataConstructor tyCtor' ctor
 
 inferDataConstructor
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
   => SourceType
   -> DataConstructorDeclaration
-  -> m SourceType
-inferDataConstructor tyCtor =
-  flip checkKind E.kindType . foldr ((E.-:>) . snd) tyCtor . dataCtorFields
+  -> m (DataConstructorDeclaration, SourceType)
+inferDataConstructor tyCtor DataConstructorDeclaration{..} = do
+  dataCtorFields' <- traverse (traverse (flip checkKind E.kindType)) dataCtorFields
+  dataCtor <- flip (foldr ((E.-:>) . snd)) dataCtorFields' <$> checkKind tyCtor E.kindType
+  pure ( DataConstructorDeclaration { dataCtorFields = dataCtorFields', .. }, dataCtor )
 
 type TypeDeclarationArgs =
   ( SourceAnn
@@ -914,7 +919,7 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
       pure (((synName, synKind'), synBody'), unknowns synKind')
     datResultsWithUnks <- for (zip datDict datResults) $ \((datName, datKind), ctors) -> do
       datKind' <- apply datKind
-      ctors' <- traverse (traverse apply) ctors
+      ctors' <- traverse (bitraverse (traverseDataCtorFields (traverse (traverse apply))) apply) ctors
       pure (((datName, datKind'), ctors'), unknowns datKind')
     clsResultsWithUnks <- for (zip clsDict clsResults) $ \((clsName, clsKind), (args, supers, decls)) -> do
       clsKind' <- apply clsKind
@@ -951,7 +956,8 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
           (args', supers', decls', generalizeUnknownsWithVars unkBinders clsKind)
     datResultsWithKinds <- for datResultsWithUnks $ \(((datName, datKind), ctors), _) -> do
       let tyUnks = snd . fromJust $ lookup (mkQualified datName moduleName) tySubs
-          ctors' = fmap (fmap (generalizeUnknowns tyUnks . replaceTypeCtors)) ctors
+          replaceDataCtorField ty = replaceUnknownsWithVars (unknownVarNames (usedTypeVariables ty) tyUnks) $ replaceTypeCtors ty
+          ctors' = fmap (mapDataCtorFields (fmap (fmap replaceDataCtorField)) *** generalizeUnknowns tyUnks . replaceTypeCtors) ctors
       traverse_ (traverse_ checkTypeQuantification) ctors'
       pure (ctors', generalizeUnknowns tyUnks datKind)
     synResultsWithKinds <- for synResultsWithUnks $ \(((synName, synKind), synBody), _) -> do

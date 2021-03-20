@@ -4,7 +4,7 @@ import Prelude
 import Effect (Effect)
 import Effect.Console (log, logShow)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
+import Data.Eq.Generic (genericEq)
 
 data X a = X a
 

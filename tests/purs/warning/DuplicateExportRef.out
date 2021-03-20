@@ -3,7 +3,7 @@ Warning 1 of 7:
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
 
-    Export list contains multiple references to type [33mX[0m
+    Export list contains multiple references to type class [33mY[0m
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
@@ -14,7 +14,7 @@ Warning 2 of 7:
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
 
-    Export list contains multiple references to value [33mfn[0m
+    Export list contains multiple references to type operator [33m(~>)[0m
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
@@ -25,7 +25,7 @@ Warning 3 of 7:
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
 
-    Export list contains multiple references to operator [33m(!)[0m
+    Export list contains multiple references to type [33mX[0m
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
@@ -36,7 +36,7 @@ Warning 4 of 7:
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
 
-    Export list contains multiple references to type class [33mY[0m
+    Export list contains multiple references to value [33mfn[0m
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
@@ -47,7 +47,7 @@ Warning 5 of 7:
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
 
-    Export list contains multiple references to type operator [33m(~>)[0m
+    Export list contains multiple references to operator [33m(!)[0m
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,

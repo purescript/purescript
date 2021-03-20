@@ -20,7 +20,7 @@ import qualified Data.List.NonEmpty as NEL (nonEmpty)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe (fromMaybe, maybeToList)
+import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -51,7 +51,7 @@ moduleToJs
   => Module Ann
   -> Maybe PSString
   -> m [AST]
-moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreignInclude =
+moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
@@ -60,6 +60,7 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreignInclude =
     optimized <- traverse (traverse optimize) jsDecls
     let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
     let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
+          `S.union` M.keysSet reExps
     jsImports <- traverse (importToJs mnLookup)
       . filter (flip S.member usedModuleNames)
       . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
@@ -70,9 +71,11 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreignInclude =
     let moduleBody = maybe [] (uncurry (:)) . fmap (first header) . uncons $ foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
+    let reExps' = M.toList (M.withoutKeys reExps (S.fromList C.primModules))
     return $ moduleBody
       ++ (maybeToList . exportsToJs foreignInclude $ foreignExps)
       ++ (maybeToList . exportsToJs Nothing $ standardExps)
+      ++ (mapMaybe reExportsToJs reExps')
 
   where
 
@@ -107,12 +110,20 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreignInclude =
   importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m AST
   importToJs mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
-    withPos ss $ AST.Import Nothing (moduleNameToJs mnSafe) (fromString (".." </> T.unpack (runModuleName mn') </> "index.js"))
+    withPos ss $ AST.Import Nothing (moduleNameToJs mnSafe) (moduleImportPath mn')
 
   -- | Generates JavaScript code for exporting at least one identifier,
   -- eventually from another module.
   exportsToJs :: Maybe PSString -> [Ident] -> Maybe AST
   exportsToJs from = fmap (flip (AST.Export Nothing) from) . NEL.nonEmpty . fmap runIdent
+
+  -- | Generates JavaScript code for re-exporting at least one identifier from
+  -- from another module.
+  reExportsToJs :: (ModuleName, [Ident]) -> Maybe AST
+  reExportsToJs = uncurry exportsToJs . first (Just . moduleImportPath)
+
+  moduleImportPath :: ModuleName -> PSString
+  moduleImportPath mn' = fromString (".." </> T.unpack (runModuleName mn') </> "index.js")
 
   -- | Replaces the `ModuleName`s in the AST so that the generated code refers to
   -- the collision-avoiding renamed module imports.

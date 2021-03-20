@@ -12,7 +12,7 @@ import Control.Monad.Writer.Class
 
 import Data.Function (on)
 import Data.Foldable (for_)
-import Data.List (find, intersect, groupBy, sortBy, (\\))
+import Data.List (find, intersect, groupBy, sort, sortBy, (\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid (Sum(..))
 import Data.Traversable (forM)
@@ -334,7 +334,7 @@ findUsedRefs ss env mni qn names =
     typesRefs
       = map (flip (TypeRef ss) (Just [])) typesWithoutDctors
       ++ map (\(ty, ds) -> TypeRef ss ty (Just ds)) (M.toList typesWithDctors)
-  in sortBy compDecRef $ classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
+  in sort $ classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
 
   where
 

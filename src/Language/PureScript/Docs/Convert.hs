@@ -39,10 +39,8 @@ convertModule ::
   P.Environment ->
   P.Module ->
   m Module
-convertModule externs env checkEnv m =
-  partiallyDesugar externs env [m] >>= \case
-    [m'] -> pure (insertValueTypes checkEnv (convertSingleModule m'))
-    _ -> P.internalError "partiallyDesugar did not return a singleton"
+convertModule externs env checkEnv =
+  fmap (insertValueTypes checkEnv . convertSingleModule) . partiallyDesugar externs env
 
 -- |
 -- Updates all the types of the ValueDeclarations inside the module based on
@@ -90,17 +88,17 @@ partiallyDesugar ::
   (MonadError P.MultipleErrors m) =>
   [P.ExternsFile] ->
   P.Env ->
-  [P.Module] ->
-  m [P.Module]
+  P.Module ->
+  m P.Module
 partiallyDesugar externs env = evalSupplyT 0 . desugar'
   where
   desugar' =
-    traverse P.desugarDoModule
-      >=> traverse P.desugarAdoModule
-      >=> map P.desugarLetPatternModule
-      >>> traverse P.desugarCasesModule
-      >=> traverse P.desugarTypeDeclarationsModule
-      >=> fmap fst . runWriterT . P.desugarImports env
+    P.desugarDoModule
+      >=> P.desugarAdoModule
+      >=> P.desugarLetPatternModule
+      >>> P.desugarCasesModule
+      >=> P.desugarTypeDeclarationsModule
+      >=> fmap fst . runWriterT . flip evalStateT (env, mempty) . P.desugarImports
       >=> P.rebracketFiltered isInstanceDecl externs
 
   isInstanceDecl (P.TypeInstanceDeclaration {}) = True

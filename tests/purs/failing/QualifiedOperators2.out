@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/QualifiedOperators2.purs:4:8 - 4:21 (line 4, column 8 - line 4, column 21)
+
+  Unknown module [33mFoo.Bar[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+or to contribute content related to this error.
+

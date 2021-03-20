@@ -44,11 +44,6 @@ spec = do
         "tests/purs/publish/basic-example"
         "resolutions.json"
 
-    it "basic example with legacy resolutions file" $ do
-      testPackage
-        "tests/purs/publish/basic-example"
-        "resolutions-legacy.json"
-
   context "json compatibility" $ do
     let compatDir = "tests" </> "json-compat"
     versions <- runIO $ listDirectory compatDir

@@ -44,7 +44,7 @@ explicitAnnotations = WildcardAnnotations True
 noAnnotations :: WildcardAnnotations
 noAnnotations = WildcardAnnotations False
 
-type DataType = ([(Text, Maybe P.SourceType)], [(P.ProperName 'P.ConstructorName, [P.SourceType])])
+type DataType = ([(Text, Maybe P.SourceType, P.Role)], [(P.ProperName 'P.ConstructorName, [P.SourceType])])
 
 caseSplit
   :: (Ide m, MonadError IdeError m)
@@ -54,7 +54,7 @@ caseSplit q = do
   type' <- parseType' q
   (tc, args) <- splitTypeConstructor type'
   (typeVars, ctors) <- findTypeDeclaration tc
-  let applyTypeVars = P.everywhereOnTypes (P.replaceAllTypeVars (zip (map fst typeVars) args))
+  let applyTypeVars = P.everywhereOnTypes (P.replaceAllTypeVars (zip (map (\(name, _, _) -> name) typeVars) args))
   let appliedCtors = map (second (map applyTypeVars)) ctors
   pure appliedCtors
 
@@ -76,7 +76,7 @@ findTypeDeclaration'
   -> First DataType
 findTypeDeclaration' t ExternsFile{..} =
   First $ head $ mapMaybe (\case
-            EDType tn _ (P.DataType typeVars ctors)
+            EDType tn _ (P.DataType _ typeVars ctors)
               | tn == t -> Just (typeVars, ctors)
             _ -> Nothing) efDeclarations
 

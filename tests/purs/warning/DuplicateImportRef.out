@@ -3,7 +3,7 @@ Warning 1 of 4:
   in module [33mMain[0m
   at tests/purs/warning/DuplicateImportRef.purs:7:1 - 12:4 (line 7, column 1 - line 12, column 4)
 
-    Import list contains multiple references to type [33mUnit[0m
+    Import list contains multiple references to type class [33mFunctor[0m
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateImportRef.md for more information,
@@ -14,7 +14,7 @@ Warning 2 of 4:
   in module [33mMain[0m
   at tests/purs/warning/DuplicateImportRef.purs:7:1 - 12:4 (line 7, column 1 - line 12, column 4)
 
-    Import list contains multiple references to value [33munit[0m
+    Import list contains multiple references to type [33mUnit[0m
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateImportRef.md for more information,
@@ -25,7 +25,7 @@ Warning 3 of 4:
   in module [33mMain[0m
   at tests/purs/warning/DuplicateImportRef.purs:7:1 - 12:4 (line 7, column 1 - line 12, column 4)
 
-    Import list contains multiple references to type class [33mFunctor[0m
+    Import list contains multiple references to value [33munit[0m
 
 
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateImportRef.md for more information,

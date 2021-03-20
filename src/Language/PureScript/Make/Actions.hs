@@ -26,6 +26,7 @@ import qualified Data.Map as M
 import           Data.Maybe (fromMaybe, maybeToList)
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 import           Data.Time.Clock (UTCTime)
 import           Data.Version (showVersion)
@@ -53,6 +54,7 @@ import           SourceMap
 import           SourceMap.Types
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath ((</>), makeRelative, splitPath, normalise)
+import           System.IO (stderr)
 
 -- | Determines when to rebuild a module
 data RebuildPolicy
@@ -69,8 +71,8 @@ data ProgressMessage
   deriving (Show, Eq, Ord)
 
 -- | Render a progress message
-renderProgressMessage :: ProgressMessage -> String
-renderProgressMessage (CompilingModule mn) = "Compiling " ++ T.unpack (runModuleName mn)
+renderProgressMessage :: ProgressMessage -> T.Text
+renderProgressMessage (CompilingModule mn) = T.append "Compiling " (runModuleName mn)
 
 -- | Actions that require implementations when running in "make" mode.
 --
@@ -268,7 +270,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   requiresForeign = not . null . CF.moduleForeign
 
   progress :: ProgressMessage -> Make ()
-  progress = liftIO . putStrLn . renderProgressMessage
+  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage
 
   readCacheDb :: Make CacheDb
   readCacheDb = readCacheDb' outputDir
@@ -285,7 +287,7 @@ checkForeignDecls m path = do
 
   foreignIdentsStrs <- either errorParsingModule pure $ getExps js
 
-  let deprecatedFFI = filter (any (== '\'')) foreignIdentsStrs
+  let deprecatedFFI = filter (elem '\'') foreignIdentsStrs
   unless (null deprecatedFFI) $
     errorDeprecatedForeignPrimes deprecatedFFI
 

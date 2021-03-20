@@ -1,3 +1,5 @@
+.build
+bin
 dist
 cabal-dev
 .cabal-sandbox
@@ -22,7 +24,6 @@ core-tests/full-core-docs.md
 tests/support/package-lock.json
 .psc-ide-port
 .psc-package/
-purescript.cabal
 tags
 TAGS
 

@@ -1,0 +1,32 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/CoercibleConstrained2.purs:11:28 - 11:34 (line 11, column 28 - line 11, column 34)
+
+  Could not match type
+  [33m    [0m
+  [33m  a0[0m
+  [33m    [0m
+  with type
+  [33m    [0m
+  [33m  b1[0m
+  [33m    [0m
+
+while solving type class constraint
+[33m                                        [0m
+[33m  Prim.Coerce.Coercible (Constrained a0)[0m
+[33m                        (Constrained b1)[0m
+[33m                                        [0m
+while checking that type [33mforall (a :: Type) (b :: Type). Coercible @Type a b => a -> b[0m
+  is at least as general as type [33mConstrained a0 -> Constrained b1[0m
+while checking that expression [33mcoerce[0m
+  has type [33mConstrained a0 -> Constrained b1[0m
+in value declaration [33mconstrainedToConstrained[0m
+
+where [33ma0[0m is a rigid type variable
+        bound at (line 11, column 28 - line 11, column 34)
+      [33mb1[0m is a rigid type variable
+        bound at (line 11, column 28 - line 11, column 34)
+
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+or to contribute content related to this error.
+
