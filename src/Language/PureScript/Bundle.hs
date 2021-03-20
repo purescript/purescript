@@ -37,12 +37,15 @@ import Data.Version (showVersion)
 import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Data.Text.Lazy as T
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as LT
 
 import Language.JavaScript.AST.JSCommaList (fromCommaList, toCommaList)
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Process.Minify
+import Language.PureScript.Names (ModuleName(..))
+import Language.PureScript.CodeGen.JS.Common (moduleNameToJs)
 
 import qualified Paths_purescript as Paths
 
@@ -183,7 +186,7 @@ instance A.ToJSON ModuleElement where
 
     getFragment = ellipsize . renderToText . minifyJS
       where
-      ellipsize text = if T.compareLength text 20 == GT then T.take 19 text `T.snoc` ellipsis else text
+      ellipsize text = if LT.compareLength text 20 == GT then LT.take 19 text `LT.snoc` ellipsis else text
       ellipsis = '\x2026'
 
 -- | A module is just a list of elements of the types listed above.
@@ -502,11 +505,16 @@ toModule mids mid filename top
     = sequence $ toExport from <$> identName jsIdent <*> identName jsIdentAs
 
   toExport :: Maybe String -> String -> String -> m (ExportType, String, JSExpression, [Key])
-  toExport (Just "./foreign.js") name as =
-    pure . (ForeignReexport, as,, []) $
-             (JSMemberSquare (JSIdentifier sp "$foreign") JSNoAnnot
-               (stringLiteral name) JSNoAnnot)
-  toExport (Just _) _ _ = err UnsupportedExport
+  toExport (Just from) name as
+    | from == "./foreign.js" =
+        pure . (ForeignReexport, as,, []) $
+                 (JSMemberSquare (JSIdentifier sp "$foreign") JSNoAnnot
+                   (stringLiteral name) JSNoAnnot)
+    | Just from' <- stripSuffix "/index.js" =<< stripPrefix "../" from =
+        pure . (RegularExport name, as,, []) $
+               (JSMemberSquare (JSIdentifier sp (T.unpack . moduleNameToJs . ModuleName $ T.pack from')) JSNoAnnot
+                 (stringLiteral name) JSNoAnnot)
+    | otherwise = err UnsupportedExport
   toExport Nothing name as =
     pure (RegularExport name, as, JSIdentifier sp name, [])
 
