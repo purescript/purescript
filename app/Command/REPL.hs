@@ -51,7 +51,7 @@ import           System.IO.UTF8 (readUTF8File)
 import           System.Exit
 import           System.Directory (doesFileExist, getCurrentDirectory)
 import           System.FilePath ((</>))
-import           System.FilePath.Glob (glob)
+import qualified System.FilePath.Glob as Glob
 import           System.Process (readProcessWithExitCode)
 import qualified Data.ByteString.Lazy.UTF8 as U
 
@@ -115,7 +115,7 @@ pasteMode =
 -- | Make a JavaScript bundle for the browser.
 bundle :: IO (Either Bundle.ErrorMessage String)
 bundle = runExceptT $ do
-  inputFiles <- liftIO (glob (".psci_modules" </> "node_modules" </> "*" </> "*.js"))
+  inputFiles <- liftIO $ concat <$> Glob.globDir [Glob.compile "*/*.js", Glob.compile "*/foreign.cjs"] modulesDir
   input <- for inputFiles $ \filename -> do
     js <- liftIO (readUTF8File filename)
     mid <- Bundle.guessModuleIdentifier filename
@@ -310,7 +310,7 @@ command = loop <$> options
   where
     loop :: PSCiOptions -> IO ()
     loop PSCiOptions{..} = do
-        inputFiles <- concat <$> traverse glob psciInputGlob
+        inputFiles <- concat <$> traverse Glob.glob psciInputGlob
         e <- runExceptT $ do
           modules <- ExceptT (loadAllModules inputFiles)
           when (null modules) . liftIO $ do

@@ -13,6 +13,7 @@ module Language.PureScript.Bundle
   , ModuleType(..)
   , ErrorMessage(..)
   , printErrorMessage
+  , ForeignModuleExports(..)
   , getExportedIdentifiers
   , Module
   ) where
@@ -38,6 +39,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text.Lazy as T
 
+import Language.JavaScript.AST.JSCommaList (fromCommaList, toCommaList)
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Process.Minify
@@ -90,6 +92,7 @@ guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory f
   where
     guessModuleType "index.js" = pure Regular
     guessModuleType "foreign.js" = pure Foreign
+    guessModuleType "foreign.cjs" = pure Foreign
     guessModuleType name = throwError $ UnsupportedModulePath name
 
 data Visibility
@@ -199,7 +202,8 @@ printErrorMessage (UnsupportedModulePath s) =
   [ "An ES or CommonJS module has an unsupported name (" ++ show s ++ ")."
   , "The following file names are supported:"
   , "  1) index.js (PureScript native modules)"
-  , "  2) foreign.js (PureScript foreign modules)"
+  , "  2) foreign.js (PureScript ES foreign modules)"
+  , "  3) foreign.cjs (PureScript CommonJS foreign modules)"
   ]
 printErrorMessage InvalidTopLevel =
   [ "Expected a list of source elements at the top level." ]
@@ -332,7 +336,7 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
         in
           (map (\name -> (m, name, Internal)) shorthandNames, bn)
     toReference (JSFunctionExpression _ _ _ params _ _) bn
-      = ([], bn \\ (mapMaybe unIdentifier $ commaList params))
+      = ([], bn \\ (mapMaybe unIdentifier $ fromCommaList params))
     toReference e bn
       | Just nm <- exportsAccessor e
       -- exports.foo means there's a dependency on the public member "foo" of
@@ -379,14 +383,9 @@ strValue str = go $ drop 1 str
   go (x : xs) = x : go xs
   go "" = ""
 
-commaList :: JSCommaList a -> [a]
-commaList JSLNil = []
-commaList (JSLOne x) = [x]
-commaList (JSLCons l _ x) = commaList l ++ [x]
-
 trailingCommaList :: JSCommaTrailingList a -> [a]
-trailingCommaList (JSCTLComma l _) = commaList l
-trailingCommaList (JSCTLNone l) = commaList l
+trailingCommaList (JSCTLComma l _) = fromCommaList l
+trailingCommaList (JSCTLNone l) = fromCommaList l
 
 identName :: JSIdent -> Maybe String
 identName (JSIdentName _ ident) = Just ident
@@ -408,7 +407,7 @@ exportStatementIdentifiers (JSGenerator _ _ jsIdent _ _ _ _ _) =
 exportStatementIdentifiers _ = []
 
 varNames :: JSCommaList JSExpression -> [String]
-varNames = mapMaybe varName . commaList
+varNames = mapMaybe varName . fromCommaList
   where
   varName (JSVarInitExpression (JSIdentifier _ ident) _) = Just ident
   varName _ = Nothing
@@ -493,8 +492,9 @@ toModule mids mid filename top
 
   toModuleElements (JSModuleStatementListItem other) = pure [Other other]
 
+  exportSpecifiersList (Just "./foreign.cjs") = const $ pure []
   exportSpecifiersList from =
-    fmap catMaybes . traverse (exportSpecifier from) . commaList
+    fmap catMaybes . traverse (exportSpecifier from) . fromCommaList
 
   exportSpecifier from (JSExportSpecifier jsIdent)
     = traverse (toExport' from) $ identName jsIdent
@@ -512,6 +512,18 @@ toModule mids mid filename top
 
   toExport' from name = toExport from name name
 
+data ForeignModuleExports =
+  ForeignModuleExports
+    { cjsExports :: [String]
+    , esExports :: [String]
+    } deriving (Show)
+
+instance Semigroup ForeignModuleExports where
+  (ForeignModuleExports cjsExports esExports) <> (ForeignModuleExports cjsExports' esExports') =
+    ForeignModuleExports (cjsExports <> cjsExports') (esExports <> esExports')
+instance Monoid ForeignModuleExports where
+  mempty = ForeignModuleExports [] []
+
 -- Get a list of all the exported identifiers from a foreign module.
 --
 -- TODO: what if we assign to exports.foo and then later assign to
@@ -519,9 +531,9 @@ toModule mids mid filename top
 getExportedIdentifiers :: forall m. (MonadError ErrorMessage m)
                           => String
                           -> JSAST
-                          -> m [String]
+                          -> m ForeignModuleExports
 getExportedIdentifiers mname top
-  | JSAstModule jsModuleItems _ <- top = concat <$> traverse go jsModuleItems
+  | JSAstModule jsModuleItems _ <- top = fold <$> traverse go jsModuleItems
   | otherwise = err InvalidTopLevel
   where
   err :: ErrorMessage -> m a
@@ -529,14 +541,15 @@ getExportedIdentifiers mname top
 
   go (JSModuleStatementListItem jsStatement)
     | Just props <- matchExportsAssignment jsStatement
-    = traverse toIdent (trailingCommaList props)
+    = do cjsExports <- traverse toIdent (trailingCommaList props)
+         pure ForeignModuleExports{ cjsExports, esExports = [] }
     | Just (Public, name, _) <- matchMember jsStatement
-    = pure [name]
+    = pure ForeignModuleExports{ cjsExports = [name], esExports = [] }
     | otherwise
-    = pure []
+    = pure mempty
   go (JSModuleExportDeclaration _ jsExportDeclaration) =
-    pure $ exportDeclarationIdentifiers jsExportDeclaration
-  go _ = pure []
+    pure ForeignModuleExports{ cjsExports = [], esExports = exportDeclarationIdentifiers jsExportDeclaration }
+  go _ = pure mempty
 
   toIdent (JSPropertyNameandValue name _ [_]) =
     extractLabel' name
@@ -553,7 +566,7 @@ getExportedIdentifiers mname top
     exportStatementIdentifiers jsStatement
 
   exportClauseIdentifiers (JSExportClause _ jsExportsSpecifiers _) =
-    mapMaybe exportSpecifierName $ commaList jsExportsSpecifiers
+    mapMaybe exportSpecifierName $ fromCommaList jsExportsSpecifiers
 
   exportSpecifierName (JSExportSpecifier jsIdent) = identName jsIdent
   exportSpecifierName (JSExportSpecifierAs _ _ jsIdentAs) = identName jsIdentAs
@@ -566,12 +579,12 @@ matchRequire :: S.Set String
                 -> Maybe (String, Either String ModuleIdentifier)
 matchRequire mids mid stmt
   | JSVariable _ jsInit _ <- stmt
-  , [JSVarInitExpression var varInit] <- commaList jsInit
+  , [JSVarInitExpression var varInit] <- fromCommaList jsInit
   , JSIdentifier _ importName <- var
   , JSVarInit _ jsInitEx <- varInit
   , JSMemberExpression req _ argsE _ <- jsInitEx
   , JSIdentifier _ "require" <- req
-  , [ Just importPath ] <- map fromStringLiteral (commaList argsE)
+  , [ Just importPath ] <- map fromStringLiteral (fromCommaList argsE)
   , importPath' <- checkImportPath importPath mid mids
   = Just (importName, importPath')
   | otherwise
@@ -582,7 +595,7 @@ matchMember :: JSStatement -> Maybe (Visibility, String, JSExpression)
 matchMember stmt
   -- var foo = expr;
   | JSVariable _ jsInit _ <- stmt
-  , [JSVarInitExpression var varInit] <- commaList jsInit
+  , [JSVarInitExpression var varInit] <- fromCommaList jsInit
   , JSIdentifier _ name <- var
   , JSVarInit _ decl <- varInit
   = Just (Internal, name, decl)
@@ -805,7 +818,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
     declToJS (Import _ nm req) = withLength
       [
         JSVariable lfsp
-          (cList [
+          (toCommaList [
             JSVarInitExpression (JSIdentifier sp nm)
               (JSVarInit sp $ either require (innerModuleReference sp . moduleName) req )
           ]) (JSSemi JSNoAnnot)
@@ -823,16 +836,6 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
           val
           (JSSemi JSNoAnnot)
 
-  -- comma lists are reverse-consed
-  cList :: [a] -> JSCommaList a
-  cList [] = JSLNil
-  cList [x] = JSLOne x
-  cList l = go $ reverse l
-    where
-      go [x] = JSLOne x
-      go (h:t)= JSLCons (go t) JSNoAnnot h
-      go [] = error "Invalid case in comma-list"
-
   indent :: [JSStatement] -> [JSStatement]
   indent = everywhere (mkT squash)
     where
@@ -849,7 +852,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
   prelude :: JSStatement
   prelude = JSVariable (JSAnnot tokenPosnEmpty [ CommentA tokenPosnEmpty $ "// Generated by purs bundle " ++ showVersion Paths.version
                                                , WhiteSpace tokenPosnEmpty "\n" ])
-              (cList [
+              (toCommaList [
                 JSVarInitExpression (JSIdentifier sp optionsNamespace)
                   (JSVarInit sp (emptyObj sp))
               ]) (JSSemi JSNoAnnot)
@@ -857,7 +860,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
   require :: String -> JSExpression
   require mn =
     JSMemberExpression (JSIdentifier JSNoAnnot "require") JSNoAnnot
-      (cList [ stringLiteral mn ]) JSNoAnnot
+      (toCommaList [ stringLiteral mn ]) JSNoAnnot
 
   moduleReference :: JSAnnot -> String -> JSExpression
   moduleReference a mn =
@@ -926,7 +929,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
     [JSMethodCall
       (JSMemberDot (moduleReference lf mn) JSNoAnnot
         (JSIdentifier JSNoAnnot "main"))
-      JSNoAnnot (cList []) JSNoAnnot (JSSemi JSNoAnnot)]
+      JSNoAnnot (toCommaList []) JSNoAnnot (JSSemi JSNoAnnot)]
 
   lf :: JSAnnot
   lf = JSAnnot tokenPosnEmpty [ WhiteSpace tokenPosnEmpty "\n" ]

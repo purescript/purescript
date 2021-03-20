@@ -66,7 +66,7 @@ assertBundles supportModules supportExterns supportForeigns inputFiles outputFil
       Left errs -> return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right _ -> do
         process <- findNodeProcess
-        jsFiles <- Glob.globDir1 (Glob.compile "**/*.js") modulesDir
+        jsFiles <- concat <$> Glob.globDir [Glob.compile "*/*.js", Glob.compile "*/foreign.cjs"] modulesDir
         let entryPoint = modulesDir </> "index.js"
         let entryModule = map (`ModuleIdentifier` Regular) ["Main"] 
         bundled <- runExceptT $ do

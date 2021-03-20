@@ -11,6 +11,7 @@ module Language.PureScript.Make.Actions
 
 import           Prelude
 
+import           Blaze.ByteString.Builder (toByteString)
 import           Control.Monad hiding (sequence)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
@@ -31,8 +32,11 @@ import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 import           Data.Time.Clock (UTCTime)
 import           Data.Version (showVersion)
+import qualified Language.JavaScript.AST.JSCommaList as JSAST (toCommaList)
 import qualified Language.JavaScript.Parser as JS
 import           Language.PureScript.AST
+import qualified Language.JavaScript.Parser.AST as JSAST
+import           Language.JavaScript.Pretty.Printer (renderJS)
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.CodeGen.JS as J
 import           Language.PureScript.CodeGen.JS.Printer
@@ -248,12 +252,29 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         Just path
           | not $ requiresForeign m ->
               tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
-          | otherwise ->
-              checkForeignDecls m path
+          | otherwise -> do
+              (foreignModuleType, foreignIdents) <- checkForeignDecls m path
+              case foreignModuleType of
+                ESModule -> copyFile path (outputFilename mn "foreign.js")
+                CJSModule -> do
+                  copyFile path (outputFilename mn "foreign.cjs")
+                  writeESForeignModuleWrapper mn foreignIdents
+
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return ()
-      for_ (mn `M.lookup` foreigns) $ \path ->
-        copyFile path (outputFilename mn "foreign.js")
+
+  writeESForeignModuleWrapper :: ModuleName -> S.Set Ident -> Make ()
+  writeESForeignModuleWrapper mn idents =
+    writeTextFile (outputFilename mn "foreign.js") . toByteString . renderJS $
+      JSAST.JSAstModule
+        [ JSAST.JSModuleExportDeclaration JSAST.JSNoAnnot
+            (JSAST.JSExportFrom
+              (JSAST.JSExportClause JSAST.JSAnnotSpace
+                (JSAST.toCommaList $ JSAST.JSExportSpecifier . JSAST.JSIdentName JSAST.JSAnnotSpace . T.unpack . runIdent <$> S.toList idents)
+                JSAST.JSAnnotSpace)
+              (JSAST.JSFromClause JSAST.JSAnnotSpace JSAST.JSAnnotSpace "\"./foreign.cjs\"")
+              (JSAST.JSSemi JSAST.JSNoAnnot))
+        ] JSAST.JSNoAnnot
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
@@ -294,18 +315,26 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   writePackageJson :: Make ()
   writePackageJson = writePackageJson' outputDir
 
+data ForeignModuleType = ESModule | CJSModule deriving (Show)
+
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
-checkForeignDecls :: CF.Module ann -> FilePath -> Make ()
+checkForeignDecls :: CF.Module ann -> FilePath -> Make (ForeignModuleType, S.Set Ident)
 checkForeignDecls m path = do
   jsStr <- T.unpack <$> readTextFile path
   js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parseModule jsStr path
 
-  foreignIdentsStrs <- either errorParsingModule pure $ getExps js
+  (foreignModuleType, foreignIdentsStrs) <- case getForeignModuleExports js of
+    Left reason -> errorParsingModule reason
+    Right (Bundle.ForeignModuleExports{..})
+      | null esExports -> do
+          let deprecatedFFI = filter (elem '\'') cjsExports
+          unless (null deprecatedFFI) $
+            errorDeprecatedForeignPrimes deprecatedFFI
 
-  let deprecatedFFI = filter (elem '\'') foreignIdentsStrs
-  unless (null deprecatedFFI) $
-    errorDeprecatedForeignPrimes deprecatedFFI
+          pure (CJSModule, cjsExports)
+      | otherwise ->
+          pure (ESModule, esExports)
 
   foreignIdents <- either
                      errorInvalidForeignIdentifiers
@@ -323,6 +352,7 @@ checkForeignDecls m path = do
     throwError . errorMessage' modSS . MissingFFIImplementations mname $
       S.toList missingFFI
 
+  pure (foreignModuleType, foreignIdents)
   where
   mname = CF.moduleName m
   modSS = CF.moduleSourceSpan m
@@ -330,8 +360,8 @@ checkForeignDecls m path = do
   errorParsingModule :: Bundle.ErrorMessage -> Make a
   errorParsingModule = throwError . errorMessage' modSS . ErrorParsingFFIModule path . Just
 
-  getExps :: JS.JSAST -> Either Bundle.ErrorMessage [String]
-  getExps = Bundle.getExportedIdentifiers (T.unpack (runModuleName mname))
+  getForeignModuleExports :: JS.JSAST -> Either Bundle.ErrorMessage  Bundle.ForeignModuleExports
+  getForeignModuleExports = Bundle.getExportedIdentifiers (T.unpack (runModuleName mname))
 
   errorInvalidForeignIdentifiers :: [String] -> Make a
   errorInvalidForeignIdentifiers =
