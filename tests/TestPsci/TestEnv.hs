@@ -6,7 +6,7 @@ import Prelude ()
 import Prelude.Compat
 
 import           Control.Exception.Lifted (bracket_)
-import           Control.Monad (forM, void, when)
+import           Control.Monad (void, when)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.RWS.Strict (evalRWST, asks, local, RWST)
 import           Data.Foldable (traverse_)
@@ -59,10 +59,7 @@ jsEval :: TestPSCi String
 jsEval = liftIO $ do
   writeFile indexFile "require('$PSCI')['$main']();"
   process <- findNodeProcess
-  result <- forM process $ \node -> do
-    cwd <- getCurrentDirectory
-    let esm = cwd </> "tests" </> "support" </> "node_modules" </> "esm"
-    readProcessWithExitCode node ["--require", esm, indexFile] ""
+  result <- traverse (\node -> readProcessWithExitCode node [indexFile] "") process
   case result of
     Just (ExitSuccess, out, _)   -> return out
     Just (ExitFailure _, _, err) -> putStrLn err >> exitFailure
