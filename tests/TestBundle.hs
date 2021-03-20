@@ -67,7 +67,7 @@ assertBundles supportModules supportExterns supportForeigns inputFiles outputFil
       Right _ -> do
         process <- findNodeProcess
         jsFiles <- concat <$> Glob.globDir [Glob.compile "*/*.js", Glob.compile "*/foreign.cjs"] modulesDir
-        let entryPoint = modulesDir </> "index.js"
+        let entryPoint = modulesDir </> "index.cjs"
         let entryModule = map (`ModuleIdentifier` Regular) ["Main"] 
         bundled <- runExceptT $ do
           input <- forM jsFiles $ \filename -> do
