@@ -257,6 +257,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
               case foreignModuleType of
                 ESModule -> copyFile path (outputFilename mn "foreign.js")
                 CJSModule -> do
+                  tell $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
                   copyFile path (outputFilename mn "foreign.cjs")
                   writeESForeignModuleWrapper mn foreignIdents
 

@@ -65,6 +65,7 @@ data SimpleErrorMessage
   | UnusedFFIImplementations ModuleName [Ident]
   | InvalidFFIIdentifier ModuleName Text
   | DeprecatedFFIPrime ModuleName Text
+  | DeprecatedFFICommonJSModule ModuleName FilePath
   | DeprecatedFFIDefaultCommonJSExport ModuleName
   | UnsupportedFFICommonJSExports ModuleName [Text]
   | UnsupportedFFICommonJSImports ModuleName [Text]
@@ -238,6 +239,7 @@ errorCode em = case unwrapErrorMessage em of
   UnusedFFIImplementations{} -> "UnusedFFIImplementations"
   InvalidFFIIdentifier{} -> "InvalidFFIIdentifier"
   DeprecatedFFIPrime{} -> "DeprecatedFFIPrime"
+  DeprecatedFFICommonJSModule {} -> "DeprecatedFFICommonJSModule"
   DeprecatedFFIDefaultCommonJSExport {} -> "DeprecatedFFIDefaultCommonJSExport"
   UnsupportedFFICommonJSExports {} -> "UnsupportedFFICommonJSExports"
   UnsupportedFFICommonJSImports {} -> "UnsupportedFFICommonJSImports"
@@ -704,6 +706,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 [ line $ "The identifier " <> markCode ident <> " contains a prime (" <> markCode "'" <> ")."
                 , line $ "Primes are not allowed in identifiers exported from FFI modules."
                 ]
+            ]
+    renderSimpleErrorMessage (DeprecatedFFICommonJSModule mn path) =
+      paras [ line $ "A CommonJS foreign module implementation was provided for module " <> markCode (runModuleName mn) <> ": "
+            , indent . lineS $ path
+            , line $ "CommonJS foreign modules are deprecated and won't be supported in the future."
             ]
     renderSimpleErrorMessage (DeprecatedFFIDefaultCommonJSExport mn) =
       paras [ line $ "In the FFI module for " <> markCode (runModuleName mn) <> ":"
