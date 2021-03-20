@@ -236,7 +236,7 @@ trim :: String -> String
 trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
 
 modulesDir :: FilePath
-modulesDir = ".test_modules" </> "node_modules"
+modulesDir = ".test_modules"
 
 logpath :: FilePath
 logpath = "purescript-output"

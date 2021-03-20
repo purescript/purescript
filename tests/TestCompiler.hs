@@ -166,7 +166,7 @@ assertCompiles supportModules supportExterns supportForeigns inputFiles outputFi
       Right _ -> do
         process <- findNodeProcess
         let entryPoint = modulesDir </> "index.js"
-        writeFile entryPoint "require('Main').main()"
+        writeFile entryPoint "import('./Main/index.js').then(({ main }) => main());"
         result <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
         hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) <> ":"
         case result of

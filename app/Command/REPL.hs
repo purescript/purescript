@@ -287,7 +287,7 @@ nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
 
     eval :: () -> String -> IO ()
     eval _ _ = do
-      writeFile indexFile "require('$PSCI')['$main']();"
+      writeFile indexFile "import('./$PSCI/index.js').then(({ $main }) => $main());"
       process <- maybe findNodeProcess (pure . pure) nodePath
       result <- traverse (\node -> readProcessWithExitCode node (nodeArgs ++ [indexFile]) "") process
       case result of

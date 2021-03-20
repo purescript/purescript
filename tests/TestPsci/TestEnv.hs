@@ -57,7 +57,7 @@ execTestPSCi i = do
 -- command evaluation.
 jsEval :: TestPSCi String
 jsEval = liftIO $ do
-  writeFile indexFile "require('$PSCI')['$main']();"
+  writeFile indexFile "import('./$PSCI/index.js').then(({ $main }) => $main());"
   process <- findNodeProcess
   result <- traverse (\node -> readProcessWithExitCode node [indexFile] "") process
   case result of
