@@ -65,6 +65,7 @@ data SimpleErrorMessage
   | UnusedFFIImplementations ModuleName [Ident]
   | InvalidFFIIdentifier ModuleName Text
   | DeprecatedFFIPrime ModuleName Text
+  | DeprecatedFFIDefaultCommonJSExport ModuleName
   | FileIOError Text IOError -- ^ A description of what we were trying to do, and the error which occurred
   | InfiniteType SourceType
   | InfiniteKind SourceType
@@ -235,6 +236,7 @@ errorCode em = case unwrapErrorMessage em of
   UnusedFFIImplementations{} -> "UnusedFFIImplementations"
   InvalidFFIIdentifier{} -> "InvalidFFIIdentifier"
   DeprecatedFFIPrime{} -> "DeprecatedFFIPrime"
+  DeprecatedFFIDefaultCommonJSExport {} -> "DeprecatedFFIDefaultCommonJSExport"
   FileIOError{} -> "FileIOError"
   InfiniteType{} -> "InfiniteType"
   InfiniteKind{} -> "InfiniteKind"
@@ -697,6 +699,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent . paras $
                 [ line $ "The identifier " <> markCode ident <> " contains a prime (" <> markCode "'" <> ")."
                 , line $ "Primes are not allowed in identifiers exported from FFI modules."
+                ]
+            ]
+    renderSimpleErrorMessage (DeprecatedFFIDefaultCommonJSExport mn) =
+      paras [ line $ "In the FFI module for " <> markCode (runModuleName mn) <> ":"
+            , indent . paras $
+                [ line $ "CommonJS exports named " <> markCode "default" <> " are not allowed."
                 ]
             ]
     renderSimpleErrorMessage InvalidDoBind =

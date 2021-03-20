@@ -1,0 +1,12 @@
+Error found:
+at tests/purs/failing/DeprecatedFFIDefaultCommonJSExport.purs:2:1 - 4:38 (line 2, column 1 - line 4, column 38)
+
+  In the FFI module for [33mMain[0m:
+
+    CommonJS exports named [33mdefault[0m are not allowed.
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/DeprecatedFFIDefaultCommonJSExport.md for more information,
+or to contribute content related to this error.
+
