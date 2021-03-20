@@ -66,6 +66,8 @@ data SimpleErrorMessage
   | InvalidFFIIdentifier ModuleName Text
   | DeprecatedFFIPrime ModuleName Text
   | DeprecatedFFIDefaultCommonJSExport ModuleName
+  | UnsupportedFFICommonJSExports ModuleName [Text]
+  | UnsupportedFFICommonJSImports ModuleName [Text]
   | FileIOError Text IOError -- ^ A description of what we were trying to do, and the error which occurred
   | InfiniteType SourceType
   | InfiniteKind SourceType
@@ -237,6 +239,8 @@ errorCode em = case unwrapErrorMessage em of
   InvalidFFIIdentifier{} -> "InvalidFFIIdentifier"
   DeprecatedFFIPrime{} -> "DeprecatedFFIPrime"
   DeprecatedFFIDefaultCommonJSExport {} -> "DeprecatedFFIDefaultCommonJSExport"
+  UnsupportedFFICommonJSExports {} -> "UnsupportedFFICommonJSExports"
+  UnsupportedFFICommonJSImports {} -> "UnsupportedFFICommonJSImports"
   FileIOError{} -> "FileIOError"
   InfiniteType{} -> "InfiniteType"
   InfiniteKind{} -> "InfiniteKind"
@@ -706,6 +710,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent . paras $
                 [ line $ "CommonJS exports named " <> markCode "default" <> " are not allowed."
                 ]
+            ]
+    renderSimpleErrorMessage (UnsupportedFFICommonJSExports mn idents) =
+      paras [ line $ "The following CommonJS exports are not supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "
+            , indent . paras $ map line idents
+            ]
+    renderSimpleErrorMessage (UnsupportedFFICommonJSImports mn mids) =
+      paras [ line $ "The following CommonJS imports are no supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "
+            , indent . paras $ map line mids
             ]
     renderSimpleErrorMessage InvalidDoBind =
       line "The last statement in a 'do' block must be an expression, but this block ends with a binder."

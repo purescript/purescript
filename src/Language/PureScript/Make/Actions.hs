@@ -324,20 +324,29 @@ checkForeignDecls m path = do
   jsStr <- T.unpack <$> readTextFile path
   js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parseModule jsStr path
 
-  (foreignModuleType, foreignIdentsStrs) <- case getForeignModuleExports js of
-    Left reason -> errorParsingModule reason
-    Right (Bundle.ForeignModuleExports{..})
-      | null esExports -> do
-          let deprecatedFFI = filter (elem '\'') cjsExports
-          unless (null deprecatedFFI) $
-            errorDeprecatedForeignPrimes deprecatedFFI
+  (foreignModuleType, foreignIdentsStrs) <-
+    case (,) <$> getForeignModuleExports js <*> getForeignModuleImports js of
+      Left reason -> errorParsingModule reason
+      Right (Bundle.ForeignModuleExports{..}, Bundle.ForeignModuleImports{..})
+        | not (null cjsExports && null cjsImports)
+        , null esExports
+        , null esImports -> do
+            let deprecatedFFI = filter (elem '\'') cjsExports
+            unless (null deprecatedFFI) $
+              errorDeprecatedForeignPrimes deprecatedFFI
 
-          when (elem "default" cjsExports) $
-            errorDeprecatedFFIDefaultCJSExport
+            when (elem "default" cjsExports) $
+              errorDeprecatedFFIDefaultCJSExport
 
-          pure (CJSModule, cjsExports)
-      | otherwise ->
-          pure (ESModule, esExports)
+            pure (CJSModule, cjsExports)
+        | otherwise -> do
+            unless (null cjsImports) $
+              errorUnsupportedFFICommonJSImports cjsImports
+
+            unless (null cjsExports) $
+              errorUnsupportedFFICommonJSExports cjsExports
+
+            pure (ESModule, esExports)
 
   foreignIdents <- either
                      errorInvalidForeignIdentifiers
@@ -366,6 +375,9 @@ checkForeignDecls m path = do
   getForeignModuleExports :: JS.JSAST -> Either Bundle.ErrorMessage  Bundle.ForeignModuleExports
   getForeignModuleExports = Bundle.getExportedIdentifiers (T.unpack (runModuleName mname))
 
+  getForeignModuleImports :: JS.JSAST -> Either Bundle.ErrorMessage Bundle.ForeignModuleImports
+  getForeignModuleImports = Bundle.getImportedModules (T.unpack (runModuleName mname))
+
   errorInvalidForeignIdentifiers :: [String] -> Make a
   errorInvalidForeignIdentifiers =
     throwError . mconcat . map (errorMessage . InvalidFFIIdentifier mname . T.pack)
@@ -377,6 +389,14 @@ checkForeignDecls m path = do
   errorDeprecatedFFIDefaultCJSExport :: Make a
   errorDeprecatedFFIDefaultCJSExport =
     throwError . errorMessage' modSS $ DeprecatedFFIDefaultCommonJSExport mname
+
+  errorUnsupportedFFICommonJSExports :: [String] -> Make a
+  errorUnsupportedFFICommonJSExports =
+    throwError . errorMessage' modSS . UnsupportedFFICommonJSExports mname . map T.pack
+
+  errorUnsupportedFFICommonJSImports :: [String] -> Make a
+  errorUnsupportedFFICommonJSImports =
+    throwError . errorMessage' modSS . UnsupportedFFICommonJSImports mname . map T.pack
 
   parseIdents :: [String] -> Either [String] [Ident]
   parseIdents strs =

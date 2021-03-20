@@ -15,6 +15,8 @@ module Language.PureScript.Bundle
   , printErrorMessage
   , ForeignModuleExports(..)
   , getExportedIdentifiers
+  , ForeignModuleImports(..)
+  , getImportedModules
   , Module
   ) where
 
@@ -462,8 +464,8 @@ toModule mids mid filename top
              ]
 
   toModuleElements item@(JSModuleStatementListItem jsStatement)
-    | Just (importName, importPath) <- matchRequire mids mid jsStatement
-    = pure [Import item importName importPath]
+    | Just (importName, importPath) <- matchRequire jsStatement
+    = pure [Import item importName $ checkImportPath importPath mid mids]
   toModuleElements (JSModuleStatementListItem jsStatement)
     | Just (visibility, name, decl) <- matchMember jsStatement
     = pure [Member jsStatement visibility name decl []]
@@ -579,13 +581,44 @@ getExportedIdentifiers mname top
   exportSpecifierName (JSExportSpecifier jsIdent) = identName jsIdent
   exportSpecifierName (JSExportSpecifierAs _ _ jsIdentAs) = identName jsIdentAs
 
+data ForeignModuleImports =
+  ForeignModuleImports
+    { cjsImports :: [String]
+    , esImports :: [String]
+    } deriving (Show)
+
+instance Semigroup ForeignModuleImports where
+  (ForeignModuleImports cjsImports esImports) <> (ForeignModuleImports cjsImports' esImports') =
+    ForeignModuleImports (cjsImports <> cjsImports') (esImports <> esImports')
+instance Monoid ForeignModuleImports where
+  mempty = ForeignModuleImports [] []
+
+-- Get a list of all the imported module identifiers from a foreign module.
+getImportedModules :: forall m. (MonadError ErrorMessage m)
+                          => String
+                          -> JSAST
+                          -> m ForeignModuleImports
+getImportedModules mname top
+  | JSAstModule jsModuleItems _ <- top = pure $ foldMap go jsModuleItems
+  | otherwise = err InvalidTopLevel
+  where
+  err :: ErrorMessage -> m a
+  err = throwError . ErrorInModule (ModuleIdentifier mname Foreign)
+
+  go (JSModuleStatementListItem jsStatement)
+    | Just (_, mid) <- matchRequire jsStatement
+    = ForeignModuleImports{ cjsImports = [mid], esImports = [] }
+  go (JSModuleImportDeclaration _ jsImportDeclaration) =
+    ForeignModuleImports{ cjsImports = [], esImports = [importDeclarationModuleId jsImportDeclaration] }
+  go _ = mempty
+
+  importDeclarationModuleId (JSImportDeclaration _ (JSFromClause _ _ mid) _) = mid
+  importDeclarationModuleId (JSImportDeclarationBare _ mid _) = mid
+
 -- Matches JS statements like this:
 -- var ModuleName = require("file");
-matchRequire :: S.Set String
-                -> ModuleIdentifier
-                -> JSStatement
-                -> Maybe (String, Either String ModuleIdentifier)
-matchRequire mids mid stmt
+matchRequire :: JSStatement -> Maybe (String, String)
+matchRequire stmt
   | JSVariable _ jsInit _ <- stmt
   , [JSVarInitExpression var varInit] <- fromCommaList jsInit
   , JSIdentifier _ importName <- var
@@ -593,8 +626,7 @@ matchRequire mids mid stmt
   , JSMemberExpression req _ argsE _ <- jsInitEx
   , JSIdentifier _ "require" <- req
   , [ Just importPath ] <- map fromStringLiteral (fromCommaList argsE)
-  , importPath' <- checkImportPath importPath mid mids
-  = Just (importName, importPath')
+  = Just (importName, importPath)
   | otherwise
   = Nothing
 
