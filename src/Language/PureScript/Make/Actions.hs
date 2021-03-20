@@ -18,6 +18,7 @@ import           Control.Monad.Reader (asks)
 import           Control.Monad.Supply
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
+import           Data.Aeson (Value(String), (.=), object)
 import           Data.Bifunctor (bimap)
 import           Data.Either (partitionEithers)
 import           Data.Foldable (for_, minimum)
@@ -105,6 +106,9 @@ data MakeActions m = MakeActions
   , writeCacheDb :: CacheDb -> m ()
   -- ^ Write the given cache database to some external source (e.g. a file on
   -- disk).
+  , writePackageJson :: m ()
+  -- ^ Write to the output directory the package.json file allowing Node.js to
+  -- load .js files as ES modules.
   , outputPrimDocs :: m ()
   -- ^ If generating docs, output the documentation for the Prim modules
   }
@@ -131,6 +135,15 @@ writeCacheDb'
   -> m ()
 writeCacheDb' = writeJSONFile . cacheDbFile
 
+writePackageJson'
+  :: (MonadIO m, MonadError MultipleErrors m)
+  => FilePath
+  -- ^ The path to the output directory
+  -> m ()
+writePackageJson' outputDir = writeJSONFile (outputDir </> "package.json") $ object
+  [ "type" .= String "module"
+  ]
+
 -- | A set of make actions that read and write modules from the given directory.
 buildMakeActions
   :: FilePath
@@ -143,7 +156,7 @@ buildMakeActions
   -- ^ Generate a prefix comment?
   -> MakeActions Make
 buildMakeActions outputDir filePathMap foreigns usePrefix =
-    MakeActions getInputTimestampsAndHashes getOutputTimestamp readExterns codegen ffiCodegen progress readCacheDb writeCacheDb outputPrimDocs
+    MakeActions getInputTimestampsAndHashes getOutputTimestamp readExterns codegen ffiCodegen progress readCacheDb writeCacheDb writePackageJson outputPrimDocs
   where
 
   getInputTimestampsAndHashes
@@ -277,6 +290,9 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   writeCacheDb :: CacheDb -> Make ()
   writeCacheDb = writeCacheDb' outputDir
+
+  writePackageJson :: Make ()
+  writePackageJson = writePackageJson' outputDir
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
