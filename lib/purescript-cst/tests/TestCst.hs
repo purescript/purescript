@@ -73,9 +73,9 @@ readTok' failMsg t = case CST.lex t of
   Right tok : _ ->
     pure tok
   Left (_, err) : _ ->
-    fail $ failMsg <> ": " <> CST.prettyPrintError err
+    error $ failMsg <> ": " <> CST.prettyPrintError err
   [] ->
-    fail "Empty token stream"
+    error "Empty token stream"
 
 readTok :: Text -> Gen SourceToken
 readTok = readTok' "Failed to parse"
@@ -89,7 +89,7 @@ checkTok p f t = do
   SourceToken _ tok <- readTok t
   case f tok of
     Just a  -> p t a
-    Nothing -> fail $ "Failed to lex correctly: " <> show tok
+    Nothing -> error $ "Failed to lex correctly: " <> show tok
 
 roundTripTok :: Text -> Gen Bool
 roundTripTok t = do
@@ -106,7 +106,7 @@ checkReadNum t a = do
       chs' -> chs'
   case (== a) <$> readMaybe chs of
     Just a' -> pure a'
-    Nothing -> fail "Failed to `read`"
+    Nothing -> error "Failed to `read`"
 
 newtype PSSourceInt = PSSourceInt { unInt :: Text }
   deriving (Show, Eq)

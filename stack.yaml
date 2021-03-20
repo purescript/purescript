@@ -1,4 +1,4 @@
-resolver: lts-13.26
+resolver: lts-17.6
 pvp-bounds: both
 packages:
 - '.'
@@ -8,13 +8,7 @@ ghc-options:
   # Build with advanced optimizations enabled by default
   "$locals": -O2
 extra-deps:
-- serialise-0.2.2.0
-- cborg-0.2.2.0
-- happy-1.19.9
 - language-javascript-0.7.0.0
-- network-3.0.1.1
-- these-1.0.1
-- semialign-1
 nix:
   enable: false
   packages:
@@ -28,4 +22,3 @@ flags:
     lib-only: true
   these:
     assoc: false
-    quickcheck: false

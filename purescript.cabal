@@ -82,7 +82,7 @@ common defaults
     TypeFamilies
     ViewPatterns
   build-tool-depends:
-    happy:happy ==1.19.9
+    happy:happy ==1.20.0
   build-depends:
     -- NOTE: Please do not edit these version constraints manually. They are
     -- deliberately made narrow because changing the dependency versions in
@@ -114,69 +114,69 @@ common defaults
     -- is part of the compiler's public API; all FFI modules must be parseable
     -- by language-javascript otherwise the compiler will reject them. It
     -- should always be pinned to a single specific version.
-    aeson >=1.4.2.0 && <1.5,
+    aeson >=1.5.6.0 && <1.6,
     aeson-better-errors >=0.9.1.0 && <0.10,
-    aeson-pretty >=0.8.7 && <0.9,
-    ansi-terminal >=0.8.2 && <0.9,
-    array >=0.5.3.0 && <0.6,
-    base >=4.12.0.0 && <4.13,
-    base-compat >=0.10.5 && <0.11,
-    blaze-html >=0.9.1.1 && <0.10,
+    aeson-pretty >=0.8.8 && <0.9,
+    ansi-terminal >=0.10.3 && <0.11,
+    array >=0.5.4.0 && <0.6,
+    base >=4.14.1.0 && <4.15,
+    base-compat >=0.11.2 && <0.12,
+    blaze-html >=0.9.1.2 && <0.10,
     bower-json >=1.0.0.1 && <1.1,
     boxes >=0.1.5 && <0.2,
-    bytestring >=0.10.8.2 && <0.11,
-    Cabal >=2.4.1.0 && <2.5,
-    cborg >=0.2.2.0 && <0.3,
-    serialise >=0.2.2.0 && <0.3,
-    cheapskate >=0.1.1.1 && <0.2,
-    clock >=0.7.2 && <0.8,
-    containers >=0.6.0.1 && <0.7,
-    cryptonite ==0.25.*,
+    bytestring >=0.10.12.0 && <0.11,
+    Cabal >=3.2.1.0 && <3.3,
+    cborg >=0.2.4.0 && <0.3,
+    serialise >=0.2.3.0 && <0.3,
+    cheapskate >=0.1.1.2 && <0.2,
+    clock ==0.8.*,
+    containers >=0.6.2.1 && <0.7,
+    cryptonite ==0.27.*,
     data-ordlist >=0.4.7.0 && <0.5,
     deepseq >=1.4.4.0 && <1.5,
-    directory >=1.3.3.0 && <1.4,
-    dlist >=0.8.0.6 && <0.9,
+    directory >=1.3.6.0 && <1.4,
+    dlist >=0.8.0.8 && <0.9,
     edit-distance >=0.2.2.1 && <0.3,
-    file-embed >=0.0.11 && <0.1,
+    file-embed >=0.0.13.0 && <0.1,
     filepath >=1.4.2.1 && <1.5,
     fsnotify >=0.3.0.1 && <0.4,
-    Glob >=0.9.3 && <0.10,
-    haskeline >=0.7.5.0 && <0.8,
+    Glob >=0.10.1 && <0.11,
+    haskeline >=0.8.1.1 && <0.9,
     language-javascript ==0.7.0.0,
-    lifted-async >=0.10.0.4 && <0.11,
+    lifted-async >=0.10.1.3 && <0.11,
     lifted-base >=0.2.3.12 && <0.3,
-    memory >=0.14.18 && <0.15,
-    microlens >=0.4.10 && <0.5,
-    microlens-platform >=0.3.11 && <0.4,
+    memory >=0.15.0 && <0.16,
+    microlens >=0.4.11.2 && <0.5,
+    microlens-platform >=0.4.1 && <0.5,
     monad-control >=1.0.2.3 && <1.1,
-    monad-logger >=0.3.30 && <0.4,
+    monad-logger >=0.3.36 && <0.4,
     mtl >=2.2.2 && <2.3,
     parallel >=3.2.2.0 && <3.3,
-    parsec >=3.1.13.0 && <3.2,
+    parsec >=3.1.14.0 && <3.2,
     pattern-arrows >=0.0.2 && <0.1,
-    process >=1.6.5.0 && <1.7,
-    protolude >=0.2.3 && <0.3,
+    process >=1.6.9.0 && <1.7,
+    protolude >=0.3.0 && <0.4,
     purescript-ast >=0.1.0.0 && <0.2,
     purescript-cst >=0.1.0.0 && <0.2,
-    regex-tdfa >=1.2.3.2 && <1.3,
-    safe >=0.3.17 && <0.4,
+    regex-tdfa >=1.3.1.0 && <1.4,
+    safe >=0.3.19 && <0.4,
     scientific >=0.3.6.2 && <0.4,
-    semigroups >=0.18.5 && <0.19,
-    semialign >=1 && <1.1,
+    semigroups >=0.19.1 && <0.20,
+    semialign >=1.1.0.1 && <1.2,
     sourcemap >=0.1.6 && <0.2,
-    split >=0.2.3.3 && <0.3,
+    split >=0.2.3.4 && <0.3,
     stm >=2.5.0.0 && <2.6,
     stringsearch >=0.3.6.6 && <0.4,
-    syb >=0.7.1 && <0.8,
-    text >=1.2.3.1 && <1.3,
-    these >=1.0.1 && <1.1,
-    time >=1.8.0.2 && <1.9,
+    syb >=0.7.2.1 && <0.8,
+    text >=1.2.4.1 && <1.3,
+    these >=1.1.1.1 && <1.2,
+    time >=1.9.3 && <1.10,
     transformers >=0.5.6.2 && <0.6,
     transformers-base >=0.4.5.2 && <0.5,
-    transformers-compat >=0.6.5 && <0.7,
-    unordered-containers >=0.2.10.0 && <0.3,
-    utf8-string >=1.0.1.1 && <1.1,
-    vector >=0.12.0.3 && <0.13
+    transformers-compat >=0.6.6 && <0.7,
+    unordered-containers >=0.2.13.0 && <0.3,
+    utf8-string >=1.0.2 && <1.1,
+    vector >=0.12.1.2 && <0.13
 
 library
   import: defaults
@@ -325,16 +325,17 @@ executable purs
   main-is: Main.hs
   ghc-options: -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      ansi-wl-pprint >=0.6.8.2 && < 0.7
-    , file-embed ==0.0.11
-    , http-types >=0.12.3 && < 0.13
-    , network >= 3.0.1.1 && <3.1
-    , optparse-applicative >=0.13.0 && <0.15
+      ansi-wl-pprint >=0.6.9 && <0.7
+    , exceptions >=0.10.4 && <0.11
+    , file-embed >=0.0.13.0 && <0.1
+    , http-types >=0.12.3 && <0.13
+    , network >= 3.1.1.1 && <3.2
+    , optparse-applicative >=0.15.1.0 && <0.16
     , purescript
-    , wai ==3.*
-    , wai-websockets ==3.*
-    , warp ==3.*
-    , websockets >=0.9 && <0.13
+    , wai >=3.2.3 && <3.3
+    , wai-websockets >=3.0.1.2 && <3.1
+    , warp >=3.3.14 && <3.4
+    , websockets >=0.12.7.2 && <0.13
   if flag(release)
     cpp-options: -DRELEASE
   else

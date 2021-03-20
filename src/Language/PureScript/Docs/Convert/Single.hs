@@ -7,7 +7,6 @@ import Protolude hiding (moduleName)
 
 import Control.Category ((>>>))
 
-import Data.Functor (($>))
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types

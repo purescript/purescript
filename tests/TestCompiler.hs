@@ -55,7 +55,6 @@ import Text.Regex.TDFA (Regex)
 import TestUtils
 import Test.Tasty
 import Test.Tasty.Hspec
-import Test.Tasty (testGroup)
 import Test.Tasty.Golden (goldenVsString)
 
 main :: IO TestTree
