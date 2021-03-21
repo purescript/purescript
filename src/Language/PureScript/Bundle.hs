@@ -226,7 +226,7 @@ printErrorMessage UnsupportedImport =
 printErrorMessage UnsupportedExport =
   [ "An export was unsupported."
   , "Declarations can be exported as ES named exports:"
-  , "  export decl"
+  , "  export var decl"
   , "Existing identifiers can be exported as well:"
   , "  export { name }"
   , "They can also be renamed on export:"
@@ -458,10 +458,12 @@ toModule mids mid filename top
     = pure . ExportsList <$> exportSpecifiersList Nothing jsExportSpecifiers
   toModuleElements (JSModuleExportDeclaration _ jsExportDeclaration)
     | JSExport jsStatement _ <- jsExportDeclaration
-    = traverse (toExport' Nothing) (exportStatementIdentifiers jsStatement) >>= \exports ->
-        pure [ Other jsStatement
-             , ExportsList exports
-             ]
+    , Just (visibility, name, decl) <- matchInternalMember jsStatement
+    = pure [ Member jsStatement visibility name decl []
+           , ExportsList [toRegularExport' name]
+           ]
+  toModuleElements (JSModuleExportDeclaration _ JSExport{})
+    = err UnsupportedExport
 
   toModuleElements item@(JSModuleStatementListItem jsStatement)
     | Just (importName, importPath) <- matchRequire jsStatement
@@ -518,9 +520,14 @@ toModule mids mid filename top
                  (stringLiteral name) JSNoAnnot)
     | otherwise = err UnsupportedExport
   toExport Nothing name as =
-    pure (RegularExport name, as, JSIdentifier sp name, [])
+    pure $ toRegularExport name as
 
   toExport' from name = toExport from name name
+
+  toRegularExport name as =
+    (RegularExport name, as, JSIdentifier sp name, [])
+
+  toRegularExport' name = toRegularExport name name
 
 data ForeignModuleExports =
   ForeignModuleExports
@@ -633,16 +640,23 @@ matchRequire stmt
 -- Matches JS member declarations.
 matchMember :: JSStatement -> Maybe (Visibility, String, JSExpression)
 matchMember stmt
+  | Just (visibility, name, decl) <- matchInternalMember stmt
+  = pure (visibility, name, decl)
+  -- exports.foo = expr; exports["foo"] = expr;
+  | JSAssignStatement e (JSAssign _) decl _ <- stmt
+  , Just name <- exportsAccessor e
+  = Just (Public, name, decl)
+  | otherwise
+  = Nothing
+
+matchInternalMember :: JSStatement -> Maybe (Visibility, String, JSExpression)
+matchInternalMember stmt
   -- var foo = expr;
   | JSVariable _ jsInit _ <- stmt
   , [JSVarInitExpression var varInit] <- fromCommaList jsInit
   , JSIdentifier _ name <- var
   , JSVarInit _ decl <- varInit
-  = Just (Internal, name, decl)
-  -- exports.foo = expr; exports["foo"] = expr;
-  | JSAssignStatement e (JSAssign _) decl _ <- stmt
-  , Just name <- exportsAccessor e
-  = Just (Public, name, decl)
+  = pure (Internal, name, decl)
   | otherwise
   = Nothing
 
