@@ -11,7 +11,7 @@ module Language.PureScript.Make.Actions
 
 import           Prelude
 
-import           Blaze.ByteString.Builder (toByteString)
+import           Control.Arrow ((&&&))
 import           Control.Monad hiding (sequence)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
@@ -32,11 +32,8 @@ import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 import           Data.Time.Clock (UTCTime)
 import           Data.Version (showVersion)
-import qualified Language.JavaScript.AST.JSCommaList as JSAST (toCommaList)
 import qualified Language.JavaScript.Parser as JS
 import           Language.PureScript.AST
-import qualified Language.JavaScript.Parser.AST as JSAST
-import           Language.JavaScript.Pretty.Printer (renderJS)
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.CodeGen.JS as J
 import           Language.PureScript.CodeGen.JS.Printer
@@ -266,16 +263,20 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   writeESForeignModuleWrapper :: ModuleName -> S.Set Ident -> Make ()
   writeESForeignModuleWrapper mn idents =
-    writeTextFile (outputFilename mn "foreign.js") . toByteString . renderJS $
-      JSAST.JSAstModule
-        [ JSAST.JSModuleExportDeclaration JSAST.JSNoAnnot
-            (JSAST.JSExportFrom
-              (JSAST.JSExportClause JSAST.JSAnnotSpace
-                (JSAST.toCommaList $ JSAST.JSExportSpecifier . JSAST.JSIdentName JSAST.JSAnnotSpace . T.unpack . runIdent <$> S.toList idents)
-                JSAST.JSAnnotSpace)
-              (JSAST.JSFromClause JSAST.JSAnnotSpace JSAST.JSAnnotSpace "\"./foreign.cjs\"")
-              (JSAST.JSSemi JSAST.JSNoAnnot))
-        ] JSAST.JSNoAnnot
+    writeTextFile (outputFilename mn "foreign.js") wrapper
+    where
+    xs = (J.identToJs &&& runIdent) <$> S.toList idents
+    wrapper = TE.encodeUtf8 . T.intercalate "\n" $
+      "import $foreign from \"./foreign.cjs\";" :
+      fmap (uncurry toLocalDeclaration) xs ++
+      [ "export { " <> T.intercalate ", " (uncurry toNamedExport <$> xs) <> " };"
+      , ""
+      ]
+    toLocalDeclaration local exported =
+      "var " <> local <> " = $foreign." <> exported <> ";"
+    toNamedExport local exported
+      | local == exported = local
+      | otherwise = local <> " as " <> exported
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do

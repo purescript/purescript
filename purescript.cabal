@@ -121,7 +121,6 @@ common defaults
     array >=0.5.3.0 && <0.6,
     base >=4.12.0.0 && <4.13,
     base-compat >=0.10.5 && <0.11,
-    blaze-builder >=0.2 && <0.5,
     blaze-html >=0.9.1.1 && <0.10,
     bower-json >=1.0.0.1 && <1.1,
     boxes >=0.1.5 && <0.2,
@@ -184,7 +183,6 @@ library
   hs-source-dirs: src
   exposed-modules:
     Control.Monad.Logger
-    Language.JavaScript.AST.JSCommaList
     Language.PureScript
     Language.PureScript.Bundle
     Language.PureScript.CodeGen
