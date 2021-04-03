@@ -23,6 +23,8 @@ Bugfixes:
 
 * Make close punctuation printable in errors (#3982, @rhendric)
 
+* Instantiate polymorphic kinds when unwrapping newtypes while solving Coercible constraints (#4040, @kl0tl)
+
 Other improvements:
 
 * Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
