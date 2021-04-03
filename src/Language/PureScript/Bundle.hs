@@ -468,8 +468,8 @@ toModule mids mid filename top
     = pure . ExportsList <$> exportSpecifiersList Nothing jsExportSpecifiers
   toModuleElements (JSModuleExportDeclaration _ jsExportDeclaration)
     | JSExport jsStatement _ <- jsExportDeclaration
-    , Just (visibility, name, decl) <- matchInternalMember jsStatement
-    = pure [ Member jsStatement visibility name decl []
+    , Just (name, decl) <- matchInternalMember jsStatement
+    = pure [ Member jsStatement Internal name decl []
            , ExportsList [toRegularExport' name]
            ]
   toModuleElements (JSModuleExportDeclaration _ JSExport{})
@@ -649,8 +649,8 @@ matchRequire stmt
 -- Matches JS member declarations.
 matchMember :: JSStatement -> Maybe (Visibility, String, JSExpression)
 matchMember stmt
-  | Just (visibility, name, decl) <- matchInternalMember stmt
-  = pure (visibility, name, decl)
+  | Just (name, decl) <- matchInternalMember stmt
+  = pure (Internal, name, decl)
   -- exports.foo = expr; exports["foo"] = expr;
   | JSAssignStatement e (JSAssign _) decl _ <- stmt
   , Just name <- exportsAccessor e
@@ -658,14 +658,14 @@ matchMember stmt
   | otherwise
   = Nothing
 
-matchInternalMember :: JSStatement -> Maybe (Visibility, String, JSExpression)
+matchInternalMember :: JSStatement -> Maybe (String, JSExpression)
 matchInternalMember stmt
   -- var foo = expr;
   | JSVariable _ jsInit _ <- stmt
   , [JSVarInitExpression var varInit] <- commaList jsInit
   , JSIdentifier _ name <- var
   , JSVarInit _ decl <- varInit
-  = pure (Internal, name, decl)
+  = pure (name, decl)
   | otherwise
   = Nothing
 
