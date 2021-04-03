@@ -29,6 +29,10 @@ Other improvements:
 
   The previous `logo.png` was not legible against a dark background (#4001).
 
+Internal:
+
+* Remove unused Data.Foldable.foldr import (#4042, @kl0tl)
+
 ## v0.14.0
 
 ### Polykinds
