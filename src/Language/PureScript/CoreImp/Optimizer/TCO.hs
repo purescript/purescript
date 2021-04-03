@@ -6,7 +6,6 @@ import Prelude.Compat
 import Control.Applicative (empty, liftA2)
 import Control.Monad (guard)
 import Control.Monad.State (State, evalState, get, modify)
-import Data.Foldable (foldr)
 import Data.Functor (($>), (<&>))
 import qualified Data.Set as S
 import Data.Text (Text, pack)
