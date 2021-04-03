@@ -31,6 +31,7 @@ Other improvements:
 
 Internal:
 
+* Upgrade tests Bower dependencies (#4041, @kl0tl)
 * Remove unused Data.Foldable.foldr import (#4042, @kl0tl)
 
 ## v0.14.0
