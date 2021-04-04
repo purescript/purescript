@@ -8,13 +8,33 @@ Breaking changes:
 
 New features:
 
+* Support TCO for functions with tail-recursive inner functions (#3958, @rhendric)
+
+  Adds support for optimizing functions that contain local functions which call
+  the outer function in tail position, as long as those functions themselves
+  are only called from tail position, either in the outer function or in other
+  such functions.
+
+  This enables hand-written mutually-tail-recursive function groups to be
+  optimized, but more critically, it also means that case guards which desugar
+  to use local functions don't break TCO.
+
 Bugfixes:
 
 * Make close punctuation printable in errors (#3982, @rhendric)
 
 Other improvements:
 
+* Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
+
+  The previous `logo.png` was not legible against a dark background (#4001).
+
 * Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
+
+Internal:
+
+* Upgrade tests Bower dependencies (#4041, @kl0tl)
+* Remove unused Data.Foldable.foldr import (#4042, @kl0tl)
 
 ## v0.14.0
 
@@ -299,6 +319,7 @@ We are going to output ES modules instead of CommonJS in the next breaking relea
 * Add golden tests for errors and warnings (#3774, #3811, #3808, #3846, @dariooddenino, @rhendric, @kl0tl)
 
 * More descriptive protocol errors from the ide server (@kritzcreek)
+
 
 ## [v0.13.8](https://github.com/purescript/purescript/releases/tag/v0.13.8) - 2020-05-23
 

@@ -11,7 +11,6 @@ import Prelude.Compat hiding ((<>))
 
 import Control.Arrow (second)
 
-import Data.Maybe (maybe)
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Monoid as Monoid ((<>))

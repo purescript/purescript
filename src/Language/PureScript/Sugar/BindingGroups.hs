@@ -115,18 +115,21 @@ createBindingGroups moduleName = mapM f <=< handleDecls
 --
 collapseBindingGroups :: [Declaration] -> [Declaration]
 collapseBindingGroups =
-  let (f, _, _) = everywhereOnValues id collapseBindingGroupsForValue id
-  in fmap f . concatMap go
+  let (f, _, _) = everywhereOnValues id flattenBindingGroupsForValue id
+  in fmap f . flattenBindingGroups
+
+flattenBindingGroupsForValue :: Expr -> Expr
+flattenBindingGroupsForValue (Let w ds val) = Let w (flattenBindingGroups ds) val
+flattenBindingGroupsForValue other = other
+
+flattenBindingGroups :: [Declaration] -> [Declaration]
+flattenBindingGroups = concatMap go
   where
   go (DataBindingGroupDeclaration ds) = NEL.toList ds
   go (BindingGroupDeclaration ds) =
     NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
       ValueDecl sa ident nameKind [] [MkUnguarded val]) ds
   go other = [other]
-
-collapseBindingGroupsForValue :: Expr -> Expr
-collapseBindingGroupsForValue (Let w ds val) = Let w (collapseBindingGroups ds) val
-collapseBindingGroupsForValue other = other
 
 usedIdents :: ModuleName -> ValueDeclarationData Expr -> [Ident]
 usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression

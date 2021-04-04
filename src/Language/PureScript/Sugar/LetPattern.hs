@@ -6,7 +6,7 @@ module Language.PureScript.Sugar.LetPattern (desugarLetPatternModule) where
 
 import Prelude.Compat
 
-import Data.List (groupBy, concatMap)
+import Data.List (groupBy)
 import Data.Function (on)
 
 import Language.PureScript.AST

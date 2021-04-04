@@ -27,7 +27,6 @@ module Language.PureScript.Ide.Filter
 import           Protolude                     hiding (isPrefixOf, Prefix)
 
 import           Control.Monad.Fail (fail)
-import           Data.Bifunctor (first)
 import           Data.Aeson
 import           Data.Text (isPrefixOf)
 import qualified Data.Set as Set
