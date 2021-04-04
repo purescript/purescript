@@ -661,8 +661,8 @@ lookupNewtypeConstructor
   -> [SourceType]
   -> Maybe ([Text], ProperName 'ConstructorName, SourceType)
 lookupNewtypeConstructor env qualifiedNewtypeName ks = do
-  (k, DataType Newtype tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
-  let (kvs, _) = fromMaybe (internalError "lookupNewtypeConstructor: unkinded forall binder") $ completeBinderList k
+  (newtyk, DataType Newtype tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
+  let (kvs, _) = fromMaybe (internalError "lookupNewtypeConstructor: unkinded forall binder") $ completeBinderList newtyk
       instantiatedKinds = zipWith (\(_, (kv, _)) k -> (kv, k)) kvs ks
   pure (map (\(name, _, _) -> name) tvs, ctorName, replaceAllTypeVars instantiatedKinds wrappedTy)
 
