@@ -165,6 +165,8 @@ Bugfixes:
   corefn.json file in your output directory which would be incorrectly
   considered up-to-date by the compiler.
 
+* Do not remove bindings referenced in function declarations when bundling (#4044, @kl0tl)
+
 Other improvements:
 
 * Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
