@@ -47,5 +47,5 @@ tar -xzf sdist-test/lib/purescript-cst/purescript-cst-*.tar.gz -C sdist-test/lib
 $STACK sdist . --tar-dir sdist-test;
 tar -xzf sdist-test/purescript-*.tar.gz -C sdist-test --strip-components=1
 pushd sdist-test
-$STACK build --pedantic $STACK_OPTS
+$STACK build $STACK_OPTS
 popd
