@@ -29,6 +29,8 @@ Other improvements:
 
   The previous `logo.png` was not legible against a dark background (#4001).
 
+* Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
+
 Internal:
 
 * Upgrade tests Bower dependencies (#4041, @kl0tl)
