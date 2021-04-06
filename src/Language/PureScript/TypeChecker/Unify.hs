@@ -166,7 +166,7 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
   unifyTails ([], REmptyKinded _ _) ([], REmptyKinded _ _) = return ()
   unifyTails ([], TypeVar _ v1)    ([], TypeVar _ v2)    | v1 == v2 = return ()
   unifyTails ([], Skolem _ _ s1 _ _) ([], Skolem _ _ s2 _ _) | s1 == s2 = return ()
-  unifyTails (sd1, TUnknown a u1)  (sd2, TUnknown _ u2)  = do
+  unifyTails (sd1, TUnknown a u1)  (sd2, TUnknown _ u2)  | u1 /= u2 = do
     forM_ sd1 $ occursCheck u2 . rowListType
     forM_ sd2 $ occursCheck u1 . rowListType
     rest' <- freshTypeWithKind =<< elaborateKind (TUnknown a u1)

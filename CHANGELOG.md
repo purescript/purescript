@@ -23,6 +23,8 @@ Bugfixes:
 
 * Make close punctuation printable in errors (#3982, @rhendric)
 
+* Fix row unification with shared unknown in tails (#4048, @rhendric)
+
 Other improvements:
 
 * Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
