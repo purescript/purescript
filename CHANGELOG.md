@@ -25,6 +25,8 @@ Bugfixes:
 * Desugar type operators in top-level kind signatures (#4027, @natefaubion)
 * Use type annotation hint only when needed (#4025, @rhendric)
 
+* Instantiate polymorphic kinds when unwrapping newtypes while solving Coercible constraints (#4040, @kl0tl)
+
 Other improvements:
 
 * Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
