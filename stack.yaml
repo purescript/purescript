@@ -6,7 +6,7 @@ packages:
 - lib/purescript-cst
 ghc-options:
   # Build with advanced optimizations enabled by default
-  "$locals": -O2
+  "$locals": -O2 -Werror
 extra-deps:
 - language-javascript-0.7.0.0
 nix:

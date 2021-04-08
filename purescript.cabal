@@ -52,6 +52,7 @@ flag release
   default: False
 
 common defaults
+  ghc-options: -Wall
   default-language: Haskell2010
   default-extensions:
     BangPatterns
