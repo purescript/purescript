@@ -23,6 +23,8 @@ Bugfixes:
 
 * Make close punctuation printable in errors (#3982, @rhendric)
 
+* Use type annotation hint only when needed (#4025, @rhendric)
+
 Other improvements:
 
 * Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
