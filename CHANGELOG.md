@@ -29,6 +29,8 @@ Bugfixes:
 
 * Fix row unification with shared unknown in tails (#4048, @rhendric)
 
+* Fix kinded declaration reordering in desugaring (#4047, @rhendric)
+
 Other improvements:
 
 * Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
