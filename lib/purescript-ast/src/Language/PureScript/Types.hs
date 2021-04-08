@@ -549,6 +549,12 @@ unknowns = everythingOnTypes (<>) go where
   go (TUnknown _ u) = IS.singleton u
   go _ = mempty
 
+containsUnknowns :: Type a -> Bool
+containsUnknowns = everythingOnTypes (||) go where
+  go :: Type a -> Bool
+  go TUnknown{} = True
+  go _ = False
+
 eraseKindApps :: Type a -> Type a
 eraseKindApps = everywhereOnTypes $ \case
   KindApp _ ty _ -> ty

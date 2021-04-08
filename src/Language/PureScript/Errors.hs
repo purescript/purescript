@@ -103,7 +103,9 @@ data SimpleErrorMessage
   | KindsDoNotUnify SourceType SourceType
   | ConstrainedTypeUnified SourceType SourceType
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
-  | NoInstanceFound SourceConstraint
+  | NoInstanceFound
+      SourceConstraint -- ^ constraint that could not be solved
+      Bool -- ^ whether eliminating unknowns with annotations might help
   | AmbiguousTypeVariables SourceType [Int]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
@@ -448,7 +450,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-  gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
+  gSimple (NoInstanceFound con unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure unks
   gSimple (AmbiguousTypeVariables t us) = AmbiguousTypeVariables <$> f t <*> pure us
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
@@ -856,14 +858,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ line (showQualified runProperName nm)
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _)) | Just box <- toTypelevelString ty =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _) _) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Partial
                                                           _
                                                           _
-                                                          (Just (PartialConstraintData bs b)))) =
+                                                          (Just (PartialConstraintData bs b))) _) =
       paras [ line "A case expression could not be determined to cover all inputs."
             , line "The following additional cases are required to cover all inputs:"
             , indent $ paras $
@@ -872,28 +874,22 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _) _) =
       paras [ line "A result of type"
             , markCodeBox $ indent $ prettyType ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _) unks) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
-                    | any containsUnknowns ts
+                    | unks
                     ]
             ]
-      where
-      containsUnknowns :: Type a -> Bool
-      containsUnknowns = everythingOnTypes (||) go
-        where
-        go TUnknown{} = True
-        go _ = False
     renderSimpleErrorMessage (AmbiguousTypeVariables t us) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ prettyType t
@@ -1629,7 +1625,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       where
       isUnifyHint ErrorUnifyingTypes{} = True
       isUnifyHint _ = False
-    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _)) = filter (not . isSolverHint)
+    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _) _) = filter (not . isSolverHint)
       where
       isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
       isSolverHint _ = False

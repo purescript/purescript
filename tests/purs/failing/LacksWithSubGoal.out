@@ -8,6 +8,13 @@ at tests/purs/failing/LacksWithSubGoal.purs:14:11 - 14:33 (line 14, column 11 - 
   [33m                 r0     [0m
   [33m                        [0m
 
+while solving type class constraint
+[33m                           [0m
+[33m  Prim.Row.Lacks "hello"   [0m
+[33m                 ( k :: Int[0m
+[33m                 | r0      [0m
+[33m                 )         [0m
+[33m                           [0m
 while applying a function [33munion[0m
   of type [33mLacks @Type t1 t2 => S t1 -> R t2[0m
   to argument [33mS[0m
