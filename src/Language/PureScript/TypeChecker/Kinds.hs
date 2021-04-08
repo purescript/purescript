@@ -411,7 +411,7 @@ unifyKindsWithFailure onFailure = go
       solveUnknown a' $ rowFromList (rs, p1)
     (([], w1), ([], w2)) | eqType w1 w2 ->
       pure ()
-    ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) -> do
+    ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) | u1 /= u2 -> do
       rest <- freshKind nullSourceSpan
       solveUnknown u1 $ rowFromList (rs2, rest)
       solveUnknown u2 $ rowFromList (rs1, rest)
