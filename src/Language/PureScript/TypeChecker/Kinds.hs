@@ -358,9 +358,6 @@ unifyKinds = unifyKindsWithFailure $ \w1 w2 ->
   throwError
     . errorMessage''' (fst . getAnnForType <$> [w1, w2])
     $ KindsDoNotUnify w1 w2
-  -- throwError
-  --   . errorMessage
-  --   $ KindsDoNotUnify w1 w2
 
 -- | Does not attach positions to the error node, instead relies on the
 -- | local position context. This is useful when invoking kind unification
