@@ -24,7 +24,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import Data.Traversable (for, sequence)
 import Language.PureScript.CST.Errors
-import Language.PureScript.CST.Flatten (flattenType)
+import Language.PureScript.CST.Flatten (flattenConstraint, flattenOneOrDelimited, flattenType)
 import Language.PureScript.CST.Lexer
 import Language.PureScript.CST.Monad
 import Language.PureScript.CST.Positions
@@ -737,7 +737,9 @@ classMember :: { Labeled (Name Ident) (Type ()) }
 
 instHead :: { InstanceHead () }
   : 'instance' ident '::' constraints '=>' qualProperName manyOrEmpty(typeAtom)
-      { InstanceHead $1 $2 $3 (Just ($4, $5)) (getQualifiedProperName $6) $7 }
+      {% addWarning (toList (flattenOneOrDelimited flattenConstraint $4)) WarnDeprecatedInstHeadForallSyntax *> pure (InstanceHead $1 $2 $3 (Just ($4, $5)) (getQualifiedProperName $6) $7) }
+  | 'instance' ident '::' forall many(typeVarBinding) '.' constraints '=>' qualProperName manyOrEmpty(typeAtom)
+      { InstanceHead $1 $2 $3 (Just ($7, $8)) (getQualifiedProperName $9) $10 }
   | 'instance' ident '::' qualProperName manyOrEmpty(typeAtom)
       { InstanceHead $1 $2 $3 Nothing (getQualifiedProperName $4) $5 }
 

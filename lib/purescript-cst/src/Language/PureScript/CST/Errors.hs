@@ -63,6 +63,7 @@ data ParserWarningType
   | WarnDeprecatedConstraintInForeignImportSyntax
   | WarnDeprecatedKindImportSyntax
   | WarnDeprecatedKindExportSyntax
+  | WarnDeprecatedInstHeadForallSyntax
   deriving (Show, Eq, Ord)
 
 data ParserErrorInfo a = ParserErrorInfo
@@ -193,3 +194,5 @@ prettyPrintWarningMessage (ParserErrorInfo {..}) = case errType of
     "Kind imports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."
   WarnDeprecatedKindExportSyntax ->
     "Kind exports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."
+  WarnDeprecatedInstHeadForallSyntax ->
+    "Implicit 'forall' in the instance head is deprecated and will be removed in a future release. Add 'forall' keyword before any instance contraints."

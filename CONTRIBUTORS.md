@@ -145,6 +145,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@woody88](https://github.com/woody88) | Woodson Delhia | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mhmdanas](https://github.com/mhmdanas) | Mohammed Anas | [MIT license](http://opensource.org/licenses/MIT) |
 | [@kl0tl](https://github.com/kl0tl) | Cyril Sobierajewicz | [MIT license](http://opensource.org/licenses/MIT) |
+| [@jrairigh](https://github.com/jrairigh) | Josh Rairigh | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 
