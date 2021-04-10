@@ -534,6 +534,7 @@ errorSuggestion err =
           CST.WarnDeprecatedKindImportSyntax -> suggest $ CST.printTokens $ drop 1 toks
           CST.WarnDeprecatedKindExportSyntax -> suggest $ CST.printTokens $ drop 1 toks
           CST.WarnDeprecatedCaseOfOffsideSyntax -> Nothing
+          CST.WarnDeprecatedInstHeadForallSyntax -> emptySuggestion
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
