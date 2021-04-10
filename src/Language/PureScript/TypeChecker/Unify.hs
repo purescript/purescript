@@ -30,7 +30,7 @@ import qualified Data.Text as T
 import Language.PureScript.Crash
 import qualified Language.PureScript.Environment as E
 import Language.PureScript.Errors
-import Language.PureScript.TypeChecker.Kinds (elaborateKind, instantiateKind, unifyKinds)
+import Language.PureScript.TypeChecker.Kinds (elaborateKind, instantiateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.Types
@@ -63,7 +63,11 @@ freshTypeWithKind kind = state $ \st -> do
 
 -- | Update the substitution to solve a type constraint
 solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> SourceType -> m ()
-solveType u t = do
+solveType u t = rethrow (onErrorMessages withoutPosition) $ do
+  -- We strip the position so that any errors get rethrown with the position of
+  -- the original unification constraint. Otherwise errors may arise from arbitrary
+  -- locations. We don't otherwise have the "correct" position on hand, since it
+  -- is maintained as part of the type-checker stack.
   occursCheck u t
   k1 <- elaborateKind t
   subst <- gets checkSubstitution
@@ -133,7 +137,7 @@ unifyTypes t1 t2 = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
   unifyTypes' (KindApp _ t3 t4) (KindApp _ t5 t6) = do
-    t3 `unifyKinds` t5
+    t3 `unifyKinds'` t5
     t4 `unifyTypes` t6
   unifyTypes' (Skolem _ _ _ s1 _) (Skolem _ _ _ s2 _) | s1 == s2 = return ()
   unifyTypes' (KindedType _ ty1 _) ty2 = ty1 `unifyTypes` ty2

@@ -38,7 +38,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Entailment.Coercible
-import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds)
+import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
@@ -320,7 +320,7 @@ entails SolverOptions{..} constraint context hints =
                   for_ (lookup var tcdForAll) $ \instKind -> do
                     tyKind <- elaborateKind ty
                     currentSubst <- gets checkSubstitution
-                    unifyKinds
+                    unifyKinds'
                       (substituteType currentSubst . replaceAllTypeVars (M.toList subst) $ instKind)
                       (substituteType currentSubst tyKind)
 
