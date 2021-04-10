@@ -29,6 +29,8 @@ Bugfixes:
 
 * Fix row unification with shared unknown in tails (#4048, @rhendric)
 
+* Fix wildly off kind unification positions (#4050, @natefaubion)
+
 Other improvements:
 
 * Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
