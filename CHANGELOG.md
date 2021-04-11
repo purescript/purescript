@@ -36,6 +36,7 @@ Other improvements:
   The previous `logo.png` was not legible against a dark background (#4001).
 
 * Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
+* Made the forall keyword optional in the instance header but gives warning if it is missing (@jrairigh, #1120)
 
 Internal:
 
