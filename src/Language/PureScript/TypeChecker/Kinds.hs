@@ -10,6 +10,7 @@ module Language.PureScript.TypeChecker.Kinds
   , kindOfClass
   , kindsOfAll
   , unifyKinds
+  , unifyKinds'
   , subsumesKind
   , instantiateKind
   , checkKind
@@ -356,6 +357,19 @@ unifyKinds
 unifyKinds = unifyKindsWithFailure $ \w1 w2 ->
   throwError
     . errorMessage''' (fst . getAnnForType <$> [w1, w2])
+    $ KindsDoNotUnify w1 w2
+
+-- | Does not attach positions to the error node, instead relies on the
+-- | local position context. This is useful when invoking kind unification
+-- | outside of kind checker internals.
+unifyKinds'
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceType
+  -> SourceType
+  -> m ()
+unifyKinds' = unifyKindsWithFailure $ \w1 w2 ->
+  throwError
+    . errorMessage
     $ KindsDoNotUnify w1 w2
 
 -- | Check the kind of a type, failing if it is not of kind *.

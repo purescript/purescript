@@ -1844,6 +1844,12 @@ withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
 withPosition NullSourceSpan err = err
 withPosition pos (ErrorMessage hints se) = ErrorMessage (positionedError pos : hints) se
 
+withoutPosition :: ErrorMessage -> ErrorMessage
+withoutPosition (ErrorMessage hints se) = ErrorMessage (filter go hints) se
+  where
+  go (PositionedError _) = False
+  go _ = True
+
 positionedError :: SourceSpan -> ErrorMessageHint
 positionedError = PositionedError . pure
 

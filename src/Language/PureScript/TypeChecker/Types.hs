@@ -730,7 +730,7 @@ check' (DeferredDictionary className tys) ty = do
 check' (TypedValue checkType val ty1) ty2 = do
   (elabTy1, kind1) <- kindOf ty1
   (elabTy2, kind2) <- kindOf ty2
-  unifyKinds kind1 kind2
+  unifyKinds' kind1 kind2
   checkTypeKind ty1 kind1
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy2

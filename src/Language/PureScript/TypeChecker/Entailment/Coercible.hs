@@ -279,7 +279,7 @@ unify (a, b) = do
   let kindOf = sequence . (id &&& elaborateKind) <=< replaceAllTypeSynonyms
   (a', kind) <- kindOf a
   (b', kind') <- kindOf b
-  unifyKinds kind kind'
+  unifyKinds' kind kind'
   subst <- gets checkSubstitution
   pure ( substituteType subst kind
        , substituteType subst a'
