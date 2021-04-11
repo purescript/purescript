@@ -8,7 +8,7 @@ module Main (main) where
 import Prelude ()
 import Prelude.Compat
 
-import Test.Tasty
+import Test.Hspec
 
 import qualified TestCompiler
 import qualified TestCoreFn
@@ -23,44 +23,27 @@ import qualified TestMake
 import qualified TestUtils
 import qualified TestGraph
 
-import System.IO (hSetEncoding, stdout, stderr, utf8)
+import System.IO (hSetBuffering, stdout, BufferMode(..))
 
 main :: IO ()
 main = do
-  hSetEncoding stdout utf8
-  hSetEncoding stderr utf8
+  hSetBuffering stdout LineBuffering
 
   heading "Updating support code"
   TestUtils.updateSupportCode
 
-  ideTests <- TestIde.main
-  compilerTests <- TestCompiler.main
-  makeTests <- TestMake.main
-  psciTests <- TestPsci.main
-  pscBundleTests <- TestBundle.main
-  coreFnTests <- TestCoreFn.main
-  docsTests <- TestDocs.main
-  primDocsTests <- TestPrimDocs.main
-  publishTests <- TestPscPublish.main
-  hierarchyTests <- TestHierarchy.main
-  graphTests <- TestGraph.main
-
-  defaultMain $
-    testGroup
-      "Tests"
-      [ compilerTests
-      , makeTests
-      , psciTests
-      , pscBundleTests
-      , ideTests
-      , coreFnTests
-      , docsTests
-      , primDocsTests
-      , publishTests
-      , hierarchyTests
-      , graphTests
-      ]
-
+  hspec $ do
+    describe "ide" TestIde.spec
+    describe "compiler" TestCompiler.spec
+    describe "make" TestMake.spec
+    describe "psci" TestPsci.spec
+    describe "bundle" TestBundle.spec
+    describe "corefn" TestCoreFn.spec
+    describe "docs" TestDocs.spec
+    describe "prim-docs" TestPrimDocs.spec
+    describe "publish" TestPscPublish.spec
+    describe "hierarchy" TestHierarchy.spec
+    describe "graph" TestGraph.spec
   where
   heading msg = do
     putStrLn ""

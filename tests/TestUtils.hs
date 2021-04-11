@@ -32,7 +32,7 @@ import System.Exit (exitFailure)
 import System.FilePath
 import qualified System.FilePath.Glob as Glob
 import System.IO
-import Test.Tasty.Hspec
+import Test.Hspec
 
 
 findNodeProcess :: IO (Maybe String)

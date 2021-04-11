@@ -26,8 +26,7 @@ import System.Directory
 import System.IO.Error (isDoesNotExistError)
 import System.IO.UTF8 (readUTF8FilesT, writeUTF8FileT)
 
-import Test.Tasty
-import Test.Tasty.Hspec
+import Test.Hspec
 
 utcMidnightOnDate :: Integer -> Int -> Int -> UTCTime
 utcMidnightOnDate year month day = UTCTime (fromGregorian year month day) (secondsToDiffTime 0)
@@ -39,9 +38,6 @@ timestampC = utcMidnightOnDate 2019 1 3
 timestampD = utcMidnightOnDate 2019 1 4
 timestampE = utcMidnightOnDate 2019 1 5
 timestampF = utcMidnightOnDate 2019 1 6
-
-main :: IO TestTree
-main = testSpec "make" spec
 
 spec :: Spec
 spec = do

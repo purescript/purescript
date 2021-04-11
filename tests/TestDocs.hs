@@ -29,11 +29,7 @@ import Web.Bower.PackageMeta (parsePackageName, runPackageName)
 
 import TestPscPublish (preparePackage)
 
-import Test.Tasty
-import Test.Tasty.Hspec (Spec, it, context, expectationFailure, runIO, testSpec)
-
-main :: IO TestTree
-main = testSpec "docs" spec
+import Test.Hspec
 
 spec :: Spec
 spec = do
@@ -306,8 +302,8 @@ displayAssertionFailure = \case
     "in rendered code for " <> decl <> ", bad link location for " <> target <>
     ": expected " <> T.pack (show expected) <>
     " got " <> T.pack (show actual)
-  WrongOrder _ before after' ->
-    "expected to see " <> before <> " before " <> after'
+  WrongOrder _ before' after' ->
+    "expected to see " <> before' <> " before " <> after'
 
 displayTagsAssertionFailure :: TagsAssertionFailure -> Text
 displayTagsAssertionFailure = \case
@@ -462,20 +458,20 @@ runAssertion assertion linksCtx Docs.Module{..} =
             Nothing ->
               Fail (LinkedDeclarationMissing mn decl destTitle)
 
-    ShouldComeBefore mn before after' ->
+    ShouldComeBefore mn before' after' ->
       let
         decls = declarationsFor mn
 
         indexOf :: Text -> Maybe Int
         indexOf title = findIndex ((==) title . Docs.declTitle) decls
       in
-        case (indexOf before, indexOf after') of
+        case (indexOf before', indexOf after') of
           (Just i, Just j) ->
             if i < j
               then Pass
-              else Fail (WrongOrder mn before after')
+              else Fail (WrongOrder mn before' after')
           (Nothing, _) ->
-            Fail (NotDocumented mn before)
+            Fail (NotDocumented mn before')
           (_, Nothing) ->
             Fail (NotDocumented mn after')
 

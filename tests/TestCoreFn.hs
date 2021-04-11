@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module TestCoreFn (main) where
+module TestCoreFn (spec) where
 
 import Prelude ()
 import Prelude.Compat
@@ -22,11 +22,7 @@ import Language.PureScript.CoreFn.ToJSON
 import Language.PureScript.Names
 import Language.PureScript.PSString
 
-import Test.Tasty
-import Test.Tasty.Hspec
-
-main :: IO TestTree
-main = testSpec "corefn" spec
+import Test.Hspec
 
 parseModule :: Value -> Result (Version, Module Ann)
 parseModule = parse moduleFromJSON
@@ -42,7 +38,7 @@ isSuccess (Aeson.Success _) = True
 isSuccess _           = False
 
 spec :: Spec
-spec = context "CoreFnFromJsonTest" $ do
+spec = context "CoreFnFromJson" $ do
   let mn = ModuleName "Example.Main"
       mp = "src/Example/Main.purs"
       ss = SourceSpan mp (SourcePos 0 0) (SourcePos 0 0)

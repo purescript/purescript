@@ -6,11 +6,10 @@ import Prelude
 import Language.PureScript.Hierarchy
 import qualified Language.PureScript as P
 
-import Test.Tasty
-import Test.Tasty.Hspec (describe, it, shouldBe, testSpec)
+import Test.Hspec
 
-main :: IO TestTree
-main = testSpec "hierarchy" $ do
+spec :: Spec
+spec = describe "hierarchy" $ do
   describe "Language.PureScript.Hierarchy" $ do
     describe "prettyPrint" $ do
       it "creates just the node when there is no relation" $ do

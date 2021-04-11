@@ -5,12 +5,11 @@ import           Prelude
 import           Control.Monad (unless)
 import           Language.PureScript.Ide.Test
 import qualified PscIdeSpec
-import           Test.Tasty
-import           Test.Tasty.Hspec
+import           Test.Hspec
 
-main :: IO TestTree
-main =
-  testSpec "ide" (beforeAll_ setup PscIdeSpec.spec)
+spec :: Spec
+spec =
+  beforeAll_ setup PscIdeSpec.spec
   where
     setup = do
       deleteOutputFolder
