@@ -7,6 +7,7 @@ import Effect (Effect)
 
 test :: forall m. Monad m => Int -> m Unit
 test x =
+  let _ = x in -- don't mark x unused
   let x = unit
   in pure x
 

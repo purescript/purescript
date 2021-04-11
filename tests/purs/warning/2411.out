@@ -1,6 +1,6 @@
 Warning found:
 in module [33mMain[0m
-at tests/purs/warning/2411.purs:10:7 - 10:15 (line 10, column 7 - line 10, column 15)
+at tests/purs/warning/2411.purs:11:7 - 11:15 (line 11, column 7 - line 11, column 15)
 
   Name [33mx[0m was shadowed.
 
