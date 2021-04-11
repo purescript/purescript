@@ -19,11 +19,14 @@ New features:
   optimized, but more critically, it also means that case guards which desugar
   to use local functions don't break TCO.
 
-* Unused warnings (#3819, @nwolverson)
+* Add warnings for unused names and values (#3819, @nwolverson)
 
-  The compiler now emits warnings for unused names and declarations. A
-  declaration is considered to be unused if it is not exported and not
-  reachable by any of the exported declarations.
+  The compiler now emits warnings when it encounters unused names in binders
+  and unused value declarations. A declaration is considered to be unused if it
+  is not exported and is also not reachable by any of the exported
+  declarations. The compiler will not currently produce unused warnings about
+  other kinds of declarations such as data and type class declarations, but we
+  intend to produce warnings for these in the future as well.
 
 Bugfixes:
 
