@@ -19,6 +19,12 @@ New features:
   optimized, but more critically, it also means that case guards which desugar
   to use local functions don't break TCO.
 
+* Unused warnings (#3819, @nwolverson)
+
+  The compiler now emits warnings for unused names and declarations. A
+  declaration is considered to be unused if it is not exported and not
+  reachable by any of the exported declarations.
+
 Bugfixes:
 
 * Make close punctuation printable in errors (#3982, @rhendric)
