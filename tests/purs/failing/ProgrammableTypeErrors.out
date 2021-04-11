@@ -7,6 +7,10 @@ at tests/purs/failing/ProgrammableTypeErrors.purs:17:13 - 17:27 (line 17, column
     Cannot show functions
 
 
+while solving type class constraint
+[33m                          [0m
+[33m  Main.MyShow (Int -> Int)[0m
+[33m                          [0m
 while applying a function [33mmyShow[0m
   of type [33mMyShow t0 => t0 -> String[0m
   to argument [33m\$0 ->      [0m

@@ -10,7 +10,6 @@ import Protolude hiding (check)
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (runWriterT)
 import Control.Monad.Supply (evalSupplyT)
-import Data.Functor (($>))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import Data.String (String)

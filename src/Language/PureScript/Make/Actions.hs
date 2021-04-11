@@ -20,7 +20,7 @@ import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Bifunctor (bimap)
 import           Data.Either (partitionEithers)
-import           Data.Foldable (for_, minimum)
+import           Data.Foldable (for_)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe, maybeToList)
@@ -47,7 +47,6 @@ import           Language.PureScript.Externs (ExternsFile, externsFileName)
 import           Language.PureScript.Make.Monad
 import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names
-import           Language.PureScript.Names (runModuleName, ModuleName)
 import           Language.PureScript.Options hiding (codegenTargets)
 import           Language.PureScript.Pretty.Common (SMap(..))
 import qualified Paths_purescript as Paths

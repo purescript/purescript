@@ -8,15 +8,41 @@ Breaking changes:
 
 New features:
 
+* Support TCO for functions with tail-recursive inner functions (#3958, @rhendric)
+
+  Adds support for optimizing functions that contain local functions which call
+  the outer function in tail position, as long as those functions themselves
+  are only called from tail position, either in the outer function or in other
+  such functions.
+
+  This enables hand-written mutually-tail-recursive function groups to be
+  optimized, but more critically, it also means that case guards which desugar
+  to use local functions don't break TCO.
+
 Bugfixes:
 
 * Make close punctuation printable in errors (#3982, @rhendric)
+* Desugar type operators in top-level kind signatures (#4027, @natefaubion)
+* Use type annotation hint only when needed (#4025, @rhendric)
+
+* Instantiate polymorphic kinds when unwrapping newtypes while solving Coercible constraints (#4040, @kl0tl)
+
+* Fix row unification with shared unknown in tails (#4048, @rhendric)
+
+* Fix wildly off kind unification positions (#4050, @natefaubion)
 
 Other improvements:
 
 * Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
 
   The previous `logo.png` was not legible against a dark background (#4001).
+
+* Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
+
+Internal:
+
+* Upgrade tests Bower dependencies (#4041, @kl0tl)
+* Remove unused Data.Foldable.foldr import (#4042, @kl0tl)
 
 ## v0.14.0
 

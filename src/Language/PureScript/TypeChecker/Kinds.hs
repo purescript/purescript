@@ -10,6 +10,7 @@ module Language.PureScript.TypeChecker.Kinds
   , kindOfClass
   , kindsOfAll
   , unifyKinds
+  , unifyKinds'
   , subsumesKind
   , instantiateKind
   , checkKind
@@ -358,6 +359,19 @@ unifyKinds = unifyKindsWithFailure $ \w1 w2 ->
     . errorMessage''' (fst . getAnnForType <$> [w1, w2])
     $ KindsDoNotUnify w1 w2
 
+-- | Does not attach positions to the error node, instead relies on the
+-- | local position context. This is useful when invoking kind unification
+-- | outside of kind checker internals.
+unifyKinds'
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceType
+  -> SourceType
+  -> m ()
+unifyKinds' = unifyKindsWithFailure $ \w1 w2 ->
+  throwError
+    . errorMessage
+    $ KindsDoNotUnify w1 w2
+
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -411,7 +425,7 @@ unifyKindsWithFailure onFailure = go
       solveUnknown a' $ rowFromList (rs, p1)
     (([], w1), ([], w2)) | eqType w1 w2 ->
       pure ()
-    ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) -> do
+    ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) | u1 /= u2 -> do
       rest <- freshKind nullSourceSpan
       solveUnknown u1 $ rowFromList (rs2, rest)
       solveUnknown u2 $ rowFromList (rs1, rest)

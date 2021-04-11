@@ -328,6 +328,10 @@ updateTypes goType = (goDecl, goExpr, goBinder)
     TypeSynonymDeclaration sa name args <$> goType' ss ty
   goDecl (TypeDeclaration (TypeDeclarationData sa@(ss, _) expr ty)) =
     TypeDeclaration . TypeDeclarationData sa expr <$> goType' ss ty
+  goDecl (KindDeclaration sa@(ss, _) sigFor name ty) =
+    KindDeclaration sa sigFor name <$> goType' ss ty
+  goDecl (ExternDataDeclaration sa@(ss, _) name ty) =
+    ExternDataDeclaration sa name <$> goType' ss ty
   goDecl other =
     return other
 
