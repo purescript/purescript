@@ -166,17 +166,49 @@ spec = do
       compileAllowingFailures [modulePath] `shouldReturn` moduleNames ["Module"]
       compileAllowingFailures [modulePath] `shouldReturn` moduleNames ["Module"]
 
+    it "recompiles if docs are requested but not up to date" $ do
+      let modulePath = sourcesDir </> "Module.purs"
+          moduleContent1 = "module Module where\nx :: Int\nx = 1"
+          moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
+          optsWithDocs = P.defaultOptions { P.optionsCodegenTargets = Set.fromList [P.JS, P.Docs] }
+          go opts = compileWithOptions opts [modulePath] >>= assertSuccess
+
+      writeFileWithTimestamp modulePath timestampA moduleContent1
+      go optsWithDocs `shouldReturn` moduleNames ["Module"]
+      writeFileWithTimestamp modulePath timestampB moduleContent2
+      go P.defaultOptions `shouldReturn` moduleNames ["Module"]
+      -- Since the existing docs.json is now outdated, the module should be
+      -- recompiled.
+      go optsWithDocs `shouldReturn` moduleNames ["Module"]
+
+    it "recompiles if corefn is requested but not up to date" $ do
+      let modulePath = sourcesDir </> "Module.purs"
+          moduleContent1 = "module Module where\nx :: Int\nx = 1"
+          moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
+          optsCorefnOnly = P.defaultOptions { P.optionsCodegenTargets = Set.singleton P.CoreFn }
+          go opts = compileWithOptions opts [modulePath] >>= assertSuccess
+
+      writeFileWithTimestamp modulePath timestampA moduleContent1
+      go optsCorefnOnly `shouldReturn` moduleNames ["Module"]
+      writeFileWithTimestamp modulePath timestampB moduleContent2
+      go P.defaultOptions `shouldReturn` moduleNames ["Module"]
+      go optsCorefnOnly `shouldReturn` moduleNames ["Module"]
+
 rimraf :: FilePath -> IO ()
 rimraf =
   void . tryJust (guard . isDoesNotExistError) . removeDirectoryRecursive
 
--- | Returns a set of the modules for which a rebuild was attempted, including
--- the make result.
-compileWithResult :: [FilePath] -> IO (Either P.MultipleErrors [P.ExternsFile], Set P.ModuleName)
-compileWithResult input = do
+-- | Compile a group of modules, returning a set of the modules for which a
+-- rebuild was attempted, allowing the caller to set the compiler options and
+-- including the make result in the return value.
+compileWithOptions ::
+  P.Options ->
+  [FilePath] ->
+  IO (Either P.MultipleErrors [P.ExternsFile], Set P.ModuleName)
+compileWithOptions opts input = do
   recompiled <- newMVar Set.empty
   moduleFiles <- readUTF8FilesT input
-  (makeResult, _) <- P.runMake P.defaultOptions $ do
+  (makeResult, _) <- P.runMake opts $ do
     ms <- CST.parseModulesFromFiles id moduleFiles
     let filePathMap = M.fromList $ map (\(fp, pm) -> (P.getModuleName $ CST.resPartial pm, Right fp)) ms
     foreigns <- P.inferForeignModules filePathMap
@@ -190,16 +222,26 @@ compileWithResult input = do
   recompiledModules <- readMVar recompiled
   pure (makeResult, recompiledModules)
 
--- | Compile, returning the set of modules which were rebuilt, and failing if
--- any errors occurred.
-compile :: [FilePath] -> IO (Set P.ModuleName)
-compile input = do
-  (result, recompiled) <- compileWithResult input
+-- | Compile a group of modules using the default options, and including the
+-- make result in the return value.
+compileWithResult ::
+  [FilePath] ->
+  IO (Either P.MultipleErrors [P.ExternsFile], Set P.ModuleName)
+compileWithResult = compileWithOptions P.defaultOptions
+
+assertSuccess :: (Either P.MultipleErrors a, Set P.ModuleName) -> IO (Set P.ModuleName)
+assertSuccess (result, recompiled) =
   case result of
     Left errs ->
       fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
     Right _ ->
       pure recompiled
+
+-- | Compile, returning the set of modules which were rebuilt, and failing if
+-- any errors occurred.
+compile :: [FilePath] -> IO (Set P.ModuleName)
+compile input =
+  compileWithResult input >>= assertSuccess
 
 compileAllowingFailures :: [FilePath] -> IO (Set P.ModuleName)
 compileAllowingFailures input = fmap snd (compileWithResult input)
