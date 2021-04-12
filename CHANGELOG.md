@@ -50,6 +50,13 @@ Other improvements:
 
 * Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
 
+* Fix incorrect incremental builds with different `--codegen` options (#3911, #3914, @hdgarrood)
+
+  This bug meant that after invoking the compiler with different `--codegen`
+  options, it was easy to end up with (for example) an outdated docs.json or
+  corefn.json file in your output directory which would be incorrectly
+  considered up-to-date by the compiler.
+
 Internal:
 
 * Upgrade tests Bower dependencies (#4041, @kl0tl)
