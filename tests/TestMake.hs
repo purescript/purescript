@@ -30,7 +30,7 @@ import Test.Tasty
 import Test.Tasty.Hspec
 
 utcMidnightOnDate :: Integer -> Int -> Int -> UTCTime
-utcMidnightOnDate day month year = UTCTime (fromGregorian day month year) (secondsToDiffTime 0)
+utcMidnightOnDate year month day = UTCTime (fromGregorian year month day) (secondsToDiffTime 0)
 
 timestampA, timestampB, timestampC, timestampD, timestampE, timestampF :: UTCTime
 timestampA = utcMidnightOnDate 2019 1 1
