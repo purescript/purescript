@@ -2,4 +2,6 @@
 module Main where
 
 f :: Int -> Int -> Int
-f n = \(n) -> 1
+f n = 
+  let _ = n in
+  \(n) -> n
