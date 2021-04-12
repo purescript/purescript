@@ -38,6 +38,8 @@ Bugfixes:
 
 * Fix row unification with shared unknown in tails (#4048, @rhendric)
 
+* Fix kinded declaration reordering in desugaring (#4047, @rhendric)
+
 * Fix wildly off kind unification positions (#4050, @natefaubion)
 
 Other improvements:
