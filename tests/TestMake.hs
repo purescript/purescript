@@ -9,6 +9,7 @@ import Prelude.Compat
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
 
+import Control.Concurrent (threadDelay)
 import Control.Monad
 import Control.Exception (tryJust)
 import Control.Monad.IO.Class (liftIO)
@@ -172,13 +173,16 @@ spec = do
           moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
           optsWithDocs = P.defaultOptions { P.optionsCodegenTargets = Set.fromList [P.JS, P.Docs] }
           go opts = compileWithOptions opts [modulePath] >>= assertSuccess
+          oneSecond = 10^(6::Int) -- microseconds
 
       writeFileWithTimestamp modulePath timestampA moduleContent1
       go optsWithDocs `shouldReturn` moduleNames ["Module"]
       writeFileWithTimestamp modulePath timestampB moduleContent2
+      threadDelay oneSecond
       go P.defaultOptions `shouldReturn` moduleNames ["Module"]
       -- Since the existing docs.json is now outdated, the module should be
       -- recompiled.
+      threadDelay oneSecond
       go optsWithDocs `shouldReturn` moduleNames ["Module"]
 
     it "recompiles if corefn is requested but not up to date" $ do
@@ -187,11 +191,14 @@ spec = do
           moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
           optsCorefnOnly = P.defaultOptions { P.optionsCodegenTargets = Set.singleton P.CoreFn }
           go opts = compileWithOptions opts [modulePath] >>= assertSuccess
+          oneSecond = 10^(6::Int) -- microseconds
 
       writeFileWithTimestamp modulePath timestampA moduleContent1
       go optsCorefnOnly `shouldReturn` moduleNames ["Module"]
       writeFileWithTimestamp modulePath timestampB moduleContent2
+      threadDelay oneSecond
       go P.defaultOptions `shouldReturn` moduleNames ["Module"]
+      threadDelay oneSecond
       go optsCorefnOnly `shouldReturn` moduleNames ["Module"]
 
 rimraf :: FilePath -> IO ()
