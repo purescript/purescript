@@ -173,16 +173,16 @@ spec = do
           moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
           optsWithDocs = P.defaultOptions { P.optionsCodegenTargets = Set.fromList [P.JS, P.Docs] }
           go opts = compileWithOptions opts [modulePath] >>= assertSuccess
-          oneSecond = 10^(6::Int) -- microseconds
+          oneSecond = 10^(6::Int) -- microseconds.
 
       writeFileWithTimestamp modulePath timestampA moduleContent1
       go optsWithDocs `shouldReturn` moduleNames ["Module"]
       writeFileWithTimestamp modulePath timestampB moduleContent2
+      -- See Note [Sleeping to avoid flaky tests]
       threadDelay oneSecond
       go P.defaultOptions `shouldReturn` moduleNames ["Module"]
       -- Since the existing docs.json is now outdated, the module should be
       -- recompiled.
-      threadDelay oneSecond
       go optsWithDocs `shouldReturn` moduleNames ["Module"]
 
     it "recompiles if corefn is requested but not up to date" $ do
@@ -191,15 +191,33 @@ spec = do
           moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
           optsCorefnOnly = P.defaultOptions { P.optionsCodegenTargets = Set.singleton P.CoreFn }
           go opts = compileWithOptions opts [modulePath] >>= assertSuccess
-          oneSecond = 10^(6::Int) -- microseconds
+          oneSecond = 10^(6::Int) -- microseconds.
 
       writeFileWithTimestamp modulePath timestampA moduleContent1
       go optsCorefnOnly `shouldReturn` moduleNames ["Module"]
       writeFileWithTimestamp modulePath timestampB moduleContent2
+      -- See Note [Sleeping to avoid flaky tests]
       threadDelay oneSecond
       go P.defaultOptions `shouldReturn` moduleNames ["Module"]
-      threadDelay oneSecond
+      -- Since the existing corefn.json is now outdated, the module should be
+      -- recompiled.
       go optsCorefnOnly `shouldReturn` moduleNames ["Module"]
+
+-- Note [Sleeping to avoid flaky tests]
+--
+-- One of the things we want to test here is that all requested output files
+-- (via the --codegen CLI option) must be up to date if we are to skip
+-- recompiling a particular module. Since we check for outdatedness by
+-- comparing the timestamp of the output files (eg. corefn.json, index.js) to
+-- the timestamp of the externs file, this check is susceptible to flakiness
+-- if the timestamp resolution is sufficiently coarse. To get around this, we
+-- delay for one second.
+--
+-- Note that most of the compiler behaviour here doesn't depend on file
+-- timestamps (instead, content hashes are usually more important) and so
+-- sleeping should not be necessary in most of these tests.
+--
+-- See also discussion on https://github.com/purescript/purescript/pull/4053
 
 rimraf :: FilePath -> IO ()
 rimraf =
