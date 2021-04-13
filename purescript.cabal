@@ -367,6 +367,7 @@ test-suite tests
       purescript
     , hspec
     , HUnit
+    , QuickCheck
     , regex-base
   build-tool-depends:
       hspec-discover:hspec-discover -any
@@ -387,6 +388,7 @@ test-suite tests
     TestBundle
     TestCompiler
     TestCoreFn
+    TestCst
     TestDocs
     TestGraph
     TestHierarchy

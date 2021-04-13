@@ -12,6 +12,7 @@ import Test.Hspec
 
 import qualified TestCompiler
 import qualified TestCoreFn
+import qualified TestCst
 import qualified TestDocs
 import qualified TestHierarchy
 import qualified TestPrimDocs
@@ -33,6 +34,7 @@ main = do
   TestUtils.updateSupportCode
 
   hspec $ do
+    describe "cst" TestCst.spec
     describe "ide" TestIde.spec
     describe "compiler" TestCompiler.spec
     describe "make" TestMake.spec

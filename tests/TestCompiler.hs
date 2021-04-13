@@ -32,17 +32,14 @@ import Prelude.Compat
 import qualified Language.PureScript as P
 
 import Control.Arrow ((>>>))
-import Control.Exception (tryJust)
 import Data.Function (on)
 import Data.List (sort, stripPrefix, intercalate, minimumBy)
-import Data.Maybe (mapMaybe, isJust)
+import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
 import qualified Data.Map as M
 
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 
 import Control.Monad
 
@@ -50,9 +47,7 @@ import System.Exit
 import System.Process
 import System.FilePath
 import System.IO
-import System.IO.Error (isDoesNotExistError)
 import System.IO.UTF8 (readUTF8File)
-import System.Environment (lookupEnv)
 
 import Text.Regex.Base
 import Text.Regex.TDFA (Regex)
@@ -211,43 +206,6 @@ assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles sh
 
   where
   noPreCheck = const (return ())
-
--- | Assert that the contents of the provided file path match the result of the
--- provided action. If the "HSPEC_ACCEPT" environment variable is set, or if the
--- file does not already exist, we write the resulting ByteString out to the
--- provided file path instead. However, if the "CI" environment variable is
--- set, "HSPEC_ACCEPT" is ignored and we require that the file does exist with
--- the correct contents (see #3808). Based (very loosely) on the tasty-golden
--- package.
-goldenVsString
-  :: HasCallStack -- For expectationFailure; use the call site for better failure locations
-  => FilePath
-  -> IO ByteString
-  -> Expectation
-goldenVsString goldenFile testAction = do
-  accept <- isJust <$> lookupEnv "HSPEC_ACCEPT"
-  ci <- isJust <$> lookupEnv "CI"
-  goldenContents <- tryJust (guard . isDoesNotExistError) (BS.readFile goldenFile)
-  case goldenContents of
-    Left () ->
-      -- The golden file does not exist
-      if ci
-        then expectationFailure $ "Missing golden file: " ++ goldenFile
-        else createOrReplaceGoldenFile
-
-    Right _ | not ci && accept ->
-      createOrReplaceGoldenFile
-
-    Right expected -> do
-      actual <- testAction
-      if expected == actual
-        then pure ()
-        else expectationFailure $
-          "Test output differed from '" ++ goldenFile ++ "'; got:\n" ++
-          T.unpack (T.decodeUtf8With (\_ _ -> Just '\xFFFD') actual)
-  where
-  createOrReplaceGoldenFile =
-    testAction >>= BS.writeFile goldenFile
 
 printErrorOrWarning
   :: [P.Module]
