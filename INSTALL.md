@@ -6,12 +6,12 @@ alternatively Stack Overflow.
 
 ## Requirements
 
-The PureScript compiler is built using GHC 8.6.4, and should be able to run on any operating system supported by GHC 8.6.4. In particular:
+The PureScript compiler is built using GHC 8.10.4, and should be able to run on any operating system supported by GHC 8.10.4. In particular:
 
 * for Windows users, versions predating Vista are not officially supported,
 * for macOS / OS X users, versions predating Mac OS X 10.7 (Lion) are not officially supported.
 
-See also <https://www.haskell.org/ghc/download_ghc_8_6_4.html> for more details about the operating systems which GHC 8.6.4 supports.
+See also <https://www.haskell.org/ghc/download_ghc_8_10_4.html> for more details about the operating systems which GHC 8.10.4 supports.
 
 ## Official prebuilt binaries
 
@@ -25,7 +25,6 @@ There are several other distributions of the PureScript compiler available, whic
 
 * NPM: `npm install -g purescript`
 * Homebrew (for macOS): `brew install purescript`
-* [PSVM](https://github.com/ThomasCrevoisier/psvm-js): `npm install -g psvm`
 
 ## Compiling from source
 
