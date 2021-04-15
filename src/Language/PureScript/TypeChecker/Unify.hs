@@ -115,10 +115,10 @@ unifyTypes t1 t2 = do
   unifyTypes' _ (TUnknown _ u1) (TUnknown _ u2) | u1 == u2 = return ()
   unifyTypes' sub (TUnknown _ u) ty
     | Just ty' <- M.lookup u (substType sub) = unifyTypes' sub ty' ty
-    | otherwise = solveType u ty
+    | otherwise = solveType u (substituteType sub ty)
   unifyTypes' sub ty (TUnknown _ u)
     | Just ty' <- M.lookup u (substType sub) = unifyTypes' sub ty ty'
-    | otherwise = solveType u ty
+    | otherwise = solveType u (substituteType sub ty)
   unifyTypes' _ (ForAll ann1 ident1 mbK1 ty1 sc1) (ForAll ann2 ident2 mbK2 ty2 sc2) =
     case (sc1, sc2) of
       (Just sc1', Just sc2') -> do
