@@ -58,6 +58,8 @@ Other improvements:
   corefn.json file in your output directory which would be incorrectly
   considered up-to-date by the compiler.
 
+ * Optimizes type unification for faster performance (#4062, @mikesol)
+
 Internal:
 
 * Upgrade tests Bower dependencies (#4041, @kl0tl)
