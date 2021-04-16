@@ -60,6 +60,10 @@ Other improvements:
 
 * Removed all shift/reduce conflicts in parser (#4063, @JordanMartinez).
 
+  Happy defaults to using "shift" rather than "reduce" in shift/reduce
+  conflicts. This change merely makes explicit what is already happening
+  implicitly.
+
 Internal:
 
 * Upgrade tests Bower dependencies (#4041, @kl0tl)
