@@ -1676,7 +1676,7 @@ prettyPrintImport mn idt qual =
   let i = case idt of
             Implicit -> runModuleName mn
             Explicit refs -> runModuleName mn <> " (" <> T.intercalate ", " (mapMaybe prettyPrintRef refs) <> ")"
-            Hiding refs -> runModuleName mn <> " hiding (" <> T.intercalate "," (mapMaybe prettyPrintRef refs) <> ")"
+            Hiding refs -> runModuleName mn <> " hiding (" <> T.intercalate ", " (mapMaybe prettyPrintRef refs) <> ")"
   in i <> maybe "" (\q -> " as " <> runModuleName q) qual
 
 prettyPrintRef :: DeclarationRef -> Maybe Text

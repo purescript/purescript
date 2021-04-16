@@ -65,6 +65,7 @@ depsNamesAndVersions = do
   excluded name =
     name == "purescript"
     || name == "rts"
+    || name == "ghc-boot-th"
 
   parse line =
     case splitOn " " line of

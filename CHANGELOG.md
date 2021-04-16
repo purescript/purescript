@@ -33,10 +33,13 @@ Bugfixes:
 * Make close punctuation printable in errors (#3982, @rhendric)
 * Desugar type operators in top-level kind signatures (#4027, @natefaubion)
 * Use type annotation hint only when needed (#4025, @rhendric)
+* Fix pretty printing of "hiding" imports (#4058, @natefaubion)
 
 * Instantiate polymorphic kinds when unwrapping newtypes while solving Coercible constraints (#4040, @kl0tl)
 
 * Fix row unification with shared unknown in tails (#4048, @rhendric)
+
+* Fix kinded declaration reordering in desugaring (#4047, @rhendric)
 
 * Fix wildly off kind unification positions (#4050, @natefaubion)
 
@@ -47,6 +50,13 @@ Other improvements:
   The previous `logo.png` was not legible against a dark background (#4001).
 
 * Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
+
+* Fix incorrect incremental builds with different `--codegen` options (#3911, #3914, @hdgarrood)
+
+  This bug meant that after invoking the compiler with different `--codegen`
+  options, it was easy to end up with (for example) an outdated docs.json or
+  corefn.json file in your output directory which would be incorrectly
+  considered up-to-date by the compiler.
 
 * Removed all shift/reduce conflicts in parser (#4063, @JordanMartinez).
 

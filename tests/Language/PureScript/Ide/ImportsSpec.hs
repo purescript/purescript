@@ -35,7 +35,7 @@ hidingFile :: [Text]
 hidingFile =
   [ "module Main where"
   , "import Prelude"
-  , "import Data.Maybe hiding (maybe)"
+  , "import Data.Maybe hiding (maybe, maybe')"
   , ""
   , "myFunc x y = x + y"
   ]
@@ -138,10 +138,10 @@ spec = do
         , ""
         , "import Data.Map as Map"
         ]
-    it "adds a qualified import and maintains proper grouping for implicit hiding imports" $
+    it "adds a qualified import and maintains proper grouping and formatting for implicit hiding imports" $
       shouldBe
         (addQualifiedImport' hidingFileImports (Test.mn "Data.Map") (Test.mn "Map"))
-        [ "import Data.Maybe hiding (maybe)"
+        [ "import Data.Maybe hiding (maybe, maybe')"
         , "import Prelude"
         , ""
         , "import Data.Map as Map"
