@@ -470,7 +470,7 @@ guardedDeclExpr :: { GuardedExpr () }
 
 guardedCase :: { Guarded () }
   : '->' exprWhere { Unconditional $1 $2 }
-  | many(guardedCaseExpr) %shift { Guarded $1 }
+  | many(guardedCaseExpr) { Guarded $1 }
 
 guardedCaseExpr :: { GuardedExpr () }
   : guard '->' exprWhere { uncurry GuardedExpr $1 $2 $3 }
