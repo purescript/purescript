@@ -48,6 +48,8 @@ Other improvements:
 
 * Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
 
+* Removed all shift/reduce conflicts in parser (#4063, @JordanMartinez).
+
 Internal:
 
 * Upgrade tests Bower dependencies (#4041, @kl0tl)
