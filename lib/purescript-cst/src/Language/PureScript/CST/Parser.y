@@ -35,7 +35,7 @@ import qualified Language.PureScript.Roles as R
 import Language.PureScript.PSString (PSString)
 }
 
-%expect 1
+%expect 0
 
 %name parseType type
 %name parseExpr expr
@@ -144,10 +144,10 @@ import Language.PureScript.PSString (PSString)
 %%
 
 many(a) :: { NE.NonEmpty a }
-  : many1(a) { NE.reverse $1 }
+  : many1(a) %shift { NE.reverse $1 }
 
 many1(a) :: { NE.NonEmpty a }
-  : a %shift { pure $1 }
+  : a { pure $1 }
   | many1(a) a { NE.cons $2 $1 }
 
 manySep(a, sep) :: { NE.NonEmpty a }
