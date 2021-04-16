@@ -58,6 +58,12 @@ Other improvements:
   corefn.json file in your output directory which would be incorrectly
   considered up-to-date by the compiler.
 
+* Removed all shift/reduce conflicts in parser (#4063, @JordanMartinez).
+
+  Happy defaults to using "shift" rather than "reduce" in shift/reduce
+  conflicts. This change merely makes explicit what is already happening
+  implicitly.
+
 Internal:
 
 * Upgrade tests Bower dependencies (#4041, @kl0tl)
