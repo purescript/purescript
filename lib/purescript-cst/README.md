@@ -8,4 +8,5 @@ We provide a table to make it a bit easier to map between versions of `purescrip
 
 | `purescript` | `purescript-cst` |
 | --- | --- |
-| `0.13.6` | `0.1.0.0` |
+| `0.14.0` | `0.1.0.0` |
+| `0.14.1` | `0.1.1.0` |

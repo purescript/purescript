@@ -1,7 +1,7 @@
 cabal-version: 2.4
 
 name:           purescript-cst
-version:        0.1.0.0
+version:        0.1.1.0
 synopsis:       PureScript Programming Language Concrete Syntax Tree
 description:    The surface syntax of the PureScript Programming Language.
 category:       Language
@@ -60,7 +60,7 @@ common defaults
     base >=4.14.1.0 && <4.15,
     containers >=0.6.2.1 && <0.7,
     dlist >=0.8.0.8 && <0.9,
-    purescript-ast >=0.1.0.0 && <0.2,
+    purescript-ast ==0.1.1.0,
     scientific >=0.3.6.2 && <0.4,
     semigroups >=0.19.1 && <0.20,
     text >=1.2.4.1 && <1.3
