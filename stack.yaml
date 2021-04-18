@@ -22,3 +22,6 @@ flags:
     lib-only: true
   these:
     assoc: false
+  haskeline:
+    # Avoids a libtinfo dynamic library dependency
+    terminfo: false
