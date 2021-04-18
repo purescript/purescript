@@ -8,6 +8,14 @@ Breaking changes:
 
 New features:
 
+Bugfixes:
+
+Internal:
+
+## v0.14.1
+
+New features:
+
 * Support TCO for functions with tail-recursive inner functions (#3958, @rhendric)
 
   Adds support for optimizing functions that contain local functions which call
