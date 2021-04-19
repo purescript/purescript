@@ -43,10 +43,10 @@ If you don't have stack installed, please see the [stack install documentation](
 
 ## The "curses" library
 
-Prior to version vX.Y.Z __TODO: fill in when known__, the PureScript REPL
-depends on the `curses` library (via the Haskell package `terminfo`). If you
-are having difficulty running the compiler, it may be because the `curses`
-library is missing. This problem may appear as a `libtinfo` error:
+Prior to version v0.14.2, the PureScript REPL depends on the `curses` library
+by default (via the Haskell package `terminfo`). If you are having difficulty
+running the compiler, it may be because the `curses` library is missing. This
+problem may appear as a `libtinfo` error:
 ```
 error while loading shared libraries: libtinfo.so.5: cannot open shared object file: No such file or directory
 ```
@@ -56,6 +56,12 @@ example, this can be done by running:
 ```
 $ sudo apt install libtinfo5 libncurses5-dev
 ```
+
+As of v0.14.2, this should no longer be necessary if you are using the prebuilt
+binaries or building the compiler from source with the default configuration.
+However, you can still opt into using `curses` by setting the Haskeline
+`terminfo` flag to `true`. This may improve the REPL experience slightly - for
+example, by providing better editing of long input lines.
 
 ## EACCES error
 

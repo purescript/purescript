@@ -12,6 +12,16 @@ Bugfixes:
 
 Internal:
 
+* Drop libtinfo dependency (#3696, @hdgarrood)
+
+  Changes the build configuration so that by default, compiler binaries will
+  not have a dynamic library dependency on libncurses/libtinfo. This should
+  alleviate one of the most common pains in getting the compiler successfully
+  installed, especially on Linux. The cost is a slight degradation in the REPL
+  experience when editing long lines, but this can be avoided by building the
+  compiler with the libtinfo dependency by setting the `terminfo` flag of the
+  `haskeline` library to `true`.
+
 ## v0.14.1
 
 New features:
@@ -71,16 +81,6 @@ Other improvements:
   Happy defaults to using "shift" rather than "reduce" in shift/reduce
   conflicts. This change merely makes explicit what is already happening
   implicitly.
-
-* Drop libtinfo dependency (#3696, @hdgarrood)
-
-  Changes the build configuration so that by default, compiler binaries will
-  not have a dynamic library dependency on libncurses/libtinfo. This should
-  alleviate one of the most common pains in getting the compiler successfully
-  installed, especially on Linux. The cost is a slight degradation in the REPL
-  experience when editing long lines, but this can be avoided by building the
-  compiler with the libtinfo dependency by setting the `terminfo` flag of the
-  `haskeline` library to `true`.
 
 Internal:
 
