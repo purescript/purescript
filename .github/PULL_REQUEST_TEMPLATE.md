@@ -7,6 +7,7 @@ Clearly and concisely describe the purpose of the pull request. If this PR relat
 **Checklist:**
 
 - [ ] Added the change to the changelog's "Unreleased" section with a reference to this PR (e.g. "- Made a change (#0000)")
+- [ ] Added myself to CONTRIBUTORS.md (if this is my first contribution)
 - [ ] Linked any existing issues or proposals that this pull request should close
 - [ ] Updated or added relevant documentation
 - [ ] Added a test for the contribution (if applicable)
