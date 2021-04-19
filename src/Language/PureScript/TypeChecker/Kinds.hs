@@ -753,7 +753,8 @@ type ClassDeclarationArgs =
 -- ( The kind annotated class arguments
 -- , The kind annotated superclass constraints
 -- , The kind annotated declarations
--- , The inferred kind of the declaration)
+-- , The inferred kind of the declaration
+-- )
 type ClassDeclarationResult =
   ( [(Text, SourceType)]
   , [SourceConstraint]
