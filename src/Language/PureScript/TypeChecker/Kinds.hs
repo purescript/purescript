@@ -587,10 +587,9 @@ type DataDeclarationArgs =
   , [DataConstructorDeclaration]
   )
 
--- | (The infered type signatures of data constructors, The inferred kind of the declaration)
 type DataDeclarationResult =
-  ( [(DataConstructorDeclaration, SourceType)]
-  , SourceType
+  ( [(DataConstructorDeclaration, SourceType)] -- The infered type signatures of data constructors
+  , SourceType -- The inferred kind of the declaration
   )
 
 kindOfData
@@ -637,10 +636,9 @@ type TypeDeclarationArgs =
   , SourceType
   )
 
--- | (The elaborated rhs of the declaration, The inferred kind of the declaration)
 type TypeDeclarationResult =
-  ( SourceType
-  , SourceType
+  ( SourceType -- The elaborated rhs of the declaration
+  , SourceType -- The inferred kind of the declaration
   )
 
 kindOfTypeSynonym
@@ -749,17 +747,11 @@ type ClassDeclarationArgs =
   , [Declaration]
   )
 
--- |
--- ( The kind annotated class arguments
--- , The kind annotated superclass constraints
--- , The kind annotated declarations
--- , The inferred kind of the declaration
--- )
 type ClassDeclarationResult =
-  ( [(Text, SourceType)]
-  , [SourceConstraint]
-  , [Declaration]
-  , SourceType
+  ( [(Text, SourceType)] -- The kind annotated class arguments
+  , [SourceConstraint]   -- The kind annotated superclass constraints
+  , [Declaration]        -- The kind annotated declarations
+  , SourceType           -- The inferred kind of the declaration
   )
 
 kindOfClass
