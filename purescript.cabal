@@ -2,7 +2,7 @@ cabal-version:  2.4
 
 name:           purescript
 -- note: When updating the prerelease identifier, update it in app/Version.hs too!
-version:        0.14.0
+version:        0.14.1
 synopsis:       PureScript Programming Language Compiler
 description:    A small strongly, statically typed programming language with expressive types, inspired by Haskell and compiling to JavaScript.
 category:       Language
@@ -97,7 +97,7 @@ common defaults
     -- update to a newer snapshot as follows:
     --
     -- 1. Remove all version constraints from this cabal file (apart from
-    --    language-javascript).
+    --    language-javascript, purescript-cst, and purescript-ast).
     -- 2. Update stack.yaml as required to select a new snapshot, and check
     --    everything builds correctly with stack.
     -- 3. Run `stack sdist`; this will produce a source distribution including
@@ -111,10 +111,12 @@ common defaults
     -- built with (almost) the same install plan for both cabal and stack
     -- users.
     --
-    -- We need to be especially careful with language-javascript because it
-    -- is part of the compiler's public API; all FFI modules must be parseable
-    -- by language-javascript otherwise the compiler will reject them. It
-    -- should always be pinned to a single specific version.
+    -- We need to be especially careful with purescript-cst, purescript-ast,
+    -- and language-javascript, because they all form part of the compiler's
+    -- public API. In the case of language-javascript specifically, all FFI
+    -- modules must be parseable by this library otherwise the compiler
+    -- will reject them. It should therefore always be pinned to a single
+    -- specific version.
     aeson >=1.5.6.0 && <1.6,
     aeson-better-errors >=0.9.1.0 && <0.10,
     aeson-pretty >=0.8.8 && <0.9,
@@ -157,8 +159,8 @@ common defaults
     pattern-arrows >=0.0.2 && <0.1,
     process >=1.6.9.0 && <1.7,
     protolude >=0.3.0 && <0.4,
-    purescript-ast >=0.1.0.0 && <0.2,
-    purescript-cst >=0.1.0.0 && <0.2,
+    purescript-ast ==0.1.1.0,
+    purescript-cst ==0.1.1.0,
     regex-tdfa >=1.3.1.0 && <1.4,
     safe >=0.3.19 && <0.4,
     scientific >=0.3.6.2 && <0.4,

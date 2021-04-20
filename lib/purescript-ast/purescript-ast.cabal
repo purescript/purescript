@@ -1,7 +1,7 @@
 cabal-version: 2.4
 
 name:           purescript-ast
-version:        0.1.0.0
+version:        0.1.1.0
 synopsis:       PureScript Programming Language Abstract Syntax Tree
 description:    Defines the underlying syntax of the PureScript Programming Language.
 category:       Language

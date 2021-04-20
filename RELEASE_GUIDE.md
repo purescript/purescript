@@ -45,17 +45,57 @@ considering what effects this may have:
 ## Making a release
 
 - Make a commit bumping versions. The following should be updated:
-  - The `version` field in `package.yaml`
+
+  - The `version` field in `purescript.cabal`
+
+  - The `prerelease` field in `app/Version.hs`, if updating the prerelease
+    field
+
   - The `version` field in `npm-package/package.json`
+
   - The version to install in the `postinstall` script in `package.json`
+
+  - If `purescript-ast` has changed at all since the last release:
+
+      - The `version` field in `lib/purescript-ast/purescript-ast.cabal` (note
+        that the new version should be based on the PVP, according to what
+        changed since the previous release, and not on the actual compiler
+        version)
+
+      - The versions table in `lib/purescript-ast/README.md`,
+
+      - The version bounds for `purescript-ast` in
+        `lib/purescript-cst/purescript-cst.cabal` and in `purescript.cabal`
+
+  - If `purescript-cst` has changed at all since the last release:
+
+      - The `version` field in `lib/purescript-cst/purescript-cst.cabal` (note
+        that the new version should be based on the PVP, according to what
+        changed since the previous release, and not on the actual compiler
+        version)
+
+      - The versions table in `lib/purescript-cst/README.md`,
+
+      - The version bounds for `purescript-cst` in `purescript.cabal`
+
 - Create a release from the releases tab in GitHub and copy in the release
   notes. This will also create a tag, which will kick off a CI build, which
   will upload prebuilt compiler binaries to the release on GitHub when it
   completes. (If the CI build fails, binaries can also be built locally and
   manually uploaded to the release on GitHub)
-- Publish to Hackage: change to the compiler directory and run `stack upload .`.
-  It's a good idea to check that the package can be installed from Hackage at
-  this point.
+
+- Publish to Hackage:
+
+  - change to the `lib/purescript-cst` directory and run `stack upload .`
+
+  - change to the `lib/purescript-ast` directory and run `stack upload .`
+
+  - Finally, run `stack upload .` from the repo root directory.
+
+  It's a good idea to check that the three packages (`purescript`,
+  `purescript-cst`, and `purescript-ast`) can be installed from Hackage at this
+  point.
+
 - After all of the prebuilt binaries are present on the GitHub releases page,
   publish to npm: change to the `npm-package` directory and run `npm publish`.
   It's a good idea to check that the package can be installed from npm at this

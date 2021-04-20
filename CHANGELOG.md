@@ -8,6 +8,24 @@ Breaking changes:
 
 New features:
 
+Bugfixes:
+
+Internal:
+
+* Drop libtinfo dependency (#3696, @hdgarrood)
+
+  Changes the build configuration so that by default, compiler binaries will
+  not have a dynamic library dependency on libncurses/libtinfo. This should
+  alleviate one of the most common pains in getting the compiler successfully
+  installed, especially on Linux. The cost is a slight degradation in the REPL
+  experience when editing long lines, but this can be avoided by building the
+  compiler with the libtinfo dependency by setting the `terminfo` flag of the
+  `haskeline` library to `true`.
+
+## v0.14.1
+
+New features:
+
 * Support TCO for functions with tail-recursive inner functions (#3958, @rhendric)
 
   Adds support for optimizing functions that contain local functions which call
@@ -33,6 +51,7 @@ Bugfixes:
 * Make close punctuation printable in errors (#3982, @rhendric)
 * Desugar type operators in top-level kind signatures (#4027, @natefaubion)
 * Use type annotation hint only when needed (#4025, @rhendric)
+* Fix pretty printing of "hiding" imports (#4058, @natefaubion)
 
 * Instantiate polymorphic kinds when unwrapping newtypes while solving Coercible constraints (#4040, @kl0tl)
 
@@ -42,6 +61,13 @@ Bugfixes:
 
 * Fix wildly off kind unification positions (#4050, @natefaubion)
 
+* Fix incorrect incremental builds with different `--codegen` options (#3911, #3914, @hdgarrood)
+
+  This bug meant that after invoking the compiler with different `--codegen`
+  options, it was easy to end up with (for example) an outdated docs.json or
+  corefn.json file in your output directory which would be incorrectly
+  considered up-to-date by the compiler.
+
 Other improvements:
 
 * Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
@@ -50,12 +76,11 @@ Other improvements:
 
 * Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
 
-* Fix incorrect incremental builds with different `--codegen` options (#3911, #3914, @hdgarrood)
+* Removed all shift/reduce conflicts in parser (#4063, @JordanMartinez).
 
-  This bug meant that after invoking the compiler with different `--codegen`
-  options, it was easy to end up with (for example) an outdated docs.json or
-  corefn.json file in your output directory which would be incorrectly
-  considered up-to-date by the compiler.
+  Happy defaults to using "shift" rather than "reduce" in shift/reduce
+  conflicts. This change merely makes explicit what is already happening
+  implicitly.
 
 Internal:
 
