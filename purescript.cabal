@@ -29,7 +29,6 @@ extra-source-files:
   tests/purs/**/*.out
   tests/json-compat/**/*.json
   tests/support/*.json
-  tests/support/setup-win.cmd
   tests/support/psci/**/*.purs
   tests/support/psci/**/*.edit
   tests/support/pscide/src/**/*.purs
