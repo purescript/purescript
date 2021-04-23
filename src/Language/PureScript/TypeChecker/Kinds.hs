@@ -639,7 +639,8 @@ type TypeDeclarationArgs =
   )
 
 type TypeDeclarationResult =
-  ( SourceType -- The elaborated rhs of the declaration
+  ( SourceType
+  -- The elaborated rhs of the declaration
   , SourceType -- The inferred kind of the declaration
   )
 
