@@ -65,7 +65,7 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton moduleName (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules (M.singleton moduleName (Right file))
+  foreigns <- P.inferForeignModules (M.singleton moduleName (Right (fromMaybe file actualFile)))
   let makeEnv = P.buildMakeActions outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
