@@ -40,6 +40,7 @@ extra-source-files:
   INSTALL.md
   CONTRIBUTORS.md
   CONTRIBUTING.md
+  .hspec
 
 source-repository head
   type: git
