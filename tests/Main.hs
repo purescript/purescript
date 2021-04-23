@@ -24,13 +24,12 @@ import qualified TestMake
 import qualified TestUtils
 import qualified TestGraph
 
-import System.IO (hSetBuffering, hSetEncoding, stdout, stderr, BufferMode(..), utf8)
+import System.IO (hSetEncoding, stdout, stderr, utf8)
 
 main :: IO ()
 main = do
   hSetEncoding stdout utf8
   hSetEncoding stderr utf8
-  hSetBuffering stdout LineBuffering
 
   heading "Updating support code"
   TestUtils.updateSupportCode
