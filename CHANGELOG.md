@@ -22,6 +22,8 @@ Internal:
   compiler with the libtinfo dependency by setting the `terminfo` flag of the
   `haskeline` library to `true`.
 
+* Migrate CI from Travis to GitHub Actions (#4077, @rhendric)
+
 * Remove tasty from test suite and just use hspec (#4056, @hdgarrood)
 
 ## v0.14.1
