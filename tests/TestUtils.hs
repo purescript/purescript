@@ -167,38 +167,18 @@ compile
   -> [P.ExternsFile]
   -> M.Map P.ModuleName FilePath
   -> [FilePath]
-  -> ([P.Module] -> IO ())
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile supportModules supportExterns supportForeigns inputFiles check = runTest $ do
-  fs <- liftIO $ readInput inputFiles
+compile supportModules supportExterns supportForeigns inputFiles = runTest $ do
+  -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
+  fs <- liftIO $ readInput (sort inputFiles)
   msWithWarnings <- CST.parseFromFiles id fs
   tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
   let ms = fmap snd <$> msWithWarnings
   foreigns <- inferForeignModules ms
-  liftIO (check (map snd ms))
   let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
   case ms of
     [singleModule] -> pure <$> P.rebuildModule actions supportExterns (snd singleModule)
     _ -> P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
-
-assert
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> [FilePath]
-  -> ([P.Module] -> IO ())
-  -> (Either P.MultipleErrors P.MultipleErrors -> IO (Maybe String))
-  -> Expectation
-assert supportModules supportExterns supportForeigns inputFiles check f = do
-  (e, w) <- compile supportModules supportExterns supportForeigns inputFiles check
-  maybeErr <- f (const w <$> e)
-  maybe (return ()) expectationFailure maybeErr
-
-checkMain :: [P.Module] -> IO ()
-checkMain ms =
-  unless (any ((== P.moduleNameFromString "Main") . P.getModuleName) ms)
-    (fail "Main module missing")
-
 
 makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
 makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
