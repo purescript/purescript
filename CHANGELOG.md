@@ -26,6 +26,8 @@ Internal:
 
 * Remove tasty from test suite and just use hspec (#4056, @hdgarrood)
 
+* Avoid compiling tests with diagnostics twice in test suite (#4079, @hdgarrood)
+
 ## v0.14.1
 
 New features:
