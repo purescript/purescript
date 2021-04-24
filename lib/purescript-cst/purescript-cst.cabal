@@ -16,8 +16,6 @@ license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
-    tests/purs/**/*.out
-    tests/purs/**/*.purs
     README.md
 
 source-repository head
@@ -89,20 +87,3 @@ library
     Paths_purescript_cst
   autogen-modules:
     Paths_purescript_cst
-
-test-suite tests
-  import: defaults
-  hs-source-dirs: tests
-  type: exitcode-stdio-1.0
-  main-is: Main.hs
-  other-modules:
-    TestCst
-    Paths_purescript_cst
-  build-depends:
-    base-compat,
-    purescript-cst,
-    bytestring,
-    filepath,
-    tasty,
-    tasty-golden,
-    tasty-quickcheck

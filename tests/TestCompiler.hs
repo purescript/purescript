@@ -21,9 +21,10 @@ module TestCompiler where
 --   -- @shouldFailWith TypesDoNotUnify
 --   -- @shouldFailWith TransitiveExportError
 --
--- Failing tests also check their output against the relative golden files (`.out`).
--- The golden files are generated automatically when missing, and can be updated
--- by passing `--accept` to `--test-arguments.`
+-- Warning and failing tests also check their output against the relative
+-- golden files (`.out`). The golden files are generated automatically when
+-- missing, and can be updated by setting the "HSPEC_ACCEPT" environment
+-- variable, e.g. by running `HSPEC_ACCEPT=true stack test`.
 
 import Prelude ()
 import Prelude.Compat
@@ -39,7 +40,6 @@ import qualified Data.Text.Encoding as T
 
 import qualified Data.Map as M
 
-import qualified Data.ByteString.Lazy as BS
 
 import Control.Monad
 
@@ -53,29 +53,26 @@ import Text.Regex.Base
 import Text.Regex.TDFA (Regex)
 
 import TestUtils
-import Test.Tasty
-import Test.Tasty.Hspec
-import Test.Tasty.Golden (goldenVsString)
+import Test.Hspec
 
-main :: IO TestTree
-main = do
-  (supportModules, supportExterns, supportForeigns) <- setupSupportModules
-  passing <- passingTests supportModules supportExterns supportForeigns
-  warning <- warningTests supportModules supportExterns supportForeigns
-  failing <- failingTests supportModules supportExterns supportForeigns
-  return . testGroup "compiler" $ [passing, warning, failing]
+spec :: Spec
+spec = do
+  (supportModules, supportExterns, supportForeigns) <- runIO setupSupportModules
+
+  passingTests supportModules supportExterns supportForeigns
+  warningTests supportModules supportExterns supportForeigns
+  failingTests supportModules supportExterns supportForeigns
 
 passingTests
   :: [P.Module]
   -> [P.ExternsFile]
   -> M.Map P.ModuleName FilePath
-  -> IO TestTree
+  -> Spec
 passingTests supportModules supportExterns supportForeigns = do
-  passingTestCases <- getTestFiles "passing"
+  passingTestCases <- runIO $ getTestFiles "passing"
+  outputFile <- runIO $ createOutputFile logfile
 
-  outputFile <- createOutputFile logfile
-
-  testSpec "Passing examples" $
+  describe "Passing examples" $
     forM_ passingTestCases $ \testPurs ->
       it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $
         assertCompiles supportModules supportExterns supportForeigns testPurs outputFile
@@ -84,41 +81,36 @@ warningTests
   :: [P.Module]
   -> [P.ExternsFile]
   -> M.Map P.ModuleName FilePath
-  -> IO TestTree
+  -> Spec
 warningTests supportModules supportExterns supportForeigns = do
-  warningTestCases <- getTestFiles "warning"
-  tests <- forM warningTestCases $ \testPurs -> do
-    let mainPath = getTestMain testPurs
-    expectedWarnings <- getShouldWarnWith mainPath
-    wTc <- testSpecs $
-      it ("'" <> takeFileName mainPath <> "' should compile with warning(s) '" <> intercalate "', '" expectedWarnings <> "'") $
+  warningTestCases <- runIO $ getTestFiles "warning"
+
+  describe "Warning examples" $
+    forM_ warningTestCases $ \testPurs -> do
+      let mainPath = getTestMain testPurs
+      expectedWarnings <- runIO $ getShouldWarnWith mainPath
+      it ("'" <> takeFileName mainPath <> "' should compile with warning(s) '" <> intercalate "', '" expectedWarnings <> "'") $ do
         assertCompilesWithWarnings supportModules supportExterns supportForeigns testPurs expectedWarnings
-    return $ wTc ++ [ goldenVsString
-                      ("'" <> takeFileName mainPath <> "' golden test")
-                      (replaceExtension mainPath ".out")
-                      (BS.fromStrict . T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
-                    ]
-  return $ testGroup "Warning examples" $ concat tests
+        goldenVsString
+          (replaceExtension mainPath ".out")
+          (T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
 
 failingTests
   :: [P.Module]
   -> [P.ExternsFile]
   -> M.Map P.ModuleName FilePath
-  -> IO TestTree
+  -> Spec
 failingTests supportModules supportExterns supportForeigns = do
-  failingTestCases <- getTestFiles "failing"
-  tests <- forM failingTestCases $ \testPurs -> do
-    let mainPath = getTestMain testPurs
-    expectedFailures <- getShouldFailWith mainPath
-    fTc <- testSpecs $
-      it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $
+  failingTestCases <- runIO $ getTestFiles "failing"
+  describe "Failing examples" $ do
+    forM_ failingTestCases $ \testPurs -> do
+      let mainPath = getTestMain testPurs
+      expectedFailures <- runIO $ getShouldFailWith mainPath
+      it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $ do
         assertDoesNotCompile supportModules supportExterns supportForeigns testPurs expectedFailures
-    return $ fTc ++ [ goldenVsString
-                    ("'" <> takeFileName mainPath <> "' golden test")
-                    (replaceExtension mainPath ".out")
-                    (BS.fromStrict . T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
-                  ]
-  return $ testGroup "Failing examples" $ concat tests
+        goldenVsString
+          (replaceExtension mainPath ".out")
+          (T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
 
 checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Maybe String
 checkShouldReport expected prettyPrintDiagnostics errs =

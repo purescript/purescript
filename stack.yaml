@@ -9,6 +9,12 @@ ghc-options:
   "$locals": -O2 -Werror
 extra-deps:
 - language-javascript-0.7.0.0
+- git: https://github.com/hspec/hspec.git
+  commit: 8f628c861d01ec8fc0a94ffdfe31e4399bd049d1
+  subdirs:
+    - .
+    - hspec-core
+    - hspec-discover
 nix:
   enable: false
   packages:

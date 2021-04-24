@@ -39,6 +39,7 @@ extra-source-files:
   INSTALL.md
   CONTRIBUTORS.md
   CONTRIBUTING.md
+  .hspec
 
 source-repository head
   type: git
@@ -366,12 +367,9 @@ test-suite tests
   main-is: Main.hs
   build-depends:
       purescript
-    , tasty
-    , tasty-golden
-    , tasty-hspec
-    , tasty-quickcheck
     , hspec
     , HUnit
+    , QuickCheck
     , regex-base
   build-tool-depends:
       hspec-discover:hspec-discover -any
@@ -392,6 +390,7 @@ test-suite tests
     TestBundle
     TestCompiler
     TestCoreFn
+    TestCst
     TestDocs
     TestGraph
     TestHierarchy

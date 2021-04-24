@@ -33,10 +33,10 @@ When submitting a pull request, please follow the following guidelines:
 
 Run all test suites with `stack test`. You will need `npm`, `bower` and `node` on your PATH to run the tests.
 
-You can run individual test suites using `stack test --test-arguments="-p PATTERN"` where `PATTERN` is one of `compiler`, `repl`, `ide`, `docs`, `corefn`, or `hierarchy`. You can also build and run a specific test in `tests/purs/passing/` or `tests/purs/failing/` by using the test's filename as the pattern, e.g.:
+You can run individual test suites using `stack test --test-arguments="--match PATTERN"` where `PATTERN` is one of `compiler`, `repl`, `ide`, `docs`, `corefn`, or `hierarchy`. You can also build and run a specific test in `tests/purs/passing/` or `tests/purs/failing/` by using the test's filename as the pattern, e.g.:
 
 ```
-stack test --fast --test-arguments="-p 1110.purs"
+stack test --fast --test-arguments="--match 1110.purs"
 ```
 
 This will run whatever test uses the example file `1110.purs`.

@@ -29,11 +29,7 @@ import System.IO.UTF8
 import qualified System.FilePath.Glob as Glob
 
 import TestUtils
-import Test.Tasty
-import Test.Tasty.Hspec
-
-main :: IO TestTree
-main = testSpec "bundle" spec
+import Test.Hspec
 
 spec :: Spec
 spec = do

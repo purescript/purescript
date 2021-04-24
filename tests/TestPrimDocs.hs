@@ -10,12 +10,7 @@ import qualified Data.Text as Text
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 
-import Test.Tasty
-import Test.Tasty.Hspec (Spec, testSpec, it)
-import Test.Hspec (shouldBe)
-
-main :: IO TestTree
-main = testSpec "prim docs" spec
+import Test.Hspec
 
 spec :: Spec
 spec = do

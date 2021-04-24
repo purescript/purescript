@@ -24,6 +24,8 @@ Internal:
 
 * Migrate CI from Travis to GitHub Actions (#4077, @rhendric)
 
+* Remove tasty from test suite and just use hspec (#4056, @hdgarrood)
+
 ## v0.14.1
 
 New features:

@@ -17,22 +17,27 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Writer.Class (tell)
 import Control.Exception
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import Data.Char (isSpace)
 import Data.Function (on)
 import Data.List (sort, sortBy, stripPrefix, groupBy)
 import qualified Data.Map as M
+import Data.Maybe (isJust)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import Data.Time.Clock (UTCTime())
 import Data.Tuple (swap)
-import System.Process hiding (cwd)
 import System.Directory
-import System.IO.UTF8 (readUTF8FileT)
 import System.Exit (exitFailure)
+import System.Environment (lookupEnv)
 import System.FilePath
+import System.IO.Error (isDoesNotExistError)
+import System.IO.UTF8 (readUTF8FileT)
+import System.Process hiding (cwd)
 import qualified System.FilePath.Glob as Glob
 import System.IO
-import Test.Tasty.Hspec
-
+import Test.Hspec
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
@@ -236,3 +241,41 @@ modulesDir = ".test_modules" </> "node_modules"
 
 logpath :: FilePath
 logpath = "purescript-output"
+
+-- | Assert that the contents of the provided file path match the result of the
+-- provided action. If the "HSPEC_ACCEPT" environment variable is set, or if the
+-- file does not already exist, we write the resulting ByteString out to the
+-- provided file path instead. However, if the "CI" environment variable is
+-- set, "HSPEC_ACCEPT" is ignored and we require that the file does exist with
+-- the correct contents (see #3808). Based (very loosely) on the tasty-golden
+-- package.
+goldenVsString
+  :: HasCallStack -- For expectationFailure; use the call site for better failure locations
+  => FilePath
+  -> IO ByteString
+  -> Expectation
+goldenVsString goldenFile testAction = do
+  accept <- isJust <$> lookupEnv "HSPEC_ACCEPT"
+  ci <- isJust <$> lookupEnv "CI"
+  goldenContents <- tryJust (guard . isDoesNotExistError) (BS.readFile goldenFile)
+  case goldenContents of
+    Left () ->
+      -- The golden file does not exist
+      if ci
+        then expectationFailure $ "Missing golden file: " ++ goldenFile
+        else createOrReplaceGoldenFile
+
+    Right _ | not ci && accept ->
+      createOrReplaceGoldenFile
+
+    Right expected -> do
+      actual <- testAction
+      if expected == actual
+        then pure ()
+        else expectationFailure $
+          "Test output differed from '" ++ goldenFile ++ "'; got:\n" ++
+          T.unpack (T.decodeUtf8With (\_ _ -> Just '\xFFFD') actual)
+  where
+  createOrReplaceGoldenFile = do
+    testAction >>= BS.writeFile goldenFile
+    pendingWith "Accepting new output"
