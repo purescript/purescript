@@ -91,9 +91,6 @@ warningTests supportModules supportExterns supportForeigns = do
       expectedWarnings <- runIO $ getShouldWarnWith mainPath
       it ("'" <> takeFileName mainPath <> "' should compile with warning(s) '" <> intercalate "', '" expectedWarnings <> "'") $ do
         assertCompilesWithWarnings supportModules supportExterns supportForeigns testPurs expectedWarnings
-        goldenVsString
-          (replaceExtension mainPath ".out")
-          (T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
 
 failingTests
   :: [P.Module]
@@ -108,26 +105,23 @@ failingTests supportModules supportExterns supportForeigns = do
       expectedFailures <- runIO $ getShouldFailWith mainPath
       it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $ do
         assertDoesNotCompile supportModules supportExterns supportForeigns testPurs expectedFailures
-        goldenVsString
-          (replaceExtension mainPath ".out")
-          (T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
 
-checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Maybe String
+checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Expectation
 checkShouldReport expected prettyPrintDiagnostics errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
   in if sort expected == sort (map T.unpack actual)
     then checkPositioned errs
-    else Just $ "Expected these diagnostics: " ++ show expected ++ ", but got these: "
+    else expectationFailure $ "Expected these diagnostics: " ++ show expected ++ ", but got these: "
       ++ show actual ++ ", full diagnostic messages: \n"
       ++ prettyPrintDiagnostics errs
 
-checkPositioned :: P.MultipleErrors -> Maybe String
+checkPositioned :: P.MultipleErrors -> Expectation
 checkPositioned errs =
   case mapMaybe guardSpans (P.runMultipleErrors errs) of
     [] ->
-      Nothing
+      pure ()
     errs' ->
-      Just
+      expectationFailure
         $ "Found diagnostics with missing source spans:\n"
         ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) errs')
   where
@@ -150,25 +144,23 @@ assertCompiles
   -> [FilePath]
   -> Handle
   -> Expectation
-assertCompiles supportModules supportExterns supportForeigns inputFiles outputFile =
-  assert supportModules supportExterns supportForeigns inputFiles checkMain $ \e ->
-    case e of
-      Left errs -> return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
-      Right _ -> do
-        process <- findNodeProcess
-        let entryPoint = modulesDir </> "index.js"
-        writeFile entryPoint "require('Main').main()"
-        result <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
-        hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) <> ":"
-        case result of
-          Just (ExitSuccess, out, err)
-            | not (null err) -> return $ Just $ "Test wrote to stderr:\n\n" <> err
-            | not (null out) && trim (last (lines out)) == "Done" -> do
-                hPutStr outputFile out
-                return Nothing
-            | otherwise -> return $ Just $ "Test did not finish with 'Done':\n\n" <> out
-          Just (ExitFailure _, _, err) -> return $ Just err
-          Nothing -> return $ Just "Couldn't find node.js executable"
+assertCompiles supportModules supportExterns supportForeigns inputFiles outputFile = do
+  (result, _) <- compile supportModules supportExterns supportForeigns inputFiles
+  case result of
+    Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+    Right _ -> do
+      process <- findNodeProcess
+      let entryPoint = modulesDir </> "index.js"
+      writeFile entryPoint "require('Main').main()"
+      nodeResult <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
+      hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) <> ":"
+      case nodeResult of
+        Just (ExitSuccess, out, err)
+          | not (null err) -> expectationFailure $ "Test wrote to stderr:\n\n" <> err
+          | not (null out) && trim (last (lines out)) == "Done" -> hPutStr outputFile out
+          | otherwise -> expectationFailure $ "Test did not finish with 'Done':\n\n" <> out
+        Just (ExitFailure _, _, err) -> expectationFailure err
+        Nothing -> expectationFailure "Couldn't find node.js executable"
 
 assertCompilesWithWarnings
   :: [P.Module]
@@ -177,13 +169,16 @@ assertCompilesWithWarnings
   -> [FilePath]
   -> [String]
   -> Expectation
-assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFiles shouldWarnWith =
-  assert supportModules supportExterns supportForeigns inputFiles checkMain $ \e ->
-    case e of
-      Left errs ->
-        return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
-      Right warnings ->
-        return $ checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings P.defaultPPEOptions) warnings
+assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFiles shouldWarnWith = do
+  result'@(result, warnings) <- compile supportModules supportExterns supportForeigns inputFiles
+  case result of
+    Left errs ->
+      expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+    Right _ -> do
+      checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings P.defaultPPEOptions) warnings
+      goldenVsString
+        (replaceExtension (getTestMain inputFiles) ".out")
+        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest result')
 
 assertDoesNotCompile
   :: [P.Module]
@@ -192,37 +187,32 @@ assertDoesNotCompile
   -> [FilePath]
   -> [String]
   -> Expectation
-assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles shouldFailWith =
-  assert supportModules supportExterns supportForeigns inputFiles noPreCheck $ \e ->
-    case e of
-      Left errs ->
-        return $ if null shouldFailWith
-          then Just $ "shouldFailWith declaration is missing (errors were: "
-                      ++ show (map P.errorCode (P.runMultipleErrors errs))
-                      ++ ")"
-          else checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors P.defaultPPEOptions) errs
-      Right _ ->
-        return $ Just "Should not have compiled"
+assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles shouldFailWith = do
+  result <- compile supportModules supportExterns supportForeigns inputFiles
+  case fst result of
+    Left errs -> do
+      when (null shouldFailWith)
+        (expectationFailure $
+          "shouldFailWith declaration is missing (errors were: "
+          ++ show (map P.errorCode (P.runMultipleErrors errs))
+          ++ ")")
+      checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors P.defaultPPEOptions) errs
+      goldenVsString
+        (replaceExtension (getTestMain inputFiles) ".out")
+        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest result)
+    Right _ ->
+      expectationFailure "Should not have compiled"
 
-  where
-  noPreCheck = const (return ())
-
-printErrorOrWarning
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> [FilePath]
-  -> IO String
-printErrorOrWarning supportModules supportExterns supportForeigns inputFiles = do
-  -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
-  (res, warnings) <- compile supportModules supportExterns supportForeigns (sort inputFiles) noPreCheck
-  return . normalizePaths $ case res of
+-- Prints a set of diagnostics (i.e. errors or warnings) as a string, in order
+-- to compare it to the contents of a golden test file.
+printDiagnosticsForGoldenTest :: (Either P.MultipleErrors a, P.MultipleErrors) -> String
+printDiagnosticsForGoldenTest (result, warnings) =
+  normalizePaths $ case result of
     Left errs ->
+      -- TODO: should probably include warnings when failing?
       P.prettyPrintMultipleErrors P.defaultPPEOptions errs
     Right _ ->
       P.prettyPrintMultipleWarnings P.defaultPPEOptions warnings
-  where
-    noPreCheck = const (return ())
 
 -- Replaces Windows-style paths in an error or warning with POSIX paths
 normalizePaths :: String -> String
