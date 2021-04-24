@@ -34,7 +34,6 @@ import System.Environment (lookupEnv)
 import System.FilePath
 import System.IO.Error (isDoesNotExistError)
 import System.IO.UTF8 (readUTF8FileT)
-import System.Info
 import System.Process hiding (cwd)
 import qualified System.FilePath.Glob as Glob
 import System.IO
