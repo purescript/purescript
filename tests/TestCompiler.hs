@@ -33,7 +33,7 @@ import qualified Language.PureScript as P
 
 import Control.Arrow ((>>>))
 import Data.Function (on)
-import Data.List (sort, stripPrefix, intercalate, minimumBy)
+import Data.List (sort, stripPrefix, minimumBy)
 import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -55,55 +55,45 @@ import Text.Regex.TDFA (Regex)
 import TestUtils
 import Test.Hspec
 
-spec :: Spec
+spec :: SpecWith ([P.Module], [P.ExternsFile], M.Map P.ModuleName FilePath)
 spec = do
-  (supportModules, supportExterns, supportForeigns) <- runIO setupSupportModules
+  passingTests
+  warningTests
+  failingTests
 
-  passingTests supportModules supportExterns supportForeigns
-  warningTests supportModules supportExterns supportForeigns
-  failingTests supportModules supportExterns supportForeigns
-
-passingTests
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> Spec
-passingTests supportModules supportExterns supportForeigns = do
+passingTests :: SpecWith ([P.Module], [P.ExternsFile], M.Map P.ModuleName FilePath)
+passingTests = do
   passingTestCases <- runIO $ getTestFiles "passing"
-  outputFile <- runIO $ createOutputFile logfile
 
   describe "Passing examples" $
-    forM_ passingTestCases $ \testPurs ->
-      it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $
-        assertCompiles supportModules supportExterns supportForeigns testPurs outputFile
+    beforeAllWith ((<$> createOutputFile logfile) . (,)) $
+      forM_ passingTestCases $ \testPurs ->
+        it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $
+          \((supportModules, supportExterns, supportForeigns), outputFile) ->
+            assertCompiles supportModules supportExterns supportForeigns testPurs outputFile
 
-warningTests
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> Spec
-warningTests supportModules supportExterns supportForeigns = do
+warningTests :: SpecWith ([P.Module], [P.ExternsFile], M.Map P.ModuleName FilePath)
+warningTests = do
   warningTestCases <- runIO $ getTestFiles "warning"
 
   describe "Warning examples" $
     forM_ warningTestCases $ \testPurs -> do
       let mainPath = getTestMain testPurs
-      expectedWarnings <- runIO $ getShouldWarnWith mainPath
-      it ("'" <> takeFileName mainPath <> "' should compile with warning(s) '" <> intercalate "', '" expectedWarnings <> "'") $ do
-        assertCompilesWithWarnings supportModules supportExterns supportForeigns testPurs expectedWarnings
+      it ("'" <> takeFileName mainPath <> "' should compile with expected warning(s)") $
+        \(supportModules, supportExterns, supportForeigns) -> do
+          expectedWarnings <- getShouldWarnWith mainPath
+          assertCompilesWithWarnings supportModules supportExterns supportForeigns testPurs expectedWarnings
 
-failingTests
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> Spec
-failingTests supportModules supportExterns supportForeigns = do
+failingTests :: SpecWith ([P.Module], [P.ExternsFile], M.Map P.ModuleName FilePath)
+failingTests = do
   failingTestCases <- runIO $ getTestFiles "failing"
+
   describe "Failing examples" $ do
     forM_ failingTestCases $ \testPurs -> do
       let mainPath = getTestMain testPurs
-      expectedFailures <- runIO $ getShouldFailWith mainPath
-      it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $ do
+      it ("'" <> takeFileName mainPath <> "' should fail to compile") $ \(supportModules, supportExterns, supportForeigns) -> do
+        expectedFailures <- getShouldFailWith mainPath
+
         assertDoesNotCompile supportModules supportExterns supportForeigns testPurs expectedFailures
 
 checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Expectation

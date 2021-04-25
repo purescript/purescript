@@ -28,6 +28,8 @@ Internal:
 
 * Avoid compiling tests with diagnostics twice in test suite (#4079, @hdgarrood)
 
+* Do less work in test initialization (#4080, @rhendric)
+
 ## v0.14.1
 
 New features:
