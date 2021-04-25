@@ -142,7 +142,13 @@ createOutputFile logfileName = do
   createDirectoryIfMissing False (tmp </> logpath)
   openFile (tmp </> logpath </> logfileName) WriteMode
 
-setupSupportModules :: IO ([P.Module], [P.ExternsFile], M.Map P.ModuleName FilePath)
+data SupportModules = SupportModules
+  { supportModules :: [P.Module]
+  , supportExterns :: [P.ExternsFile]
+  , supportForeigns :: M.Map P.ModuleName FilePath
+  }
+
+setupSupportModules :: IO SupportModules
 setupSupportModules = do
   ms <- getSupportModuleTuples
   let modules = map snd ms
@@ -152,7 +158,7 @@ setupSupportModules = do
     return (externs, foreigns)
   case supportExterns of
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
-    Right (externs, foreigns) -> return (modules, externs, foreigns)
+    Right (externs, foreigns) -> return $ SupportModules modules externs foreigns
 
 getTestFiles :: FilePath -> IO [[FilePath]]
 getTestFiles testDir = do
@@ -197,12 +203,10 @@ getTestFiles testDir = do
        else dir
 
 compile
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  :: SupportModules
   -> [FilePath]
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile supportModules supportExterns supportForeigns inputFiles = runTest $ do
+compile SupportModules{..} inputFiles = runTest $ do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
   fs <- liftIO $ readInput (sort inputFiles)
   msWithWarnings <- CST.parseFromFiles id fs
