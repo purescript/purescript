@@ -15,8 +15,6 @@ import Language.PureScript.Bundle
 import Data.Function (on)
 import Data.List (minimumBy)
 
-import qualified Data.Map as M
-
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except
@@ -31,16 +29,14 @@ import qualified System.FilePath.Glob as Glob
 import TestUtils
 import Test.Hspec
 
-spec :: Spec
-spec = do
-  (supportModules, supportExterns, supportForeigns) <- runIO $ setupSupportModules
-  bundleTestCases <- runIO $ getTestFiles "bundle"
-  outputFile <- runIO $ createOutputFile logfile
-
+spec :: SpecWith SupportModules
+spec =
   context "Bundle examples" $
-    forM_ bundleTestCases $ \testPurs -> do
-      it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile, bundle and run without error") $
-        assertBundles supportModules supportExterns supportForeigns testPurs outputFile
+    beforeAllWith ((<$> createOutputFile logfile) . (,)) $ do
+      bundleTestCases <- runIO $ getTestFiles "bundle"
+      forM_ bundleTestCases $ \testPurs -> do
+        it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile, bundle and run without error") $ \(support, outputFile) ->
+          assertBundles support testPurs outputFile
   where
 
   -- Takes the test entry point from a group of purs files - this is determined
@@ -50,14 +46,12 @@ spec = do
   getTestMain = minimumBy (compare `on` length)
 
 assertBundles
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  :: SupportModules
   -> [FilePath]
   -> Handle
   -> Expectation
-assertBundles supportModules supportExterns supportForeigns inputFiles outputFile = do
-  (result, _) <- compile supportModules supportExterns supportForeigns inputFiles
+assertBundles support inputFiles outputFile = do
+  (result, _) <- compile support inputFiles
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
     Right _ -> do

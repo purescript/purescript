@@ -1,15 +1,9 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module TestDocs where
 
 import Prelude ()
 import Prelude.Compat
 
-import Control.Arrow (first)
+import Data.Bifunctor (first)
 import Data.List (findIndex)
 import Data.Foldable
 import Safe (headMay)
@@ -32,70 +26,37 @@ import TestPscPublish (preparePackage)
 import Test.Hspec
 
 spec :: Spec
-spec = do
-  packageResult <- runIO (preparePackage "tests/purs/docs" "resolutions.json")
-
-  case packageResult of
-    Left e ->
-      it "failed to produce docs" $ do
-        expectationFailure (Boxes.render (Publish.renderError e))
-    Right pkg ->
-      mkSpec pkg
-
-mkSpec :: Docs.Package Docs.NotYetKnown -> Spec
-mkSpec pkg@Docs.Package{..} = do
-  let linksCtx = Docs.getLinksContext pkg
-
+spec = beforeAll (handleDocPrepFailure <$> preparePackage "tests/purs/docs" "resolutions.json") $
   context "Language.PureScript.Docs" $ do
     context "Doc generation tests:" $
-      forM_ testCases $ \(mnString, assertions) -> do
-        let mn = P.moduleNameFromString mnString
-            mdl = find ((==) mn . Docs.modName) pkgModules
-
-        context ("in module " ++ T.unpack mnString) $
-          case mdl of
-            Nothing ->
-              it "exists in docs output" $
-                expectationFailure ("module not found in docs: " ++ T.unpack mnString)
-            Just mdl' ->
-              toHspec linksCtx mdl' assertions
-
-    context "Tag generation tests:" $
-      forM_ testTagsCases $ \(mnString, assertions) -> do
-        let mn = P.moduleNameFromString mnString
-            mdl = find ((==) mn . Docs.modName) pkgModules
-        context ("in module " ++ T.unpack mnString) $
-          case mdl of
-            Nothing ->
-              it "exists in docs output" $
-                expectationFailure ("module not found in docs: " ++ T.unpack mnString)
-            Just mdl' ->
-              tagAssertionsToHspec mdl' assertions
-
-  where
-  toHspec :: Docs.LinksContext -> Docs.Module -> [DocsAssertion] -> Spec
-  toHspec linksCtx mdl assertions =
-    forM_ assertions $ \a ->
-      it (T.unpack (displayAssertion a)) $ do
-        case runAssertion a linksCtx mdl of
+      mkSpec testCases displayAssertion $ \a pkg mdl ->
+        case runAssertion a (Docs.getLinksContext pkg) mdl of
           Pass ->
             pure ()
           Fail reason ->
             expectationFailure (T.unpack (displayAssertionFailure reason))
 
-  tagAssertionsToHspec :: Docs.Module -> [TagsAssertion] -> Spec
-  tagAssertionsToHspec mdl assertions =
-    let tags = Map.fromList $ Docs.tags mdl
-    in forM_ assertions $ \a ->
-      it (T.unpack (displayTagsAssertion a)) $ do
-        case runTagsAssertion a tags of
+    context "Tag generation tests:" $
+      mkSpec testTagsCases displayTagsAssertion $ \a _ mdl ->
+        case runTagsAssertion a (Map.fromList $ Docs.tags mdl) of
           TagsPass ->
             pure ()
           TagsFail reason ->
             expectationFailure (T.unpack (displayTagsAssertionFailure reason))
+  where
+  handleDocPrepFailure = first (expectationFailure . ("failed to produce docs: " <>) . Boxes.render . Publish.renderError)
 
-takeJust :: String -> Maybe a -> a
-takeJust msg = fromMaybe (error msg)
+  mkSpec cases displayAssertion' runner =
+    forM_ cases $ \(mnString, assertions) -> do
+      let mn = P.moduleNameFromString mnString
+      context ("in module " ++ T.unpack mnString) $
+        forM_ assertions $ \a ->
+          it (T.unpack (displayAssertion' a)) . either id $ \pkg@Docs.Package{..} ->
+            case find ((==) mn . Docs.modName) pkgModules of
+              Nothing ->
+                expectationFailure ("module not found in docs: " ++ T.unpack mnString)
+              Just mdl ->
+                runner a pkg mdl
 
 data DocsAssertion
   -- | Assert that a particular declaration is documented with the given

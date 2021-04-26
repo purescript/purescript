@@ -26,7 +26,7 @@ import qualified Data.Map as M
 import Data.Maybe (isJust)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import Data.Time.Clock (UTCTime())
+import Data.Time.Clock (UTCTime(), diffUTCTime, getCurrentTime, nominalDay)
 import Data.Tuple (swap)
 import System.Directory
 import System.Exit (exitFailure)
@@ -53,20 +53,54 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 -- updating.
 --
 updateSupportCode :: IO ()
-updateSupportCode = do
-  setCurrentDirectory "tests/support"
-  callCommand "npm install"
-  -- bower uses shebang "/usr/bin/env node", but we might have nodejs
-  node <- maybe cannotFindNode pure =<< findNodeProcess
-  -- Sometimes we run as a root (e.g. in simple docker containers)
-  -- And we are non-interactive: https://github.com/bower/bower/issues/1162
-  callProcess node ["node_modules/bower/bin/bower", "--allow-root", "install", "--config.interactive=false"]
-  setCurrentDirectory "../.."
+updateSupportCode = withCurrentDirectory "tests/support" $ do
+  let lastUpdatedFile = ".last_updated"
+  skipUpdate <- fmap isJust . runMaybeT $ do
+    -- We skip the update if: `.last_updated` exists,
+    lastUpdated <- MaybeT $ getModificationTimeMaybe lastUpdatedFile
+
+    -- ... and it was modified less than a day ago (no particular reason why
+    -- "one day" specifically),
+    now <- lift $ getCurrentTime
+    guard $ now `diffUTCTime` lastUpdated < nominalDay
+
+    -- ... and the needed directories exist,
+    contents <- lift $ listDirectory "."
+    guard $ "node_modules" `elem` contents && "bower_components" `elem` contents
+
+    -- ... and everything else in `tests/support` is at least as old as
+    -- `.last_updated`.
+    modTimes <- lift $ traverse getModificationTime . filter (/= lastUpdatedFile) $ contents
+    guard $ all (<= lastUpdated) modTimes
+
+    pure ()
+
+  unless skipUpdate $ do
+    heading "Updating support code"
+    callCommand "npm install"
+    -- bower uses shebang "/usr/bin/env node", but we might have nodejs
+    node <- maybe cannotFindNode pure =<< findNodeProcess
+    -- Sometimes we run as a root (e.g. in simple docker containers)
+    -- And we are non-interactive: https://github.com/bower/bower/issues/1162
+    callProcess node ["node_modules/bower/bin/bower", "--allow-root", "install", "--config.interactive=false"]
+    writeFile lastUpdatedFile ""
   where
   cannotFindNode :: IO a
   cannotFindNode = do
     hPutStrLn stderr "Cannot find node (or nodejs) executable"
     exitFailure
+
+  getModificationTimeMaybe :: FilePath -> IO (Maybe UTCTime)
+  getModificationTimeMaybe f = catch (Just <$> getModificationTime f) $ \case
+    e | isDoesNotExistError e -> pure Nothing
+      | otherwise             -> throw e
+
+  heading msg = do
+    putStrLn ""
+    putStrLn $ replicate 79 '#'
+    putStrLn $ "# " ++ msg
+    putStrLn $ replicate 79 '#'
+    putStrLn ""
 
 readInput :: [FilePath] -> IO [(FilePath, T.Text)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
@@ -108,7 +142,13 @@ createOutputFile logfileName = do
   createDirectoryIfMissing False (tmp </> logpath)
   openFile (tmp </> logpath </> logfileName) WriteMode
 
-setupSupportModules :: IO ([P.Module], [P.ExternsFile], M.Map P.ModuleName FilePath)
+data SupportModules = SupportModules
+  { supportModules :: [P.Module]
+  , supportExterns :: [P.ExternsFile]
+  , supportForeigns :: M.Map P.ModuleName FilePath
+  }
+
+setupSupportModules :: IO SupportModules
 setupSupportModules = do
   ms <- getSupportModuleTuples
   let modules = map snd ms
@@ -118,7 +158,7 @@ setupSupportModules = do
     return (externs, foreigns)
   case supportExterns of
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
-    Right (externs, foreigns) -> return (modules, externs, foreigns)
+    Right (externs, foreigns) -> return $ SupportModules modules externs foreigns
 
 getTestFiles :: FilePath -> IO [[FilePath]]
 getTestFiles testDir = do
@@ -163,12 +203,10 @@ getTestFiles testDir = do
        else dir
 
 compile
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  :: SupportModules
   -> [FilePath]
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile supportModules supportExterns supportForeigns inputFiles = runTest $ do
+compile SupportModules{..} inputFiles = runTest $ do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
   fs <- liftIO $ readInput (sort inputFiles)
   msWithWarnings <- CST.parseFromFiles id fs

@@ -33,12 +33,10 @@ import qualified Language.PureScript as P
 
 import Control.Arrow ((>>>))
 import Data.Function (on)
-import Data.List (sort, stripPrefix, intercalate, minimumBy)
+import Data.List (sort, stripPrefix, minimumBy)
 import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-
-import qualified Data.Map as M
 
 
 import Control.Monad
@@ -55,56 +53,43 @@ import Text.Regex.TDFA (Regex)
 import TestUtils
 import Test.Hspec
 
-spec :: Spec
+spec :: SpecWith SupportModules
 spec = do
-  (supportModules, supportExterns, supportForeigns) <- runIO setupSupportModules
+  passingTests
+  warningTests
+  failingTests
 
-  passingTests supportModules supportExterns supportForeigns
-  warningTests supportModules supportExterns supportForeigns
-  failingTests supportModules supportExterns supportForeigns
-
-passingTests
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> Spec
-passingTests supportModules supportExterns supportForeigns = do
+passingTests :: SpecWith SupportModules
+passingTests = do
   passingTestCases <- runIO $ getTestFiles "passing"
-  outputFile <- runIO $ createOutputFile logfile
 
   describe "Passing examples" $
-    forM_ passingTestCases $ \testPurs ->
-      it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $
-        assertCompiles supportModules supportExterns supportForeigns testPurs outputFile
+    beforeAllWith ((<$> createOutputFile logfile) . (,)) $
+      forM_ passingTestCases $ \testPurs ->
+        it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $ \(support, outputFile) ->
+          assertCompiles support testPurs outputFile
 
-warningTests
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> Spec
-warningTests supportModules supportExterns supportForeigns = do
+warningTests :: SpecWith SupportModules
+warningTests = do
   warningTestCases <- runIO $ getTestFiles "warning"
 
   describe "Warning examples" $
     forM_ warningTestCases $ \testPurs -> do
       let mainPath = getTestMain testPurs
-      expectedWarnings <- runIO $ getShouldWarnWith mainPath
-      it ("'" <> takeFileName mainPath <> "' should compile with warning(s) '" <> intercalate "', '" expectedWarnings <> "'") $ do
-        assertCompilesWithWarnings supportModules supportExterns supportForeigns testPurs expectedWarnings
+      it ("'" <> takeFileName mainPath <> "' should compile with expected warning(s)") $ \support -> do
+        expectedWarnings <- getShouldWarnWith mainPath
+        assertCompilesWithWarnings support testPurs expectedWarnings
 
-failingTests
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> Spec
-failingTests supportModules supportExterns supportForeigns = do
+failingTests :: SpecWith SupportModules
+failingTests = do
   failingTestCases <- runIO $ getTestFiles "failing"
+
   describe "Failing examples" $ do
     forM_ failingTestCases $ \testPurs -> do
       let mainPath = getTestMain testPurs
-      expectedFailures <- runIO $ getShouldFailWith mainPath
-      it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $ do
-        assertDoesNotCompile supportModules supportExterns supportForeigns testPurs expectedFailures
+      it ("'" <> takeFileName mainPath <> "' should fail to compile") $ \support -> do
+        expectedFailures <- getShouldFailWith mainPath
+        assertDoesNotCompile support testPurs expectedFailures
 
 checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Expectation
 checkShouldReport expected prettyPrintDiagnostics errs =
@@ -138,14 +123,12 @@ checkPositioned errs =
   emptyPos = P.SourcePos 0 0
 
 assertCompiles
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  :: SupportModules
   -> [FilePath]
   -> Handle
   -> Expectation
-assertCompiles supportModules supportExterns supportForeigns inputFiles outputFile = do
-  (result, _) <- compile supportModules supportExterns supportForeigns inputFiles
+assertCompiles support inputFiles outputFile = do
+  (result, _) <- compile support inputFiles
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
     Right _ -> do
@@ -163,14 +146,12 @@ assertCompiles supportModules supportExterns supportForeigns inputFiles outputFi
         Nothing -> expectationFailure "Couldn't find node.js executable"
 
 assertCompilesWithWarnings
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  :: SupportModules
   -> [FilePath]
   -> [String]
   -> Expectation
-assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFiles shouldWarnWith = do
-  result'@(result, warnings) <- compile supportModules supportExterns supportForeigns inputFiles
+assertCompilesWithWarnings support inputFiles shouldWarnWith = do
+  result'@(result, warnings) <- compile support inputFiles
   case result of
     Left errs ->
       expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
@@ -181,14 +162,12 @@ assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFi
         (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest result')
 
 assertDoesNotCompile
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  :: SupportModules
   -> [FilePath]
   -> [String]
   -> Expectation
-assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles shouldFailWith = do
-  result <- compile supportModules supportExterns supportForeigns inputFiles
+assertDoesNotCompile support inputFiles shouldFailWith = do
+  result <- compile support inputFiles
   case fst result of
     Left errs -> do
       when (null shouldFailWith)
