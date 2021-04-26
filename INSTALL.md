@@ -25,6 +25,7 @@ There are several other distributions of the PureScript compiler available, whic
 
 * NPM: `npm install -g purescript`
 * Homebrew (for macOS): `brew install purescript`
+* FreeBSD binary packages: `pkg install hs-purescript`
 
 ## Compiling from source
 
