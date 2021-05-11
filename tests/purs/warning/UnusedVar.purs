@@ -3,6 +3,9 @@
 -- @shouldWarnWith UnusedName
 -- @shouldWarnWith UnusedName
 -- @shouldWarnWith UnusedName
+-- @shouldWarnWith UnusedName
+-- @shouldWarnWith UnusedName
+-- @shouldWarnWith ShadowedName
 module Main where
 
 data X = X
@@ -45,3 +48,22 @@ unusedObjUpdate =
       obj = { foo: X }
   in
   obj { foo = x }
+
+-- The outer x is used in the let-bound expression, the let-binding variable is used in the body
+notUnusedNonRecursiveBinding :: X -> X
+notUnusedNonRecursiveBinding x = 
+  let {x} = {x}
+  in x
+
+-- Almost like above but the outer x is not used, as x is bound recursively (Can also be true if there are no 
+-- arguments to x but in most cases this will error due to being cyclic)
+unusedShadowedByRecursiveBinding :: X -> X
+unusedShadowedByRecursiveBinding x = 
+  let x _ = x X
+  in x X
+
+-- In this case the outer x is used but the new x binding is not
+unusedShadowingLet :: X -> X
+unusedShadowingLet x = 
+  let (x) = x
+  in X

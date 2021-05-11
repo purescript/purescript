@@ -191,8 +191,10 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go _ (Var _ _) = (S.empty, mempty)
 
     go ss (Let _ ds e) =
-      let letNames = S.fromList $ concatMap declIdents ds
-      in removeAndWarn ss letNames $ mconcat (go ss e : map underDecl ds)
+      let (letNames, letNamesRec) = foldMap declIdents ds
+      in removeAndWarn ss letNamesRec $
+            removeAndWarn ss letNames (go ss e)
+            <> mconcat (map underDecl ds)
     go ss (Abs binder v1) =
       let newNames = S.fromList (binderNames binder)
       in
@@ -249,17 +251,19 @@ lintUnused (Module modSS _ mn modDecls exports) =
       in go ss' e <> removeAndWarn ss' bindNewNames (doElts ss' rest v)
 
     doElts ss' (DoNotationLet ds : rest) v =
-      let letNewNames = S.fromList $ concatMap declIdents ds
-          declRes = foldr1 (<>) (map underDecl ds)
-      in removeAndWarn ss' letNewNames $ declRes <> doElts ss' rest v
+      let (letNewNames, letNewNamesRec) = foldMap declIdents ds
+      in removeAndWarn ss' letNewNamesRec $
+            mconcat (map underDecl ds)
+            <> removeAndWarn ss' letNewNames (doElts ss' rest v)
     doElts _ (PositionedDoNotationElement ss'' _ e : rest) v = doElts ss'' (e : rest) v
     doElts ss' [] (Just e) = go ss' e <> (rebindable, mempty)
     doElts _ [] Nothing = (rebindable, mempty)
 
-    declIdents :: Declaration -> [Ident]
-    declIdents (ValueDecl _ ident _ _ _) = [ident]
-    declIdents (BoundValueDeclaration _ binders _) = binderNames binders
-    declIdents _ = []
+    -- (non-recursively, recursively) bound idents in decl
+    declIdents :: Declaration -> (S.Set Ident, S.Set Ident)
+    declIdents (ValueDecl _ ident _ _ _) = (S.empty, S.singleton ident)
+    declIdents (BoundValueDeclaration _ binders _) = (S.fromList $ binderNames binders, S.empty)
+    declIdents _ = (S.empty, S.empty)
 
     -- let f x = e  -- check the x in e (but not the f)
     underDecl d@(ValueDecl _ _ _ binders gexprs) =
