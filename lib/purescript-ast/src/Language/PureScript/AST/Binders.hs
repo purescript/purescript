@@ -132,20 +132,24 @@ instance Ord Binder where
 -- Collect all names introduced in binders in an expression
 --
 binderNames :: Binder -> [Ident]
-binderNames = go []
+binderNames = map snd . binderNamesWithSpans
+
+binderNamesWithSpans :: Binder -> [(SourceSpan, Ident)]
+binderNamesWithSpans = go []
   where
   go ns (LiteralBinder _ b) = lit ns b
-  go ns (VarBinder _ name) = name : ns
+  go ns (VarBinder ss name) = (ss, name) : ns
   go ns (ConstructorBinder _ _ bs) = foldl go ns bs
   go ns (BinaryNoParensBinder b1 b2 b3) = foldl go ns [b1, b2, b3]
   go ns (ParensInBinder b) = go ns b
-  go ns (NamedBinder _ name b) = go (name : ns) b
+  go ns (NamedBinder ss name b) = go ((ss, name) : ns) b
   go ns (PositionedBinder _ _ b) = go ns b
   go ns (TypedBinder _ b) = go ns b
   go ns _ = ns
   lit ns (ObjectLiteral bs) = foldl go ns (map snd bs)
   lit ns (ArrayLiteral bs) = foldl go ns bs
   lit ns _ = ns
+
 
 isIrrefutable :: Binder -> Bool
 isIrrefutable NullBinder = True

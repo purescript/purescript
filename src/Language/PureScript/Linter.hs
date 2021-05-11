@@ -176,7 +176,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
     goDecl :: Declaration -> (S.Set Ident, MultipleErrors)
     goDecl d@(ValueDeclaration vd) =
         let allExprs = concatMap unguard $ valdeclExpression vd
-            bindNewNames = S.fromList (concatMap binderNames $ valdeclBinders vd)
+            bindNewNames = S.fromList (concatMap binderNamesWithSpans $ valdeclBinders vd)
             ss = declSourceSpan d
             (vars, errs) = removeAndWarn ss bindNewNames $ mconcat $ map (go ss) allExprs
             errs' = addHint (ErrorInValueDeclaration $ valdeclIdent vd) errs
@@ -196,7 +196,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
             removeAndWarn ss letNames (go ss e)
             <> mconcat (map underDecl ds)
     go ss (Abs binder v1) =
-      let newNames = S.fromList (binderNames binder)
+      let newNames = S.fromList (binderNamesWithSpans binder)
       in
       removeAndWarn ss newNames $ go ss v1
 
@@ -218,7 +218,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go ss (IfThenElse v1 v2 v3) = go ss v1 <> go ss v2 <> go ss v3
     go ss (Case vs alts) =
       let f (CaseAlternative binders gexprs) =
-            let bindNewNames = S.fromList (concatMap binderNames binders)
+            let bindNewNames = S.fromList (concatMap binderNamesWithSpans binders)
                 allExprs = concatMap unguard gexprs
             in
                 removeAndWarn ss bindNewNames $ mconcat $ map (go ss) allExprs
@@ -247,7 +247,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
     doElts :: SourceSpan -> [DoNotationElement] -> Maybe Expr -> (S.Set Ident, MultipleErrors)
     doElts ss' (DoNotationValue e : rest) v = go ss' e <> doElts ss' rest v
     doElts ss' (DoNotationBind binder e : rest) v =
-      let bindNewNames = S.fromList (binderNames binder)
+      let bindNewNames = S.fromList (binderNamesWithSpans binder)
       in go ss' e <> removeAndWarn ss' bindNewNames (doElts ss' rest v)
 
     doElts ss' (DoNotationLet ds : rest) v =
@@ -260,14 +260,14 @@ lintUnused (Module modSS _ mn modDecls exports) =
     doElts _ [] Nothing = (rebindable, mempty)
 
     -- (non-recursively, recursively) bound idents in decl
-    declIdents :: Declaration -> (S.Set Ident, S.Set Ident)
-    declIdents (ValueDecl _ ident _ _ _) = (S.empty, S.singleton ident)
-    declIdents (BoundValueDeclaration _ binders _) = (S.fromList $ binderNames binders, S.empty)
+    declIdents :: Declaration -> (S.Set (SourceSpan, Ident), S.Set (SourceSpan, Ident))
+    declIdents (ValueDecl (ss,_) ident _ _ _) = (S.empty, S.singleton (ss, ident))
+    declIdents (BoundValueDeclaration _ binders _) = (S.fromList $ binderNamesWithSpans binders, S.empty)
     declIdents _ = (S.empty, S.empty)
 
     -- let f x = e  -- check the x in e (but not the f)
     underDecl d@(ValueDecl _ _ _ binders gexprs) =
-      let bindNewNames = S.fromList (concatMap binderNames binders)
+      let bindNewNames = S.fromList (concatMap binderNamesWithSpans binders)
           allExprs = concatMap unguard gexprs
           ss = declSourceSpan d
       in
@@ -281,10 +281,12 @@ lintUnused (Module modSS _ mn modDecls exports) =
     unguard' (ConditionGuard ee) = ee
     unguard' (PatternGuard _ ee) = ee
 
-    removeAndWarn :: SourceSpan -> S.Set Ident -> (S.Set Ident, MultipleErrors) -> (S.Set Ident, MultipleErrors)
-    removeAndWarn ss newNames (used, errors) =
-      let filteredUsed = used `S.difference` newNames
+    removeAndWarn :: SourceSpan -> S.Set (SourceSpan, Ident) -> (S.Set Ident, MultipleErrors) -> (S.Set Ident, MultipleErrors)
+    removeAndWarn _ newNamesWithSpans (used, errors) =
+      let newNames = S.map snd newNamesWithSpans
+          filteredUsed = used `S.difference` newNames
           warnUnused = S.filter (not . Text.isPrefixOf "_" . runIdent) (newNames `S.difference` used)
-          combinedErrors = if not $ S.null warnUnused then errors <> (mconcat $ map (errorMessage' ss . UnusedName) $ S.toList warnUnused) else errors
+          warnUnusedSpans = S.filter (\(_,ident) -> ident `elem` warnUnused) newNamesWithSpans 
+          combinedErrors = if not $ S.null warnUnusedSpans then errors <> (mconcat $ map (\(ss,ident) -> errorMessage' ss $ UnusedName ident) $ S.toList warnUnusedSpans) else errors
       in
         (filteredUsed, combinedErrors)
