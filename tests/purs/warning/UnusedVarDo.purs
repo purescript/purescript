@@ -33,3 +33,8 @@ unusedAdoLetBinding :: Maybe Int
 unusedAdoLetBinding = ado
   let unusedAdoLet = 42
   in 17
+
+notUnusedNonRecursiveBinding :: Int -> Maybe Int
+notUnusedNonRecursiveBinding x = do
+  let {x} = {x}
+  pure x
