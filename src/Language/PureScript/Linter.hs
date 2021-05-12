@@ -220,15 +220,15 @@ lintUnused (Module modSS _ mn modDecls exports) =
             let bindNewNames = S.fromList (concatMap binderNamesWithSpans binders)
                 allExprs = concatMap unguard gexprs
             in
-                removeAndWarn bindNewNames $ mconcat $ map (go) allExprs
+                removeAndWarn bindNewNames $ mconcat $ map go allExprs
       in
-      mconcat $ map (go) vs ++ map f alts
+      mconcat $ map go vs ++ map f alts
 
     go (TypedValue _ v1 _) = go v1
     go (Do _ es) = doElts es Nothing
     go (Ado _ es v1) = doElts es (Just v1)
 
-    go (Literal _ (ArrayLiteral es)) = mconcat $ map (go) es
+    go (Literal _ (ArrayLiteral es)) = mconcat $ map go es
     go (Literal _ (ObjectLiteral oo)) = mconcat $ map (go . snd) oo
 
     go (PositionedValue _ _ v1) = go v1
@@ -254,7 +254,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
       in removeAndWarn letNewNamesRec $
             mconcat (map underDecl ds)
             <> removeAndWarn letNewNames (doElts rest v)
-    doElts (PositionedDoNotationElement _ _ e : rest) v = doElts  (e : rest) v
+    doElts (PositionedDoNotationElement _ _ e : rest) v = doElts (e : rest) v
     doElts [] (Just e) = go e <> (rebindable, mempty)
     doElts [] Nothing = (rebindable, mempty)
 
@@ -269,7 +269,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
       let bindNewNames = S.fromList (concatMap binderNamesWithSpans binders)
           allExprs = concatMap unguard gexprs
       in
-          removeAndWarn bindNewNames $ foldr1 (<>) $ map (go) allExprs
+          removeAndWarn bindNewNames $ foldr1 (<>) $ map go allExprs
     -- let {x} = e  -- no binding to check inside e
     underDecl (BoundValueDeclaration _ _ expr) = go expr
     underDecl _ = (mempty, mempty)
