@@ -10,6 +10,11 @@ New features:
 
 Bugfixes:
 
+* Unused identifier warnings now report smaller and more relevant source spans (#4088, @nwolverson)
+  
+  Also fix incorrect warnings in cases involving a let-pattern binding shadowing
+  an existing identifier.
+
 Internal:
 
 * Drop libtinfo dependency (#3696, @hdgarrood)
