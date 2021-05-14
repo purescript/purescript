@@ -41,7 +41,7 @@ import Data.Functor (($>))
 import qualified Data.IntSet as IS
 import Data.List (nubBy, sortBy, (\\))
 import qualified Data.Map as M
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe)
 import Data.Ord (comparing)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -191,7 +191,7 @@ inferKind = \tyToInfer ->
       kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
       pure (ty, kind $> ann)
     ty@(Skolem ann _ mbK _ _) -> do
-      kind <- apply $ maybe (internalError "Skolem has no kind") id mbK
+      kind <- apply $ fromMaybe (internalError "Skolem has no kind") mbK
       pure (ty, kind $> ann)
     ty@(TUnknown ann u) -> do
       kind <- apply . snd =<< lookupUnsolved u
@@ -499,7 +499,7 @@ elaborateKind = \case
     kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName a)
     pure (kind $> ann)
   (Skolem ann _ mbK _ _) -> do
-    kind <- apply $ maybe (internalError "Skolem has no kind") id mbK
+    kind <- apply $ fromMaybe (internalError "Skolem has no kind") mbK
     pure $ kind $> ann
   TUnknown ann a' -> do
     kind <- snd <$> lookupUnsolved a'
