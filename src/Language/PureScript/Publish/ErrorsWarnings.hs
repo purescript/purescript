@@ -174,20 +174,17 @@ displayUserError e = case e of
       , spacer
       ] ++ spdxExamples ++
       [ spacer
-      , para $ concat
-          [ "See https://spdx.org/licenses/ for a full list of licenses. For more "
-          , "information on SPDX license expressions, see https://spdx.org/ids-how"
-          ]
+      , para $
+          "See https://spdx.org/licenses/ for a full list of licenses. For more " ++
+          "information on SPDX license expressions, see https://spdx.org/ids-how"
       , spacer
-      , para $ concat
-          [ "Note that distributing code without a license means that nobody will "
-          , "(legally) be able to use it."
-          ]
+      , para $
+          "Note that distributing code without a license means that nobody will " ++
+          "(legally) be able to use it."
       , spacer
-      , para $ concat
-          [ "It is also recommended to add a LICENSE file to the repository, "
-          , "including your name and the current year, although this is not necessary."
-          ]
+      , para $
+          "It is also recommended to add a LICENSE file to the repository, " ++
+          "including your name and the current year, although this is not necessary."
       ]
   InvalidLicense ->
     vcat $
