@@ -35,7 +35,6 @@
 - ignore: {name: "Hoist not"}
 - ignore: {name: "Functor law"}
 - ignore: {name: "Redundant fmap"}
-- ignore: {name: "Use unwords"}
 - ignore: {name: "Use fmap"}
 - ignore: {name: "Avoid lambda using `infix`"}
 - ignore: {name: "Use const"}

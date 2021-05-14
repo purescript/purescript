@@ -46,7 +46,7 @@ parseEvalLine line =
   case stripPrefix evalCommentPrefix line of
     Just rest ->
       case splitOn " " rest of
-        "shouldEvaluateTo" : args -> Comment (ShouldEvaluateTo $ intercalate " " args)
+        "shouldEvaluateTo" : args -> Comment (ShouldEvaluateTo $ unwords args)
         "paste" : [] -> Comment (Paste [])
         _ -> Invalid line
     Nothing -> Line line

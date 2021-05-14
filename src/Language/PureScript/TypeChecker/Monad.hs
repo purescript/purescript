@@ -12,7 +12,6 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
-import Data.List (intercalate)
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -422,7 +421,7 @@ debugTypeSynonyms = fmap go . M.toList . typeSynonyms
   where
   go (qual, (binders, subTy)) = do
     let
-      vars = intercalate " " $ flip fmap binders $ \case
+      vars = unwords $ flip fmap binders $ \case
                (v, Just k) -> "(" <> unpack v <> " :: " <> init (prettyPrintType 100 k) <> ")"
                (v, Nothing) -> unpack v
       ppTy = prettyPrintType 100 subTy
@@ -440,8 +439,8 @@ debugTypeClassDictionaries = go . typeClassDictionaries
       moduleName = maybe "" (\m -> "[" <> runModuleName m <> "] ") mbModuleName
       className' = showQualified runProperName className
       ident' = showQualified runIdent ident
-      kds = intercalate " " $ fmap ((\a -> "@(" <> a <> ")") . debugType) $ tcdInstanceKinds $ NEL.head dicts
-      tys = intercalate " " $ fmap ((\a -> "(" <> a <> ")") . debugType) $ tcdInstanceTypes $ NEL.head dicts
+      kds = unwords $ fmap ((\a -> "@(" <> a <> ")") . debugType) $ tcdInstanceKinds $ NEL.head dicts
+      tys = unwords $ fmap ((\a -> "(" <> a <> ")") . debugType) $ tcdInstanceTypes $ NEL.head dicts
     pure $ "dict " <> unpack moduleName <> unpack className' <> " " <> unpack ident' <> " (" <> show (length dicts) <> ")" <> " " <> kds <> " " <> tys
 
 debugTypeClasses :: Environment -> [String]
@@ -450,7 +449,7 @@ debugTypeClasses = fmap go . M.toList . typeClasses
   go (className, tc) = do
     let
       className' = showQualified runProperName className
-      args = intercalate " " $ fmap (\(a, b) -> "(" <> debugType (maybe (srcTypeVar a) (srcKindedType (srcTypeVar a)) b) <> ")") $ typeClassArguments tc
+      args = unwords $ fmap (\(a, b) -> "(" <> debugType (maybe (srcTypeVar a) (srcKindedType (srcTypeVar a)) b) <> ")") $ typeClassArguments tc
     "class " <> unpack className' <> " " <> args
 
 debugValue :: Expr -> String
