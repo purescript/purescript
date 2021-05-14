@@ -690,7 +690,7 @@ checkQuantification ty =
 
   go acc _ [] = reverse acc
   go acc sco ((_, (arg, k)) : rest)
-    | any (not . flip elem sco) $ freeTypeVariables k = goDeps acc arg rest
+    | not . all (flip elem sco) $ freeTypeVariables k = goDeps acc arg rest
     | otherwise = go acc (arg : sco) rest
 
   goDeps acc _ [] = acc

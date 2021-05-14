@@ -108,7 +108,7 @@ checkPositioned errs =
   where
   guardSpans :: P.ErrorMessage -> Maybe P.ErrorMessage
   guardSpans err = case P.errorSpan err of
-    Just ss | any (not . isNonsenseSpan) ss -> Nothing
+    Just ss | not $ all isNonsenseSpan ss -> Nothing
     _ -> Just err
 
   isNonsenseSpan :: P.SourceSpan -> Bool

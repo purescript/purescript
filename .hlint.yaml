@@ -26,7 +26,6 @@
 - ignore: {name: "Avoid reverse"}
 - ignore: {name: "Reduce duplication"}
 - ignore: {name: "Use camelCase"}
-- ignore: {name: "Hoist not"}
 - ignore: {name: "Functor law"}
 - ignore: {name: "Redundant fmap"}
 - ignore: {name: "Use fmap"}
