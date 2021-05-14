@@ -2,7 +2,7 @@ module Language.PureScript.CST.Utils where
 
 import Prelude
 
-import Control.Monad (when)
+import Control.Monad (unless)
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
 import Data.Functor (($>))
@@ -128,14 +128,14 @@ internalError = error . ("Internal parser error: " <>)
 toModuleName :: SourceToken -> [Text] -> Parser (Maybe N.ModuleName)
 toModuleName _ [] = pure Nothing
 toModuleName tok ns = do
-  when (not (all isValidModuleNamespace ns)) $ addFailure [tok] ErrModuleName
+  unless (all isValidModuleNamespace ns) $ addFailure [tok] ErrModuleName
   pure . Just . N.ModuleName $ Text.intercalate "." ns
 
 upperToModuleName :: SourceToken -> Parser (Name N.ModuleName)
 upperToModuleName tok = case tokValue tok of
   TokUpperName q a -> do
     let ns = q <> [a]
-    when (not (all isValidModuleNamespace ns)) $ addFailure [tok] ErrModuleName
+    unless (all isValidModuleNamespace ns) $ addFailure [tok] ErrModuleName
     pure . Name tok . N.ModuleName $ Text.intercalate "." ns
   _ -> internalError $ "Invalid upper name: " <> show tok
 

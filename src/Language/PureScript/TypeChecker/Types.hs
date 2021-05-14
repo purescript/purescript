@@ -157,7 +157,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         let constraintTypeVars = fold (conData >>= snd)
         let solved = solveFrom determinedFromType
         let unsolvedVars = S.difference constraintTypeVars solved
-        when (not (S.null unsolvedVars)) .
+        unless (S.null unsolvedVars) .
           throwError
             . onErrorMessages (replaceTypes currentSubst)
             . errorMessage' ss

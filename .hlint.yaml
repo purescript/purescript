@@ -21,7 +21,6 @@
 - ignore: {name: "Redundant $"}
 - ignore: {name: "Use record patterns"}
 - ignore: {name: "Use list literal pattern"}
-- ignore: {name: "Use unless"}
 - ignore: {name: "Move brackets to avoid $"}
 - ignore: {name: "Use section"}
 - ignore: {name: "Use &&"}
