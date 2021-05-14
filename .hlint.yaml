@@ -18,7 +18,6 @@
 - ignore: {name: "Use tuple-section"}
 - ignore: {name: "Use record patterns"}
 - ignore: {name: "Use section"}
-- ignore: {name: "Use <$>"}
 - ignore: {name: "Reduce duplication"}
 - ignore: {name: "Use camelCase"}
 - ignore: {name: "Functor law"}

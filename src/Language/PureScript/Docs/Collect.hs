@@ -158,7 +158,7 @@ operateAndRetag ::
   [(tag, a)] ->
   m [(tag, b)]
 operateAndRetag keyA keyB operation input =
-  fmap (map retag) $ operation (map snd input)
+  map retag <$> operation (map snd input)
   where
   tags :: Map key tag
   tags = Map.fromList $ map (\(tag, a) -> (keyA a, tag)) input

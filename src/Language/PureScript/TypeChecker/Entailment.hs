@@ -165,8 +165,8 @@ entails SolverOptions{..} constraint context hints =
   where
     forClassNameM :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> m [TypeClassDict]
     forClassNameM env ctx cn@C.Coercible kinds args =
-      solveCoercible env ctx kinds args >>=
-        pure . fromMaybe (forClassName env ctx cn kinds args)
+      fromMaybe (forClassName env ctx cn kinds args) <$>
+        solveCoercible env ctx kinds args
     forClassNameM env ctx cn kinds args =
       pure $ forClassName env ctx cn kinds args
 

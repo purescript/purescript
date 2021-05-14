@@ -449,7 +449,7 @@ debugTypeClasses = fmap go . M.toList . typeClasses
   go (className, tc) = do
     let
       className' = showQualified runProperName className
-      args = unwords $ fmap (\(a, b) -> "(" <> debugType (maybe (srcTypeVar a) (srcKindedType (srcTypeVar a)) b) <> ")") $ typeClassArguments tc
+      args = unwords $ (\(a, b) -> "(" <> debugType (maybe (srcTypeVar a) (srcKindedType (srcTypeVar a)) b) <> ")") <$> typeClassArguments tc
     "class " <> unpack className' <> " " <> args
 
 debugValue :: Expr -> String

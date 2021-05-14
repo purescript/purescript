@@ -212,7 +212,7 @@ getManifestRepositoryInfo pkgMeta =
     Nothing -> do
       giturl <- catchError (Just . T.strip . T.pack <$> readProcess' "git" ["config", "remote.origin.url"] "")
                   (const (return Nothing))
-      userError (BadRepositoryField (RepositoryFieldMissing (giturl >>= extractGithub >>= return . format)))
+      userError (BadRepositoryField (RepositoryFieldMissing (giturl >>= extractGithub <&> format)))
     Just Repository{..} -> do
       unless (repositoryType == "git")
         (userError (BadRepositoryField (BadRepositoryType repositoryType)))
