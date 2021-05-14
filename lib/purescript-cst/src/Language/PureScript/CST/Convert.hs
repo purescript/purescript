@@ -40,8 +40,8 @@ import Language.PureScript.CST.Types
 comment :: Comment a -> Maybe C.Comment
 comment = \case
   Comment t
-    | Text.isPrefixOf "{-" t -> Just $ C.BlockComment $ Text.drop 2 $ Text.dropEnd 2 t
-    | Text.isPrefixOf "--" t -> Just $ C.LineComment $ Text.drop 2 t
+    | "{-" `Text.isPrefixOf` t -> Just $ C.BlockComment $ Text.drop 2 $ Text.dropEnd 2 t
+    | "--" `Text.isPrefixOf` t -> Just $ C.LineComment $ Text.drop 2 t
   _ -> Nothing
 
 comments :: [Comment a] -> [C.Comment]

@@ -395,7 +395,7 @@ debugTypes = go <=< M.toList . types
         ExternData _      -> "extern"
         LocalTypeVariable -> "local"
         ScopedTypeVar     -> "scoped"
-    guard (not (isPrefixOf "Prim" name))
+    guard (not ("Prim" `isPrefixOf` name))
     pure $ decl <> " " <> unpack name <> " :: " <> init ppTy
 
 debugNames :: Environment -> [String]

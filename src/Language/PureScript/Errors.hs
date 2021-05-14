@@ -506,7 +506,7 @@ errorSuggestion err =
         case CST.errType pe of
           CST.WarnDeprecatedRowSyntax -> do
             let kind = CST.printTokens $ drop 1 toks
-                sugg | T.isPrefixOf " " kind = "Row" <> kind
+                sugg | " " `T.isPrefixOf` kind = "Row" <> kind
                      | otherwise = "Row " <> kind
             suggest sugg
           CST.WarnDeprecatedForeignKindSyntax -> suggest $ "data " <> CST.printTokens (drop 3 toks)
