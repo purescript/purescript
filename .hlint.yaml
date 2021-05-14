@@ -20,7 +20,6 @@
 - ignore: {name: "Use camelCase"}
 - ignore: {name: "Functor law"}
 - ignore: {name: "Avoid lambda using `infix`"}
-- ignore: {name: "Use const"}
 - ignore: {name: "Fuse mapM/map"}
 
 
