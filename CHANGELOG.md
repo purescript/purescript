@@ -70,6 +70,8 @@ Internal:
 
 * Do less work in test initialization (#4080, @rhendric)
 
+* Follow more HLint suggestions (#4090, @rhendric)
+
 ## v0.14.1
 
 New features:
