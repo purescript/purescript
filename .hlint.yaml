@@ -40,7 +40,6 @@
 - ignore: {name: "Use Just"}
 - ignore: {name: "Use /="}
 - ignore: {name: "Reduce duplication"}
-- ignore: {name: "Use fewer imports"}
 - ignore: {name: "Use camelCase"}
 - ignore: {name: "Use ++"}
 - ignore: {name: "Hoist not"}
@@ -55,7 +54,6 @@
 - ignore: {name: "Use unwords"}
 - ignore: {name: "Use fmap"}
 - ignore: {name: "Avoid lambda using `infix`"}
-- ignore: {name: "Use <$"}
 - ignore: {name: "Use const"}
 - ignore: {name: "Fuse mapM/map"}
 
