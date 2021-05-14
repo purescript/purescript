@@ -288,7 +288,7 @@ typeClassMemberToDictionaryAccessor
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa ident ty)) =
   let className = Qualified (Just mn) name
-  in ValueDecl sa ident Private [] $
+  in ValueDecl sa ident Private []
     [MkUnguarded (
      TypedValue False (TypeClassDictionaryAccessor className ident) $
        moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty))

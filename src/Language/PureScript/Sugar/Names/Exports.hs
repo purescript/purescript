@@ -217,7 +217,7 @@ resolveExports env ss mn imps exps refs =
   resolve f (Qualified (Just mn'') a) = do
     exps' <- envModuleExports <$> mn'' `M.lookup` env
     src <- a `M.lookup` f exps'
-    return $ (a, src { exportSourceImportedFrom = Just mn'' })
+    return (a, src { exportSourceImportedFrom = Just mn'' })
   resolve _ _ = internalError "Unqualified value in resolve"
 
 -- |

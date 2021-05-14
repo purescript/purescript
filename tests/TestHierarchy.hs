@@ -19,7 +19,7 @@ spec = describe "hierarchy" $ do
         prettyPrinted `shouldBe` "  A;"
 
       it "creates a relation when there is one" $ do
-        let superMap = SuperMap (Right $ (P.ProperName "A", P.ProperName "B"))
+        let superMap = SuperMap (Right (P.ProperName "A", P.ProperName "B"))
 
         let prettyPrinted = prettyPrint superMap
 

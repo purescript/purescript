@@ -698,7 +698,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "In the FFI module for " <> markCode (runModuleName mn) <> ":"
             , indent . paras $
                 [ line $ "The identifier " <> markCode ident <> " contains a prime (" <> markCode "'" <> ")."
-                , line $ "Primes in identifiers exported from FFI modules are deprecated and won’t be supported in the future."
+                , line "Primes in identifiers exported from FFI modules are deprecated and won’t be supported in the future."
                 ]
             ]
     renderSimpleErrorMessage InvalidDoBind =
@@ -793,14 +793,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (CycleInTypeClassDeclaration [name]) =
       paras [ line $ "A type class '" <> markCode (runProperName (disqualify name)) <> "' may not have itself as a superclass." ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration names) =
-      paras [ line $ "A cycle appears in a set of type class definitions:"
+      paras [ line "A cycle appears in a set of type class definitions:"
             , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName . disqualify) names) <> "}"
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             ]
     renderSimpleErrorMessage (CycleInKindDeclaration [name]) =
       paras [ line $ "A kind declaration '" <> markCode (runProperName (disqualify name)) <> "' may not refer to itself in its own signature." ]
     renderSimpleErrorMessage (CycleInKindDeclaration names) =
-      paras [ line $ "A cycle appears in a set of kind declarations:"
+      paras [ line "A cycle appears in a set of kind declarations:"
             , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName . disqualify) names) <> "}"
             , line "Kind declarations may not refer to themselves in their own signatures."
             ]
@@ -949,7 +949,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
-            , line $ fold $
+            , line $ fold
                 [ "because the "
                 , markCode (showQualified runProperName nm)
                 , " type class has "
@@ -985,11 +985,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (OverlappingArgNames ident) =
       line $ "Overlapping names in function/binder" <> foldMap ((" in declaration " <>) . showIdent) ident
     renderSimpleErrorMessage (MissingClassMember identsAndTypes) =
-      paras $ [ line "The following type class members have not been implemented:"
-              , Box.vcat Box.left
-                [ markCodeBox $ Box.text (T.unpack (showIdent ident)) Box.<> " :: " Box.<> prettyType ty
-                | (ident, ty) <- NEL.toList identsAndTypes ]
-              ]
+      paras [ line "The following type class members have not been implemented:"
+            , Box.vcat Box.left
+              [ markCodeBox $ Box.text (T.unpack (showIdent ident)) Box.<> " :: " Box.<> prettyType ty
+              | (ident, ty) <- NEL.toList identsAndTypes ]
+            ]
     renderSimpleErrorMessage (ExtraneousClassMember ident className) =
       line $ "" <> markCode (showIdent ident) <> " is not a member of type class " <> markCode (showQualified runProperName className)
     renderSimpleErrorMessage (ExpectedType ty kind) =
@@ -1107,7 +1107,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (MissingKindDeclaration sig name ty) =
       let sigKw = prettyPrintKindSignatureFor sig in
       paras [ line $ "The inferred kind for the " <> sigKw <> " declaration " <> markCode (runProperName name) <> " contains polymorphic kinds."
-            , line $ "Consider adding a top-level kind signature as a form of documentation."
+            , line "Consider adding a top-level kind signature as a form of documentation."
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line $ sigKw <> " " <> runProperName name <> " ::"
                 , prettyTypeWithDepth maxBound ty
@@ -1173,7 +1173,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage msg@(ImplicitQualifiedImportReExport importedModule asModule _) =
       paras [ line $ "Module " <> markCode (runModuleName importedModule) <> " was imported as " <> markCode (runModuleName asModule) <> " with unspecified imports."
-            , line $ "As this module is being re-exported, consider using the explicit form:"
+            , line "As this module is being re-exported, consider using the explicit form:"
             , indent $ line $ markCode $ showSuggestion msg
             ]
 
@@ -1252,9 +1252,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
 
     renderSimpleErrorMessage (CannotDefinePrimModules mn) =
-      paras $
+      paras
         [ line $ "The module name " <> markCode (runModuleName mn) <> " is in the Prim namespace."
-        , line $ "The Prim namespace is reserved for compiler-defined terms."
+        , line "The Prim namespace is reserved for compiler-defined terms."
         ]
 
     renderSimpleErrorMessage (MixedAssociativityError opsWithAssoc) =
@@ -1300,7 +1300,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (VisibleQuantificationCheckFailureInType var) =
       paras
         [ line $ "Visible dependent quantification of type variable " <> markCode var <> " is not supported."
-        , line $ "If you would like this feature supported, please bother Liam Goodacre (@LiamGoodacre)."
+        , line "If you would like this feature supported, please bother Liam Goodacre (@LiamGoodacre)."
         ]
 
     renderSimpleErrorMessage (UnsupportedTypeInKind ty) =
@@ -1330,7 +1330,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         ]
 
     renderSimpleErrorMessage UnsupportedRoleDeclaration =
-      line $ "Role declarations are only supported for data types, not for type synonyms nor type classes."
+      line "Role declarations are only supported for data types, not for type synonyms nor type classes."
 
     renderSimpleErrorMessage (RoleDeclarationArityMismatch name expected actual) =
       line $ T.intercalate " "

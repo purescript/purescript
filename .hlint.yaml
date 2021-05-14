@@ -16,7 +16,6 @@
 - ignore: {name: "Use lambda-case"}
 - ignore: {name: "Avoid lambda"}
 - ignore: {name: "Use tuple-section"}
-- ignore: {name: "Redundant $"}
 - ignore: {name: "Use record patterns"}
 - ignore: {name: "Move brackets to avoid $"}
 - ignore: {name: "Use section"}

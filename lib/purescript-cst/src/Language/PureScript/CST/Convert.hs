@@ -121,7 +121,7 @@ convertType fileName = go
     TypeHole _ a ->
       T.TypeWildcard (sourceName fileName a) . Just . getIdent $ nameValue a
     TypeString _ a b ->
-      T.TypeLevelString (sourceAnnCommented fileName a a) $ b
+      T.TypeLevelString (sourceAnnCommented fileName a a) b
     TypeRow _ (Wrapped _ row b) ->
       goRow row b
     TypeRecord _ (Wrapped a row b) -> do

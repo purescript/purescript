@@ -57,7 +57,7 @@ updateSupportCode = withCurrentDirectory "tests/support" $ do
 
     -- ... and it was modified less than a day ago (no particular reason why
     -- "one day" specifically),
-    now <- lift $ getCurrentTime
+    now <- lift getCurrentTime
     guard $ now `diffUTCTime` lastUpdated < nominalDay
 
     -- ... and the needed directories exist,

@@ -231,7 +231,7 @@ entails SolverOptions{..} constraint context hints =
 
             let instances = do
                   chain <- groupBy ((==) `on` tcdChain) $
-                           sortOn (tcdChain &&& tcdIndex) $
+                           sortOn (tcdChain &&& tcdIndex)
                            dicts
                   -- process instances in a chain in index order
                   let found = for chain $ \tcd ->

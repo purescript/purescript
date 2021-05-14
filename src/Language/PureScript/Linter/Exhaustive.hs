@@ -293,7 +293,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     where
       partial :: Text -> Text -> Declaration
       partial var tyVar =
-        ValueDecl (ss, []) UnusedIdent Private [] $
+        ValueDecl (ss, []) UnusedIdent Private []
         [MkUnguarded
           (TypedValue
            True

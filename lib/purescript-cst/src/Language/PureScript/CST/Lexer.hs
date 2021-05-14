@@ -204,7 +204,7 @@ breakComments = k0 []
   comment = isBlockComment >>= \case
     Just True  -> Just <$> blockComment "{-"
     Just False -> Just <$> lineComment "--"
-    Nothing    -> pure $ Nothing
+    Nothing    -> pure Nothing
 
   lineComment acc = do
     comm <- nextWhile (\c -> c /= '\r' && c /= '\n')
@@ -417,7 +417,7 @@ token = peek >>= maybe (pure TokEof) k0
       Just ch ->
         next $> (Text.singleton ch, ch)
       Nothing ->
-        throw $ ErrEof
+        throw ErrEof
     peek >>= \case
       Just '\''
         | fromEnum ch > 0xFFFF -> throw ErrAstralCodePointInChar
@@ -425,7 +425,7 @@ token = peek >>= maybe (pure TokEof) k0
       Just ch2 ->
         throw $ ErrLexeme (Just [ch2]) []
       _ ->
-        throw $ ErrEof
+        throw ErrEof
 
   {-
     stringPart
@@ -571,7 +571,7 @@ token = peek >>= maybe (pure TokEof) k0
       Just ch | isNumberChar ch -> throw ErrLeadingZero
       _ -> pure $ Just ("0", "0")
     Just ch | Char.isDigit ch -> Just <$> digits
-    _ -> pure $ Nothing
+    _ -> pure Nothing
 
   {-
     integer1
@@ -589,7 +589,7 @@ token = peek >>= maybe (pure TokEof) k0
     ch | Char.isDigit ch -> do
       (raw, chs) <- digits
       pure $ Just (Text.cons ch raw, ch : chs)
-    _ -> pure $ Nothing
+    _ -> pure Nothing
 
   {-
     fraction

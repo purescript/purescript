@@ -217,7 +217,7 @@ inferKind = \tyToInfer ->
           t2' <- checkKind t2 argKind
           pure (KindApp ann t1' t2', replaceTypeVars arg t2' resKind)
         _ ->
-          internalError $ "inferKind: unkinded forall binder"
+          internalError "inferKind: unkinded forall binder"
     KindedType _ t1 t2 -> do
       t2' <- replaceAllTypeSynonyms . fst =<< go t2
       t1' <- checkKind t1 t2'

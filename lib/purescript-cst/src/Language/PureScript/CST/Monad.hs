@@ -157,7 +157,7 @@ manyDelimited open close sep p = do
   _   <- token open
   res <- go1
   _   <- token close
-  pure $ res
+  pure res
   where
   go1 =
     oneOf $ NE.fromList
