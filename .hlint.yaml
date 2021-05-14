@@ -7,7 +7,6 @@
 
 
 # Warnings currently triggered by your code
-- ignore: {name: "Unused LANGUAGE pragma"}
 - ignore: {name: "Redundant =="}
 - ignore: {name: "Use infix"}
 - ignore: {name: "Redundant do"}

@@ -12,8 +12,6 @@
 -- Filters for psc-ide commands
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Ide.Filter
        ( Filter
        , moduleFilter

@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module TestHierarchy where
 
 import Prelude

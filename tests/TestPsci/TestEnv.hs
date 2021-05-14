@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module TestPsci.TestEnv where
 
 import Prelude ()

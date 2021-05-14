@@ -12,9 +12,6 @@
 -- Matchers for psc-ide commands
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Ide.Matcher
        ( Matcher
        , runMatcher

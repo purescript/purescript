@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 -- |
 -- The top-level type checker, which checks all declarations in a module.
 --

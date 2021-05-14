@@ -1,7 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports    #-}
-{-# LANGUAGE DataKinds         #-}
 module Language.PureScript.Ide.Test where
 
 import           Control.Concurrent.STM

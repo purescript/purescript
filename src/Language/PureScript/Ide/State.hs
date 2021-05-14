@@ -13,9 +13,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE PackageImports #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Language.PureScript.Ide.State

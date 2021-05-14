@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Make.Cache
   ( ContentHash
   , hash

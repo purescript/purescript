@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ImportsSpec where
 
 import           Protolude hiding (moduleName)

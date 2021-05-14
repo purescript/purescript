@@ -1,6 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NamedFieldPuns #-}
-
 module Language.PureScript.Errors
   ( module Language.PureScript.AST
   , module Language.PureScript.Errors

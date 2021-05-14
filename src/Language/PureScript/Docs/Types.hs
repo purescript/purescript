@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-
 module Language.PureScript.Docs.Types
   ( module Language.PureScript.Docs.Types
   , module ReExports

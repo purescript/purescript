@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Publish
   ( preparePackage
   , preparePackage'

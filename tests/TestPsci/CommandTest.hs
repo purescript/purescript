@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module TestPsci.CommandTest where
 
 import Prelude ()

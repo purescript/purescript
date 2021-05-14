@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 -- |
 -- Functions and instances relating to unification
 --

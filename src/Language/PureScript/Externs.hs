@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 -- |
 -- This module generates code for \"externs\" files, i.e. files containing only
 -- foreign import declarations.
