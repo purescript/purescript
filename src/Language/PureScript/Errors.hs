@@ -16,10 +16,11 @@ import           Data.Char (isSpace)
 import           Data.Either (partitionEithers)
 import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nubBy, partition, dropWhileEnd, sort, sortOn)
+import           Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn)
 import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
+import           Data.Ord (Down(..))
 import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text (Text)
@@ -377,8 +378,7 @@ errorMessage''' :: [SourceSpan] -> SimpleErrorMessage -> MultipleErrors
 errorMessage''' sss err =
   maybe (errorMessage err) (flip errorMessage'' err)
     . NEL.nonEmpty
-    . reverse
-    . sort
+    . sortOn Down
     $ filter (/= NullSourceSpan) sss
 
 -- | Create an error set from a single error message
