@@ -46,7 +46,7 @@ app Options{..} = do
   when (null inputFiles) . liftIO $ do
     hPutStrLn stderr "purs bundle: No input files."
     exitFailure
-  when (isNothing optionsOutputFile && optionsSourceMaps == True) . liftIO $ do
+  when (isNothing optionsOutputFile && optionsSourceMaps) . liftIO $ do
     hPutStrLn stderr "purs bundle: Source maps only supported when output file specified."
     exitFailure
 

@@ -7,7 +7,6 @@
 
 
 # Warnings currently triggered by your code
-- ignore: {name: "Redundant =="}
 - ignore: {name: "Use infix"}
 - ignore: {name: "Redundant do"}
 - ignore: {name: "Use newtype instead of data"}
