@@ -30,7 +30,6 @@
 - ignore: {name: "Use &&"}
 - ignore: {name: "Use <$>"}
 - ignore: {name: "Use ."}
-- ignore: {name: "Redundant if"}
 - ignore: {name: "Use traverse_"}
 - ignore: {name: "Use :"}
 - ignore: {name: "Avoid reverse"}
