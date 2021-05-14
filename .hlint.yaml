@@ -23,7 +23,6 @@
 - ignore: {name: "Move brackets to avoid $"}
 - ignore: {name: "Use section"}
 - ignore: {name: "Use <$>"}
-- ignore: {name: "Use ."}
 - ignore: {name: "Avoid reverse"}
 - ignore: {name: "Use Just"}
 - ignore: {name: "Reduce duplication"}
