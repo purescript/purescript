@@ -10,7 +10,6 @@
 - ignore: {name: "Use infix"}
 - ignore: {name: "Redundant do"}
 - ignore: {name: "Use newtype instead of data"}
-- ignore: {name: "Use join"}
 - ignore: {name: "Fuse foldr/map"}
 - ignore: {name: "Use lambda-case"}
 - ignore: {name: "Avoid lambda"}
