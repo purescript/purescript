@@ -196,14 +196,14 @@ withTypeClassDictionaries entries action = do
 getTypeClassDictionaries
   :: (MonadState CheckState m)
   => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
-getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
+getTypeClassDictionaries = gets $ typeClassDictionaries . checkEnv
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionaries
   :: (MonadState CheckState m)
   => Maybe ModuleName
   -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
-lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
+lookupTypeClassDictionaries mn = gets $ fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionariesForClass
@@ -295,7 +295,7 @@ lookupTypeVariable currentModule (Qualified moduleName name) = do
 
 -- | Get the current @Environment@
 getEnv :: (MonadState CheckState m) => m Environment
-getEnv = checkEnv <$> get
+getEnv = gets checkEnv
 
 -- | Get locally-bound names in context, to create an error message.
 getLocalContext :: MonadState CheckState m => m Context
@@ -362,7 +362,7 @@ unsafeCheckCurrentModule
   :: forall m
    . (MonadError MultipleErrors m, MonadState CheckState m)
   => m ModuleName
-unsafeCheckCurrentModule = checkCurrentModule <$> get >>= \case
+unsafeCheckCurrentModule = gets checkCurrentModule >>= \case
   Nothing -> internalError "No module name set in scope"
   Just name -> pure name
 
