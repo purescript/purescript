@@ -26,7 +26,6 @@
 - ignore: {name: "Use &&"}
 - ignore: {name: "Use <$>"}
 - ignore: {name: "Use ."}
-- ignore: {name: "Use traverse_"}
 - ignore: {name: "Use :"}
 - ignore: {name: "Avoid reverse"}
 - ignore: {name: "Use Just"}

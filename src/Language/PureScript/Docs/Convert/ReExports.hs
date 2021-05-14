@@ -12,6 +12,7 @@ import Control.Monad.Trans.Reader (runReaderT)
 import Control.Monad.Trans.State.Strict (execState)
 
 import Data.Either
+import Data.Foldable (traverse_)
 import Data.Map (Map)
 import Data.Maybe (mapMaybe, fromMaybe)
 import qualified Data.Map as Map
@@ -47,7 +48,7 @@ updateReExports ::
 updateReExports externs withPackage = execState action
   where
   action =
-    void (traverse go traversalOrder)
+    traverse_ go traversalOrder
 
   go mn = do
     mdl <- lookup' mn
