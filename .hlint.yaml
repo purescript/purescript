@@ -34,7 +34,6 @@
 - ignore: {name: "Use ++"}
 - ignore: {name: "Hoist not"}
 - ignore: {name: "Functor law"}
-- ignore: {name: "Use $>"}
 - ignore: {name: "Redundant fmap"}
 - ignore: {name: "Use =<<"}
 - ignore: {name: "Use maybe"}

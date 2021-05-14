@@ -31,6 +31,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Data.Either (partitionEithers)
 import Data.Foldable (for_, traverse_)
 import Data.Function (on)
+import Data.Functor (($>))
 import Data.Functor.Identity (Identity(..), runIdentity)
 import Data.List (groupBy, sortBy)
 import Data.Maybe (mapMaybe, listToMaybe)
@@ -372,7 +373,7 @@ checkFixityExports (Module _ _ _ _ Nothing) =
 checkFixityExports m@(Module ss _ mn ds (Just exps)) =
   rethrow (addHint (ErrorInModule mn))
     $ rethrowWithPosition ss (traverse_ checkRef exps)
-    *> return m
+    $> m
   where
 
   checkRef :: DeclarationRef -> m ()
