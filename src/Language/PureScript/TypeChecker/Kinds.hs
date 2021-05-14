@@ -617,8 +617,8 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
           tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . fst) tyCtor tyArgs'
           ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (nullSourceAnn,) tyArgs'
-      for ctors $ \ctor ->
-        fmap (mkForAll ctorBinders) <$> inferDataConstructor tyCtor' ctor
+      for ctors $
+        fmap (fmap (mkForAll ctorBinders)) . inferDataConstructor tyCtor'
 
 inferDataConstructor
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)

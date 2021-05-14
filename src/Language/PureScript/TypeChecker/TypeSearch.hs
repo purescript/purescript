@@ -36,7 +36,7 @@ checkInEnvironment env st =
   . TC.runCheck' (st { TC.checkEnv = env })
 
 evalWriterT :: Monad m => WriterT b m r -> m r
-evalWriterT m = liftM fst (runWriterT m)
+evalWriterT m = fmap fst (runWriterT m)
 
 checkSubsume
   :: Maybe [(P.Ident, Entailment.InstanceContext, P.SourceConstraint)]
