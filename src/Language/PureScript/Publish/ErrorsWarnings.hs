@@ -44,7 +44,7 @@ data PackageError
 data PackageWarning
   = NoResolvedVersion PackageName
   | UnacceptableVersion (PackageName, Text)
-  | DirtyWorkingTree_Warn
+  | DirtyWorkingTreeWarn
   deriving (Show)
 
 -- | An error that should be fixed by the user.
@@ -314,7 +314,7 @@ collectWarnings = foldMap singular
       mempty { noResolvedVersions = [pn] }
     UnacceptableVersion t ->
       mempty { unacceptableVersions = [t] }
-    DirtyWorkingTree_Warn ->
+    DirtyWorkingTreeWarn ->
       mempty { dirtyWorkingTree = Any True }
 
 renderWarnings :: [PackageWarning] -> Box

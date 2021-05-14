@@ -63,7 +63,7 @@ mkPublishOptions cliOpts =
         opts
           { publishGetVersion = return ("0.0.0", Version [0,0,0] [])
           , publishGetTagTime = const (liftIO getCurrentTime)
-          , publishWorkingTreeDirty = warn DirtyWorkingTree_Warn
+          , publishWorkingTreeDirty = warn DirtyWorkingTreeWarn
           }
       else
         opts
