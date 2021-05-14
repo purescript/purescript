@@ -35,7 +35,6 @@
 - ignore: {name: "Hoist not"}
 - ignore: {name: "Functor law"}
 - ignore: {name: "Redundant fmap"}
-- ignore: {name: "Use zipWithM_"}
 - ignore: {name: "Use fromMaybe"}
 - ignore: {name: "Use gets"}
 - ignore: {name: "Use unwords"}

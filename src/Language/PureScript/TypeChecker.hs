@@ -10,7 +10,7 @@ module Language.PureScript.TypeChecker
 import Prelude.Compat
 import Protolude (headMay, ordNub)
 
-import Control.Monad (when, unless, void, forM,)
+import Control.Monad (when, unless, void, forM, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
@@ -413,7 +413,7 @@ typeCheckAll moduleName _ = traverse go
           checkInstanceArity dictName className typeClass tys
           (deps', kinds', tys', vars) <- withFreshSubstitution $ checkInstanceDeclaration moduleName (sa, deps, className, tys)
           tys'' <- traverse replaceAllTypeSynonyms tys'
-          sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys'')
+          zipWithM_ (checkTypeClassInstance typeClass) [0..] tys''
           let nonOrphanModules = findNonOrphanModules className typeClass tys''
           checkOrphanInstance dictName className tys'' nonOrphanModules
           let chainId = Just ch
