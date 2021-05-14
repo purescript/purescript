@@ -17,7 +17,7 @@ import           Control.Monad.Supply.Class
 import           Data.Graph
 import           Data.List (find, partition)
 import qualified Data.Map as M
-import           Data.Maybe (catMaybes, mapMaybe, isJust, fromMaybe)
+import           Data.Maybe (catMaybes, mapMaybe, isJust)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
 import           Data.Text (Text)
@@ -362,7 +362,7 @@ declIdent (TypeDeclaration td) = Just (tydeclIdent td)
 declIdent _ = Nothing
 
 typeClassMemberName :: Declaration -> Text
-typeClassMemberName = fromMaybe (internalError "typeClassMemberName: Invalid declaration in type class definition") . fmap runIdent . declIdent
+typeClassMemberName = maybe (internalError "typeClassMemberName: Invalid declaration in type class definition") runIdent . declIdent
 
 superClassDictionaryNames :: [Constraint a] -> [Text]
 superClassDictionaryNames supers =

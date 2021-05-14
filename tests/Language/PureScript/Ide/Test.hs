@@ -136,7 +136,7 @@ compileTestProject = inProject $ do
   (_, _, _, procHandle) <-
     createProcess $ (shell $ "purs compile \"src/**/*.purs\"")
   r <- tryNTimes 10 (getProcessExitCode procHandle)
-  pure (fromMaybe False (isSuccess <$> r))
+  pure (maybe False isSuccess r)
 
 isSuccess :: ExitCode -> Bool
 isSuccess ExitSuccess = True
