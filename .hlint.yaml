@@ -11,7 +11,6 @@
 - ignore: {name: "Redundant do"}
 - ignore: {name: "Use newtype instead of data"}
 - ignore: {name: "Fuse foldr/map"}
-- ignore: {name: "Use lambda-case"}
 - ignore: {name: "Avoid lambda"}
 - ignore: {name: "Use tuple-section"}
 - ignore: {name: "Use record patterns"}

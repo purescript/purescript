@@ -672,7 +672,7 @@ typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
 
     pure $ checkSuperClassExport superClassesFor transitiveSuperClassesFor
   moduleClassExports :: S.Set (Qualified (ProperName 'ClassName))
-  moduleClassExports = S.fromList $ mapMaybe (\x -> case x of
+  moduleClassExports = S.fromList $ mapMaybe (\case
      TypeClassRef _ name -> Just (qualify' name)
      _ -> Nothing) exps
 

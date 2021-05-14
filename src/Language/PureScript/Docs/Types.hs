@@ -646,7 +646,7 @@ asFunDeps = eachInArray asFunDep
 
 asDataDeclType :: Parse PackageError P.DataDeclType
 asDataDeclType =
-  withText $ \s -> case s of
+  withText $ \case
     "data"    -> Right P.Data
     "newtype" -> Right P.Newtype
     other     -> Left (InvalidDataDeclType other)

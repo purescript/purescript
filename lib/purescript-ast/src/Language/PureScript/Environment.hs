@@ -240,11 +240,10 @@ instance A.ToJSON DataDeclType where
   toJSON = A.toJSON . showDataDeclType
 
 instance A.FromJSON DataDeclType where
-  parseJSON = A.withText "DataDeclType" $ \str ->
-    case str of
-      "data" -> return Data
-      "newtype" -> return Newtype
-      other -> fail $ "invalid type: '" ++ T.unpack other ++ "'"
+  parseJSON = A.withText "DataDeclType" $ \case
+    "data" -> return Data
+    "newtype" -> return Newtype
+    other -> fail $ "invalid type: '" ++ T.unpack other ++ "'"
 
 -- | Construct a ProperName in the Prim module
 primName :: Text -> Qualified (ProperName a)
