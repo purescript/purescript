@@ -35,7 +35,6 @@
 - ignore: {name: "Redundant if"}
 - ignore: {name: "Use traverse_"}
 - ignore: {name: "Use :"}
-- ignore: {name: "Parse error"}
 - ignore: {name: "Avoid reverse"}
 - ignore: {name: "Use Just"}
 - ignore: {name: "Use /="}
