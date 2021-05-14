@@ -332,7 +332,7 @@ token = peek >>= maybe (pure TokEof) k0
     operator
       : symbolChar+
   -}
-  operator :: [Text] -> [Char] -> Lexer Token
+  operator :: [Text] -> String -> Lexer Token
   operator qual pre = do
     rest <- nextWhile isSymbolChar
     pure . TokOperator (reverse qual) $ Text.pack pre <> rest
@@ -649,20 +649,20 @@ token = peek >>= maybe (pure TokEof) k0
       then throw ErrExpectedHex
       else pure $ TokInt ("0x" <> chs) $ digitsToIntegerBase 16 $ Text.unpack chs
 
-digitsToInteger :: [Char] -> Integer
+digitsToInteger :: String -> Integer
 digitsToInteger = digitsToIntegerBase 10
 
-digitsToIntegerBase :: Integer -> [Char] -> Integer
+digitsToIntegerBase :: Integer -> String -> Integer
 digitsToIntegerBase b = foldl' (\n c -> n * b + (toInteger (Char.digitToInt c))) 0
 
-digitsToScientific :: [Char] -> [Char] -> (Integer, Int)
+digitsToScientific :: String -> String -> (Integer, Int)
 digitsToScientific = go 0 . reverse
   where
   go !exp is [] = (digitsToInteger (reverse is), exp)
   go !exp is (f : fs) = go (exp - 1) (f : is) fs
 
 isSymbolChar :: Char -> Bool
-isSymbolChar c = (c `elem` (":!#$%&*+./<=>?@\\^|-~" :: [Char])) || (not (Char.isAscii c) && Char.isSymbol c)
+isSymbolChar c = (c `elem` (":!#$%&*+./<=>?@\\^|-~" :: String)) || (not (Char.isAscii c) && Char.isSymbol c)
 
 isReservedSymbolError :: ParserErrorType -> Bool
 isReservedSymbolError = (== ErrReservedSymbol)
