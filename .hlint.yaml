@@ -29,7 +29,6 @@
 - ignore: {name: "Use :"}
 - ignore: {name: "Avoid reverse"}
 - ignore: {name: "Use Just"}
-- ignore: {name: "Use /="}
 - ignore: {name: "Reduce duplication"}
 - ignore: {name: "Use camelCase"}
 - ignore: {name: "Use ++"}
