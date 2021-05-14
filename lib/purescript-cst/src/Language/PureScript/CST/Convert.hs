@@ -575,7 +575,7 @@ convertDeclaration fileName decl = case decl of
         TypeForall{} -> ""
         TypeApp _ t1 t2 -> argName t1 <> argName t2
         TypeOp _ t1 op t2 ->
-          argName t1 <> (N.runOpName $ qualName op) <> argName t2
+          argName t1 <> N.runOpName (qualName op) <> argName t2
         TypeArr _ t1 _ t2 -> argName t1 <> "Function" <> argName t2
         TypeConstrained{} -> ""
         TypeUnaryRow{} -> "Row"

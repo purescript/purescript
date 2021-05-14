@@ -18,7 +18,7 @@ tags = map (first T.unpack) . concatMap dtags . modDeclarations
   where
     dtags :: Declaration -> [(T.Text, Int)]
     dtags decl = case declSourceSpan decl of
-      Just ss -> (declTitle decl, pos ss):(mapMaybe subtag $ declChildren decl)
+      Just ss -> (declTitle decl, pos ss):mapMaybe subtag (declChildren decl)
       Nothing -> mapMaybe subtag $ declChildren decl
 
     subtag :: ChildDeclaration -> Maybe (T.Text, Int)
