@@ -203,12 +203,11 @@ displayUserError e = case e of
         do_          = pl "do" "does"
         dependencies = pl "dependencies" "dependency"
     in vcat $
-      [ para (concat
+      para (concat
         [ "The following ", dependencies, " ", do_, " not appear to be "
         , "installed:"
-        ])
-      ] ++
-        bulletedListT runPackageName (NonEmpty.toList pkgs)
+        ]) :
+      bulletedListT runPackageName (NonEmpty.toList pkgs)
   CompileError err ->
     vcat
       [ para "Compile error:"
@@ -221,8 +220,8 @@ displayUserError e = case e of
         )
   ResolutionsFileError path err ->
     successivelyIndented $
-      [ "Error in resolutions file (" ++ path ++ "):" ]
-      ++ map T.unpack (displayError D.displayPackageError err)
+      ("Error in resolutions file (" ++ path ++ "):") :
+      map T.unpack (displayError D.displayPackageError err)
 
 spdxExamples :: [Box]
 spdxExamples =

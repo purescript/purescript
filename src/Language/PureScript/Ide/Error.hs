@@ -73,7 +73,7 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
         , complExpandedType = prettyPrintTypeSingleLine ty
         , complLocation = Nothing
         , complDocumentation = Nothing
-        , complExportedFrom = maybe [] (\x -> [x]) mn
+        , complExportedFrom = toList mn
         , complDeclarationType = Nothing
         }
     fieldCompletion (label, ty) =
