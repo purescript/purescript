@@ -82,7 +82,7 @@ ideValueOp opName ident precedence assoc t =
        (IdeValueOperator
         (P.OpName opName)
         (bimap P.Ident P.ProperName <$> ident)
-        (precedence)
+        precedence
         (fromMaybe P.Infix assoc)
         t))
 
@@ -92,7 +92,7 @@ ideTypeOp opName ident precedence assoc k =
        (IdeTypeOperator
         (P.OpName opName)
         (P.ProperName <$> ident)
-        (precedence)
+        precedence
         (fromMaybe P.Infix assoc)
         k))
 

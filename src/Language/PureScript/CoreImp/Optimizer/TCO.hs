@@ -83,7 +83,7 @@ tco = flip evalState 0 . everywhereTopDownM convert where
       case S.minView required of
         Just (r, required') -> do
           required'' <- findTailPositionDeps r js
-          go (S.insert (fst r) known, required' <> (S.filter (not . (`S.member` known) . fst) required''))
+          go (S.insert (fst r) known, required' <> S.filter (not . (`S.member` known) . fst) required'')
         Nothing ->
           pure known
 
@@ -168,7 +168,7 @@ tco = flip evalState 0 . everywhereTopDownM convert where
         , Function rootSS (Just tcoLoop) (outerArgs ++ innerArgs) (Block rootSS [loopify js])
         , While rootSS (Unary rootSS Not (Var rootSS tcoDone))
             (Block rootSS
-              [(Assignment rootSS (Var rootSS tcoResult) (App rootSS (Var rootSS tcoLoop) ((map (Var rootSS . tcoVar) outerArgs) ++ (map (Var rootSS . copyVar) innerArgs))))])
+              [Assignment rootSS (Var rootSS tcoResult) (App rootSS (Var rootSS tcoLoop) (map (Var rootSS . tcoVar) outerArgs ++ map (Var rootSS . copyVar) innerArgs))])
         , Return rootSS (Var rootSS tcoResult)
         ]
     where

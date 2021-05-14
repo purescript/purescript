@@ -99,7 +99,7 @@ getReExports externsEnv mn =
   case Map.lookup mn externsEnv of
     Nothing ->
       internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
-    Just (P.ExternsFile { P.efExports = refs }) -> do
+    Just P.ExternsFile { P.efExports = refs } -> do
       let reExpRefs = mapMaybe toReExportRef refs
       runReaderT (collectDeclarations reExpRefs) mn
 

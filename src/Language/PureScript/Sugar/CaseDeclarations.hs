@@ -186,7 +186,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           --
         in Case scrut
             (CaseAlternative vb [MkUnguarded (desugarGuard gs e alt_fail)]
-              : (alt_fail' (length scrut)))
+              : alt_fail' (length scrut))
 
       return [ CaseAlternative scrut_nullbinder [MkUnguarded rhs]]
 

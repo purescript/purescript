@@ -61,10 +61,10 @@ instance Monad (ParserM e s) where
 runParser :: ParserState -> Parser a -> (ParserState, Either (NE.NonEmpty ParserError) a)
 runParser st (Parser k) = k st left right
   where
-  left st'@(ParserState {..}) err =
+  left st'@ParserState {..} err =
     (st', Left $ NE.sortBy (comparing errRange) $ err NE.:| parserErrors)
 
-  right st'@(ParserState {..}) res
+  right st'@ParserState {..} res
     | null parserErrors = (st', Right res)
     | otherwise = (st', Left $ NE.fromList $ sortOn errRange parserErrors)
 
@@ -179,7 +179,7 @@ token t = do
     else parseError t'
 
 munch :: Parser SourceToken
-munch = Parser $ \state@(ParserState {..}) kerr ksucc ->
+munch = Parser $ \state@ParserState {..} kerr ksucc ->
   case parserBuff of
     Right tok : parserBuff' ->
       ksucc (state { parserBuff = parserBuff' }) tok

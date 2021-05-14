@@ -10,7 +10,6 @@
 - ignore: {name: "Use infix"}
 - ignore: {name: "Redundant do"}
 - ignore: {name: "Use newtype instead of data"}
-- ignore: {name: "Redundant bracket"}
 - ignore: {name: "Use join"}
 - ignore: {name: "Fuse foldr/map"}
 - ignore: {name: "Eta reduce"}

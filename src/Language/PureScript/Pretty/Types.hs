@@ -180,7 +180,7 @@ explicitParens = mkPattern match
 
 matchTypeAtom :: TypeRenderOptions -> Pattern () PrettyPrintType Box
 matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
-    typeLiterals <+> fmap ((`before` (text ")")) . (text "(" <>)) (matchType tro)
+    typeLiterals <+> fmap ((`before` text ")") . (text "(" <>)) (matchType tro)
   where
     typeLiterals :: Pattern () PrettyPrintType Box
     typeLiterals = mkPattern match where

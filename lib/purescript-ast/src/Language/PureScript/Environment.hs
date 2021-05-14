@@ -468,7 +468,7 @@ primTypeErrorTypes =
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
-    [ (primName "Partial", (makeTypeClassData [] [] [] [] True))
+    [ (primName "Partial", makeTypeClassData [] [] [] [] True)
     ]
 
 -- | This contains all of the type classes from all Prim modules.

@@ -688,7 +688,7 @@ asQualifiedProperName = fromAesonParser
 asQualifiedIdent :: Parse e (P.Qualified P.Ident)
 asQualifiedIdent = fromAesonParser
 
-asSourceAnn :: Parse e (P.SourceAnn)
+asSourceAnn :: Parse e P.SourceAnn
 asSourceAnn = fromAesonParser
 
 asModuleMap :: Parse PackageError (Map P.ModuleName PackageName)

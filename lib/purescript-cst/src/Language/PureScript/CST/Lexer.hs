@@ -70,7 +70,7 @@ lexWithState = go
   Parser lexK =
     tokenAndComments
 
-  go state@(LexState {..}) =
+  go state@LexState {..} =
     lexK lexSource onError onSuccess
     where
     onError lexSource' err = do
@@ -653,7 +653,7 @@ digitsToInteger :: String -> Integer
 digitsToInteger = digitsToIntegerBase 10
 
 digitsToIntegerBase :: Integer -> String -> Integer
-digitsToIntegerBase b = foldl' (\n c -> n * b + (toInteger (Char.digitToInt c))) 0
+digitsToIntegerBase b = foldl' (\n c -> n * b + toInteger (Char.digitToInt c)) 0
 
 digitsToScientific :: String -> String -> (Integer, Int)
 digitsToScientific = go 0 . reverse

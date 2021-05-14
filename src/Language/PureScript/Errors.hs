@@ -788,20 +788,20 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         []   -> pure . line $ "A cycle appears in a set of type synonym definitions."
         [pn] -> pure . line $ "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
         _    -> [ line " A cycle appears in a set of type synonym definitions:"
-                , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName) names)) <> "}"
+                , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName) names) <> "}"
                 ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration [name]) =
       paras [ line $ "A type class '" <> markCode (runProperName (disqualify name)) <> "' may not have itself as a superclass." ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration names) =
       paras [ line $ "A cycle appears in a set of type class definitions:"
-            , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName . disqualify) names)) <> "}"
+            , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName . disqualify) names) <> "}"
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             ]
     renderSimpleErrorMessage (CycleInKindDeclaration [name]) =
       paras [ line $ "A kind declaration '" <> markCode (runProperName (disqualify name)) <> "' may not refer to itself in its own signature." ]
     renderSimpleErrorMessage (CycleInKindDeclaration names) =
       paras [ line $ "A cycle appears in a set of kind declarations:"
-            , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName . disqualify) names)) <> "}"
+            , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName . disqualify) names) <> "}"
             , line "Kind declarations may not refer to themselves in their own signatures."
             ]
     renderSimpleErrorMessage (NameIsUndefined ident) =
@@ -1031,7 +1031,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 ]
       where
         modulesToList = S.toList $ S.delete (moduleNameFromString "Prim") nonOrphanModules
-        formattedModules = T.intercalate " or " ((markCode . runModuleName) <$> modulesToList)
+        formattedModules = T.intercalate " or " (markCode . runModuleName <$> modulesToList)
     renderSimpleErrorMessage (InvalidNewtype name) =
       paras [ line $ "Newtype " <> markCode (runProperName name) <> " is invalid."
             , line "Newtypes must define a single constructor with a single argument."
@@ -1077,7 +1077,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       let
         maxTSResults = 15
         tsResult = case ts of
-          Just (TSAfter{tsAfterIdentifiers=idents}) | not (null idents) ->
+          Just TSAfter{tsAfterIdentifiers=idents} | not (null idents) ->
             let
               formatTS (names, types) =
                 let

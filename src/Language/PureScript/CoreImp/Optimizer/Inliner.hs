@@ -284,7 +284,7 @@ inlineFnComposition = everywhereTopDownM convert where
   goApps (App _ (App _ (App _ fn [dict']) [x]) [y])
     | isFnCompose dict' fn = mappend <$> goApps x <*> goApps y
     | isFnComposeFlipped dict' fn = mappend <$> goApps y <*> goApps x
-  goApps app@(App {}) = pure . Right . (,app) <$> freshName
+  goApps app@App {} = pure . Right . (,app) <$> freshName
   goApps other = pure [Left other]
 
   isFnCompose :: AST -> AST -> Bool

@@ -196,7 +196,7 @@ deriveNewtypeInstance ss mn syns kinds ndis className ds tys tyConNm dargs = do
     tyCon <- findTypeDecl ss tyConNm ds
     go tyCon
   where
-    go (DataDeclaration _ Newtype _ tyArgNames [(DataConstructorDeclaration _ _ [(_, wrapped)])]) = do
+    go (DataDeclaration _ Newtype _ tyArgNames [DataConstructorDeclaration _ _ [(_, wrapped)]]) = do
       -- The newtype might not be applied to all type arguments.
       -- This is okay as long as the newtype wraps something which ends with
       -- sufficiently many type applications to variables.
@@ -439,7 +439,7 @@ deriveEq ss mn syns kinds ds tyConNm = do
       | Just rec <- objectType ty
       , Just fields <- decomposeRec rec =
           conjAll
-          . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
+          . map (\(Label str, typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
           $ fields
       | isAppliedVar ty = preludeEq1 l r
       | otherwise = preludeEq l r
@@ -501,7 +501,7 @@ deriveOrd ss mn syns kinds ds tyConNm = do
     ordCompare1 = App . App (Var ss (Qualified (Just dataOrd) (Ident Prelude.compare1)))
 
     mkCtorClauses :: (DataConstructorDeclaration, Bool) -> m [CaseAlternative]
-    mkCtorClauses ((DataConstructorDeclaration _ ctorName tys), isLast) = do
+    mkCtorClauses (DataConstructorDeclaration _ ctorName tys, isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       tys' <- mapM (replaceAllTypeSynonymsM syns kinds . snd) tys
@@ -541,7 +541,7 @@ deriveOrd ss mn syns kinds ds tyConNm = do
       | Just rec <- objectType ty
       , Just fields <- decomposeRec rec =
           appendAll
-          . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
+          . map (\(Label str, typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
           $ fields
       | isAppliedVar ty = ordCompare1 l r
       | otherwise = ordCompare l r
@@ -685,7 +685,7 @@ deriveFunctor ss mn syns kinds ds tyConNm = do
               buildRecord updates = do
                 arg <- freshIdent "o"
                 let argVar = mkVar ss arg
-                    mkAssignment ((Label l), x) = (l, App x (Accessor l argVar))
+                    mkAssignment (Label l, x) = (l, App x (Accessor l argVar))
                 return (lam ss arg (ObjectUpdate argVar (mkAssignment <$> updates)))
 
           -- quantifiers

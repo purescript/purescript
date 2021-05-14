@@ -210,7 +210,7 @@ constraintDataToJSON (PartialConstraintData bs trunc) =
     ]
 
 constraintToJSON :: (a -> A.Value) -> Constraint a -> A.Value
-constraintToJSON annToJSON (Constraint {..}) =
+constraintToJSON annToJSON Constraint {..} =
   A.object
     [ "constraintAnn"   .= annToJSON constraintAnn
     , "constraintClass" .= constraintClass
@@ -642,7 +642,7 @@ everywhereOnTypesTopDownM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (T
 everywhereOnTypesTopDownM f = go <=< f where
   go (TypeApp ann t1 t2) = TypeApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (KindApp ann t1 t2) = KindApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
-  go (ForAll ann arg mbK ty sco) = ForAll ann arg <$> (traverse (f >=> go) mbK) <*> (f ty >>= go) <*> pure sco
+  go (ForAll ann arg mbK ty sco) = ForAll ann arg <$> traverse (f >=> go) mbK <*> (f ty >>= go) <*> pure sco
   go (ConstrainedType ann c ty) = ConstrainedType ann <$> overConstraintArgsAll (mapM (go <=< f)) c <*> (f ty >>= go)
   go (RCons ann name ty rest) = RCons ann name <$> (f ty >>= go) <*> (f rest >>= go)
   go (KindedType ann ty k) = KindedType ann <$> (f ty >>= go) <*> (f k >>= go)

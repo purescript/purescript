@@ -224,7 +224,7 @@ desugarDecl syns kinds mn exps = go
     return (expRef name className tys, [d, dictDecl])
   go d@(TypeInstanceDeclaration sa _ _ (Right name) deps className tys (NewtypeInstanceWithDictionary dict)) = do
     let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) className)) tys
-        constrainedTy = quantify (foldr (srcConstrainedType) dictTy deps)
+        constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
     return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
 

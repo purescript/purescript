@@ -60,7 +60,7 @@ addDataType
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   let mapDataCtor (DataConstructorDeclaration _ ctorName vars) = (ctorName, snd <$> vars)
-      qualName = (Qualified (Just moduleName) name)
+      qualName = Qualified (Just moduleName) name
       hasSig = qualName `M.member` types env
   putEnv $ env { types = M.insert qualName (ctorKind, DataType dtype args (map (mapDataCtor . fst) dctors)) (types env) }
   unless (hasSig || not (containsForAll ctorKind)) $ do
@@ -109,7 +109,7 @@ addTypeSynonym
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
   checkTypeSynonyms ty
-  let qualName = (Qualified (Just moduleName) name)
+  let qualName = Qualified (Just moduleName) name
       hasSig = qualName `M.member` types env
   unless (hasSig || isDictSynonym name || not (containsForAll kind)) $ do
     tell . errorMessage $ MissingKindDeclaration TypeSynonymSig name kind
@@ -286,12 +286,12 @@ typeCheckAll moduleName _ = traverse go
       let args'' = args' `withRoles` roles
       addDataType moduleName dtype name args'' dataCtors ctorKind
     return $ DataDeclaration sa dtype name args dctors
-  go (d@(DataBindingGroupDeclaration tys)) = do
+  go d@(DataBindingGroupDeclaration tys) = do
     let tysList = NEL.toList tys
         syns = mapMaybe toTypeSynonym tysList
         dataDecls = mapMaybe toDataDecl tysList
         clss = mapMaybe toClassDecl tysList
-        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2) ++ (fmap coerceProperName (clss^..traverse._2._2)))
+        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2) ++ fmap coerceProperName (clss^..traverse._2._2))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
       env <- getEnv
@@ -369,7 +369,7 @@ typeCheckAll moduleName _ = traverse go
         addValue moduleName name ty nameKind
         return (sai, nameKind, val)
       return . BindingGroupDeclaration $ NEL.fromList vals''
-  go (d@(ExternDataDeclaration _ name kind)) = do
+  go d@(ExternDataDeclaration _ name kind) = do
     elabKind <- withFreshSubstitution $ checkKindDeclaration moduleName kind
     env <- getEnv
     let qualName = Qualified (Just moduleName) name
@@ -377,7 +377,7 @@ typeCheckAll moduleName _ = traverse go
     let roles = fromMaybe (nominalRolesForKind elabKind) $ M.lookup qualName (roleDeclarations env)
     putEnv $ env { types = M.insert qualName (elabKind, ExternData roles) (types env) }
     return d
-  go (d@(ExternDeclaration (ss, _) name ty)) = do
+  go d@(ExternDeclaration (ss, _) name ty) = do
     warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (positionedError ss)) $ do
       env <- getEnv
       (elabTy, kind) <- withFreshSubstitution $ do
@@ -400,7 +400,7 @@ typeCheckAll moduleName _ = traverse go
       addTypeClass moduleName qualifiedClassName (fmap Just <$> args') implies' deps tys' kind
       return d
   go (TypeInstanceDeclaration _ _ _ (Left _) _ _ _ _) = internalError "typeCheckAll: type class instance generated name should have been desugared"
-  go (d@(TypeInstanceDeclaration sa@(ss, _) ch idx (Right dictName) deps className tys body)) =
+  go d@(TypeInstanceDeclaration sa@(ss, _) ch idx (Right dictName) deps className tys body) =
     rethrow (addHint (ErrorInInstance className tys) . addHint (positionedError ss)) $ do
       env <- getEnv
       let qualifiedDictName = Qualified (Just moduleName) dictName
@@ -587,7 +587,7 @@ checkNewtype
   => ProperName 'TypeName
   -> [DataConstructorDeclaration]
   -> m ()
-checkNewtype _ [(DataConstructorDeclaration _ _ [_])] = return ()
+checkNewtype _ [DataConstructorDeclaration _ _ [_]] = return ()
 checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 
 -- |

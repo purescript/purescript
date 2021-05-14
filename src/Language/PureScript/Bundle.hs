@@ -650,7 +650,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
           map (\(porig, pgen) -> Mapping {
                 mapOriginal = Just (Pos (fromIntegral $ porig + 1) 0)
               , mapSourceFile = pathToFile <$> file
-              , mapGenerated = (Pos (fromIntegral $ pos + pgen) 0)
+              , mapGenerated = Pos (fromIntegral $ pos + pgen) 0
               , mapName = Nothing
               })
             (offsets (0,0) (Right 1 : positions)))

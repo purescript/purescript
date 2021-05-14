@@ -59,7 +59,7 @@ collectDocs outputDir inputFiles depsFiles = do
           addReExports withPackage docsModules externs
 
   docsModules <- go modulePaths
-  pure ((filter (shouldKeep . modName . snd) docsModules), modulesDeps)
+  pure (filter (shouldKeep . modName . snd) docsModules, modulesDeps)
 
   where
   packageDiscriminators modulesDeps =
@@ -226,4 +226,4 @@ getModulePackageInfo inputFiles depsFiles = do
     InPackage FilePath ->
     m (InPackage FilePath, Text)
   readFileAs fi =
-    liftIO . fmap ((fi,)) $ readUTF8FileT (ignorePackage fi)
+    liftIO . fmap (fi,) $ readUTF8FileT (ignorePackage fi)

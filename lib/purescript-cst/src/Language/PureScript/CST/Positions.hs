@@ -118,10 +118,10 @@ labelRange :: Label -> TokenRange
 labelRange a = (lblTok a, lblTok a)
 
 wrappedRange :: Wrapped a -> TokenRange
-wrappedRange (Wrapped { wrpOpen, wrpClose }) = (wrpOpen, wrpClose)
+wrappedRange Wrapped { wrpOpen, wrpClose } = (wrpOpen, wrpClose)
 
 moduleRange :: Module a -> TokenRange
-moduleRange (Module { modKeyword, modWhere, modImports, modDecls }) =
+moduleRange Module { modKeyword, modWhere, modImports, modDecls } =
   case (modImports, modDecls) of
     ([], []) -> (modKeyword, modWhere)
     (is, []) -> (modKeyword, snd . importDeclRange $ last is)
@@ -140,7 +140,7 @@ exportRange = \case
   ExportModule _ a b -> (a, nameTok b)
 
 importDeclRange :: ImportDecl a -> TokenRange
-importDeclRange (ImportDecl { impKeyword, impModule, impNames, impQual })
+importDeclRange ImportDecl { impKeyword, impModule, impNames, impQual }
   | Just (_, modName) <- impQual = (impKeyword, nameTok modName)
   | Just (_, imports) <- impNames = (impKeyword, wrpClose imports)
   | otherwise = (impKeyword, nameTok impModule)

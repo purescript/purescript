@@ -172,7 +172,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     finalState <- get
     let replaceTypes' = replaceTypes (checkSubstitution finalState)
         runTypeSearch' gen = runTypeSearch (guard gen $> foldMap snd inferred) finalState
-        raisePreviousWarnings gen = (escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' gen . replaceTypes'))
+        raisePreviousWarnings gen = escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' gen . replaceTypes')
 
     raisePreviousWarnings False wInfer
     forM_ tys $ \(shouldGeneralize, ((_, (_, _)), w)) ->

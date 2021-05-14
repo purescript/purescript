@@ -162,7 +162,7 @@ getModules opts paths = do
   (inputFiles, depsFiles) <- liftIO (getInputAndDepsFiles paths)
 
   (modules, moduleMap) <-
-    (liftIO (runExceptT (D.collectDocs (publishCompileOutputDir opts) inputFiles depsFiles)))
+    liftIO (runExceptT (D.collectDocs (publishCompileOutputDir opts) inputFiles depsFiles))
     >>= either (userError . CompileError) return
 
   pure (map snd modules, moduleMap)

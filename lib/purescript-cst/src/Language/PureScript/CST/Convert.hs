@@ -614,7 +614,7 @@ convertImportDecl fileName decl@(ImportDecl _ _ modName mbNames mbQual) = do
     ann = uncurry (sourceAnnCommented fileName) $ importDeclRange decl
     importTy = case mbNames of
       Nothing -> AST.Implicit
-      Just (hiding, (Wrapped _ imps _)) -> do
+      Just (hiding, Wrapped _ imps _) -> do
         let imps' = convertImport fileName <$> toList imps
         if isJust hiding
           then AST.Hiding imps'

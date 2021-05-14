@@ -120,7 +120,7 @@ separated = go []
   go _ [] = internalError "Separated should not be empty"
 
 consSeparated :: a -> SourceToken -> Separated a -> Separated a
-consSeparated x sep (Separated {..}) = Separated x ((sep, sepHead) : sepTail)
+consSeparated x sep Separated {..} = Separated x ((sep, sepHead) : sepTail)
 
 internalError :: String -> a
 internalError = error . ("Internal parser error: " <>)
@@ -232,7 +232,7 @@ toBinderConstructor = \case
   BinderConstructor a name [] NE.:| bs ->
     pure $ BinderConstructor a name bs
   a NE.:| [] -> pure a
-  a NE.:| _ -> unexpectedToks binderRange (unexpectedBinder) ErrExprInBinder a
+  a NE.:| _ -> unexpectedToks binderRange unexpectedBinder ErrExprInBinder a
 
 toRecordFields
   :: Monoid a
