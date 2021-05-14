@@ -257,15 +257,15 @@ renameInModule imports (Module modSS coms mn decls exps) =
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let w ds val')
   updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound =
-    (,) (ss, bound) <$> (Var ss <$> updateValueName name' ss)
+    ((ss, bound), ) <$> (Var ss <$> updateValueName name' ss)
   updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) =
-    (,) (ss, bound) <$> (Var ss <$> updateValueName name' ss)
+    ((ss, bound), ) <$> (Var ss <$> updateValueName name' ss)
   updateValue (_, bound) (Op ss op) =
-    (,) (ss, bound) <$> (Op ss <$> updateValueOpName op ss)
+    ((ss, bound), ) <$> (Op ss <$> updateValueOpName op ss)
   updateValue (_, bound) (Constructor ss name) =
-    (,) (ss, bound) <$> (Constructor ss <$> updateDataConstructorName name ss)
+    ((ss, bound), ) <$> (Constructor ss <$> updateDataConstructorName name ss)
   updateValue s (TypedValue check val ty) =
-    (,) s <$> (TypedValue check val <$> updateTypesEverywhere ty)
+    (s, ) <$> (TypedValue check val <$> updateTypesEverywhere ty)
   updateValue s v = return (s, v)
 
   updateBinder
@@ -275,9 +275,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateBinder (_, bound) v@(PositionedBinder pos _ _) =
     return ((pos, bound), v)
   updateBinder (_, bound) (ConstructorBinder ss name b) =
-    (,) (ss, bound) <$> (ConstructorBinder ss <$> updateDataConstructorName name ss <*> pure b)
+    ((ss, bound), ) <$> (ConstructorBinder ss <$> updateDataConstructorName name ss <*> pure b)
   updateBinder (_, bound) (OpBinder ss op) =
-    (,) (ss, bound) <$> (OpBinder ss <$> updateValueOpName op ss)
+    ((ss, bound), ) <$> (OpBinder ss <$> updateValueOpName op ss)
   updateBinder s (TypedBinder t b) = do
     t' <- updateTypesEverywhere t
     return (s, TypedBinder t' b)

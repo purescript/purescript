@@ -311,7 +311,7 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
             mapMaybe unPropertyIdentRef $
             trailingCommaList props
         in
-          (map (\name -> (m, name, Internal)) shorthandNames, bn)
+          (map (m, , Internal) shorthandNames, bn)
     toReference (JSFunctionExpression _ _ _ params _ _) bn
       = ([], bn \\ mapMaybe unIdentifier (commaList params))
     toReference e bn

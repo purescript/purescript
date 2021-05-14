@@ -464,7 +464,7 @@ inferLetBinding
   -> Expr
   -> (Expr -> m TypedValue')
   -> m ([Declaration], TypedValue')
-inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
+inferLetBinding seen [] ret j = (seen, ) <$> withBindingGroupVisible (j ret)
 inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (TypedValue checkType val ty)] : rest) ret j = do
   moduleName <- unsafeCheckCurrentModule
   TypedValue' _ val' ty'' <- warnAndRethrowWithPositionTC ss $ do
