@@ -118,7 +118,7 @@ matchOperators isBinOp extractOp fromOp reapply modOpTable ops = parseChains
       mixedAssoc :: [NEL.NonEmpty (Qualified (OpName nameType))]
       mixedAssoc = fmap join . filter (\precGroup -> NEL.length precGroup > 1) $ assocGrouped
       nonAssoc :: [NEL.NonEmpty (Qualified (OpName nameType))]
-      nonAssoc = join $ fmap (NEL.filter (\assocGroup -> opAssoc (NEL.head assocGroup) == Infix && sum (fmap opUsages assocGroup) > 1)) assocGrouped
+      nonAssoc = NEL.filter (\assocGroup -> opAssoc (NEL.head assocGroup) == Infix && sum (fmap opUsages assocGroup) > 1) =<< assocGrouped
     in
       if null (nonAssoc ++ mixedAssoc)
         then internalError "matchOperators: cannot reorder operators"
@@ -141,4 +141,4 @@ matchOperators isBinOp extractOp fromOp reapply modOpTable ops = parseChains
     -> ErrorMessage
   mkPositionedError chainOpSpans grp =
     ErrorMessage
-      [PositionedError (join . fmap (fromJust . flip M.lookup chainOpSpans) $ grp)]
+      [PositionedError (fromJust . flip M.lookup chainOpSpans =<< grp)]
