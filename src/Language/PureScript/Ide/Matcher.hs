@@ -80,7 +80,7 @@ runMatcher :: Matcher a -> [Match a] -> [Match a]
 runMatcher (Matcher m)= appEndo m
 
 sortCompletions :: [ScoredMatch a] -> [ScoredMatch a]
-sortCompletions = sortBy (flip compare `on` snd)
+sortCompletions = sortOn (Down . snd)
 
 flexMatch :: Text -> [Match IdeDeclarationAnn] -> [ScoredMatch IdeDeclarationAnn]
 flexMatch = mapMaybe . flexRate

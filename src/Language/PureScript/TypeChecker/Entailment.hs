@@ -21,7 +21,7 @@ import Control.Monad.Writer
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (findIndices, minimumBy, groupBy, nubBy, sortBy)
+import Data.List (findIndices, minimumBy, groupBy, nubBy, sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -231,7 +231,7 @@ entails SolverOptions{..} constraint context hints =
 
             let instances = do
                   chain <- groupBy ((==) `on` tcdChain) $
-                           sortBy (compare `on` (tcdChain &&& tcdIndex)) $
+                           sortOn (tcdChain &&& tcdIndex) $
                            dicts
                   -- process instances in a chain in index order
                   let found = for chain $ \tcd ->

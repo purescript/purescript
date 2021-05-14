@@ -10,10 +10,9 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.Foldable (for_)
-import           Data.List (foldl', find, sortBy, unzip5)
+import           Data.List (foldl', find, sortOn, unzip5)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
-import           Data.Ord (comparing)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import           Language.PureScript.AST
@@ -616,13 +615,13 @@ objectType (TypeApp _ (TypeConstructor _ Prim.Record) rec) = Just rec
 objectType _ = Nothing
 
 decomposeRec :: SourceType -> Maybe [(Label, SourceType)]
-decomposeRec = fmap (sortBy (comparing fst)) . go
+decomposeRec = fmap (sortOn fst) . go
   where go (RCons _ str typ typs) = fmap ((str, typ) :) (go typs)
         go (REmptyKinded _ _) = Just []
         go _ = Nothing
 
 decomposeRec' :: SourceType -> [(Label, SourceType)]
-decomposeRec' = sortBy (comparing fst) . go
+decomposeRec' = sortOn fst . go
   where go (RCons _ str typ typs) = (str, typ) : go typs
         go _ = []
 

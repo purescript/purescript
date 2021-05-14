@@ -16,11 +16,10 @@ import           Data.Char (isSpace)
 import           Data.Either (partitionEithers)
 import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nubBy, partition, dropWhileEnd, sort, sortBy)
+import           Data.List (transpose, nubBy, partition, dropWhileEnd, sort, sortOn)
 import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
-import           Data.Ord (comparing)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text (Text)
@@ -1529,7 +1528,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     -- Keep the unique labels only
     filterRows :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)
     filterRows (s1, r1) (s2, r2) =
-         let sort' = sortBy (comparing $ \(RowListItem _ name ty) -> (name, ty))
+         let sort' = sortOn $ \(RowListItem _ name ty) -> (name, ty)
              notElem' s (RowListItem _ name ty) = all (\(RowListItem _ name' ty') -> name /= name' || not (eqType ty ty')) s
              unique1 = filter (notElem' s2) s1
              unique2 = filter (notElem' s1) s2

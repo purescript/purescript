@@ -39,10 +39,9 @@ import Data.Foldable (for_, traverse_)
 import Data.Function (on)
 import Data.Functor (($>))
 import qualified Data.IntSet as IS
-import Data.List (nubBy, sortBy, (\\))
+import Data.List (nubBy, sortOn, (\\))
 import qualified Data.Map as M
 import Data.Maybe (fromJust, fromMaybe)
-import Data.Ord (comparing)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
@@ -147,7 +146,7 @@ unknownsWithKinds
   :: forall m. (MonadState CheckState m, MonadError MultipleErrors m, HasCallStack)
   => [Unknown]
   -> m [(Unknown, SourceType)]
-unknownsWithKinds = fmap (fmap snd . nubBy ((==) `on` fst) . sortBy (comparing fst) . join) . traverse go
+unknownsWithKinds = fmap (fmap snd . nubBy ((==) `on` fst) . sortOn fst . join) . traverse go
   where
   go u = do
     (lvl, ty) <- traverse apply =<< lookupUnsolved u

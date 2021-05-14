@@ -33,9 +33,10 @@ import Data.Foldable (for_, traverse_)
 import Data.Function (on)
 import Data.Functor (($>))
 import Data.Functor.Identity (Identity(..), runIdentity)
-import Data.List (groupBy, sortBy)
+import Data.List (groupBy, sortOn)
 import Data.Maybe (mapMaybe, listToMaybe)
 import qualified Data.Map as M
+import Data.Ord (Down(..))
 
 import qualified Language.PureScript.Constants.Prelude as C
 
@@ -278,7 +279,7 @@ ensureNoDuplicates
   => (a -> SimpleErrorMessage)
   -> [(Qualified a, SourceSpan)]
   -> m ()
-ensureNoDuplicates toError m = go $ sortBy (compare `on` fst) m
+ensureNoDuplicates toError m = go $ sortOn fst m
   where
   go [] = return ()
   go [_] = return ()
@@ -293,7 +294,7 @@ customOperatorTable
 customOperatorTable fixities =
   let
     userOps = map (\(name, Fixity a p) -> (name, p, a)) fixities
-    sorted = sortBy (flip compare `on` (\(_, p, _) -> p)) userOps
+    sorted = sortOn (Down . (\(_, p, _) -> p)) userOps
     groups = groupBy ((==) `on` (\(_, p, _) -> p)) sorted
   in
     map (map (\(name, _, a) -> (name, a))) groups

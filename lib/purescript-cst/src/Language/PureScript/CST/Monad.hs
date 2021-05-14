@@ -2,7 +2,7 @@ module Language.PureScript.CST.Monad where
 
 import Prelude
 
-import Data.List (sortBy)
+import Data.List (sortOn)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord (comparing)
 import Data.Text (Text)
@@ -66,7 +66,7 @@ runParser st (Parser k) = k st left right
 
   right st'@(ParserState {..}) res
     | null parserErrors = (st', Right res)
-    | otherwise = (st', Left $ NE.fromList $ sortBy (comparing errRange) parserErrors)
+    | otherwise = (st', Left $ NE.fromList $ sortOn errRange parserErrors)
 
 runTokenParser :: Parser a -> [LexResult] -> Either (NE.NonEmpty ParserError) ([ParserWarning], a)
 runTokenParser p buff = fmap (warnings,) res

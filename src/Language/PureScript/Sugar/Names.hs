@@ -10,7 +10,7 @@ module Language.PureScript.Sugar.Names
   ) where
 
 import Prelude.Compat
-import Protolude (ordNub, sortBy, on)
+import Protolude (ordNub, sortOn)
 
 import Control.Arrow (first, second)
 import Control.Monad
@@ -149,7 +149,7 @@ elaborateExports exps (Module ss coms mn decls refs) =
 -- their order in the source file.
 reorderExports :: [Declaration] -> Maybe [DeclarationRef] -> [DeclarationRef] -> [DeclarationRef]
 reorderExports decls originalRefs =
-  sortBy (compare `on` originalIndex)
+  sortOn originalIndex
   where
   names =
     maybe (mapMaybe declName decls) (map declRefName) originalRefs

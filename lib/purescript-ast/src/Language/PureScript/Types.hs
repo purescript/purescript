@@ -16,8 +16,7 @@ import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 import Data.Foldable (fold)
 import qualified Data.IntSet as IS
-import Data.List (sort, sortBy)
-import Data.Ord (comparing)
+import Data.List (sort, sortOn)
 import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Set as S
 import Data.Text (Text)
@@ -413,7 +412,7 @@ rowToList = go where
 
 -- | Convert a row to a list of pairs of labels and types, sorted by the labels.
 rowToSortedList :: Type a -> ([RowListItem a], Type a)
-rowToSortedList = first (sortBy (comparing rowListLabel)) . rowToList
+rowToSortedList = first (sortOn rowListLabel) . rowToList
 
 -- | Convert a list of labels and types to a row
 rowFromList :: ([RowListItem a], Type a) -> Type a
