@@ -47,7 +47,7 @@ parseEvalLine line =
     Just rest ->
       case splitOn " " rest of
         "shouldEvaluateTo" : args -> Comment (ShouldEvaluateTo $ unwords args)
-        "paste" : [] -> Comment (Paste [])
+        ["paste"] -> Comment (Paste [])
         _ -> Invalid line
     Nothing -> Line line
 

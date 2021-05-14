@@ -115,7 +115,7 @@ unexpectedToks toRange toCst err old = do
 separated :: [(SourceToken, a)] -> Separated a
 separated = go []
   where
-  go accum ((_, a) : []) = Separated a accum
+  go accum [(_, a)] = Separated a accum
   go accum (x : xs) = go (x : accum) xs
   go _ [] = internalError "Separated should not be empty"
 
