@@ -154,7 +154,7 @@ makeTypeClassData args m s deps tcIsEmpty = TypeClassData args m s deps determin
       Nothing -> internalError "Unknown argument index in makeTypeClassData"
       Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
                     varContributesTo = G.reachable depGraph v
-                in any (\r -> not (r `elem` varContributesTo)) contributesToVar
+                in any (`notElem` varContributesTo) contributesToVar
 
     -- find all the arguments that are determined
     determinedArgs :: S.Set Int

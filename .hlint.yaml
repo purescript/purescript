@@ -14,7 +14,6 @@
 - ignore: {name: "Use join"}
 - ignore: {name: "Fuse foldr/map"}
 - ignore: {name: "Eta reduce"}
-- ignore: {name: "Use notElem"}
 - ignore: {name: "Use lambda-case"}
 - ignore: {name: "Avoid lambda"}
 - ignore: {name: "Use tuple-section"}

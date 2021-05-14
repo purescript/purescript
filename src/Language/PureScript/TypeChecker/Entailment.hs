@@ -551,7 +551,7 @@ entails SolverOptions{..} constraint context hints =
         (fixed, rest) = rowToList r
 
         lacksSym =
-          not $ sym `elem` (runLabel . rowListLabel <$> fixed)
+          sym `notElem` (runLabel . rowListLabel <$> fixed)
 
         (canMakeProgress, cst) = case rest of
             REmptyKinded _ _ -> (True, Nothing)
