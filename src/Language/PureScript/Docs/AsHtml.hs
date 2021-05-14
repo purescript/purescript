@@ -316,7 +316,7 @@ v :: Text -> AttributeValue
 v = toValue
 
 withClass :: String -> Html -> Html
-withClass className content = H.span ! A.class_ (fromString className) $ content
+withClass className = H.span ! A.class_ (fromString className)
 
 partitionChildren ::
   [ChildDeclaration] ->

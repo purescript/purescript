@@ -18,10 +18,10 @@ advanceToken :: SourcePos -> Token -> SourcePos
 advanceToken pos = applyDelta pos . tokenDelta
 
 advanceLeading :: SourcePos -> [Comment LineFeed] -> SourcePos
-advanceLeading pos = foldl' (\a -> applyDelta a . commentDelta lineDelta) pos
+advanceLeading = foldl' $ \a -> applyDelta a . commentDelta lineDelta
 
 advanceTrailing :: SourcePos -> [Comment Void] -> SourcePos
-advanceTrailing pos = foldl' (\a -> applyDelta a . commentDelta (const (0, 0))) pos
+advanceTrailing = foldl' $ \a -> applyDelta a . commentDelta (const (0, 0))
 
 tokenDelta :: Token -> (Int, Int)
 tokenDelta = \case

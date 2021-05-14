@@ -15,7 +15,7 @@ load :: [Text] -> Command
 load = LoadSync . map Test.mn
 
 usage :: P.ModuleName -> Text -> IdeNamespace -> Command
-usage mn ident ns = FindUsages mn ident ns
+usage = FindUsages
 
 shouldBeUsage :: P.SourceSpan -> (FilePath, Text) -> Expectation
 shouldBeUsage usage' (fp, range) =

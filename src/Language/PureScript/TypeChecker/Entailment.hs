@@ -202,11 +202,11 @@ entails SolverOptions{..} constraint context hints =
     valUndefined = Var nullSourceSpan (Qualified (Just C.Prim) (Ident C.undefined))
 
     solve :: SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
-    solve con = go 0 hints con
+    solve = go 0 hints
       where
         go :: Int -> [ErrorMessageHint] -> SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
         go work _ (Constraint _ className' _ tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
-        go work hints' con'@(Constraint _ className' kinds' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con') .) . runStateT . runWriterT $ do
+        go work hints' con@(Constraint _ className' kinds' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con) .) . runStateT . runWriterT $ do
             -- We might have unified types by solving other constraints, so we need to
             -- apply the latest substitution.
             latestSubst <- lift . lift $ gets checkSubstitution
@@ -263,7 +263,7 @@ entails SolverOptions{..} constraint context hints =
                 currentSubst' <- lift . lift $ gets checkSubstitution
                 let subst'' = fmap (substituteType currentSubst') subst'
                 -- Solve any necessary subgoals
-                args <- solveSubgoals subst'' (ErrorSolvingConstraint con') (tcdDependencies tcd)
+                args <- solveSubgoals subst'' (ErrorSolvingConstraint con) (tcdDependencies tcd)
 
                 initDict <- lift . lift $ mkDictionary (tcdValue tcd) args
 

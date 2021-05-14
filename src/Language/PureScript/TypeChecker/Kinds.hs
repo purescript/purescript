@@ -678,8 +678,8 @@ checkQuantification
   :: forall m. (MonadError MultipleErrors m)
   => SourceType
   -> m ()
-checkQuantification ty =
-  collectErrors . go [] [] . fst . fromJust . completeBinderList $ ty
+checkQuantification =
+  collectErrors . go [] [] . fst . fromJust . completeBinderList
   where
   collectErrors vars =
     unless (null vars)

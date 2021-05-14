@@ -132,7 +132,7 @@ makeTypeClassData
   -> [FunctionalDependency]
   -> Bool
   -> TypeClassData
-makeTypeClassData args m s deps tcIsEmpty = TypeClassData args m s deps determinedArgs coveringSets tcIsEmpty
+makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
   where
     argumentIndices = [0 .. length args - 1]
 
@@ -349,7 +349,7 @@ isTypeOrApplied t1 t2 = eqType t1 t2
 
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
-function t1 t2 = TypeApp nullSourceAnn (TypeApp nullSourceAnn tyFunction t1) t2
+function = TypeApp nullSourceAnn . TypeApp nullSourceAnn tyFunction
 
 -- To make reading the kind signatures below easier
 (-:>) :: SourceType -> SourceType -> SourceType
