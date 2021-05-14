@@ -570,7 +570,7 @@ token = peek >>= maybe (pure TokEof) k0
     Just '0' -> next *> peek >>= \case
       Just ch | isNumberChar ch -> throw ErrLeadingZero
       _ -> pure $ Just ("0", "0")
-    Just ch | isDigitChar ch -> Just <$> digits
+    Just ch | Char.isDigit ch -> Just <$> digits
     _ -> pure $ Nothing
 
   {-
@@ -586,7 +586,7 @@ token = peek >>= maybe (pure TokEof) k0
     '0' -> peek >>= \case
       Just ch | isNumberChar ch -> throw ErrLeadingZero
       _ -> pure $ Just ("0", "0")
-    ch | isDigitChar ch -> do
+    ch | Char.isDigit ch -> do
       (raw, chs) <- digits
       pure $ Just (Text.cons ch raw, ch : chs)
     _ -> pure $ Nothing
@@ -692,11 +692,8 @@ isIdentStart c = Char.isLower c || c == '_'
 isIdentChar :: Char -> Bool
 isIdentChar c = Char.isAlphaNum c || c == '_' || c == '\''
 
-isDigitChar :: Char -> Bool
-isDigitChar c = c >= '0' && c <= '9'
-
 isNumberChar :: Char -> Bool
-isNumberChar c = (c >= '0' && c <= '9') || c == '_'
+isNumberChar c = Char.isDigit c || c == '_'
 
 isNormalStringChar :: Char -> Bool
 isNormalStringChar c = c /= '"' && c /= '\\' && c /= '\r' && c /= '\n'
