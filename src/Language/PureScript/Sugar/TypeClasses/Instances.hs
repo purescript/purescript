@@ -25,14 +25,10 @@ desugarTypeClassInstanceNames
   => Module
   -> m (M.Map Text Ident, Module)
 desugarTypeClassInstanceNames (Module ss coms name decls exps) = do
-  results <- parU decls desugarInstName
-  let (desugared, instMaps) = foldr splitVals ([], []) results
+  (desugared, instMaps) <- unzip <$> parU decls desugarInstName
   pure (foldr M.union mempty instMaps, Module ss coms name desugared exps)
 
   where
-  splitVals (updatedDecls, instMap) (declList, instList) =
-    ((updatedDecls : declList), (instMap : instList))
-
   desugarInstName
     :: (MonadSupply m, MonadError MultipleErrors m)
     => Declaration
