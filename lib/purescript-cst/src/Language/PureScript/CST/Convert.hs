@@ -470,7 +470,7 @@ convertDeclaration fileName decl = case decl of
     let
       chainId = (\(Instance (InstanceHead _ nameSep _ cls args) _) -> mkInstanceName nameSep cls args) <$> toList insts
       goInst ix inst@(Instance (InstanceHead _ nameSep ctrs cls args) bd) = do
-        let ann' = instanceAnn inst
+        let ann' = uncurry (sourceAnnCommented fileName) $ instanceRange inst
         AST.TypeInstanceDeclaration ann' chainId ix
           (mkInstanceName nameSep cls args)
           (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
@@ -528,8 +528,6 @@ convertDeclaration fileName decl = case decl of
   where
   ann =
     uncurry (sourceAnnCommented fileName) $ declRange decl
-
-  instanceAnn = uncurry (sourceAnnCommented fileName) . instanceRange
 
   mkInstanceName :: Maybe (Name Ident, SourceToken) -> QualifiedName (N.ProperName 'N.ClassName) -> [Type a] -> Either Text.Text N.Ident
   mkInstanceName nameSep cls args =
