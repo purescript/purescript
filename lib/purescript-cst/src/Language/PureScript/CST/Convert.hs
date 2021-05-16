@@ -468,11 +468,11 @@ convertDeclaration fileName decl = case decl of
       (goSig <$> maybe [] (NE.toList . snd) bd)
   DeclInstanceChain _ insts -> do
     let
-      chainId = (\(Instance (InstanceHead _ nameSep _ cls args) _) -> mkInstanceName nameSep cls args) <$> toList insts
+      chainId = (\(Instance (InstanceHead _ nameSep _ cls args) _) -> mkPartialInstanceName nameSep cls args) <$> toList insts
       goInst ix inst@(Instance (InstanceHead _ nameSep ctrs cls args) bd) = do
         let ann' = uncurry (sourceAnnCommented fileName) $ instanceRange inst
         AST.TypeInstanceDeclaration ann' chainId ix
-          (mkInstanceName nameSep cls args)
+          (mkPartialInstanceName nameSep cls args)
           (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
           (qualified cls)
           (convertType fileName <$> args)
@@ -480,7 +480,7 @@ convertDeclaration fileName decl = case decl of
     uncurry goInst <$> zip [0..] (toList insts)
   DeclDerive _ _ new (InstanceHead _ nameSep ctrs cls args) -> do
     let
-      name' = mkInstanceName nameSep cls args
+      name' = mkPartialInstanceName nameSep cls args
       instTy
         | isJust new = AST.NewtypeInstance
         | otherwise = AST.DerivedInstance
@@ -529,8 +529,8 @@ convertDeclaration fileName decl = case decl of
   ann =
     uncurry (sourceAnnCommented fileName) $ declRange decl
 
-  mkInstanceName :: Maybe (Name Ident, SourceToken) -> QualifiedName (N.ProperName 'N.ClassName) -> [Type a] -> Either Text.Text N.Ident
-  mkInstanceName nameSep cls args =
+  mkPartialInstanceName :: Maybe (Name Ident, SourceToken) -> QualifiedName (N.ProperName 'N.ClassName) -> [Type a] -> Either Text.Text N.Ident
+  mkPartialInstanceName nameSep cls args =
     maybe (Left genName) (Right . ident . nameValue . fst) nameSep
     where
       -- instance name truncation will occur in desugaring process
