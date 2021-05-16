@@ -11,7 +11,7 @@ import Prelude.Compat hiding (take)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Supply.Class
 import qualified Data.Map as M
-import           Data.Text (Text, take)
+import           Data.Text (Text, take, pack)
 import           Language.PureScript.Errors
 import           Language.PureScript.Names
 
@@ -38,7 +38,7 @@ desugarTypeClassInstanceNames (Module ss coms name decls exps) = do
       uniqueInt <- fresh
       -- truncate to 25 chars to reduce verbosity
       -- of name and still keep it readable
-      let finalName = GenIdent (Just $ (take 25 genText) <> "$") uniqueInt
+      let finalName = Ident $ (take 25 genText) <> "$" <> (pack $ show uniqueInt)
           decl = TypeInstanceDeclaration sa chainId idx (Right finalName) deps className tys bd
       pure (decl, M.singleton genText finalName)
     a -> pure (a, mempty)
