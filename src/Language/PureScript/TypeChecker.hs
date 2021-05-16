@@ -400,7 +400,8 @@ typeCheckAll moduleName _ = traverse go
       (args', implies', tys', kind) <- kindOfClass moduleName (sa, pn, args, implies, tys)
       addTypeClass moduleName qualifiedClassName (fmap Just <$> args') implies' deps tys' kind
       return d
-  go (d@(TypeInstanceDeclaration sa@(ss, _) ch idx dictName deps className tys body)) =
+  go (TypeInstanceDeclaration _ _ _ (Left _) _ _ _ _) = internalError "typeCheckAll: type class instance generated name should have been desugared"
+  go (d@(TypeInstanceDeclaration sa@(ss, _) ch idx (Right dictName) deps className tys body)) =
     rethrow (addHint (ErrorInInstance className tys) . addHint (positionedError ss)) $ do
       env <- getEnv
       let qualifiedDictName = Qualified (Just moduleName) dictName
@@ -416,13 +417,17 @@ typeCheckAll moduleName _ = traverse go
           sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys'')
           let nonOrphanModules = findNonOrphanModules className typeClass tys''
           checkOrphanInstance dictName className tys'' nonOrphanModules
-          let qualifiedChain = Qualified (Just moduleName) <$> ch
+          let qualifiedChain = (Qualified (Just moduleName) . extractInstanceChainIdents) <$> ch
           checkOverlappingInstance qualifiedChain dictName className typeClass tys'' nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
           let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className vars kinds' tys'' (Just deps'')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
+
+  extractInstanceChainIdents :: Either Text Ident -> Ident
+  extractInstanceChainIdents (Right i) = i
+  extractInstanceChainIdents _ = internalError "extractInstanceChainIdents: partialy generated names should have been fully generated"
 
   checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [SourceType] -> m ()
   checkInstanceArity dictName className typeClass tys = do

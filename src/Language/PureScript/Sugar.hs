@@ -30,6 +30,7 @@ import Language.PureScript.Sugar.ObjectWildcards as S
 import Language.PureScript.Sugar.Operators as S
 import Language.PureScript.Sugar.TypeClasses as S
 import Language.PureScript.Sugar.TypeClasses.Deriving as S
+import Language.PureScript.Sugar.TypeClasses.Instances as S
 import Language.PureScript.Sugar.TypeDeclarations as S
 import Language.PureScript.TypeChecker.Synonyms (SynonymMap)
 
@@ -47,6 +48,8 @@ import Language.PureScript.TypeChecker.Synonyms (SynonymMap)
 --  * Desugar ado-notation
 --
 --  * Desugar top-level case declarations into explicit case expressions
+--
+--  * Generate type class instance names for those not defined in source code
 --
 --  * Desugar type declarations into value declarations with explicit type annotations
 --
@@ -85,6 +88,7 @@ desugar externs =
       -- knowing their kinds but they're not available yet.
           kinds = mempty
        in deriveInstances externs syns kinds m
+      >>= desugarTypeClassInstanceNames
       >>= desugarTypeClasses externs syns kinds)
     >=> createBindingGroupsModule
 

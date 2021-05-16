@@ -48,9 +48,9 @@ desugarTypeClasses
   => [ExternsFile]
   -> SynonymMap
   -> KindMap
-  -> Module
+  -> (M.Map Text Ident, Module)
   -> m Module
-desugarTypeClasses externs syns kinds = flip evalStateT initialState . desugarModule syns kinds
+desugarTypeClasses externs syns kinds (instMap, modul) = flip evalStateT initialState $ desugarModule syns kinds instMap modul
   where
   initialState :: MemberMap
   initialState =
@@ -76,13 +76,14 @@ desugarModule
   :: (MonadSupply m, MonadError MultipleErrors m)
   => SynonymMap
   -> KindMap
+  -> M.Map Text Ident
   -> Module
   -> Desugar m Module
-desugarModule syns kinds (Module ss coms name decls (Just exps)) = do
+desugarModule syns kinds instMap (Module ss coms name decls (Just exps)) = do
   let (classDecls, restDecls) = partition isTypeClassDecl decls
       classVerts = fmap (\d -> (d, classDeclName d, superClassesNames d)) classDecls
   (classNewExpss, classDeclss) <- unzip <$> parU (stronglyConnComp classVerts) (desugarClassDecl name exps)
-  (restNewExpss, restDeclss) <- unzip <$> parU restDecls (desugarDecl syns kinds name exps)
+  (restNewExpss, restDeclss) <- unzip <$> parU restDecls (desugarDecl syns kinds instMap name exps)
   return $ Module ss coms name (concat restDeclss ++ concat classDeclss) $ Just (exps ++ catMaybes restNewExpss ++ catMaybes classNewExpss)
   where
   desugarClassDecl :: (MonadSupply m, MonadError MultipleErrors m)
@@ -90,7 +91,7 @@ desugarModule syns kinds (Module ss coms name decls (Just exps)) = do
     -> [DeclarationRef]
     -> SCC Declaration
     -> Desugar m (Maybe DeclarationRef, [Declaration])
-  desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl syns kinds name' exps' d
+  desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl syns kinds instMap name' exps' d
   desugarClassDecl _ _ (CyclicSCC ds') = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeClassDeclaration (map classDeclName ds')
 
   superClassesNames :: Declaration -> [Qualified (ProperName 'ClassName)]
@@ -104,7 +105,7 @@ desugarModule syns kinds (Module ss coms name decls (Just exps)) = do
   classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (Just name) pn
   classDeclName _ = internalError "Expected TypeClassDeclaration"
 
-desugarModule _ _ _ = internalError "Exports should have been elaborated in name desugaring"
+desugarModule _ _ _ _ = internalError "Exports should have been elaborated in name desugaring"
 
 {- Desugar type class and type class instance declarations
 --
@@ -204,28 +205,40 @@ desugarDecl
   :: (MonadSupply m, MonadError MultipleErrors m)
   => SynonymMap
   -> KindMap
+  -> M.Map Text Ident
   -> ModuleName
   -> [DeclarationRef]
   -> Declaration
   -> Desugar m (Maybe DeclarationRef, [Declaration])
-desugarDecl syns kinds mn exps = go
+desugarDecl syns kinds instMap mn exps = go
   where
   go d@(TypeClassDeclaration sa name args implies deps members) = do
     modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration _ _ _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
-  go d@(TypeInstanceDeclaration sa _ _ name deps className tys (ExplicitInstance members))
+  go (TypeInstanceDeclaration _ _ _ (Left _) _ _ _ _) = internalError "instance names should have been desugared"
+  go (TypeInstanceDeclaration sa ch ix n@(Right name) deps className tys bdy@(ExplicitInstance members))
     | className == C.Coercible
     = throwError . errorMessage' (fst sa) $ InvalidCoercibleInstanceDeclaration tys
     | otherwise = do
     desugared <- desugarCases members
     dictDecl <- typeInstanceDictionaryDeclaration syns kinds sa name mn deps className tys desugared
-    return (expRef name className tys, [d, dictDecl])
-  go d@(TypeInstanceDeclaration sa _ _ name deps className tys (NewtypeInstanceWithDictionary dict)) = do
+    let ch' = map remapInstNameToFinalName ch
+        inst = TypeInstanceDeclaration sa ch' ix n deps className tys bdy
+    return (expRef name className tys, [inst, dictDecl])
+  go (TypeInstanceDeclaration sa ch ix n@(Right name) deps className tys bdy@(NewtypeInstanceWithDictionary dict)) = do
     let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) className)) tys
+        ch' = map remapInstNameToFinalName ch
         constrainedTy = quantify (foldr (srcConstrainedType) dictTy deps)
-    return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
+        inst = TypeInstanceDeclaration sa ch' ix n deps className tys bdy
+    return (expRef name className tys, [inst, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
+
+  remapInstNameToFinalName :: Either Text Ident -> Either Text Ident
+  remapInstNameToFinalName (Left t) =
+    maybe (internalError "updateInstanceChain: no mapping found for partially-generated instance name") Right $
+      M.lookup t instMap
+  remapInstNameToFinalName x = x
 
   expRef :: Ident -> Qualified (ProperName 'ClassName) -> [SourceType] -> Maybe DeclarationRef
   expRef name className tys

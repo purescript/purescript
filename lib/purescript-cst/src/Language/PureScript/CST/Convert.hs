@@ -15,7 +15,7 @@ module Language.PureScript.CST.Convert
   , comments
   ) where
 
-import Prelude
+import Prelude hiding (take)
 
 import Data.Bifunctor (bimap, first)
 import Data.Foldable (foldl', toList)
@@ -30,7 +30,7 @@ import Language.PureScript.Crash (internalError)
 import qualified Language.PureScript.Environment as Env
 import qualified Language.PureScript.Label as L
 import qualified Language.PureScript.Names as N
-import Language.PureScript.PSString (mkString)
+import Language.PureScript.PSString (mkString, prettyPrintStringJS)
 import qualified Language.PureScript.Types as T
 import Language.PureScript.CST.Positions
 import Language.PureScript.CST.Print (printToken)
@@ -468,20 +468,19 @@ convertDeclaration fileName decl = case decl of
       (goSig <$> maybe [] (NE.toList . snd) bd)
   DeclInstanceChain _ insts -> do
     let
-      instName (Instance (InstanceHead _ a _ _ _ _) _) = ident $ nameValue a
-      chainId = instName <$> toList insts
-      goInst ix inst@(Instance (InstanceHead _ name _ ctrs cls args) bd) = do
-        let ann' = uncurry (sourceAnnCommented fileName) $ instanceRange inst
+      chainId = (\(Instance (InstanceHead _ nameSep _ cls args) _) -> mkInstanceName nameSep cls args) <$> toList insts
+      goInst ix inst@(Instance (InstanceHead _ nameSep ctrs cls args) bd) = do
+        let ann' = instanceAnn inst
         AST.TypeInstanceDeclaration ann' chainId ix
-          (ident $ nameValue name)
+          (mkInstanceName nameSep cls args)
           (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
           (qualified cls)
           (convertType fileName <$> args)
           (AST.ExplicitInstance $ goInstanceBinding <$> maybe [] (NE.toList . snd) bd)
     uncurry goInst <$> zip [0..] (toList insts)
-  DeclDerive _ _ new (InstanceHead _ name _ ctrs cls args) -> do
+  DeclDerive _ _ new (InstanceHead _ nameSep ctrs cls args) -> do
     let
-      name' = ident $ nameValue name
+      name' = mkInstanceName nameSep cls args
       instTy
         | isJust new = AST.NewtypeInstance
         | otherwise = AST.DerivedInstance
@@ -529,6 +528,46 @@ convertDeclaration fileName decl = case decl of
   where
   ann =
     uncurry (sourceAnnCommented fileName) $ declRange decl
+
+  instanceAnn = uncurry (sourceAnnCommented fileName) . instanceRange
+
+  mkInstanceName :: Maybe (Name Ident, SourceToken) -> QualifiedName (N.ProperName 'N.ClassName) -> [Type a] -> Either Text.Text N.Ident
+  mkInstanceName nameSep cls args =
+    maybe (Left genName) (Right . ident . nameValue . fst) nameSep
+    where
+      -- instance name truncation will occur in desugaring process
+      -- when the final instance name is determined
+      genName :: Text.Text
+      genName = "$" <> unqualifiedClassName <> "$" <> typeArgs <> "$"
+
+      unqualifiedClassName :: Text.Text
+      unqualifiedClassName = N.runProperName $ qualName cls
+
+      typeArgs :: Text.Text
+      typeArgs = Text.intercalate "$" $ fmap argName args
+
+      -- based on Parser.y's `typeAtom` expression
+      -- which is used in its `instHead` expression
+      argName :: Type a -> Text.Text
+      argName = \case
+        TypeVar _ n -> N.runIdent $ ident $ nameValue n
+        TypeConstructor _ qn -> N.runProperName $ qualName qn
+        TypeOpName _ qn -> N.runOpName $ qualName qn
+        TypeString _ _ ps -> prettyPrintStringJS ps
+        TypeHole _ n -> N.runIdent $ ident $ nameValue n
+        TypeParens _ t -> argName $ wrpValue t
+        TypeKinded _ t1 _ t2 -> argName t1 <> "$" <> argName t2
+        TypeRecord _ _ -> "Record"
+        TypeRow _ _ -> "Row"
+        TypeArrName _ _ -> "Arrow"
+        --
+        TypeWildcard _ _ -> ""
+        TypeForall _ _ _ _ _ -> ""
+        TypeApp _ _ _ -> ""
+        TypeOp _ _ _ _ -> ""
+        TypeArr _ _ _ _ -> ""
+        TypeConstrained _ _ _ _ -> ""
+        TypeUnaryRow _ _ _ -> ""
 
   goTypeVar = \case
     TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
