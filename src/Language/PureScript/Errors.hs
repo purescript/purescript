@@ -190,6 +190,7 @@ data SimpleErrorMessage
   | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
+  | DuplicatePartiallyGeneratedInstanceName Text
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -354,6 +355,7 @@ errorCode em = case unwrapErrorMessage em of
   UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
+  DuplicatePartiallyGeneratedInstanceName {} -> "DuplicatePartiallyGeneratedInstanceName"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1351,6 +1353,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
     renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
       line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
+
+    renderSimpleErrorMessage (DuplicatePartiallyGeneratedInstanceName t) =
+      paras
+        [ line "The following partially-generated type class instance name..."
+        , line $ markCode t
+        , line "... was generated for multiple instances in an instance chain."
+        , line "In an instance chain, one instance's type parameters overlap with another instance."
+        ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
