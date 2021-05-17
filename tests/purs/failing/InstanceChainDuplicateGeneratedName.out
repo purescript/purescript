@@ -1,0 +1,14 @@
+Error found:
+at tests/purs/failing/InstanceChainDuplicateGeneratedName.purs:8:6 - 8:20 (line 8, column 6 - line 8, column 20)
+
+  The following partially-generated type class instance name...
+
+    [33m$$Foo$x[0m
+
+  ... was generated for multiple instances in an instance chain.
+  In an instance chain, one instance's type parameters overlap with another instance.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/DuplicatePartiallyGeneratedInstanceName.md for more information,
+or to contribute content related to this error.
+
