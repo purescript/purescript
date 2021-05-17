@@ -7,9 +7,4 @@ class Foo a
 instance Foo x
 else instance Foo x
 
-class Foo2 a b
-
-instance Foo2 Int String
-else instance Foo2 Int String
-
 main = log "Done"
