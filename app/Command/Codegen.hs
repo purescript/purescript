@@ -66,19 +66,7 @@ codegen CodegenOptions{..} = do
   runCodegen foreigns filePathMap m =
     P.codegen (makeActions foreigns filePathMap) m
       (Docs.Module (CoreFn.moduleName m) Nothing [] [])
-      (moduleToExternsFile m)
-
-  moduleToExternsFile :: CoreFn.Module a -> P.ExternsFile
-  moduleToExternsFile CoreFn.Module {CoreFn.moduleName} = P.ExternsFile {
-      P.efVersion      = mempty,
-      P.efModuleName   = moduleName,
-      P.efExports      = [],
-      P.efImports      = [],
-      P.efFixities     = [],
-      P.efTypeFixities = [],
-      P.efDeclarations = [],
-      P.efSourceSpan   = P.SourceSpan "none" (P.SourcePos 0 0) (P.SourcePos 0 0)
-    }
+      Nothing
 
   warnFileTypeNotFound :: String -> IO ()
   warnFileTypeNotFound =

@@ -111,7 +111,7 @@ data MakeActions m = MakeActions
   , readExterns :: ModuleName -> m (FilePath, Maybe ExternsFile)
   -- ^ Read the externs file for a module as a string and also return the actual
   -- path for the file.
-  , codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> SupplyT m ()
+  , codegen :: CF.Module CF.Ann -> Docs.Module -> Maybe ExternsFile -> SupplyT m ()
   -- ^ Run the code generator for the module and write any required output files.
   , ffiCodegen :: CF.Module CF.Ann -> m ()
   -- ^ Check ffi and print it in the output directory.
@@ -244,10 +244,11 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     when (S.member Docs codegenTargets) $ for_ Docs.Prim.primModules $ \docsMod@Docs.Module{..} ->
       writeJSONFile (outputFilename modName "docs.json") docsMod
 
-  codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> SupplyT Make ()
-  codegen m docs exts = do
+  codegen :: CF.Module CF.Ann -> Docs.Module -> Maybe ExternsFile -> SupplyT Make ()
+  codegen m docs mbExts = do
     let mn = CF.moduleName m
-    lift $ writeCborFile (outputFilename mn externsFileName) exts
+    for_ mbExts $ \exts ->
+      lift $ writeCborFile (outputFilename mn externsFileName) exts
     codegenTargets <- lift $ asks optionsCodegenTargets
     when (S.member CoreFn codegenTargets) $ do
       let coreFnFile = targetFilename mn CoreFn
