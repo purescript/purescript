@@ -1356,10 +1356,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
     renderSimpleErrorMessage (DuplicatePartiallyGeneratedInstanceName t) =
       paras
-        [ line "The following partially-generated type class instance name..."
+        [ line "The following partially-generated type class instance name was generated for multiple instances in an instance chain."
         , indent $ line $ markCode t
-        , line "... was generated for multiple instances in an instance chain."
-        , line "In an instance chain, one instance's type parameters overlap with another instance."
         ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
