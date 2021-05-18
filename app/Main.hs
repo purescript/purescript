@@ -3,6 +3,7 @@ module Main where
 import Prelude
 
 import qualified Command.Bundle as Bundle
+import qualified Command.Codegen as Codegen
 import qualified Command.Compile as Compile
 import qualified Command.Docs as Docs
 import qualified Command.Graph as Graph
@@ -61,6 +62,9 @@ main = do
         [ Opts.command "bundle"
             (Opts.info Bundle.command
               (Opts.progDesc "This command was removed in v0.15.0. Run this command for migration information."))
+        , Opts.command "codegen"
+            (Opts.info Codegen.command
+              (Opts.progDesc "Generate JS from core functional representation"))
         , Opts.command "compile"
             (Opts.info Compile.command
               (Opts.progDesc "Compile PureScript source files"))

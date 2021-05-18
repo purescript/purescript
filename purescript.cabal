@@ -393,6 +393,7 @@ executable purs
       gitrev >=1.2.0 && <1.4
   other-modules:
     Command.Bundle
+    Command.Codegen
     Command.Compile
     Command.Docs
     Command.Docs.Html
