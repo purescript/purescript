@@ -3,6 +3,9 @@ module Main where
 import Effect.Console (log)
 import Data.Generic.Rep (class Generic)
 
+-- This file verifies that unnamed instances will produce
+-- completely-generated instance names without problems.
+
 class NoTypeParams
 instance NoTypeParams
 
