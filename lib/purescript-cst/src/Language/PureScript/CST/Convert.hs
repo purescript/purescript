@@ -469,7 +469,7 @@ convertDeclaration fileName decl = case decl of
       (goSig <$> maybe [] (NE.toList . snd) bd)
   DeclInstanceChain _ insts -> do
     let
-      chainId = (mkChainId fileName . startSourcePos . instKeyword . instHead) <$> toList insts
+      chainId = mkChainId fileName $ startSourcePos $ instKeyword $ instHead $ sepHead insts
       goInst ix inst@(Instance (InstanceHead _ nameSep ctrs cls args) bd) = do
         let ann' = uncurry (sourceAnnCommented fileName) $ instanceRange inst
         AST.TypeInstanceDeclaration ann' chainId ix
@@ -486,7 +486,7 @@ convertDeclaration fileName decl = case decl of
       instTy
         | isJust new = AST.NewtypeInstance
         | otherwise = AST.DerivedInstance
-    pure $ AST.TypeInstanceDeclaration ann [chainId] 0 name'
+    pure $ AST.TypeInstanceDeclaration ann chainId 0 name'
       (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
       (qualified cls)
       (convertType fileName <$> args)

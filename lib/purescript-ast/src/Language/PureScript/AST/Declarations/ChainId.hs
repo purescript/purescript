@@ -9,8 +9,10 @@ import Control.DeepSeq (NFData)
 import Codec.Serialise (Serialise)
 
 -- |
--- Stores all information needed to determine whether a given
--- instance is a part of an instance chain.
+-- For a given instance chain, stores the chain's file name and
+-- the starting source pos of the first instance in the chain.
+-- This data is used to determine which instances are part of
+-- the same instance chain.
 newtype ChainId = ChainId (String, Pos.SourcePos)
   deriving (Eq, Ord, Show, NFData, Serialise)
 

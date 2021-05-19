@@ -151,7 +151,7 @@ data ExternsDeclaration =
       , edInstanceKinds           :: [SourceType]
       , edInstanceTypes           :: [SourceType]
       , edInstanceConstraints     :: Maybe [SourceConstraint]
-      , edInstanceChain           :: [ChainId]
+      , edInstanceChain           :: Maybe ChainId
       , edInstanceChainIndex      :: Integer
       }
   deriving (Show, Generic)

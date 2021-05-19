@@ -16,7 +16,7 @@ import Language.PureScript.Types
 data TypeClassDictionaryInScope v
   = TypeClassDictionaryInScope {
     -- | The instance chain
-      tcdChain :: [ChainId]
+      tcdChain :: Maybe ChainId
     -- | Index of the instance chain
     , tcdIndex :: Integer
     -- | The value with which the dictionary can be accessed at runtime

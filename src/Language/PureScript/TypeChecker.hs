@@ -418,10 +418,11 @@ typeCheckAll moduleName _ = traverse go
           sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys'')
           let nonOrphanModules = findNonOrphanModules className typeClass tys''
           checkOrphanInstance dictName className tys'' nonOrphanModules
-          checkOverlappingInstance ch dictName className typeClass tys'' nonOrphanModules
+          let chainId = Just ch
+          checkOverlappingInstance chainId dictName className typeClass tys'' nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
-          let dict = TypeClassDictionaryInScope ch idx qualifiedDictName [] className vars kinds' tys'' (Just deps'')
+          let dict = TypeClassDictionaryInScope chainId idx qualifiedDictName [] className vars kinds' tys'' (Just deps'')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 
@@ -492,7 +493,7 @@ typeCheckAll moduleName _ = traverse go
   -- flexible instances: the instances `Cls X y` and `Cls x Y` overlap and
   -- could live in different modules but won't be caught here.
   checkOverlappingInstance
-    :: [ChainId]
+    :: Maybe ChainId
     -> Ident
     -> Qualified (ProperName 'ClassName)
     -> TypeClassData
