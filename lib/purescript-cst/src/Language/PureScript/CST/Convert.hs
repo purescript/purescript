@@ -562,9 +562,9 @@ convertDeclaration fileName decl = case decl of
         TypeHole _ n -> N.runIdent $ ident $ nameValue n
         TypeParens _ t -> argName $ wrpValue t
         TypeKinded _ t1 _ t2 -> argName t1 <> "$" <> argName t2
-        TypeRecord _ _ -> "_Record"
-        TypeRow _ _ -> "_Row"
-        TypeArrName _ _ -> "_Arrow"
+        TypeRecord _ _ -> "Record"
+        TypeRow _ _ -> "Row"
+        TypeArrName _ _ -> "Arrow"
         --
         TypeWildcard{} -> "_"
         TypeForall _ _ _ _ t -> argName t
