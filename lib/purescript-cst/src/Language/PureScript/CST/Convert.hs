@@ -555,7 +555,11 @@ convertDeclaration fileName decl = case decl of
       -- which is used in its `instHead` expression
       argName :: Type a -> Text.Text
       argName = \case
-        TypeVar _ n -> N.runIdent $ ident $ nameValue n
+        -- These are only useful to disambiguate between overlapping instances
+        -- but they’re disallowed outside of instance chains. Since we’re
+        -- avoiding name collisions with unique identifiers anyway,
+        -- we don't need to render this constructor.
+        TypeVar{} -> ""
         TypeConstructor _ qn -> N.runProperName $ qualName qn
         TypeOpName _ qn -> N.runOpName $ qualName qn
         TypeString _ _ ps -> prettyPrintStringJS ps
