@@ -561,13 +561,13 @@ convertDeclaration fileName decl = case decl of
         TypeRow _ _ -> "Row"
         TypeArrName _ _ -> "Arrow"
         --
-        TypeWildcard _ _ -> ""
-        TypeForall _ _ _ _ _ -> ""
-        TypeApp _ _ _ -> ""
-        TypeOp _ _ _ _ -> ""
-        TypeArr _ _ _ _ -> ""
-        TypeConstrained _ _ _ _ -> ""
-        TypeUnaryRow _ _ _ -> ""
+        TypeWildcard{} -> ""
+        TypeForall{} -> ""
+        TypeApp{} -> ""
+        TypeOp{} -> ""
+        TypeArr{} -> ""
+        TypeConstrained{} -> ""
+        TypeUnaryRow{} -> ""
 
   goTypeVar = \case
     TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
