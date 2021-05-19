@@ -567,7 +567,9 @@ convertDeclaration fileName decl = case decl of
         TypeArrName _ _ -> "Arrow"
         --
         TypeWildcard{} -> "_"
-        TypeForall _ _ _ _ t -> argName t
+
+        -- Polytypes are disallowed in instance heads
+        TypeForall{} -> ""
         TypeApp _ t1 t2 -> argName t1 <> "$" <> argName t2
         TypeOp _ t1 op t2 ->
           argName t1 <> "$" <> (N.runOpName $ qualName op) <> "$" <> argName t2
