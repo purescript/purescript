@@ -248,7 +248,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef _ ident)
-    = [ EDInstance tcdClassName ident tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies f tcdIndex
+    = [ EDInstance tcdClassName ident tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
