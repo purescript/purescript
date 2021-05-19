@@ -13,7 +13,7 @@ import           Data.Aeson.Parser (eitherDecodeWith, json)
 import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.UTF8 as LBU8
-import           Data.Either (rights)
+import           Data.Either (lefts, rights)
 import qualified Data.Set as S
 import qualified Data.Map as M
 
@@ -46,9 +46,14 @@ codegen CodegenOptions{..} = do
       ]
     exitFailure
   mods <- traverse parseCoreFn inputFiles
+
   let
     filePathMap =
       M.fromList $ map (\m -> (CoreFn.moduleName m, Right $ CoreFn.modulePath m)) $ map snd $ rights mods
+
+  unless (null (lefts mods)) $ do
+    _ <- traverse (hPutStr stderr . formatParseError) $ lefts mods
+    exitFailure
 
   foreigns <- P.inferForeignModules filePathMap
   (makeResult, makeWarnings) <-
@@ -58,6 +63,9 @@ codegen CodegenOptions{..} = do
       $ traverse (runCodegen foreigns filePathMap) $ map snd $ rights mods
   printWarningsAndErrors codegenJSONErrors makeWarnings makeResult
   where
+  formatParseError (file, _, e) =
+    "Failed parsing file " <> file <> " with error: " <> e
+
   parseCoreFn file = do
     contents <- BSL.readFile file
     case eitherDecodeWith json (A.iparse CoreFn.moduleFromJSON) contents of
@@ -76,7 +84,7 @@ codegen CodegenOptions{..} = do
 
   warnFileTypeNotFound :: String -> IO ()
   warnFileTypeNotFound =
-    hPutStrLn stderr . ("purs graph: No files found using pattern: " <>)
+    hPutStrLn stderr . ("purs codegen: No files found using pattern: " <>)
 
 command :: Opts.Parser (IO ())
 command = codegen <$> (Opts.helper <*> codegenOptions)
