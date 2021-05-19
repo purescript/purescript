@@ -10,7 +10,7 @@ import Prelude.Compat hiding (take)
 
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Supply.Class
-import           Data.Text (take, pack)
+import           Data.Text (take)
 import           Language.PureScript.Errors
 import           Language.PureScript.Names
 
