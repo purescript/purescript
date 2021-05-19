@@ -90,7 +90,7 @@ else instance OverlappingStillCompiles x
 data RowFoo :: Row Type -> Type
 data RowFoo row = RowFoo
 
-class TestRowApplications
+class TestRowApplications a
 instance TestRowApplications (RowFoo ())
 
 
