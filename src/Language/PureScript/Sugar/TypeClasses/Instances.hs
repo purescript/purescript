@@ -38,6 +38,5 @@ desugarTypeClassInstanceNames (Module ss coms name decls exps) = do
       -- truncate to 25 chars to reduce verbosity
       -- of name and still keep it readable
       let finalName = Ident $ (take 25 genText) <> "$" <> (pack $ show uniqueInt)
-          decl = TypeInstanceDeclaration sa chainId idx (Right finalName) deps className tys bd
-      pure decl
+      pure $ TypeInstanceDeclaration sa chainId idx (Right finalName) deps className tys bd
     a -> pure a
