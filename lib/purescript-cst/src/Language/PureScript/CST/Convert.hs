@@ -569,7 +569,7 @@ convertDeclaration fileName decl = case decl of
         TypeWildcard{} -> "_"
         TypeForall _ _ _ _ t -> argName t
         TypeApp _ t1 t2 -> argName t1 <> "$" <> argName t2
-        TypeOp _ t1 _ t2 -> argName t1 <> "___" <> argName t2
+        TypeOp _ t1 _ t2 -> argName t1 <> "_op_" <> argName t2
         TypeArr _ t1 _ t2 -> argName t1 <> "_Arrow_" <> argName t2
         TypeConstrained{} -> ""
         TypeUnaryRow{} -> "EmptyRow"
