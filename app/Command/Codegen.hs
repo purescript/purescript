@@ -34,6 +34,7 @@ import           System.IO (hPutStr, hPutStrLn, stderr)
 data CodegenOptions = CodegenOptions
   { codegenCoreFnInput :: [FilePath]
   , codegenJSONErrors :: Bool
+  , codegenOutputDir :: FilePath
   }
 
 codegen :: CodegenOptions -> IO ()
@@ -72,7 +73,7 @@ codegen CodegenOptions{..} = do
       Left (j, e) -> pure $ Left (file, j, e)
       Right r -> pure $ Right r
 
-  makeActions foreigns filePathMap = P.buildMakeActions "output" filePathMap foreigns False
+  makeActions foreigns filePathMap = P.buildMakeActions codegenOutputDir filePathMap foreigns False
 
   purescriptOptions :: P.Options
   purescriptOptions = P.Options False False (S.fromList [ P.JS ])
@@ -93,6 +94,7 @@ command = codegen <$> (Opts.helper <*> codegenOptions)
   codegenOptions =
     CodegenOptions <$> many inputFile
                    <*> jsonErrors
+                   <*> outputDirectory
 
   inputFile :: Opts.Parser FilePath
   inputFile =
@@ -105,6 +107,14 @@ command = codegen <$> (Opts.helper <*> codegenOptions)
     Opts.switch $
       Opts.long "json-errors" <>
       Opts.help "Print errors to stderr as JSON"
+
+  outputDirectory :: Opts.Parser FilePath
+  outputDirectory = Opts.strOption $
+    Opts.short 'o'
+      <> Opts.long "output"
+      <> Opts.value "output"
+      <> Opts.showDefault
+      <> Opts.help "The output directory"
 
 globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
 globWarningOnMisses warn = concatMapM globWithWarning
