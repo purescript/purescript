@@ -7,6 +7,7 @@
 module Language.PureScript.AST.Declarations where
 
 import Prelude.Compat
+import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
@@ -502,7 +503,7 @@ declName (ExternDataDeclaration _ n _) = Just (TyName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
-declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = either (const Nothing) (Just . IdentName) n
+declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = IdentName <$> hush n
 declName ImportDeclaration{} = Nothing
 declName BindingGroupDeclaration{} = Nothing
 declName DataBindingGroupDeclaration{} = Nothing
