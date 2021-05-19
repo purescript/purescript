@@ -34,9 +34,8 @@ desugarTypeClassInstanceNames (Module ss coms name decls exps) = do
     -> m Declaration
   desugarInstName = \case
     TypeInstanceDeclaration sa chainId idx (Left genText) deps className tys bd -> do
-      uniqueInt <- fresh
       -- truncate to 25 chars to reduce verbosity
       -- of name and still keep it readable
-      let finalName = Ident $ (take 25 genText) <> "$" <> (pack $ show uniqueInt)
+      finalName <- GenIdent (Just (take 25 genText)) <$> fresh
       pure $ TypeInstanceDeclaration sa chainId idx (Right finalName) deps className tys bd
     a -> pure a
