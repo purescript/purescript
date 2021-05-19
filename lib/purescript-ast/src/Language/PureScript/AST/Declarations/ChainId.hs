@@ -14,7 +14,5 @@ import Codec.Serialise (Serialise)
 newtype ChainId = ChainId (String, Pos.SourcePos)
   deriving (Eq, Ord, Show, NFData, Serialise)
 
--- instance Serialise ChainId
-
 mkChainId :: String -> Pos.SourcePos -> ChainId
 mkChainId fileName startingSourcePos = ChainId (fileName, startingSourcePos)
