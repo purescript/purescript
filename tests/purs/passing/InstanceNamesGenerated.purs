@@ -87,13 +87,6 @@ instance OverlappingStillCompiles x
 else instance OverlappingStillCompiles x
 
 
-data RowFoo :: Row Type -> Type
-data RowFoo row = RowFoo
-
-class TestRowApplications a
-instance TestRowApplications (RowFoo ())
-
-
 main = log "Done"
 
 data Either l r = Left l | Right r
