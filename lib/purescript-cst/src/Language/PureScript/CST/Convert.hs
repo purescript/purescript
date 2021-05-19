@@ -551,8 +551,6 @@ convertDeclaration fileName decl = case decl of
       typeArgs :: Text.Text
       typeArgs = Text.intercalate "$" $ fmap argName args
 
-      -- based on Parser.y's `typeAtom` expression
-      -- which is used in its `instHead` expression
       argName :: Type a -> Text.Text
       argName = \case
         -- These are only useful to disambiguate between overlapping instances
