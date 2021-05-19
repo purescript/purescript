@@ -67,6 +67,11 @@ instance MultipleKindParamsChain Constructor1
 else instance MultipleKindParamsChain Constructor2
 else instance MultipleKindParamsChain Constructor3
 
+data Arrow a b = Foo a b
+class ReservedWord a
+instance ReservedWord (Arrow a b)
+instance ReservedWord ((->) a b)
+
 main = log "Done"
 
 data Either l r = Left l | Right r
