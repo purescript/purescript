@@ -7,21 +7,27 @@ import           Control.Monad (when, unless)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Supply
 
+import qualified Data.Aeson as Json
 import qualified Data.Aeson.Internal as A
 import           Data.Aeson.Parser (eitherDecodeWith, json)
+import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as BSL
+import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Data.Either (rights)
 import qualified Data.Set as S
 import qualified Data.Map as M
 
 import qualified Options.Applicative as Opts
 
-import qualified Language.PureScript.Docs.Types as Docs
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CoreFn as CoreFn
 import qualified Language.PureScript.CoreFn.FromJSON as CoreFn
+import           Language.PureScript.Errors.JSON
+import qualified Language.PureScript.Docs.Types as Docs
 
-import           System.Exit (exitFailure, exitSuccess)
+import qualified System.Console.ANSI as ANSI
+import           System.Directory (getCurrentDirectory)
+import           System.Exit (exitFailure)
 import           System.FilePath.Glob (glob)
 import           System.IO (hPutStr, hPutStrLn, stderr)
 
@@ -45,12 +51,12 @@ codegen CodegenOptions{..} = do
       M.fromList $ map (\m -> (CoreFn.moduleName m, Right $ CoreFn.modulePath m)) $ map snd $ rights mods
 
   foreigns <- P.inferForeignModules filePathMap
-  _ <-
+  (makeResult, makeWarnings) <-
     liftIO
       $ P.runMake purescriptOptions
       $ runSupplyT 0
       $ traverse (runCodegen foreigns filePathMap) $ map snd $ rights mods
-  exitSuccess
+  printWarningsAndErrors codegenJSONErrors makeWarnings makeResult
   where
   parseCoreFn file = do
     contents <- BSL.readFile file
@@ -103,3 +109,25 @@ globWarningOnMisses warn = concatMapM globWithWarning
 
   concatMapM :: (a -> IO [b]) -> [a] -> IO [b]
   concatMapM f = fmap concat . mapM f
+
+-- | Arguments: use JSON, warnings, errors
+printWarningsAndErrors :: Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
+printWarningsAndErrors False warnings errors = do
+  pwd <- getCurrentDirectory
+  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stderr
+  let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = True, P.ppeRelativeDirectory = pwd }
+  when (P.nonEmpty warnings) $
+    hPutStrLn stderr (P.prettyPrintMultipleWarnings ppeOpts warnings)
+  case errors of
+    Left errs -> do
+      hPutStrLn stderr (P.prettyPrintMultipleErrors ppeOpts errs)
+      exitFailure
+    Right _ -> pure ()
+printWarningsAndErrors True warnings errors = do
+  let verbose = True
+  hPutStrLn stderr . LBU8.toString . Json.encode $
+    JSONResult (toJSONErrors verbose P.Warning warnings)
+               (either (toJSONErrors verbose P.Error) (const []) errors)
+  case errors of
+    Left _errs -> exitFailure
+    Right _ -> pure ()
