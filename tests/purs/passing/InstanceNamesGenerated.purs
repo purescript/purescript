@@ -1,6 +1,7 @@
 module Main where
 
 import Effect.Console (log)
+import Data.Generic.Rep (class Generic)
 
 class NoTypeParams
 instance NoTypeParams
@@ -71,6 +72,9 @@ data Arrow a b = Foo a b
 class ReservedWord a
 instance ReservedWord (Arrow a b)
 instance ReservedWord ((->) a b)
+
+data GenericFoo = GenericFoo
+derive instance Generic GenericFoo _
 
 main = log "Done"
 
