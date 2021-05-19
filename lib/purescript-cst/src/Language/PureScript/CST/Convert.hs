@@ -559,7 +559,9 @@ convertDeclaration fileName decl = case decl of
         TypeConstructor _ qn -> N.runProperName $ qualName qn
         TypeOpName _ qn -> N.runOpName $ qualName qn
         TypeString _ _ ps -> prettyPrintStringJS ps
-        TypeHole _ n -> N.runIdent $ ident $ nameValue n
+
+        -- Typed holes are disallowed in instance heads
+        TypeHole{} -> ""
         TypeParens _ t -> argName $ wrpValue t
         TypeKinded _ t1 _ t2 -> argName t1 <> "$" <> argName t2
         TypeRecord _ _ -> "Record"
