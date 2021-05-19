@@ -541,7 +541,7 @@ convertDeclaration fileName decl = case decl of
       -- instance name truncation will occur in desugaring process
       -- when the final instance name is determined
       genName :: Text.Text
-      genName = "$$" <> className <> "$" <> typeArgs
+      genName = "$" <> className <> "$$" <> typeArgs
 
       className :: Text.Text
       className = do
