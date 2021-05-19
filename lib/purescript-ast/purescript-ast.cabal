@@ -78,6 +78,7 @@ library
     Language.PureScript.AST
     Language.PureScript.AST.Binders
     Language.PureScript.AST.Declarations
+    Language.PureScript.AST.Declarations.ChainId
     Language.PureScript.AST.Exported
     Language.PureScript.AST.Literals
     Language.PureScript.AST.Operators

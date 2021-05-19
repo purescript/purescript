@@ -23,6 +23,7 @@ import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Operators
 import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Types
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Label (Label)
@@ -430,7 +431,7 @@ data Declaration
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
   --
-  | TypeInstanceDeclaration SourceAnn [Either Text Ident] Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
+  | TypeInstanceDeclaration SourceAnn [ChainId] Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
   deriving (Show)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)

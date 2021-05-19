@@ -76,6 +76,10 @@ instance ReservedWord ((->) a b)
 data GenericFoo = GenericFoo
 derive instance Generic GenericFoo _
 
+class OverlappingStillCompiles a
+instance OverlappingStillCompiles x
+else instance OverlappingStillCompiles x
+
 main = log "Done"
 
 data Either l r = Left l | Right r

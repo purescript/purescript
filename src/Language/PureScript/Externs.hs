@@ -30,6 +30,7 @@ import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
+import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Names
@@ -150,7 +151,7 @@ data ExternsDeclaration =
       , edInstanceKinds           :: [SourceType]
       , edInstanceTypes           :: [SourceType]
       , edInstanceConstraints     :: Maybe [SourceConstraint]
-      , edInstanceChain           :: [Qualified Ident]
+      , edInstanceChain           :: [ChainId]
       , edInstanceChainIndex      :: Integer
       }
   deriving (Show, Generic)
@@ -247,7 +248,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef _ ident)
-    = [ EDInstance tcdClassName ident tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex
+    = [ EDInstance tcdClassName ident tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies f tcdIndex
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)

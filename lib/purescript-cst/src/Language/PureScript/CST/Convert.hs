@@ -24,6 +24,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Maybe (isJust, fromJust, mapMaybe)
 import qualified Data.Text as Text
 import qualified Language.PureScript.AST as AST
+import Language.PureScript.AST.Declarations.ChainId (mkChainId)
 import qualified Language.PureScript.AST.SourcePos as Pos
 import qualified Language.PureScript.Comments as C
 import Language.PureScript.Crash (internalError)
@@ -468,7 +469,7 @@ convertDeclaration fileName decl = case decl of
       (goSig <$> maybe [] (NE.toList . snd) bd)
   DeclInstanceChain _ insts -> do
     let
-      chainId = (\(Instance (InstanceHead _ nameSep _ cls args) _) -> mkPartialInstanceName nameSep cls args) <$> toList insts
+      chainId = (mkChainId fileName . startSourcePos . instKeyword . instHead) <$> toList insts
       goInst ix inst@(Instance (InstanceHead _ nameSep ctrs cls args) bd) = do
         let ann' = uncurry (sourceAnnCommented fileName) $ instanceRange inst
         AST.TypeInstanceDeclaration ann' chainId ix
@@ -478,13 +479,14 @@ convertDeclaration fileName decl = case decl of
           (convertType fileName <$> args)
           (AST.ExplicitInstance $ goInstanceBinding <$> maybe [] (NE.toList . snd) bd)
     uncurry goInst <$> zip [0..] (toList insts)
-  DeclDerive _ _ new (InstanceHead _ nameSep ctrs cls args) -> do
+  DeclDerive _ _ new (InstanceHead kw nameSep ctrs cls args) -> do
     let
+      chainId = mkChainId fileName $ startSourcePos kw
       name' = mkPartialInstanceName nameSep cls args
       instTy
         | isJust new = AST.NewtypeInstance
         | otherwise = AST.DerivedInstance
-    pure $ AST.TypeInstanceDeclaration ann [name'] 0 name'
+    pure $ AST.TypeInstanceDeclaration ann [chainId] 0 name'
       (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
       (qualified cls)
       (convertType fileName <$> args)
@@ -528,6 +530,9 @@ convertDeclaration fileName decl = case decl of
   where
   ann =
     uncurry (sourceAnnCommented fileName) $ declRange decl
+
+  startSourcePos :: SourceToken -> Pos.SourcePos
+  startSourcePos = sourcePos . srcStart . tokRange . tokAnn
 
   mkPartialInstanceName :: Maybe (Name Ident, SourceToken) -> QualifiedName (N.ProperName 'N.ClassName) -> [Type a] -> Either Text.Text N.Ident
   mkPartialInstanceName nameSep cls args =

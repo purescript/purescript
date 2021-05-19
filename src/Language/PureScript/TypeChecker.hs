@@ -29,6 +29,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Language.PureScript.AST
+import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import qualified Language.PureScript.Constants.Data.Generic.Rep as DataGenericRep
 import qualified Language.PureScript.Constants.Data.Newtype as DataNewtype
 import Language.PureScript.Crash
@@ -417,17 +418,12 @@ typeCheckAll moduleName _ = traverse go
           sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys'')
           let nonOrphanModules = findNonOrphanModules className typeClass tys''
           checkOrphanInstance dictName className tys'' nonOrphanModules
-          let qualifiedChain = (Qualified (Just moduleName) . extractInstanceChainIdents) <$> ch
-          checkOverlappingInstance qualifiedChain dictName className typeClass tys'' nonOrphanModules
+          checkOverlappingInstance ch dictName className typeClass tys'' nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
-          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className vars kinds' tys'' (Just deps'')
+          let dict = TypeClassDictionaryInScope ch idx qualifiedDictName [] className vars kinds' tys'' (Just deps'')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
-
-  extractInstanceChainIdents :: Either Text Ident -> Ident
-  extractInstanceChainIdents (Right i) = i
-  extractInstanceChainIdents _ = internalError "extractInstanceChainIdents: partialy generated names should have been fully generated"
 
   checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [SourceType] -> m ()
   checkInstanceArity dictName className typeClass tys = do
@@ -496,7 +492,7 @@ typeCheckAll moduleName _ = traverse go
   -- flexible instances: the instances `Cls X y` and `Cls x Y` overlap and
   -- could live in different modules but won't be caught here.
   checkOverlappingInstance
-    :: [Qualified Ident]
+    :: [ChainId]
     -> Ident
     -> Qualified (ProperName 'ClassName)
     -> TypeClassData
