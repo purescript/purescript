@@ -567,12 +567,12 @@ convertDeclaration fileName decl = case decl of
         TypeArrName _ _ -> "_Arrow"
         --
         TypeWildcard{} -> "_"
-        TypeForall{} -> ""
+        TypeForall _ _ _ _ t -> argName t
         TypeApp _ t1 t2 -> argName t1 <> "$" <> argName t2
         TypeOp _ t1 _ t2 -> argName t1 <> "___" <> argName t2
         TypeArr _ t1 _ t2 -> argName t1 <> "_Arrow_" <> argName t2
         TypeConstrained{} -> ""
-        TypeUnaryRow{} -> ""
+        TypeUnaryRow{} -> "EmptyRow"
 
   goTypeVar = \case
     TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
