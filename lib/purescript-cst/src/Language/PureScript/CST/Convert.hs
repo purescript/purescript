@@ -536,10 +536,12 @@ convertDeclaration fileName decl = case decl of
       -- instance name truncation will occur in desugaring process
       -- when the final instance name is determined
       genName :: Text.Text
-      genName = "$$" <> unqualifiedClassName <> "$" <> typeArgs
+      genName = "$$" <> className <> "$" <> typeArgs
 
-      unqualifiedClassName :: Text.Text
-      unqualifiedClassName = N.runProperName $ qualName cls
+      className :: Text.Text
+      className =
+        (maybe "" ((<> "_") . N.runModuleName) (qualModule cls)) <>
+          (N.runProperName $ qualName cls)
 
       typeArgs :: Text.Text
       typeArgs = Text.intercalate "$" $ fmap argName args
