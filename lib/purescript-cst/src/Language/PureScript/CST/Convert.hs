@@ -564,8 +564,7 @@ convertDeclaration fileName decl = case decl of
         TypeKinded _ t1 _ t2 -> argName t1 <> "$" <> argName t2
         TypeRecord _ _ -> "Record"
         TypeRow _ _ -> "Row"
-        TypeArrName _ _ -> "Arrow"
-        --
+        TypeArrName _ _ -> "Function"
         TypeWildcard{} -> "_"
 
         -- Polytypes are disallowed in instance heads
