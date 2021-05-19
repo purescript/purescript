@@ -50,7 +50,7 @@ codegen CodegenOptions{..} = do
 
   let
     filePathMap =
-      M.fromList $ map (\m -> (CoreFn.moduleName m, Right $ CoreFn.modulePath m)) $ map snd $ rights mods
+      M.fromList $ map ((\m -> (CoreFn.moduleName m, Right $ CoreFn.modulePath m)) . snd) $ rights mods
 
   unless (null (lefts mods)) $ do
     _ <- traverse (hPutStr stderr . formatParseError) $ lefts mods
@@ -61,7 +61,7 @@ codegen CodegenOptions{..} = do
     liftIO
       $ P.runMake purescriptOptions
       $ runSupplyT 0
-      $ traverse (runCodegen foreigns filePathMap) $ map snd $ rights mods
+      $ traverse (runCodegen foreigns filePathMap . snd) $ rights mods
   printWarningsAndErrors codegenJSONErrors makeWarnings makeResult
   where
   formatParseError (file, _, e) =
