@@ -10,7 +10,7 @@ import Prelude.Compat hiding (take)
 
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Supply.Class
-import           Data.Text (take)
+import           Data.Text (pack)
 import           Language.PureScript.Errors
 import           Language.PureScript.Names
 
@@ -34,8 +34,7 @@ desugarTypeClassInstanceNames (Module ss coms name decls exps) = do
     -> m Declaration
   desugarInstName = \case
     TypeInstanceDeclaration sa chainId idx (Left genText) deps className tys bd -> do
-      -- truncate to 25 chars to reduce verbosity
-      -- of name and still keep it readable
-      finalName <- GenIdent (Just (take 25 genText)) <$> fresh
+      uniqueIdent <- fresh
+      let finalName = Ident $ genText <> (pack $ show uniqueIdent)
       pure $ TypeInstanceDeclaration sa chainId idx (Right finalName) deps className tys bd
     a -> pure a

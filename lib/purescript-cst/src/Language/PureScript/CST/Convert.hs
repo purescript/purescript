@@ -538,10 +538,12 @@ convertDeclaration fileName decl = case decl of
   mkPartialInstanceName nameSep cls args =
     maybe (Left genName) (Right . ident . nameValue . fst) nameSep
     where
-      -- instance name truncation will occur in desugaring process
-      -- when the final instance name is determined
+      -- truncate to 25 chars to reduce verbosity
+      -- of name and still keep it readable
+      -- unique identifier will be appended to this name
+      -- in desugaring proces
       genName :: Text.Text
-      genName = className <> "$$" <> typeArgs <> "$"
+      genName = Text.take 25 ("$" <> className <> "$$" <> typeArgs) <> "$"
 
       className :: Text.Text
       className = do
