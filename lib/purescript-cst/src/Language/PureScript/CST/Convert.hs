@@ -580,7 +580,7 @@ convertDeclaration fileName decl = case decl of
           argName t1 <> "_" <> (N.runOpName $ qualName op) <> "_" <> argName t2
         TypeArr _ t1 _ t2 -> argName t1 <> "_Arrow_" <> argName t2
         TypeConstrained{} -> ""
-        TypeUnaryRow{} -> "EmptyRow"
+        TypeUnaryRow{} -> "Row"
 
   goTypeVar = \case
     TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
