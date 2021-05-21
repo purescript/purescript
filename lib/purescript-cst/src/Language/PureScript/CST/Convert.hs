@@ -546,9 +546,7 @@ convertDeclaration fileName decl = case decl of
       genName = Text.take 25 ("$" <> className <> "_" <> typeArgs) <> "$"
 
       className :: Text.Text
-      className = do
-        let modName = (<> "_") . Text.replace "." "_" . N.runModuleName
-        (maybe "" modName (qualModule cls)) <> (N.runProperName $ qualName cls)
+      className = N.runProperName $ qualName cls
 
       typeArgs :: Text.Text
       typeArgs = Text.intercalate "_" $ fmap argName args
