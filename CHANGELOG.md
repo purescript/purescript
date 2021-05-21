@@ -27,7 +27,7 @@ New features:
   ```
 
   and the compiler will generate a unique name for the instance
-  (e.g. `$Foo$$Int$String$4` where `4` is a randomly-generated number
+  (e.g. `$dollar_FooIntString$dollar4` where `4` is a randomly-generated number
   that can change across compiler runs). This version of the instance name
   is not intended for use in FFI.
 
