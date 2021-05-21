@@ -18,7 +18,7 @@ module Language.PureScript.CST.Convert
 import Prelude hiding (take)
 
 import Data.Bifunctor (bimap, first)
-import Data.Foldable (foldl', toList)
+import Data.Foldable (foldl', foldMap, toList)
 import Data.Functor (($>))
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (isJust, fromJust, mapMaybe)
@@ -543,13 +543,13 @@ convertDeclaration fileName decl = case decl of
       -- unique identifier will be appended to this name
       -- in desugaring proces
       genName :: Text.Text
-      genName = Text.take 25 ("$" <> className <> "_" <> typeArgs) <> "$"
+      genName = "$_" <> Text.take 25 (className <> typeArgs) <> "$"
 
       className :: Text.Text
       className = N.runProperName $ qualName cls
 
       typeArgs :: Text.Text
-      typeArgs = Text.intercalate "_" $ fmap argName args
+      typeArgs = foldMap argName args
 
       argName :: Type a -> Text.Text
       argName = \case
@@ -565,7 +565,7 @@ convertDeclaration fileName decl = case decl of
         -- Typed holes are disallowed in instance heads
         TypeHole{} -> ""
         TypeParens _ t -> argName $ wrpValue t
-        TypeKinded _ t1 _ t2 -> argName t1 <> "_" <> argName t2
+        TypeKinded _ t1 _ t2 -> argName t1 <> argName t2
         TypeRecord _ _ -> "Record"
         TypeRow _ _ -> "Row"
         TypeArrName _ _ -> "Function"
@@ -573,10 +573,10 @@ convertDeclaration fileName decl = case decl of
 
         -- Polytypes are disallowed in instance heads
         TypeForall{} -> ""
-        TypeApp _ t1 t2 -> argName t1 <> "_" <> argName t2
+        TypeApp _ t1 t2 -> argName t1 <> argName t2
         TypeOp _ t1 op t2 ->
-          argName t1 <> "_" <> (N.runOpName $ qualName op) <> "_" <> argName t2
-        TypeArr _ t1 _ t2 -> argName t1 <> "_Arrow_" <> argName t2
+          argName t1 <> (N.runOpName $ qualName op) <> argName t2
+        TypeArr _ t1 _ t2 -> argName t1 <> "Function" <> argName t2
         TypeConstrained{} -> ""
         TypeUnaryRow{} -> "Row"
 
