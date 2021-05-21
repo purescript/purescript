@@ -18,7 +18,7 @@ module Language.PureScript.CST.Convert
 import Prelude hiding (take)
 
 import Data.Bifunctor (bimap, first)
-import Data.Foldable (foldl', foldMap, toList)
+import Data.Foldable (foldl', toList)
 import Data.Functor (($>))
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (isJust, fromJust, mapMaybe)
