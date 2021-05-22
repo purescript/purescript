@@ -543,7 +543,7 @@ convertDeclaration fileName decl = case decl of
       -- unique identifier will be appended to this name
       -- in desugaring proces
       genName :: Text.Text
-      genName = "$_" <> Text.take 25 (className <> typeArgs) <> "$"
+      genName = "$_" <> Text.take 25 (className <> typeArgs) <> "_"
 
       className :: Text.Text
       className = N.runProperName $ qualName cls
