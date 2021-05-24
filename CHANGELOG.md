@@ -14,7 +14,8 @@ New features:
   instance. For example
 
   ```purescript
-  -- convention: classNameType1Type2Type3
+  -- instance naming convention:
+  -- classNameType1Type2Type3
   instance fooIntString :: Foo Int String
   ```
 
