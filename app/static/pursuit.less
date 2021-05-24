@@ -49,18 +49,55 @@
 /* Section: Variables
  * ========================================================================== */
 @background: rgb(255, 255, 255);
+@foreground: rgb(0, 0, 0);
+@separator: rgb(204, 204, 204);
 @banner_background: rgb(29, 34, 45);
-@package_banner_background: lighten(@banner_background, 30%);
+@package_banner_background: rgb(59, 63, 76);
 @dark_foreground: rgb(240, 240, 240);
 @link: rgb(196, 149, 58);
 @link_active: rgb(123, 89, 4);
 @error_background: rgb(255, 240, 240);
 @error_border: rgb(200, 80, 80);
 @not_available_background: rgb(240, 240, 150);
+@not_available_border: darken(@not_available_background, 20%);
 @code_foreground: rgb(25, 74, 91);
 @code_background: rgb(241, 245, 249);
+@code_background_targeted: rgb(234, 238, 242);
 @light_glyph: rgb(160, 160, 160);
 @light_type: rgb(102, 102, 102);
+
+:root {
+  --background: @background;
+  --foreground: @foreground;
+  --separator: @separator;
+  --banner_background: @banner_background;
+  --package_banner_background: @package_banner_background;
+  --dark_foreground: @dark_foreground;
+  --link: @link;
+  --link_active: @link_active;
+  --error_background: @error_background;
+  --error_border: @error_border;
+  --not_available_background: @not_available_background;
+  --not_available_border: @not_available_border;
+  --code_foreground: @code_foreground;
+  --code_background: @code_background;
+  --light_glyph: @light_glyph;
+  --light_type: @light_type;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: rgb(0, 0, 0);
+    --foreground: rgb(255, 255, 255);
+    --separator: rgb(60, 60, 60);
+    --link: rgb(222, 170, 69);
+    --link_active: rgb(152, 100, 22);
+    --code_background: rgb(18, 18, 18);
+    --code_foreground: rgb(252, 252, 252);
+    --light_type: rgb(170, 170, 170);
+  }
+}
+
 
 /* Section: Document Styles
  * ========================================================================== */
@@ -80,7 +117,9 @@ html {
 
 body {
   background-color: @background;
-  color: #000;
+  background-color: var(--background, ~"@{background}");
+  color: @foreground;
+  color: var(--foreground, ~"@{foreground}");
   font-family: "Roboto", sans-serif;
   font-size: 87.5%;
   line-height: 1.563;
@@ -89,6 +128,22 @@ body {
 @media (min-width: 38em) {
   body {
     font-size: 100%;
+  }
+}
+
+@media (prefer-color-scheme: dark) {
+  body {
+    font-weight: 350;
+  }
+  b,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  strong {
+    font-weight: 650;
   }
 }
 
@@ -177,7 +232,8 @@ body {
  * Except we don't support IE6
  * -------------------------------------------------------------------------- */
 
-html, body {
+html,
+body {
   height: 100%;
 }
 
@@ -193,7 +249,9 @@ html, body {
   width: 100%;
   text-align: center;
   background-color: @banner_background;
+  background-color: var(--banner_background, ~"@{banner_background}");
   color: @dark_foreground;
+  color: var(--dark_foreground, ~"@{dark_foreground}");
 }
 
 .footer * {
@@ -209,30 +267,36 @@ html, body {
 
 :target {
   background-color: @code_background;
+  background-color: var(--code_background, ~"@{code_background}");
 }
 
 a, a:visited {
   color: @link;
+  color: var(--link, ~"@{link}");
   text-decoration: none;
   font-weight: bold;
 }
 
 a:hover {
   color: @link_active;
+  color: var(--link_active, ~"@{link_active}");
   text-decoration: none;
 }
 
-code, pre {
+code, kbd, pre, samp {
   background-color: @code_background;
+  background-color: var(--code_background, ~"@{code_background}");
   border-radius: 3px;
   color: @code_foreground;
+  color: var(--code_foreground, ~"@{code_foreground}");
   font-family: "Roboto Mono", monospace;
   font-size: 87.5%;
 }
 
 :target code,
 :target pre {
-  background-color: darken(@code_background, 5%);
+  background-color: @code_background_targeted;
+  background-color: var(--code_background_targeted, ~"@{code_background_targeted}");
 }
 
 code {
@@ -308,7 +372,7 @@ h1 {
 h2 {
   font-size: 1.953em;
   font-weight: normal;
-  line-height: 1.250;
+  line-height: 1.25;
   margin-top: 3.052rem;
   margin-bottom: 1rem;
 }
@@ -316,7 +380,7 @@ h2 {
 h3 {
   font-size: 1.563em;
   font-weight: normal;
-  line-height: 1.250;
+  line-height: 1.25;
   margin-top: 2.441rem;
   margin-bottom: 1rem;
 }
@@ -340,7 +404,8 @@ h3 + h4 {
 hr {
   border: none;
   height: 1px;
-  background-color: darken(@background, 20%);
+  background-color: @separator;
+  background-color: var(--separator, ~"@{separator}");
 }
 
 img {
@@ -355,7 +420,8 @@ p {
 }
 
 table {
-  border-bottom: 1px solid darken(@background, 20%);
+  border-bottom: 1px solid @separator;
+  border-color: var(--separator, ~"@{separator}");
   border-collapse: collapse;
   border-spacing: 0;
   margin-top: 1rem;
@@ -369,7 +435,8 @@ td, th {
 }
 
 td {
-  border-top: 1px solid darken(@background, 20%);
+  border-top: 1px solid @separator;
+  border-color: var(--separator, ~"@{separator}");
 }
 
 td:first-child, th:first-child {
@@ -389,16 +456,17 @@ ul {
 
 ul li {
   position: relative;
-  padding-left: 1.250em;
+  padding-left: 1.25em;
 }
 
 ul li::before {
   position: absolute;
   color: @light_glyph;
+  color: var(--light_glyph, ~"@{light_glyph}");
   content: "–";
   display: inline-block;
-  margin-left: -1.250em;
-  width: 1.250em;
+  margin-left: -1.25em;
+  width: 1.25em;
 }
 
 /* Tying this tightly to ul at the moment because it's a slight variation thereof */
@@ -411,12 +479,21 @@ ul.ul--search li::before {
 ol {
   margin-top: 1rem;
   margin-bottom: 1rem;
-  padding-left: 1.250em;
+  padding-left: 1.25em;
 }
 
 ol li {
   position: relative;
   padding-left: 0;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]),
+select,
+textarea {
+  background: @background;
+  background: var(--background, ~"@{background}");
+  color: @foreground;
+  color: var(--foreground, ~"@{foreground}");
 }
 
 
@@ -443,11 +520,12 @@ ol li {
 
 .badge.badge--package {
   background-color: @link;
+  background-color: var(--link, ~"@{link}");
   letter-spacing: -0.1em;
 }
 
 .badge.badge--module {
-  background-color: #75B134;
+  background-color: #75b134;
 }
 
 
@@ -483,9 +561,11 @@ ol li {
 .decl__signature {
   background-color: transparent;
   border-radius: 0;
-  border-top: 1px solid darken(@background, 20%);
-  border-bottom: 1px solid darken(@background, 20%);
-  padding: 0;
+  border-width: 1px 0 1px 0;
+  border-style: solid;
+  border-color: @separator;
+  border-color: var(--separator, ~"@{separator}");
+  padding: 0.328em 0;
 }
 
 .decl__signature code {
@@ -508,7 +588,7 @@ ol li {
 
 .decl__body .keyword,
 .decl__body .syntax {
-  color: #0B71B4;
+  color: #0b71b4;
 }
 
 .decl__child_comments {
@@ -516,10 +596,13 @@ ol li {
   margin-bottom: 1rem;
 }
 
+
 /* Component: Dependency Link
  * -------------------------------------------------------------------------- */
 
-.deplink { /* Currently no root styles, but keep the class as a namespace */ }
+.deplink {
+  /* Currently no root styles, but keep the class as a namespace */
+}
 
 .deplink__link {
   display: inline-block;
@@ -528,6 +611,7 @@ ol li {
 
 .deplink__version {
   color: @light_type;
+  color: var(--light_type, ~"@{light_type}");
   display: inline-block;
   font-size: 0.8em;
   line-height: 1;
@@ -538,12 +622,14 @@ ol li {
  * -------------------------------------------------------------------------- */
 
 .grouped-list {
-  border-top: 1px solid darken(@background, 20%);
+  border-top: 1px solid @separator;
+  border-color: var(--separator, ~"@{separator}");
   margin: 0 0 2.44em 0;
 }
 
 .grouped-list__title {
   color: @light_type;
+  color: var(--light_type, ~"@{light_type}");
   font-size: 0.8em;
   font-weight: 300;
   letter-spacing: 1px;
@@ -567,12 +653,15 @@ ol li {
 
 .message.message--error {
   background-color: @error_background;
+  background-color: var(--error_background, ~"@{error_background}");
   border-color: @error_border;
+  border-color: var(--error_border, ~"@{error_border}");
 }
 
 .message.message--not-available {
   background-color: @not_available_background;
-  border-color: darken(@not_available_background, 20%);
+  border-color: @not_available_border;
+  border-color: var(--not_available_border, ~"@{not_available_border}");
 }
 
 
@@ -597,7 +686,7 @@ ol li {
     width: 50%;
   }
 
-  .multi-col__col:nth-child(2n+3) {
+  .multi-col__col:nth-child(2n + 3) {
     clear: both;
   }
 }
@@ -608,7 +697,7 @@ ol li {
     width: 33.333333%;
   }
 
-  .multi-col__col:nth-child(3n+4) {
+  .multi-col__col:nth-child(3n + 4) {
     clear: both;
   }
 }
@@ -630,6 +719,7 @@ ol li {
 .page-title__label {
   position: relative;
   color: @light_type;
+  color: var(--light_type, ~"@{light_type}");
   font-size: 0.8rem;
   font-weight: 300;
   letter-spacing: 1px;
@@ -644,7 +734,9 @@ ol li {
 
 .top-banner {
   background-color: @banner_background;
+  background-color: var(--banner_background, ~"@{banner_background}");
   color: @dark_foreground;
+  color: var(--dark_foreground, ~"@{dark_foreground}");
   font-weight: normal;
 }
 
@@ -652,6 +744,7 @@ ol li {
 .top-banner__logo:visited {
   float: left;
   color: @dark_foreground;
+  color: var(--dark_foreground, ~"@{dark_foreground}");
   font-size: 2.44em;
   font-weight: 300;
   line-height: 90px;
@@ -660,6 +753,7 @@ ol li {
 
 .top-banner__logo:hover {
   color: @link;
+  color: var(--link, ~"@{link}");
   text-decoration: none;
 }
 
@@ -668,9 +762,10 @@ ol li {
 }
 
 .top-banner__form input {
-  border: 1px solid @banner_background;
+  border: 1px solid currentColor;
   border-radius: 3px;
   color: @banner_background;
+  color: var(--banner_background, ~"@{banner_background}");
   font-weight: 300;
   line-height: 2;
   padding: 0.21em 0.512em;
@@ -696,10 +791,12 @@ ol li {
 .top-banner__actions__item a,
 .top-banner__actions__item a:visited {
   color: @dark_foreground;
+  color: var(--dark_foreground, ~"@{dark_foreground}");
 }
 
 .top-banner__actions__item a:hover {
   color: @link;
+  color: var(--link, ~"@{link}");
 }
 
 @media (min-width: 38em) {
@@ -741,18 +838,20 @@ ol li {
 }
 
 .result__body > *:first-child {
-  margin-top: 0!important;
+  margin-top: 0 !important;
 }
 
 .result__body > *:last-child {
-  margin-bottom: 0!important;
+  margin-bottom: 0 !important;
 }
 
 .result__signature {
   background-color: transparent;
   border-radius: 0;
-  border-top: 1px solid darken(@background, 20%);
-  border-bottom: 1px solid darken(@background, 20%);
+  border-width: 1px 0 1px 0;
+  border-style: solid;
+  border-color: @separator;
+  border-color: var(--separator, ~"@{separator}");
   padding: 0.328em 0;
 }
 
@@ -802,7 +901,8 @@ ol li {
   padding: 5px 0;
 }
 
-.help h3 { /* FIXME: target with class */
+.help h3 {
+  /* FIXME: target with class */
   margin-top: 16px;
 }
 
@@ -820,11 +920,11 @@ ol li {
   word-wrap: break-word;
 }
 
-.markdown-body>*:first-child {
+.markdown-body > *:first-child {
   margin-top: 0 !important;
 }
 
-.markdown-body>*:last-child {
+.markdown-body > *:last-child {
   margin-bottom: 0 !important;
 }
 
@@ -840,11 +940,11 @@ ol li {
   border-left: 0.25em solid #ddd;
 }
 
-.markdown-body blockquote>:first-child {
+.markdown-body blockquote > :first-child {
   margin-top: 0;
 }
 
-.markdown-body blockquote>:last-child {
+.markdown-body blockquote > :last-child {
   margin-bottom: 0;
 }
 
