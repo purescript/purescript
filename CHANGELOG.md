@@ -22,7 +22,6 @@ New features:
   could be rewritten like so:
 
   ```purescript
-  -- convention: classNameType1Type2Type3
   instance Foo Int String
   ```
 
