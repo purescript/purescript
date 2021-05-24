@@ -30,6 +30,7 @@ import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
+import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Names
@@ -150,7 +151,7 @@ data ExternsDeclaration =
       , edInstanceKinds           :: [SourceType]
       , edInstanceTypes           :: [SourceType]
       , edInstanceConstraints     :: Maybe [SourceConstraint]
-      , edInstanceChain           :: [Qualified Ident]
+      , edInstanceChain           :: Maybe ChainId
       , edInstanceChainIndex      :: Integer
       }
   deriving (Show, Generic)
