@@ -31,6 +31,18 @@ New features:
   that can change across compiler runs). This version of the instance name
   is not intended for use in FFI.
 
+  Note: if one wrote
+
+  ```purescript
+  instance ReallyLongClassName Int String
+  ```
+
+  the generated name would be something like
+  `$dollar_ReallyLongClassNameIntStr_87` rather than
+  `$dollar_ReallyLongClassNameIntString_87` as the generated part
+  of the name will be truncated to 25 characters (long enough to be readable
+  without being too verbose).
+
 Bugfixes:
 
 Internal:
