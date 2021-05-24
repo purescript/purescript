@@ -7,6 +7,7 @@
 module Language.PureScript.AST.Declarations where
 
 import Prelude.Compat
+import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
@@ -22,6 +23,7 @@ import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Operators
 import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Types
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Label (Label)
@@ -429,7 +431,7 @@ data Declaration
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
   --
-  | TypeInstanceDeclaration SourceAnn [Ident] Integer Ident [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
+  | TypeInstanceDeclaration SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
   deriving (Show)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -502,7 +504,7 @@ declName (ExternDataDeclaration _ n _) = Just (TyName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
-declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = Just (IdentName n)
+declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = IdentName <$> hush n
 declName ImportDeclaration{} = Nothing
 declName BindingGroupDeclaration{} = Nothing
 declName DataBindingGroupDeclaration{} = Nothing

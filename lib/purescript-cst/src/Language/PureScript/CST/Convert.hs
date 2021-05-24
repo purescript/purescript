@@ -15,7 +15,7 @@ module Language.PureScript.CST.Convert
   , comments
   ) where
 
-import Prelude
+import Prelude hiding (take)
 
 import Data.Bifunctor (bimap, first)
 import Data.Foldable (foldl', toList)
@@ -24,13 +24,14 @@ import qualified Data.List.NonEmpty as NE
 import Data.Maybe (isJust, fromJust, mapMaybe)
 import qualified Data.Text as Text
 import qualified Language.PureScript.AST as AST
+import Language.PureScript.AST.Declarations.ChainId (mkChainId)
 import qualified Language.PureScript.AST.SourcePos as Pos
 import qualified Language.PureScript.Comments as C
 import Language.PureScript.Crash (internalError)
 import qualified Language.PureScript.Environment as Env
 import qualified Language.PureScript.Label as L
 import qualified Language.PureScript.Names as N
-import Language.PureScript.PSString (mkString)
+import Language.PureScript.PSString (mkString, prettyPrintStringJS)
 import qualified Language.PureScript.Types as T
 import Language.PureScript.CST.Positions
 import Language.PureScript.CST.Print (printToken)
@@ -468,24 +469,24 @@ convertDeclaration fileName decl = case decl of
       (goSig <$> maybe [] (NE.toList . snd) bd)
   DeclInstanceChain _ insts -> do
     let
-      instName (Instance (InstanceHead _ a _ _ _ _) _) = ident $ nameValue a
-      chainId = instName <$> toList insts
-      goInst ix inst@(Instance (InstanceHead _ name _ ctrs cls args) bd) = do
+      chainId = mkChainId fileName $ startSourcePos $ instKeyword $ instHead $ sepHead insts
+      goInst ix inst@(Instance (InstanceHead _ nameSep ctrs cls args) bd) = do
         let ann' = uncurry (sourceAnnCommented fileName) $ instanceRange inst
         AST.TypeInstanceDeclaration ann' chainId ix
-          (ident $ nameValue name)
+          (mkPartialInstanceName nameSep cls args)
           (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
           (qualified cls)
           (convertType fileName <$> args)
           (AST.ExplicitInstance $ goInstanceBinding <$> maybe [] (NE.toList . snd) bd)
     uncurry goInst <$> zip [0..] (toList insts)
-  DeclDerive _ _ new (InstanceHead _ name _ ctrs cls args) -> do
+  DeclDerive _ _ new (InstanceHead kw nameSep ctrs cls args) -> do
     let
-      name' = ident $ nameValue name
+      chainId = mkChainId fileName $ startSourcePos kw
+      name' = mkPartialInstanceName nameSep cls args
       instTy
         | isJust new = AST.NewtypeInstance
         | otherwise = AST.DerivedInstance
-    pure $ AST.TypeInstanceDeclaration ann [name'] 0 name'
+    pure $ AST.TypeInstanceDeclaration ann chainId 0 name'
       (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
       (qualified cls)
       (convertType fileName <$> args)
@@ -529,6 +530,55 @@ convertDeclaration fileName decl = case decl of
   where
   ann =
     uncurry (sourceAnnCommented fileName) $ declRange decl
+
+  startSourcePos :: SourceToken -> Pos.SourcePos
+  startSourcePos = sourcePos . srcStart . tokRange . tokAnn
+
+  mkPartialInstanceName :: Maybe (Name Ident, SourceToken) -> QualifiedName (N.ProperName 'N.ClassName) -> [Type a] -> Either Text.Text N.Ident
+  mkPartialInstanceName nameSep cls args =
+    maybe (Left genName) (Right . ident . nameValue . fst) nameSep
+    where
+      -- truncate to 25 chars to reduce verbosity
+      -- of name and still keep it readable
+      -- unique identifier will be appended to this name
+      -- in desugaring proces
+      genName :: Text.Text
+      genName = "$_" <> Text.take 25 (className <> typeArgs) <> "_"
+
+      className :: Text.Text
+      className = N.runProperName $ qualName cls
+
+      typeArgs :: Text.Text
+      typeArgs = foldMap argName args
+
+      argName :: Type a -> Text.Text
+      argName = \case
+        -- These are only useful to disambiguate between overlapping instances
+        -- but they’re disallowed outside of instance chains. Since we’re
+        -- avoiding name collisions with unique identifiers anyway,
+        -- we don't need to render this constructor.
+        TypeVar{} -> ""
+        TypeConstructor _ qn -> N.runProperName $ qualName qn
+        TypeOpName _ qn -> N.runOpName $ qualName qn
+        TypeString _ _ ps -> prettyPrintStringJS ps
+
+        -- Typed holes are disallowed in instance heads
+        TypeHole{} -> ""
+        TypeParens _ t -> argName $ wrpValue t
+        TypeKinded _ t1 _ t2 -> argName t1 <> argName t2
+        TypeRecord _ _ -> "Record"
+        TypeRow _ _ -> "Row"
+        TypeArrName _ _ -> "Function"
+        TypeWildcard{} -> "_"
+
+        -- Polytypes are disallowed in instance heads
+        TypeForall{} -> ""
+        TypeApp _ t1 t2 -> argName t1 <> argName t2
+        TypeOp _ t1 op t2 ->
+          argName t1 <> (N.runOpName $ qualName op) <> argName t2
+        TypeArr _ t1 _ t2 -> argName t1 <> "Function" <> argName t2
+        TypeConstrained{} -> ""
+        TypeUnaryRow{} -> "Row"
 
   goTypeVar = \case
     TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)

@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/InstanceNamedWithoutSeparator.purs:9:23 - 9:26 (line 9, column 23 - line 9, column 26)
+
+  Unable to parse module:
+  Unexpected token 'Foo'
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

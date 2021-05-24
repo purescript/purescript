@@ -67,7 +67,7 @@ ef = P.ExternsFile
       -- , edInstanceConstraints =
       mempty
       -- , edInstanceChain =
-      mempty
+      Nothing
       -- , edInstanceChainIndex =
       0
  --     }

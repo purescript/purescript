@@ -211,7 +211,7 @@ instanceRange (Instance hd bd)
   where start = instanceHeadRange hd
 
 instanceHeadRange :: InstanceHead a -> TokenRange
-instanceHeadRange (InstanceHead kw _ _ _ cls types)
+instanceHeadRange (InstanceHead kw _ _ cls types)
   | [] <- types = (kw, qualTok cls)
   | otherwise = (kw, snd . typeRange $ last types)
 

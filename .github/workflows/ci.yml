@@ -1,0 +1,90 @@
+name: "CI"
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  release:
+    types: [ "published" ]
+
+defaults:
+  run:
+    shell: "bash"
+
+env:
+  CI_RELEASE: "${{ github.event_name == 'release' }}"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false # do not cancel builds for other OSes if one fails
+      matrix:
+        os: [ "ubuntu-latest", "macOS-latest", "windows-latest" ]
+
+    runs-on: "${{ matrix.os }}"
+
+    steps:
+      - uses: "actions/checkout@v2"
+
+      - uses: "actions/setup-node@v1"
+        with:
+          node-version: "10"
+
+      - id: "haskell"
+        uses: "haskell/actions/setup@v1"
+        with:
+          enable-stack: true
+          stack-version: "2.5.1"
+          stack-no-global: true
+
+      - uses: "actions/cache@v2"
+        with:
+          path: |
+            ${{ steps.haskell.outputs.stack-root }}
+          key: "${{ runner.os }}-${{ hashFiles('stack.yaml') }}"
+
+      - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
+        # This ensures that the local GHC and MSYS binaries that Stack installs
+        # are included in the cache. (This behavior is the default on
+        # non-Windows OSes.)
+        if: "${{ runner.os == 'Windows' }}"
+        run: |
+          mkdir -p "$STACK_ROOT"
+          echo "local-programs-path: $STACK_ROOT/programs" > $STACK_ROOT/config.yaml
+
+      - run: "ci/run-hlint.sh --git"
+        env:
+          VERSION: "2.2.11"
+
+      - run: "ci/build.sh"
+
+      - name: "(Release only) Create bundle"
+        if: "${{ env.CI_RELEASE == 'true' }}"
+        run: |
+          os_name="${{ runner.os }}"
+          case "$os_name" in
+            Linux)
+              bundle_os=linux64;;
+            macOS)
+              bundle_os=macos;;
+            Windows)
+              bundle_os=win64;;
+            *)
+              echo "Unknown OS name: $os_name"
+              exit 1;;
+          esac
+          cd sdist-test
+          bundle/build.sh "$bundle_os"
+
+      - name: "(Release only) Publish bundle"
+        if: "${{ env.CI_RELEASE == 'true' }}"
+        # Astonishingly, GitHub doesn't currently maintain a first-party action
+        # for uploading assets to GitHub releases! This is the best third-party
+        # one I could find, but as this step handles a token, it seems
+        # particularly important that we lock it down to a specific audited
+        # version, instead of a tag like the other steps.
+        uses: "AButler/upload-release-assets@ec6d3263266dc57eb6645b5f75e827987f7c217d"
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          files: "sdist-test/bundle/*.{tar.gz,sha}"

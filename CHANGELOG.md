@@ -8,11 +8,69 @@ Breaking changes:
 
 New features:
 
+* Make type class instance names optional (#4085, @JordanMartinez)
+
+  Previously, one would be required to define a unique name for a type class
+  instance. For example
+
+  ```purescript
+  -- instance naming convention:
+  -- classNameType1Type2Type3
+  instance fooIntString :: Foo Int String
+  ```
+
+  Now, the name and `::` separator characters are optional. The above instance
+  could be rewritten like so:
+
+  ```purescript
+  instance Foo Int String
+  ```
+
+  and the compiler will generate a unique name for the instance
+  (e.g. `$dollar_FooIntString_4` where `4` is a randomly-generated number
+  that can change across compiler runs). This version of the instance name
+  is not intended for use in FFI.
+
+  Note: if one wrote
+
+  ```purescript
+  instance ReallyLongClassName Int String
+  ```
+
+  the generated name would be something like
+  `$dollar_ReallyLongClassNameIntStr_87` rather than
+  `$dollar_ReallyLongClassNameIntString_87` as the generated part
+  of the name will be truncated to 25 characters (long enough to be readable
+  without being too verbose).
+
 Bugfixes:
+
+* Unused identifier warnings now report smaller and more relevant source spans (#4088, @nwolverson)
+  
+  Also fix incorrect warnings in cases involving a let-pattern binding shadowing
+  an existing identifier.
 
 Internal:
 
 * Fix for Haddock (#4072, @ncaq)
+
+* Drop libtinfo dependency (#3696, @hdgarrood)
+
+  Changes the build configuration so that by default, compiler binaries will
+  not have a dynamic library dependency on libncurses/libtinfo. This should
+  alleviate one of the most common pains in getting the compiler successfully
+  installed, especially on Linux. The cost is a slight degradation in the REPL
+  experience when editing long lines, but this can be avoided by building the
+  compiler with the libtinfo dependency by setting the `terminfo` flag of the
+  `haskeline` library to `true`.
+
+* Migrate CI from Travis to GitHub Actions (#4077, @rhendric)
+
+* Remove tasty from test suite and just use hspec (#4056, @hdgarrood)
+
+* Avoid compiling tests with diagnostics twice in test suite (#4079, @hdgarrood)
+
+* Do less work in test initialization (#4080, @rhendric)
 
 ## v0.14.1
 

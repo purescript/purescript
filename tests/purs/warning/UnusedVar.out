@@ -1,7 +1,7 @@
-Warning 1 of 5:
+Warning 1 of 8:
 
   in module [33mMain[0m
-  at tests/purs/warning/UnusedVar.purs:12:19 - 12:37 (line 12, column 19 - line 12, column 37)
+  at tests/purs/warning/UnusedVar.purs:15:20 - 15:32 (line 15, column 20 - line 15, column 32)
 
     Name [33mlambdaUnused[0m was introduced but not used.
 
@@ -10,10 +10,10 @@ Warning 1 of 5:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 2 of 5:
+Warning 2 of 8:
 
   in module [33mMain[0m
-  at tests/purs/warning/UnusedVar.purs:16:3 - 17:4 (line 16, column 3 - line 17, column 4)
+  at tests/purs/warning/UnusedVar.purs:19:7 - 19:20 (line 19, column 7 - line 19, column 20)
 
     Name [33mletUnused[0m was introduced but not used.
 
@@ -22,10 +22,10 @@ Warning 2 of 5:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 3 of 5:
+Warning 3 of 8:
 
   in module [33mMain[0m
-  at tests/purs/warning/UnusedVar.purs:21:3 - 21:4 (line 21, column 3 - line 21, column 4)
+  at tests/purs/warning/UnusedVar.purs:25:9 - 25:24 (line 25, column 9 - line 25, column 24)
 
     Name [33mwhereUnused[0m was introduced but not used.
 
@@ -34,10 +34,10 @@ Warning 3 of 5:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 4 of 5:
+Warning 4 of 8:
 
   in module [33mMain[0m
-  at tests/purs/warning/UnusedVar.purs:26:7 - 26:27 (line 26, column 7 - line 26, column 27)
+  at tests/purs/warning/UnusedVar.purs:29:11 - 29:23 (line 29, column 11 - line 29, column 23)
 
     Name [33mletArgUnused[0m was introduced but not used.
 
@@ -46,15 +46,51 @@ Warning 4 of 5:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 5 of 5:
+Warning 5 of 8:
 
   in module [33mMain[0m
-  at tests/purs/warning/UnusedVar.purs:39:3 - 40:20 (line 39, column 3 - line 40, column 20)
+  at tests/purs/warning/UnusedVar.purs:43:5 - 43:15 (line 43, column 5 - line 43, column 15)
 
     Name [33mcaseUnused[0m was introduced but not used.
 
   in value declaration [33munusedCaseBinder[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+  or to contribute content related to this warning.
+
+Warning 6 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/UnusedVar.purs:61:34 - 61:35 (line 61, column 34 - line 61, column 35)
+
+    Name [33mx[0m was introduced but not used.
+
+  in value declaration [33munusedShadowedByRecursiveBinding[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+  or to contribute content related to this warning.
+
+Warning 7 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/UnusedVar.purs:68:8 - 68:9 (line 68, column 8 - line 68, column 9)
+
+    Name [33mx[0m was introduced but not used.
+
+  in value declaration [33munusedShadowingLet[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+  or to contribute content related to this warning.
+
+Warning 8 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/UnusedVar.purs:62:7 - 62:16 (line 62, column 7 - line 62, column 16)
+
+    Name [33mx[0m was shadowed.
+
+  in value declaration [33munusedShadowedByRecursiveBinding[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/ShadowedName.md for more information,
   or to contribute content related to this warning.
 
