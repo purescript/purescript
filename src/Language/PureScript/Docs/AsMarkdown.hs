@@ -45,18 +45,19 @@ declAsMarkdown decl@Declaration{..} = do
   let (instances, children) = partition (isChildInstance . cdeclInfo) declChildren
   fencedBlock $ do
     tell' (codeToString $ Render.renderDeclaration decl)
-    zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
+    zipWithM_ (\f c -> childToString f c) (First : repeat NotFirst) children
   spacer
 
   for_ declComments tell'
 
   unless (null instances) $ do
     headerLevel 5 "Instances"
-    fencedBlock $ mapM_ (tell' . childToString NotFirst) instances
+    mapM_ (childToString NotFirst) instances
     spacer
 
   where
-  isChildInstance (ChildInstance _ _) = True
+  isChildInstance (ChildInstanceChain _ ) = True
+  isChildInstance (ChildPartOfInstanceChain _) = True
   isChildInstance _ = False
 
 codeToString :: RenderedCode -> Text
@@ -81,18 +82,31 @@ codeToString = outputWith elemAsMarkdown
 --     P.Infixr -> "right-associative"
 --     P.Infix  -> "non-associative"
 
-childToString :: First -> ChildDeclaration -> Text
+childToString :: First -> ChildDeclaration -> Docs
 childToString f decl@ChildDeclaration{..} =
   case cdeclInfo of
     ChildDataConstructor _ ->
       let c = if f == First then "=" else "|"
-      in  "  " <> c <> " " <> str
+      in  fencedBlock $ do
+        tell' $ "  " <> c <> " " 
+        str
     ChildTypeClassMember _ ->
-      "  " <> str
-    ChildInstance _ _ ->
+      fencedBlock $ do
+        tell' $ "  " 
+        str
+    ChildInstanceChain  _ ->
       str
+    ChildPartOfInstanceChain _ ->
+      fencedBlock $ str
   where
-  str = codeToString $ Render.renderChildDeclaration decl
+  str = case  Render.renderChildDeclaration decl of 
+      Render.RenderedAsCode code -> tell' $ codeToString code
+      Render.RenderedAsStructure structure -> mapM_ chainInstanceToString structure
+
+  chainInstanceToString :: (ChildInstanceChainInfo, RenderedCode) -> Docs
+  chainInstanceToString (inst, code) = do
+    fencedBlock $ tell' $ codeToString code
+    mapM_ tell' $ icComments inst
 
 data First
   = First

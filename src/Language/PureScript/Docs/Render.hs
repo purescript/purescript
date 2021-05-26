@@ -80,20 +80,43 @@ renderDeclaration Declaration{..} =
       , aliasName for declTitle
       ]
 
-renderChildDeclaration :: ChildDeclaration -> RenderedCode
+data RenderedChildDeclaration
+  = RenderedAsCode RenderedCode
+  | RenderedAsStructure [(ChildInstanceChainInfo, RenderedCode)]
+  deriving (Show, Eq, Ord)
+
+renderChildDeclaration :: ChildDeclaration -> RenderedChildDeclaration
 renderChildDeclaration ChildDeclaration{..} =
-  mintersperse sp $ case cdeclInfo of
-    ChildInstance constraints ty ->
-      maybeToList (renderConstraints constraints) ++ [ renderType ty ]
+  case cdeclInfo of
+    ChildInstanceChain instances ->
+      RenderedAsStructure $ intersperseElse (renderInstanceChain <$> instances)
+    ChildPartOfInstanceChain childInstance ->
+      RenderedAsCode $ mintersperse sp $ renderChildInstance childInstance
     ChildDataConstructor args ->
-      [ dataCtor' cdeclTitle ]
-      ++ map renderTypeAtom args
+      RenderedAsCode $ mintersperse sp $ 
+        [ dataCtor' cdeclTitle ]
+        ++ map renderTypeAtom args
 
     ChildTypeClassMember ty ->
-      [ ident' cdeclTitle
-      , syntax "::"
-      , renderType ty
-      ]
+      RenderedAsCode $ mintersperse sp $ 
+        [ ident' cdeclTitle
+        , syntax "::"
+        , renderType ty
+        ]
+
+  where
+    intersperseElse :: [(a, RenderedCode)] -> [(a, RenderedCode)]
+    intersperseElse = zipWith ($) $ id : repeat (mapSnd $ ((keywordElse <> sp) <>))
+
+    mapSnd f (a, b) = (a, f b)
+    
+    renderInstanceChain :: ChildInstanceChainInfo -> (ChildInstanceChainInfo, RenderedCode)
+    renderInstanceChain inst =
+      (inst, mintersperse sp $ renderChildInstance $ inst)
+
+renderChildInstance :: ChildInstanceChainInfo -> [RenderedCode]
+renderChildInstance (ChildInstanceChainInfo{..}) =
+  [ ident' icTitle, syntax "::" ] ++ maybeToList (renderConstraints icConstraint) ++ [ renderType icType ]
 
 renderConstraint :: Constraint' -> RenderedCode
 renderConstraint (P.Constraint ann pn kinds tys _) =
