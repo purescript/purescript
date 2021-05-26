@@ -133,7 +133,12 @@ writeCacheDb'
   -> CacheDb
   -- ^ The CacheDb to be written
   -> m ()
-writeCacheDb' = writeJSONFile . cacheDbFile
+writeCacheDb' dir db = do
+    writeJSONFile file_tmp db
+    renameFile file_tmp file
+  where
+    file = cacheDbFile dir
+    file_tmp = file ++ ".tmp"
 
 -- | A set of make actions that read and write modules from the given directory.
 buildMakeActions

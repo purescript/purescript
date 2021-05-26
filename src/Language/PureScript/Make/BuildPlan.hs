@@ -1,10 +1,12 @@
 module Language.PureScript.Make.BuildPlan
   ( BuildPlan(bpEnv)
   , BuildJobResult(..)
+  , ResultChannel
   , buildJobSuccess
   , buildJobFailure
   , construct
   , getResult
+  , setResultChannel
   , collectResults
   , markComplete
   , needsRebuild
@@ -39,7 +41,11 @@ data BuildPlan = BuildPlan
   { bpPrebuilt :: M.Map ModuleName Prebuilt
   , bpBuildJobs :: M.Map ModuleName BuildJob
   , bpEnv :: C.MVar Env
+  , bpResultChan :: Maybe ResultChannel
+  -- ^^ Optional channel for reporting build results, By sending Nothing we indicate that the build is done
   }
+
+type ResultChannel = C.Chan (Maybe (ModuleName, BuildJobResult))
 
 data Prebuilt = Prebuilt
   { pbModificationTime :: UTCTime
@@ -93,6 +99,9 @@ markComplete
   -> m ()
 markComplete buildPlan moduleName result = do
   let BuildJob rVar = fromMaybe (internalError "make: markComplete no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
+  case bpResultChan buildPlan of
+    Just chan -> writeChan chan $ Just (moduleName, result)
+    Nothing -> return ()
   putMVar rVar result
 
 -- | Whether or not the module with the given ModuleName needs to be rebuilt
@@ -146,7 +155,7 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
   buildJobs <- foldM makeBuildJob M.empty toBeRebuilt
   env <- C.newMVar primEnv
   pure
-    ( BuildPlan prebuilt buildJobs env
+    ( BuildPlan prebuilt buildJobs env Nothing
     , let
         update = flip $ \s ->
           M.alter (const (statusNewCacheInfo s)) (statusModuleName s)
@@ -213,6 +222,16 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
                 Just depModTime | pbModificationTime pb < depModTime ->
                   prev
                 _ -> M.insert moduleName pb prev
+
+setResultChannel :: forall m. (Monad m, MonadBaseControl IO m)
+                    => BuildPlan
+                    -> Maybe ResultChannel
+                    -> m BuildPlan
+setResultChannel bp chan = do
+  case bpResultChan bp of
+    Just oldChan -> writeChan oldChan Nothing
+    Nothing -> return ()
+  pure $ bp { bpResultChan = chan }
 
 maximumMaybe :: Ord a => [a] -> Maybe a
 maximumMaybe [] = Nothing
