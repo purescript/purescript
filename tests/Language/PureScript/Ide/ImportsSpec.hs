@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ImportsSpec where
 
 import           Protolude hiding (moduleName)
@@ -288,7 +286,7 @@ spec = do
   describe "explicit import sorting" $ do
     -- given some basic import skeleton
     let Right (_, _, baseImports, _) = sliceImportSection $ withImports ["import Control.Monad (ap)"]
-        moduleName = (P.moduleNameFromString "Control.Monad")
+        moduleName = P.moduleNameFromString "Control.Monad"
         addImport imports import' = addExplicitImport' import' moduleName Nothing imports
         valueImport ident = _idaDeclaration (Test.ideValue ident Nothing)
         typeImport name = _idaDeclaration (Test.ideType name Nothing [])
@@ -308,11 +306,11 @@ spec = do
         ["import Prelude", "", "import Control.Monad (ap, unless, where)"]
     it "sorts type, value" $
       expectSorted
-        ((map valueImport ["unless", "where"]) ++ (map typeImport ["Foo", "Bar"]))
+        (map valueImport ["unless", "where"] ++ map typeImport ["Foo", "Bar"])
         ["import Prelude", "", "import Control.Monad (Bar, Foo, ap, unless, where)"]
     it "sorts class, type, value" $
       expectSorted
-        ((map valueImport ["unless", "where"]) ++ (map typeImport ["Foo", "Bar"]) ++ (map classImport ["Applicative", "Bind"]))
+        (map valueImport ["unless", "where"] ++ map typeImport ["Foo", "Bar"] ++ map classImport ["Applicative", "Bind"])
         ["import Prelude", "", "import Control.Monad (class Applicative, class Bind, Bar, Foo, ap, unless, where)"]
     it "sorts types with constructors, using open imports for the constructors" $
       expectSorted

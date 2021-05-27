@@ -2,7 +2,7 @@ module Language.PureScript.CST.Monad where
 
 import Prelude
 
-import Data.List (sortBy)
+import Data.List (sortOn)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord (comparing)
 import Data.Text (Text)
@@ -61,12 +61,12 @@ instance Monad (ParserM e s) where
 runParser :: ParserState -> Parser a -> (ParserState, Either (NE.NonEmpty ParserError) a)
 runParser st (Parser k) = k st left right
   where
-  left st'@(ParserState {..}) err =
+  left st'@ParserState {..} err =
     (st', Left $ NE.sortBy (comparing errRange) $ err NE.:| parserErrors)
 
-  right st'@(ParserState {..}) res
+  right st'@ParserState {..} res
     | null parserErrors = (st', Right res)
-    | otherwise = (st', Left $ NE.fromList $ sortBy (comparing errRange) parserErrors)
+    | otherwise = (st', Left $ NE.fromList $ sortOn errRange parserErrors)
 
 runTokenParser :: Parser a -> [LexResult] -> Either (NE.NonEmpty ParserError) ([ParserWarning], a)
 runTokenParser p buff = fmap (warnings,) res
@@ -157,7 +157,7 @@ manyDelimited open close sep p = do
   _   <- token open
   res <- go1
   _   <- token close
-  pure $ res
+  pure res
   where
   go1 =
     oneOf $ NE.fromList
@@ -179,7 +179,7 @@ token t = do
     else parseError t'
 
 munch :: Parser SourceToken
-munch = Parser $ \state@(ParserState {..}) kerr ksucc ->
+munch = Parser $ \state@ParserState {..} kerr ksucc ->
   case parserBuff of
     Right tok : parserBuff' ->
       ksucc (state { parserBuff = parserBuff' }) tok

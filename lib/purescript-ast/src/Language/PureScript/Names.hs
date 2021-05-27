@@ -174,7 +174,7 @@ moduleNameFromString :: Text -> ModuleName
 moduleNameFromString = ModuleName
 
 isBuiltinModuleName :: ModuleName -> Bool
-isBuiltinModuleName (ModuleName mn) = mn == "Prim" || T.isPrefixOf "Prim." mn
+isBuiltinModuleName (ModuleName mn) = mn == "Prim" || "Prim." `T.isPrefixOf` mn
 
 -- |
 -- A qualified name, i.e. a name with an optional module name

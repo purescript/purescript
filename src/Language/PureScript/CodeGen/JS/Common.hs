@@ -51,11 +51,9 @@ anyNameToJs name
 -- absolutely necessary.
 isValidJsIdentifier :: Text -> Bool
 isValidJsIdentifier s =
-  and
-    [ not (T.null s)
-    , isAlpha (T.head s)
-    , s == anyNameToJs s
-    ]
+  not (T.null s) &&
+  isAlpha (T.head s) &&
+  s == anyNameToJs s
 
 -- | Attempts to find a human-readable name for a symbol, if none has been specified returns the
 -- ordinal value.

@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Language.PureScript.Make.Monad
   ( -- * Implementation of Make API using files on disk
     Make(..)

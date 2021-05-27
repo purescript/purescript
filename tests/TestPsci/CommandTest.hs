@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module TestPsci.CommandTest where
 
 import Prelude ()
@@ -69,7 +67,7 @@ commandTests = context "commandTests" $ do
   specPSCi ":print" $ do
     let failMsg = "Unable to set the repl's printing function"
     let interactivePrintModuleShouldBe modName = do
-          modName' <- (fst . psciInteractivePrint) <$> get
+          modName' <- fst . psciInteractivePrint <$> get
           modName' `equalsTo` modName
 
     run "import Prelude"

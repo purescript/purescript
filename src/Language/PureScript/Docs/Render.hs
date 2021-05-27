@@ -86,8 +86,7 @@ renderChildDeclaration ChildDeclaration{..} =
     ChildInstance constraints ty ->
       maybeToList (renderConstraints constraints) ++ [ renderType ty ]
     ChildDataConstructor args ->
-      [ dataCtor' cdeclTitle ]
-      ++ map renderTypeAtom args
+      dataCtor' cdeclTitle : map renderTypeAtom args
 
     ChildTypeClassMember ty ->
       [ ident' cdeclTitle

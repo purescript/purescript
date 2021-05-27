@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module TestPsci.TestEnv where
 
 import Prelude ()
@@ -75,7 +73,7 @@ runAndEval comm jsOutputEval textOutputEval =
     Right commands ->
       -- The JS result is ignored, as it's already written in a JS source file.
       -- For the detail, please refer to Interactive.hs
-      traverse_ (handleCommand (\_ -> jsOutputEval) (return ()) textOutputEval) commands
+      traverse_ (handleCommand (const jsOutputEval) (return ()) textOutputEval) commands
 
 -- | Run a PSCi command, evaluate compiled JS, and ignore evaluation output and printed output
 run :: String -> TestPSCi ()

@@ -12,8 +12,6 @@
 -- Filters for psc-ide commands
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Ide.Filter
        ( Filter
        , moduleFilter
@@ -104,7 +102,7 @@ applyDeclarationFilter f = case f of
 
 namespaceFilter' :: Set IdeNamespace -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
 namespaceFilter' namespaces =
-  filter (\decl -> elem (namespaceForDeclaration (discardAnn decl)) namespaces)
+  filter (\decl -> namespaceForDeclaration (discardAnn decl) `elem` namespaces)
 
 exactFilter' :: Text -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
 exactFilter' search =

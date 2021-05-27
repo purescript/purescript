@@ -76,17 +76,17 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
   checkRoleDeclarations :: Maybe Declaration -> [Declaration] -> m ()
   checkRoleDeclarations Nothing (RoleDeclaration RoleDeclarationData{..} : _) =
     throwError . errorMessage' (fst rdeclSourceAnn) $ OrphanRoleDeclaration rdeclIdent
-  checkRoleDeclarations (Just (RoleDeclaration (RoleDeclarationData _ name' _))) ((RoleDeclaration (RoleDeclarationData{..})) : _) | name' == rdeclIdent =
+  checkRoleDeclarations (Just (RoleDeclaration (RoleDeclarationData _ name' _))) ((RoleDeclaration RoleDeclarationData{..}) : _) | name' == rdeclIdent =
     throwError . errorMessage' (fst rdeclSourceAnn) $ DuplicateRoleDeclaration rdeclIdent
-  checkRoleDeclarations (Just d) (rd@(RoleDeclaration (RoleDeclarationData{..})) : rest) = do
+  checkRoleDeclarations (Just d) (rd@(RoleDeclaration RoleDeclarationData{..}) : rest) = do
     unless (matchesDeclaration d) . throwError . errorMessage' (fst rdeclSourceAnn) $ OrphanRoleDeclaration rdeclIdent
     unless (isSupported d) . throwError . errorMessage' (fst rdeclSourceAnn) $ UnsupportedRoleDeclaration
     checkRoleDeclarationArity d
     checkRoleDeclarations (Just rd) rest
     where
     isSupported :: Declaration -> Bool
-    isSupported (DataDeclaration{}) = True
-    isSupported (ExternDataDeclaration{}) = True
+    isSupported DataDeclaration{} = True
+    isSupported ExternDataDeclaration{} = True
     isSupported _ = False
     matchesDeclaration :: Declaration -> Bool
     matchesDeclaration (DataDeclaration _ _ name' _ _) = rdeclIdent == name'

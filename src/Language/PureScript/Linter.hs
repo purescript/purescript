@@ -284,6 +284,6 @@ lintUnused (Module modSS _ mn modDecls exports) =
           filteredUsed = used `S.difference` newNames
           warnUnused = S.filter (not . Text.isPrefixOf "_" . runIdent) (newNames `S.difference` used)
           warnUnusedSpans = S.filter (\(_,ident) -> ident `elem` warnUnused) newNamesWithSpans 
-          combinedErrors = if not $ S.null warnUnusedSpans then errors <> (mconcat $ map (\(ss,ident) -> errorMessage' ss $ UnusedName ident) $ S.toList warnUnusedSpans) else errors
+          combinedErrors = if not $ S.null warnUnusedSpans then errors <> mconcat (map (\(ss,ident) -> errorMessage' ss $ UnusedName ident) $ S.toList warnUnusedSpans) else errors
       in
         (filteredUsed, combinedErrors)

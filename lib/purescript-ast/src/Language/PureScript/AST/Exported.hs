@@ -4,7 +4,7 @@ module Language.PureScript.AST.Exported
   ) where
 
 import Prelude.Compat
-import Protolude (sortBy, on)
+import Protolude (sortOn)
 
 import Control.Category ((>>>))
 
@@ -148,7 +148,7 @@ isDctorExported ident (Just exps) ctor = test `any` exps
 --
 reorder :: [DeclarationRef] -> [Declaration] -> [Declaration]
 reorder refs =
-  sortBy (compare `on` refIndex)
+  sortOn refIndex
   where
   refIndices =
     M.fromList $ zip (map declRefName refs) [(0::Int)..]

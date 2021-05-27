@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 
 -- |
@@ -13,7 +12,6 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
-import Data.List (intercalate)
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -197,14 +195,14 @@ withTypeClassDictionaries entries action = do
 getTypeClassDictionaries
   :: (MonadState CheckState m)
   => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
-getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
+getTypeClassDictionaries = gets $ typeClassDictionaries . checkEnv
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionaries
   :: (MonadState CheckState m)
   => Maybe ModuleName
   -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
-lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
+lookupTypeClassDictionaries mn = gets $ fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionariesForClass
@@ -296,7 +294,7 @@ lookupTypeVariable currentModule (Qualified moduleName name) = do
 
 -- | Get the current @Environment@
 getEnv :: (MonadState CheckState m) => m Environment
-getEnv = checkEnv <$> get
+getEnv = gets checkEnv
 
 -- | Get locally-bound names in context, to create an error message.
 getLocalContext :: MonadState CheckState m => m Context
@@ -363,7 +361,7 @@ unsafeCheckCurrentModule
   :: forall m
    . (MonadError MultipleErrors m, MonadState CheckState m)
   => m ModuleName
-unsafeCheckCurrentModule = checkCurrentModule <$> get >>= \case
+unsafeCheckCurrentModule = gets checkCurrentModule >>= \case
   Nothing -> internalError "No module name set in scope"
   Just name -> pure name
 
@@ -397,7 +395,7 @@ debugTypes = go <=< M.toList . types
         ExternData _      -> "extern"
         LocalTypeVariable -> "local"
         ScopedTypeVar     -> "scoped"
-    guard (not (isPrefixOf "Prim" name))
+    guard (not ("Prim" `isPrefixOf` name))
     pure $ decl <> " " <> unpack name <> " :: " <> init ppTy
 
 debugNames :: Environment -> [String]
@@ -423,7 +421,7 @@ debugTypeSynonyms = fmap go . M.toList . typeSynonyms
   where
   go (qual, (binders, subTy)) = do
     let
-      vars = intercalate " " $ flip fmap binders $ \case
+      vars = unwords $ flip fmap binders $ \case
                (v, Just k) -> "(" <> unpack v <> " :: " <> init (prettyPrintType 100 k) <> ")"
                (v, Nothing) -> unpack v
       ppTy = prettyPrintType 100 subTy
@@ -441,8 +439,8 @@ debugTypeClassDictionaries = go . typeClassDictionaries
       moduleName = maybe "" (\m -> "[" <> runModuleName m <> "] ") mbModuleName
       className' = showQualified runProperName className
       ident' = showQualified runIdent ident
-      kds = intercalate " " $ fmap ((\a -> "@(" <> a <> ")") . debugType) $ tcdInstanceKinds $ NEL.head dicts
-      tys = intercalate " " $ fmap ((\a -> "(" <> a <> ")") . debugType) $ tcdInstanceTypes $ NEL.head dicts
+      kds = unwords $ fmap ((\a -> "@(" <> a <> ")") . debugType) $ tcdInstanceKinds $ NEL.head dicts
+      tys = unwords $ fmap ((\a -> "(" <> a <> ")") . debugType) $ tcdInstanceTypes $ NEL.head dicts
     pure $ "dict " <> unpack moduleName <> unpack className' <> " " <> unpack ident' <> " (" <> show (length dicts) <> ")" <> " " <> kds <> " " <> tys
 
 debugTypeClasses :: Environment -> [String]
@@ -451,7 +449,7 @@ debugTypeClasses = fmap go . M.toList . typeClasses
   go (className, tc) = do
     let
       className' = showQualified runProperName className
-      args = intercalate " " $ fmap (\(a, b) -> "(" <> debugType (maybe (srcTypeVar a) (srcKindedType (srcTypeVar a)) b) <> ")") $ typeClassArguments tc
+      args = unwords $ (\(a, b) -> "(" <> debugType (maybe (srcTypeVar a) (srcKindedType (srcTypeVar a)) b) <> ")") <$> typeClassArguments tc
     "class " <> unpack className' <> " " <> args
 
 debugValue :: Expr -> String

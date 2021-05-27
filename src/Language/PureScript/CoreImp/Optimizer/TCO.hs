@@ -83,7 +83,7 @@ tco = flip evalState 0 . everywhereTopDownM convert where
       case S.minView required of
         Just (r, required') -> do
           required'' <- findTailPositionDeps r js
-          go (S.insert (fst r) known, required' <> (S.filter (not . (`S.member` known) . fst) required''))
+          go (S.insert (fst r) known, required' <> S.filter (not . (`S.member` known) . fst) required'')
         Nothing ->
           pure known
 
@@ -92,7 +92,7 @@ tco = flip evalState 0 . everywhereTopDownM convert where
   -- identifier to be considered in tail position (or Nothing if this
   -- identifier is used somewhere not as a tail call with full arity).
   findTailPositionDeps :: (Text, Int) -> AST -> Maybe (S.Set (Text, Int))
-  findTailPositionDeps (ident, arity) js = allInTailPosition js where
+  findTailPositionDeps (ident, arity) = allInTailPosition where
     countSelfReferences = countReferences ident
 
     allInTailPosition (Return _ expr)
@@ -168,7 +168,7 @@ tco = flip evalState 0 . everywhereTopDownM convert where
         , Function rootSS (Just tcoLoop) (outerArgs ++ innerArgs) (Block rootSS [loopify js])
         , While rootSS (Unary rootSS Not (Var rootSS tcoDone))
             (Block rootSS
-              [(Assignment rootSS (Var rootSS tcoResult) (App rootSS (Var rootSS tcoLoop) ((map (Var rootSS . tcoVar) outerArgs) ++ (map (Var rootSS . copyVar) innerArgs))))])
+              [Assignment rootSS (Var rootSS tcoResult) (App rootSS (Var rootSS tcoLoop) (map (Var rootSS . tcoVar) outerArgs ++ map (Var rootSS . copyVar) innerArgs))])
         , Return rootSS (Var rootSS tcoResult)
         ]
     where

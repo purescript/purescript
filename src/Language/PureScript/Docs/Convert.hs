@@ -50,7 +50,7 @@ insertValueTypes ::
 insertValueTypes env m =
   m { modDeclarations = map go (modDeclarations m) }
   where
-  go (d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} }) =
+  go d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} } =
     let
       ident = P.Ident . CST.getIdent . CST.nameValue . parseIdent $ declTitle d
       ty = lookupName ident
@@ -100,5 +100,5 @@ partiallyDesugar externs env = evalSupplyT 0 . desugar'
       >=> fmap fst . runWriterT . flip evalStateT (env, mempty) . P.desugarImports
       >=> P.rebracketFiltered isInstanceDecl externs
 
-  isInstanceDecl (P.TypeInstanceDeclaration {}) = True
+  isInstanceDecl P.TypeInstanceDeclaration {} = True
   isInstanceDecl _ = False

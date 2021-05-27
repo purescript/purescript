@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Publish
   ( preparePackage
   , preparePackage'
@@ -164,7 +162,7 @@ getModules opts paths = do
   (inputFiles, depsFiles) <- liftIO (getInputAndDepsFiles paths)
 
   (modules, moduleMap) <-
-    (liftIO (runExceptT (D.collectDocs (publishCompileOutputDir opts) inputFiles depsFiles)))
+    liftIO (runExceptT (D.collectDocs (publishCompileOutputDir opts) inputFiles depsFiles))
     >>= either (userError . CompileError) return
 
   pure (map snd modules, moduleMap)
@@ -214,7 +212,7 @@ getManifestRepositoryInfo pkgMeta =
     Nothing -> do
       giturl <- catchError (Just . T.strip . T.pack <$> readProcess' "git" ["config", "remote.origin.url"] "")
                   (const (return Nothing))
-      userError (BadRepositoryField (RepositoryFieldMissing (giturl >>= extractGithub >>= return . format)))
+      userError (BadRepositoryField (RepositoryFieldMissing (giturl >>= extractGithub <&> format)))
     Just Repository{..} -> do
       unless (repositoryType == "git")
         (userError (BadRepositoryField (BadRepositoryType repositoryType)))

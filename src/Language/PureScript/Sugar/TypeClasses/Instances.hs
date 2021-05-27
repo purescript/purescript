@@ -35,6 +35,6 @@ desugarTypeClassInstanceNames (Module ss coms name decls exps) = do
   desugarInstName = \case
     TypeInstanceDeclaration sa chainId idx (Left genText) deps className tys bd -> do
       uniqueIdent <- fresh
-      let finalName = Ident $ genText <> (pack $ show uniqueIdent)
+      let finalName = Ident $ genText <> pack (show uniqueIdent)
       pure $ TypeInstanceDeclaration sa chainId idx (Right finalName) deps className tys bd
     a -> pure a

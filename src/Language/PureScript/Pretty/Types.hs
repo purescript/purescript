@@ -1,3 +1,6 @@
+-- HLint is confused by the identifier `pattern` if PatternSynonyms is enabled.
+{-# LANGUAGE NoPatternSynonyms #-}
+
 -- |
 -- Pretty printer for Types
 --
@@ -22,6 +25,7 @@ import Prelude.Compat hiding ((<>))
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
+import Data.Bifunctor (first)
 import Data.Maybe (fromMaybe, catMaybes)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -176,11 +180,11 @@ explicitParens = mkPattern match
 
 matchTypeAtom :: TypeRenderOptions -> Pattern () PrettyPrintType Box
 matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
-    typeLiterals <+> fmap ((`before` (text ")")) . (text "(" <>)) (matchType tro)
+    typeLiterals <+> fmap ((`before` text ")") . (text "(" <>)) (matchType tro)
   where
     typeLiterals :: Pattern () PrettyPrintType Box
     typeLiterals = mkPattern match where
-      match (PPTypeWildcard name) = Just $ maybe (text "_") (text . ('?' :) . T.unpack) name
+      match (PPTypeWildcard name) = Just $ text $ maybe "_" (('?' :) . T.unpack) name
       match (PPTypeVar var) = Just $ text $ T.unpack var
       match (PPTypeLevelString s) = Just $ text $ T.unpack $ prettyPrintString s
       match (PPTypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
@@ -228,7 +232,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
 forall_ :: Pattern () PrettyPrintType ([(String, Maybe PrettyPrintType)], PrettyPrintType)
 forall_ = mkPattern match
   where
-  match (PPForAll idents ty) = Just (map (\(v, mbK) -> (T.unpack v, mbK)) idents, ty)
+  match (PPForAll idents ty) = Just (map (first T.unpack) idents, ty)
   match _ = Nothing
 
 typeAtomAsBox' :: PrettyPrintType -> Box
