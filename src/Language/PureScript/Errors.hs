@@ -102,6 +102,7 @@ data SimpleErrorMessage
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
   | NoInstanceFound
       SourceConstraint -- ^ constraint that could not be solved
+      [Qualified (Either SourceType Ident)] -- ^ a list of instances that stopped further progress in instance chains due to ambiguity
       Bool -- ^ whether eliminating unknowns with annotations might help
   | AmbiguousTypeVariables SourceType [Int]
   | UnknownClass (Qualified (ProperName 'ClassName))
@@ -450,7 +451,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-  gSimple (NoInstanceFound con unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure unks
+  gSimple (NoInstanceFound con ambig unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure ambig <*> pure unks
   gSimple (AmbiguousTypeVariables t us) = AmbiguousTypeVariables <$> f t <*> pure us
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
@@ -858,14 +859,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ line (showQualified runProperName nm)
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _) _) | Just box <- toTypelevelString ty =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _) _ _) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Partial
                                                           _
                                                           _
-                                                          (Just (PartialConstraintData bs b))) _) =
+                                                          (Just (PartialConstraintData bs b))) _ _) =
       paras [ line "A case expression could not be determined to cover all inputs."
             , line "The following additional cases are required to cover all inputs:"
             , indent $ paras $
@@ -874,18 +875,28 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _) _) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _) _ _) =
       paras [ line "A result of type"
             , markCodeBox $ indent $ prettyType ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _) unks) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _) ambiguous unks) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
+            , paras $ case ambiguous of
+                        [] -> []
+                        [ambig] ->
+                            [ "The instance " Box.<> prettyInstanceName False ambig
+                                Box.<> " partially overlaps the above constraint, which means the rest of its instance chain will not be considered."
+                            ]
+                        _ ->
+                            [ line "The following instances partially overlap the above constraint, which means the rest of their instance chains will not be considered:"
+                            , indent $ paras (map (prettyInstanceName True) ambiguous)
+                            ]
             , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
                     | unks
                     ]
@@ -1629,7 +1640,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       where
       isUnifyHint ErrorUnifyingTypes{} = True
       isUnifyHint _ = False
-    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _) _) = filter (not . isSolverHint)
+    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _) _ _) = filter (not . isSolverHint)
       where
       isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
       isSolverHint _ = False
@@ -1658,6 +1669,19 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
   hintCategory ErrorSolvingConstraint{}             = SolverHint
   hintCategory PositionedError{}                    = PositionHint
   hintCategory _                                    = OtherHint
+
+  prettyInstanceName :: Bool -> Qualified (Either SourceType Ident) -> Box.Box
+  prettyInstanceName inList = \case
+    Qualified maybeMn (Left ty) ->
+      (if inList then "instance " else Box.nullBox)
+        Box.<> (case maybeMn of
+                  Just mn -> "in module "
+                               Box.<> line (markCode $ runModuleName mn)
+                               Box.<> " "
+                  Nothing -> Box.nullBox)
+        Box.<> "with type "
+        Box.<> markCodeBox (prettyType ty)
+    Qualified mn (Right inst) -> line . markCode . showQualified showIdent $ Qualified mn inst
 
 -- Pretty print and export declaration
 prettyPrintExport :: DeclarationRef -> Text

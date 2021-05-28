@@ -14,6 +14,8 @@ Bugfixes:
 
 * Allow fixity, kind, role declarations in REPL (#4046, @rhendric)
 
+* Improve apartness checking (#4064, @rhendric)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
