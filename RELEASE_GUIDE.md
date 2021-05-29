@@ -55,18 +55,6 @@ considering what effects this may have:
 
   - The version to install in the `postinstall` script in `package.json`
 
-  - If `purescript-ast` has changed at all since the last release:
-
-      - The `version` field in `lib/purescript-ast/purescript-ast.cabal` (note
-        that the new version should be based on the PVP, according to what
-        changed since the previous release, and not on the actual compiler
-        version)
-
-      - The versions table in `lib/purescript-ast/README.md`,
-
-      - The version bounds for `purescript-ast` in
-        `lib/purescript-cst/purescript-cst.cabal` and in `purescript.cabal`
-
   - If `purescript-cst` has changed at all since the last release:
 
       - The `version` field in `lib/purescript-cst/purescript-cst.cabal` (note
@@ -88,12 +76,10 @@ considering what effects this may have:
 
   - change to the `lib/purescript-cst` directory and run `stack upload .`
 
-  - change to the `lib/purescript-ast` directory and run `stack upload .`
-
   - Finally, run `stack upload .` from the repo root directory.
 
-  It's a good idea to check that the three packages (`purescript`,
-  `purescript-cst`, and `purescript-ast`) can be installed from Hackage at this
+  It's a good idea to check that the two packages (`purescript` and
+  `purescript-cst`) can be installed from Hackage at this
   point.
 
 - After all of the prebuilt binaries are present on the GitHub releases page,
