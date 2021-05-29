@@ -4,10 +4,10 @@ module Main where
 class Test a where
   test :: a -> a
 
-instance testRefl :: Test a where
+instance Test a where
   test x = x
 
-instance testInt :: Test Int where
+instance Test Int where
   test _ = 0
 
 -- The OverlappingInstances instances error only arises when there are two
