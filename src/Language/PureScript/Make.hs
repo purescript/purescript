@@ -2,6 +2,7 @@ module Language.PureScript.Make
   (
   -- * Make API
   rebuildModule
+  , rebuildModule'
   , make
   , inferForeignModules
   , module Monad
