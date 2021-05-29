@@ -68,7 +68,7 @@ common defaults
     protolude >=0.3.0 && <0.4,
     scientific >=0.3.6.2 && <0.4,
     semigroups >=0.19.1 && <0.20,
-    text >=1.2.4.1 && <1.3
+    text >=1.2.4.1 && <1.3,
     serialise >=0.2.3.0 && <0.3,
     text >=1.2.4.1 && <1.3,
     vector >=0.12.1.2 && <0.13
