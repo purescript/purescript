@@ -72,6 +72,8 @@ Internal:
 
 * Follow more HLint suggestions (#4090, @rhendric)
 
+* Export `rebuildModule'` to speed up Try PureScript! slightly (#4095 by @JordanMartinez)
+
 ## v0.14.1
 
 New features:
