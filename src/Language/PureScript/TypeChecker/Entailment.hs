@@ -450,7 +450,7 @@ entails SolverOptions{..} constraint context hints =
       normalizedRowS = foldl' go (Just id) where
         go s (RowListItem _ (Label n) t) = do
           s'  <- s
-          lbl <- traverse (either (\_ -> Nothing) Just) $ decodeStringEither n
+          lbl <- traverse (either (const Nothing) Just) $ decodeStringEither n
           tS  <- normalizedTypeS t
           Just $ s' . showString lbl . showString "::" . tS . showString ","
     solveTypeable _ _ = Nothing
