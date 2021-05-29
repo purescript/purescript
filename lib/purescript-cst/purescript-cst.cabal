@@ -66,7 +66,6 @@ common defaults
     microlens >=0.4.11.2 && <0.5,
     mtl >=2.2.2 && <2.3,
     protolude >=0.3.0 && <0.4,
-    purescript-ast ==0.1.1.0,
     scientific >=0.3.6.2 && <0.4,
     semigroups >=0.19.1 && <0.20,
     text >=1.2.4.1 && <1.3
