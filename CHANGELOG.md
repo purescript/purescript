@@ -74,6 +74,8 @@ Internal:
 
 * Export `rebuildModule'` to speed up Try PureScript! slightly (#4095 by @JordanMartinez)
 
+* Merge `purescript-ast` into `purescript-cst` (#4096 by @JordanMartinez)
+
 ## v0.14.1
 
 New features:
