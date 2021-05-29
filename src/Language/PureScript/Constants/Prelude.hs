@@ -376,6 +376,17 @@ pattern DataSymbol = ModuleName "Data.Symbol"
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
 pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 
+-- Type.Rep
+
+pattern TypeRep :: ModuleName
+pattern TypeRep = ModuleName "Type.Rep"
+
+pattern Typeable :: Qualified (ProperName 'ClassName)
+pattern Typeable = Qualified (Just TypeRep) (ProperName "Typeable")
+
+typeRep :: forall a. (IsString a) => a
+typeRep = "typeRep"
+
 prelude :: forall a. (IsString a) => a
 prelude = "Prelude"
 
