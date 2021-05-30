@@ -97,7 +97,7 @@ common defaults
     -- update to a newer snapshot as follows:
     --
     -- 1. Remove all version constraints from this cabal file (apart from
-    --    language-javascript, purescript-cst, and purescript-ast).
+    --    language-javascript and purescript-cst).
     -- 2. Update stack.yaml as required to select a new snapshot, and check
     --    everything builds correctly with stack.
     -- 3. Run `stack sdist`; this will produce a source distribution including
@@ -111,7 +111,7 @@ common defaults
     -- built with (almost) the same install plan for both cabal and stack
     -- users.
     --
-    -- We need to be especially careful with purescript-cst, purescript-ast,
+    -- We need to be especially careful with purescript-cst
     -- and language-javascript, because they all form part of the compiler's
     -- public API. In the case of language-javascript specifically, all FFI
     -- modules must be parseable by this library otherwise the compiler
@@ -159,7 +159,6 @@ common defaults
     pattern-arrows >=0.0.2 && <0.1,
     process >=1.6.9.0 && <1.7,
     protolude >=0.3.0 && <0.4,
-    purescript-ast ==0.1.1.0,
     purescript-cst ==0.1.1.0,
     regex-tdfa >=1.3.1.0 && <1.4,
     safe >=0.3.19 && <0.4,

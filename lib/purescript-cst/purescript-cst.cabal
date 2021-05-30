@@ -3,7 +3,7 @@ cabal-version: 2.4
 name:           purescript-cst
 version:        0.1.1.0
 synopsis:       PureScript Programming Language Concrete Syntax Tree
-description:    The surface syntax of the PureScript Programming Language.
+description:    The parser for the PureScript programming language.
 category:       Language
 stability:      experimental
 homepage:       http://www.purescript.org/
@@ -54,14 +54,24 @@ common defaults
     TypeFamilies
     ViewPatterns
   build-depends:
+    aeson >=1.5.6.0 && <1.6,
     array >=0.5.4.0 && <0.6,
     base >=4.14.1.0 && <4.15,
+    base-compat >=0.11.2 && <0.12,
+    bytestring >=0.10.12.0 && <0.11,
     containers >=0.6.2.1 && <0.7,
+    deepseq >=1.4.4.0 && <1.5,
     dlist >=0.8.0.8 && <0.9,
-    purescript-ast ==0.1.1.0,
+    filepath >=1.4.2.1 && <1.5,
+    microlens >=0.4.11.2 && <0.5,
+    mtl >=2.2.2 && <2.3,
+    protolude >=0.3.0 && <0.4,
     scientific >=0.3.6.2 && <0.4,
     semigroups >=0.19.1 && <0.20,
-    text >=1.2.4.1 && <1.3
+    text >=1.2.4.1 && <1.3,
+    serialise >=0.2.3.0 && <0.3,
+    text >=1.2.4.1 && <1.3,
+    vector >=0.12.1.2 && <0.13
   build-tool-depends:
     happy:happy ==1.20.0
 
@@ -69,6 +79,17 @@ library
   import: defaults
   hs-source-dirs: src
   exposed-modules:
+    Control.Monad.Supply
+    Control.Monad.Supply.Class
+    Language.PureScript.AST
+    Language.PureScript.AST.Binders
+    Language.PureScript.AST.Declarations
+    Language.PureScript.AST.Declarations.ChainId
+    Language.PureScript.AST.Exported
+    Language.PureScript.AST.Literals
+    Language.PureScript.AST.Operators
+    Language.PureScript.AST.SourcePos
+    Language.PureScript.AST.Traversals
     Language.PureScript.CST.Convert
     Language.PureScript.CST.Errors
     Language.PureScript.CST.Flatten
@@ -82,6 +103,17 @@ library
     Language.PureScript.CST.Traversals.Type
     Language.PureScript.CST.Types
     Language.PureScript.CST.Utils
+    Language.PureScript.Comments
+    Language.PureScript.Constants.Prim
+    Language.PureScript.Crash
+    Language.PureScript.Environment
+    Language.PureScript.Label
+    Language.PureScript.Names
+    Language.PureScript.PSString
+    Language.PureScript.Roles
+    Language.PureScript.Traversals
+    Language.PureScript.TypeClassDictionaries
+    Language.PureScript.Types
   other-modules:
     Data.Text.PureScript
     Paths_purescript_cst
