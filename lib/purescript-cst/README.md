@@ -1,6 +1,6 @@
 # purescript-cst
 
-Defines the surface and underlying syntax of the PureScript Programming Language.
+The parser for the PureScript programming language.
 
 ## Compiler compatibility
 

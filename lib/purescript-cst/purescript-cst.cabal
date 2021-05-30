@@ -3,7 +3,7 @@ cabal-version: 2.4
 name:           purescript-cst
 version:        0.1.1.0
 synopsis:       PureScript Programming Language Concrete Syntax Tree
-description:    The surface and underlying syntax of the PureScript Programming Language.
+description:    The parser for the PureScript programming language.
 category:       Language
 stability:      experimental
 homepage:       http://www.purescript.org/
