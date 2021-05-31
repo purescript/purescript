@@ -183,7 +183,7 @@ data SimpleErrorMessage
       Text -- ^ Type variable in question
       Role -- ^ inferred role
       Role -- ^ declared role
-  | InvalidCoercibleInstanceDeclaration [SourceType]
+  | DisallowedInstanceDeclaration (Qualified (ProperName 'ClassName)) [SourceType]
   | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
@@ -347,7 +347,7 @@ errorCode em = case unwrapErrorMessage em of
   VisibleQuantificationCheckFailureInType {} -> "VisibleQuantificationCheckFailureInType"
   UnsupportedTypeInKind {} -> "UnsupportedTypeInKind"
   RoleMismatch {} -> "RoleMismatch"
-  InvalidCoercibleInstanceDeclaration {} -> "InvalidCoercibleInstanceDeclaration"
+  DisallowedInstanceDeclaration {} -> "DisallowedInstanceDeclaration"
   UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
@@ -467,7 +467,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (MissingKindDeclaration sig nm ty) = MissingKindDeclaration sig nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
-  gSimple (InvalidCoercibleInstanceDeclaration tys) = InvalidCoercibleInstanceDeclaration <$> traverse f tys
+  gSimple (DisallowedInstanceDeclaration cn tys) = DisallowedInstanceDeclaration cn <$> traverse f tys
   gSimple other = pure other
 
   gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
@@ -1319,11 +1319,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             " is required."
         ]
 
-    renderSimpleErrorMessage (InvalidCoercibleInstanceDeclaration tys) =
+    renderSimpleErrorMessage (DisallowedInstanceDeclaration cn tys) =
       paras
         [ line "Invalid type class instance declaration for"
         , markCodeBox $ indent $ Box.hsep 1 Box.left
-            [ line (showQualified runProperName C.Coercible)
+            [ line (showQualified runProperName cn)
             , Box.vcat Box.left (map prettyTypeAtom tys)
             ]
         , line "Instance declarations of this type class are disallowed."

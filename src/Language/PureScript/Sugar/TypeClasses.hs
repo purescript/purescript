@@ -23,6 +23,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import           Data.Traversable (for)
 import qualified Language.PureScript.Constants.Prim as C
+import qualified Language.PureScript.Constants.Prelude as C
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors hiding (isExported)
@@ -216,8 +217,8 @@ desugarDecl syns kinds mn exps = go
   go (TypeInstanceDeclaration _ _ _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
   go (TypeInstanceDeclaration _ _ _ (Left _) _ _ _ _) = internalError "instance names should have been desugared"
   go d@(TypeInstanceDeclaration sa _ _ (Right name) deps className tys (ExplicitInstance members))
-    | className == C.Coercible
-    = throwError . errorMessage' (fst sa) $ InvalidCoercibleInstanceDeclaration tys
+    | className `elem` [C.Coercible, C.Typeable]
+    = throwError . errorMessage' (fst sa) $ DisallowedInstanceDeclaration className tys
     | otherwise = do
     desugared <- desugarCases members
     dictDecl <- typeInstanceDictionaryDeclaration syns kinds sa name mn deps className tys desugared
