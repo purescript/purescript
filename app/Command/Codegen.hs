@@ -18,7 +18,6 @@ import qualified Data.Map as M
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CoreFn as CoreFn
 import qualified Language.PureScript.CoreFn.FromJSON as CoreFn
-import qualified Language.PureScript.Docs.Types as Docs
 
 import qualified Options.Applicative as Opts
 
@@ -72,9 +71,7 @@ codegen CodegenOptions{..} = do
   purescriptOptions = P.Options False False (S.fromList [ P.JS ])
 
   runCodegen foreigns filePathMap m =
-    P.codegen (makeActions foreigns filePathMap) m
-      (Docs.Module (CoreFn.moduleName m) Nothing [] [])
-      Nothing
+    P.codegenJS (makeActions foreigns filePathMap) False m
 
   warnFileTypeNotFound :: String -> IO ()
   warnFileTypeNotFound =
