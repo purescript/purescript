@@ -394,6 +394,7 @@ executable purs
   other-modules:
     Command.Bundle
     Command.Codegen
+    Command.Common
     Command.Compile
     Command.Docs
     Command.Docs.Html
