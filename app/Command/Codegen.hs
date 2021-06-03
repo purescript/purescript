@@ -12,6 +12,7 @@ import qualified Data.Aeson.Internal as A
 import           Data.Aeson.Parser (eitherDecodeWith, json)
 import qualified Data.ByteString.Lazy as BSL
 import           Data.Either (lefts, rights)
+import           Data.Foldable (traverse_)
 import qualified Data.Set as S
 import qualified Data.Map as M
 
@@ -46,14 +47,14 @@ codegen CodegenOptions{..} = do
       M.fromList $ map ((\m -> (CoreFn.moduleName m, Right $ CoreFn.modulePath m)) . snd) $ rights mods
 
   unless (null (lefts mods)) $ do
-    _ <- traverse (hPutStr stderr . formatParseError) $ lefts mods
+    traverse_ (hPutStr stderr . formatParseError) $ lefts mods
     exitFailure
 
   foreigns <- P.inferForeignModules filePathMap
   (makeResult, makeWarnings) <-
     P.runMake purescriptOptions
       $ runSupplyT 0
-      $ traverse (runCodegen foreigns filePathMap . snd) $ rights mods
+      $ traverse (P.codegenJS (makeActions foreigns filePathMap) False . snd) $ rights mods
   printWarningsAndErrors True codegenJSONErrors makeWarnings makeResult
   where
   formatParseError (file, _, e) =
@@ -69,9 +70,6 @@ codegen CodegenOptions{..} = do
 
   purescriptOptions :: P.Options
   purescriptOptions = P.Options False False (S.fromList [ P.JS ])
-
-  runCodegen foreigns filePathMap m =
-    P.codegenJS (makeActions foreigns filePathMap) False m
 
   warnFileTypeNotFound :: String -> IO ()
   warnFileTypeNotFound =
