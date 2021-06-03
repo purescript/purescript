@@ -29,6 +29,7 @@ data CodegenOptions = CodegenOptions
   { codegenCoreFnInput :: [FilePath]
   , codegenJSONErrors :: Bool
   , codegenOutputDir :: FilePath
+  , codegenSourceMaps :: Bool
   }
 
 codegen :: CodegenOptions -> IO ()
@@ -54,7 +55,7 @@ codegen CodegenOptions{..} = do
   (makeResult, makeWarnings) <-
     P.runMake purescriptOptions
       $ runSupplyT 0
-      $ traverse (P.codegenJS (makeActions foreigns filePathMap) False . snd) $ rights mods
+      $ traverse (P.codegenJS (makeActions foreigns filePathMap) codegenSourceMaps . snd) $ rights mods
   printWarningsAndErrors True codegenJSONErrors makeWarnings makeResult
   where
   formatParseError (file, _, e) =
@@ -83,6 +84,7 @@ command = codegen <$> (Opts.helper <*> codegenOptions)
     CodegenOptions <$> many inputFile
                    <*> jsonErrors
                    <*> outputDirectory
+                   <*> sourceMaps
 
   inputFile :: Opts.Parser FilePath
   inputFile =
@@ -103,3 +105,9 @@ command = codegen <$> (Opts.helper <*> codegenOptions)
       <> Opts.value "output"
       <> Opts.showDefault
       <> Opts.help "The output directory"
+
+  sourceMaps :: Opts.Parser Bool
+  sourceMaps =
+    Opts.switch $
+      Opts.long "json-errors" <>
+      Opts.help "Generate source maps for generated JS"
