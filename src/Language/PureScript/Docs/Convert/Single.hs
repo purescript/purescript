@@ -28,7 +28,9 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
   comments = convertComments coms
   declarations =
     P.exportedDeclarations
-    >>> mapMaybe (\d -> getDeclarationTitle d >>= convertDeclaration d)
+    >>> mapMaybe (\d -> do
+      title <- getDeclarationTitle d
+      convertDeclaration d title)
     >>> augmentDeclarations
 
 -- | Different declarations we can augment
