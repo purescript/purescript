@@ -30,7 +30,8 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
     P.exportedDeclarations
     >>> mapMaybe (\d -> do
       title <- getDeclarationTitle d
-      convertDeclaration title d)
+      convertDeclaration title d
+      )
     >>> augmentDeclarations
 
 -- | Different declarations we can augment
