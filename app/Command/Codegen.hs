@@ -6,7 +6,6 @@ import           Command.Common (globWarningOnMisses, printWarningsAndErrors)
 
 import           Control.Applicative (many)
 import           Control.Monad (when, unless)
-import           Control.Monad.Supply
 
 import qualified Data.Aeson.Internal as A
 import           Data.Aeson.Parser (eitherDecodeWith, json)
@@ -54,8 +53,8 @@ codegen CodegenOptions{..} = do
   foreigns <- P.inferForeignModules filePathMap
   (makeResult, makeWarnings) <-
     P.runMake purescriptOptions
-      $ runSupplyT 0
-      $ traverse (P.codegenJS (makeActions foreigns filePathMap) codegenSourceMaps . snd) $ rights mods
+      $ traverse (P.codegenJS (makeActions foreigns filePathMap) codegenSourceMaps . snd)
+      $ rights mods
   printWarningsAndErrors True codegenJSONErrors makeWarnings makeResult
   where
   formatParseError (file, _, e) =

@@ -111,9 +111,9 @@ data MakeActions m = MakeActions
   , readExterns :: ModuleName -> m (FilePath, Maybe ExternsFile)
   -- ^ Read the externs file for a module as a string and also return the actual
   -- path for the file.
-  , codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> SupplyT m ()
+  , codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> m ()
   -- ^ Run the code generator for the module and write any required output files.
-  , codegenJS :: Bool -> CF.Module CF.Ann -> SupplyT m ()
+  , codegenJS :: Bool -> CF.Module CF.Ann -> m ()
   -- ^ Run the JS code generator for the module.
   , ffiCodegen :: CF.Module CF.Ann -> m ()
   -- ^ Check ffi and print it in the output directory.
@@ -255,8 +255,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         json = CFJ.moduleToJSON Paths.version m
     writeJSONFile coreFnFile json
 
-  codegenJS :: Bool -> CF.Module CF.Ann -> SupplyT Make ()
-  codegenJS sourceMaps m = do
+  codegenJS :: Bool -> CF.Module CF.Ann -> Make ()
+  codegenJS sourceMaps m = evalSupplyT 0 $ do
     let mn = CF.moduleName m
     foreignInclude <- case mn `M.lookup` foreigns of
       Just _
@@ -281,14 +281,14 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   codegenDocs :: ModuleName -> Docs.Module -> Make ()
   codegenDocs mn = writeJSONFile (outputFilename mn "docs.json")
 
-  codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> SupplyT Make ()
+  codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> Make ()
   codegen m docs exts = do
     let mn = CF.moduleName m
-    lift $ codegenExterns mn exts
-    codegenTargets <- lift $ asks optionsCodegenTargets
-    when (S.member CoreFn codegenTargets) $ lift $ codegenCoreFn mn m
+    codegenExterns mn exts
+    codegenTargets <- asks optionsCodegenTargets
+    when (S.member CoreFn codegenTargets) $ codegenCoreFn mn m
     when (S.member JS codegenTargets) $ codegenJS (S.member JSSourceMap codegenTargets) m
-    when (S.member Docs codegenTargets) $ lift $ codegenDocs mn docs
+    when (S.member Docs codegenTargets) $ codegenDocs mn docs
 
   ffiCodegen :: CF.Module CF.Ann -> Make ()
   ffiCodegen m = do
