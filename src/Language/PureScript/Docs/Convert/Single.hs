@@ -126,27 +126,13 @@ convertDeclaration title = \case
   P.ExternDeclaration sa _ ty ->
     basicDeclaration sa title (ValueDeclaration (ty $> ()))
   P.DataDeclaration sa dtype _ args ctors ->
-    Just (Right (mkDeclaration sa title info) { declChildren = children })
-    where
-    info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args)
-    children = map convertCtor ctors
-    convertCtor :: P.DataConstructorDeclaration -> ChildDeclaration
-    convertCtor P.DataConstructorDeclaration{..} =
-      ChildDeclaration (P.runProperName dataCtorName) (convertComments $ snd dataCtorAnn) Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
+    mkDataDeclaration sa dtype args ctors
   P.ExternDataDeclaration sa _ kind' ->
     basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
   P.TypeSynonymDeclaration sa _ args ty ->
-    basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()))
+    mkTypeSynonymDeclaration sa args ty
   P.TypeClassDeclaration sa _ args implies fundeps ds ->
-    Just (Right (mkDeclaration sa title info) { declChildren = children })
-    where
-    args' = fmap (fmap (fmap ($> ()))) args
-    info = TypeClassDeclaration args' (fmap ($> ()) implies) (convertFundepsToStrings args' fundeps)
-    children = map convertClassMember ds
-    convertClassMember (P.TypeDeclaration (P.TypeDeclarationData (ss, com) ident' ty)) =
-      ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember (ty $> ()))
-    convertClassMember _ =
-      P.internalError "convertDeclaration: Invalid argument to convertClassMember."
+    mkTypeClassDeclaration sa args implies fundeps ds
   P.TypeInstanceDeclaration (ss, com) _ _ _ constraints className tys _ ->
     Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
     where
@@ -164,6 +150,30 @@ convertDeclaration title = \case
   P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _ ->
     Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Left alias)))
   _ -> Nothing
+
+  where
+    mkDataDeclaration sa dtype args ctors =
+      Just (Right (mkDeclaration sa title info) { declChildren = children })
+      where
+      info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args)
+      children = map convertCtor ctors
+      convertCtor :: P.DataConstructorDeclaration -> ChildDeclaration
+      convertCtor P.DataConstructorDeclaration{..} =
+        ChildDeclaration (P.runProperName dataCtorName) (convertComments $ snd dataCtorAnn) Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
+
+    mkTypeSynonymDeclaration sa args ty =
+      basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()))
+
+    mkTypeClassDeclaration sa args implies fundeps ds =
+      Just (Right (mkDeclaration sa title info) { declChildren = children })
+      where
+      args' = fmap (fmap (fmap ($> ()))) args
+      info = TypeClassDeclaration args' (fmap ($> ()) implies) (convertFundepsToStrings args' fundeps)
+      children = map convertClassMember ds
+      convertClassMember (P.TypeDeclaration (P.TypeDeclarationData (ss, com) ident' ty)) =
+        ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember (ty $> ()))
+      convertClassMember _ =
+        P.internalError "convertDeclaration: Invalid argument to convertClassMember."
 
 convertComments :: [P.Comment] -> Maybe Text
 convertComments cs = do
