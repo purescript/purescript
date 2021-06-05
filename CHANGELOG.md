@@ -8,6 +8,14 @@ Breaking changes:
 
 New features:
 
+Bugfixes:
+
+Internal:
+
+## v0.14.2
+
+New features:
+
 * Make type class instance names optional (#4085, @JordanMartinez)
 
   Previously, one would be required to define a unique name for a type class
@@ -46,7 +54,7 @@ New features:
 Bugfixes:
 
 * Unused identifier warnings now report smaller and more relevant source spans (#4088, @nwolverson)
-  
+
   Also fix incorrect warnings in cases involving a let-pattern binding shadowing
   an existing identifier.
 
