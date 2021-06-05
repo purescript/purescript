@@ -14,8 +14,6 @@ Internal:
 
 ## v0.14.2
 
-Breaking changes:
-
 New features:
 
 * Make type class instance names optional (#4085, @JordanMartinez)
