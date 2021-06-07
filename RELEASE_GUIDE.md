@@ -13,7 +13,6 @@
 - Check that INSTALL.md is up-to-date
 - Regenerate LICENSE: `make license-generator` (see `license-generator/` for
   details)
-- Write release notes
 
 Additionally, if there are any breaking changes, there are number of downstream
 projects who we should probably at least notify:
