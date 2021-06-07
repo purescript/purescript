@@ -589,9 +589,9 @@ type DataDeclarationArgs =
 
 type DataDeclarationResult =
   ( [(DataConstructorDeclaration, SourceType)]
-    -- The infered type signatures of data constructors
+  -- The infered type signatures of data constructors
   , SourceType
-    -- The inferred kind of the declaration
+  -- The inferred kind of the declaration
   )
 
 kindOfData
