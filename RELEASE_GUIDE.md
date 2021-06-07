@@ -56,10 +56,10 @@ make use of? If so:
 
 Has the compiler CLI changed at all? If so, the following may need updates:
 
-- spago
-- pulp
-- psc-package
-- purs-loader
+- [spago](https://github.com/purescript/spago)
+- [pulp](https://github.com/purescript-contrib/pulp)
+- [psc-package](https://github.com/purescript/psc-package)
+- [purs-loader](https://github.com/ethul/purs-loader)
 - ide plugins
 
 ### JSON formats
