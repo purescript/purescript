@@ -1,5 +1,12 @@
 # Release Guide (for maintainers)
 
+## Prerequisites
+
+- You will need a [Hackage](https://hackage.haskell.org/) account that has been invited to be a maintainer of the `purescript` package on Hackage. If you don't have one, create one and ask to be invited as a maintainer.
+- You will need an [NPM](https://www.npmjs.com/) account that has been invited to be a maintainer of the `purescript` package on NPM. If you don't have one, create one and ask to be invited as a maintainer.
+- You need `spago` installed.
+- You need to be logged into NPM (i.e. running `npm whoami` should print your NPM account's username)
+
 ## Before making a release
 
 - Check that there are no unintended breaking changes by compiling [the latest package set](https://github.com/purescript/package-sets/releases/latest)
