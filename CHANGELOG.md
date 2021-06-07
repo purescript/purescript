@@ -12,6 +12,8 @@ Bugfixes:
 
 Internal:
 
+* Update RELEASE_GUIDE.md with more details (#4104 by @JordanMartinez)
+
 ## v0.14.2
 
 New features:
