@@ -12,6 +12,8 @@ Bugfixes:
 
 Internal:
 
+* Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
+
 ## v0.14.2
 
 New features:
@@ -59,8 +61,6 @@ Bugfixes:
   an existing identifier.
 
 Internal:
-
-* Fix for Haddock (#4072, @ncaq)
 
 * Drop libtinfo dependency (#3696, @hdgarrood)
 
