@@ -2,6 +2,7 @@ module Language.PureScript.Make
   (
   -- * Make API
   rebuildModule
+  , rebuildModule'
   , make
   , inferForeignModules
   , module Monad
@@ -21,7 +22,7 @@ import           Control.Monad.Writer.Class (MonadWriter(..), censor)
 import           Control.Monad.Writer.Strict (runWriterT)
 import           Data.Function (on)
 import           Data.Foldable (fold, for_)
-import           Data.List (foldl', sortBy)
+import           Data.List (foldl', sortOn)
 import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (fromMaybe)
 import qualified Data.Map as M
@@ -199,7 +200,7 @@ make ma@MakeActions{..} ms = do
   -- Find all groups of duplicate values in a list based on a projection.
   findDuplicates :: Ord b => (a -> b) -> [a] -> Maybe [NEL.NonEmpty a]
   findDuplicates f xs =
-    case filter ((> 1) . length) . NEL.groupBy ((==) `on` f) . sortBy (compare `on` f) $ xs of
+    case filter ((> 1) . length) . NEL.groupBy ((==) `on` f) . sortOn f $ xs of
       [] -> Nothing
       xss -> Just xss
 

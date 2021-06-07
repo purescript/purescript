@@ -17,8 +17,7 @@ import Control.Monad (unless)
 import Control.Monad.Writer.Class
 import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 
-import Data.Function (on)
-import Data.List (foldl', sortBy)
+import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import Data.Text (Text)
@@ -133,7 +132,7 @@ missingCasesSingle env mn (LiteralBinder _ (ObjectLiteral bs)) (LiteralBinder ss
   where
   (allMisses, pr) = uncurry (missingCasesMultiple env mn) (unzip binders)
 
-  sortNames = sortBy (compare `on` fst)
+  sortNames = sortOn fst
 
   (sbs, sbs') = (sortNames bs, sortNames bs')
 
@@ -294,7 +293,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     where
       partial :: Text -> Text -> Declaration
       partial var tyVar =
-        ValueDecl (ss, []) UnusedIdent Private [] $
+        ValueDecl (ss, []) UnusedIdent Private []
         [MkUnguarded
           (TypedValue
            True

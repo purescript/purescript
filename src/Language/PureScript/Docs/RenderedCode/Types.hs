@@ -1,6 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveGeneric #-}
-
 -- | Data types and functions for representing a simplified form of PureScript
 -- code, intended for use in e.g. HTML documentation.
 

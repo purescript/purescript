@@ -2,7 +2,6 @@ resolver: lts-17.6
 pvp-bounds: both
 packages:
 - '.'
-- lib/purescript-ast
 - lib/purescript-cst
 ghc-options:
   # Build with advanced optimizations enabled by default

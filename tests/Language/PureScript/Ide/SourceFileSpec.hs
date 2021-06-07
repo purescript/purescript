@@ -1,5 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.SourceFileSpec where
 
 import           Protolude
@@ -80,7 +78,7 @@ spec = do
       r `shouldBe` synonymSS
     it "finds a data declaration and its constructors" $ do
       rs <- traverse getLocation ["SFData", "SFOne", "SFTwo", "SFThree"]
-      traverse_ (`shouldBe` (Just typeSS)) rs
+      traverse_ (`shouldBe` Just typeSS) rs
     it "finds a class declaration" $ do
       Just r <- getLocation "SFClass"
       r `shouldBe` classSS

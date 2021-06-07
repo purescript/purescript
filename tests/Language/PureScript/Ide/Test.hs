@@ -1,7 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports    #-}
-{-# LANGUAGE DataKinds         #-}
 module Language.PureScript.Ide.Test where
 
 import           Control.Concurrent.STM
@@ -85,7 +82,7 @@ ideValueOp opName ident precedence assoc t =
        (IdeValueOperator
         (P.OpName opName)
         (bimap P.Ident P.ProperName <$> ident)
-        (precedence)
+        precedence
         (fromMaybe P.Infix assoc)
         t))
 
@@ -95,7 +92,7 @@ ideTypeOp opName ident precedence assoc k =
        (IdeTypeOperator
         (P.OpName opName)
         (P.ProperName <$> ident)
-        (precedence)
+        precedence
         (fromMaybe P.Infix assoc)
         k))
 
@@ -137,9 +134,9 @@ inProject f = do
 compileTestProject :: IO Bool
 compileTestProject = inProject $ do
   (_, _, _, procHandle) <-
-    createProcess $ (shell $ "purs compile \"src/**/*.purs\"")
+    createProcess $ shell "purs compile \"src/**/*.purs\""
   r <- tryNTimes 10 (getProcessExitCode procHandle)
-  pure (fromMaybe False (isSuccess <$> r))
+  pure (maybe False isSuccess r)
 
 isSuccess :: ExitCode -> Bool
 isSuccess ExitSuccess = True

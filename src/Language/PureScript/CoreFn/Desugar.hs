@@ -6,7 +6,7 @@ import Protolude (ordNub)
 import Control.Arrow (second)
 
 import Data.Function (on)
-import Data.List (sort, sortBy)
+import Data.List (sort, sortOn)
 import Data.Maybe (mapMaybe)
 import Data.Tuple (swap)
 import qualified Data.List.NonEmpty as NEL
@@ -120,7 +120,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal _ (A.ObjectLiteral _)) _)) =
     exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
   exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal _ (A.ObjectLiteral vs))) =
-    let args = fmap (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
+    let args = exprToCoreFn ss [] Nothing . snd <$> sortOn fst vs
         ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
     in foldl (App (ss, com, Nothing, Nothing)) ctor args
   exprToCoreFn ss com ty  (A.TypeClassDictionaryAccessor _ ident) =

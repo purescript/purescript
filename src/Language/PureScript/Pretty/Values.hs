@@ -226,7 +226,7 @@ prettyPrintLiteralBinder (ArrayLiteral bs) =
 --
 prettyPrintBinder :: Binder -> Text
 prettyPrintBinder (ConstructorBinder _ ctor []) = runProperName (disqualify ctor)
-prettyPrintBinder (ConstructorBinder _ ctor args) = (runProperName (disqualify ctor)) Monoid.<> " " Monoid.<> T.unwords (map prettyPrintBinderAtom args)
+prettyPrintBinder (ConstructorBinder _ ctor args) = runProperName (disqualify ctor) Monoid.<> " " Monoid.<> T.unwords (map prettyPrintBinderAtom args)
 prettyPrintBinder (PositionedBinder _ _ binder) = prettyPrintBinder binder
 prettyPrintBinder (TypedBinder _ binder) = prettyPrintBinder binder
 prettyPrintBinder b = prettyPrintBinderAtom b

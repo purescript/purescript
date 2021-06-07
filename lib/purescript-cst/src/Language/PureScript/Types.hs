@@ -16,8 +16,7 @@ import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 import Data.Foldable (fold)
 import qualified Data.IntSet as IS
-import Data.List (sort, sortBy)
-import Data.Ord (comparing)
+import Data.List (sort, sortOn)
 import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Set as S
 import Data.Text (Text)
@@ -211,7 +210,7 @@ constraintDataToJSON (PartialConstraintData bs trunc) =
     ]
 
 constraintToJSON :: (a -> A.Value) -> Constraint a -> A.Value
-constraintToJSON annToJSON (Constraint {..}) =
+constraintToJSON annToJSON Constraint {..} =
   A.object
     [ "constraintAnn"   .= annToJSON constraintAnn
     , "constraintClass" .= constraintClass
@@ -413,7 +412,7 @@ rowToList = go where
 
 -- | Convert a row to a list of pairs of labels and types, sorted by the labels.
 rowToSortedList :: Type a -> ([RowListItem a], Type a)
-rowToSortedList = first (sortBy (comparing rowListLabel)) . rowToList
+rowToSortedList = first (sortOn rowListLabel) . rowToList
 
 -- | Convert a list of labels and types to a row
 rowFromList :: ([RowListItem a], Type a) -> Type a
@@ -596,7 +595,7 @@ everywhereOnTypes f = go where
   go (TypeApp ann t1 t2) = f (TypeApp ann (go t1) (go t2))
   go (KindApp ann t1 t2) = f (KindApp ann (go t1) (go t2))
   go (ForAll ann arg mbK ty sco) = f (ForAll ann arg (go <$> mbK) (go ty) sco)
-  go (ConstrainedType ann c ty) = f (ConstrainedType ann (mapConstraintArgsAll (map go) $ c) (go ty))
+  go (ConstrainedType ann c ty) = f (ConstrainedType ann (mapConstraintArgsAll (map go) c) (go ty))
   go (RCons ann name ty rest) = f (RCons ann name (go ty) (go rest))
   go (KindedType ann ty k) = f (KindedType ann (go ty) (go k))
   go (BinaryNoParensType ann t1 t2 t3) = f (BinaryNoParensType ann (go t1) (go t2) (go t3))
@@ -643,7 +642,7 @@ everywhereOnTypesTopDownM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (T
 everywhereOnTypesTopDownM f = go <=< f where
   go (TypeApp ann t1 t2) = TypeApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (KindApp ann t1 t2) = KindApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
-  go (ForAll ann arg mbK ty sco) = ForAll ann arg <$> (traverse (f >=> go) mbK) <*> (f ty >>= go) <*> pure sco
+  go (ForAll ann arg mbK ty sco) = ForAll ann arg <$> traverse (f >=> go) mbK <*> (f ty >>= go) <*> pure sco
   go (ConstrainedType ann c ty) = ConstrainedType ann <$> overConstraintArgsAll (mapM (go <=< f)) c <*> (f ty >>= go)
   go (RCons ann name ty rest) = RCons ann name <$> (f ty >>= go) <*> (f rest >>= go)
   go (KindedType ann ty k) = KindedType ann <$> (f ty >>= go) <*> (f k >>= go)

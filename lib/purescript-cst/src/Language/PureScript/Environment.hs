@@ -132,7 +132,7 @@ makeTypeClassData
   -> [FunctionalDependency]
   -> Bool
   -> TypeClassData
-makeTypeClassData args m s deps tcIsEmpty = TypeClassData args m s deps determinedArgs coveringSets tcIsEmpty
+makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
   where
     argumentIndices = [0 .. length args - 1]
 
@@ -154,7 +154,7 @@ makeTypeClassData args m s deps tcIsEmpty = TypeClassData args m s deps determin
       Nothing -> internalError "Unknown argument index in makeTypeClassData"
       Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
                     varContributesTo = G.reachable depGraph v
-                in any (\r -> not (r `elem` varContributesTo)) contributesToVar
+                in any (`notElem` varContributesTo) contributesToVar
 
     -- find all the arguments that are determined
     determinedArgs :: S.Set Int
@@ -240,11 +240,10 @@ instance A.ToJSON DataDeclType where
   toJSON = A.toJSON . showDataDeclType
 
 instance A.FromJSON DataDeclType where
-  parseJSON = A.withText "DataDeclType" $ \str ->
-    case str of
-      "data" -> return Data
-      "newtype" -> return Newtype
-      other -> fail $ "invalid type: '" ++ T.unpack other ++ "'"
+  parseJSON = A.withText "DataDeclType" $ \case
+    "data" -> return Data
+    "newtype" -> return Newtype
+    other -> fail $ "invalid type: '" ++ T.unpack other ++ "'"
 
 -- | Construct a ProperName in the Prim module
 primName :: Text -> Qualified (ProperName a)
@@ -349,7 +348,7 @@ isTypeOrApplied t1 t2 = eqType t1 t2
 
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
-function t1 t2 = TypeApp nullSourceAnn (TypeApp nullSourceAnn tyFunction t1) t2
+function = TypeApp nullSourceAnn . TypeApp nullSourceAnn tyFunction
 
 -- To make reading the kind signatures below easier
 (-:>) :: SourceType -> SourceType -> SourceType
@@ -468,7 +467,7 @@ primTypeErrorTypes =
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
-    [ (primName "Partial", (makeTypeClassData [] [] [] [] True))
+    [ (primName "Partial", makeTypeClassData [] [] [] [] True)
     ]
 
 -- | This contains all of the type classes from all Prim modules.

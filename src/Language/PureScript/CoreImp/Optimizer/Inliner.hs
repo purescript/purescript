@@ -46,7 +46,7 @@ etaConvert = everywhere convert
   convert :: AST -> AST
   convert (Block ss [Return _ (App _ (Function _ Nothing idents block@(Block _ body)) args)])
     | all shouldInline args &&
-      not (any (`isRebound` block) (map (Var Nothing) idents)) &&
+      not (any ((`isRebound` block) . Var Nothing) idents) &&
       not (any (`isRebound` block) args)
       = Block ss (map (replaceIdents (zip idents args)) body)
   convert (Function _ Nothing [] (Block _ [Return _ (App _ fn [])])) = fn
@@ -284,7 +284,7 @@ inlineFnComposition = everywhereTopDownM convert where
   goApps (App _ (App _ (App _ fn [dict']) [x]) [y])
     | isFnCompose dict' fn = mappend <$> goApps x <*> goApps y
     | isFnComposeFlipped dict' fn = mappend <$> goApps y <*> goApps x
-  goApps app@(App {}) = pure . Right . (,app) <$> freshName
+  goApps app@App {} = pure . Right . (,app) <$> freshName
   goApps other = pure [Left other]
 
   isFnCompose :: AST -> AST -> Bool

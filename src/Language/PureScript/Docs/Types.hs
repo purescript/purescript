@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-
 module Language.PureScript.Docs.Types
   ( module Language.PureScript.Docs.Types
   , module ReExports
@@ -648,7 +646,7 @@ asFunDeps = eachInArray asFunDep
 
 asDataDeclType :: Parse PackageError P.DataDeclType
 asDataDeclType =
-  withText $ \s -> case s of
+  withText $ \case
     "data"    -> Right P.Data
     "newtype" -> Right P.Newtype
     other     -> Left (InvalidDataDeclType other)
@@ -690,7 +688,7 @@ asQualifiedProperName = fromAesonParser
 asQualifiedIdent :: Parse e (P.Qualified P.Ident)
 asQualifiedIdent = fromAesonParser
 
-asSourceAnn :: Parse e (P.SourceAnn)
+asSourceAnn :: Parse e P.SourceAnn
 asSourceAnn = fromAesonParser
 
 asModuleMap :: Parse PackageError (Map P.ModuleName PackageName)

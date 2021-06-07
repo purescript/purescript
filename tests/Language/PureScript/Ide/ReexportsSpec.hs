@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ReexportsSpec where
 
 import           Protolude

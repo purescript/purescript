@@ -52,7 +52,7 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
     encodeRebuildError err = case err of
       (P.ErrorMessage _
        ((P.HoleInferredType name _ _
-         (Just (P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields}))))) ->
+         (Just P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields})))) ->
         insertTSCompletions name idents (fromMaybe [] fields) (toJSON (toJSONError False P.Error err))
       _ ->
         (toJSON . toJSONError False P.Error) err
@@ -61,7 +61,7 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
       Aeson.Object
         (HM.insert "pursIde"
          (object [ "name" .= name
-                 , "completions" .= (ordNub (map identCompletion idents ++ map fieldCompletion fields))
+                 , "completions" .= ordNub (map identCompletion idents ++ map fieldCompletion fields)
                  ]) value)
     insertTSCompletions _ _ _ v = v
 
@@ -73,13 +73,13 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
         , complExpandedType = prettyPrintTypeSingleLine ty
         , complLocation = Nothing
         , complDocumentation = Nothing
-        , complExportedFrom = maybe [] (\x -> [x]) mn
+        , complExportedFrom = toList mn
         , complDeclarationType = Nothing
         }
     fieldCompletion (label, ty) =
       Completion 
         { complModule = ""
-        , complIdentifier = ("_." <> P.prettyPrintLabel label)
+        , complIdentifier = "_." <> P.prettyPrintLabel label
         , complType = prettyPrintTypeSingleLine ty
         , complExpandedType = prettyPrintTypeSingleLine ty
         , complLocation = Nothing

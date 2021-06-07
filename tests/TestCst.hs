@@ -1,6 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PackageImports #-}
 module TestCst where
 
 import Prelude
@@ -189,7 +186,7 @@ genStringChar delimiter ch = frequency
 
 genRawString :: Gen PSSourceRawString
 genRawString = PSSourceRawString <$> do
-  chs <- listOf $ arbitraryUnicodeChar
+  chs <- listOf arbitraryUnicodeChar
   let
     k1 acc qs cs = do
       let (cs', q) = span (/= '"') cs

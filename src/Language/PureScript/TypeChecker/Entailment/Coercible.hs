@@ -17,7 +17,7 @@ import Prelude.Compat hiding (interact)
 
 import Control.Applicative ((<|>), empty)
 import Control.Arrow ((&&&))
-import Control.Monad ((<=<), guard, when)
+import Control.Monad ((<=<), guard, unless, when)
 import Control.Monad.Error.Class (MonadError, catchError, throwError)
 import Control.Monad.State (MonadState, StateT, get, gets, modify, put)
 import Control.Monad.Trans.Class (lift)
@@ -640,7 +640,7 @@ unwrapNewtype env = go (0 :: Int) where
         -- to canonicalize them yet and we'd rather try to make progress with
         -- another rule.
         , isMonoType wrappedTy -> do
-            when (not inScope) $ do
+            unless inScope $ do
               tell [MissingConstructorImportForCoercible newtypeCtorName]
               throwError CannotUnwrapConstructor
             for_ fromModuleName $ flip addConstructorImportForCoercible newtypeCtorName

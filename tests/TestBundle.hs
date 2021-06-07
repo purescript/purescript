@@ -1,8 +1,4 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DoAndIfThenElse #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module TestBundle where
 
@@ -64,7 +60,7 @@ assertBundles support inputFiles outputFile = do
           js <- liftIO $ readUTF8File filename
           mid <- guessModuleIdentifier filename
           length js `seq` return (mid, Just filename, js)
-        bundleSM input entryModule (Just $ "Main") "PS" (Just entryPoint) Nothing
+        bundleSM input entryModule (Just "Main") "PS" (Just entryPoint) Nothing
       case bundled of
           Right (_, js) -> do
             writeUTF8File entryPoint js

@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module TestPsci.CompletionTest where
 
 import Prelude ()

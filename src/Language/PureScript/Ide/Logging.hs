@@ -22,7 +22,7 @@ runLogger logLevel' =
                                          LogAll -> True
                                          LogDefault -> not (logLevel == LevelOther "perf" || logLevel == LevelDebug)
                                          LogNone -> False
-                                         LogDebug -> not (logLevel == LevelOther "perf")
+                                         LogDebug -> logLevel /= LevelOther "perf"
                                          LogPerf -> logLevel == LevelOther "perf")
 
 labelTimespec :: Text -> TimeSpec -> Text

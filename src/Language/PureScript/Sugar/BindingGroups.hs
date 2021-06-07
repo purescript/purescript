@@ -73,13 +73,13 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
-        kindDecls = fmap (,VertexKindSignature) $ filter isKindDecl ds
-        dataDecls = fmap (,VertexDefinition) $ filter (\a -> isDataDecl a || isExternDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
-        kindSigs = fmap (declTypeName . fst) kindDecls
-        typeSyns = fmap declTypeName $ filter isTypeSynonymDecl ds
+        kindDecls = (,VertexKindSignature) <$> filter isKindDecl ds
+        dataDecls = (,VertexDefinition) <$> filter (\a -> isDataDecl a || isExternDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
+        kindSigs = declTypeName . fst <$> kindDecls
+        typeSyns = declTypeName <$> filter isTypeSynonymDecl ds
         nonTypeSynKindSigs = kindSigs \\ typeSyns
         allDecls = kindDecls ++ dataDecls
-        allProperNames = fmap (declTypeName . fst) allDecls
+        allProperNames = declTypeName . fst <$> allDecls
         mkVert (d, vty) =
           let names = usedTypeNames moduleName d `intersect` allProperNames
               name = declTypeName d

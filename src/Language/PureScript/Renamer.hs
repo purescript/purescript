@@ -134,7 +134,7 @@ renameInDecl isTopLevel (Rec ds) = do
     name' <- if isTopLevel then return name else updateScope name
     return ((a, name'), val)
   updateValues :: ((Ann, Ident), Expr Ann) -> Rename ((Ann, Ident), Expr Ann)
-  updateValues (aname, val) = (,) aname <$> renameInValue val
+  updateValues (aname, val) = (aname, ) <$> renameInValue val
 
 -- |
 -- Renames within a value.
@@ -146,7 +146,7 @@ renameInValue c@Constructor{} = return c
 renameInValue (Accessor ann prop v) =
   Accessor ann prop <$> renameInValue v
 renameInValue (ObjectUpdate ann obj vs) =
-  ObjectUpdate ann <$> renameInValue obj <*> traverse (\(name, v) -> (,) name <$> renameInValue v) vs
+  ObjectUpdate ann <$> renameInValue obj <*> traverse (\(name, v) -> (name, ) <$> renameInValue v) vs
 renameInValue e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) = return e
 renameInValue (Abs ann name v) =
   newScope $ Abs ann <$> updateScope name <*> renameInValue v

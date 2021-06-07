@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-
 module System.IO.UTF8 where
 
 import Prelude.Compat

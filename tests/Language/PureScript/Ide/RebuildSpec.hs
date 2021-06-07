@@ -1,5 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.RebuildSpec where
 
 import           Protolude
@@ -63,12 +61,12 @@ spec = describe "Rebuilding single modules" $ do
         Test.runIde [ rebuild "RebuildSpecWithMissingForeign.fail" ]
       result `shouldSatisfy` isLeft
     it "completes a hidden identifier after rebuilding" $ do
-      ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+      ([_, Right (CompletionResult [ result ])], _) <- Test.inProject $
         Test.runIde [ rebuildSync "RebuildSpecWithHiddenIdent.purs"
                     , Complete [] (flexMatcher "hid") (Just (Test.mn "RebuildSpecWithHiddenIdent")) defaultCompletionOptions]
       complIdentifier result `shouldBe` "hidden"
     it "uses the specified `actualFile` for location information" $ do
-      ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+      ([_, Right (CompletionResult [ result ])], _) <- Test.inProject $
         Test.runIde'
           Test.defConfig
           emptyIdeState

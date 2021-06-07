@@ -40,8 +40,8 @@ import Language.PureScript.CST.Types
 comment :: Comment a -> Maybe C.Comment
 comment = \case
   Comment t
-    | Text.isPrefixOf "{-" t -> Just $ C.BlockComment $ Text.drop 2 $ Text.dropEnd 2 t
-    | Text.isPrefixOf "--" t -> Just $ C.LineComment $ Text.drop 2 t
+    | "{-" `Text.isPrefixOf` t -> Just $ C.BlockComment $ Text.drop 2 $ Text.dropEnd 2 t
+    | "--" `Text.isPrefixOf` t -> Just $ C.LineComment $ Text.drop 2 t
   _ -> Nothing
 
 comments :: [Comment a] -> [C.Comment]
@@ -121,7 +121,7 @@ convertType fileName = go
     TypeHole _ a ->
       T.TypeWildcard (sourceName fileName a) . Just . getIdent $ nameValue a
     TypeString _ a b ->
-      T.TypeLevelString (sourceAnnCommented fileName a a) $ b
+      T.TypeLevelString (sourceAnnCommented fileName a a) b
     TypeRow _ (Wrapped _ row b) ->
       goRow row b
     TypeRecord _ (Wrapped a row b) -> do
@@ -575,7 +575,7 @@ convertDeclaration fileName decl = case decl of
         TypeForall{} -> ""
         TypeApp _ t1 t2 -> argName t1 <> argName t2
         TypeOp _ t1 op t2 ->
-          argName t1 <> (N.runOpName $ qualName op) <> argName t2
+          argName t1 <> N.runOpName (qualName op) <> argName t2
         TypeArr _ t1 _ t2 -> argName t1 <> "Function" <> argName t2
         TypeConstrained{} -> ""
         TypeUnaryRow{} -> "Row"
@@ -614,7 +614,7 @@ convertImportDecl fileName decl@(ImportDecl _ _ modName mbNames mbQual) = do
     ann = uncurry (sourceAnnCommented fileName) $ importDeclRange decl
     importTy = case mbNames of
       Nothing -> AST.Implicit
-      Just (hiding, (Wrapped _ imps _)) -> do
+      Just (hiding, Wrapped _ imps _) -> do
         let imps' = convertImport fileName <$> toList imps
         if isJust hiding
           then AST.Hiding imps'

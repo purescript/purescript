@@ -4,13 +4,13 @@ module Language.PureScript.Traversals where
 import Prelude.Compat
 
 fstM :: (Functor f) => (a -> f c) -> (a, b) -> f (c, b)
-fstM f (a, b) = flip (,) b <$> f a
+fstM f (a, b) = (, b) <$> f a
 
 sndM :: (Functor f) => (b -> f c) -> (a, b) -> f (a, c)
-sndM f (a, b) = (,) a <$> f b
+sndM f (a, b) = (a, ) <$> f b
 
 thirdM :: (Functor f) => (c -> f d) -> (a, b, c) -> f (a, b, d)
-thirdM f (a, b, c) = (,,) a b <$> f c
+thirdM f (a, b, c) = (a, b, ) <$> f c
 
 pairM :: (Applicative f) => (a -> f c) -> (b -> f d) -> (a, b) -> f (c, d)
 pairM f g (a, b)  = (,) <$> f a <*> g b

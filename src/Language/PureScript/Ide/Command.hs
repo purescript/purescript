@@ -160,7 +160,7 @@ instance FromJSON Command where
       "usages" -> do
         params <- o .: "params"
         FindUsages
-          <$> (map P.moduleNameFromString (params .: "module"))
+          <$> map P.moduleNameFromString (params .: "module")
           <*> params .: "identifier"
           <*> params .: "namespace"
       "import" -> do
