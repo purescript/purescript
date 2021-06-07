@@ -21,7 +21,7 @@ spago upgrade-set
 spago install $(spago ls packages | cut -f 1 -d ' ' | tr '\n' ' ')
 
 # Verify that code compiles and docs are properly created
-exec stack exec bash <<EOF
+stack exec bash <<EOF
 spago build
 spago docs
 EOF
