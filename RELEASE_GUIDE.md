@@ -10,12 +10,36 @@
 ## Before making a release
 
 - Check that there are no unintended breaking changes by compiling [the latest package set](https://github.com/purescript/package-sets/releases/latest)
-- Check that INSTALL.md is up-to-date
-- Regenerate LICENSE: `make license-generator` (see `license-generator/` for
-  details)
 
-Additionally, if there are any breaking changes, there are number of downstream
-projects who we should probably at least notify:
+```bash
+stack build
+mkdir wPackageSet
+pushd wPackageSet
+spago init
+spago upgrade-set
+# install all packages in the set
+spago install $(spago ls packages | cut -f 1 -d ' ' | tr '\n' ' ')
+
+# Verify that code compiles and docs are properly created
+exec stack exec bash <<EOF
+spago build
+spago docs
+EOF
+popd
+# rm -rf wPackageSet
+```
+
+- Check that INSTALL.md is up-to-date. For example:
+    - Does the GHC version correspond to the one we're currently on?
+    - Is the list of supported OSes (based on GHC version) correct? If not, check the GHC website for the list.
+    - Are there any unofficial installation methods that should be dropped because they are no longer maintained?
+    - Are the instructions for building from source currently working?
+    - Anything else that needs to be changed?
+
+- Regenerate LICENSE: `make license-generator` (see `license-generator/` for details)
+
+- Additionally, if there are any breaking changes, there are number of downstream
+projects whom we should probably at least notify. See below subsections:
 
 ### Libraries
 
