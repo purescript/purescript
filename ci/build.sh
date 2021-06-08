@@ -23,7 +23,9 @@ set -ex
 # for compilation or for tests in our package.yaml file (these sorts of issues
 # don't test to get noticed until after releasing otherwise).
 
-STACK="stack --no-terminal --jobs=2"
+# We test with --haddock because haddock generation can fail if there is invalid doc-comment syntax,
+# and these failures are very easy to miss otherwise.
+STACK="stack --no-terminal --haddock --jobs=2"
 
 STACK_OPTS="--test"
 if [ "$CI_RELEASE" = "true" ]
