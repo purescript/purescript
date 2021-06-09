@@ -27,9 +27,10 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
   where
   comments = convertComments coms
   declarations =
-    P.exportedDeclarations
+    P.exportedDocumentedDeclarations
+    >>> (reverse . snd . foldl' reassociateKindSignatures (Nothing, []))
     >>> mapMaybe (\d -> do
-      title <- getDeclarationTitle d
+      title <- either (getDeclarationTitle . snd) getDeclarationTitle d
       convertDeclaration title d
       )
     >>> augmentDeclarations
@@ -103,70 +104,114 @@ getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (P.showOp op)
 getDeclarationTitle _ = Nothing
 
 -- | Create a basic Declaration value.
-mkDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Declaration
-mkDeclaration (ss, com) title info =
+mkDeclaration :: P.SourceAnn -> Text -> Maybe KindInfo -> DeclarationInfo -> Declaration
+mkDeclaration (ss, com) title kindInfo info =
   Declaration { declTitle      = title
               , declComments   = convertComments com
               , declSourceSpan = Just ss -- TODO: make this non-optional when we next break the format
               , declChildren   = []
               , declInfo       = info
+              , declKind       = kindInfo
               }
 
 basicDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Maybe IntermediateDeclaration
-basicDeclaration sa title = Just . Right . mkDeclaration sa title
+basicDeclaration sa title = Just . Right . mkDeclaration sa title Nothing
 
-convertDeclaration :: Text -> P.Declaration -> Maybe IntermediateDeclaration
+reassociateKindSignatures
+  :: (Maybe P.Declaration, [Either (P.Declaration, P.Declaration) P.Declaration])
+  -> P.Declaration
+  -> (Maybe P.Declaration, [Either (P.Declaration, P.Declaration) P.Declaration])
+reassociateKindSignatures (ks, ls) = \case
+  d@P.KindDeclaration{} -> (Just d, ls)
+  d@P.DataDeclaration{} -> (Nothing, storeKindSig d)
+  d@P.TypeSynonymDeclaration{} -> (Nothing, storeKindSig d)
+  d@P.TypeClassDeclaration{} -> (Nothing, storeKindSig d)
+  d -> (Nothing, Right d : ls)
+  where
+    storeKindSig d =
+      maybe (Right d : ls) (\kDecl -> Left (kDecl, d) : ls) ks
+
+convertDeclaration
+  :: Text
+  -> Either (P.Declaration, P.Declaration) P.Declaration
+  -> Maybe IntermediateDeclaration
 convertDeclaration title = \case
-  P.ValueDecl sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)] ->
-    basicDeclaration sa title (ValueDeclaration (ty $> ()))
-  P.ValueDecl sa _ _ _ _ ->
-    -- If no explicit type declaration was provided, insert a wildcard, so that
-    -- the actual type will be added during type checking.
-    basicDeclaration sa title (ValueDeclaration (P.TypeWildcard () Nothing))
-  P.ExternDeclaration sa _ ty ->
-    basicDeclaration sa title (ValueDeclaration (ty $> ()))
-  P.DataDeclaration sa dtype _ args ctors ->
-    mkDataDeclaration sa dtype args ctors
-  P.ExternDataDeclaration sa _ kind' ->
-    basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
-  P.TypeSynonymDeclaration sa _ args ty ->
-    mkTypeSynonymDeclaration sa args ty
-  P.TypeClassDeclaration sa _ args implies fundeps ds ->
-    mkTypeClassDeclaration sa args implies fundeps ds
-  P.TypeInstanceDeclaration (ss, com) _ _ _ constraints className tys _ ->
-    Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
-    where
-    classNameString = unQual className
-    typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
-    unQual x = let (P.Qualified _ y) = x in P.runProperName y
+  Left (kd@P.KindDeclaration{}, decl) -> do
+    let kindDecl = Just kd
+    case decl of
+      P.DataDeclaration sa dtype _ args ctors ->
+        mkDataDeclaration kindDecl sa dtype args ctors
 
-    extractProperNames (P.TypeConstructor _ n) = [unQual n]
-    extractProperNames _ = []
+      P.TypeSynonymDeclaration sa _ args ty ->
+        mkTypeSynonymDeclaration kindDecl sa args ty
 
-    childDecl = ChildDeclaration title (convertComments com) (Just ss) (ChildInstance (fmap ($> ()) constraints) (classApp $> ()))
-    classApp = foldl' P.srcTypeApp (P.srcTypeConstructor (fmap P.coerceProperName className)) tys
-  P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _ ->
-    Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
-  P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _ ->
-    Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Left alias)))
-  _ -> Nothing
+      P.TypeClassDeclaration sa _ args implies fundeps ds ->
+        mkTypeClassDeclaration kindDecl sa args implies fundeps ds
+
+      _ -> P.internalError "convertDeclarationWithKindSig: something other than data/type/newtype/class declarations stored in Tuple's second entry"
+
+  Left (_, _) -> P.internalError "convertDeclarationWithKindSig: something other than KindDeclaration stored in Tuple's first entry"
+  Right decl -> case decl of
+    P.ValueDecl sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)] ->
+      basicDeclaration sa title (ValueDeclaration (ty $> ()))
+    P.ValueDecl sa _ _ _ _ ->
+      -- If no explicit type declaration was provided, insert a wildcard, so that
+      -- the actual type will be added during type checking.
+      basicDeclaration sa title (ValueDeclaration (P.TypeWildcard () Nothing))
+    P.ExternDeclaration sa _ ty ->
+      basicDeclaration sa title (ValueDeclaration (ty $> ()))
+    P.DataDeclaration sa dtype _ args ctors ->
+      mkDataDeclaration Nothing sa dtype args ctors
+    P.ExternDataDeclaration sa _ kind' ->
+      basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
+    P.TypeSynonymDeclaration sa _ args ty ->
+      mkTypeSynonymDeclaration Nothing sa args ty
+    P.TypeClassDeclaration sa _ args implies fundeps ds ->
+      mkTypeClassDeclaration Nothing sa args implies fundeps ds
+    P.TypeInstanceDeclaration (ss, com) _ _ _ constraints className tys _ ->
+      Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
+      where
+      classNameString = unQual className
+      typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
+      unQual x = let (P.Qualified _ y) = x in P.runProperName y
+
+      extractProperNames (P.TypeConstructor _ n) = [unQual n]
+      extractProperNames _ = []
+
+      childDecl = ChildDeclaration title (convertComments com) (Just ss) (ChildInstance (fmap ($> ()) constraints) (classApp $> ()))
+      classApp = foldl' P.srcTypeApp (P.srcTypeConstructor (fmap P.coerceProperName className)) tys
+    P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _ ->
+      Just . Right $ mkDeclaration sa title Nothing (AliasDeclaration fixity (P.Qualified mn (Right alias)))
+    P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _ ->
+      Just . Right $ mkDeclaration sa title Nothing (AliasDeclaration fixity (P.Qualified mn (Left alias)))
+    _ -> Nothing
 
   where
-    mkDataDeclaration sa dtype args ctors =
-      Just (Right (mkDeclaration sa title info) { declChildren = children })
+    mkKindSig ann@(sa, comments) = \case
+      Just (P.KindDeclaration (_, commentsK) kindSig _ ty) ->
+        ((sa, commentsK ++ comments), Just (KindInfo kindSig (ty $> ())))
+      _ -> (ann, Nothing)
+
+    mkDataDeclaration kindDecl sa dtype args ctors =
+      Just (Right (mkDeclaration sa' title kindSig info) { declChildren = children })
       where
+      (sa', kindSig) = mkKindSig sa kindDecl
       info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args)
       children = map convertCtor ctors
       convertCtor :: P.DataConstructorDeclaration -> ChildDeclaration
       convertCtor P.DataConstructorDeclaration{..} =
         ChildDeclaration (P.runProperName dataCtorName) (convertComments $ snd dataCtorAnn) Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
 
-    mkTypeSynonymDeclaration sa args ty =
-      basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()))
-
-    mkTypeClassDeclaration sa args implies fundeps ds =
-      Just (Right (mkDeclaration sa title info) { declChildren = children })
+    mkTypeSynonymDeclaration kindDecl sa args ty =
+      Just $ Right $ mkDeclaration sa' title kindSig info
       where
+        (sa', kindSig) = mkKindSig sa kindDecl
+        info = TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ())
+
+    mkTypeClassDeclaration kindDecl sa args implies fundeps ds =
+      Just (Right (mkDeclaration sa' title kindSig info) { declChildren = children })
+      where
+      (sa', kindSig) = mkKindSig sa kindDecl
       args' = fmap (fmap (fmap ($> ()))) args
       info = TypeClassDeclaration args' (fmap ($> ()) implies) (convertFundepsToStrings args' fundeps)
       children = map convertClassMember ds

@@ -434,6 +434,7 @@ handleEnv TypeClassEnv{..} =
           , declSourceSpan = cdeclSourceSpan
           , declChildren   = []
           , declInfo       = ValueDeclaration (addConstraint constraint typ)
+          , declKind       = Nothing
           }
       _ ->
         internalErrorInModule

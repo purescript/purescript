@@ -1,5 +1,6 @@
 module Language.PureScript.AST.Exported
   ( exportedDeclarations
+  , exportedDocumentedDeclarations
   , isExported
   ) where
 
@@ -9,6 +10,7 @@ import Protolude (sortOn)
 import Control.Category ((>>>))
 
 import Data.Maybe (mapMaybe)
+import Data.Foldable (foldl')
 import qualified Data.Map as M
 
 import Language.PureScript.AST.Declarations
@@ -38,6 +40,29 @@ exportedDeclarations (Module _ _ mn decls exps) = go decls
         >>> map (filterDataConstructors exps)
         >>> filterInstances mn exps
         >>> maybe id reorder exps
+
+-- | This function is intended to be used solely for creating a module's
+-- documentation. It functions exactly like @exportedDeclarations@,
+-- except that @KindDeclaration@s are also exported if the corresponding
+-- declaration is exported.
+exportedDocumentedDeclarations :: Module -> [Declaration]
+exportedDocumentedDeclarations (Module _ _ mn decls exps) = go decls
+  where
+  go = flattenDecls
+        >>> reverse . snd . foldl' (f exps) (Nothing, [])
+        >>> map (filterDataConstructors exps)
+        >>> filterInstances mn exps
+        >>> maybe id reorderForDocs exps
+
+  f :: Maybe [DeclarationRef] -> (Maybe Declaration, [Declaration]) -> Declaration -> (Maybe Declaration, [Declaration])
+  f _ (_, ls) d@KindDeclaration{} = (Just d, ls)
+  f Nothing (_, ls) d = (Nothing, d : ls)
+  f _ (_, ls) d@TypeInstanceDeclaration{} = (Nothing, d : ls)
+  f (Just exps') (ks, ls) d
+    | any matches exps' = (Nothing, maybe (d : ls) (\kd -> d : kd : ls) ks)
+    | otherwise = (Nothing, ls)
+    where
+    matches declRef = declName d == Just (declRefName declRef)
 
 -- |
 -- Filter out all data constructors from a declaration which are not exported.
@@ -154,3 +179,16 @@ reorder refs =
     M.fromList $ zip (map declRefName refs) [(0::Int)..]
   refIndex decl =
     declName decl >>= flip M.lookup refIndices
+
+-- |
+-- Same as @reorder@ except KindDeclarations are included
+-- when reordering
+--
+reorderForDocs :: [DeclarationRef] -> [Declaration] -> [Declaration]
+reorderForDocs refs =
+  sortOn refIndex
+  where
+  refIndices =
+    M.fromList $ zip (map declRefName refs) [(0::Int)..]
+  refIndex decl =
+    declDocName decl >>= flip M.lookup refIndices

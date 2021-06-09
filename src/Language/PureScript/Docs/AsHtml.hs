@@ -145,7 +145,10 @@ declAsHtml r d@Declaration{..} = do
       case declInfo of
         AliasDeclaration fixity alias_ ->
           renderAlias fixity alias_
-        _ ->
+        _ -> do
+          for_ declKind $ \kindInfo -> do
+            pre ! A.class_ "decl__signature" $ code $
+              codeAsHtml r (Render.renderKindSig declTitle kindInfo)
           pre ! A.class_ "decl__signature" $ code $
             codeAsHtml r (Render.renderDeclaration d)
 

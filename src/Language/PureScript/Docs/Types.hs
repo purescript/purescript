@@ -132,6 +132,7 @@ data Declaration = Declaration
   , declSourceSpan :: Maybe P.SourceSpan
   , declChildren   :: [ChildDeclaration]
   , declInfo       :: DeclarationInfo
+  , declKind       :: Maybe KindInfo
   }
   deriving (Show, Eq, Ord, Generic)
 
@@ -183,6 +184,15 @@ data DeclarationInfo
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData DeclarationInfo
+
+-- |
+-- Wraps enough information to properly render the kind signature
+-- of a data/newtype/type/class declaration.
+data KindInfo
+  = KindInfo P.KindSignatureFor Type'
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData KindInfo
 
 convertFundepsToStrings :: [(Text, Maybe Type')] -> [P.FunctionalDependency] -> [([Text], [Text])]
 convertFundepsToStrings args fundeps =
@@ -347,6 +357,7 @@ data PackageError
   | InvalidFixity
   | InvalidKind Text
   | InvalidDataDeclType Text
+  | InvalidKindSignatureFor Text
   | InvalidTime
   deriving (Show, Eq, Ord, Generic)
 
@@ -530,6 +541,8 @@ displayPackageError e = case e of
     "Invalid kind: \"" <> str <> "\""
   InvalidDataDeclType str ->
     "Invalid data declaration type: \"" <> str <> "\""
+  InvalidKindSignatureFor str ->
+    "Invalid kind signature keyword: \"" <> str <> "\""
   InvalidTime ->
     "Invalid time"
 
@@ -560,6 +573,7 @@ asDeclaration =
               <*> key "sourceSpan" (perhaps asSourceSpan)
               <*> key "children" (eachInArray asChildDeclaration)
               <*> key "info" asDeclarationInfo
+              <*> keyOrDefault "kind" Nothing (Just <$> asKindInfo)
 
 asReExport :: Parse PackageError (InPackage P.ModuleName, [Declaration])
 asReExport =
@@ -630,6 +644,20 @@ asDeclarationInfo = do
       pure $ ExternDataDeclaration (P.kindType $> ())
     other ->
       throwCustomError (InvalidDeclarationType other)
+
+asKindInfo :: Parse PackageError KindInfo
+asKindInfo =
+  KindInfo <$> key "keyword" asKindSignatureFor
+           <*> key "ty" asType
+
+asKindSignatureFor :: Parse PackageError P.KindSignatureFor
+asKindSignatureFor =
+  withText $ \case
+    "data" -> Right P.DataSig
+    "newtype" -> Right P.NewtypeSig
+    "class" -> Right P.ClassSig
+    "type" -> Right P.TypeSynonymSig
+    x -> Left (InvalidKindSignatureFor x)
 
 asTypeArguments :: Parse PackageError [(Text, Maybe Type')]
 asTypeArguments = eachInArray asTypeArgument
@@ -777,7 +805,14 @@ instance A.ToJSON Declaration where
              , "sourceSpan" .= declSourceSpan
              , "children"   .= declChildren
              , "info"       .= declInfo
+             , "kind"       .= declKind
              ]
+
+instance A.ToJSON KindInfo where
+ toJSON (KindInfo kindFor ty) =
+   A.object [ "keyword" .= P.kindSignatureForKeyword kindFor
+            , "ty"      .= ty
+            ]
 
 instance A.ToJSON ChildDeclaration where
   toJSON ChildDeclaration{..} =

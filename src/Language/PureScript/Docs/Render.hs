@@ -20,9 +20,19 @@ import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
 
 import qualified Language.PureScript.AST as P
+import Language.PureScript.AST.Declarations (kindSignatureForKeyword)
 import qualified Language.PureScript.Environment as P
 import qualified Language.PureScript.Names as P
 import qualified Language.PureScript.Types as P
+
+renderKindSig :: Text -> KindInfo -> RenderedCode
+renderKindSig declTitle (KindInfo ks ty) =
+  mintersperse sp
+      [ keyword $ kindSignatureForKeyword ks
+      , renderType (P.TypeConstructor () (notQualified declTitle))
+      , syntax "::"
+      , renderType ty
+      ]
 
 renderDeclaration :: Declaration -> RenderedCode
 renderDeclaration Declaration{..} =
