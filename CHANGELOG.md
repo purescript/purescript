@@ -10,6 +10,8 @@ New features:
 
 Bugfixes:
 
+* Ensure unnamed instances appear in documentation (#4109 by @JordanMartinez)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
