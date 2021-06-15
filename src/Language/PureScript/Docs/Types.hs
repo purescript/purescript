@@ -573,7 +573,7 @@ asDeclaration =
               <*> key "sourceSpan" (perhaps asSourceSpan)
               <*> key "children" (eachInArray asChildDeclaration)
               <*> key "info" asDeclarationInfo
-              <*> keyOrDefault "kind" Nothing (Just <$> asKindInfo)
+              <*> keyOrDefault "kind" Nothing (perhaps asKindInfo)
 
 asReExport :: Parse PackageError (InPackage P.ModuleName, [Declaration])
 asReExport =
