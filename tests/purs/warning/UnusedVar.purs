@@ -5,6 +5,7 @@
 -- @shouldWarnWith UnusedName
 -- @shouldWarnWith UnusedName
 -- @shouldWarnWith UnusedName
+-- @shouldWarnWith UnusedName
 -- @shouldWarnWith ShadowedName
 module Main where
 
@@ -67,3 +68,37 @@ unusedShadowingLet :: X -> X
 unusedShadowingLet x = 
   let (x) = x
   in X
+
+-- 4110
+oops ∷ { inner :: String } → String
+oops box =
+  let
+    { inner } = box
+    val = inner
+  in
+    val
+
+-- like oops but switching order to show we don't 
+notOops ∷ { x :: String } -> String → String
+notOops box x =
+  let
+    val = x
+    _blah = x
+    { x } = box
+  in
+    val
+
+bindingGroupsNotRecognised :: Int
+bindingGroupsNotRecognised =
+  let
+    f n = g n
+    g n = f n
+    
+    -- Second f is unused because this is multiple recursive binding groups, we don't warn because we assume
+    -- it might be one binding group so there is a usage. If it would be 1 binding group there would be an error
+    -- Shadowed variable warnings are similarly not aware of binding groups
+    { x } = { x: 2 }
+    h n = n
+    f x = x
+  in 
+    h x

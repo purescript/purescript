@@ -12,6 +12,8 @@ Bugfixes:
 
 * Ensure unnamed instances appear in documentation (#4109 by @JordanMartinez)
 
+* Fix UnusedName warnings for multiple non-recursive let bindings (#4114 by @nwolverson)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
