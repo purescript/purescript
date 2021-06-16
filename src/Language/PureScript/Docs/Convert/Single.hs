@@ -189,7 +189,9 @@ convertDeclaration title = \case
   where
     mkKindSig ann@(sa, comments) = \case
       Just (P.KindDeclaration (_, commentsK) kindSig _ ty) ->
-        ((sa, commentsK ++ comments), Just (KindInfo kindSig (ty $> ())))
+        ( (sa, commentsK ++ comments)
+        , Just $ KindInfo kindSig (ty $> ())
+        )
       _ -> (ann, Nothing)
 
     mkDataDeclaration kindDecl sa dtype args ctors =
