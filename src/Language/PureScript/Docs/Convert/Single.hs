@@ -187,14 +187,19 @@ convertDeclaration title = \case
     _ -> Nothing
 
   where
-    mkKindSig ann@(sa, comments) = \case
-      Just (P.KindDeclaration (_, commentsK) kindSig _ ty) ->
-      -- The `LineComment " | "` functionally adds a newline character
-      -- between the docs on the kind signature and the docs on
-      -- the declaration.
-        ( (sa, commentsK ++ P.LineComment " | " : comments)
+    mkKindSig ann@(sa, declComments) = \case
+      Just (P.KindDeclaration (_, ksComments) kindSig _ ty) ->
+        ( (sa, mergeComments ksComments declComments)
         , Just $ KindInfo kindSig (ty $> ())
         )
+        where
+          -- The `LineComment " | "` functionally adds a newline character
+          -- between the docs on the kind signature and the docs on
+          -- the declaration, but only if both declarations
+          -- have comments.
+          mergeComments ks [] = ks
+          mergeComments [] decl = decl
+          mergeComments ks decl = ks ++ P.LineComment " | " : decl
       _ -> (ann, Nothing)
 
     mkDataDeclaration kindDecl sa dtype args ctors =
