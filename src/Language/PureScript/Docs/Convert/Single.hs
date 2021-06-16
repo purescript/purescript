@@ -190,7 +190,7 @@ convertDeclaration title = \case
     mkKindSig ann@(sa, declComments) = \case
       Just (P.KindDeclaration (_, ksComments) kindSig _ ty) ->
         ( (sa, mergeComments ksComments declComments)
-        , Just $ KindInfo kindSig (ty $> ())
+        , Just $ KindInfo { kiKindSigFor = kindSig, kiType = ty $> () }
         )
         where
           -- The `LineComment " | "` functionally adds a newline character
