@@ -169,10 +169,11 @@ reorder refs =
   refIndex = \case
     KindDeclaration _ _ n _ ->
       M.lookup (TyName n) refIndices <|> M.lookup (TyClassName (tyToClassName n)) refIndices
-    decl -> declName decl >>= flip M.lookup refIndices
+      where
+        -- Workaround to the fact that the kind's name's ProperNameType
+        -- isn't the same as the declaration's ProperNameType
+        -- when that declaration is a type class
+        tyToClassName :: ProperName 'TypeName -> ProperName 'ClassName
+        tyToClassName = coerceProperName
 
-  -- Workaround to the fact that the kind's name's ProperNameType
-  -- isn't the same as the declaration's ProperNameType
-  -- when that declaration is a type class
-  tyToClassName :: ProperName 'TypeName -> ProperName 'ClassName
-  tyToClassName = coerceProperName
+    decl -> declName decl >>= flip M.lookup refIndices
