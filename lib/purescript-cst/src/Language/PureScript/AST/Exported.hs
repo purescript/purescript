@@ -1,6 +1,5 @@
 module Language.PureScript.AST.Exported
   ( exportedDeclarations
-  , exportedDocumentedDeclarations
   , isExported
   ) where
 
@@ -33,27 +32,16 @@ import Language.PureScript.Names
 -- list, unless there is no export list, in which case they appear in the same
 -- order as they do in the source file.
 --
+-- Kind signatures declarations are also exported if their associated
+-- declaration is exported.
 exportedDeclarations :: Module -> [Declaration]
 exportedDeclarations (Module _ _ mn decls exps) = go decls
-  where
-  go = flattenDecls
-        >>> filter (isExported exps)
-        >>> map (filterDataConstructors exps)
-        >>> filterInstances mn exps
-        >>> maybe id reorder exps
-
--- | This function is intended to be used solely for creating a module's
--- documentation. It functions exactly like @exportedDeclarations@,
--- except that @KindDeclaration@s are also exported if the corresponding
--- declaration is exported.
-exportedDocumentedDeclarations :: Module -> [Declaration]
-exportedDocumentedDeclarations (Module _ _ mn decls exps) = go decls
   where
   go = flattenDecls
         >>> reverse . snd . foldl' (f exps) (Nothing, [])
         >>> map (filterDataConstructors exps)
         >>> filterInstances mn exps
-        >>> maybe id reorderForDocs exps
+        >>> maybe id reorder exps
 
   f :: Maybe [DeclarationRef] -> (Maybe Declaration, [Declaration]) -> Declaration -> (Maybe Declaration, [Declaration])
   f _ (_, ls) d@KindDeclaration{} = (Just d, ls)
@@ -178,23 +166,10 @@ reorder refs =
   where
   refIndices =
     M.fromList $ zip (map declRefName refs) [(0::Int)..]
-  refIndex decl =
-    declName decl >>= flip M.lookup refIndices
-
--- |
--- Same as @reorder@ except KindDeclarations are included
--- when reordering
---
-reorderForDocs :: [DeclarationRef] -> [Declaration] -> [Declaration]
-reorderForDocs refs =
-  sortOn refIndex
-  where
-  refIndices =
-    M.fromList $ zip (map declRefName refs) [(0::Int)..]
   refIndex = \case
     KindDeclaration _ _ n _ ->
       M.lookup (TyName n) refIndices <|> M.lookup (TyClassName (tyToClassName n)) refIndices
-    decl -> declDocName decl >>= flip M.lookup refIndices
+    decl -> declName decl >>= flip M.lookup refIndices
 
   -- Workaround to the fact that the kind's name's ProperNameType
   -- isn't the same as the declaration's ProperNameType

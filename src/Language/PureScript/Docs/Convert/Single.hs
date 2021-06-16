@@ -27,7 +27,7 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
   where
   comments = convertComments coms
   declarations =
-    P.exportedDocumentedDeclarations
+    P.exportedDeclarations
     >>> (reverse . snd . foldl' reassociateKindSignatures (Nothing, []))
     >>> mapMaybe (\d -> do
       title <- either (getDeclarationTitle . snd) getDeclarationTitle d

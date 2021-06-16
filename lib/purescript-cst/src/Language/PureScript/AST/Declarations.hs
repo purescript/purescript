@@ -504,6 +504,9 @@ declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _) = sa
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
 
+-- Note: Kind Declarations' names can refer to either a `TyClassName`
+-- or a `TypeName`. Use a helper function for handling `KindDeclaration`s
+-- specifically in the context in which it is needed.
 declName :: Declaration -> Maybe Name
 declName (DataDeclaration _ _ n _ _) = Just (TyName n)
 declName (TypeSynonymDeclaration _ n _ _) = Just (TyName n)
@@ -521,26 +524,6 @@ declName BoundValueDeclaration{} = Nothing
 declName KindDeclaration{} = Nothing
 declName TypeDeclaration{} = Nothing
 declName RoleDeclaration{} = Nothing
-
--- | Same as @declName@ except that KindDeclaration's names
--- are also included
-declDocName :: Declaration -> Maybe Name
-declDocName (DataDeclaration _ _ n _ _) = Just (TyName n)
-declDocName (TypeSynonymDeclaration _ n _ _) = Just (TyName n)
-declDocName (ValueDeclaration vd) = Just (IdentName (valdeclIdent vd))
-declDocName (ExternDeclaration _ n _) = Just (IdentName n)
-declDocName (ExternDataDeclaration _ n _) = Just (TyName n)
-declDocName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
-declDocName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
-declDocName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
-declDocName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = IdentName <$> hush n
-declDocName (KindDeclaration _ _ n _) = Just (TyName n)
-declDocName ImportDeclaration{} = Nothing
-declDocName BindingGroupDeclaration{} = Nothing
-declDocName DataBindingGroupDeclaration{} = Nothing
-declDocName BoundValueDeclaration{} = Nothing
-declDocName TypeDeclaration{} = Nothing
-declDocName RoleDeclaration{} = Nothing
 
 -- |
 -- Test if a declaration is a value declaration
