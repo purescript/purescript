@@ -8,6 +8,7 @@ import Prelude.Compat
 import Protolude (sortOn)
 
 import Control.Category ((>>>))
+import Control.Applicative ((<|>))
 
 import Data.Maybe (mapMaybe)
 import Data.Foldable (foldl')
@@ -190,5 +191,13 @@ reorderForDocs refs =
   where
   refIndices =
     M.fromList $ zip (map declRefName refs) [(0::Int)..]
-  refIndex decl =
-    declDocName decl >>= flip M.lookup refIndices
+  refIndex = \case
+    KindDeclaration _ _ n _ ->
+      M.lookup (TyName n) refIndices <|> M.lookup (TyClassName (tyToClassName n)) refIndices
+    decl -> declDocName decl >>= flip M.lookup refIndices
+
+  -- Workaround to the fact that the kind's name's ProperNameType
+  -- isn't the same as the declaration's ProperNameType
+  -- when that declaration is a type class
+  tyToClassName :: ProperName 'TypeName -> ProperName 'ClassName
+  tyToClassName = coerceProperName
