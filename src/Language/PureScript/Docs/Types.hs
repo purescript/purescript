@@ -810,9 +810,16 @@ instance A.ToJSON Declaration where
 
 instance A.ToJSON KindInfo where
  toJSON (KindInfo kindFor ty) =
-   A.object [ "keyword" .= P.kindSignatureForKeyword kindFor
+   A.object [ "keyword" .= kindSignatureForKeyword kindFor
             , "ty"      .= ty
             ]
+
+kindSignatureForKeyword :: P.KindSignatureFor -> Text
+kindSignatureForKeyword = \case
+  P.DataSig -> "data"
+  P.NewtypeSig -> "newtype"
+  P.TypeSynonymSig -> "type"
+  P.ClassSig -> "class"
 
 instance A.ToJSON ChildDeclaration where
   toJSON ChildDeclaration{..} =

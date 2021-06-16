@@ -477,13 +477,6 @@ data KindSignatureFor
 
 instance NFData KindSignatureFor
 
-kindSignatureForKeyword :: KindSignatureFor -> Text
-kindSignatureForKeyword = \case
-  DataSig -> "data"
-  NewtypeSig -> "newtype"
-  TypeSynonymSig -> "type"
-  ClassSig -> "class"
-
 declSourceAnn :: Declaration -> SourceAnn
 declSourceAnn (DataDeclaration sa _ _ _ _) = sa
 declSourceAnn (DataBindingGroupDeclaration ds) = declSourceAnn (NEL.head ds)
