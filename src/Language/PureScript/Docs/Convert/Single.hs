@@ -189,7 +189,10 @@ convertDeclaration title = \case
   where
     mkKindSig ann@(sa, comments) = \case
       Just (P.KindDeclaration (_, commentsK) kindSig _ ty) ->
-        ( (sa, commentsK ++ comments)
+      -- The `LineComment " | "` functionally adds a newline character
+      -- between the docs on the kind signature and the docs on
+      -- the declaration.
+        ( (sa, commentsK ++ P.LineComment " | " : comments)
         , Just $ KindInfo kindSig (ty $> ())
         )
       _ -> (ann, Nothing)
