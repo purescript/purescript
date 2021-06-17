@@ -28,11 +28,7 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
   comments = convertComments coms
   declarations =
     P.exportedDeclarations
-    >>> (reverse . snd . foldl' reassociateKindSignatures (Nothing, []))
-    >>> mapMaybe (\d -> do
-      title <- either (getDeclarationTitle . snd) getDeclarationTitle d
-      convertDeclaration title d
-      )
+    >>> mapMaybe (\d -> getDeclarationTitle d >>= convertDeclaration d)
     >>> augmentDeclarations
 
 -- | Different declarations we can augment
@@ -70,8 +66,13 @@ type IntermediateDeclaration
 -- since they appear at the top level in the AST, and since they might need to
 -- appear as children in two places (for example, if a data type defined in a
 -- module is an instance of a type class also defined in that module).
+--
+-- The AugmentKindSig constructor allows us to add a kind signature
+-- to its corresponding declaration. Comments for both declarations
+-- are also merged together.
 data DeclarationAugment
   = AugmentChild ChildDeclaration
+  | AugmentKindSig (Maybe Text) P.KindSignatureFor Type'
 
 -- | Augment top-level declarations; the second pass. See the comments under
 -- the type synonym IntermediateDeclaration for more information.
@@ -90,6 +91,15 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
 
   augmentWith (AugmentChild child) d =
     d { declChildren = declChildren d ++ [child] }
+  augmentWith (AugmentKindSig comms kindSig ty) d =
+    d { declComments = mergeComments comms $ declComments d
+      , declKind = Just $ KindInfo { kiKindSigFor = kindSig, kiType = ty }
+      }
+    where
+      mergeComments Nothing dc = dc
+      mergeComments kc Nothing = kc
+      mergeComments (Just kcoms) (Just dcoms) =
+        Just $ kcoms <> "\n" <> dcoms
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
 getDeclarationTitle (P.ValueDeclaration vd) = Just (P.showIdent (P.valdeclIdent vd))
@@ -101,134 +111,75 @@ getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _) = Just (P.runProperN
 getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ name _ _ _ _) = Just $ either (const "<anonymous>") P.showIdent name
 getDeclarationTitle (P.TypeFixityDeclaration _ _ _ op) = Just ("type " <> P.showOp op)
 getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (P.showOp op)
+getDeclarationTitle (P.KindDeclaration _ _ n _) = Just (P.runProperName n)
 getDeclarationTitle _ = Nothing
 
 -- | Create a basic Declaration value.
-mkDeclaration :: P.SourceAnn -> Text -> Maybe KindInfo -> DeclarationInfo -> Declaration
-mkDeclaration (ss, com) title kindInfo info =
+mkDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Declaration
+mkDeclaration (ss, com) title info =
   Declaration { declTitle      = title
               , declComments   = convertComments com
               , declSourceSpan = Just ss -- TODO: make this non-optional when we next break the format
               , declChildren   = []
               , declInfo       = info
-              , declKind       = kindInfo
+              , declKind       = Nothing -- kind sigs are added in augment pass
               }
 
 basicDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Maybe IntermediateDeclaration
-basicDeclaration sa title = Just . Right . mkDeclaration sa title Nothing
+basicDeclaration sa title = Just . Right . mkDeclaration sa title
 
-reassociateKindSignatures
-  :: (Maybe P.Declaration, [Either (P.Declaration, P.Declaration) P.Declaration])
-  -> P.Declaration
-  -> (Maybe P.Declaration, [Either (P.Declaration, P.Declaration) P.Declaration])
-reassociateKindSignatures (ks, ls) = \case
-  d@P.KindDeclaration{} -> (Just d, ls)
-  d@P.DataDeclaration{} -> (Nothing, storeKindSig d)
-  d@P.TypeSynonymDeclaration{} -> (Nothing, storeKindSig d)
-  d@P.TypeClassDeclaration{} -> (Nothing, storeKindSig d)
-  d -> (Nothing, Right d : ls)
+convertDeclaration :: P.Declaration -> Text -> Maybe IntermediateDeclaration
+convertDeclaration (P.ValueDecl sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) title =
+  basicDeclaration sa title (ValueDeclaration (ty $> ()))
+convertDeclaration (P.ValueDecl sa _ _ _ _) title =
+  -- If no explicit type declaration was provided, insert a wildcard, so that
+  -- the actual type will be added during type checking.
+  basicDeclaration sa title (ValueDeclaration (P.TypeWildcard () Nothing))
+convertDeclaration (P.ExternDeclaration sa _ ty) title =
+  basicDeclaration sa title (ValueDeclaration (ty $> ()))
+convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
+  Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
-    storeKindSig d =
-      maybe (Right d : ls) (\kDecl -> Left (kDecl, d) : ls) ks
-
-convertDeclaration
-  :: Text
-  -> Either (P.Declaration, P.Declaration) P.Declaration
-  -> Maybe IntermediateDeclaration
-convertDeclaration title = \case
-  Left (kd@P.KindDeclaration{}, decl) -> do
-    let kindDecl = Just kd
-    case decl of
-      P.DataDeclaration sa dtype _ args ctors ->
-        mkDataDeclaration kindDecl sa dtype args ctors
-
-      P.TypeSynonymDeclaration sa _ args ty ->
-        mkTypeSynonymDeclaration kindDecl sa args ty
-
-      P.TypeClassDeclaration sa _ args implies fundeps ds ->
-        mkTypeClassDeclaration kindDecl sa args implies fundeps ds
-
-      _ -> P.internalError "convertDeclarationWithKindSig: something other than data/type/newtype/class declarations stored in Tuple's second entry"
-
-  Left (_, _) -> P.internalError "convertDeclarationWithKindSig: something other than KindDeclaration stored in Tuple's first entry"
-  Right decl -> case decl of
-    P.ValueDecl sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)] ->
-      basicDeclaration sa title (ValueDeclaration (ty $> ()))
-    P.ValueDecl sa _ _ _ _ ->
-      -- If no explicit type declaration was provided, insert a wildcard, so that
-      -- the actual type will be added during type checking.
-      basicDeclaration sa title (ValueDeclaration (P.TypeWildcard () Nothing))
-    P.ExternDeclaration sa _ ty ->
-      basicDeclaration sa title (ValueDeclaration (ty $> ()))
-    P.DataDeclaration sa dtype _ args ctors ->
-      mkDataDeclaration Nothing sa dtype args ctors
-    P.ExternDataDeclaration sa _ kind' ->
-      basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
-    P.TypeSynonymDeclaration sa _ args ty ->
-      mkTypeSynonymDeclaration Nothing sa args ty
-    P.TypeClassDeclaration sa _ args implies fundeps ds ->
-      mkTypeClassDeclaration Nothing sa args implies fundeps ds
-    P.TypeInstanceDeclaration (ss, com) _ _ _ constraints className tys _ ->
-      Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
-      where
-      classNameString = unQual className
-      typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
-      unQual x = let (P.Qualified _ y) = x in P.runProperName y
-
-      extractProperNames (P.TypeConstructor _ n) = [unQual n]
-      extractProperNames _ = []
-
-      childDecl = ChildDeclaration title (convertComments com) (Just ss) (ChildInstance (fmap ($> ()) constraints) (classApp $> ()))
-      classApp = foldl' P.srcTypeApp (P.srcTypeConstructor (fmap P.coerceProperName className)) tys
-    P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _ ->
-      Just . Right $ mkDeclaration sa title Nothing (AliasDeclaration fixity (P.Qualified mn (Right alias)))
-    P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _ ->
-      Just . Right $ mkDeclaration sa title Nothing (AliasDeclaration fixity (P.Qualified mn (Left alias)))
-    _ -> Nothing
-
+  info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args)
+  children = map convertCtor ctors
+  convertCtor :: P.DataConstructorDeclaration -> ChildDeclaration
+  convertCtor P.DataConstructorDeclaration{..} =
+    ChildDeclaration (P.runProperName dataCtorName) (convertComments $ snd dataCtorAnn) Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
+convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
+  basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
+convertDeclaration (P.TypeSynonymDeclaration sa _ args ty) title =
+  basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()))
+convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
+  Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
-    mkKindSig ann@(sa, declComments) = \case
-      Just (P.KindDeclaration (_, ksComments) kindSig _ ty) ->
-        ( (sa, mergeComments ksComments declComments)
-        , Just $ KindInfo { kiKindSigFor = kindSig, kiType = ty $> () }
-        )
-        where
-          -- The `LineComment " | "` functionally adds a newline character
-          -- between the docs on the kind signature and the docs on
-          -- the declaration, but only if both declarations
-          -- have comments.
-          mergeComments ks [] = ks
-          mergeComments [] decl = decl
-          mergeComments ks decl = ks ++ P.LineComment " | " : decl
-      _ -> (ann, Nothing)
+  args' = fmap (fmap (fmap ($> ()))) args
+  info = TypeClassDeclaration args' (fmap ($> ()) implies) (convertFundepsToStrings args' fundeps)
+  children = map convertClassMember ds
+  convertClassMember (P.TypeDeclaration (P.TypeDeclarationData (ss, com) ident' ty)) =
+    ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember (ty $> ()))
+  convertClassMember _ =
+    P.internalError "convertDeclaration: Invalid argument to convertClassMember."
+convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ constraints className tys _) title =
+  Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
+  where
+  classNameString = unQual className
+  typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
+  unQual x = let (P.Qualified _ y) = x in P.runProperName y
 
-    mkDataDeclaration kindDecl sa dtype args ctors =
-      Just (Right (mkDeclaration sa' title kindSig info) { declChildren = children })
-      where
-      (sa', kindSig) = mkKindSig sa kindDecl
-      info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args)
-      children = map convertCtor ctors
-      convertCtor :: P.DataConstructorDeclaration -> ChildDeclaration
-      convertCtor P.DataConstructorDeclaration{..} =
-        ChildDeclaration (P.runProperName dataCtorName) (convertComments $ snd dataCtorAnn) Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
+  extractProperNames (P.TypeConstructor _ n) = [unQual n]
+  extractProperNames _ = []
 
-    mkTypeSynonymDeclaration kindDecl sa args ty =
-      Just $ Right $ mkDeclaration sa' title kindSig info
-      where
-        (sa', kindSig) = mkKindSig sa kindDecl
-        info = TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ())
-
-    mkTypeClassDeclaration kindDecl sa args implies fundeps ds =
-      Just (Right (mkDeclaration sa' title kindSig info) { declChildren = children })
-      where
-      (sa', kindSig) = mkKindSig sa kindDecl
-      args' = fmap (fmap (fmap ($> ()))) args
-      info = TypeClassDeclaration args' (fmap ($> ()) implies) (convertFundepsToStrings args' fundeps)
-      children = map convertClassMember ds
-      convertClassMember (P.TypeDeclaration (P.TypeDeclarationData (ss, com) ident' ty)) =
-        ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember (ty $> ()))
-      convertClassMember _ =
-        P.internalError "convertDeclaration: Invalid argument to convertClassMember."
+  childDecl = ChildDeclaration title (convertComments com) (Just ss) (ChildInstance (fmap ($> ()) constraints) (classApp $> ()))
+  classApp = foldl' P.srcTypeApp (P.srcTypeConstructor (fmap P.coerceProperName className)) tys
+convertDeclaration (P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
+  Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
+convertDeclaration (P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
+  Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Left alias)))
+convertDeclaration (P.KindDeclaration sa kindSig _ tys) title =
+  Just $ Left ([(title, AugmentType), (title, AugmentClass)], AugmentKindSig comms kindSig (tys $> ()))
+  where
+    comms = convertComments $ snd sa
+convertDeclaration _ _ = Nothing
 
 convertComments :: [P.Comment] -> Maybe Text
 convertComments cs = do
