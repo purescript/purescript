@@ -72,7 +72,13 @@ type IntermediateDeclaration
 -- are also merged together.
 data DeclarationAugment
   = AugmentChild ChildDeclaration
-  | AugmentKindSig (Maybe Text) P.KindSignatureFor Type'
+  | AugmentKindSig KindSignatureInfo
+
+data KindSignatureInfo = KindSignatureInfo
+  { ksiComments :: Maybe Text
+  , ksiKindSignatureFor :: P.KindSignatureFor
+  , ksiType :: Type'
+  }
 
 -- | Augment top-level declarations; the second pass. See the comments under
 -- the type synonym IntermediateDeclaration for more information.
@@ -91,9 +97,9 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
 
   augmentWith (AugmentChild child) d =
     d { declChildren = declChildren d ++ [child] }
-  augmentWith (AugmentKindSig comms kindSig ty) d =
-    d { declComments = mergeComments comms $ declComments d
-      , declKind = Just $ KindInfo { kiKindSigFor = kindSig, kiType = ty }
+  augmentWith (AugmentKindSig KindSignatureInfo{..}) d =
+    d { declComments = mergeComments ksiComments $ declComments d
+      , declKind = Just $ KindInfo { kiKindSigFor = ksiKindSignatureFor, kiType = ksiType }
       }
     where
       mergeComments Nothing dc = dc
@@ -176,9 +182,10 @@ convertDeclaration (P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _)
 convertDeclaration (P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
   Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Left alias)))
 convertDeclaration (P.KindDeclaration sa kindSig _ tys) title =
-  Just $ Left ([(title, AugmentType), (title, AugmentClass)], AugmentKindSig comms kindSig (tys $> ()))
+  Just $ Left ([(title, AugmentType), (title, AugmentClass)], AugmentKindSig ksi)
   where
     comms = convertComments $ snd sa
+    ksi = KindSignatureInfo { ksiComments = comms, ksiKindSignatureFor = kindSig, ksiType = tys $> () }
 convertDeclaration _ _ = Nothing
 
 convertComments :: [P.Comment] -> Maybe Text
