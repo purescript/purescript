@@ -10,7 +10,6 @@ import Control.Category ((>>>))
 import Control.Applicative ((<|>))
 
 import Data.Maybe (mapMaybe)
-import Data.Foldable (foldl')
 import qualified Data.Map as M
 
 import Language.PureScript.AST.Declarations
@@ -38,20 +37,10 @@ exportedDeclarations :: Module -> [Declaration]
 exportedDeclarations (Module _ _ mn decls exps) = go decls
   where
   go = flattenDecls
-        >>> reverse . snd . foldl' (f exps) (Nothing, [])
+        >>> filter (isExported exps)
         >>> map (filterDataConstructors exps)
         >>> filterInstances mn exps
         >>> maybe id reorder exps
-
-  f :: Maybe [DeclarationRef] -> (Maybe Declaration, [Declaration]) -> Declaration -> (Maybe Declaration, [Declaration])
-  f _ (_, ls) d@KindDeclaration{} = (Just d, ls)
-  f Nothing (_, ls) d = (Nothing, d : ls)
-  f _ (_, ls) d@TypeInstanceDeclaration{} = (Nothing, d : ls)
-  f (Just exps') (ks, ls) d
-    | any matches exps' = (Nothing, maybe (d : ls) (\kd -> d : kd : ls) ks)
-    | otherwise = (Nothing, ls)
-    where
-    matches declRef = declName d == Just (declRefName declRef)
 
 -- |
 -- Filter out all data constructors from a declaration which are not exported.
@@ -140,6 +129,11 @@ typeInstanceConstituents _ = []
 isExported :: Maybe [DeclarationRef] -> Declaration -> Bool
 isExported Nothing _ = True
 isExported _ TypeInstanceDeclaration{} = True
+isExported (Just exps) (KindDeclaration _ _ n _) = any matches exps
+  where
+  matches declRef = do
+    let refName = declRefName declRef
+    TyName n == refName || TyClassName (tyToClassName n) == refName
 isExported (Just exps) decl = any matches exps
   where
   matches declRef = declName decl == Just (declRefName declRef)
@@ -169,11 +163,11 @@ reorder refs =
   refIndex = \case
     KindDeclaration _ _ n _ ->
       M.lookup (TyName n) refIndices <|> M.lookup (TyClassName (tyToClassName n)) refIndices
-      where
-        -- Workaround to the fact that the kind's name's ProperNameType
-        -- isn't the same as the declaration's ProperNameType
-        -- when that declaration is a type class
-        tyToClassName :: ProperName 'TypeName -> ProperName 'ClassName
-        tyToClassName = coerceProperName
 
     decl -> declName decl >>= flip M.lookup refIndices
+
+-- |
+-- Workaround to the fact that a `KindDeclaration`'s name's `ProperNameType`
+-- isn't the same as the corresponding `TypeClassDeclaration`'s `ProperNameType`
+tyToClassName :: ProperName 'TypeName -> ProperName 'ClassName
+tyToClassName = coerceProperName
