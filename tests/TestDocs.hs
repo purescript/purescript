@@ -106,6 +106,8 @@ data DocsAssertion
   | ShouldHaveLink P.ModuleName Text Text Docs.Namespace Docs.LinkLocation
   -- | Assert that a given declaration comes before another in the output
   | ShouldComeBefore P.ModuleName Text Text
+  -- | Assert that a given declaration has a kind signature
+  | ShouldHaveKindSignature P.ModuleName Text
 
 data TagsAssertion
   -- | Assert that a particular declaration is tagged
@@ -161,6 +163,8 @@ displayAssertion = \case
   ShouldComeBefore mn declA declB ->
     showQual mn declA <> " should come before " <> showQual mn declB <>
     " in the docs"
+  ShouldHaveKindSignature mn decl ->
+    showQual mn decl <> " should have a kind signature."
 
 displayTagsAssertion :: TagsAssertion -> Text
 displayTagsAssertion = \case
@@ -215,6 +219,9 @@ data DocsAssertionFailure
   | BadLinkLocation P.ModuleName Text Text Docs.LinkLocation Docs.LinkLocation
   -- | Declarations were in the wrong order
   | WrongOrder P.ModuleName Text Text
+  -- | Expected a kind signature for a declaration, but did not find one
+  -- Fields: module name, declaration title.
+  | KindSignatureMissing P.ModuleName Text
 
 data TagsAssertionFailure
   -- | A declaration was not tagged, but should have been
@@ -265,6 +272,8 @@ displayAssertionFailure = \case
     " got " <> T.pack (show actual)
   WrongOrder _ before' after' ->
     "expected to see " <> before' <> " before " <> after'
+  KindSignatureMissing _ decl ->
+    "the kind signature for " <> decl <> " is missing."
 
 displayTagsAssertionFailure :: TagsAssertionFailure -> Text
 displayTagsAssertionFailure = \case
@@ -436,6 +445,11 @@ runAssertion assertion linksCtx Docs.Module{..} =
           (_, Nothing) ->
             Fail (NotDocumented mn after')
 
+    ShouldHaveKindSignature mn decl ->
+      findDeclKinds mn decl $ \case
+        Just _ -> Pass
+        Nothing -> Fail (KindSignatureMissing mn decl)
+
   where
   declarationsFor mn =
     if mn == modName
@@ -451,6 +465,13 @@ runAssertion assertion linksCtx Docs.Module{..} =
           Fail (NotDocumented mn title)
         Just decl ->
           f decl
+
+  findDeclKinds mn title f =
+      case find ((==) title . Docs.declTitle) (declarationsFor mn) of
+        Nothing ->
+          Fail (NotDocumented mn title)
+        Just Docs.Declaration{..} ->
+          f declKind
 
   findDeclChildren mn title child f =
     findDecl mn title $ \Docs.Declaration{..} ->
@@ -665,6 +686,21 @@ testCases =
 
   , ("TypeSynonymInstance",
       [ ShouldBeDocumented (n "TypeSynonymInstance") "MyNT" ["MyNT", "ntMyNT"]
+      ]
+    )
+  , ("KindSignatureDocs",
+      [ ShouldHaveKindSignature (n "KindSignatureDocs") "DKindAndType"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TKindAndType"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NKindAndType"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CKindAndType"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DKindOnly"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TKindOnly"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NKindOnly"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CKindOnly"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DTypeOnly"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TTypeOnly"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NTypeOnly"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CTypeOnly"
       ]
     )
   ]
