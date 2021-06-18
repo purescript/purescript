@@ -189,8 +189,8 @@ instance NFData DeclarationInfo
 -- Wraps enough information to properly render the kind signature
 -- of a data/newtype/type/class declaration.
 data KindInfo = KindInfo
-  { kiKindSigFor :: P.KindSignatureFor
-  , kiType :: Type'
+  { kiKeyword :: P.KindSignatureFor
+  , kiKind :: Type'
   }
   deriving (Show, Eq, Ord, Generic)
 
@@ -650,7 +650,7 @@ asDeclarationInfo = do
 asKindInfo :: Parse PackageError KindInfo
 asKindInfo =
   KindInfo <$> key "keyword" asKindSignatureFor
-           <*> key "ty" asType
+           <*> key "kind" asType
 
 asKindSignatureFor :: Parse PackageError P.KindSignatureFor
 asKindSignatureFor =
@@ -812,8 +812,8 @@ instance A.ToJSON Declaration where
 
 instance A.ToJSON KindInfo where
  toJSON KindInfo{..} =
-   A.object [ "keyword" .= kindSignatureForKeyword kiKindSigFor
-            , "ty"      .= kiType
+   A.object [ "keyword" .= kindSignatureForKeyword kiKeyword
+            , "kind"    .= kiKind
             ]
 
 kindSignatureForKeyword :: P.KindSignatureFor -> Text

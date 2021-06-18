@@ -27,10 +27,10 @@ import qualified Language.PureScript.Types as P
 renderKindSig :: Text -> KindInfo -> RenderedCode
 renderKindSig declTitle KindInfo{..} =
   mintersperse sp
-      [ keyword $ kindSignatureForKeyword kiKindSigFor
+      [ keyword $ kindSignatureForKeyword kiKeyword
       , renderType (P.TypeConstructor () (notQualified declTitle))
       , syntax "::"
-      , renderType kiType
+      , renderType kiKind
       ]
 
 renderDeclaration :: Declaration -> RenderedCode

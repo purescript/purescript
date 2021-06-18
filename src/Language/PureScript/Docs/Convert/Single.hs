@@ -76,8 +76,8 @@ data DeclarationAugment
 
 data KindSignatureInfo = KindSignatureInfo
   { ksiComments :: Maybe Text
-  , ksiKindSignatureFor :: P.KindSignatureFor
-  , ksiType :: Type'
+  , ksiKeyword :: P.KindSignatureFor
+  , ksiKind :: Type'
   }
 
 -- | Augment top-level declarations; the second pass. See the comments under
@@ -99,7 +99,7 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
     d { declChildren = declChildren d ++ [child] }
   augmentWith (AugmentKindSig KindSignatureInfo{..}) d =
     d { declComments = mergeComments ksiComments $ declComments d
-      , declKind = Just $ KindInfo { kiKindSigFor = ksiKindSignatureFor, kiType = ksiType }
+      , declKind = Just $ KindInfo { kiKeyword = ksiKeyword, kiKind = ksiKind }
       }
     where
       mergeComments Nothing dc = dc
@@ -181,11 +181,11 @@ convertDeclaration (P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _)
   Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
 convertDeclaration (P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
   Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Left alias)))
-convertDeclaration (P.KindDeclaration sa kindSig _ tys) title =
+convertDeclaration (P.KindDeclaration sa keyword _ kind) title =
   Just $ Left ([(title, AugmentType), (title, AugmentClass)], AugmentKindSig ksi)
   where
     comms = convertComments $ snd sa
-    ksi = KindSignatureInfo { ksiComments = comms, ksiKindSignatureFor = kindSig, ksiType = tys $> () }
+    ksi = KindSignatureInfo { ksiComments = comms, ksiKeyword = keyword, ksiKind = kind $> () }
 convertDeclaration _ _ = Nothing
 
 convertComments :: [P.Comment] -> Maybe Text
