@@ -754,6 +754,11 @@ testCases =
       , ShouldMergeDocComments (n "KindSignatureDocs") "TTypeOnly" $ Just "ttot\n"
       , ShouldMergeDocComments (n "KindSignatureDocs") "NTypeOnly" $ Just "ntot\n"
       , ShouldMergeDocComments (n "KindSignatureDocs") "CTypeOnly" $ Just "ctot\n"
+
+      , ShouldMergeDocComments (n "KindSignatureDocs") "DImplicit" $ Just "dit\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "TImplicit" $ Just "tit\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "NImplicit" $ Just "nit\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "CImplicit" $ Just "cit\n"
       ]
     )
   ]
