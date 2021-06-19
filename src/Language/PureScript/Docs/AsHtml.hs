@@ -146,11 +146,11 @@ declAsHtml r d@Declaration{..} = do
         AliasDeclaration fixity alias_ ->
           renderAlias fixity alias_
         _ -> do
-          for_ declKind $ \kindInfo -> do
-            pre ! A.class_ "decl__signature" $ code $
-              codeAsHtml r (Render.renderKindSig declTitle kindInfo)
-          pre ! A.class_ "decl__signature" $ code $
-            codeAsHtml r (Render.renderDeclaration d)
+          pre ! A.class_ "decl__signature" $ do
+            for_ declKind $ \kindInfo -> do
+              code ! A.class_ "decl__kind" $ do
+                codeAsHtml r (Render.renderKindSig declTitle kindInfo)
+            code $ codeAsHtml r (Render.renderDeclaration d)
 
       for_ declComments renderMarkdown
 
