@@ -14,6 +14,8 @@ Bugfixes:
 
 * Allow fixity, kind, role declarations in REPL (#4046, @rhendric)
 
+* Pin OS versions used in CI (#4107, @f-f)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
