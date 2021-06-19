@@ -1,41 +1,41 @@
 module KindSignatureDocs where
 
--- | DKindAndType - kind docs
+-- | dkatk
 data DKindAndType :: forall k. k -> Type
--- | DKindAndType - type docs
+-- | dkatt
 data DKindAndType a = DKindAndType
 
--- | TKindAndType - kind docs
+-- | tkatk
 type TKindAndType :: forall k. k -> Type
--- | TKindAndType - type docs
+-- | tkatt
 type TKindAndType a = Int
 
--- | NKindAndType - kind docs
+-- | nkatk
 newtype NKindAndType :: forall k. k -> Type
--- | NKindAndType - type docs
+-- | nkatt
 newtype NKindAndType a = NKindAndType Int
 
--- | CKindAndType - kind docs
--- | CKindAndType - type docs
+-- | ckatk
 class CKindAndType :: forall k. (k -> Type) -> k -> Constraint
+-- | ckatt
 class CKindAndType a k where
   fooKindAndType :: a k -> String
 
 ----------
 
--- | DKindOnly - kind docs
+-- | dkok
 data DKindOnly :: forall k. k -> Type
 data DKindOnly a = DKindOnly
 
--- | TKindOnly - kind docs
+-- | tkok
 type TKindOnly :: forall k. k -> Type
 type TKindOnly a = Int
 
--- | NKindOnly - kind docs
+-- | nkok
 newtype NKindOnly :: forall k. k -> Type
 newtype NKindOnly a = NKindOnly Int
 
--- | CKindOnly - kind docs
+-- | ckok
 class CKindOnly :: forall k. (k -> Type) -> k -> Constraint
 class CKindOnly a k where
   fooKindOnly :: a k -> String
@@ -43,18 +43,18 @@ class CKindOnly a k where
 ----------
 
 data DTypeOnly :: forall k. k -> Type
--- | DTypeOnly - type docs
+-- | dtot
 data DTypeOnly a = DTypeOnly
 
 type TTypeOnly :: forall k. k -> Type
--- | TTypeOnly - type docs
+-- | ttot
 type TTypeOnly a = Int
 
 newtype NTypeOnly :: forall k. k -> Type
--- | NTypeOnly - type docs
+-- | ntot
 newtype NTypeOnly a = NTypeOnly Int
 
--- | CTypeOnly - type docs
 class CTypeOnly :: forall k. (k -> Type) -> k -> Constraint
+-- | ctot
 class CTypeOnly a k where
   fooTypeOnly :: a k -> String
