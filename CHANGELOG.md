@@ -12,6 +12,8 @@ Bugfixes:
 
 * Ensure unnamed instances appear in documentation (#4109 by @JordanMartinez)
 
+* Allow fixity, kind, role declarations in REPL (#4046, @rhendric)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)

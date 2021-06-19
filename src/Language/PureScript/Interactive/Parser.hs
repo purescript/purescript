@@ -8,7 +8,7 @@ module Language.PureScript.Interactive.Parser
 
 import           Prelude.Compat hiding (lex)
 
-import           Control.Monad (join, unless)
+import           Control.Monad (join)
 import           Data.Bifunctor (bimap)
 import           Data.Char (isSpace)
 import           Data.List (intercalate)
@@ -17,7 +17,6 @@ import qualified Data.Text as T
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.CST.Monad as CSTM
-import qualified Language.PureScript.CST.Positions as CST
 import qualified Language.PureScript.Interactive.Directive as D
 import           Language.PureScript.Interactive.Types
 
@@ -128,27 +127,7 @@ psciImport filePath = do
 -- | Any declaration that we don't need a 'special case' parser for
 -- (like import declarations).
 psciDeclaration :: CST.Parser Command
-psciDeclaration = do
-  decl <- CST.parseDeclP
-  let decl' = CST.convertDeclaration "" decl
-  unless (all acceptable decl') $ do
-    let
-      tok  = fst $ CST.declRange decl
-      tok' = T.unpack $ CST.printToken $ CST.tokValue tok
-      msg  = tok' <> "; this kind of declaration is not supported in psci"
-    CSTM.parseFail tok $ CST.ErrLexeme (Just msg) []
-  pure $ Decls decl'
-
-acceptable :: P.Declaration -> Bool
-acceptable P.DataDeclaration{} = True
-acceptable P.TypeSynonymDeclaration{} = True
-acceptable P.ExternDeclaration{} = True
-acceptable P.ExternDataDeclaration{} = True
-acceptable P.TypeClassDeclaration{} = True
-acceptable P.TypeInstanceDeclaration{} = True
-acceptable P.TypeDeclaration{} = True
-acceptable P.ValueDeclaration{} = True
-acceptable _ = False
+psciDeclaration = Decls . CST.convertDeclaration "" <$> CST.parseDeclP
 
 parseReplQuery' :: String -> Either String ReplQuery
 parseReplQuery' str =
