@@ -106,8 +106,8 @@ data DocsAssertion
   | ShouldHaveLink P.ModuleName Text Text Docs.Namespace Docs.LinkLocation
   -- | Assert that a given declaration comes before another in the output
   | ShouldComeBefore P.ModuleName Text Text
-  -- | Assert that a given declaration has a kind signature
-  | ShouldHaveKindSignature P.ModuleName Text
+  -- | Assert that a given declaration has the given kind signature
+  | ShouldHaveKindSignature P.ModuleName Text Text
 
 data TagsAssertion
   -- | Assert that a particular declaration is tagged
@@ -163,8 +163,8 @@ displayAssertion = \case
   ShouldComeBefore mn declA declB ->
     showQual mn declA <> " should come before " <> showQual mn declB <>
     " in the docs"
-  ShouldHaveKindSignature mn decl ->
-    showQual mn decl <> " should have a kind signature."
+  ShouldHaveKindSignature mn decl expected ->
+    showQual mn decl <> " should have the kind signature `" <> expected <> "`"
 
 displayTagsAssertion :: TagsAssertion -> Text
 displayTagsAssertion = \case
@@ -222,6 +222,10 @@ data DocsAssertionFailure
   -- | Expected a kind signature for a declaration, but did not find one
   -- Fields: module name, declaration title.
   | KindSignatureMissing P.ModuleName Text
+  -- | The rendered kind signature did not match the expected one.
+  -- Fields: module name, declaration title, expected kind signature,
+  -- actual kind signature
+  | KindSignatureMismatch P.ModuleName Text Text Text
 
 data TagsAssertionFailure
   -- | A declaration was not tagged, but should have been
@@ -274,6 +278,9 @@ displayAssertionFailure = \case
     "expected to see " <> before' <> " before " <> after'
   KindSignatureMissing _ decl ->
     "the kind signature for " <> decl <> " is missing."
+  KindSignatureMismatch _ decl expected actual ->
+    "expected the kind signature for " <> decl <> " to be " <> expected <>
+    "; got " <> actual
 
 displayTagsAssertionFailure :: TagsAssertionFailure -> Text
 displayTagsAssertionFailure = \case
@@ -445,9 +452,15 @@ runAssertion assertion linksCtx Docs.Module{..} =
           (_, Nothing) ->
             Fail (NotDocumented mn after')
 
-    ShouldHaveKindSignature mn decl ->
+    ShouldHaveKindSignature mn decl expected ->
       findDeclKinds mn decl $ \case
-        Just _ -> Pass
+        Just Docs.KindInfo{..} ->
+          if expected /= actual
+              then Fail (KindSignatureMismatch mn decl expected actual)
+              else Pass
+          where
+            actual = codeToString $ Docs.renderKindSig decl $
+              Docs.KindInfo kiKeyword kiKind
         Nothing -> Fail (KindSignatureMissing mn decl)
 
   where
@@ -689,18 +702,21 @@ testCases =
       ]
     )
   , ("KindSignatureDocs",
-      [ ShouldHaveKindSignature (n "KindSignatureDocs") "DKindAndType"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "TKindAndType"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "NKindAndType"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "CKindAndType"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "DKindOnly"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "TKindOnly"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "NKindOnly"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "CKindOnly"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "DTypeOnly"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "TTypeOnly"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "NTypeOnly"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "CTypeOnly"
+      -- expected kind signatures
+      [ ShouldHaveKindSignature (n "KindSignatureDocs") "DKindAndType" "data DKindAndType :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TKindAndType" "type TKindAndType :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NKindAndType" "newtype NKindAndType :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CKindAndType" "class CKindAndType :: forall k. (k -> Type) -> k -> Constraint"
+
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DKindOnly" "data DKindOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TKindOnly" "type TKindOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NKindOnly" "newtype NKindOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CKindOnly" "class CKindOnly :: forall k. (k -> Type) -> k -> Constraint"
+
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DTypeOnly" "data DTypeOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TTypeOnly" "type TTypeOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NTypeOnly" "newtype NTypeOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CTypeOnly" "class CTypeOnly :: forall k. (k -> Type) -> k -> Constraint"
       ]
     )
   ]
