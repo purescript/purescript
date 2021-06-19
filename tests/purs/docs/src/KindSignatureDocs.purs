@@ -16,10 +16,10 @@ newtype NKindAndType :: forall k. k -> Type
 newtype NKindAndType a = NKindAndType Int
 
 -- | CKindAndType - kind docs
-class CKindAndType :: Type -> Constraint
 -- | CKindAndType - type docs
-class CKindAndType a where
-  fooKindAndType :: a -> String
+class CKindAndType :: forall k. (k -> Type) -> k -> Constraint
+class CKindAndType a k where
+  fooKindAndType :: a k -> String
 
 ----------
 
@@ -36,9 +36,9 @@ newtype NKindOnly :: forall k. k -> Type
 newtype NKindOnly a = NKindOnly Int
 
 -- | CKindOnly - kind docs
-class CKindOnly :: Type -> Constraint
-class CKindOnly a where
-  fooKindOnly :: a -> String
+class CKindOnly :: forall k. (k -> Type) -> k -> Constraint
+class CKindOnly a k where
+  fooKindOnly :: a k -> String
 
 ----------
 
@@ -54,7 +54,7 @@ newtype NTypeOnly :: forall k. k -> Type
 -- | NTypeOnly - type docs
 newtype NTypeOnly a = NTypeOnly Int
 
-class CTypeOnly :: Type -> Constraint
 -- | CTypeOnly - type docs
-class CTypeOnly a where
-  fooTypeOnly :: a -> String
+class CTypeOnly :: forall k. (k -> Type) -> k -> Constraint
+class CTypeOnly a k where
+  fooTypeOnly :: a k -> String
