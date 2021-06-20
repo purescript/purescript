@@ -741,10 +741,10 @@ testCases =
       , ShouldHaveKindSignature (n "KindSignatureDocs") "CTypeOnly" "class CTypeOnly :: forall k. (k -> Type) -> k -> Constraint"
 
       -- Declarations with no explicit kind signatures should stlil have them implicitly.
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "DImplicit" "data DImplicit :: forall k. k -> Type"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "TImplicit" "type TImplicit :: forall k. k -> Type"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "NImplicit" "newtype NImplicit :: forall k. k -> Type"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "CImplicit" "class CImplicit :: forall k1. (k1 -> Type) -> k1 -> Constraint"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DImplicit" "data DImplicit :: forall (k :: Type). k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TImplicit" "type TImplicit :: forall (k :: Type). k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NImplicit" "newtype NImplicit :: forall (k :: Type). k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CImplicit" "class CImplicit :: forall (k1 :: Type). (k1 -> Type) -> k1 -> Constraint"
 
       -- expected docs
       , ShouldMergeDocComments (n "KindSignatureDocs") "DKindAndType" $ Just "dkatk\n\ndkatt\n"
