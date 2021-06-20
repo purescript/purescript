@@ -16,6 +16,8 @@ Bugfixes:
 
 * Pin OS versions used in CI (#4107, @f-f)
 
+* Fix UnusedName warnings for multiple non-recursive let bindings (#4114 by @nwolverson)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)

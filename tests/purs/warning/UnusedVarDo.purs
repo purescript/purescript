@@ -38,3 +38,11 @@ notUnusedNonRecursiveBinding :: Int -> Maybe Int
 notUnusedNonRecursiveBinding x = do
   let {x} = {x}
   pure x
+
+-- 4110 in do syntax
+oops ∷ { inner :: String } → String
+oops box = do
+  let
+    { inner } = box
+    val = inner
+  val
