@@ -1,7 +1,11 @@
 module Main where
 
+import Prelude
+
 import Effect.Console (log)
 import Data.Generic.Rep (class Generic)
+
+import Lib (namedExportStillWorksUnit)
 
 -- This file verifies that unnamed instances will produce
 -- completely-generated instance names without problems.
@@ -87,6 +91,8 @@ instance OverlappingStillCompiles x
 else instance OverlappingStillCompiles x
 
 
-main = log "Done"
+main = do
+  namedExportStillWorksUnit 0
+  log "Done"
 
 data Either l r = Left l | Right r

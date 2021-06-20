@@ -100,8 +100,8 @@ rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
       optimized = CF.optimizeCoreFn corefn
-      [renamed] = renameInModules [optimized]
-      exts = moduleToExternsFile mod' env'
+      (renamedIdents, renamed) = renameInModule optimized
+      exts = moduleToExternsFile mod' env' renamedIdents
   ffiCodegen renamed
 
   -- It may seem more obvious to write `docs <- Docs.convertModule m env' here,

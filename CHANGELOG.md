@@ -24,6 +24,8 @@ Internal:
 
 * Update RELEASE_GUIDE.md with more details (#4104 by @JordanMartinez)
 
+* Use GenIdent for anonymous instances (#4096, @rhendric)
+
 ## v0.14.2
 
 New features:

@@ -17,6 +17,7 @@ module Language.PureScript.Externs
 import Prelude.Compat
 
 import Codec.Serialise (Serialise)
+import Control.Monad (join)
 import GHC.Generics (Generic)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
@@ -187,18 +188,24 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   qual :: a -> Qualified a
   qual = Qualified (Just efModuleName)
 
--- | Generate an externs file for all declarations in a module
-moduleToExternsFile :: Module -> Environment -> ExternsFile
-moduleToExternsFile (Module _ _ _ _ Nothing) _ = internalError "moduleToExternsFile: module exports were not elaborated"
-moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
+-- | Generate an externs file for all declarations in a module.
+--
+-- The `Map Ident Ident` argument should contain any top-level `GenIdent`s that
+-- were rewritten to `Ident`s when the module was compiled; this rewrite only
+-- happens in the CoreFn, not the original module AST, so it needs to be
+-- applied to the exported names here also. (The appropriate map is returned by
+-- `L.P.Renamer.renameInModule`.)
+moduleToExternsFile :: Module -> Environment -> M.Map Ident Ident -> ExternsFile
+moduleToExternsFile (Module _ _ _ _ Nothing) _ _ = internalError "moduleToExternsFile: module exports were not elaborated"
+moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsFile{..}
   where
   efVersion       = T.pack (showVersion Paths.version)
   efModuleName    = mn
-  efExports       = exps
+  efExports       = map renameRef exps
   efImports       = mapMaybe importDecl ds
   efFixities      = mapMaybe fixityDecl ds
   efTypeFixities  = mapMaybe typeFixityDecl ds
-  efDeclarations  = concatMap toExternsDeclaration efExports
+  efDeclarations  = concatMap toExternsDeclaration exps
   efSourceSpan    = ss
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
@@ -230,7 +237,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       _ -> internalError "toExternsDeclaration: Invalid input"
   toExternsDeclaration (ValueRef _ ident)
     | Just (ty, _, _) <- Qualified (Just mn) ident `M.lookup` names env
-    = [ EDValue ident ty ]
+    = [ EDValue (lookupRenamedIdent ident) ty ]
   toExternsDeclaration (TypeClassRef _ className)
     | let dictName = dictSynonymName . coerceProperName $ className
     , Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
@@ -243,13 +250,22 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef _ ident)
-    = [ EDInstance tcdClassName ident tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex
+    = [ EDInstance tcdClassName (lookupRenamedIdent ident) tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
       , TypeClassDictionaryInScope{..} <- NEL.toList nel
       ]
   toExternsDeclaration _ = []
+
+  renameRef :: DeclarationRef -> DeclarationRef
+  renameRef = \case
+    ValueRef ss' ident -> ValueRef ss' $ lookupRenamedIdent ident
+    TypeInstanceRef ss' ident -> TypeInstanceRef ss' $ lookupRenamedIdent ident
+    other -> other
+
+  lookupRenamedIdent :: Ident -> Ident
+  lookupRenamedIdent = flip (join M.findWithDefault) renamedIdents
 
 externsFileName :: FilePath
 externsFileName = "externs.cbor"
