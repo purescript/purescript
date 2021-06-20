@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
-        os: [ "ubuntu-latest", "macOS-latest", "windows-latest" ]
+        os: [ "ubuntu-18.04", "macOS-10.15", "windows-2016" ]
 
     runs-on: "${{ matrix.os }}"
 
