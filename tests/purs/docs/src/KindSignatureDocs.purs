@@ -58,18 +58,3 @@ class CTypeOnly :: forall k. (k -> Type) -> k -> Constraint
 -- | ctot
 class CTypeOnly a k where
   fooTypeOnly :: a k -> String
-
-----------
-
--- | dit
-data DImplicit a = DImplicit
-
--- | tit
-type TImplicit a = Int
-
--- | nit
-newtype NImplicit a = NImplicit Int
-
--- | cit
-class CImplicit a k where
-  fooImplicit :: a k -> String

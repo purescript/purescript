@@ -39,18 +39,15 @@ convertModule ::
   P.Module ->
   m Module
 convertModule externs env checkEnv =
-  fmap (insertValueTypesAndInferredKinds checkEnv . convertSingleModule) . partiallyDesugar externs env
+  fmap (insertValueTypes checkEnv . convertSingleModule) . partiallyDesugar externs env
 
 -- |
 -- Updates all the types of the ValueDeclarations inside the module based on
 -- their types inside the given Environment.
 --
--- Also inserts inferred kind signatures into the corresponding declarations
--- if no kind signatures were declared explicitly.
---
-insertValueTypesAndInferredKinds ::
+insertValueTypes ::
   P.Environment -> Module -> Module
-insertValueTypesAndInferredKinds env m =
+insertValueTypes env m =
   m { modDeclarations = map go (modDeclarations m) }
   where
   -- insert value types
@@ -60,20 +57,6 @@ insertValueTypesAndInferredKinds env m =
       ty = lookupName ident
     in
       d { declInfo = ValueDeclaration (ty $> ()) }
-
-  -- insert inferred kinds
-  go d@Declaration{..} | isNothing declKind = case declInfo of
-    DataDeclaration dataDeclType _ -> do
-      d { declKind = mkInferredKindInfo declTitle $ toKindSignatureFor dataDeclType }
-
-    TypeSynonymDeclaration _ _ ->
-      d { declKind = mkInferredKindInfo declTitle P.TypeSynonymSig }
-
-    TypeClassDeclaration _ _ _ ->
-      d { declKind = mkInferredKindInfo declTitle P.ClassSig }
-
-    _ -> d
-
   go other =
     other
 
@@ -87,20 +70,6 @@ insertValueTypesAndInferredKinds env m =
         ty
       Nothing ->
         err ("name not found: " ++ show key)
-
-  toKindSignatureFor :: P.DataDeclType -> P.KindSignatureFor
-  toKindSignatureFor = \case
-    P.Data -> P.DataSig
-    P.Newtype -> P.NewtypeSig
-
-  mkInferredKindInfo :: Text -> P.KindSignatureFor -> Maybe KindInfo
-  mkInferredKindInfo name keyword =
-    let key = P.Qualified (Just (modName m)) (P.ProperName name)
-    in case Map.lookup key (P.types env) of
-      Just (inferredKind, _) ->
-        Just $ KindInfo { kiKeyword = keyword, kiKind = () <$ inferredKind }
-      Nothing ->
-        err ("type not found: " ++ show key)
 
   err msg =
     P.internalError ("Docs.Convert.insertValueTypes: " ++ msg)
