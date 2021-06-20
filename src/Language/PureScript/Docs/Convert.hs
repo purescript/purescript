@@ -39,23 +39,44 @@ convertModule ::
   P.Module ->
   m Module
 convertModule externs env checkEnv =
-  fmap (insertValueTypes checkEnv . convertSingleModule) . partiallyDesugar externs env
+  fmap (insertValueTypesAndInferredKinds checkEnv . convertSingleModule) . partiallyDesugar externs env
 
 -- |
 -- Updates all the types of the ValueDeclarations inside the module based on
 -- their types inside the given Environment.
 --
-insertValueTypes ::
+-- Also inserts inferred kind signatures into the corresponding declarations
+-- if no kind signatures were declared explicitly.
+--
+insertValueTypesAndInferredKinds ::
   P.Environment -> Module -> Module
-insertValueTypes env m =
+insertValueTypesAndInferredKinds env m =
   m { modDeclarations = map go (modDeclarations m) }
   where
+  -- insert value types
   go d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} } =
     let
       ident = P.Ident . CST.getIdent . CST.nameValue . parseIdent $ declTitle d
       ty = lookupName ident
     in
       d { declInfo = ValueDeclaration (ty $> ()) }
+
+  -- insert inferred kinds
+  go d@Declaration{..} | isNothing declKind = case declInfo of
+    DataDeclaration dataDeclType _ -> do
+      let keyword = case dataDeclType of
+            P.Data -> P.DataSig
+            P.Newtype -> P.NewtypeSig
+      d { declKind = Just $ KindInfo { kiKeyword = keyword, kiKind = () <$ lookupKind declTitle } }
+
+    TypeSynonymDeclaration _ _ ->
+      d { declKind = Just $ KindInfo { kiKeyword = P.TypeSynonymSig, kiKind = () <$ lookupKind declTitle } }
+
+    TypeClassDeclaration _ _ _ ->
+      d { declKind = Just $ KindInfo { kiKeyword = P.ClassSig , kiKind = () <$ lookupKind declTitle } }
+
+    _ -> d
+
   go other =
     other
 
@@ -69,6 +90,14 @@ insertValueTypes env m =
         ty
       Nothing ->
         err ("name not found: " ++ show key)
+
+  lookupKind name =
+    let key = P.Qualified (Just (modName m)) (P.ProperName name)
+    in case Map.lookup key (P.types env) of
+      Just (kind, _) ->
+        kind
+      Nothing ->
+        err ("type not found: " ++ show key)
 
   err msg =
     P.internalError ("Docs.Convert.insertValueTypes: " ++ msg)
