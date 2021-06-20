@@ -290,8 +290,9 @@ displayAssertionFailure = \case
   KindSignatureMissing _ decl ->
     "the kind signature for " <> decl <> " is missing."
   KindSignatureMismatch _ decl expected actual ->
-    "expected the kind signature for " <> decl <> " to be " <> expected <>
-    "; got " <> actual
+    "expected the kind signature for " <> decl <> "\n" <>
+    "to be `" <> expected <> "`\n" <>
+    "  got `" <> actual <> "`"
   DocCommentMergeFailure _ decl expected actual ->
     "Expected the doc-comment for " <> decl <> " to merge comments and be `" <>
     expected <> "`; got `" <> actual <> "`"
