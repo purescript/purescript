@@ -64,16 +64,13 @@ insertValueTypesAndInferredKinds env m =
   -- insert inferred kinds
   go d@Declaration{..} | isNothing declKind = case declInfo of
     DataDeclaration dataDeclType _ -> do
-      let keyword = case dataDeclType of
-            P.Data -> P.DataSig
-            P.Newtype -> P.NewtypeSig
-      d { declKind = Just $ KindInfo { kiKeyword = keyword, kiKind = () <$ lookupKind declTitle } }
+      d { declKind = mkInferredKindInfo declTitle $ toKindSignatureFor dataDeclType }
 
     TypeSynonymDeclaration _ _ ->
-      d { declKind = Just $ KindInfo { kiKeyword = P.TypeSynonymSig, kiKind = () <$ lookupKind declTitle } }
+      d { declKind = mkInferredKindInfo declTitle P.TypeSynonymSig }
 
     TypeClassDeclaration _ _ _ ->
-      d { declKind = Just $ KindInfo { kiKeyword = P.ClassSig , kiKind = () <$ lookupKind declTitle } }
+      d { declKind = mkInferredKindInfo declTitle P.ClassSig }
 
     _ -> d
 
@@ -91,11 +88,17 @@ insertValueTypesAndInferredKinds env m =
       Nothing ->
         err ("name not found: " ++ show key)
 
-  lookupKind name =
+  toKindSignatureFor :: P.DataDeclType -> P.KindSignatureFor
+  toKindSignatureFor = \case
+    P.Data -> P.DataSig
+    P.Newtype -> P.NewtypeSig
+
+  mkInferredKindInfo :: Text -> P.KindSignatureFor -> Maybe KindInfo
+  mkInferredKindInfo name keyword =
     let key = P.Qualified (Just (modName m)) (P.ProperName name)
     in case Map.lookup key (P.types env) of
-      Just (kind, _) ->
-        kind
+      Just (inferredKind, _) ->
+        Just $ KindInfo { kiKeyword = keyword, kiKind = () <$ inferredKind }
       Nothing ->
         err ("type not found: " ++ show key)
 
