@@ -547,10 +547,11 @@ convertDeclaration fileName decl = case decl of
       genName = Text.take 25 (className <> typeArgs)
 
       className :: Text.Text
-      className = foldMap (uncurry Text.cons . first toLower)
-                . Text.uncons
-                . N.runProperName
-                $ qualName cls
+      className
+        = foldMap (uncurry Text.cons . first toLower)
+        . Text.uncons
+        . N.runProperName
+        $ qualName cls
 
       typeArgs :: Text.Text
       typeArgs = foldMap argName args

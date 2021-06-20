@@ -188,7 +188,13 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   qual :: a -> Qualified a
   qual = Qualified (Just efModuleName)
 
--- | Generate an externs file for all declarations in a module
+-- | Generate an externs file for all declarations in a module.
+--
+-- The `Map Ident Ident` argument should contain any top-level `GenIdent`s that
+-- were rewritten to `Ident`s when the module was compiled; this rewrite only
+-- happens in the CoreFn, not the original module AST, so it needs to be
+-- applied to the exported names here also. (The appropriate map is returned by
+-- `L.P.Renamer.renameInModule`.)
 moduleToExternsFile :: Module -> Environment -> M.Map Ident Ident -> ExternsFile
 moduleToExternsFile (Module _ _ _ _ Nothing) _ _ = internalError "moduleToExternsFile: module exports were not elaborated"
 moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsFile{..}
