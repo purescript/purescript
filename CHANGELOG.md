@@ -8,11 +8,13 @@ Breaking changes:
 
 New features:
 
+* Display kind signatures and their comments in documentation (#4100 by JordanMartinez)
+
 Bugfixes:
 
 * Ensure unnamed instances appear in documentation (#4109 by @JordanMartinez)
 
-* Display kind signatures and their comments in documentation (#4100 by JordanMartinez)
+* Allow fixity, kind, role declarations in REPL (#4046, @rhendric)
 
 Internal:
 
