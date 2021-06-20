@@ -12,6 +12,10 @@ Bugfixes:
 
 * Ensure unnamed instances appear in documentation (#4109 by @JordanMartinez)
 
+* Allow fixity, kind, role declarations in REPL (#4046, @rhendric)
+
+* Pin OS versions used in CI (#4107, @f-f)
+
 * Fix UnusedName warnings for multiple non-recursive let bindings (#4114 by @nwolverson)
 
 Internal:
