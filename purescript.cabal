@@ -302,7 +302,6 @@ library
     Language.PureScript.Sugar.Operators.Types
     Language.PureScript.Sugar.TypeClasses
     Language.PureScript.Sugar.TypeClasses.Deriving
-    Language.PureScript.Sugar.TypeClasses.Instances
     Language.PureScript.Sugar.TypeDeclarations
     Language.PureScript.TypeChecker
     Language.PureScript.TypeChecker.Entailment

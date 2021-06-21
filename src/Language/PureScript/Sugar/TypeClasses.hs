@@ -214,19 +214,28 @@ desugarDecl syns kinds mn exps = go
     modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration _ _ _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
-  go (TypeInstanceDeclaration _ _ _ (Left _) _ _ _ _) = internalError "instance names should have been desugared"
-  go d@(TypeInstanceDeclaration sa _ _ (Right name) deps className tys (ExplicitInstance members))
+  go (TypeInstanceDeclaration sa chainId idx name deps className tys (ExplicitInstance members))
     | className == C.Coercible
     = throwError . errorMessage' (fst sa) $ InvalidCoercibleInstanceDeclaration tys
     | otherwise = do
     desugared <- desugarCases members
-    dictDecl <- typeInstanceDictionaryDeclaration syns kinds sa name mn deps className tys desugared
-    return (expRef name className tys, [d, dictDecl])
-  go d@(TypeInstanceDeclaration sa _ _ (Right name) deps className tys (NewtypeInstanceWithDictionary dict)) = do
+    name' <- desugarInstName name
+    dictDecl <- typeInstanceDictionaryDeclaration syns kinds sa name' mn deps className tys desugared
+    let d = TypeInstanceDeclaration sa chainId idx (Right name') deps className tys (ExplicitInstance members)
+    return (expRef name' className tys, [d, dictDecl])
+  go (TypeInstanceDeclaration sa chainId idx name deps className tys (NewtypeInstanceWithDictionary dict)) = do
+    name' <- desugarInstName name
     let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) className)) tys
         constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
-    return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
+        d = TypeInstanceDeclaration sa chainId idx (Right name') deps className tys (NewtypeInstanceWithDictionary dict)
+    return (expRef name' className tys, [d, ValueDecl sa name' Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
+
+  -- |
+  -- Completes the name generation for type class instances that do not have
+  -- a unique name defined in source code.
+  desugarInstName :: MonadSupply m => Either Text Ident -> Desugar m Ident
+  desugarInstName = either freshIdent pure
 
   expRef :: Ident -> Qualified (ProperName 'ClassName) -> [SourceType] -> Maybe DeclarationRef
   expRef name className tys
