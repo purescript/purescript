@@ -26,6 +26,8 @@ Internal:
 
 * Use GenIdent for anonymous instances (#4096, @rhendric)
 
+* Desugar type class instance names in type class desugaring pass (#4099 by @JordanMartinez)
+
 ## v0.14.2
 
 New features:
