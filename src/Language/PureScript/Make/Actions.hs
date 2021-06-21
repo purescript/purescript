@@ -337,9 +337,6 @@ checkForeignDecls m path = do
             unless (null deprecatedFFI) $
               errorDeprecatedForeignPrimes deprecatedFFI
 
-            when (elem "default" cjsExports) $
-              errorDeprecatedFFIDefaultCJSExport
-
             pure (CJSModule, cjsExports)
         | otherwise -> do
             unless (null cjsImports) $
@@ -387,10 +384,6 @@ checkForeignDecls m path = do
   errorDeprecatedForeignPrimes :: [String] -> Make a
   errorDeprecatedForeignPrimes =
     throwError . mconcat . map (errorMessage' modSS . DeprecatedFFIPrime mname . T.pack)
-
-  errorDeprecatedFFIDefaultCJSExport :: Make a
-  errorDeprecatedFFIDefaultCJSExport =
-    throwError . errorMessage' modSS $ DeprecatedFFIDefaultCommonJSExport mname
 
   errorUnsupportedFFICommonJSExports :: [String] -> Make a
   errorUnsupportedFFICommonJSExports =

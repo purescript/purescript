@@ -66,7 +66,6 @@ data SimpleErrorMessage
   | InvalidFFIIdentifier ModuleName Text
   | DeprecatedFFIPrime ModuleName Text
   | DeprecatedFFICommonJSModule ModuleName FilePath
-  | DeprecatedFFIDefaultCommonJSExport ModuleName
   | UnsupportedFFICommonJSExports ModuleName [Text]
   | UnsupportedFFICommonJSImports ModuleName [Text]
   | FileIOError Text IOError -- ^ A description of what we were trying to do, and the error which occurred
@@ -240,7 +239,6 @@ errorCode em = case unwrapErrorMessage em of
   InvalidFFIIdentifier{} -> "InvalidFFIIdentifier"
   DeprecatedFFIPrime{} -> "DeprecatedFFIPrime"
   DeprecatedFFICommonJSModule {} -> "DeprecatedFFICommonJSModule"
-  DeprecatedFFIDefaultCommonJSExport {} -> "DeprecatedFFIDefaultCommonJSExport"
   UnsupportedFFICommonJSExports {} -> "UnsupportedFFICommonJSExports"
   UnsupportedFFICommonJSImports {} -> "UnsupportedFFICommonJSImports"
   FileIOError{} -> "FileIOError"
@@ -711,12 +709,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "A CommonJS foreign module implementation was provided for module " <> markCode (runModuleName mn) <> ": "
             , indent . lineS $ path
             , line $ "CommonJS foreign modules are deprecated and won't be supported in the future."
-            ]
-    renderSimpleErrorMessage (DeprecatedFFIDefaultCommonJSExport mn) =
-      paras [ line $ "In the FFI module for " <> markCode (runModuleName mn) <> ":"
-            , indent . paras $
-                [ line $ "CommonJS exports named " <> markCode "default" <> " are not allowed."
-                ]
             ]
     renderSimpleErrorMessage (UnsupportedFFICommonJSExports mn idents) =
       paras [ line $ "The following CommonJS exports are not supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "
