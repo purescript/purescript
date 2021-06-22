@@ -25,6 +25,7 @@ import qualified Language.PureScript.Environment as P
 import qualified Language.PureScript.Names as P
 import qualified Language.PureScript.Sugar as P
 import qualified Language.PureScript.Types as P
+import qualified Language.PureScript.Constants.Prim as Prim
 
 -- |
 -- Convert a single module to a Docs.Module, making use of a pre-existing
@@ -96,10 +97,17 @@ insertValueTypesAndInferredKinds env m =
       key = P.Qualified (Just (modName m)) (P.ProperName name)
     in case Map.lookup key (P.types env) of
       Just (inferredKind, _) ->
-        let
-          inferredKind' = inferredKind $> ()
-        in
-          d { declKind = Just $ KindInfo { kiKeyword  = keyword, kiKind = inferredKind' } }
+        d { declKind = Just $ KindInfo { kiKeyword = keyword, kiKind = inferredKind' } }
+        where
+          inferredKind' = dropTypeSortAnnotation $ inferredKind $> ()
+          kindPrimType = P.TypeConstructor () Prim.Type
+
+          -- changes `forall (k :: Type). k -> ...`
+          -- to      `forall k          . k -> ...`
+          dropTypeSortAnnotation = \case
+            P.ForAll sa txt (Just kAnn) rest skol | kAnn == kindPrimType ->
+              P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol
+            rest -> rest
       Nothing ->
         err ("type not found: " ++ show key)
 
