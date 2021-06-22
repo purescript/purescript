@@ -214,7 +214,3 @@ renameInBinder (ConstructorBinder ann tctor dctor bs) =
   ConstructorBinder ann tctor dctor <$> traverse renameInBinder bs
 renameInBinder (NamedBinder ann name b) =
   NamedBinder ann <$> updateScope name <*> renameInBinder b
-
-isPlainIdent :: Ident -> Bool
-isPlainIdent Ident{} = True
-isPlainIdent _ = False

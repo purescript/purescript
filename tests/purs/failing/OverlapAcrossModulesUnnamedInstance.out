@@ -9,8 +9,8 @@ at tests/purs/failing/OverlapAcrossModulesUnnamedInstance.purs:6:1 - 6:15 (line 
   [33m                                [0m
   The following instances were found:
 
-    OverlapAcrossModules.X.cX
-    OverlapAcrossModules.$cXY0
+    [33mOverlapAcrossModules.X.cX[0m
+    instance in module [33mOverlapAcrossModules[0m with type [33mC X Y[0m (line 6, column 1 - line 6, column 15)
 
 
 in type class instance

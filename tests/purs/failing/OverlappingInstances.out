@@ -8,8 +8,8 @@ at tests/purs/failing/OverlappingInstances.purs:10:1 - 11:13 (line 10, column 1 
   [33m               [0m
   The following instances were found:
 
-    Main.testRefl
-    Main.testInt
+    [33mMain.testRefl[0m
+    [33mMain.testInt[0m
 
 
 in type class instance

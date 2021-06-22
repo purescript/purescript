@@ -68,6 +68,10 @@ ef = P.ExternsFile
       Nothing
       -- , edInstanceChainIndex =
       0
+      -- , edInstanceNameSource =
+      P.UserNamed
+      -- , edInstanceSourceSpan =
+      P.NullSourceSpan
  --     }
     ]
   --, efSourceSpan =

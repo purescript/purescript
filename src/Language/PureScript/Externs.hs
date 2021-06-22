@@ -152,6 +152,8 @@ data ExternsDeclaration =
       , edInstanceConstraints     :: Maybe [SourceConstraint]
       , edInstanceChain           :: Maybe ChainId
       , edInstanceChainIndex      :: Integer
+      , edInstanceNameSource      :: NameSource
+      , edInstanceSourceSpan      :: SourceSpan
       }
   deriving (Show, Generic)
 
@@ -173,17 +175,22 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
   applyDecl env (EDClass pn args members cs deps tcIsEmpty) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps tcIsEmpty) (typeClasses env) }
-  applyDecl env (EDInstance className ident vars kinds tys cs ch idx) =
+  applyDecl env (EDInstance className ident vars kinds tys cs ch idx ns ss) =
     env { typeClassDictionaries =
             updateMap
               (updateMap (M.insertWith (<>) (qual ident) (pure dict)) className)
               (Just efModuleName) (typeClassDictionaries env) }
     where
     dict :: NamedDict
-    dict = TypeClassDictionaryInScope ch idx (qual ident) [] className vars kinds tys cs
+    dict = TypeClassDictionaryInScope ch idx (qual ident) [] className vars kinds tys cs instTy
 
     updateMap :: (Ord k, Monoid a) => (a -> a) -> k -> M.Map k a -> M.Map k a
     updateMap f = M.alter (Just . f . fold)
+
+    instTy :: Maybe SourceType
+    instTy = case ns of
+      CompilerNamed -> Just $ srcInstanceType ss vars className tys
+      UserNamed -> Nothing
 
   qual :: a -> Qualified a
   qual = Qualified (Just efModuleName)
@@ -249,8 +256,8 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsF
       , EDTypeSynonym dictName synArgs synTy
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
-  toExternsDeclaration (TypeInstanceRef _ ident)
-    = [ EDInstance tcdClassName (lookupRenamedIdent ident) tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex
+  toExternsDeclaration (TypeInstanceRef ss' ident ns)
+    = [ EDInstance tcdClassName (lookupRenamedIdent ident) tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex ns ss'
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
@@ -261,7 +268,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsF
   renameRef :: DeclarationRef -> DeclarationRef
   renameRef = \case
     ValueRef ss' ident -> ValueRef ss' $ lookupRenamedIdent ident
-    TypeInstanceRef ss' ident -> TypeInstanceRef ss' $ lookupRenamedIdent ident
+    TypeInstanceRef ss' ident _ | not $ isPlainIdent ident -> TypeInstanceRef ss' (lookupRenamedIdent ident) CompilerNamed
     other -> other
 
   lookupRenamedIdent :: Ident -> Ident

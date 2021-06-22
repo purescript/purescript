@@ -8,7 +8,7 @@ module Language.PureScript.TypeChecker
   ) where
 
 import Prelude.Compat
-import Protolude (headMay, ordNub)
+import Protolude (headMay, maybeToLeft, ordNub)
 
 import Control.Monad (when, unless, void, forM, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
@@ -417,10 +417,12 @@ typeCheckAll moduleName _ = traverse go
           let nonOrphanModules = findNonOrphanModules className typeClass tys''
           checkOrphanInstance dictName className tys'' nonOrphanModules
           let chainId = Just ch
-          checkOverlappingInstance chainId dictName className typeClass tys'' nonOrphanModules
+          checkOverlappingInstance ss chainId dictName vars className typeClass tys'' nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
-          let dict = TypeClassDictionaryInScope chainId idx qualifiedDictName [] className vars kinds' tys'' (Just deps'')
+          let dict =
+                TypeClassDictionaryInScope chainId idx qualifiedDictName [] className vars kinds' tys'' (Just deps'') $
+                  if isPlainIdent dictName then Nothing else Just $ srcInstanceType ss vars className tys''
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 
@@ -491,27 +493,32 @@ typeCheckAll moduleName _ = traverse go
   -- flexible instances: the instances `Cls X y` and `Cls x Y` overlap and
   -- could live in different modules but won't be caught here.
   checkOverlappingInstance
-    :: Maybe ChainId
+    :: SourceSpan
+    -> Maybe ChainId
     -> Ident
+    -> [(Text, SourceType)]
     -> Qualified (ProperName 'ClassName)
     -> TypeClassData
     -> [SourceType]
     -> S.Set ModuleName
     -> m ()
-  checkOverlappingInstance ch dictName className typeClass tys' nonOrphanModules = do
+  checkOverlappingInstance ss ch dictName vars className typeClass tys' nonOrphanModules = do
     for_ nonOrphanModules $ \m -> do
       dicts <- M.toList <$> lookupTypeClassDictionariesForClass (Just m) className
 
-      for_ dicts $ \(ident, dictNel) -> do
+      for_ dicts $ \(Qualified mn' ident, dictNel) -> do
         for_ dictNel $ \dict -> do
           -- ignore instances in the same instance chain
           if ch == tcdChain dict ||
             instancesAreApart (typeClassCoveringSets typeClass) tys' (tcdInstanceTypes dict)
           then return ()
-          else throwError . errorMessage $
-                OverlappingInstances className
-                                      tys'
-                                      [ident, Qualified (Just moduleName) dictName]
+          else do
+            let this = if isPlainIdent dictName then Right dictName else Left $ srcInstanceType ss vars className tys'
+            let that = Qualified mn' . maybeToLeft ident $ tcdDescription dict
+            throwError . errorMessage $
+              OverlappingInstances className
+                                    tys'
+                                    [that, Qualified (Just moduleName) this]
 
   instancesAreApart
     :: S.Set (S.Set Int)
