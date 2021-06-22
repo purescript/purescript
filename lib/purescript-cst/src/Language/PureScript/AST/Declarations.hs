@@ -473,7 +473,9 @@ data KindSignatureFor
   | NewtypeSig
   | TypeSynonymSig
   | ClassSig
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
+
+instance NFData KindSignatureFor
 
 declSourceAnn :: Declaration -> SourceAnn
 declSourceAnn (DataDeclaration sa _ _ _ _) = sa
@@ -495,6 +497,9 @@ declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _) = sa
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
 
+-- Note: Kind Declarations' names can refer to either a `TyClassName`
+-- or a `TypeName`. Use a helper function for handling `KindDeclaration`s
+-- specifically in the context in which it is needed.
 declName :: Declaration -> Maybe Name
 declName (DataDeclaration _ _ n _ _) = Just (TyName n)
 declName (TypeSynonymDeclaration _ n _ _) = Just (TyName n)

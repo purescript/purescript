@@ -183,6 +183,7 @@ primTypeOf gen title comments = Declaration
   , declSourceSpan = Nothing
   , declChildren = []
   , declInfo = ExternDataDeclaration (lookupPrimTypeKindOf gen title)
+  , declKind = Nothing
   }
 
 -- | Lookup the TypeClassData of a Prim class. This function is specifically
@@ -214,6 +215,7 @@ primClassOf gen title comments = Declaration
         fundeps = convertFundepsToStrings args (P.typeClassDependencies tcd)
       in
         TypeClassDeclaration args superclasses fundeps
+  , declKind = Nothing
   }
 
 kindType :: Declaration

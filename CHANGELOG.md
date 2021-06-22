@@ -8,6 +8,32 @@ Breaking changes:
 
 New features:
 
+* Display kind signatures and their comments in documentation (#4100 by JordanMartinez)
+
+  Previously, data/newtype/type/class declarations that have explicit kind
+  signatures would not display those kind signatures in their documentation.
+  For example, the two below types...
+
+  ```purescript
+  data PolyProxy :: forall k. k -> Type
+  data PolyProxy a = PolyProxy
+
+  data TypeProxy :: Type -> Type
+  data TypeProxy a = TypeProxy
+  ```
+
+  ... would only show the following information in their docs. One cannot
+  be distinguished from another due to the missing kind signatures:
+
+  ```
+  data PolyProxy a = PolyProxy
+
+  data TypeProxy a = TypeProxy
+  ```
+
+  Now, these types' kind signatures are displayed above their declarations
+  in their docs, similar to what one would see in the source code.
+
 Bugfixes:
 
 * Ensure unnamed instances appear in documentation (#4109 by @JordanMartinez)

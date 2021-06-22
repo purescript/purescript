@@ -24,6 +24,15 @@ import qualified Language.PureScript.Environment as P
 import qualified Language.PureScript.Names as P
 import qualified Language.PureScript.Types as P
 
+renderKindSig :: Text -> KindInfo -> RenderedCode
+renderKindSig declTitle KindInfo{..} =
+  mintersperse sp
+      [ keyword $ kindSignatureForKeyword kiKeyword
+      , renderType (P.TypeConstructor () (notQualified declTitle))
+      , syntax "::"
+      , renderType kiKind
+      ]
+
 renderDeclaration :: Declaration -> RenderedCode
 renderDeclaration Declaration{..} =
   mintersperse sp $ case declInfo of

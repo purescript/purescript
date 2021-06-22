@@ -7,6 +7,7 @@ import Prelude.Compat
 import Protolude (sortOn)
 
 import Control.Category ((>>>))
+import Control.Applicative ((<|>))
 
 import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
@@ -30,6 +31,8 @@ import Language.PureScript.Names
 -- list, unless there is no export list, in which case they appear in the same
 -- order as they do in the source file.
 --
+-- Kind signatures declarations are also exported if their associated
+-- declaration is exported.
 exportedDeclarations :: Module -> [Declaration]
 exportedDeclarations (Module _ _ mn decls exps) = go decls
   where
@@ -126,6 +129,11 @@ typeInstanceConstituents _ = []
 isExported :: Maybe [DeclarationRef] -> Declaration -> Bool
 isExported Nothing _ = True
 isExported _ TypeInstanceDeclaration{} = True
+isExported (Just exps) (KindDeclaration _ _ n _) = any matches exps
+  where
+  matches declRef = do
+    let refName = declRefName declRef
+    TyName n == refName || TyClassName (tyToClassName n) == refName
 isExported (Just exps) decl = any matches exps
   where
   matches declRef = declName decl == Just (declRefName declRef)
@@ -152,5 +160,14 @@ reorder refs =
   where
   refIndices =
     M.fromList $ zip (map declRefName refs) [(0::Int)..]
-  refIndex decl =
-    declName decl >>= flip M.lookup refIndices
+  refIndex = \case
+    KindDeclaration _ _ n _ ->
+      M.lookup (TyName n) refIndices <|> M.lookup (TyClassName (tyToClassName n)) refIndices
+
+    decl -> declName decl >>= flip M.lookup refIndices
+
+-- |
+-- Workaround to the fact that a `KindDeclaration`'s name's `ProperNameType`
+-- isn't the same as the corresponding `TypeClassDeclaration`'s `ProperNameType`
+tyToClassName :: ProperName 'TypeName -> ProperName 'ClassName
+tyToClassName = coerceProperName
