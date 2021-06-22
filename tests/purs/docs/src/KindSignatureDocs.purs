@@ -73,3 +73,18 @@ newtype NImplicit a = NImplicit Int
 -- | cit
 class CImplicit a k where
   fooImplicit :: a k -> String
+
+----------
+
+-- | dit
+data DHidden a b c = DHidden a b c
+
+-- | tit
+type THidden a b c = DHidden b c a
+
+-- | nit
+newtype NHidden a b c = NHidden (DHidden a c b)
+
+-- | cit
+class CHidden a b c where
+  fooHidden :: a -> b -> c -> String
