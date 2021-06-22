@@ -97,7 +97,7 @@ insertValueTypesAndInferredKinds env m =
       key = P.Qualified (Just (modName m)) (P.ProperName name)
     in case Map.lookup key (P.types env) of
       Just (inferredKind, _) ->
-        if isFunctionTypeStarTerminal inferredKind'
+        if isUninteresting inferredKind'
           then  d
           else  d { declKind = Just $ KindInfo
                     { kiKeyword = keyword
@@ -114,22 +114,16 @@ insertValueTypesAndInferredKinds env m =
           kindFunctionType = P.TypeApp () kindPrimFunction kindPrimType
 
           -- |
-          -- Returns True if the inferred kind signature follows this
-          -- pattern: `(Type ->)* [Terminal]` where `Terminal` is
-          -- `Type` or `Constraint`
-          --
-          -- Concretely, these will return True
-          -- - Type
-          -- - Constraint
-          -- - Type -> Type
-          -- - Type -> Constraint
-          -- - Type -> Type -> ... -> Type
-          -- - Type -> Type -> ... -> Constraint
-          isFunctionTypeStarTerminal
+          -- Returns True if the kind signature is "uninteresting", which
+          -- is a kind that follows this form:
+          -- - `Type`
+          -- - `Constraint` (class declaration only)
+          -- - `Type -> K` where `K` is an "uninteresting" kind
+          isUninteresting
             :: P.Type () -> Bool
-          isFunctionTypeStarTerminal = \case
+          isUninteresting = \case
             P.TypeApp _ t1 t2 | t1 == kindFunctionType ->
-              isFunctionTypeStarTerminal t2
+              isUninteresting t2
             x
               | x == kindPrimType || x == kindPrimConstraint -> True
               | otherwise -> False
