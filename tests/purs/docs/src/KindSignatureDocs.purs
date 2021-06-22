@@ -93,3 +93,17 @@ class CHidden a b c where
 
 class CNothing
 
+----------
+
+-- | dit
+data DShown a b f = DShown (f Int) a b
+
+-- | tit
+type TShown f b c = DShown b c f
+
+-- | nit
+newtype NShown a f c = NShown (DShown a c f)
+
+-- | cit
+class CShown f a b where
+  fooShown :: f Int -> a -> b -> String

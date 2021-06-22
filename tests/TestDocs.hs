@@ -780,6 +780,14 @@ testCases =
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CHidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CNothing"
 
+      -- Declarations with no explicit kind signatures should be displayed
+      -- if at least one type parameter has a kind other than `Type`
+      -- despite all others having kind `Type`.
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DShown" "data DShown :: Type -> Type -> (Type -> Type) -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TShown" "data TShown :: (Type -> Type) -> Type -> Type -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NShown" "data NShown :: Type -> (Type -> Type) -> Type -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CShown" "data CShown :: (Type -> Type) -> Type -> Type -> Type"
+
       -- expected docs
       , ShouldMergeDocComments (n "KindSignatureDocs") "DKindAndType" $ Just "dkatk\n\ndkatt\n"
       , ShouldMergeDocComments (n "KindSignatureDocs") "TKindAndType" $ Just "tkatk\n\ntkatt\n"
