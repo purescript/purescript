@@ -774,9 +774,11 @@ testCases =
       -- if each type parameter in their inferred kind signature
       -- has kind `Type`.
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DHidden"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DNothing"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "THidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "NHidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CHidden"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CNothing"
 
       -- expected docs
       , ShouldMergeDocComments (n "KindSignatureDocs") "DKindAndType" $ Just "dkatk\n\ndkatt\n"
