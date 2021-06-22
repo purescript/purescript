@@ -8,7 +8,7 @@ Breaking changes:
 
 New features:
 
-* Display kind signatures and their comments in documentation (#4100 by JordanMartinez)
+* Display kind signatures and their comments in documentation (#4100 and #4119 by JordanMartinez)
 
   Previously, data/newtype/type/class declarations that have explicit kind
   signatures would not display those kind signatures in their documentation.
@@ -33,6 +33,36 @@ New features:
 
   Now, these types' kind signatures are displayed above their declarations
   in their docs, similar to what one would see in the source code.
+
+  But that's not all!
+
+  The two below types do not have explicit kind signatures, but the compiler
+  infers what their kind signature is anyway. "Interesting" kind signatures
+  will be displayed but "uninteresting" kind signatures (even if they are
+  explicit) will be removed.
+
+  ```purescript
+                                                  {-
+  data Foo :: (Type -> Type) -> Type -> Type      -}
+  data Foo f a = Foo (f a)
+                                                  {-
+  data Tuple :: Type -> Type -> Type              -}
+  data Tuple a b = Tuple a b
+  ```
+
+  The docs will include the kind signature for `Foo`, but will
+  intentionally remove the kind signature for `Bar`, even if `Bar`'s
+  kind signature was explicitly defined by the developer. `Bar`'s
+  kind signature is considered "uninteresting" because all of the
+  type parameters have kind `Type`. `Foo`, on the other hand, has
+  at least one type parameter, `f`, whose kind is something other than
+  `Type`. Thus, `Foo`'s inferred kind signature will be displayed
+  in its docs.
+
+  An "uninteresting" kind signature is one that follows this form:
+  - `Type`
+  - `Constraint`
+  - `Type -> K` where `K` refers to an "uninteresting" kind signature
 
 Bugfixes:
 
