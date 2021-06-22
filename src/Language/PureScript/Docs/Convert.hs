@@ -77,9 +77,6 @@ insertValueTypesAndAdjustKinds env m =
           -- insert inferred kinds so long as they are "interesting"
           insertInferredKind d declTitle keyword
 
-  go other =
-    other
-
   parseIdent =
     either (err . ("failed to parse Ident: " ++)) identity . runParser CST.parseIdent
 
