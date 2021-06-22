@@ -97,10 +97,42 @@ insertValueTypesAndInferredKinds env m =
       key = P.Qualified (Just (modName m)) (P.ProperName name)
     in case Map.lookup key (P.types env) of
       Just (inferredKind, _) ->
-        d { declKind = Just $ KindInfo { kiKeyword = keyword, kiKind = inferredKind' } }
+        if isFunctionTypeStarTerminal inferredKind'
+          then  d
+          else  d { declKind = Just $ KindInfo
+                    { kiKeyword = keyword
+                    , kiKind = dropTypeSortAnnotation inferredKind'
+                    }
+                  }
         where
-          inferredKind' = dropTypeSortAnnotation $ inferredKind $> ()
+          inferredKind' = inferredKind $> ()
           kindPrimType = P.TypeConstructor () Prim.Type
+          kindPrimFunction = P.TypeConstructor () Prim.Function
+          kindPrimConstraint = P.TypeConstructor () Prim.Constraint
+
+          -- `Type ->`
+          kindFunctionType = P.TypeApp () kindPrimFunction kindPrimType
+
+          -- |
+          -- Returns True if the inferred kind signature follows this
+          -- pattern: `(Type ->)* [Terminal]` where `Terminal` is
+          -- `Type` or `Constraint`
+          --
+          -- Concretely, these will return True
+          -- - Type
+          -- - Constraint
+          -- - Type -> Type
+          -- - Type -> Constraint
+          -- - Type -> Type -> ... -> Type
+          -- - Type -> Type -> ... -> Constraint
+          isFunctionTypeStarTerminal
+            :: P.Type () -> Bool
+          isFunctionTypeStarTerminal = \case
+            P.TypeApp _ t1 t2 | t1 == kindFunctionType ->
+              isFunctionTypeStarTerminal t2
+            x
+              | x == kindPrimType || x == kindPrimConstraint -> True
+              | otherwise -> False
 
           -- changes `forall (k :: Type). k -> ...`
           -- to      `forall k          . k -> ...`
@@ -108,6 +140,8 @@ insertValueTypesAndInferredKinds env m =
             P.ForAll sa txt (Just kAnn) rest skol | kAnn == kindPrimType ->
               P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol
             rest -> rest
+
+
       Nothing ->
         err ("type not found: " ++ show key)
 
