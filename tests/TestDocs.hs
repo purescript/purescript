@@ -740,6 +740,12 @@ testCases =
       , ShouldHaveKindSignature (n "KindSignatureDocs") "NTypeOnly" "newtype NTypeOnly :: forall k. k -> Type"
       , ShouldHaveKindSignature (n "KindSignatureDocs") "CTypeOnly" "class CTypeOnly :: forall k. (k -> Type) -> k -> Constraint"
 
+      -- Declarations with no explicit kind signatures should stlil have them implicitly.
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DImplicit" "data DImplicit :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TImplicit" "type TImplicit :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NImplicit" "newtype NImplicit :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CImplicit" "class CImplicit :: forall k1. (k1 -> Type) -> k1 -> Constraint"
+
       -- expected docs
       , ShouldMergeDocComments (n "KindSignatureDocs") "DKindAndType" $ Just "dkatk\n\ndkatt\n"
       , ShouldMergeDocComments (n "KindSignatureDocs") "TKindAndType" $ Just "tkatk\n\ntkatt\n"
@@ -755,6 +761,11 @@ testCases =
       , ShouldMergeDocComments (n "KindSignatureDocs") "TTypeOnly" $ Just "ttot\n"
       , ShouldMergeDocComments (n "KindSignatureDocs") "NTypeOnly" $ Just "ntot\n"
       , ShouldMergeDocComments (n "KindSignatureDocs") "CTypeOnly" $ Just "ctot\n"
+
+      , ShouldMergeDocComments (n "KindSignatureDocs") "DImplicit" $ Just "dit\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "TImplicit" $ Just "tit\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "NImplicit" $ Just "nit\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "CImplicit" $ Just "cit\n"
       ]
     )
   ]
