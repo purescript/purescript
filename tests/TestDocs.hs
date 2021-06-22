@@ -786,7 +786,7 @@ testCases =
       , ShouldHaveKindSignature (n "KindSignatureDocs") "DShown" "data DShown :: Type -> Type -> (Type -> Type) -> Type"
       , ShouldHaveKindSignature (n "KindSignatureDocs") "TShown" "type TShown :: (Type -> Type) -> Type -> Type -> Type"
       , ShouldHaveKindSignature (n "KindSignatureDocs") "NShown" "newtype NShown :: Type -> (Type -> Type) -> Type -> Type"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "CShown" "class CShown :: (Type -> Type) -> Type -> Type -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CShown" "class CShown :: (Type -> Type) -> Type -> Type -> Constraint"
 
       -- expected docs
       , ShouldMergeDocComments (n "KindSignatureDocs") "DKindAndType" $ Just "dkatk\n\ndkatt\n"
