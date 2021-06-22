@@ -229,9 +229,9 @@ data DocsAssertionFailure
   -- Fields: module name, declaration title.
   | KindSignatureMissing P.ModuleName Text
   -- | The rendered kind signature did not match the expected one.
-  -- Fields: module name, declaration title, expected kind signature,
-  -- actual kind signature
-  | KindSignatureMismatch P.ModuleName Text Text Text
+  -- Fields: module name, declaration title, expected kind signature (text),
+  -- actual kind signature (text), actual kind signature (structure)
+  | KindSignatureMismatch P.ModuleName Text Text Text (P.Type ())
   -- | The doc comments for the kind signature and type declaration were
   -- not properly merged into the expected one.
   -- Fields: module name, declaration title, expected doc-comments,
@@ -289,10 +289,11 @@ displayAssertionFailure = \case
     "expected to see " <> before' <> " before " <> after'
   KindSignatureMissing _ decl ->
     "the kind signature for " <> decl <> " is missing."
-  KindSignatureMismatch _ decl expected actual ->
+  KindSignatureMismatch _ decl expected actualTxt actualKind ->
     "expected the kind signature for " <> decl <> "\n" <>
     "to be `" <> expected <> "`\n" <>
-    "  got `" <> actual <> "`"
+    "  got `" <> actualTxt <> "`\n" <>
+    "Structure of kind: " <> T.pack (show actualKind)
   DocCommentMergeFailure _ decl expected actual ->
     "Expected the doc-comment for " <> decl <> " to merge comments and be `" <>
     expected <> "`; got `" <> actual <> "`"
@@ -471,7 +472,7 @@ runAssertion assertion linksCtx Docs.Module{..} =
       findDeclKinds mn decl $ \case
         Just Docs.KindInfo{..} ->
           if expected /= actual
-              then Fail (KindSignatureMismatch mn decl expected actual)
+              then Fail (KindSignatureMismatch mn decl expected actual kiKind)
               else Pass
           where
             actual = codeToString $ Docs.renderKindSig decl $
