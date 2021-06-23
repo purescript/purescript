@@ -32,37 +32,38 @@ New features:
   ```
 
   Now, these types' kind signatures are displayed above their declarations
-  in their docs, similar to what one would see in the source code.
+  in their docs, similar to what one would see in the source code. The only
+  exception to this are kind signatures whose kinds are "uninteresting"
+  (covered below).
 
-  But that's not all!
-
-  The two below types do not have explicit kind signatures, but the compiler
-  infers what their kind signature is anyway. "Interesting" kind signatures
-  will be displayed but "uninteresting" kind signatures (even if they are
-  explicit) will be removed.
+  Moreover, declarations without explicit kind signatures will still
+  display the kind signatures inferred by the compiler. For example,
+  `Foo`'s documentation will display the below (commented-out) inferred
+  kind signature:
 
   ```purescript
                                                   {-
   data Foo :: (Type -> Type) -> Type -> Type      -}
-  data Foo f a = Foo (f a)
-                                                  {-
-  data Tuple :: Type -> Type -> Type              -}
-  data Tuple a b = Tuple a b
+  data Foo f a = Foo (f Int) a
   ```
 
-  The docs will include the kind signature for `Foo`, but will
-  intentionally remove the kind signature for `Bar`, even if `Bar`'s
-  kind signature was explicitly defined by the developer. `Bar`'s
-  kind signature is considered "uninteresting" because all of the
-  type parameters have kind `Type`. `Foo`, on the other hand, has
-  at least one type parameter, `f`, whose kind is something other than
-  `Type`. Thus, `Foo`'s inferred kind signature will be displayed
-  in its docs.
-
-  An "uninteresting" kind signature is one that follows this form:
+  However, a kind signature for both explicit and inferred kinds will not
+  be displayed if that kind is considered "uninteresting." An "uninteresting"
+  kind is one that follows this form:
   - `Type`
   - `Constraint`
   - `Type -> K` where `K` refers to an "uninteresting" kind signature
+
+  Thus, both the `Bar` and `Baz` declarations below will not have their
+  explicit and inferred kind signatures displayed in their docs.
+  ```purescript
+  data Bar :: Type -> Type -> Type
+  data Bar a b = Bar a b
+                                                    {-
+  class Baz :: Type -> Type -> Constraint           -}
+  class Baz a b where
+    doBaz :: a -> b -> String
+  ```
 
 Bugfixes:
 
