@@ -65,17 +65,19 @@ insertValueTypesAndAdjustKinds env m =
     in
       d { declInfo = ValueDeclaration (ty $> ()) }
 
-  go d@Declaration{..} = maybe d hideOrInsert $ extractKeyword declInfo
-    where
-      hideOrInsert keyword = case declKind of
-        Just ks ->
-          -- hide explicit kind signatures that are "uninteresting"
-          if isUninteresting keyword $ kiKind ks
-            then d { declKind = Nothing }
-            else d
-        Nothing ->
-          -- insert inferred kinds so long as they are "interesting"
-          insertInferredKind d declTitle keyword
+  go d@Declaration{..} | Just keyword <- extractKeyword declInfo =
+    case declKind of
+      Just ks ->
+        -- hide explicit kind signatures that are "uninteresting"
+        if isUninteresting keyword $ kiKind ks
+          then d { declKind = Nothing }
+          else d
+      Nothing ->
+        -- insert inferred kinds so long as they are "interesting"
+        insertInferredKind d declTitle keyword
+
+  go other =
+    other
 
   parseIdent =
     either (err . ("failed to parse Ident: " ++)) identity . runParser CST.parseIdent
