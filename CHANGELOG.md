@@ -10,60 +10,18 @@ New features:
 
 * Display kind signatures and their comments in documentation (#4100 and #4119 by JordanMartinez)
 
-  Previously, data/newtype/type/class declarations that have explicit kind
-  signatures would not display those kind signatures in their documentation.
-  For example, the two below types...
+  The compiler now displays kind signatures for data, newtype, type
+  synonym, and type class declarations in generated documentation. The
+  compiler now also includes documentation-comments (i.e. those which start
+  with a `|` character) both above and below the associated kind signature
+  declaration (if any) in generated documentation, whereas previously
+  documentation-comments above a kind signature declaration were ignored.
 
-  ```purescript
-  data PolyProxy :: forall k. k -> Type
-  data PolyProxy a = PolyProxy
-
-  data TypeProxy :: Type -> Type
-  data TypeProxy a = TypeProxy
-  ```
-
-  ... would only show the following information in their docs. One cannot
-  be distinguished from another due to the missing kind signatures:
-
-  ```
-  data PolyProxy a = PolyProxy
-
-  data TypeProxy a = TypeProxy
-  ```
-
-  Now, these types' kind signatures are displayed above their declarations
-  in their docs, similar to what one would see in the source code. The only
-  exception to this are kind signatures whose kinds are "uninteresting"
-  (covered below).
-
-  Moreover, declarations without explicit kind signatures will still
-  display the kind signatures inferred by the compiler. For example,
-  `Foo`'s documentation will display the below (commented-out) inferred
-  kind signature:
-
-  ```purescript
-                                                  {-
-  data Foo :: (Type -> Type) -> Type -> Type      -}
-  data Foo f a = Foo (f Int) a
-  ```
-
-  However, a kind signature for both explicit and inferred kinds will not
-  be displayed if that kind is considered "uninteresting." An "uninteresting"
-  kind is one that follows this form:
-  - `Type`
-  - `Constraint`
-  - `Type -> K` where `K` refers to an "uninteresting" kind signature
-
-  Thus, both the `Bar` and `Baz` declarations below will not have their
-  explicit and inferred kind signatures displayed in their docs.
-  ```purescript
-  data Bar :: Type -> Type -> Type
-  data Bar a b = Bar a b
-                                                    {-
-  class Baz :: Type -> Type -> Constraint           -}
-  class Baz a b where
-    doBaz :: a -> b -> String
-  ```
+  Both explicitly declared and inferred kinds are included in documentation.
+  The compiler omits including a kind signature in generated documentation
+  only when the kind is considered "uninteresting". An uninteresting kind is
+  defined as one where all of the declaration's type parameters have kind
+  `Type`.
 
 Bugfixes:
 
