@@ -6,7 +6,10 @@ at tests/purs/failing/3531-2.purs:22:11 - 22:22 (line 22, column 11 - line 22, c
   [33m                   [0m
   [33m  Main.C (X t2 Int)[0m
   [33m                   [0m
-  The instance [33mMain.cx[0m partially overlaps the above constraint, which means the rest of its instance chain will not be considered.
+  The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:
+
+    [33mMain.cx[0m
+
   The instance head contains unknown type variables. Consider adding a type annotation.
 
 while applying a function [33mthing[0m

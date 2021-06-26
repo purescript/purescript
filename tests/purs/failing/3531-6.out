@@ -9,8 +9,8 @@ at tests/purs/failing/3531-6.purs:21:7 - 21:27 (line 21, column 7 - line 21, col
   [33m           [0m
   The following instances partially overlap the above constraint, which means the rest of their instance chains will not be considered:
 
-    instance in module [33mMain[0m with type [33mforall a. C String (Array a)[0m
-    instance in module [33mMain[0m with type [33mC Int Int[0m
+    instance in module [33mMain[0m with type [33mforall a. C String (Array a)[0m (line 9, column 1 - line 10, column 15)
+    instance in module [33mMain[0m with type [33mC Int Int[0m (line 14, column 1 - line 15, column 15)
 
 
 while applying a function [33mc[0m

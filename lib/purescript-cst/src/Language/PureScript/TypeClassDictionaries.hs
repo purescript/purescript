@@ -33,6 +33,9 @@ data TypeClassDictionaryInScope v
     , tcdInstanceTypes :: [SourceType]
     -- | Type class dependencies which must be satisfied to construct this dictionary
     , tcdDependencies :: Maybe [SourceConstraint]
+    -- | If this instance was unnamed, the type to use when describing it in
+    -- error messages
+    , tcdDescription :: Maybe SourceType
     }
     deriving (Show, Functor, Foldable, Traversable, Generic)
 

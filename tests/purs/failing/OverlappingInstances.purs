@@ -12,6 +12,6 @@ instance testInt :: Test Int where
 
 -- The OverlappingInstances instances error only arises when there are two
 -- choices for a dictionary, not when the instances are defined. So without
--- `value` this module would not raise a warning.
+-- `value` this module would not raise an error.
 value :: Int
 value = test 1

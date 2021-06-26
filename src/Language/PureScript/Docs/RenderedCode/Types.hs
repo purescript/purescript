@@ -30,6 +30,7 @@ module Language.PureScript.Docs.RenderedCode.Types
  , keywordFixity
  , keywordKind
  , keywordAs
+ , kindSignatureFor
  , ident
  , dataCtor
  , typeCtor
@@ -54,6 +55,7 @@ import qualified Data.Text.Encoding as TE
 
 import Language.PureScript.Names
 import Language.PureScript.AST (Associativity(..))
+import qualified Language.PureScript.AST.Declarations as P
 
 -- | Given a list of actions, attempt them all, returning the first success.
 -- If all the actions fail, 'tryAll' returns the first argument.
@@ -306,6 +308,13 @@ keywordKind = keyword "kind"
 
 keywordAs :: RenderedCode
 keywordAs = keyword "as"
+
+kindSignatureFor :: P.KindSignatureFor -> RenderedCode
+kindSignatureFor = \case
+  P.DataSig -> keywordData
+  P.NewtypeSig -> keywordNewtype
+  P.TypeSynonymSig -> keywordType
+  P.ClassSig -> keywordClass
 
 ident :: Qualified Ident -> RenderedCode
 ident (fromQualified -> (mn, name)) =

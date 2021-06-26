@@ -8,6 +8,32 @@ Breaking changes:
 
 New features:
 
+* Display kind signatures and their comments in documentation (#4100 by JordanMartinez)
+
+  Previously, data/newtype/type/class declarations that have explicit kind
+  signatures would not display those kind signatures in their documentation.
+  For example, the two below types...
+
+  ```purescript
+  data PolyProxy :: forall k. k -> Type
+  data PolyProxy a = PolyProxy
+
+  data TypeProxy :: Type -> Type
+  data TypeProxy a = TypeProxy
+  ```
+
+  ... would only show the following information in their docs. One cannot
+  be distinguished from another due to the missing kind signatures:
+
+  ```
+  data PolyProxy a = PolyProxy
+
+  data TypeProxy a = TypeProxy
+  ```
+
+  Now, these types' kind signatures are displayed above their declarations
+  in their docs, similar to what one would see in the source code.
+
 Bugfixes:
 
 * Ensure unnamed instances appear in documentation (#4109 by @JordanMartinez)
@@ -16,6 +42,10 @@ Bugfixes:
 
 * Pin OS versions used in CI (#4107, @f-f)
 
+* Fix UnusedName warnings for multiple non-recursive let bindings (#4114 by @nwolverson)
+
+* Remove generated names from errors about instances (#4118 by @rhendric)
+
 * Improve apartness checking (#4064, @rhendric)
 
 Internal:
@@ -23,6 +53,10 @@ Internal:
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
 
 * Update RELEASE_GUIDE.md with more details (#4104 by @JordanMartinez)
+
+* Use GenIdent for anonymous instances (#4096, @rhendric)
+
+* Desugar type class instance names in type class desugaring pass (#4099 by @JordanMartinez)
 
 ## v0.14.2
 

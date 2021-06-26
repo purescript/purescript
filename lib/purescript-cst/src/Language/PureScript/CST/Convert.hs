@@ -18,6 +18,7 @@ module Language.PureScript.CST.Convert
 import Prelude hiding (take)
 
 import Data.Bifunctor (bimap, first)
+import Data.Char (toLower)
 import Data.Foldable (foldl', toList)
 import Data.Functor (($>))
 import qualified Data.List.NonEmpty as NE
@@ -540,13 +541,17 @@ convertDeclaration fileName decl = case decl of
     where
       -- truncate to 25 chars to reduce verbosity
       -- of name and still keep it readable
-      -- unique identifier will be appended to this name
-      -- in desugaring proces
+      -- name will be used to create a GenIdent
+      -- in desugaring process
       genName :: Text.Text
-      genName = "$_" <> Text.take 25 (className <> typeArgs) <> "_"
+      genName = Text.take 25 (className <> typeArgs)
 
       className :: Text.Text
-      className = N.runProperName $ qualName cls
+      className
+        = foldMap (uncurry Text.cons . first toLower)
+        . Text.uncons
+        . N.runProperName
+        $ qualName cls
 
       typeArgs :: Text.Text
       typeArgs = foldMap argName args

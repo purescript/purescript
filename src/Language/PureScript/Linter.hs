@@ -189,11 +189,8 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go (Var _ (Qualified Nothing v)) = (S.singleton v, mempty)
     go (Var _ _) = (S.empty, mempty)
 
-    go (Let _ ds e) =
-      let (letNames, letNamesRec) = foldMap declIdents ds
-      in removeAndWarn letNamesRec $
-            removeAndWarn letNames (go e)
-            <> mconcat (map underDecl ds)
+    go (Let _ ds e) = onDecls ds (go e)
+
     go (Abs binder v1) =
       let newNames = S.fromList (binderNamesWithSpans binder)
       in
@@ -249,11 +246,8 @@ lintUnused (Module modSS _ mn modDecls exports) =
       let bindNewNames = S.fromList (binderNamesWithSpans binder)
       in go e <> removeAndWarn bindNewNames (doElts rest v)
 
-    doElts (DoNotationLet ds : rest) v =
-      let (letNewNames, letNewNamesRec) = foldMap declIdents ds
-      in removeAndWarn letNewNamesRec $
-            mconcat (map underDecl ds)
-            <> removeAndWarn letNewNames (doElts rest v)
+    doElts (DoNotationLet ds : rest) v = onDecls ds (doElts rest v)
+
     doElts (PositionedDoNotationElement _ _ e : rest) v = doElts (e : rest) v
     doElts [] (Just e) = go e <> (rebindable, mempty)
     doElts [] Nothing = (rebindable, mempty)
@@ -263,6 +257,19 @@ lintUnused (Module modSS _ mn modDecls exports) =
     declIdents (ValueDecl (ss,_) ident _ _ _) = (S.empty, S.singleton (ss, ident))
     declIdents (BoundValueDeclaration _ binders _) = (S.fromList $ binderNamesWithSpans binders, S.empty)
     declIdents _ = (S.empty, S.empty)
+
+    onDecls :: [ Declaration ] -> (S.Set Ident, MultipleErrors) -> (S.Set Ident, MultipleErrors)
+    onDecls ds errs = 
+      let 
+        onDecl d (accErrs, accLetNamesRec) = 
+            let (letNames, recNames) = declIdents d
+                dErrs = underDecl d
+                errs' = dErrs <> removeAndWarn letNames accErrs
+            in
+                (errs', accLetNamesRec <> recNames)
+        (errs'', letNamesRec) = foldr onDecl (errs, S.empty) ds
+      in
+        removeAndWarn letNamesRec errs''
 
     -- let f x = e  -- check the x in e (but not the f)
     underDecl (ValueDecl _ _ _ binders gexprs) =

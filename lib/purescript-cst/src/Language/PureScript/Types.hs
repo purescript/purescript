@@ -14,7 +14,7 @@ import Control.Monad ((<=<), (>=>))
 import Data.Aeson ((.:), (.:?), (.!=), (.=))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
-import Data.Foldable (fold)
+import Data.Foldable (fold, foldl')
 import qualified Data.IntSet as IS
 import Data.List (sort, sortOn)
 import Data.Maybe (fromMaybe, isJust)
@@ -589,6 +589,20 @@ unapplyConstraints = go []
   where
   go acc (ConstrainedType _ con ty) = go (con : acc) ty
   go acc ty = (reverse acc, ty)
+
+-- | Construct the type of an instance declaration from its parts. Used in
+-- error messages describing unnamed instances.
+srcInstanceType
+  :: SourceSpan
+  -> [(Text, SourceType)]
+  -> Qualified (ProperName 'ClassName)
+  -> [SourceType]
+  -> SourceType
+srcInstanceType ss vars className tys
+  = setAnnForType (ss, [])
+  . flip (foldr $ \(tv, k) ty -> srcForAll tv (Just k) ty Nothing) vars
+  . flip (foldl' srcTypeApp) tys
+  $ srcTypeConstructor $ coerceProperName <$> className
 
 everywhereOnTypes :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypes f = go where

@@ -6,7 +6,10 @@ at tests/purs/failing/3531.purs:16:7 - 16:27 (line 16, column 7 - line 16, colum
   [33m           [0m
   [33m  Main.C a2[0m
   [33m           [0m
-  The instance [33mMain.c1[0m partially overlaps the above constraint, which means the rest of its instance chain will not be considered.
+  The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:
+
+    [33mMain.c1[0m
+
 
 while applying a function [33mc[0m
   of type [33mC @t0 t1 => Proxy @t0 t1 -> Boolean[0m

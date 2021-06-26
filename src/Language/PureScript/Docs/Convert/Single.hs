@@ -66,8 +66,19 @@ type IntermediateDeclaration
 -- since they appear at the top level in the AST, and since they might need to
 -- appear as children in two places (for example, if a data type defined in a
 -- module is an instance of a type class also defined in that module).
+--
+-- The AugmentKindSig constructor allows us to add a kind signature
+-- to its corresponding declaration. Comments for both declarations
+-- are also merged together.
 data DeclarationAugment
   = AugmentChild ChildDeclaration
+  | AugmentKindSig KindSignatureInfo
+
+data KindSignatureInfo = KindSignatureInfo
+  { ksiComments :: Maybe Text
+  , ksiKeyword :: P.KindSignatureFor
+  , ksiKind :: Type'
+  }
 
 -- | Augment top-level declarations; the second pass. See the comments under
 -- the type synonym IntermediateDeclaration for more information.
@@ -86,6 +97,15 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
 
   augmentWith (AugmentChild child) d =
     d { declChildren = declChildren d ++ [child] }
+  augmentWith (AugmentKindSig KindSignatureInfo{..}) d =
+    d { declComments = mergeComments ksiComments $ declComments d
+      , declKind = Just $ KindInfo { kiKeyword = ksiKeyword, kiKind = ksiKind }
+      }
+    where
+      mergeComments Nothing dc = dc
+      mergeComments kc Nothing = kc
+      mergeComments (Just kcoms) (Just dcoms) =
+        Just $ kcoms <> "\n" <> dcoms
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
 getDeclarationTitle (P.ValueDeclaration vd) = Just (P.showIdent (P.valdeclIdent vd))
@@ -97,6 +117,7 @@ getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _) = Just (P.runProperN
 getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ name _ _ _ _) = Just $ either (const "<anonymous>") P.showIdent name
 getDeclarationTitle (P.TypeFixityDeclaration _ _ _ op) = Just ("type " <> P.showOp op)
 getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (P.showOp op)
+getDeclarationTitle (P.KindDeclaration _ _ n _) = Just (P.runProperName n)
 getDeclarationTitle _ = Nothing
 
 -- | Create a basic Declaration value.
@@ -107,6 +128,7 @@ mkDeclaration (ss, com) title info =
               , declSourceSpan = Just ss -- TODO: make this non-optional when we next break the format
               , declChildren   = []
               , declInfo       = info
+              , declKind       = Nothing -- kind sigs are added in augment pass
               }
 
 basicDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Maybe IntermediateDeclaration
@@ -159,6 +181,11 @@ convertDeclaration (P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _)
   Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
 convertDeclaration (P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
   Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Left alias)))
+convertDeclaration (P.KindDeclaration sa keyword _ kind) title =
+  Just $ Left ([(title, AugmentType), (title, AugmentClass)], AugmentKindSig ksi)
+  where
+    comms = convertComments $ snd sa
+    ksi = KindSignatureInfo { ksiComments = comms, ksiKeyword = keyword, ksiKind = kind $> () }
 convertDeclaration _ _ = Nothing
 
 convertComments :: [P.Comment] -> Maybe Text

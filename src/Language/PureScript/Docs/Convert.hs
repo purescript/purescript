@@ -50,6 +50,7 @@ insertValueTypes ::
 insertValueTypes env m =
   m { modDeclarations = map go (modDeclarations m) }
   where
+  -- insert value types
   go d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} } =
     let
       ident = P.Ident . CST.getIdent . CST.nameValue . parseIdent $ declTitle d
