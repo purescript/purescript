@@ -8,31 +8,20 @@ Breaking changes:
 
 New features:
 
-* Display kind signatures and their comments in documentation (#4100 by JordanMartinez)
+* Display kind signatures and their comments in documentation (#4100 and #4119 by JordanMartinez)
 
-  Previously, data/newtype/type/class declarations that have explicit kind
-  signatures would not display those kind signatures in their documentation.
-  For example, the two below types...
+  The compiler now displays kind signatures for data, newtype, type
+  synonym, and type class declarations in generated documentation. The
+  compiler now also includes documentation-comments (i.e. those which start
+  with a `|` character) both above and below the associated kind signature
+  declaration (if any) in generated documentation, whereas previously
+  documentation-comments above a kind signature declaration were ignored.
 
-  ```purescript
-  data PolyProxy :: forall k. k -> Type
-  data PolyProxy a = PolyProxy
-
-  data TypeProxy :: Type -> Type
-  data TypeProxy a = TypeProxy
-  ```
-
-  ... would only show the following information in their docs. One cannot
-  be distinguished from another due to the missing kind signatures:
-
-  ```
-  data PolyProxy a = PolyProxy
-
-  data TypeProxy a = TypeProxy
-  ```
-
-  Now, these types' kind signatures are displayed above their declarations
-  in their docs, similar to what one would see in the source code.
+  Both explicitly declared and inferred kinds are included in documentation.
+  The compiler omits including a kind signature in generated documentation
+  only when the kind is considered "uninteresting". An uninteresting kind is
+  defined as one where all of the declaration's type parameters have kind
+  `Type`.
 
 Bugfixes:
 
