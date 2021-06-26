@@ -134,6 +134,9 @@ isExported (Just exps) (KindDeclaration _ _ n _) = any matches exps
   matches declRef = do
     let refName = declRefName declRef
     TyName n == refName || TyClassName (tyToClassName n) == refName
+isExported (Just exps) (RoleDeclaration RoleDeclarationData{..}) = any matches exps
+  where
+  matches declRef = TyName rdeclIdent == declRefName declRef
 isExported (Just exps) decl = any matches exps
   where
   matches declRef = declName decl == Just (declRefName declRef)
@@ -163,6 +166,9 @@ reorder refs =
   refIndex = \case
     KindDeclaration _ _ n _ ->
       M.lookup (TyName n) refIndices <|> M.lookup (TyClassName (tyToClassName n)) refIndices
+
+    RoleDeclaration RoleDeclarationData{..} ->
+      M.lookup (TyName rdeclIdent) refIndices
 
     decl -> declName decl >>= flip M.lookup refIndices
 
