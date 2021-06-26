@@ -76,22 +76,9 @@ New features:
   instance Foo Int String
   ```
 
-  and the compiler will generate a unique name for the instance
-  (e.g. `$dollar_FooIntString_4` where `4` is a randomly-generated number
-  that can change across compiler runs). This version of the instance name
-  is not intended for use in FFI.
-
-  Note: if one wrote
-
-  ```purescript
-  instance ReallyLongClassName Int String
-  ```
-
-  the generated name would be something like
-  `$dollar_ReallyLongClassNameIntStr_87` rather than
-  `$dollar_ReallyLongClassNameIntString_87` as the generated part
-  of the name will be truncated to 25 characters (long enough to be readable
-  without being too verbose).
+  and the compiler will generate a unique name for the instance. Note that
+  generated instance names contain numeric suffixes which can change without
+  warning, and should therefore not be relied on.
 
 Bugfixes:
 
