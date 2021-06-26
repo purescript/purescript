@@ -12,6 +12,7 @@ import           Control.Monad
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.State.Lazy
 import           Control.Monad.Writer
+import           Data.Bitraversable (bitraverse)
 import           Data.Char (isSpace)
 import           Data.Either (partitionEithers)
 import           Data.Foldable (fold)
@@ -99,7 +100,7 @@ data SimpleErrorMessage
   | TypesDoNotUnify SourceType SourceType
   | KindsDoNotUnify SourceType SourceType
   | ConstrainedTypeUnified SourceType SourceType
-  | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
+  | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified (Either SourceType Ident)]
   | NoInstanceFound
       SourceConstraint -- ^ constraint that could not be solved
       Bool -- ^ whether eliminating unknowns with annotations might help
@@ -452,7 +453,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure unks
   gSimple (AmbiguousTypeVariables t us) = AmbiguousTypeVariables <$> f t <*> pure us
-  gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
+  gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> traverse (traverse $ bitraverse f pure) insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
   gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
@@ -851,7 +852,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
             , line "The following instances were found:"
-            , indent $ paras (map (line . showQualified showIdent) ds)
+            , indent $ paras (map prettyInstanceName ds)
             ]
     renderSimpleErrorMessage (UnknownClass nm) =
       paras [ line "No type class instance was found for class"
@@ -1015,7 +1016,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (AdditionalProperty prop) =
       line $ "Type of expression contains additional label " <> markCode (prettyPrintLabel prop) <> "."
     renderSimpleErrorMessage (OrphanInstance nm cnm nonOrphanModules ts) =
-      paras [ line $ "Orphan instance " <> markCode (showIdent nm) <> " found for "
+      paras [ line $ "Orphan instance" <> prettyPrintPlainIdent nm <> " found for "
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName cnm)
                 , Box.vcat Box.left (map prettyTypeAtom ts)
@@ -1223,7 +1224,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (ClassInstanceArityMismatch dictName className expected actual) =
       paras [ line $ "The type class " <> markCode (showQualified runProperName className) <>
                      " expects " <> T.pack (show expected) <> " " <> argsMsg <> "."
-            , line $ "But the instance " <> markCode (showIdent dictName) <> mismatchMsg <> T.pack (show actual) <> "."
+            , line $ "But the instance" <> prettyPrintPlainIdent dictName <> mismatchMsg <> T.pack (show actual) <> "."
             ]
         where
           mismatchMsg = if actual > expected then " provided " else " only provided "
@@ -1659,6 +1660,27 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
   hintCategory PositionedError{}                    = PositionHint
   hintCategory _                                    = OtherHint
 
+  prettyPrintPlainIdent :: Ident -> Text
+  prettyPrintPlainIdent ident =
+    if isPlainIdent ident
+    then " " <> markCode (showIdent ident)
+    else ""
+
+  prettyInstanceName :: Qualified (Either SourceType Ident) -> Box.Box
+  prettyInstanceName = \case
+    Qualified maybeMn (Left ty) ->
+      "instance "
+        Box.<> (case maybeMn of
+                  Just mn -> "in module "
+                    Box.<> line (markCode $ runModuleName mn)
+                    Box.<> " "
+                  Nothing -> Box.nullBox)
+        Box.<> "with type "
+        Box.<> markCodeBox (prettyType ty)
+        Box.<> " "
+        Box.<> (line . displayStartEndPos . fst $ getAnnForType ty)
+    Qualified mn (Right inst) -> line . markCode . showQualified showIdent $ Qualified mn inst
+
 -- Pretty print and export declaration
 prettyPrintExport :: DeclarationRef -> Text
 prettyPrintExport (TypeRef _ pn _) = runProperName pn
@@ -1690,8 +1712,10 @@ prettyPrintRef (ValueOpRef _ op) =
   Just $ showOp op
 prettyPrintRef (TypeClassRef _ pn) =
   Just $ "class " <> runProperName pn
-prettyPrintRef (TypeInstanceRef _ ident) =
+prettyPrintRef (TypeInstanceRef _ ident UserNamed) =
   Just $ showIdent ident
+prettyPrintRef (TypeInstanceRef _ _ CompilerNamed) =
+  Nothing
 prettyPrintRef (ModuleRef _ name) =
   Just $ "module " <> runModuleName name
 prettyPrintRef ReExportRef{} =

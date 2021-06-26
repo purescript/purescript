@@ -254,7 +254,7 @@ exportToCoreFn (A.TypeOpRef _ _) = []
 exportToCoreFn (A.ValueRef _ name) = [name]
 exportToCoreFn (A.ValueOpRef _ _) = []
 exportToCoreFn (A.TypeClassRef _ name) = [properToIdent name]
-exportToCoreFn (A.TypeInstanceRef _ name) = [name]
+exportToCoreFn (A.TypeInstanceRef _ name _) = [name]
 exportToCoreFn (A.ModuleRef _ _) = []
 exportToCoreFn (A.ReExportRef _ _ _) = []
 

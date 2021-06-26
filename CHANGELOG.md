@@ -44,6 +44,8 @@ Bugfixes:
 
 * Fix UnusedName warnings for multiple non-recursive let bindings (#4114 by @nwolverson)
 
+* Remove generated names from errors about instances (#4118 by @rhendric)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)

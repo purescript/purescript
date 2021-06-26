@@ -97,6 +97,10 @@ freshIdent name = GenIdent (Just name) <$> fresh
 freshIdent' :: MonadSupply m => m Ident
 freshIdent' = GenIdent Nothing <$> fresh
 
+isPlainIdent :: Ident -> Bool
+isPlainIdent Ident{} = True
+isPlainIdent _ = False
+
 -- |
 -- Operator alias names.
 --

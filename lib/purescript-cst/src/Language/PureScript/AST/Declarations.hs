@@ -147,6 +147,9 @@ importPrim =
     addDefaultImport (Qualified (Just primModName) primModName)
       . addDefaultImport (Qualified Nothing primModName)
 
+data NameSource = UserNamed | CompilerNamed
+  deriving (Show, Generic, NFData, Serialise)
+
 -- |
 -- An item in a list of explicit imports or exports
 --
@@ -172,9 +175,9 @@ data DeclarationRef
   --
   | ValueOpRef SourceSpan (OpName 'ValueOpName)
   -- |
-  -- A type class instance, created during typeclass desugaring (name, class name, instance types)
+  -- A type class instance, created during typeclass desugaring
   --
-  | TypeInstanceRef SourceSpan Ident
+  | TypeInstanceRef SourceSpan Ident NameSource
   -- |
   -- A module, in its entirety
   --
@@ -192,7 +195,7 @@ instance Eq DeclarationRef where
   (TypeRef _ name dctors) == (TypeRef _ name' dctors') = name == name' && dctors == dctors'
   (ValueRef _ name) == (ValueRef _ name') = name == name'
   (ValueOpRef _ name) == (ValueOpRef _ name') = name == name'
-  (TypeInstanceRef _ name) == (TypeInstanceRef _ name') = name == name'
+  (TypeInstanceRef _ name _) == (TypeInstanceRef _ name' _) = name == name'
   (ModuleRef _ name) == (ModuleRef _ name') = name == name'
   (ReExportRef _ mn ref) == (ReExportRef _ mn' ref') = mn == mn' && ref == ref'
   _ == _ = False
@@ -203,7 +206,7 @@ instance Ord DeclarationRef where
   TypeRef _ name dctors `compare` TypeRef _ name' dctors' = compare name name' <> compare dctors dctors'
   ValueRef _ name `compare` ValueRef _ name' = compare name name'
   ValueOpRef _ name `compare` ValueOpRef _ name' = compare name name'
-  TypeInstanceRef _ name `compare` TypeInstanceRef _ name' = compare name name'
+  TypeInstanceRef _ name _ `compare` TypeInstanceRef _ name' _ = compare name name'
   ModuleRef _ name `compare` ModuleRef _ name' = compare name name'
   ReExportRef _ mn ref `compare` ReExportRef _ mn' ref' = compare mn mn' <> compare ref ref'
   compare ref ref' =
@@ -232,7 +235,7 @@ declRefSourceSpan (TypeOpRef ss _) = ss
 declRefSourceSpan (ValueRef ss _) = ss
 declRefSourceSpan (ValueOpRef ss _) = ss
 declRefSourceSpan (TypeClassRef ss _) = ss
-declRefSourceSpan (TypeInstanceRef ss _) = ss
+declRefSourceSpan (TypeInstanceRef ss _ _) = ss
 declRefSourceSpan (ModuleRef ss _) = ss
 declRefSourceSpan (ReExportRef ss _ _) = ss
 
@@ -242,7 +245,7 @@ declRefName (TypeOpRef _ n) = TyOpName n
 declRefName (ValueRef _ n) = IdentName n
 declRefName (ValueOpRef _ n) = ValOpName n
 declRefName (TypeClassRef _ n) = TyClassName n
-declRefName (TypeInstanceRef _ n) = IdentName n
+declRefName (TypeInstanceRef _ n _) = IdentName n
 declRefName (ModuleRef _ n) = ModName n
 declRefName (ReExportRef _ _ ref) = declRefName ref
 
@@ -835,6 +838,7 @@ data PathNode t = Leaf t | Branch (PathTree t)
 newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
   deriving (Show, Eq, Ord, Foldable, Functor, Traversable)
 
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''NameSource)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)
