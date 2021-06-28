@@ -35,6 +35,8 @@ Bugfixes:
 
 * Remove generated names from errors about instances (#4118 by @rhendric)
 
+* Improve apartness checking (#4064, @rhendric)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
