@@ -43,7 +43,7 @@ projects whom we should probably at least notify. See below subsections:
 
 ### Libraries
 
-Are there breaking changes to the language? Or alternatively, are there
+Are there breaking changes to the language? Alternatively, are there
 language changes which require breaking changes in the relevant libraries to
 make use of? If so:
 
