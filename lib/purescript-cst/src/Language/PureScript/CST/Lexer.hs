@@ -70,7 +70,7 @@ lexWithState = go
   Parser lexK =
     tokenAndComments
 
-  go state@(LexState {..}) =
+  go state@LexState {..} =
     lexK lexSource onError onSuccess
     where
     onError lexSource' err = do
@@ -204,7 +204,7 @@ breakComments = k0 []
   comment = isBlockComment >>= \case
     Just True  -> Just <$> blockComment "{-"
     Just False -> Just <$> lineComment "--"
-    Nothing    -> pure $ Nothing
+    Nothing    -> pure Nothing
 
   lineComment acc = do
     comm <- nextWhile (\c -> c /= '\r' && c /= '\n')
@@ -332,7 +332,7 @@ token = peek >>= maybe (pure TokEof) k0
     operator
       : symbolChar+
   -}
-  operator :: [Text] -> [Char] -> Lexer Token
+  operator :: [Text] -> String -> Lexer Token
   operator qual pre = do
     rest <- nextWhile isSymbolChar
     pure . TokOperator (reverse qual) $ Text.pack pre <> rest
@@ -417,7 +417,7 @@ token = peek >>= maybe (pure TokEof) k0
       Just ch ->
         next $> (Text.singleton ch, ch)
       Nothing ->
-        throw $ ErrEof
+        throw ErrEof
     peek >>= \case
       Just '\''
         | fromEnum ch > 0xFFFF -> throw ErrAstralCodePointInChar
@@ -425,7 +425,7 @@ token = peek >>= maybe (pure TokEof) k0
       Just ch2 ->
         throw $ ErrLexeme (Just [ch2]) []
       _ ->
-        throw $ ErrEof
+        throw ErrEof
 
   {-
     stringPart
@@ -570,8 +570,8 @@ token = peek >>= maybe (pure TokEof) k0
     Just '0' -> next *> peek >>= \case
       Just ch | isNumberChar ch -> throw ErrLeadingZero
       _ -> pure $ Just ("0", "0")
-    Just ch | isDigitChar ch -> Just <$> digits
-    _ -> pure $ Nothing
+    Just ch | Char.isDigit ch -> Just <$> digits
+    _ -> pure Nothing
 
   {-
     integer1
@@ -586,10 +586,10 @@ token = peek >>= maybe (pure TokEof) k0
     '0' -> peek >>= \case
       Just ch | isNumberChar ch -> throw ErrLeadingZero
       _ -> pure $ Just ("0", "0")
-    ch | isDigitChar ch -> do
+    ch | Char.isDigit ch -> do
       (raw, chs) <- digits
       pure $ Just (Text.cons ch raw, ch : chs)
-    _ -> pure $ Nothing
+    _ -> pure Nothing
 
   {-
     fraction
@@ -649,20 +649,20 @@ token = peek >>= maybe (pure TokEof) k0
       then throw ErrExpectedHex
       else pure $ TokInt ("0x" <> chs) $ digitsToIntegerBase 16 $ Text.unpack chs
 
-digitsToInteger :: [Char] -> Integer
+digitsToInteger :: String -> Integer
 digitsToInteger = digitsToIntegerBase 10
 
-digitsToIntegerBase :: Integer -> [Char] -> Integer
-digitsToIntegerBase b = foldl' (\n c -> n * b + (toInteger (Char.digitToInt c))) 0
+digitsToIntegerBase :: Integer -> String -> Integer
+digitsToIntegerBase b = foldl' (\n c -> n * b + toInteger (Char.digitToInt c)) 0
 
-digitsToScientific :: [Char] -> [Char] -> (Integer, Int)
+digitsToScientific :: String -> String -> (Integer, Int)
 digitsToScientific = go 0 . reverse
   where
   go !exp is [] = (digitsToInteger (reverse is), exp)
   go !exp is (f : fs) = go (exp - 1) (f : is) fs
 
 isSymbolChar :: Char -> Bool
-isSymbolChar c = (c `elem` (":!#$%&*+./<=>?@\\^|-~" :: [Char])) || (not (Char.isAscii c) && Char.isSymbol c)
+isSymbolChar c = (c `elem` (":!#$%&*+./<=>?@\\^|-~" :: String)) || (not (Char.isAscii c) && Char.isSymbol c)
 
 isReservedSymbolError :: ParserErrorType -> Bool
 isReservedSymbolError = (== ErrReservedSymbol)
@@ -692,11 +692,8 @@ isIdentStart c = Char.isLower c || c == '_'
 isIdentChar :: Char -> Bool
 isIdentChar c = Char.isAlphaNum c || c == '_' || c == '\''
 
-isDigitChar :: Char -> Bool
-isDigitChar c = c >= '0' && c <= '9'
-
 isNumberChar :: Char -> Bool
-isNumberChar c = (c >= '0' && c <= '9') || c == '_'
+isNumberChar c = Char.isDigit c || c == '_'
 
 isNormalStringChar :: Char -> Bool
 isNormalStringChar c = c /= '"' && c /= '\\' && c /= '\r' && c /= '\n'

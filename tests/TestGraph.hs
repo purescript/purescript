@@ -3,8 +3,7 @@ module TestGraph where
 import Prelude ()
 import Prelude.Compat
 
-import Test.Tasty
-import Test.Tasty.Hspec
+import Test.Hspec
 import System.IO.UTF8 (readUTF8FileT)
 import Data.Either (isLeft)
 
@@ -12,10 +11,6 @@ import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.Text.Encoding as Text
 import qualified Data.Aeson as Json
 import qualified Language.PureScript as P
-
-
-main :: IO TestTree
-main = testSpec "graph" spec
 
 spec :: Spec
 spec = do

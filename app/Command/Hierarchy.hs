@@ -13,8 +13,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds #-}
-
 module Command.Hierarchy (command) where
 
 import           Prelude

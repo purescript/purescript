@@ -1,8 +1,6 @@
 -- | This module implements the desugaring pass which replaces ado-notation statements with
 -- appropriate calls to pure and apply.
 
-{-# LANGUAGE PatternGuards #-}
-
 module Language.PureScript.Sugar.AdoNotation (desugarAdoModule) where
 
 import           Prelude.Compat hiding (abs)

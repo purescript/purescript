@@ -65,6 +65,7 @@ depsNamesAndVersions = do
   excluded name =
     name == "purescript"
     || name == "rts"
+    || name == "ghc-boot-th"
 
   parse line =
     case splitOn " " line of
@@ -158,7 +159,7 @@ downloadFromHackage urlpath manager dep = do
   resp <- httpLbs req manager
 
   let status = responseStatus resp
-  if (status /= ok200)
+  if status /= ok200
     then do
       hPutStrLn stderr $ "Bad status code for " ++ url
       hPutStrLn stderr $ "Expected 200, got " ++ show status

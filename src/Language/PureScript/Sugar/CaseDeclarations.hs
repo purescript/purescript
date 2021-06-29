@@ -58,7 +58,7 @@ desugarGuardedExprs
   -> Expr
   -> m Expr
 desugarGuardedExprs ss (Case scrut alternatives)
-  | any (not . isTrivialExpr) scrut = do
+  | not $ all isTrivialExpr scrut = do
     -- in case the scrutinee is non trivial (e.g. not a Var or Literal)
     -- we may evaluate the scrutinee more than once when a guard occurs.
     -- We bind the scrutinee to Vars here to mitigate this case.
@@ -186,7 +186,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           --
         in Case scrut
             (CaseAlternative vb [MkUnguarded (desugarGuard gs e alt_fail)]
-              : (alt_fail' (length scrut)))
+              : alt_fail' (length scrut))
 
       return [ CaseAlternative scrut_nullbinder [MkUnguarded rhs]]
 

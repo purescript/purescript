@@ -31,10 +31,12 @@ import Control.Monad.Error.Class (MonadError(..))
 import Data.Either (partitionEithers)
 import Data.Foldable (for_, traverse_)
 import Data.Function (on)
+import Data.Functor (($>))
 import Data.Functor.Identity (Identity(..), runIdentity)
-import Data.List (groupBy, sortBy)
+import Data.List (groupBy, sortOn)
 import Data.Maybe (mapMaybe, listToMaybe)
 import qualified Data.Map as M
+import Data.Ord (Down(..))
 
 import qualified Language.PureScript.Constants.Prelude as C
 
@@ -277,7 +279,7 @@ ensureNoDuplicates
   => (a -> SimpleErrorMessage)
   -> [(Qualified a, SourceSpan)]
   -> m ()
-ensureNoDuplicates toError m = go $ sortBy (compare `on` fst) m
+ensureNoDuplicates toError m = go $ sortOn fst m
   where
   go [] = return ()
   go [_] = return ()
@@ -292,7 +294,7 @@ customOperatorTable
 customOperatorTable fixities =
   let
     userOps = map (\(name, Fixity a p) -> (name, p, a)) fixities
-    sorted = sortBy (flip compare `on` (\(_, p, _) -> p)) userOps
+    sorted = sortOn (Down . (\(_, p, _) -> p)) userOps
     groups = groupBy ((==) `on` (\(_, p, _) -> p)) sorted
   in
     map (map (\(name, _, a) -> (name, a))) groups
@@ -328,6 +330,10 @@ updateTypes goType = (goDecl, goExpr, goBinder)
     TypeSynonymDeclaration sa name args <$> goType' ss ty
   goDecl (TypeDeclaration (TypeDeclarationData sa@(ss, _) expr ty)) =
     TypeDeclaration . TypeDeclarationData sa expr <$> goType' ss ty
+  goDecl (KindDeclaration sa@(ss, _) sigFor name ty) =
+    KindDeclaration sa sigFor name <$> goType' ss ty
+  goDecl (ExternDataDeclaration sa@(ss, _) name ty) =
+    ExternDataDeclaration sa name <$> goType' ss ty
   goDecl other =
     return other
 
@@ -368,7 +374,7 @@ checkFixityExports (Module _ _ _ _ Nothing) =
 checkFixityExports m@(Module ss _ mn ds (Just exps)) =
   rethrow (addHint (ErrorInModule mn))
     $ rethrowWithPosition ss (traverse_ checkRef exps)
-    *> return m
+    $> m
   where
 
   checkRef :: DeclarationRef -> m ()

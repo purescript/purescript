@@ -12,7 +12,7 @@ import Control.Monad.Writer.Class
 
 import Data.Function (on)
 import Data.Foldable (for_)
-import Data.List (find, intersect, groupBy, sort, sortBy, (\\))
+import Data.List (find, intersect, groupBy, sort, sortOn, (\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid (Sum(..))
 import Data.Traversable (forM)
@@ -94,7 +94,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
           . map tail
           . filter ((> 1) . length)
           . groupBy ((==) `on` defQual)
-          . sortBy (compare `on` defQual)
+          . sortOn defQual
           $ unwarned
 
     for_ duplicates $ \(pos, _, _) ->

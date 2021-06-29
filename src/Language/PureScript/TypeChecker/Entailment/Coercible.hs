@@ -17,7 +17,7 @@ import Prelude.Compat hiding (interact)
 
 import Control.Applicative ((<|>), empty)
 import Control.Arrow ((&&&))
-import Control.Monad ((<=<), guard, when)
+import Control.Monad ((<=<), guard, unless, when)
 import Control.Monad.Error.Class (MonadError, catchError, throwError)
 import Control.Monad.State (MonadState, StateT, get, gets, modify, put)
 import Control.Monad.Trans.Class (lift)
@@ -279,7 +279,7 @@ unify (a, b) = do
   let kindOf = sequence . (id &&& elaborateKind) <=< replaceAllTypeSynonyms
   (a', kind) <- kindOf a
   (b', kind') <- kindOf b
-  unifyKinds kind kind'
+  unifyKinds' kind kind'
   subst <- gets checkSubstitution
   pure ( substituteType subst kind
        , substituteType subst a'
@@ -527,7 +527,7 @@ insoluble
   -> SourceType
   -> MultipleErrors
 insoluble k a b =
-  errorMessage . NoInstanceFound $ srcConstraint Prim.Coercible [k] [a, b] Nothing
+  errorMessage $ NoInstanceFound (srcConstraint Prim.Coercible [k] [a, b] Nothing) [] (any containsUnknowns [a, b])
 
 -- | Constraints of the form @Coercible a b@ can be solved if the two arguments
 -- are the same. Since we currently don't support higher-rank arguments in
@@ -581,6 +581,16 @@ canonRow
 canonRow a b
   | RCons{} <- a =
       case alignRowsWith (,) a b of
+        -- We throw early when a bare unknown remains on either side after
+        -- aligning the rows because we don't know how to canonicalize them yet
+        -- and the unification error thrown when the rows are misaligned should
+        -- not mention unknowns.
+        (_, (([], u@TUnknown{}), rl2)) -> do
+          k <- elaborateKind u
+          throwError $ insoluble k u (rowFromList rl2)
+        (_, (rl1, ([], u@TUnknown{}))) -> do
+          k <- elaborateKind u
+          throwError $ insoluble k (rowFromList rl1) u
         (deriveds, (([], tail1), ([], tail2))) -> do
           pure . Canonicalized . S.fromList $ (tail1, tail2) : deriveds
         (_, (rl1, rl2)) ->
@@ -623,14 +633,14 @@ unwrapNewtype env = go (0 :: Int) where
     when (n > 1000) $ throwError CannotUnwrapInfiniteNewtypeChain
     (currentModuleName, currentModuleImports) <- gets $ checkCurrentModule &&& checkCurrentModuleImports
     case unapplyTypes ty of
-      (TypeConstructor _ newtypeName, _, xs)
+      (TypeConstructor _ newtypeName, ks, xs)
         | Just (inScope, fromModuleName, tvs, newtypeCtorName, wrappedTy) <-
-            lookupNewtypeConstructorInScope env currentModuleName currentModuleImports newtypeName
+            lookupNewtypeConstructorInScope env currentModuleName currentModuleImports newtypeName ks
         -- We refuse to unwrap newtypes over polytypes because we don't know how
         -- to canonicalize them yet and we'd rather try to make progress with
         -- another rule.
         , isMonoType wrappedTy -> do
-            when (not inScope) $ do
+            unless inScope $ do
               tell [MissingConstructorImportForCoercible newtypeCtorName]
               throwError CannotUnwrapConstructor
             for_ fromModuleName $ flip addConstructorImportForCoercible newtypeCtorName
@@ -648,10 +658,13 @@ unwrapNewtype env = go (0 :: Int) where
 lookupNewtypeConstructor
   :: Environment
   -> Qualified (ProperName 'TypeName)
+  -> [SourceType]
   -> Maybe ([Text], ProperName 'ConstructorName, SourceType)
-lookupNewtypeConstructor env qualifiedNewtypeName = do
-  (_, DataType Newtype tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
-  pure (map (\(name, _, _) -> name) tvs, ctorName, wrappedTy)
+lookupNewtypeConstructor env qualifiedNewtypeName ks = do
+  (newtyk, DataType Newtype tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
+  let (kvs, _) = fromMaybe (internalError "lookupNewtypeConstructor: unkinded forall binder") $ completeBinderList newtyk
+      instantiatedKinds = zipWith (\(_, (kv, _)) k -> (kv, k)) kvs ks
+  pure (map (\(name, _, _) -> name) tvs, ctorName, replaceAllTypeVars instantiatedKinds wrappedTy)
 
 -- | Behaves like 'lookupNewtypeConstructor' but also returns whether the
 -- newtype constructor is in scope and the module from which it is imported, or
@@ -667,15 +680,16 @@ lookupNewtypeConstructorInScope
        )
      ]
   -> Qualified (ProperName 'TypeName)
+  -> [SourceType]
   -> Maybe (Bool, Maybe ModuleName, [Text], Qualified (ProperName 'ConstructorName), SourceType)
-lookupNewtypeConstructorInScope env currentModuleName currentModuleImports qualifiedNewtypeName@(Qualified newtypeModuleName newtypeName) = do
+lookupNewtypeConstructorInScope env currentModuleName currentModuleImports qualifiedNewtypeName@(Qualified newtypeModuleName newtypeName) ks = do
   let fromModule = find isNewtypeCtorImported currentModuleImports
       fromModuleName = (\(_, n, _, _, _) -> n) <$> fromModule
       asModuleName = (\(_, _, _, n, _) -> n) =<< fromModule
       isDefinedInCurrentModule = newtypeModuleName == currentModuleName
       isImported = isJust fromModule
       inScope = isDefinedInCurrentModule || isImported
-  (tvs, ctorName, wrappedTy) <- lookupNewtypeConstructor env qualifiedNewtypeName
+  (tvs, ctorName, wrappedTy) <- lookupNewtypeConstructor env qualifiedNewtypeName ks
   pure (inScope, fromModuleName, tvs, Qualified asModuleName ctorName, wrappedTy)
   where
   isNewtypeCtorImported (_, _, importDeclType, _, exportedTypes) =
@@ -725,7 +739,7 @@ canonNewtypeRight env =
 --
 -- @
 -- data D a b c = D a b
--- type role D nominal representational
+-- type role D nominal representational phantom
 -- @
 --
 -- We can decompose @Coercible (D a b d) (D a c e)@ into @Coercible b c@, but
@@ -770,7 +784,7 @@ canonDecomposition env a b
   | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
   , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
   , aTyName == bTyName
-  , Nothing <- lookupNewtypeConstructor env aTyName =
+  , Nothing <- lookupNewtypeConstructor env aTyName [] =
       decompose env aTyName axs bxs
   | otherwise = empty
 
@@ -789,8 +803,8 @@ canonDecompositionFailure env k a b
   | (TypeConstructor _ aTyName, _, _) <- unapplyTypes a
   , (TypeConstructor _ bTyName, _, _) <- unapplyTypes b
   , aTyName /= bTyName
-  , Nothing <- lookupNewtypeConstructor env aTyName
-  , Nothing <- lookupNewtypeConstructor env bTyName =
+  , Nothing <- lookupNewtypeConstructor env aTyName []
+  , Nothing <- lookupNewtypeConstructor env bTyName [] =
       throwError $ insoluble k a b
   | otherwise = empty
 
@@ -839,7 +853,7 @@ canonNewtypeDecomposition env (Just givens) a b
   | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
   , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
   , aTyName == bTyName
-  , Just _ <- lookupNewtypeConstructor env aTyName = do
+  , Just _ <- lookupNewtypeConstructor env aTyName [] = do
       let givensCanDischarge = any (\given -> canDischarge given (a, b)) givens
       guard $ not givensCanDischarge
       decompose env aTyName axs bxs
@@ -861,7 +875,7 @@ canonNewtypeDecompositionFailure a b
 
 -- | Constraints of the form @Coercible tv1 tv2@ may be irreducibles, but only
 -- when the variables are lexicographically ordered. Reordering variables is
--- neessary to prevent loops.
+-- necessary to prevent loops.
 --
 -- For instance the declaration:
 --

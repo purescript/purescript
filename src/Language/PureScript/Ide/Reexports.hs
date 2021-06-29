@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 -----------------------------------------------------------------------------
 --
 -- Module      : Language.PureScript.Ide.Reexports

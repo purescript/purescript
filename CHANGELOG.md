@@ -8,24 +8,466 @@ Breaking changes:
 
 New features:
 
-* Extend ImportCompletion with declarationType (#3997, @i-am-the-slime)
+* Display kind signatures and their comments in documentation (#4100 and #4119 by JordanMartinez)
 
-  By exposing the declaration type (value, type, typeclass, etc.) 
-  downstream tooling can annotate imports with this info so users know what they
-  are about to import. The info can also be mapped to a namespace filter to 
-  allow importing identifiers that appear more than once in a source file which
-  throws an exception without such a filter. 
+  The compiler now displays kind signatures for data, newtype, type
+  synonym, and type class declarations in generated documentation. The
+  compiler now also includes documentation-comments (i.e. those which start
+  with a `|` character) both above and below the associated kind signature
+  declaration (if any) in generated documentation, whereas previously
+  documentation-comments above a kind signature declaration were ignored.
+
+  Both explicitly declared and inferred kinds are included in documentation.
+  The compiler omits including a kind signature in generated documentation
+  only when the kind is considered "uninteresting". An uninteresting kind is
+  defined as one where all of the declaration's type parameters have kind
+  `Type`.
 
 Bugfixes:
 
-* Only include direct dependencies in the output for `purs graph` (#3993, @colinwahl)
+* Ensure unnamed instances appear in documentation (#4109 by @JordanMartinez)
 
-Fixes a bug where the transitive closure of a module's dependencies
-where included in the `depends` field in the output for `purs graph`.
+* Allow fixity, kind, role declarations in REPL (#4046, @rhendric)
+
+* Pin OS versions used in CI (#4107, @f-f)
+
+* Fix UnusedName warnings for multiple non-recursive let bindings (#4114 by @nwolverson)
+
+* Remove generated names from errors about instances (#4118 by @rhendric)
+
+* Improve apartness checking (#4064, @rhendric)
+
+Internal:
+
+* Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
+
+* Update RELEASE_GUIDE.md with more details (#4104 by @JordanMartinez)
+
+* Use GenIdent for anonymous instances (#4096, @rhendric)
+
+* Desugar type class instance names in type class desugaring pass (#4099 by @JordanMartinez)
+
+## v0.14.2
+
+New features:
+
+* Make type class instance names optional (#4085, @JordanMartinez)
+
+  Previously, one would be required to define a unique name for a type class
+  instance. For example
+
+  ```purescript
+  -- instance naming convention:
+  -- classNameType1Type2Type3
+  instance fooIntString :: Foo Int String
+  ```
+
+  Now, the name and `::` separator characters are optional. The above instance
+  could be rewritten like so:
+
+  ```purescript
+  instance Foo Int String
+  ```
+
+  and the compiler will generate a unique name for the instance
+  (e.g. `$dollar_FooIntString_4` where `4` is a randomly-generated number
+  that can change across compiler runs). This version of the instance name
+  is not intended for use in FFI.
+
+  Note: if one wrote
+
+  ```purescript
+  instance ReallyLongClassName Int String
+  ```
+
+  the generated name would be something like
+  `$dollar_ReallyLongClassNameIntStr_87` rather than
+  `$dollar_ReallyLongClassNameIntString_87` as the generated part
+  of the name will be truncated to 25 characters (long enough to be readable
+  without being too verbose).
+
+Bugfixes:
+
+* Unused identifier warnings now report smaller and more relevant source spans (#4088, @nwolverson)
+
+  Also fix incorrect warnings in cases involving a let-pattern binding shadowing
+  an existing identifier.
+
+Internal:
+
+* Drop libtinfo dependency (#3696, @hdgarrood)
+
+  Changes the build configuration so that by default, compiler binaries will
+  not have a dynamic library dependency on libncurses/libtinfo. This should
+  alleviate one of the most common pains in getting the compiler successfully
+  installed, especially on Linux. The cost is a slight degradation in the REPL
+  experience when editing long lines, but this can be avoided by building the
+  compiler with the libtinfo dependency by setting the `terminfo` flag of the
+  `haskeline` library to `true`.
+
+* Migrate CI from Travis to GitHub Actions (#4077, @rhendric)
+
+* Remove tasty from test suite and just use hspec (#4056, @hdgarrood)
+
+* Avoid compiling tests with diagnostics twice in test suite (#4079, @hdgarrood)
+
+* Do less work in test initialization (#4080, @rhendric)
+
+* Follow more HLint suggestions (#4090, @rhendric)
+
+* Export `rebuildModule'` to speed up Try PureScript! slightly (#4095 by @JordanMartinez)
+
+* Merge `purescript-ast` into `purescript-cst` (#4094 by @JordanMartinez)
+
+## v0.14.1
+
+New features:
+
+* Support TCO for functions with tail-recursive inner functions (#3958, @rhendric)
+
+  Adds support for optimizing functions that contain local functions which call
+  the outer function in tail position, as long as those functions themselves
+  are only called from tail position, either in the outer function or in other
+  such functions.
+
+  This enables hand-written mutually-tail-recursive function groups to be
+  optimized, but more critically, it also means that case guards which desugar
+  to use local functions don't break TCO.
+
+* Add warnings for unused names and values (#3819, @nwolverson)
+
+  The compiler now emits warnings when it encounters unused names in binders
+  and unused value declarations. A declaration is considered to be unused if it
+  is not exported and is also not reachable by any of the exported
+  declarations. The compiler will not currently produce unused warnings about
+  other kinds of declarations such as data and type class declarations, but we
+  intend to produce warnings for these in the future as well.
+
+Bugfixes:
+
+* Make close punctuation printable in errors (#3982, @rhendric)
+* Desugar type operators in top-level kind signatures (#4027, @natefaubion)
+* Use type annotation hint only when needed (#4025, @rhendric)
+* Fix pretty printing of "hiding" imports (#4058, @natefaubion)
+
+* Instantiate polymorphic kinds when unwrapping newtypes while solving Coercible constraints (#4040, @kl0tl)
+
+* Fix row unification with shared unknown in tails (#4048, @rhendric)
+
+* Fix kinded declaration reordering in desugaring (#4047, @rhendric)
+
+* Fix wildly off kind unification positions (#4050, @natefaubion)
+
+* Fix incorrect incremental builds with different `--codegen` options (#3911, #3914, @hdgarrood)
+
+  This bug meant that after invoking the compiler with different `--codegen`
+  options, it was easy to end up with (for example) an outdated docs.json or
+  corefn.json file in your output directory which would be incorrectly
+  considered up-to-date by the compiler.
 
 Other improvements:
 
+* Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
+
+  The previous `logo.png` was not legible against a dark background (#4001).
+
+* Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
+
+* Removed all shift/reduce conflicts in parser (#4063, @JordanMartinez).
+
+  Happy defaults to using "shift" rather than "reduce" in shift/reduce
+  conflicts. This change merely makes explicit what is already happening
+  implicitly.
+
+Internal:
+
+* Upgrade tests Bower dependencies (#4041, @kl0tl)
+* Remove unused Data.Foldable.foldr import (#4042, @kl0tl)
+
+## v0.14.0
+
+### Polykinds
+
+Polymorphic kinds, based on the [Kind Inference for Datatypes](https://richarde.dev/papers/2020/kind-inference/kind-inference.pdf) paper (#3779, #3831, #3929, #4007, @natefaubion, @kl0tl)
+
+Just as types classify terms, kinds classify types. But while we have polymorphic types, kinds were previously monomorphic.
+
+This meant that we were not able to abstract over kinds, leading for instance to a proliferation of proxy types:
+
+```purescript
+data Proxy (a :: Type) = Proxy
+data SProxy (a :: Symbol) = SProxy
+data RProxy (row :: # Type) = RProxy
+data RLProxy (row :: RowList) = RLProxy
+```
+
+Now we can have a single proxy type, whose parameter has a polymorphic kind.
+
+#### Type :: Type
+
+The old `Kind` data type and namespace is gone. Kinds and types are the same and exist in the same namespace.
+
+Previously one could do:
+
+```purescript
+foreign import kind Boolean
+foreign import data True :: Boolean
+foreign import data False :: Boolean
+```
+
+Where the kind `Boolean` and type `Boolean` were two different things. This is no longer the case. The `Prim` kind `Boolean` is now removed, and you can just use `Prim` type `Boolean` in the same way. This is a breaking change.
+
+The compiler still supports the old `foreign import kind` syntax but it warns that it's deprecated.
+
+```purescript
+foreign import kind Foo
+```
+
+> Foreign kind imports are deprecated and will be removed in a future release. Use empty 'data' instead.
+
+It is treated internally as:
+
+```purescript
+data Foo
+```
+
+Note that `foreign import data` declarations are not deprecated. They are still necessary to define types with kinds other than `Type` since constructors are not lifted as in GHC with [DataKinds](https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/data_kinds.html#extension-DataKinds).
+
+Likewise, `kind` imports and exports are deprecated and treated the same as a type import or export.
+
+> Kind imports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead.
+
+The special unary `#` syntax for row kinds is still supported, but deprecated and will warn. There is now `Prim.Row :: Type -> Type` which can be used like a normal type constructor.
+
+> Unary '#' syntax for row kinds is deprecated and will be removed in a future release. Use the 'Row' kind instead.
+
+All of these deprecations have suggested fixes in the JSON output, so tools like [`purescript-suggest`](https://github.com/nwolverson/purescript-suggest) (or your IDE plugin) can automatically apply them.
+
+#### Kind Signatures
+
+With PolyKinds, all type-level declarations are generalized.
+
+```purescript
+data Proxy a = Proxy
+```
+
+Previously, this had the `Type`-defaulted kind `Type -> Type`. Now this will be generalized to `forall k. k -> Type`. Such signature can be written with a kind signature declarations, similar to [standalone kind signatures](https://ryanglscott.github.io/2020/01/05/five-benefits-to-using-standalonekindsignatures/) in GHC.
+
+```purescript
+data Proxy :: forall k. k -> Type
+data Proxy a = Proxy
+```
+
+In GHC, all signatures use the `type` prefix, but we reuse the same keyword as the subsequent declaration because we already have `foreign import data` (rather than `foreign import type`) and because it makes things align nicer. Signatures have the same rule as value-level signatures, so they must always be followed by the "real" declaration.
+
+It's better to be explicit about polymorphism by writing signatures. Since we don't really quantify over free type variables, it's also necessary in the case that two poly-kinded arguments must have the same kind. The compiler will warn about missing kind signatures when polymorphic kinds are inferred.
+
+Classes can have signatures too, but they must end with the new `Constraint` kind instead of `Type`. For example, here's the new definition of `Prim.Row.Cons`:
+
+```purescript
+class Cons :: forall k. Symbol -> k -> Row k -> Row k -> Constraint
+class Cons label a tail row | label a tail -> row, label row -> a tail
+```
+
+### Safe zero-cost coercions
+
+Coercible constraints, based on the [Safe Zero-cost Coercions for Haskell](https://www.microsoft.com/en-us/research/uploads/prod/2018/05/coercible-JFP.pdf) paper (#3351, #3810, #3896, #3873, #3860, #3905, #3893, #3909, #3931, #3906, #3881, #3878, #3937, #3930, #3955, #3927, #3999, #4000, @lunaris, @rhendric, @kl0tl, @hdgarrood)
+
+`Prim.Coerce.Coercible` is a new compiler-solved class, used to relate types with the same runtime representation. One can use `Safe.Coerce.coerce` (from the new [`safe-coerce`](https://github.com/purescript/purescript-safe-coerce) library) instead of `Unsafe.Coerce.unsafeCoerce` to safely turn a `a` into a `b` when `Coercible a b` holds.
+
+#### Roles
+
+Types parameters now have _roles_, which depend on how they affect the runtime representation of their type. There are three roles, from most to least restrictive:
+
+* _nominal_ parameters can only be coerced to themselves.
+
+* _representational_ parameters can only be coerced to each other when a Coercible constraint holds.
+
+* _phantom_ parameters can be coerced to anything.
+
+#### Role annotations
+
+The compiler infers _nominal_ roles for foreign data types, which is safe but can be too constraining sometimes. For example this prevents the coercion of `Effect Age` to `Effect Int`, even though they have the same runtime representation.
+
+The roles of foreign data types can thus be loosened with explicit role annotations, similar to the [RoleAnnotations](https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html#extension-RoleAnnotations) GHC extension.
+
+Here's the annotation we added to `Effect`:
+
+```purescript
+type role Effect representational
+```
+
+Conversely, we might want to strengthen the roles of parameters with invariants invisible to the type system. Maps are the canonical example of this: the shape of their underlying tree rely on the `Ord` instance of their keys, but the `Ord` instance of a newtype may behave differently than the one of the wrapped type so it would be unsafe to allow coercions between `Map k1 a` and `Map k2 a`, even when `Coercible k1 k2` holds.
+
+In order to forbid such unsafe coercion we added a _nominal_ annotation to the first parameter of `Map`:
+
+```purescript
+type role Map nominal representational
+```
+
+Annotated roles are compared against the roles inferred by the compiler so it is not possible to compromise safety by ascribing too permissive roles, except for foreign types.
+
+### Other changes
+
+#### Breaking
+
+* Add compiler support for `Coercible` based `Newtype` (#3975, @fsoikin)
+
+We added a `Coercible` superclass to `Data.Newtype.Newtype` in order to implement `unwrap`, `wrap` and most newtype combinators with `coerce` (see https://github.com/purescript/purescript-newtype/pull/22). This is only a breaking change for non derived instances because the `Newtype` class has no members anymore and can now only be implemented for representationally equal types (those satisfying the new superclass constraint).
+
+For example the instance for `newtype Additive a = Additive a` no longer implements `unwrap` and `wrap`:
+
+```diff
++instance newtypeAdditive :: Newtype (Additive a) a
+-instance newtypeAdditive :: Newtype (Additive a) a where
+-  wrap = Additive
+-  unwrap (Additive a) = a
+```
+
+Derived instances don't require any modifications.
+
+* Reform handling of quote characters in raw strings (#3961, @rhendric)
+
+Quotes behaved rather unexpectedly in various edge cases inside raw strings. This clears things up by enforcing the following specification:
+
+```
+'"""' '"'{0,2} ([^"]+ '"'{1,2})* [^"]* '"""'
+```
+
+Meaning that raw strings can contain up to two successive quotes, any number of times, but three successive quotes are not allowed inside.
+
+* Unsupport bare negative literals as equational binders (#3956, @rhendric)
+
+It used to be possible to match on negative literals, such as `-1`, but this prevented parsing matches on constructors aliased to `-`. The compiler will reject matches on _bare_ negative literals, but they can still be matched by wrapping them in parentheses.
+
+* Forbid partial data constructors exports (#3872, @kl0tl)
+
+Exporting only some of the constructors of a type meant that changes internal to a module, such as adding or removing an unexported constructor, could cause unexhaustive pattern match errors in downstream code. Partial explicit export lists will have to be completed with the missing constructors or replaced by implicit export lists.
+
+* Print compile errors to stdout, progress messages to stderr (#3839, @JordanMartinez)
+
+Compiler errors and warnings arising from your code are now printed to stdout rather than stderr, and progress messages such as "Compiling Data.Array" are now printed to stderr rather than stdout. Warnings and errors arising from incorrect use of the CLI, such as specifying input files which don't exist or specifying globs which don't match any files, are still printed to stderr (as they were before). This change is useful when using the `--json-errors` flag, since you can now pipe JSON errors into other programs without having to perform awkward gymnastics such as `2>&1`.
+
+#### Fixes
+
+* Only include direct dependencies in the output for `purs graph` instead of their transitive closure (#3993, @colinwahl)
+
+* Fix the reversal of the qualifier of qualified operators (#3971, @rhendric)
+
+Qualified operators, for instance `Data.Array.(!)`, were interpreted with a reversed qualifier, like `Array.Data.(!)`.
+
+* Check all recursive paths in data binding groups (#3936, @natefaubion)
+
+The compiler was not catching recursive type synonyms when some recursive paths were guarded by data types or newtypes.
+
+* Desugar type operator aliases inside parens (#3935, @natefaubion)
+
+The compiler did not accept type operators inside parens in prefix position, except `(->)`.
+
+* Pin language-javascript to a specific version (#3904, @hdgarrood)
+
+Allowing the compiler to be built against various versions of `language-javascript` meant that multiple builds of the same version of the compiler could accept different syntaxes for JavaScript foreign modules, depending on how they were built.
+
+#### Improvements
+
+* Improves protocol errors from the IDE server (#3998, @kritzcreek)
+
+The IDE server now respond with more descriptive error messages when failing to parse a command. This should make it easier to contribute fixes to the various clients.
+
+* Extend IDE ImportCompletion with declarationType (#3997, @i-am-the-slime)
+
+By exposing the declaration type (value, type, typeclass, etc.) downstream tooling can annotate imports with this info so users know what they are about to import. The info can also be mapped to a namespace filter to allow importing identifiers that appear more than once in a source file which throws an exception without such a filter.
+
+* Improve error message when `negate` isn't imported (#3952, @mhmdanas)
+
+This shows a specific message when using negative literals but `Data.Ring.negate` is out of scope, similar to the messages shown when using do notation if `Control.Bind.bind` and `Control.Bind.discard` are out of scope.
+
+* Add source spans to `PartiallyAppliedSynonym` errors (#3951, @rhendric)
+
+`PartiallyAppliedSynonym` errors were usually rethrown with the appropriate source span, but not when deriving instances. This annotates those errors with the source span of the partially applied synonyms themselves, which is more robust and accurate than rethrowing the error with an approximate source span.
+
+* Allow type synonyms in instances heads and superclass constraints (#3539, #3966, #3965, @garyb, @kl0tl)
+
+This allows declarations such as
+
+```purescript
+type Env = { port :: Int }
+newtype App a = App (ReaderT Env Aff a)
+derive newtype instance monadAskApp :: MonadAsk Env App
+```
+
+or
+
+```purescript
+class (Monad m, MonadAsk Env m) <= MonadAskEnv m
+```
+
+* Improve incremental rebuild times for modules with large dependencies (#3899, @milesfrain)
+
+#### Other
+
+* Warn against exported types with hidden constructors but `Generic` or `Newtype` instances (#3907, @kl0tl)
+
+Types with hidden constructors are supposed to be opaque outside of their module of definition but `Generic` and `Newtype` instances allow to construct them with `Data.Generic.Rep.to` or `Data.Newtype.wrap` and examine their content with `Data.Generic.Rep.from` or `Data.Newtype.unwrap`, thus making void any invariant those types may witness.
+
+* Have module re-exports appear in generated code (#3883, @citizengabe)
+
+This is the first step towards smarter incremental rebuilds, which could skip rebuilding downstream modules when the interface of a module did not change (see #3724).
+
+* Add a printer for CST modules (#3887, @kritzcreek)
+
+* Deprecate constraints in foreign imports (#3829, @kl0tl)
+
+Constrained foreign imports leak instance dictionaries, hindering the compiler ability to optimize their representation. Manipulating dictionaries in foreign code should be avoided and foreign imports should accept the class members they need as additional arguments instead of being constrained.
+
+* Deprecate primes (the `'` character) in identifiers exported from foreign modules (#3792, @kl0tl)
+
+We are going to output ES modules instead of CommonJS in the next breaking release but named exports of ES modules, unlike CommonJS exports, have to be valid JavaScript identifiers and so cannot contain primes.
+
+#### Docs
+
+* Generate a changelog from the GitHub releases and add a pull request template (#3989, @JordanMartinez)
+
+* Detail license related error messages and fix incorrect SPDX sample licenses (#3970, @fsoikin)
+
+* Remove a spurious doc comment on the CoreFn Module type (#3552, @jmackie)
+
+* Add a link to the releases page (#3920, @milesfrain)
+
+* Update CONTRIBUTING.md (#3924, @hdgarrood)
+
+* Add troubleshooting steps for libtinfo and EACCES errors (#3903, @milesfrain)
+
+* Update an outdated link to the book (#3916, @sumew)
+
+#### Internal
+
+* Simplify the `Ord` instances of some AST types (#3902, @milesfrain)
+
+* Update the desugaring pipeline to work on individual modules (#3944, @kl0tl)
+
+* Remove the unmaintained and ignored core libraries tests (#3861, @kl0tl)
+
+* Configure Travis to run `hlint` (#3816, #3864, @joneshf, @hdgarrood)
+
+* Remove support for the legacy Bower resolutions format in `purs publish` (#3847, @kl0tl)
+
+* Add GitHub issue templates for bugs and proposals (#3853, @joneshf)
+
+* Add support for Happy >=1.19.10 (#3837, @arrowd)
+
+* Use the same default extensions in all packages (#3823, #3908, @natefaubion, @i-am-the-slime)
+
+* Relax `purescript-ast` dependency on `microlens-platform` to `microlens` (#3817, @joneshf)
+
+* Extract the AST and CST types, and related functions, into their own `purescript-ast` and `purescript-cst` packages for ease of consumption by external tooling (#3793, #3821, #3826, @joneshf, @natefaubion)
+
+* Fix various typos in documentation, comments and bindings names (#3795, @mhmdanas)
+
+* Add golden tests for errors and warnings (#3774, #3811, #3808, #3846, @dariooddenino, @rhendric, @kl0tl)
+
 * More descriptive protocol errors from the ide server (@kritzcreek)
+
 
 ## [v0.13.8](https://github.com/purescript/purescript/releases/tag/v0.13.8) - 2020-05-23
 

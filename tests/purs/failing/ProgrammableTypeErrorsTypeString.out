@@ -7,6 +7,10 @@ at tests/purs/failing/ProgrammableTypeErrorsTypeString.purs:24:9 - 24:24 (line 2
     Don't want to show MyType Int because.
 
 
+while solving type class constraint
+[33m                             [0m
+[33m  Data.Show.Show (MyType Int)[0m
+[33m                             [0m
 while applying a function [33mshow[0m
   of type [33mShow t0 => t0 -> String[0m
   to argument [33mMyType 2[0m

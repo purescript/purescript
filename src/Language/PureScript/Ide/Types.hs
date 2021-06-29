@@ -228,7 +228,7 @@ data Completion = Completion
   } deriving (Show, Eq, Ord)
 
 instance ToJSON Completion where
-  toJSON (Completion {..}) =
+  toJSON Completion {..} =
     Aeson.object
       [ "module" .= complModule
       , "identifier" .= complIdentifier

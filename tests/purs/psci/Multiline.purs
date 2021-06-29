@@ -10,3 +10,8 @@ fac n = foldl mul 1 (1..n)
 
 -- @shouldEvaluateTo 3628800
 fac 10
+
+-- @paste
+data X :: Type -> Type
+data X a = X
+-- @paste

@@ -7,10 +7,12 @@ at tests/purs/failing/TypedHole.purs:8:8 - 8:13 (line 8, column 8 - line 8, colu
   [33m  Effect Unit[0m
   [33m             [0m
   You could substitute the hole with one of these values:
-  [33m                                                [0m
-  [33m  Data.Monoid.mempty  :: forall m. Monoid m => m[0m
-  [33m  Main.main           :: Effect Unit            [0m
-  [33m                                                [0m
+  [33m                                                                  [0m
+  [33m  Data.Monoid.mempty          :: forall m. Monoid m => m          [0m
+  [33m  Effect.Class.Console.clear  :: forall m. MonadEffect m => m Unit[0m
+  [33m  Effect.Console.clear        :: Effect Unit                      [0m
+  [33m  Main.main                   :: Effect Unit                      [0m
+  [33m                                                                  [0m
 
 in value declaration [33mmain[0m
 

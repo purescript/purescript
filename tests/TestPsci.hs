@@ -1,17 +1,15 @@
 module TestPsci where
 
 import Prelude ()
-import Prelude.Compat
 
 import TestPsci.CommandTest (commandTests)
 import TestPsci.CompletionTest (completionTests)
 import TestPsci.EvalTest (evalTests)
 
-import Test.Tasty
-import Test.Tasty.Hspec
+import Test.Hspec
 
-main :: IO TestTree
-main = testSpec "repl" $ do
+spec :: Spec
+spec = do
   completionTests
   commandTests
   evalTests

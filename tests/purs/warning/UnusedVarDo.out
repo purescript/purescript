@@ -1,0 +1,48 @@
+Warning 1 of 4:
+
+  in module [33mMain[0m
+  at tests/purs/warning/UnusedVarDo.purs:12:3 - 12:15 (line 12, column 3 - line 12, column 15)
+
+    Name [33munusedDoBind[0m was introduced but not used.
+
+  in value declaration [33munusedDoBinding[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+  or to contribute content related to this warning.
+
+Warning 2 of 4:
+
+  in module [33mMain[0m
+  at tests/purs/warning/UnusedVarDo.purs:24:7 - 24:23 (line 24, column 7 - line 24, column 23)
+
+    Name [33munusedDoLet[0m was introduced but not used.
+
+  in value declaration [33munusedDoLetBinding[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+  or to contribute content related to this warning.
+
+Warning 3 of 4:
+
+  in module [33mMain[0m
+  at tests/purs/warning/UnusedVarDo.purs:29:3 - 29:16 (line 29, column 3 - line 29, column 16)
+
+    Name [33munusedAdoBind[0m was introduced but not used.
+
+  in value declaration [33munusedAdoBinding[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+  or to contribute content related to this warning.
+
+Warning 4 of 4:
+
+  in module [33mMain[0m
+  at tests/purs/warning/UnusedVarDo.purs:34:7 - 34:24 (line 34, column 7 - line 34, column 24)
+
+    Name [33munusedAdoLet[0m was introduced but not used.
+
+  in value declaration [33munusedAdoLetBinding[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+  or to contribute content related to this warning.
+

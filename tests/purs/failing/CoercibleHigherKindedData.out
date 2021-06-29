@@ -3,10 +3,10 @@ in module [33mMain[0m
 at tests/purs/failing/CoercibleHigherKindedData.purs:13:17 - 13:23 (line 13, column 17 - line 13, column 23)
 
   No type class instance was found for
-  [33m                                              [0m
-  [33m  Prim.Coerce.Coercible (Unary @t4 t5)        [0m
-  [33m                        (Binary @t2 @t4 a3 t5)[0m
-  [33m                                              [0m
+  [33m                                      [0m
+  [33m  Prim.Coerce.Coercible (Unary t5)    [0m
+  [33m                        (Binary a3 t5)[0m
+  [33m                                      [0m
   The instance head contains unknown type variables. Consider adding a type annotation.
 
 while solving type class constraint

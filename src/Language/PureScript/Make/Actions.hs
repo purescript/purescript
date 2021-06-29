@@ -20,7 +20,7 @@ import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Bifunctor (bimap)
 import           Data.Either (partitionEithers)
-import           Data.Foldable (for_, minimum)
+import           Data.Foldable (for_)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe, maybeToList)
@@ -47,7 +47,6 @@ import           Language.PureScript.Externs (ExternsFile, externsFileName)
 import           Language.PureScript.Make.Monad
 import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names
-import           Language.PureScript.Names (runModuleName, ModuleName)
 import           Language.PureScript.Options hiding (codegenTargets)
 import           Language.PureScript.Pretty.Common (SMap(..))
 import qualified Paths_purescript as Paths
@@ -88,9 +87,13 @@ data MakeActions m = MakeActions
   -- The content hash is returned as a monadic action so that the file does not
   -- have to be read if it's not necessary.
   , getOutputTimestamp :: ModuleName -> m (Maybe UTCTime)
-  -- ^ Get the timestamp for the output files for a module. This should be the
-  -- timestamp for the oldest modified file, or 'Nothing' if any of the required
-  -- output files are missing.
+  -- ^ Get the time this module was last compiled, provided that all of the
+  -- requested codegen targets were also produced then. The defaultMakeActions
+  -- implementation uses the modification time of the externs file, because the
+  -- externs file is written first and we always write one. If there is no
+  -- externs file, or if any of the requested codegen targets were not produced
+  -- the last time this module was compiled, this function must return Nothing;
+  -- this indicates that the module will have to be recompiled.
   , readExterns :: ModuleName -> m (FilePath, Maybe ExternsFile)
   -- ^ Read the externs file for a module as a string and also return the actual
   -- path for the file.
@@ -179,9 +182,30 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
     codegenTargets <- asks optionsCodegenTargets
-    let outputPaths = [outputFilename mn externsFileName] <> fmap (targetFilename mn) (S.toList codegenTargets)
-    timestamps <- traverse getTimestampMaybe outputPaths
-    pure $ fmap minimum . NEL.nonEmpty =<< sequence timestamps
+    mExternsTimestamp <- getTimestampMaybe (outputFilename mn externsFileName)
+    case mExternsTimestamp of
+      Nothing ->
+        -- If there is no externs file, we will need to compile the module in
+        -- order to produce one.
+        pure Nothing
+      Just externsTimestamp ->
+        case NEL.nonEmpty (fmap (targetFilename mn) (S.toList codegenTargets)) of
+          Nothing ->
+            -- If the externs file exists and no other codegen targets have
+            -- been requested, then we can consider the module up-to-date
+            pure (Just externsTimestamp)
+          Just outputPaths -> do
+            -- If any of the other output paths are nonexistent or older than
+            -- the externs file, then they should be considered outdated, and
+            -- so the module will need rebuilding.
+            mmodTimes <- traverse getTimestampMaybe outputPaths
+            pure $ case sequence mmodTimes of
+              Nothing ->
+                Nothing
+              Just modTimes ->
+                if externsTimestamp <= minimum modTimes
+                  then Just externsTimestamp
+                  else Nothing
 
   readExterns :: ModuleName -> Make (FilePath, Maybe ExternsFile)
   readExterns mn = do

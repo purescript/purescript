@@ -1,6 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeFamilies #-}
-
 -- |
 -- A replacement for WriterT IO which uses mutable references.
 --

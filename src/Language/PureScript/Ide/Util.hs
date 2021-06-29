@@ -77,13 +77,13 @@ unwrapMatch (Match (_, ed)) = ed
 
 valueOperatorAliasT
   :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName)) -> Text
-valueOperatorAliasT i =
-  P.showQualified (either P.runIdent P.runProperName) i
+valueOperatorAliasT =
+  P.showQualified $ either P.runIdent P.runProperName
 
 typeOperatorAliasT
   :: P.Qualified (P.ProperName 'P.TypeName) -> Text
-typeOperatorAliasT i =
-  P.showQualified P.runProperName i
+typeOperatorAliasT =
+  P.showQualified P.runProperName
 
 encodeT :: (ToJSON a) => a -> Text
 encodeT = TL.toStrict . TLE.decodeUtf8 . encode

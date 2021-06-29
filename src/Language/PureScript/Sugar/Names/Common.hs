@@ -54,7 +54,7 @@ warnDuplicateRefs pos toError refs = do
   extractCtors :: SourceSpan -> DeclarationRef -> Maybe [(SourceSpan, Name)]
   extractCtors pos' (TypeRef _ _ (Just dctors)) =
     let dupes = dctors \\ ordNub dctors
-    in if null dupes then Nothing else Just $ ((pos',) . DctorName) <$> dupes
+    in if null dupes then Nothing else Just $ (pos',) . DctorName <$> dupes
   extractCtors _ _ = Nothing
 
   -- Converts a DeclarationRef into a name for an error message.

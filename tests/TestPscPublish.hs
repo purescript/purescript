@@ -1,7 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
-
 module TestPscPublish where
 
 import Prelude
@@ -24,12 +20,8 @@ import Language.PureScript.Publish (PublishOptions(..), defaultPublishOptions)
 import qualified Language.PureScript.Publish as Publish
 import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
 
-import Test.Tasty
-import Test.Tasty.Hspec (Spec, Expectation, runIO, context, it, expectationFailure, testSpec)
+import Test.Hspec
 import TestUtils hiding (inferForeignModules, makeActions)
-
-main :: IO TestTree
-main = testSpec "publish" spec
 
 spec :: Spec
 spec = do
@@ -67,14 +59,14 @@ data TestResult
 
 roundTrip :: UploadedPackage -> TestResult
 roundTrip pkg =
-  let before = A.encode pkg
-  in case A.eitherDecode before of
+  let before' = A.encode pkg
+  in case A.eitherDecode before' of
        Left err -> ParseFailed err
        Right parsed -> do
          let after' = A.encode (parsed :: UploadedPackage)
-         if before == after'
-           then Pass before
-           else Mismatch before after'
+         if before' == after'
+           then Pass before'
+           else Mismatch before' after'
 
 testRunOptions :: FilePath -> PublishOptions
 testRunOptions resolutionsFile = defaultPublishOptions

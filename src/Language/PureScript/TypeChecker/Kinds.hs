@@ -10,6 +10,7 @@ module Language.PureScript.TypeChecker.Kinds
   , kindOfClass
   , kindsOfAll
   , unifyKinds
+  , unifyKinds'
   , subsumesKind
   , instantiateKind
   , checkKind
@@ -38,10 +39,9 @@ import Data.Foldable (for_, traverse_)
 import Data.Function (on)
 import Data.Functor (($>))
 import qualified Data.IntSet as IS
-import Data.List (nubBy, sortBy, (\\))
+import Data.List (nubBy, sortOn, (\\))
 import qualified Data.Map as M
-import Data.Maybe (fromJust)
-import Data.Ord (comparing)
+import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
@@ -146,7 +146,7 @@ unknownsWithKinds
   :: forall m. (MonadState CheckState m, MonadError MultipleErrors m, HasCallStack)
   => [Unknown]
   -> m [(Unknown, SourceType)]
-unknownsWithKinds = fmap (fmap snd . nubBy ((==) `on` fst) . sortBy (comparing fst) . join) . traverse go
+unknownsWithKinds = fmap (fmap snd . nubBy ((==) `on` fst) . sortOn fst . join) . traverse go
   where
   go u = do
     (lvl, ty) <- traverse apply =<< lookupUnsolved u
@@ -190,7 +190,7 @@ inferKind = \tyToInfer ->
       kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
       pure (ty, kind $> ann)
     ty@(Skolem ann _ mbK _ _) -> do
-      kind <- apply $ maybe (internalError "Skolem has no kind") id mbK
+      kind <- apply $ fromMaybe (internalError "Skolem has no kind") mbK
       pure (ty, kind $> ann)
     ty@(TUnknown ann u) -> do
       kind <- apply . snd =<< lookupUnsolved u
@@ -217,7 +217,7 @@ inferKind = \tyToInfer ->
           t2' <- checkKind t2 argKind
           pure (KindApp ann t1' t2', replaceTypeVars arg t2' resKind)
         _ ->
-          internalError $ "inferKind: unkinded forall binder"
+          internalError "inferKind: unkinded forall binder"
     KindedType _ t1 t2 -> do
       t2' <- replaceAllTypeSynonyms . fst =<< go t2
       t1' <- checkKind t1 t2'
@@ -358,6 +358,19 @@ unifyKinds = unifyKindsWithFailure $ \w1 w2 ->
     . errorMessage''' (fst . getAnnForType <$> [w1, w2])
     $ KindsDoNotUnify w1 w2
 
+-- | Does not attach positions to the error node, instead relies on the
+-- | local position context. This is useful when invoking kind unification
+-- | outside of kind checker internals.
+unifyKinds'
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceType
+  -> SourceType
+  -> m ()
+unifyKinds' = unifyKindsWithFailure $ \w1 w2 ->
+  throwError
+    . errorMessage
+    $ KindsDoNotUnify w1 w2
+
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -411,7 +424,7 @@ unifyKindsWithFailure onFailure = go
       solveUnknown a' $ rowFromList (rs, p1)
     (([], w1), ([], w2)) | eqType w1 w2 ->
       pure ()
-    ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) -> do
+    ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) | u1 /= u2 -> do
       rest <- freshKind nullSourceSpan
       solveUnknown u1 $ rowFromList (rs2, rest)
       solveUnknown u2 $ rowFromList (rs1, rest)
@@ -485,7 +498,7 @@ elaborateKind = \case
     kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName a)
     pure (kind $> ann)
   (Skolem ann _ mbK _ _) -> do
-    kind <- apply $ maybe (internalError "Skolem has no kind") id mbK
+    kind <- apply $ fromMaybe (internalError "Skolem has no kind") mbK
     pure $ kind $> ann
   TUnknown ann a' -> do
     kind <- snd <$> lookupUnsolved a'
@@ -575,9 +588,9 @@ type DataDeclarationArgs =
 
 type DataDeclarationResult =
   ( [(DataConstructorDeclaration, SourceType)]
-  -- ^ The infered type signatures of data constructors
+  -- The infered type signatures of data constructors
   , SourceType
-  -- ^ The inferred kind of the declaration
+  -- The inferred kind of the declaration
   )
 
 kindOfData
@@ -604,8 +617,8 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
           tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . fst) tyCtor tyArgs'
           ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (nullSourceAnn,) tyArgs'
-      for ctors $ \ctor ->
-        fmap (mkForAll ctorBinders) <$> inferDataConstructor tyCtor' ctor
+      for ctors $
+        fmap (fmap (mkForAll ctorBinders)) . inferDataConstructor tyCtor'
 
 inferDataConstructor
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
@@ -626,9 +639,9 @@ type TypeDeclarationArgs =
 
 type TypeDeclarationResult =
   ( SourceType
-  -- ^ The elaborated rhs of the declaration
+  -- The elaborated rhs of the declaration
   , SourceType
-  -- ^ The inferred kind of the declaration
+  -- The inferred kind of the declaration
   )
 
 kindOfTypeSynonym
@@ -665,8 +678,8 @@ checkQuantification
   :: forall m. (MonadError MultipleErrors m)
   => SourceType
   -> m ()
-checkQuantification ty =
-  collectErrors . go [] [] . fst . fromJust . completeBinderList $ ty
+checkQuantification =
+  collectErrors . go [] [] . fst . fromJust . completeBinderList
   where
   collectErrors vars =
     unless (null vars)
@@ -676,7 +689,7 @@ checkQuantification ty =
 
   go acc _ [] = reverse acc
   go acc sco ((_, (arg, k)) : rest)
-    | any (not . flip elem sco) $ freeTypeVariables k = goDeps acc arg rest
+    | not . all (flip elem sco) $ freeTypeVariables k = goDeps acc arg rest
     | otherwise = go acc (arg : sco) rest
 
   goDeps acc _ [] = acc
@@ -739,13 +752,13 @@ type ClassDeclarationArgs =
 
 type ClassDeclarationResult =
   ( [(Text, SourceType)]
-  -- ^ The kind annotated class arguments
+  -- The kind annotated class arguments
   , [SourceConstraint]
-  -- ^ The kind annotated superclass constraints
+  -- The kind annotated superclass constraints
   , [Declaration]
-  -- ^ The kind annotated declarations
+  -- The kind annotated declarations
   , SourceType
-  -- ^ The inferred kind of the declaration
+  -- The inferred kind of the declaration
   )
 
 kindOfClass
@@ -905,8 +918,8 @@ kindsOfAll
   -> [ClassDeclarationArgs]
   -> m ([TypeDeclarationResult], [DataDeclarationResult], [ClassDeclarationResult])
 kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
-  synDict <- for syns $ \(sa, synName, _, _) -> fmap (synName,) $ existingSignatureOrFreshKind moduleName (fst sa) synName
-  datDict <- for dats $ \(sa, datName, _, _) -> fmap (datName,) $ existingSignatureOrFreshKind moduleName (fst sa) datName
+  synDict <- for syns $ \(sa, synName, _, _) -> (synName,) <$> existingSignatureOrFreshKind moduleName (fst sa) synName
+  datDict <- for dats $ \(sa, datName, _, _) -> (datName,) <$> existingSignatureOrFreshKind moduleName (fst sa) datName
   clsDict <- for clss $ \(sa, clsName, _, _, _) -> fmap (coerceProperName clsName,) $ existingSignatureOrFreshKind moduleName (fst sa) $ coerceProperName clsName
   let bindingGroup = synDict <> datDict <> clsDict
   bindLocalTypeVariables moduleName bindingGroup $ do
