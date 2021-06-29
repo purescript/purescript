@@ -37,6 +37,9 @@ Bugfixes:
 
 * Improve apartness checking (#4064, @rhendric)
 
+* Solve `Prim.Row.Union left right all` constraint for `left` when `all` and `right` are already closed rows,
+  reflecting the existing functional dependency `all right -> left` (#3720, @MonoidMusician)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
