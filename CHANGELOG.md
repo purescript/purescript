@@ -37,6 +37,8 @@ Bugfixes:
 
 * Improve apartness checking (#4064, @rhendric)
 
+* Do not remove bindings referenced in function declarations when bundling (#4044, @kl0tl)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
@@ -164,8 +166,6 @@ Bugfixes:
   options, it was easy to end up with (for example) an outdated docs.json or
   corefn.json file in your output directory which would be incorrectly
   considered up-to-date by the compiler.
-
-* Do not remove bindings referenced in function declarations when bundling (#4044, @kl0tl)
 
 Other improvements:
 
