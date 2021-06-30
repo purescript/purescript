@@ -37,6 +37,8 @@ Bugfixes:
 
 * Improve apartness checking (#4064, @rhendric)
 
+* Do not remove bindings referenced in function declarations when bundling (#4044, @kl0tl)
+
 Internal:
 
 * Fix for Haddock (#4072 by @ncaq and @JordanMartinez)

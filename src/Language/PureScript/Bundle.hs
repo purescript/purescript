@@ -474,6 +474,10 @@ matchMember stmt
   , JSIdentifier _ name <- var
   , JSVarInit _ decl <- varInit
   = Just (Internal, name, decl)
+  -- function foo(...args) { body }
+  | JSFunction a0 jsIdent a1 args a2 body _ <- stmt
+  , JSIdentName _ name <- jsIdent
+  = pure (Internal, name, JSFunctionExpression a0 jsIdent a1 args a2 body)
   -- exports.foo = expr; exports["foo"] = expr;
   | JSAssignStatement e (JSAssign _) decl _ <- stmt
   , Just name <- exportsAccessor e
