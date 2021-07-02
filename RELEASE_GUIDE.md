@@ -88,9 +88,8 @@ considering what effects this may have:
   - If `purescript-cst` has changed at all since the last release:
 
       - The `version` field in `lib/purescript-cst/purescript-cst.cabal` (note
-        that the new version should be based on the PVP, according to what
-        changed since the previous release, and not on the actual compiler
-        version)
+        that the new version should be based on the [PVP](https://pvp.haskell.org/),
+        according to what changed since the previous release, and not on the actual compiler version)
 
       - The versions table in `lib/purescript-cst/README.md`,
 
