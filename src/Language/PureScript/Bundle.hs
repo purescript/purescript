@@ -242,10 +242,10 @@ printErrorMessage (ErrorInModule mid e) =
     displayIdentifier (ModuleIdentifier name ty) =
       name ++ " (" ++ showModuleType ty ++ ")"
 printErrorMessage (MissingEntryPoint mName) =
-  [ "Couldn't find neither an ES nor CommonJS module for the specified entry point: " ++ mName
+  [ "Could not find an ES module or CommonJS module for the specified entry point: " ++ mName
   ]
 printErrorMessage (MissingMainModule mName) =
-  [ "Couldn't find neither an ES nor CommonJS module for the specified main module: " ++ mName
+  [ "Could not find an ES module or CommonJS module for the specified main module: " ++ mName
   ]
 
 -- | Calculate the ModuleIdentifier imported by an import declaration or a require(...) statement.
