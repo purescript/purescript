@@ -122,7 +122,7 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
         DataDeclaration dataDeclType args [] ->
           DataDeclaration dataDeclType args roles
         DataDeclaration _ _ _ ->
-          P.internalError "augmentWith: could not add a second role to data declaration"
+          P.internalError "augmentWith: could not add a second role declaration to a data declaration"
         _ -> P.internalError "augmentWith: could not add role to declaration"
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
