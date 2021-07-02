@@ -59,8 +59,6 @@ The following instructions are intended to help PureScript users more easily con
 
 Install `stack`. [Instructions](https://docs.haskellstack.org/en/stable/README/).
 
-See the [PureScript Install Guide](INSTALL.md) for information on the `curses`/`ncurses` dependency.
-
 Update stack's package index before proceeding:
 ```
 stack update
@@ -81,21 +79,31 @@ stack build
 
 This will take a while the first time it is run.
 
-### Install
+### Running a locally-compiled version of PureScript
 
-If you'd like to test the build in a local shell, you can run:
+Run `stack exec bash` to launch a subshell (substitute `bash` with your preferred shell) where your locally-compiled version of `purs` is available at the front of your `PATH`. Other tools (such as `spago`) will also grab this latest `purs` version if executed in this shell. You can use `purs --version` and `which purs` to confirm you're executing your locally-compiled version.
+
 ```
-stack exec bash
+> purs --version
+0.14.2
+> which purs
+~/.nvm/versions/node/v14.9.0/bin/purs
+
+> stack exec bash
+
+> purs --version
+0.14.2 [development build; commit: f1953214775945b65ba53ae903b4238c352dcd29 DIRTY]
+> which purs
+~/projects/purescript/complier/.stack-work/install/x86_64-linux-tinfo6/1a835accec0abb5a1f7364196133985d18f8c46ee8c7424ce43cf68bab56e5b1/8.10.4/bin/purs
 ```
 
-This prepends the location of the compiler to your `$PATH`, so you can test your changes. This works with other tools that depend on the `purs` binary, such as `spago`. Note that rebuilds continue to use this same path, so you don't need to keep re-running `stack exec` to test new changes (assuming you're using a separate terminal for `stack exec`). Remember that `stack exec` must be launched from the same directory that you ran `stack build` from.
+If you plan on using your patched version of `purs` for a while (for example, while waiting on your changes to be incorporated into the next official release), it may be more convenient to install it globally with:
 
-You may also install globally with:
 ```
 stack install
 ```
 
-This copies the compiler executable (`purs`) into `~/.local/bin`.
+Note that other installed version (e.g. what npm installs) may still have priority depending on how your `PATH` is configured. `stack install` should warn about other higher-priority versions, and you can always use `which purs` as a sanity check. Uninstall by simply deleting the `purs` binary (location can be found with `which purs`).
 
 ### Profiling
 
@@ -128,8 +136,8 @@ Each of these produces a clickable visual display of profiling info. Feel free t
 
 #### [ghc-prof-flamegraph](https://github.com/fpco/ghc-prof-flamegraph)
 ```
-stack install ghc-prof-flamegraph
-ghc-prof-flamegraph purs.prof
+stack build --copy-compiler-tool ghc-prof-flamegraph
+stack exec -- ghc-prof-flamegraph purs.prof
 firefox purs.svg
 ```
 
@@ -137,8 +145,8 @@ For more flamegraph customizations, you can also try [`stackcollapse-ghc`](https
 
 #### [profiteur](https://github.com/jaspervdj/profiteur)
 ```
-stack install profiteur
-profiteur purs.prof
+stack build --copy-compiler-tool profiteur
+stack exec -- profiteur purs.prof
 firefox purs.prof.html
 ```
 
@@ -149,6 +157,3 @@ firefox purs.prof.html
 * Beginner-friendly [guide](https://www.vacationlabs.com/haskell/environment-setup.html) covering VSCode + HIE setup, although the steps needed some tweaking for compatibility with the PureScript compiler project.
 
 * An [outdated table](https://github.com/rainbyte/haskell-ide-chart#the-chart-with-a-link-to-each-plug-in) of IDE recommendations. Note that the [`intero`](https://github.com/chrisdone/intero/blob/master/README.md) backend (listed for four entries) is no longer supported.
-
-[the #purescript channel in FP Slack]: https://functionalprogramming.slack.com/
-[Discourse]: https://discourse.purescript.org/
