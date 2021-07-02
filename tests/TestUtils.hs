@@ -9,12 +9,12 @@ import Prelude.Compat
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
+import Language.PureScript.Interactive.IO (findNodeProcess)
 
 import Control.Arrow ((***), (>>>))
 import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
-import Control.Monad.Trans.Maybe
 import Control.Monad.Writer.Class (tell)
 import Control.Exception
 import Data.Char (isSpace)
@@ -34,12 +34,6 @@ import qualified System.FilePath.Glob as Glob
 import System.IO
 import Test.Tasty.Hspec
 
-
-findNodeProcess :: IO (Maybe String)
-findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-  where
-  names = ["nodejs", "node"]
-
 -- |
 -- Fetches code necessary to run the tests with. The resulting support code
 -- should then be checked in, so that npm/bower etc is not required to run the
@@ -56,15 +50,15 @@ updateSupportCode = do
     else do
       callProcess "npm" ["install"]
       -- bower uses shebang "/usr/bin/env node", but we might have nodejs
-      node <- maybe cannotFindNode pure =<< findNodeProcess
+      node <- either cannotFindNode pure =<< findNodeProcess
       -- Sometimes we run as a root (e.g. in simple docker containers)
       -- And we are non-interactive: https://github.com/bower/bower/issues/1162
       callProcess node ["node_modules/.bin/bower", "--allow-root", "install", "--config.interactive=false"]
   setCurrentDirectory "../.."
   where
-  cannotFindNode :: IO a
-  cannotFindNode = do
-    hPutStrLn stderr "Cannot find node (or nodejs) executable"
+  cannotFindNode :: String -> IO a
+  cannotFindNode message = do
+    hPutStrLn stderr message
     exitFailure
 
 readInput :: [FilePath] -> IO [(FilePath, T.Text)]

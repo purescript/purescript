@@ -52,7 +52,6 @@ import           System.Exit
 import           System.Directory (doesFileExist, getCurrentDirectory)
 import           System.FilePath ((</>))
 import qualified System.FilePath.Glob as Glob
-import           System.Process (readProcessWithExitCode)
 import qualified Data.ByteString.Lazy.UTF8 as U
 
 -- | Command line options
@@ -288,12 +287,11 @@ nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
     eval :: () -> String -> IO ()
     eval _ _ = do
       writeFile indexFile "import('./$PSCI/index.js').then(({ $main }) => $main());"
-      process <- maybe findNodeProcess (pure . pure) nodePath
-      result <- traverse (\node -> readProcessWithExitCode node (nodeArgs ++ [indexFile]) "") process
+      result <- readNodeProcessWithExitCode nodePath (nodeArgs ++ [indexFile]) ""
       case result of
-        Just (ExitSuccess, out, _)   -> putStrLn out
-        Just (ExitFailure _, _, err) -> putStrLn err
-        Nothing                      -> putStrLn "Could not find node.js. Do you have node.js installed and available in your PATH?"
+        Right (ExitSuccess, out, _)   -> putStrLn out
+        Right (ExitFailure _, _, err) -> putStrLn err
+        Left err                      -> putStrLn err
 
     reload :: () -> IO ()
     reload _ = return ()

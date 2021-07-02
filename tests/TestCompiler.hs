@@ -29,6 +29,7 @@ import Prelude ()
 import Prelude.Compat
 
 import qualified Language.PureScript as P
+import Language.PureScript.Interactive.IO (readNodeProcessWithExitCode)
 
 import Control.Arrow ((>>>))
 import Data.Function (on)
@@ -44,7 +45,6 @@ import qualified Data.ByteString.Lazy as BS
 import Control.Monad
 
 import System.Exit
-import System.Process
 import System.FilePath
 import System.IO
 import System.IO.UTF8 (readUTF8File)
@@ -164,20 +164,19 @@ assertCompiles supportModules supportExterns supportForeigns inputFiles outputFi
     case e of
       Left errs -> return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right _ -> do
-        process <- findNodeProcess
         let entryPoint = modulesDir </> "index.js"
         writeFile entryPoint "import('./Main/index.js').then(({ main }) => main());"
-        result <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
+        result <- readNodeProcessWithExitCode Nothing [entryPoint] ""
         hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) <> ":"
         case result of
-          Just (ExitSuccess, out, err)
+          Right (ExitSuccess, out, err)
             | not (null err) -> return $ Just $ "Test wrote to stderr:\n\n" <> err
             | not (null out) && trim (last (lines out)) == "Done" -> do
                 hPutStr outputFile out
                 return Nothing
             | otherwise -> return $ Just $ "Test did not finish with 'Done':\n\n" <> out
-          Just (ExitFailure _, _, err) -> return $ Just err
-          Nothing -> return $ Just "Couldn't find node.js executable"
+          Right (ExitFailure _, _, err) -> return $ Just err
+          Left err -> return $ Just err
 
 assertCompilesWithWarnings
   :: [P.Module]
