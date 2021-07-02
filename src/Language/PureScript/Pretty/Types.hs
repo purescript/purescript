@@ -59,7 +59,6 @@ data PrettyPrintType
   | PPRecord [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
   | PPRow [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
   | PPTruncated
-  deriving (Show)
 
 type PrettyPrintConstraint = (Qualified (ProperName 'ClassName), [PrettyPrintType], [PrettyPrintType])
 
