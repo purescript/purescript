@@ -224,10 +224,13 @@ codeAsHtml r = outputWith elemAsHtml
         _ -> toHtml ("" :: Text)
       where
         renderRole hoverTextContent className =
-          H.a $ do
+          H.a ! A.href docRepoRolePage $ do
             H.abbr ! A.title hoverTextContent $ do
               H.sub ! A.class_ className $ do
                 toHtml ("" :: Text)
+
+        docRepoRolePage =
+          "https://github.com/purescript/documentation/blob/master/language/Roles.md"
 
         describeNominal = fold
           [ "The 'nominal' role means the type represented by this type "
