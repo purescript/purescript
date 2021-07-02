@@ -41,7 +41,7 @@ renderDeclaration Declaration{..} =
       , syntax "::"
       , renderType ty
       ]
-    DataDeclaration dtype args ->
+    DataDeclaration dtype args roles ->
       [ keyword (P.showDataDeclType dtype)
       , renderType (typeApp declTitle args)
       ]
@@ -51,7 +51,7 @@ renderDeclaration Declaration{..} =
       , syntax "::"
       , renderType kind'
       ]
-    TypeSynonymDeclaration args ty ->
+    TypeSynonymDeclaration args ty roles ->
       [ keywordType
       , renderType (typeApp declTitle args)
       , syntax "="

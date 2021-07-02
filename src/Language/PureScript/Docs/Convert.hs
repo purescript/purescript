@@ -94,10 +94,10 @@ insertValueTypesAndAdjustKinds env m =
   -- Extracts the keyword for a declaration (if there is one)
   extractKeyword :: DeclarationInfo -> Maybe P.KindSignatureFor
   extractKeyword = \case
-    DataDeclaration dataDeclType _ -> Just $ case dataDeclType of
+    DataDeclaration dataDeclType _ _ -> Just $ case dataDeclType of
       P.Data -> P.DataSig
       P.Newtype -> P.NewtypeSig
-    TypeSynonymDeclaration _ _ -> Just P.TypeSynonymSig
+    TypeSynonymDeclaration _ _ _ -> Just P.TypeSynonymSig
     TypeClassDeclaration _ _ _ -> Just P.ClassSig
     _ -> Nothing
 
