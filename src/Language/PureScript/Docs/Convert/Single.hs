@@ -123,6 +123,9 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
           DataDeclaration dataDeclType args roles
         DataDeclaration _ _ _ ->
           P.internalError "augmentWith: could not add a second role declaration to a data declaration"
+        ffiDecl@(ExternDataDeclaration _) ->
+          -- we're not yet adding role declarations to FFI declarations
+          ffiDecl
         _ -> P.internalError "augmentWith: could not add role to declaration"
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
