@@ -10,6 +10,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Data.Functor ((<&>))
+import Data.List (isInfixOf)
 import System.Directory (XdgDirectory (..), createDirectoryIfMissing,
                          getAppUserDataDirectory, getXdgDirectory,
                          findExecutable, doesFileExist)
@@ -58,7 +59,15 @@ readNodeProcessWithExitCode nodePath nodeArgs stdin = runExceptT $ do
           | major < 12 -> throwError "Unsupported node.js version."
           | otherwise -> pure (major, minor, patch)
   let nodeArgs' = if minor < 7 then "--experimental-modules" : nodeArgs else nodeArgs
-  lift $ readProcessWithExitCode process nodeArgs' stdin
+  lift (readProcessWithExitCode process nodeArgs' stdin) <&> \case
+    (ExitSuccess, out, err) ->
+      (ExitSuccess, out, censorExperimentalWarnings err)
+    (ExitFailure code, out, err) ->
+      (ExitFailure code, out, err)
+
+censorExperimentalWarnings :: String -> String
+censorExperimentalWarnings =
+  unlines . filter (not . ("ExperimentalWarning" `isInfixOf`)) . lines
 
 -- |
 -- Grabs the filename where the history is stored.
