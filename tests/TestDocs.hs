@@ -114,6 +114,9 @@ data DocsAssertion
   -- kind signature and type declaration are properly merged into one
   -- doc-comment.
   | ShouldMergeDocComments P.ModuleName Text (Maybe Text)
+  -- | Assert that a given declaration's type parameters have the
+  -- given role annotations
+  | ShouldHaveRoleAnnotation P.ModuleName Text [P.Role]
 
 data TagsAssertion
   -- | Assert that a particular declaration is tagged
@@ -175,6 +178,9 @@ displayAssertion = \case
     showQual mn decl <> " should not have a kind signature."
   ShouldMergeDocComments mn decl _ ->
     showQual mn decl <> " should merge its kind declaration and type declaration's doc-comments"
+  ShouldHaveRoleAnnotation mn decl expected ->
+    showQual mn decl <> " should have the expected role annotations:\n" <>
+    T.intercalate ", " (fmap P.displayRole expected)
 
 displayTagsAssertion :: TagsAssertion -> Text
 displayTagsAssertion = \case
@@ -245,6 +251,13 @@ data DocsAssertionFailure
   -- Fields: module name, declaration title, expected doc-comments,
   -- actual doc-comments
   | DocCommentMergeFailure P.ModuleName Text Text Text
+  -- | The given declaration cannot have role annotations.
+  -- Fields: module name, declaration title
+  | CannotHaveRoles P.ModuleName Text
+  -- | The list of expected roles did not match the list of actual roles
+  -- fields: module name, declaration title, expected role list,
+  -- actual role list
+  | RoleMismatch P.ModuleName Text [P.Role] [P.Role]
 
 data TagsAssertionFailure
   -- | A declaration was not tagged, but should have been
@@ -309,6 +322,14 @@ displayAssertionFailure = \case
   DocCommentMergeFailure _ decl expected actual ->
     "Expected the doc-comment for " <> decl <> " to merge comments and be `" <>
     expected <> "`; got `" <> actual <> "`"
+  CannotHaveRoles _ decl ->
+    decl <> " is a type of declaration that cannot have roles."
+  RoleMismatch _ decl expected actual ->
+    "Expected the role annotations for " <> decl <> " to be \n" <>
+    "`" <> displayRoleList expected <> "`, but got\n" <>
+    "`" <> displayRoleList actual <> "`"
+    where
+      displayRoleList = T.intercalate ", " . fmap P.displayRole
 
 displayTagsAssertionFailure :: TagsAssertionFailure -> Text
 displayTagsAssertionFailure = \case
@@ -507,6 +528,12 @@ runAssertion assertion linksCtx Docs.Module{..} =
             else Fail (DocCommentMergeFailure mn decl (display expected) (display declComments))
         where
           display = fromMaybe ""
+
+    ShouldHaveRoleAnnotation mn decl expected ->
+      findDeclRoles mn decl $ \actual ->
+        if expected == actual
+          then Pass
+          else Fail (RoleMismatch mn decl expected actual)
   where
   declarationsFor mn =
     if mn == modName
@@ -530,6 +557,17 @@ runAssertion assertion linksCtx Docs.Module{..} =
         Just Docs.Declaration{..} ->
           f declKind
 
+  findDeclRoles mn title f =
+      case find ((==) title . Docs.declTitle) (declarationsFor mn) of
+        Nothing ->
+          Fail (NotDocumented mn title)
+        Just Docs.Declaration{..} ->
+          case getRoles declInfo of
+            Nothing ->
+              Fail (CannotHaveRoles mn title)
+            Just roles ->
+              f roles
+
   findDeclChildren mn title child f =
     findDecl mn title $ \Docs.Declaration{..} ->
       case find ((==) child . Docs.cdeclTitle) declChildren of
@@ -551,6 +589,12 @@ runAssertion assertion linksCtx Docs.Module{..} =
       else Fail (DocCommentPresent mn constr cdeclComments)
 
   childrenTitles = map Docs.cdeclTitle . Docs.declChildren
+
+  getRoles :: Docs.DeclarationInfo -> Maybe [P.Role]
+  getRoles = \case
+    Docs.DataDeclaration _ _ roles -> Just roles
+    Docs.TypeSynonymDeclaration _ _ roles -> Just roles
+    _ -> Nothing
 
   extract :: Docs.RenderedCode -> Docs.Namespace -> Text -> Maybe Docs.DocLink
   extract rc ns title = getFirst (Docs.outputWith (First . go) rc) >>= getLink
@@ -808,6 +852,15 @@ testCases =
       , ShouldMergeDocComments (n "KindSignatureDocs") "TImplicit" $ Just "tit\n"
       , ShouldMergeDocComments (n "KindSignatureDocs") "NImplicit" $ Just "nit\n"
       , ShouldMergeDocComments (n "KindSignatureDocs") "CImplicit" $ Just "cit\n"
+      ]
+    )
+  , ("RoleAnnotationDocs",
+      [ ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_RNP" [P.Representational, P.Nominal, P.Phantom]
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_NPR" [P.Nominal, P.Phantom, P.Representational]
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_PRN" [P.Phantom, P.Representational, P.Nominal]
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "T_RNP" [P.Representational, P.Nominal, P.Phantom]
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "T_NPR" [P.Nominal, P.Phantom, P.Representational]
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "T_PRN" [P.Phantom, P.Representational, P.Nominal]
       ]
     )
   ]
