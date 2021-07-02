@@ -111,8 +111,8 @@ data DocsAssertion
   -- | Assert that a given declaration does not have a kind signature
   | ShouldNotHaveKindSignature P.ModuleName Text
   -- | Assert that a given declaration with doc-comments on its
-  -- kind signature and type declaration are properly merged into one
-  -- doc-comment.
+  -- kind signature, type declaration, and role declaration are properly
+  -- merged into one doc-comment.
   | ShouldMergeDocComments P.ModuleName Text (Maybe Text)
   -- | Assert that a given declaration's type parameters have the
   -- given role annotations
@@ -177,7 +177,9 @@ displayAssertion = \case
   ShouldNotHaveKindSignature mn decl ->
     showQual mn decl <> " should not have a kind signature."
   ShouldMergeDocComments mn decl _ ->
-    showQual mn decl <> " should merge its kind declaration and type declaration's doc-comments"
+    showQual mn decl <> " should merge the doc-commentsof its kind " <>
+    "declaration (if any), type declaration, and role declaration (if any) " <>
+    "into one doc-comment."
   ShouldHaveRoleAnnotation mn decl expected ->
     showQual mn decl <> " should have the expected role annotations: " <>
     T.intercalate ", " (fmap P.displayRole expected)
@@ -246,8 +248,8 @@ data DocsAssertionFailure
   -- Fields: module name, declaration title, actual kind signature (text),
   -- actual kind signature (structure)
   | KindSignaturePresent P.ModuleName Text Text (P.Type ())
-  -- | The doc comments for the kind signature and type declaration were
-  -- not properly merged into the expected one.
+  -- | The doc comments for the kind signature (if any), type declaration, and
+  -- role declaration (if any) were not properly merged into the expected one.
   -- Fields: module name, declaration title, expected doc-comments,
   -- actual doc-comments
   | DocCommentMergeFailure P.ModuleName Text Text Text
@@ -830,33 +832,30 @@ testCases =
       , ShouldHaveKindSignature (n "KindSignatureDocs") "TShown" "type TShown :: (Type -> Type) -> Type -> Type -> Type"
       , ShouldHaveKindSignature (n "KindSignatureDocs") "NShown" "newtype NShown :: Type -> (Type -> Type) -> Type -> Type"
       , ShouldHaveKindSignature (n "KindSignatureDocs") "CShown" "class CShown :: (Type -> Type) -> Type -> Type -> Constraint"
-
-      -- expected docs
-      , ShouldMergeDocComments (n "KindSignatureDocs") "DKindAndType" $ Just "dkatk\n\ndkatt\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "TKindAndType" $ Just "tkatk\n\ntkatt\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "NKindAndType" $ Just "nkatk\n\nnkatt\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "CKindAndType" $ Just "ckatk\n\nckatt\n"
-
-      , ShouldMergeDocComments (n "KindSignatureDocs") "DKindOnly" $ Just "dkok\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "TKindOnly" $ Just "tkok\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "NKindOnly" $ Just "nkok\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "CKindOnly" $ Just "ckok\n"
-
-      , ShouldMergeDocComments (n "KindSignatureDocs") "DTypeOnly" $ Just "dtot\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "TTypeOnly" $ Just "ttot\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "NTypeOnly" $ Just "ntot\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "CTypeOnly" $ Just "ctot\n"
-
-      , ShouldMergeDocComments (n "KindSignatureDocs") "DImplicit" $ Just "dit\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "TImplicit" $ Just "tit\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "NImplicit" $ Just "nit\n"
-      , ShouldMergeDocComments (n "KindSignatureDocs") "CImplicit" $ Just "cit\n"
       ]
     )
   , ("RoleAnnotationDocs",
       [ ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_RNP" [P.Representational, P.Nominal, P.Phantom]
       , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_NPR" [P.Nominal, P.Phantom, P.Representational]
       , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_PRN" [P.Phantom, P.Representational, P.Nominal]
+      ]
+    )
+  , ("DocCommentsMerge",
+      [ ShouldMergeDocComments (n "DocCommentsMerge") "DeclOnly" $ Just "decl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindAndDecl" $ Just "kind\n\ndecl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "DeclAndRole" $ Just "decl\n\nrole\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindDeclAndRole" $ Just "kind\n\ndecl\n\nrole\n"
+
+      , ShouldMergeDocComments (n "DocCommentsMerge") "NewtypeOnly" $ Just "decl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindAndNewtype" $ Just "kind\n\ndecl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "NewtypeAndRole" $ Just "decl\n\nrole\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindNewtypeAndRole" $ Just "kind\n\ndecl\n\nrole\n"
+
+      , ShouldMergeDocComments (n "DocCommentsMerge") "TypeOnly" $ Just "decl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindAndType" $ Just "kind\n\ndecl\n"
+
+      , ShouldMergeDocComments (n "DocCommentsMerge") "ClassOnly" $ Just "decl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindAndClass" $ Just "kind\n\ndecl\n"
       ]
     )
   ]
