@@ -12,7 +12,6 @@ import           Prelude.Compat
 import           Control.Arrow ((***))
 import           Data.Either (isLeft)
 import qualified Data.Map.Strict as M
-import           Data.Maybe (maybe)
 import           Data.Aeson
 import           Data.Version (Version, showVersion)
 import           Data.Text (Text)

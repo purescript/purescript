@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeFamilies #-}
 
 -- | Subsumption checking
 module Language.PureScript.TypeChecker.Subsumption

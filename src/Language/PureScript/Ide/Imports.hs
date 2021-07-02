@@ -229,7 +229,7 @@ addExplicitImport' decl moduleName qualifier imports =
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
     insertDeclIntoImport :: IdeDeclaration -> Import -> Import
     insertDeclIntoImport decl' (Import mn (P.Explicit refs) qual) =
-      Import mn (P.Explicit (sortBy P.compDecRef (insertDeclIntoRefs decl' refs))) qual
+      Import mn (P.Explicit (sort (insertDeclIntoRefs decl' refs))) qual
     insertDeclIntoImport _ is = is
 
     insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]
@@ -314,16 +314,13 @@ addImportForIdentifier fp ident qual filters = do
         -- worst
         Just decl ->
           Right <$> addExplicitImport fp decl m1 qual
-        -- Here we need the user to specify whether he wanted a dataconstructor
-        -- or a type
-
-        -- TODO: With the new namespace filter, this can actually be a
-        -- request for the user to specify which of the two was wanted.
+        -- Here we need the user to specify whether they wanted a 
+        -- dataconstructor or a type
         Nothing ->
           throwError (GeneralError "Undecidable between type and dataconstructor")
 
     -- Multiple matches were found so we need to ask the user to clarify which
-    -- module he meant
+    -- module they meant
     xs ->
       pure (Left xs)
     where

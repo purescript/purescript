@@ -1,6 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Command.Docs.Html
   ( asHtml
   , layout

@@ -12,9 +12,6 @@
 -- Matchers for psc-ide commands
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Ide.Matcher
        ( Matcher
        , runMatcher
@@ -24,6 +21,7 @@ module Language.PureScript.Ide.Matcher
 
 import           Protolude
 
+import           Control.Monad.Fail (fail)
 import           Data.Aeson
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
@@ -49,7 +47,7 @@ instance FromJSON (Matcher IdeDeclarationAnn) where
         distanceMatcher
           <$> params .: "search"
           <*> params .: "maximumDistance"
-      Just _ -> mzero
+      Just s -> fail ("Unknown matcher: " <> show s)
       Nothing -> return mempty
 
 -- | Matches any occurrence of the search string with intersections
@@ -82,7 +80,7 @@ runMatcher :: Matcher a -> [Match a] -> [Match a]
 runMatcher (Matcher m)= appEndo m
 
 sortCompletions :: [ScoredMatch a] -> [ScoredMatch a]
-sortCompletions = sortBy (flip compare `on` snd)
+sortCompletions = sortOn (Down . snd)
 
 flexMatch :: Text -> [Match IdeDeclarationAnn] -> [ScoredMatch IdeDeclarationAnn]
 flexMatch = mapMaybe . flexRate

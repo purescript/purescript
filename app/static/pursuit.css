@@ -404,13 +404,17 @@ ol li {
   border-radius: 0;
   border-top: 1px solid #cccccc;
   border-bottom: 1px solid #cccccc;
-  padding: 0.328em 0;
+  padding: 0;
 }
 .decl__signature code {
   display: block;
+  padding: 0.328em 0;
   padding-left: 2.441em;
   text-indent: -2.441em;
   white-space: normal;
+}
+.decl__kind {
+  border-bottom: 1px solid #cccccc;
 }
 :target .decl__signature,
 :target .decl__signature code {

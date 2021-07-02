@@ -69,7 +69,7 @@ primBooleanDocsModule = Module
 primCoerceDocsModule :: Module
 primCoerceDocsModule = Module
   { modName = P.moduleNameFromString "Prim.Coerce"
-  , modComments = Just "The Prim.Coerce module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with types that have provably-identical runtime representations."
+  , modComments = Just "The Prim.Coerce module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains an automatically solved type class for coercing types that have provably-identical runtime representations with [purescript-safe-coerce](https://pursuit.purescript.org/packages/purescript-safe-coerce)."
   , modDeclarations =
       [ coercible
       ]
@@ -183,6 +183,7 @@ primTypeOf gen title comments = Declaration
   , declSourceSpan = Nothing
   , declChildren = []
   , declInfo = ExternDataDeclaration (lookupPrimTypeKindOf gen title)
+  , declKind = Nothing
   }
 
 -- | Lookup the TypeClassData of a Prim class. This function is specifically
@@ -209,11 +210,12 @@ primClassOf gen title comments = Declaration
   , declInfo =
       let
         tcd = lookupPrimClassOf gen title
-        args = fmap (fmap (fmap ($> ()))) $ P.typeClassArguments tcd
-        superclasses = fmap ($> ()) $ P.typeClassSuperclasses tcd
+        args = fmap (fmap ($> ())) <$> P.typeClassArguments tcd
+        superclasses = ($> ()) <$> P.typeClassSuperclasses tcd
         fundeps = convertFundepsToStrings args (P.typeClassDependencies tcd)
       in
         TypeClassDeclaration args superclasses fundeps
+  , declKind = Nothing
   }
 
 kindType :: Declaration
@@ -377,65 +379,56 @@ coercible :: Declaration
 coercible = primClassOf (P.primSubName "Coerce") "Coercible" $ T.unlines
   [ "Coercible is a two-parameter type class that has instances for types `a`"
   , "and `b` if the compiler can infer that they have the same representation."
-  , "This class does not have regular instances; instead they are created"
-  , "on-the-fly during type-checking according to a set of rules."
+  , "Coercible constraints are solved according to the following rules:"
   , ""
-  , "First, Coercible obeys reflexivity - any type has the same representation"
-  , "as itself:"
+  , "* _reflexivity_, any type has the same representation as itself:"
+  , "`Coercible a a` holds."
   , ""
-  , "    instance coercibleReflexive :: Coercible a a"
+  , "* _symmetry_, if a type `a` can be coerced to some other type `b`, then `b`"
+  , "can also be coerced back to `a`: `Coercible a b` implies `Coercible b a`."
   , ""
-  , "Second, Coercible obeys symmetry - if a type `a` can be coerced to some"
-  , "other type `b`, then `b` can also be coerced back to `a`:"
+  , "* _transitivity_, if a type `a` can be coerced to some other type `b` which"
+  , "can be coerced to some other type `c`, then `a` can also be coerced to `c`:"
+  , "`Coercible a b` and `Coercible b c` imply `Coercible a c`."
   , ""
-  , "    instance coercibleSymmetric :: Coercible a b => Coercible b a"
+  , "* Newtypes can be freely wrapped and unwrapped when their constructor is"
+  , "in scope:"
   , ""
-  , "Third, for every type constructor there is an instance that allows one"
-  , "to coerce under the type constructor (`data` or `newtype`). For example,"
-  , "given a definition:"
+  , "      newtype Age = Age Int"
   , ""
-  , "data D a b = D a"
+  , "`Coercible Int Age` and `Coercible Age Int` hold since `Age` has the same"
+  , "runtime representation than `Int`."
   , ""
-  , "there is an instance:"
+  , "Newtype constructors have to be in scope to preserve abstraction. It's"
+  , "common to declare a newtype to encode some invariants (non emptiness of"
+  , "arrays with `Data.Array.NonEmpty.NonEmptyArray` for example), hide its"
+  , "constructor and export smart constructors instead. Without this restriction,"
+  , "the guarantees provided by such newtypes would be void."
   , ""
-  , "    instance coercibleConstructor :: Coercible a a' => Coercible (D a b) (D a' b')"
+  , "* If none of the above are applicable, two types of kind `Type` may be"
+  , "coercible, but only if their heads are the same. For example,"
+  , "`Coercible (Maybe a) (Either a b)` does not hold because `Maybe` and"
+  , "`Either` are different. Those types don't share a common runtime"
+  , "representation so coercing between them would be unsafe. In addition their"
+  , "arguments may need to be identical or coercible, depending on the _roles_"
+  , "of the head's type parameters. Roles are documented in [the PureScript"
+  , "language reference](https://github.com/purescript/documentation/blob/master/language/Roles.md)."
   , ""
-  , "Note that, since the type variable `a` plays a role in `D`'s representation,"
-  , "we require that the types `a` and `a'` are themselves `Coercible`. However,"
-  , "since the variable `b` does not play a part in `D`'s representation (a type"
-  , "such as `b` is thus typically referred to as a \"phantom\" type), `b` and `b'`"
-  , "can differ arbitrarily."
+  , "Coercible being polykinded, we can also coerce more than types of kind `Type`:"
   , ""
-  , "Fourth, for every `newtype NT = MkNT T`, there is a pair of instances which"
-  , "permit coercion in and out of the `newtype`:"
+  , "* Rows are coercible when they have the same labels, when the corresponding"
+  , "pairs of types are coercible and when their tails are coercible:"
+  , "`Coercible ( label :: a | r ) ( label :: b | s )` holds when"
+  , "`Coercible a b` and `Coercible r s` do. Closed rows cannot be coerced to"
+  , "open rows."
   , ""
-  , "    instance coercibleNewtypeLeft  :: Coercible a T => Coercible a NT"
-  , "    instance coercibleNewtypeRight :: Coercible T b => Coercible NT b"
+  , "* Higher kinded types are coercible if they are coercible when fully"
+  , "saturated: `Coercible (f :: _ -> Type) (g :: _ -> Type)` holds when"
+  , "`Coercible (f a) (g a)` does."
   , ""
-  , "To prevent breaking abstractions, these instances are only usable if the"
-  , "constructor `MkNT` is exported."
-  , ""
-  , "Fifth, every pair of unsaturated type constructors can be coerced if"
-  , "there is an instance for the fully saturated types. For example,"
-  , "given the definitions:"
-  , ""
-  , "newtype NT1 a = MkNT1 a"
-  , "newtype NT2 a b = MkNT2 b"
-  , ""
-  , "there is an instance:"
-  , ""
-  , "    instance coercibleUnsaturedTypes :: Coercible (NT1 b) (NT2 a b) => Coercible NT1 (NT2 a)"
-  , ""
-  , "This rule may seem puzzling since it is impossible to apply `coerce` to a term"
-  , "of type `NT1` but it is necessary to coerce types with higher kinded parameters."
-  , ""
-  , "Fifth, every pair of rows can be coerced if they have the same labels"
-  , "and the corresponding types for each label are coercible:"
-  , ""
-  , "    instance coercibleRow :: Coercible a b => Coercible ( label :: a ) ( label :: b )"
-  , ""
-  , "Closed rows can't be coerced to open rows and open rows can only be"
-  , "coerced to open rows with the same row variable."
+  , "This rule may seem puzzling since there is no term of type `_ -> Type` to"
+  , "apply `coerce` to, but it is necessary when coercing types with higher"
+  , "kinded parameters."
   ]
 
 kindOrdering :: Declaration

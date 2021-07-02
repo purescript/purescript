@@ -3,31 +3,31 @@ module Main where
 import Prelude
 import Effect.Console (log)
 import Prim.Symbol (class Append)
-import Type.Data.Symbol (SProxy(..), reflectSymbol)
-import Type.Data.Symbol (append) as Symbol
+import Type.Proxy (Proxy(..))
+import Type.Data.Symbol (append, reflectSymbol) as Symbol
 
-sym :: SProxy ""
-sym = SProxy
+sym :: Proxy ""
+sym = Proxy
 
-symA :: SProxy "A"
-symA = SProxy
+symA :: Proxy "A"
+symA = Proxy
 
-symB :: SProxy "B"
-symB = SProxy
+symB :: Proxy "B"
+symB = Proxy
 
-egAB :: SProxy "AB"
+egAB :: Proxy "AB"
 egAB = Symbol.append symA symB
 
-egBA :: SProxy "BA"
+egBA :: Proxy "BA"
 egBA = Symbol.append symB symA
 
-egA' :: SProxy "A"
+egA' :: Proxy "A"
 egA' = Symbol.append sym (Symbol.append symA sym)
 
 main = do
-  let gotAB = reflectSymbol egAB == "AB"
-      gotBA = reflectSymbol egBA == "BA"
-      gotA' = reflectSymbol egA' == "A"
+  let gotAB = Symbol.reflectSymbol egAB == "AB"
+      gotBA = Symbol.reflectSymbol egBA == "BA"
+      gotA' = Symbol.reflectSymbol egA' == "A"
   when (not gotAB) $ log "Did not get AB"
   when (not gotBA) $ log "Did not get BA"
   when (not gotA') $ log "Did not get A"

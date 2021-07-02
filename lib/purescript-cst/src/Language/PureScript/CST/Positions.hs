@@ -18,10 +18,10 @@ advanceToken :: SourcePos -> Token -> SourcePos
 advanceToken pos = applyDelta pos . tokenDelta
 
 advanceLeading :: SourcePos -> [Comment LineFeed] -> SourcePos
-advanceLeading pos = foldl' (\a -> applyDelta a . commentDelta lineDelta) pos
+advanceLeading = foldl' $ \a -> applyDelta a . commentDelta lineDelta
 
 advanceTrailing :: SourcePos -> [Comment Void] -> SourcePos
-advanceTrailing pos = foldl' (\a -> applyDelta a . commentDelta (const (0, 0))) pos
+advanceTrailing = foldl' $ \a -> applyDelta a . commentDelta (const (0, 0))
 
 tokenDelta :: Token -> (Int, Int)
 tokenDelta = \case
@@ -118,10 +118,10 @@ labelRange :: Label -> TokenRange
 labelRange a = (lblTok a, lblTok a)
 
 wrappedRange :: Wrapped a -> TokenRange
-wrappedRange (Wrapped { wrpOpen, wrpClose }) = (wrpOpen, wrpClose)
+wrappedRange Wrapped { wrpOpen, wrpClose } = (wrpOpen, wrpClose)
 
 moduleRange :: Module a -> TokenRange
-moduleRange (Module { modKeyword, modWhere, modImports, modDecls }) =
+moduleRange Module { modKeyword, modWhere, modImports, modDecls } =
   case (modImports, modDecls) of
     ([], []) -> (modKeyword, modWhere)
     (is, []) -> (modKeyword, snd . importDeclRange $ last is)
@@ -140,7 +140,7 @@ exportRange = \case
   ExportModule _ a b -> (a, nameTok b)
 
 importDeclRange :: ImportDecl a -> TokenRange
-importDeclRange (ImportDecl { impKeyword, impModule, impNames, impQual })
+importDeclRange ImportDecl { impKeyword, impModule, impNames, impQual }
   | Just (_, modName) <- impQual = (impKeyword, nameTok modName)
   | Just (_, imports) <- impNames = (impKeyword, wrpClose imports)
   | otherwise = (impKeyword, nameTok impModule)
@@ -211,7 +211,7 @@ instanceRange (Instance hd bd)
   where start = instanceHeadRange hd
 
 instanceHeadRange :: InstanceHead a -> TokenRange
-instanceHeadRange (InstanceHead kw _ _ _ cls types)
+instanceHeadRange (InstanceHead kw _ _ cls types)
   | [] <- types = (kw, qualTok cls)
   | otherwise = (kw, snd . typeRange $ last types)
 

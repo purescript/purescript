@@ -52,7 +52,7 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
     encodeRebuildError err = case err of
       (P.ErrorMessage _
        ((P.HoleInferredType name _ _
-         (Just (P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields}))))) ->
+         (Just P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields})))) ->
         insertTSCompletions name idents (fromMaybe [] fields) (toJSON (toJSONError False P.Error err))
       _ ->
         (toJSON . toJSONError False P.Error) err
@@ -61,14 +61,32 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
       Aeson.Object
         (HM.insert "pursIde"
          (object [ "name" .= name
-                 , "completions" .= (ordNub (map identCompletion idents ++ map fieldCompletion fields))
+                 , "completions" .= ordNub (map identCompletion idents ++ map fieldCompletion fields)
                  ]) value)
     insertTSCompletions _ _ _ v = v
 
     identCompletion (P.Qualified mn i, ty) =
-      Completion (maybe "" P.runModuleName mn) i (prettyPrintTypeSingleLine ty) (prettyPrintTypeSingleLine ty) Nothing Nothing (maybe [] (\x -> [x]) mn)
+      Completion     
+        { complModule = maybe "" P.runModuleName mn
+        , complIdentifier = i
+        , complType = prettyPrintTypeSingleLine ty
+        , complExpandedType = prettyPrintTypeSingleLine ty
+        , complLocation = Nothing
+        , complDocumentation = Nothing
+        , complExportedFrom = toList mn
+        , complDeclarationType = Nothing
+        }
     fieldCompletion (label, ty) =
-      Completion "" ("_." <> P.prettyPrintLabel label) (prettyPrintTypeSingleLine ty) (prettyPrintTypeSingleLine ty) Nothing Nothing []
+      Completion 
+        { complModule = ""
+        , complIdentifier = "_." <> P.prettyPrintLabel label
+        , complType = prettyPrintTypeSingleLine ty
+        , complExpandedType = prettyPrintTypeSingleLine ty
+        , complLocation = Nothing
+        , complDocumentation = Nothing
+        , complExportedFrom = []
+        , complDeclarationType = Nothing
+        }
 
 textError :: IdeError -> Text
 textError (GeneralError msg)          = msg

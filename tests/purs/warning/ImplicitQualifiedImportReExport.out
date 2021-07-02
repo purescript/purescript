@@ -21,7 +21,7 @@ Warning 2 of 2:
     Module [33mData.Either[0m was imported as [33mY[0m with unspecified imports.
     As this module is being re-exported, consider using the explicit form:
 
-      [33mimport Data.Either (Either(..), choose, either, fromLeft, fromRight, hush, isLeft, isRight, note, note') as Y[0m
+      [33mimport Data.Either (Either(..), choose, either, fromLeft, fromLeft', fromRight, fromRight', hush, isLeft, isRight, note, note') as Y[0m
 
 
 

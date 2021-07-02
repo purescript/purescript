@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/InvalidDerivedInstance3.purs:8:15 - 8:16 (line 8, column 15 - line 8, column 16)
+
+  Type synonym [33mMain.S[0m is partially applied.
+  Type synonyms must be applied to all of their type arguments.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/PartiallyAppliedSynonym.md for more information,
+or to contribute content related to this error.
+

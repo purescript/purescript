@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 
 -- |
@@ -47,7 +46,7 @@ type RoleEnv = M.Map (Qualified (ProperName 'TypeName)) [Role]
 
 typeKindRoles :: TypeKind -> Maybe [Role]
 typeKindRoles = \case
-  DataType args _ ->
+  DataType _ args _ ->
     Just $ map (\(_, _, role) -> role) args
   ExternData roles ->
     Just roles
@@ -206,13 +205,15 @@ inferDataDeclarationRoles moduleName (tyName, tyArgs, ctors) roleEnv =
           -- arguments, recursively infer the roles of the type constructor's
           -- arguments. For each (role, argument) pair:
           --
-          -- * If the role is nominal, mark all free variables in the
-          --   argument as nominal also, since they cannot be coerced if the
-          --   argument's nominality is to be preserved.
-          -- * If the role is representational, recurse on the argument, since
-          --   its use of our parameters is important.
-          -- * If the role is phantom, terminate, since the argument's use of
-          --   our parameters is unimportant.
+          -- - If the role is nominal, mark all free variables in the argument
+          -- as nominal also, since they cannot be coerced if the
+          -- argument's nominality is to be preserved.
+          --
+          -- - If the role is representational, recurse on the argument, since
+          -- its use of our parameters is important.
+          --
+          -- - If the role is phantom, terminate, since the argument's use of
+          -- our parameters is unimportant.
           TypeConstructor _ t1Name ->
             let
               t1Roles = fromMaybe (repeat Phantom) $ M.lookup t1Name roleEnv

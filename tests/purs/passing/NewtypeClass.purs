@@ -3,16 +3,20 @@ module Main where
 import Prelude
 import Effect
 import Effect.Console
+import Safe.Coerce (class Coercible, coerce)
 
-class Newtype t a | t -> a where
-  wrap :: a -> t
-  unwrap :: t -> a
+class Newtype :: Type -> Type -> Constraint
+class Coercible t a <= Newtype t a | t -> a
 
-instance newtypeMultiplicative :: Newtype (Multiplicative a) a where
-  wrap = Multiplicative
-  unwrap (Multiplicative a) = a
+wrap :: forall t a. Newtype t a => a -> t
+wrap = coerce
 
-data Multiplicative a = Multiplicative a
+unwrap :: forall t a. Newtype t a => t -> a
+unwrap = coerce
+
+instance newtypeMultiplicative :: Newtype (Multiplicative a) a
+
+newtype Multiplicative a = Multiplicative a
 
 instance semiringMultiplicative :: Semiring a => Semigroup (Multiplicative a) where
   append (Multiplicative a) (Multiplicative b) = Multiplicative (a * b)

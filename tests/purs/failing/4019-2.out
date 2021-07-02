@@ -1,0 +1,28 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/4019-2.purs:26:22 - 26:60 (line 26, column 22 - line 26, column 60)
+
+  Could not match kind
+  [33m    [0m
+  [33m  K1[0m
+  [33m    [0m
+  with kind
+  [33m    [0m
+  [33m  K2[0m
+  [33m    [0m
+
+while trying to match type [33mIndexed @Type @K1 @K2 Array[0m
+  with type [33mt0[0m
+while checking that expression [33mIndexed [ 1[0m
+                               [33m        ]  [0m
+  has type [33mt0 t1 t2 t3[0m
+in value declaration [33mbar[0m
+
+where [33mt0[0m is an unknown type
+      [33mt3[0m is an unknown type
+      [33mt1[0m is an unknown type
+      [33mt2[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

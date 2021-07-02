@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Command.Docs.Markdown
   ( asMarkdown
   , writeMarkdownModules

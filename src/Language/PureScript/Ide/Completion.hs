@@ -54,8 +54,8 @@ getExactCompletions search filters modules =
 matchesFromModules :: ModuleMap [IdeDeclarationAnn] -> [Match IdeDeclarationAnn]
 matchesFromModules = Map.foldMapWithKey completionFromModule
   where
-    completionFromModule moduleName decls =
-      map (\x -> Match (moduleName, x)) decls
+    completionFromModule moduleName =
+      map $ \x -> Match (moduleName, x)
 
 data CompletionOptions = CompletionOptions
   { coMaxResults :: Maybe Int
@@ -129,6 +129,8 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl), mns) =
     complLocation = _annLocation ann
 
     complDocumentation = _annDocumentation ann
+
+    complDeclarationType = Just (declarationType decl)
 
     showFixity p a r o =
       let asso = case a of

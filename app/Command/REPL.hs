@@ -1,14 +1,6 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
 
 module Command.REPL (command) where
 
@@ -22,9 +14,10 @@ import           Control.Concurrent.STM (TVar, atomically, newTVarIO, writeTVar,
                                         readTVarIO,
                                         TChan, newBroadcastTChanIO, dupTChan,
                                         readTChan, writeTChan)
-import           Control.Exception (fromException)
+import           Control.Exception (fromException, SomeException)
 import           Control.Monad
-import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.Catch (MonadMask)
+import           Control.Monad.IO.Class (liftIO, MonadIO)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
@@ -97,7 +90,7 @@ psciOptions = PSCiOptions <$> many inputFile
                           <*> backend
 
 -- | Parses the input and returns either a command, or an error as a 'String'.
-getCommand :: forall m. MonadException m => InputT m (Either String [Command])
+getCommand :: forall m. (MonadIO m, MonadMask m) => InputT m (Either String [Command])
 getCommand = handleInterrupt (return (Right [])) $ do
   line <- withInterrupt $ getInputLine "> "
   case line of
@@ -105,7 +98,7 @@ getCommand = handleInterrupt (return (Right [])) $ do
     Just "" -> return (Right [])
     Just s  -> return (parseCommand s)
 
-pasteMode :: forall m. MonadException m => InputT m (Either String [Command])
+pasteMode :: forall m. (MonadIO m, MonadMask m) => InputT m (Either String [Command])
 pasteMode =
     parseCommand <$> go []
   where
@@ -175,21 +168,21 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
         handleWebsocket pending = do
           conn <- WS.acceptRequest pending
           -- Fork a thread to keep the connection alive
-          WS.forkPingThread conn 10
-          -- Clone the command channel
-          cmdChanCopy <- atomically $ dupTChan cmdChan
-          -- Listen for commands
-          forever $ do
-            cmd <- atomically $ readTChan cmdChanCopy
-            case cmd of
-              Eval resultVar -> void $ do
-                WS.sendTextData conn ("eval" :: Text)
-                result <- WS.receiveData conn
-                -- With many connected clients, all but one of
-                -- these attempts will fail.
-                tryPutMVar resultVar (unpack result)
-              Refresh ->
-                WS.sendTextData conn ("reload" :: Text)
+          WS.withPingThread conn 10 (pure ()) $ do
+            -- Clone the command channel
+            cmdChanCopy <- atomically $ dupTChan cmdChan
+            -- Listen for commands
+            forever $ do
+              cmd <- atomically $ readTChan cmdChanCopy
+              case cmd of
+                Eval resultVar -> void $ do
+                  WS.sendTextData conn ("eval" :: Text)
+                  result <- WS.receiveData conn
+                  -- With many connected clients, all but one of
+                  -- these attempts will fail.
+                  tryPutMVar resultVar (unpack result)
+                Refresh ->
+                  WS.sendTextData conn ("reload" :: Text)
 
         shutdownHandler :: IO () -> IO ()
         shutdownHandler stopServer = void . forkIO $ do

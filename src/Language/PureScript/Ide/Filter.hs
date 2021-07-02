@@ -12,8 +12,6 @@
 -- Filters for psc-ide commands
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Ide.Filter
        ( Filter
        , moduleFilter
@@ -26,12 +24,12 @@ module Language.PureScript.Ide.Filter
 
 import           Protolude                     hiding (isPrefixOf, Prefix)
 
-import           Data.Bifunctor (first)
+import           Control.Monad.Fail (fail)
 import           Data.Aeson
-import           Data.Text                     (isPrefixOf)
+import           Data.Text (isPrefixOf)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
-import           Language.PureScript.Ide.Filter.Declaration (DeclarationType, declarationType)
+import           Language.PureScript.Ide.Filter.Declaration (DeclarationType)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import qualified Language.PureScript           as P
@@ -104,7 +102,7 @@ applyDeclarationFilter f = case f of
 
 namespaceFilter' :: Set IdeNamespace -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
 namespaceFilter' namespaces =
-  filter (\decl -> elem (namespaceForDeclaration (discardAnn decl)) namespaces)
+  filter (\decl -> namespaceForDeclaration (discardAnn decl) `elem` namespaces)
 
 exactFilter' :: Text -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
 exactFilter' search =
@@ -141,4 +139,4 @@ instance FromJSON Filter where
       "declarations" -> do
         declarations <- o.: "params"
         pure (declarationTypeFilter (Set.fromList declarations))
-      _ -> mzero
+      s -> fail ("Unknown filter: " <> show s)

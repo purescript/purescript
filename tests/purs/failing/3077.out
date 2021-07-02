@@ -1,6 +1,6 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/failing/3077.purs:11:24 - 11:30 (line 11, column 24 - line 11, column 30)
+at tests/purs/failing/3077.purs:11:14 - 11:38 (line 11, column 14 - line 11, column 38)
 
   Could not match kind
   [33m      [0m

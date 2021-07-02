@@ -1,6 +1,6 @@
 Error found:
 in module [33mTypeSynonyms4[0m
-at tests/purs/failing/TypeSynonyms4.purs:8:1 - 8:15 (line 8, column 1 - line 8, column 15)
+at tests/purs/failing/TypeSynonyms4.purs:8:12 - 8:15 (line 8, column 12 - line 8, column 15)
 
   Type synonym [33mTypeSynonyms4.F[0m is partially applied.
   Type synonyms must be applied to all of their type arguments.

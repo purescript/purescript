@@ -2,6 +2,7 @@ module Language.PureScript.Make
   (
   -- * Make API
   rebuildModule
+  , rebuildModule'
   , make
   , inferForeignModules
   , module Monad
@@ -21,7 +22,7 @@ import           Control.Monad.Writer.Class (MonadWriter(..), censor)
 import           Control.Monad.Writer.Strict (runWriterT)
 import           Data.Function (on)
 import           Data.Foldable (fold, for_)
-import           Data.List (foldl', sortBy)
+import           Data.List (foldl', sortOn)
 import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (fromMaybe)
 import qualified Data.Map as M
@@ -79,9 +80,10 @@ rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
 
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     (desugared, (exEnv', usedImports)) <- runStateT (desugar externs withPrim) (exEnv, mempty)
-    (checked, CheckState{..}) <- runStateT (typeCheckModule desugared) $ emptyCheckState env
+    let modulesExports = (\(_, _, exports) -> exports) <$> exEnv'
+    (checked, CheckState{..}) <- runStateT (typeCheckModule modulesExports desugared) $ emptyCheckState env
     let usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
-          M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkCoercedNewtypeCtorsImports
+          M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkConstructorImportsForCoercible
     -- Imports cannot be linted before type checking because we need to
     -- known which newtype constructors are used to solve Coercible
     -- constraints in order to not report them as unused.
@@ -98,8 +100,8 @@ rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
       optimized = CF.optimizeCoreFn corefn
-      [renamed] = renameInModules [optimized]
-      exts = moduleToExternsFile mod' env'
+      (renamedIdents, renamed) = renameInModule optimized
+      exts = moduleToExternsFile mod' env' renamedIdents
   ffiCodegen renamed
 
   -- It may seem more obvious to write `docs <- Docs.convertModule m env' here,
@@ -130,7 +132,7 @@ make ma@MakeActions{..} ms = do
   checkModuleNames
   cacheDb <- readCacheDb
 
-  (sorted, graph) <- sortModules (moduleSignature . CST.resPartial) ms
+  (sorted, graph) <- sortModules Transitive (moduleSignature . CST.resPartial) ms
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
@@ -198,7 +200,7 @@ make ma@MakeActions{..} ms = do
   -- Find all groups of duplicate values in a list based on a projection.
   findDuplicates :: Ord b => (a -> b) -> [a] -> Maybe [NEL.NonEmpty a]
   findDuplicates f xs =
-    case filter ((> 1) . length) . NEL.groupBy ((==) `on` f) . sortBy (compare `on` f) $ xs of
+    case filter ((> 1) . length) . NEL.groupBy ((==) `on` f) . sortOn f $ xs of
       [] -> Nothing
       xss -> Just xss
 

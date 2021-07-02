@@ -1,0 +1,26 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/4024.purs:10:8 - 10:13 (line 10, column 8 - line 10, column 13)
+
+  No type class instance was found for
+  [33m                 [0m
+  [33m  Main.Foo String[0m
+  [33m           t2    [0m
+  [33m           t3    [0m
+  [33m                 [0m
+
+while applying a function [33mbar[0m
+  of type [33mFoo @Type @t0 @t1 String t2 t3 => Int -> String[0m
+  to argument [33m0[0m
+while checking that expression [33mbar 0[0m
+  has type [33mString[0m
+in value declaration [33mtest[0m
+
+where [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
+      [33mt2[0m is an unknown type
+      [33mt3[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

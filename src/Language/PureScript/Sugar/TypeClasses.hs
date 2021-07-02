@@ -17,10 +17,11 @@ import           Control.Monad.Supply.Class
 import           Data.Graph
 import           Data.List (find, partition)
 import qualified Data.Map as M
-import           Data.Maybe (catMaybes, mapMaybe, isJust, fromMaybe)
+import           Data.Maybe (catMaybes, mapMaybe, isJust)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
 import           Data.Text (Text)
+import           Data.Traversable (for)
 import qualified Language.PureScript.Constants.Prim as C
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment
@@ -30,8 +31,9 @@ import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
 import           Language.PureScript.PSString (mkString)
 import           Language.PureScript.Sugar.CaseDeclarations
-import           Language.PureScript.Types
+import           Language.PureScript.TypeChecker.Synonyms (SynonymMap, KindMap, replaceAllTypeSynonymsM)
 import           Language.PureScript.TypeClassDictionaries (superclassName)
+import           Language.PureScript.Types
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
 
@@ -44,9 +46,11 @@ type Desugar = StateT MemberMap
 desugarTypeClasses
   :: (MonadSupply m, MonadError MultipleErrors m)
   => [ExternsFile]
+  -> SynonymMap
+  -> KindMap
   -> Module
   -> m Module
-desugarTypeClasses externs = flip evalStateT initialState . desugarModule
+desugarTypeClasses externs syns kinds = flip evalStateT initialState . desugarModule syns kinds
   where
   initialState :: MemberMap
   initialState =
@@ -70,13 +74,15 @@ desugarTypeClasses externs = flip evalStateT initialState . desugarModule
 
 desugarModule
   :: (MonadSupply m, MonadError MultipleErrors m)
-  => Module
+  => SynonymMap
+  -> KindMap
+  -> Module
   -> Desugar m Module
-desugarModule (Module ss coms name decls (Just exps)) = do
+desugarModule syns kinds (Module ss coms name decls (Just exps)) = do
   let (classDecls, restDecls) = partition isTypeClassDecl decls
       classVerts = fmap (\d -> (d, classDeclName d, superClassesNames d)) classDecls
   (classNewExpss, classDeclss) <- unzip <$> parU (stronglyConnComp classVerts) (desugarClassDecl name exps)
-  (restNewExpss, restDeclss) <- unzip <$> parU restDecls (desugarDecl name exps)
+  (restNewExpss, restDeclss) <- unzip <$> parU restDecls (desugarDecl syns kinds name exps)
   return $ Module ss coms name (concat restDeclss ++ concat classDeclss) $ Just (exps ++ catMaybes restNewExpss ++ catMaybes classNewExpss)
   where
   desugarClassDecl :: (MonadSupply m, MonadError MultipleErrors m)
@@ -84,7 +90,7 @@ desugarModule (Module ss coms name decls (Just exps)) = do
     -> [DeclarationRef]
     -> SCC Declaration
     -> Desugar m (Maybe DeclarationRef, [Declaration])
-  desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl name' exps' d
+  desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl syns kinds name' exps' d
   desugarClassDecl _ _ (CyclicSCC ds') = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeClassDeclaration (map classDeclName ds')
 
   superClassesNames :: Declaration -> [Qualified (ProperName 'ClassName)]
@@ -98,7 +104,7 @@ desugarModule (Module ss coms name decls (Just exps)) = do
   classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (Just name) pn
   classDeclName _ = internalError "Expected TypeClassDeclaration"
 
-desugarModule _ = internalError "Exports should have been elaborated in name desugaring"
+desugarModule _ _ _ = internalError "Exports should have been elaborated in name desugaring"
 
 {- Desugar type class and type class instance declarations
 --
@@ -196,32 +202,44 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 -}
 desugarDecl
   :: (MonadSupply m, MonadError MultipleErrors m)
-  => ModuleName
+  => SynonymMap
+  -> KindMap
+  -> ModuleName
   -> [DeclarationRef]
   -> Declaration
   -> Desugar m (Maybe DeclarationRef, [Declaration])
-desugarDecl mn exps = go
+desugarDecl syns kinds mn exps = go
   where
   go d@(TypeClassDeclaration sa name args implies deps members) = do
     modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration _ _ _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
-  go d@(TypeInstanceDeclaration sa _ _ name deps className tys (ExplicitInstance members))
+  go (TypeInstanceDeclaration sa chainId idx name deps className tys (ExplicitInstance members))
     | className == C.Coercible
     = throwError . errorMessage' (fst sa) $ InvalidCoercibleInstanceDeclaration tys
     | otherwise = do
     desugared <- desugarCases members
-    dictDecl <- typeInstanceDictionaryDeclaration sa name mn deps className tys desugared
-    return (expRef name className tys, [d, dictDecl])
-  go d@(TypeInstanceDeclaration sa _ _ name deps className tys (NewtypeInstanceWithDictionary dict)) = do
+    name' <- desugarInstName name
+    dictDecl <- typeInstanceDictionaryDeclaration syns kinds sa name' mn deps className tys desugared
+    let d = TypeInstanceDeclaration sa chainId idx (Right name') deps className tys (ExplicitInstance members)
+    return (expRef name' className tys, [d, dictDecl])
+  go (TypeInstanceDeclaration sa chainId idx name deps className tys (NewtypeInstanceWithDictionary dict)) = do
+    name' <- desugarInstName name
     let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) className)) tys
-        constrainedTy = quantify (foldr (srcConstrainedType) dictTy deps)
-    return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
+        constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
+        d = TypeInstanceDeclaration sa chainId idx (Right name') deps className tys (NewtypeInstanceWithDictionary dict)
+    return (expRef name' className tys, [d, ValueDecl sa name' Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
+
+  -- |
+  -- Completes the name generation for type class instances that do not have
+  -- a unique name defined in source code.
+  desugarInstName :: MonadSupply m => Either Text Ident -> Desugar m Ident
+  desugarInstName = either freshIdent pure
 
   expRef :: Ident -> Qualified (ProperName 'ClassName) -> [SourceType] -> Maybe DeclarationRef
   expRef name className tys
-    | isExportedClass className && all isExportedType (getConstructors `concatMap` tys) = Just $ TypeInstanceRef genSpan name
+    | isExportedClass className && all isExportedType (getConstructors `concatMap` tys) = Just $ TypeInstanceRef genSpan name UserNamed
     | otherwise = Nothing
 
   isExportedClass :: Qualified (ProperName 'ClassName) -> Bool
@@ -279,7 +297,7 @@ typeClassMemberToDictionaryAccessor
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa ident ty)) =
   let className = Qualified (Just mn) name
-  in ValueDecl sa ident Private [] $
+  in ValueDecl sa ident Private []
     [MkUnguarded (
      TypedValue False (TypeClassDictionaryAccessor className ident) $
        moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty))
@@ -292,7 +310,9 @@ unit = srcTypeApp tyRecord srcREmpty
 typeInstanceDictionaryDeclaration
   :: forall m
    . (MonadSupply m, MonadError MultipleErrors m)
-  => SourceAnn
+  => SynonymMap
+  -> KindMap
+  -> SourceAnn
   -> Ident
   -> ModuleName
   -> [SourceConstraint]
@@ -300,7 +320,7 @@ typeInstanceDictionaryDeclaration
   -> [SourceType]
   -> [Declaration]
   -> Desugar m Declaration
-typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
+typeInstanceDictionaryDeclaration syns kinds sa@(ss, _) name mn deps className tys decls =
   rethrow (addHint (ErrorInInstance className tys)) $ do
   m <- get
 
@@ -323,11 +343,12 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
       -- Create the type of the dictionary
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
-      let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
-            [ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
-            | (Constraint _ superclass _ suTyArgs _) <- typeClassSuperclasses
-            , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
-            ]
+      tys' <- traverse (replaceAllTypeSynonymsM syns kinds) tys
+      superclassesDicts <- for typeClassSuperclasses $ \(Constraint _ superclass _ suTyArgs _) -> do
+        suTyArgs' <- traverse (replaceAllTypeSynonymsM syns kinds) suTyArgs
+        let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys')) suTyArgs'
+        pure $ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
+      let superclasses = superClassDictionaryNames typeClassSuperclasses `zip` superclassesDicts
 
       let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
           dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) className)) tys
@@ -350,7 +371,7 @@ declIdent (TypeDeclaration td) = Just (tydeclIdent td)
 declIdent _ = Nothing
 
 typeClassMemberName :: Declaration -> Text
-typeClassMemberName = fromMaybe (internalError "typeClassMemberName: Invalid declaration in type class definition") . fmap runIdent . declIdent
+typeClassMemberName = maybe (internalError "typeClassMemberName: Invalid declaration in type class definition") runIdent . declIdent
 
 superClassDictionaryNames :: [Constraint a] -> [Text]
 superClassDictionaryNames supers =

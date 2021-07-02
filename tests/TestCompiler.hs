@@ -1,8 +1,4 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DoAndIfThenElse #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module TestCompiler where
 
@@ -21,9 +17,10 @@ module TestCompiler where
 --   -- @shouldFailWith TypesDoNotUnify
 --   -- @shouldFailWith TransitiveExportError
 --
--- Failing tests also check their output against the relative golden files (`.out`).
--- The golden files are generated automatically when missing, and can be updated
--- by passing `--accept` to `--test-arguments.`
+-- Warning and failing tests also check their output against the relative
+-- golden files (`.out`). The golden files are generated automatically when
+-- missing, and can be updated by setting the "HSPEC_ACCEPT" environment
+-- variable, e.g. by running `HSPEC_ACCEPT=true stack test`.
 
 import Prelude ()
 import Prelude.Compat
@@ -32,14 +29,11 @@ import qualified Language.PureScript as P
 
 import Control.Arrow ((>>>))
 import Data.Function (on)
-import Data.List (sort, stripPrefix, intercalate, minimumBy)
+import Data.List (sort, stripPrefix, minimumBy)
 import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
-import qualified Data.Map as M
-
-import qualified Data.ByteString.Lazy as BS
 
 import Control.Monad
 
@@ -53,96 +47,68 @@ import Text.Regex.Base
 import Text.Regex.TDFA (Regex)
 
 import TestUtils
-import Test.Tasty
-import Test.Tasty.Hspec
-import Test.Tasty (testGroup)
-import Test.Tasty.Golden (goldenVsString)
+import Test.Hspec
 
-main :: IO TestTree
-main = do
-  (supportModules, supportExterns, supportForeigns) <- setupSupportModules
-  passing <- passingTests supportModules supportExterns supportForeigns
-  warning <- warningTests supportModules supportExterns supportForeigns
-  failing <- failingTests supportModules supportExterns supportForeigns
-  return . testGroup "compiler" $ [passing, warning, failing]
+spec :: SpecWith SupportModules
+spec = do
+  passingTests
+  warningTests
+  failingTests
 
-passingTests
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> IO TestTree
-passingTests supportModules supportExterns supportForeigns = do
-  passingTestCases <- getTestFiles "passing"
+passingTests :: SpecWith SupportModules
+passingTests = do
+  passingTestCases <- runIO $ getTestFiles "passing"
 
-  outputFile <- createOutputFile logfile
+  describe "Passing examples" $
+    beforeAllWith ((<$> createOutputFile logfile) . (,)) $
+      forM_ passingTestCases $ \testPurs ->
+        it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $ \(support, outputFile) ->
+          assertCompiles support testPurs outputFile
 
-  testSpec "Passing examples" $
-    forM_ passingTestCases $ \testPurs ->
-      it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $
-        assertCompiles supportModules supportExterns supportForeigns testPurs outputFile
+warningTests :: SpecWith SupportModules
+warningTests = do
+  warningTestCases <- runIO $ getTestFiles "warning"
 
-warningTests
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> IO TestTree
-warningTests supportModules supportExterns supportForeigns = do
-  warningTestCases <- getTestFiles "warning"
-  tests <- forM warningTestCases $ \testPurs -> do
-    let mainPath = getTestMain testPurs
-    expectedWarnings <- getShouldWarnWith mainPath
-    wTc <- testSpecs $
-      it ("'" <> takeFileName mainPath <> "' should compile with warning(s) '" <> intercalate "', '" expectedWarnings <> "'") $
-        assertCompilesWithWarnings supportModules supportExterns supportForeigns testPurs expectedWarnings
-    return $ wTc ++ [ goldenVsString
-                      ("'" <> takeFileName mainPath <> "' golden test")
-                      (replaceExtension mainPath ".out")
-                      (BS.fromStrict . T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
-                    ]
-  return $ testGroup "Warning examples" $ concat tests
+  describe "Warning examples" $
+    forM_ warningTestCases $ \testPurs -> do
+      let mainPath = getTestMain testPurs
+      it ("'" <> takeFileName mainPath <> "' should compile with expected warning(s)") $ \support -> do
+        expectedWarnings <- getShouldWarnWith mainPath
+        assertCompilesWithWarnings support testPurs expectedWarnings
 
-failingTests
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> IO TestTree
-failingTests supportModules supportExterns supportForeigns = do
-  failingTestCases <- getTestFiles "failing"
-  tests <- forM failingTestCases $ \testPurs -> do
-    let mainPath = getTestMain testPurs
-    expectedFailures <- getShouldFailWith mainPath
-    fTc <- testSpecs $
-      it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $
-        assertDoesNotCompile supportModules supportExterns supportForeigns testPurs expectedFailures
-    return $ fTc ++ [ goldenVsString
-                    ("'" <> takeFileName mainPath <> "' golden test")
-                    (replaceExtension mainPath ".out")
-                    (BS.fromStrict . T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
-                  ]
-  return $ testGroup "Failing examples" $ concat tests
+failingTests :: SpecWith SupportModules
+failingTests = do
+  failingTestCases <- runIO $ getTestFiles "failing"
 
-checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Maybe String
+  describe "Failing examples" $ do
+    forM_ failingTestCases $ \testPurs -> do
+      let mainPath = getTestMain testPurs
+      it ("'" <> takeFileName mainPath <> "' should fail to compile") $ \support -> do
+        expectedFailures <- getShouldFailWith mainPath
+        assertDoesNotCompile support testPurs expectedFailures
+
+checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Expectation
 checkShouldReport expected prettyPrintDiagnostics errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
   in if sort expected == sort (map T.unpack actual)
     then checkPositioned errs
-    else Just $ "Expected these diagnostics: " ++ show expected ++ ", but got these: "
+    else expectationFailure $ "Expected these diagnostics: " ++ show expected ++ ", but got these: "
       ++ show actual ++ ", full diagnostic messages: \n"
       ++ prettyPrintDiagnostics errs
 
-checkPositioned :: P.MultipleErrors -> Maybe String
+checkPositioned :: P.MultipleErrors -> Expectation
 checkPositioned errs =
   case mapMaybe guardSpans (P.runMultipleErrors errs) of
     [] ->
-      Nothing
+      pure ()
     errs' ->
-      Just
+      expectationFailure
         $ "Found diagnostics with missing source spans:\n"
         ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) errs')
   where
   guardSpans :: P.ErrorMessage -> Maybe P.ErrorMessage
   guardSpans err = case P.errorSpan err of
-    Just ss | any (not . isNonsenseSpan) ss -> Nothing
+    Just ss | not $ all isNonsenseSpan ss -> Nothing
     _ -> Just err
 
   isNonsenseSpan :: P.SourceSpan -> Bool
@@ -153,85 +119,75 @@ checkPositioned errs =
   emptyPos = P.SourcePos 0 0
 
 assertCompiles
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  :: SupportModules
   -> [FilePath]
   -> Handle
   -> Expectation
-assertCompiles supportModules supportExterns supportForeigns inputFiles outputFile =
-  assert supportModules supportExterns supportForeigns inputFiles checkMain $ \e ->
-    case e of
-      Left errs -> return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
-      Right _ -> do
-        process <- findNodeProcess
-        let entryPoint = modulesDir </> "index.js"
-        writeFile entryPoint "require('Main').main()"
-        result <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
-        hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) <> ":"
-        case result of
-          Just (ExitSuccess, out, err)
-            | not (null err) -> return $ Just $ "Test wrote to stderr:\n\n" <> err
-            | not (null out) && trim (last (lines out)) == "Done" -> do
-                hPutStr outputFile out
-                return Nothing
-            | otherwise -> return $ Just $ "Test did not finish with 'Done':\n\n" <> out
-          Just (ExitFailure _, _, err) -> return $ Just err
-          Nothing -> return $ Just "Couldn't find node.js executable"
+assertCompiles support inputFiles outputFile = do
+  (result, _) <- compile support inputFiles
+  case result of
+    Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+    Right _ -> do
+      process <- findNodeProcess
+      let entryPoint = modulesDir </> "index.js"
+      writeFile entryPoint "require('Main').main()"
+      nodeResult <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
+      hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) <> ":"
+      case nodeResult of
+        Just (ExitSuccess, out, err)
+          | not (null err) -> expectationFailure $ "Test wrote to stderr:\n\n" <> err
+          | not (null out) && trim (last (lines out)) == "Done" -> hPutStr outputFile out
+          | otherwise -> expectationFailure $ "Test did not finish with 'Done':\n\n" <> out
+        Just (ExitFailure _, _, err) -> expectationFailure err
+        Nothing -> expectationFailure "Couldn't find node.js executable"
 
 assertCompilesWithWarnings
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  :: SupportModules
   -> [FilePath]
   -> [String]
   -> Expectation
-assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFiles shouldWarnWith =
-  assert supportModules supportExterns supportForeigns inputFiles checkMain $ \e ->
-    case e of
-      Left errs ->
-        return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
-      Right warnings ->
-        return $ checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings P.defaultPPEOptions) warnings
+assertCompilesWithWarnings support inputFiles shouldWarnWith = do
+  result'@(result, warnings) <- compile support inputFiles
+  case result of
+    Left errs ->
+      expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+    Right _ -> do
+      checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings P.defaultPPEOptions) warnings
+      goldenVsString
+        (replaceExtension (getTestMain inputFiles) ".out")
+        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest result')
 
 assertDoesNotCompile
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  :: SupportModules
   -> [FilePath]
   -> [String]
   -> Expectation
-assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles shouldFailWith =
-  assert supportModules supportExterns supportForeigns inputFiles noPreCheck $ \e ->
-    case e of
-      Left errs ->
-        return $ if null shouldFailWith
-          then Just $ "shouldFailWith declaration is missing (errors were: "
-                      ++ show (map P.errorCode (P.runMultipleErrors errs))
-                      ++ ")"
-          else checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors P.defaultPPEOptions) errs
-      Right _ ->
-        return $ Just "Should not have compiled"
+assertDoesNotCompile support inputFiles shouldFailWith = do
+  result <- compile support inputFiles
+  case fst result of
+    Left errs -> do
+      when (null shouldFailWith)
+        (expectationFailure $
+          "shouldFailWith declaration is missing (errors were: "
+          ++ show (map P.errorCode (P.runMultipleErrors errs))
+          ++ ")")
+      checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors P.defaultPPEOptions) errs
+      goldenVsString
+        (replaceExtension (getTestMain inputFiles) ".out")
+        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest result)
+    Right _ ->
+      expectationFailure "Should not have compiled"
 
-  where
-  noPreCheck = const (return ())
-
-printErrorOrWarning
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> [FilePath]
-  -> IO String
-printErrorOrWarning supportModules supportExterns supportForeigns inputFiles = do
-  -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
-  (res, warnings) <- compile supportModules supportExterns supportForeigns (sort inputFiles) noPreCheck
-  return . normalizePaths $ case res of
+-- Prints a set of diagnostics (i.e. errors or warnings) as a string, in order
+-- to compare it to the contents of a golden test file.
+printDiagnosticsForGoldenTest :: (Either P.MultipleErrors a, P.MultipleErrors) -> String
+printDiagnosticsForGoldenTest (result, warnings) =
+  normalizePaths $ case result of
     Left errs ->
+      -- TODO: should probably include warnings when failing?
       P.prettyPrintMultipleErrors P.defaultPPEOptions errs
     Right _ ->
       P.prettyPrintMultipleWarnings P.defaultPPEOptions warnings
-  where
-    noPreCheck = const (return ())
 
 -- Replaces Windows-style paths in an error or warning with POSIX paths
 normalizePaths :: String -> String

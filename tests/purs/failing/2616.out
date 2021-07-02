@@ -7,8 +7,11 @@ at tests/purs/failing/2616.purs:9:1 - 9:38 (line 9, column 1 - line 9, column 38
   [33m  Prim.RowList.RowToList r1[0m
   [33m                         t2[0m
   [33m                           [0m
-  The instance head contains unknown type variables. Consider adding a type annotation.
 
+while solving type class constraint
+[33m                          [0m
+[33m  Data.Ord.Ord (Record r1)[0m
+[33m                          [0m
 while applying a function [33mcompare[0m
   of type [33mOrd t0 => t0 -> t0 -> Ordering[0m
   to argument [33m$l6[0m

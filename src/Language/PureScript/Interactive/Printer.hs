@@ -103,7 +103,7 @@ printModuleSignatures moduleName P.Environment{..} =
                     textT ("type " <> P.runProperName name <> foldMap ((" " <>) . fst) typevars)
                     Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox maxBound dtType)
 
-            (Just (_, P.DataType typevars pt), _) ->
+            (Just (_, P.DataType _ typevars pt), _) ->
               let prefix =
                     case pt of
                       [(dtProperName,_)] ->
@@ -122,7 +122,7 @@ printModuleSignatures moduleName P.Environment{..} =
                     Box.moveRight 2 $
                     Box.vcat Box.left $
                     mapFirstRest (Box.text "=" Box.<+>) (Box.text "|" Box.<+>) $
-                    map (\(cons,idents) -> (textT (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents))) pt
+                    map (\(cons,idents) -> textT (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents)) pt
 
                 prettyPrintType t = Box.text " " Box.<> P.typeAtomAsBox maxBound t
 

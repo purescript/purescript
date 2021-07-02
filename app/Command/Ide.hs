@@ -12,14 +12,8 @@
 -- The server accepting commands for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Command.Ide (command) where
 
@@ -189,7 +183,7 @@ startServer port env = Network.withSocketsDo $ do
         Left err -> $(logError) err
         Right (cmd, h) -> do
           case decodeT cmd of
-            Just cmd' -> do
+            Right cmd' -> do
               let message duration =
                     "Command "
                       <> commandName cmd'
@@ -210,10 +204,11 @@ startServer port env = Network.withSocketsDo $ do
                   Right r  -> Aeson.encode r
                   Left err -> Aeson.encode err
               liftIO (hFlush stdout)
-            Nothing -> do
-              $(logError) ("Parsing the command failed. Command: " <> cmd)
+            Left err -> do
+              let errMsg = "Parsing the command failed with:\n" <> err <> "\nCommand: " <> cmd
+              $(logError) errMsg
               liftIO $ do
-                catchGoneHandle (T.hPutStrLn h (encodeT (GeneralError "Error parsing Command.")))
+                catchGoneHandle (T.hPutStrLn h (encodeT (GeneralError errMsg)))
                 hFlush stdout
           liftIO $ catchGoneHandle (hClose h)
 
@@ -226,7 +221,7 @@ catchGoneHandle :: IO () -> IO ()
 catchGoneHandle =
   handle (\e -> case e of
     IOError { ioe_type = ResourceVanished } ->
-      putText ("[Error] psc-ide-server tried to interact with the handle, but the connection was already gone.")
+      putText "[Error] psc-ide-server tried to interact with the handle, but the connection was already gone."
     _ -> throwIO e)
 
 acceptCommand

@@ -1,3 +1,6 @@
+-- HLint is confused by the identifier `pattern` if PatternSynonyms is enabled.
+{-# LANGUAGE NoPatternSynonyms #-}
+
 -- | Functions for producing RenderedCode values from PureScript Type values.
 
 module Language.PureScript.Docs.RenderedCode.RenderType
@@ -30,7 +33,7 @@ typeLiterals :: Pattern () PrettyPrintType RenderedCode
 typeLiterals = mkPattern match
   where
   match (PPTypeWildcard name) =
-    Just $ maybe (syntax "_") (syntax . ("?" <>)) name
+    Just $ syntax $ maybe "_" ("?" <>) name
   match (PPTypeVar var) =
     Just (typeVar var)
   match (PPRecord labels tail_) =

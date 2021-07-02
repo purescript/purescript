@@ -59,7 +59,7 @@ collectDocs outputDir inputFiles depsFiles = do
           addReExports withPackage docsModules externs
 
   docsModules <- go modulePaths
-  pure ((filter (shouldKeep . modName . snd) docsModules), modulesDeps)
+  pure (filter (shouldKeep . modName . snd) docsModules, modulesDeps)
 
   where
   packageDiscriminators modulesDeps =
@@ -158,7 +158,7 @@ operateAndRetag ::
   [(tag, a)] ->
   m [(tag, b)]
 operateAndRetag keyA keyB operation input =
-  fmap (map retag) $ operation (map snd input)
+  map retag <$> operation (map snd input)
   where
   tags :: Map key tag
   tags = Map.fromList $ map (\(tag, a) -> (keyA a, tag)) input
@@ -226,4 +226,4 @@ getModulePackageInfo inputFiles depsFiles = do
     InPackage FilePath ->
     m (InPackage FilePath, Text)
   readFileAs fi =
-    liftIO . fmap ((fi,)) $ readUTF8FileT (ignorePackage fi)
+    liftIO . fmap (fi,) $ readUTF8FileT (ignorePackage fi)

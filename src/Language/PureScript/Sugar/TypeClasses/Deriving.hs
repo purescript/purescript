@@ -10,10 +10,9 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.Foldable (for_)
-import           Data.List (foldl', find, sortBy, unzip5)
+import           Data.List (foldl', find, sortOn, unzip5)
 import qualified Data.Map as M
-import           Data.Maybe (fromMaybe, mapMaybe)
-import           Data.Ord (comparing)
+import           Data.Maybe (fromMaybe)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import           Language.PureScript.AST
@@ -71,28 +70,13 @@ deriveInstances
   :: forall m
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => [ExternsFile]
+  -> SynonymMap
+  -> KindMap
   -> Module
   -> m Module
-deriveInstances externs (Module ss coms mn ds exts) =
-    Module ss coms mn <$> mapM (deriveInstance mn synonyms kinds instanceData ds) ds <*> pure exts
+deriveInstances externs syns kinds (Module ss coms mn ds exts) =
+    Module ss coms mn <$> mapM (deriveInstance mn syns kinds instanceData ds) ds <*> pure exts
   where
-    kinds :: KindMap
-    kinds = mempty
-
-    -- We need to collect type synonym information, since synonyms will not be
-    -- removed until later, during type checking.
-    synonyms :: SynonymMap
-    synonyms =
-        M.fromList $ (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
-                  ++ mapMaybe fromLocalDecl ds
-      where
-        fromExternsDecl mn' (EDTypeSynonym name args ty) = Just (Qualified (Just mn') name, (args, ty))
-        fromExternsDecl _ _ = Nothing
-
-        fromLocalDecl (TypeSynonymDeclaration _ name args ty) =
-          Just (Qualified (Just mn) name, (args, ty))
-        fromLocalDecl _ = Nothing
-
     instanceData :: NewtypeDerivedInstances
     instanceData =
         foldMap (\ExternsFile{..} -> foldMap (fromExternsDecl efModuleName) efDeclarations) externs <> foldMap fromLocalDecl ds
@@ -161,8 +145,8 @@ deriveInstance mn syns kinds _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm 
       [wrappedTy, unwrappedTy]
         | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor wrappedTy
         , mn == fromMaybe mn mn'
-        -> do (inst, actualUnwrappedTy) <- deriveNewtype ss mn syns kinds ds tyCon args unwrappedTy
-              return $ TypeInstanceDeclaration sa ch idx nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance inst)
+        -> do actualUnwrappedTy <- deriveNewtype ss syns kinds ds tyCon args unwrappedTy
+              return $ TypeInstanceDeclaration sa ch idx nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance [])
         | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys wrappedTy
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 2
   | className == DataGenericRep.Generic
@@ -212,7 +196,7 @@ deriveNewtypeInstance ss mn syns kinds ndis className ds tys tyConNm dargs = do
     tyCon <- findTypeDecl ss tyConNm ds
     go tyCon
   where
-    go (DataDeclaration _ Newtype _ tyArgNames [(DataConstructorDeclaration _ _ [(_, wrapped)])]) = do
+    go (DataDeclaration _ Newtype _ tyArgNames [DataConstructorDeclaration _ _ [(_, wrapped)]]) = do
       -- The newtype might not be applied to all type arguments.
       -- This is okay as long as the newtype wraps something which ends with
       -- sufficiently many type applications to variables.
@@ -226,7 +210,9 @@ deriveNewtypeInstance ss mn syns kinds ndis className ds tys tyConNm dargs = do
       case stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped' of
         Just wrapped'' -> do
           let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
-          return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
+          wrapped''' <- replaceAllTypeSynonymsM syns kinds $ replaceAllTypeVars subst wrapped''
+          tys' <- mapM (replaceAllTypeSynonymsM syns kinds) tys
+          return (DeferredDictionary className (init tys' ++ [wrapped''']))
         Nothing -> throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
     go _ = throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 
@@ -453,7 +439,7 @@ deriveEq ss mn syns kinds ds tyConNm = do
       | Just rec <- objectType ty
       , Just fields <- decomposeRec rec =
           conjAll
-          . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
+          . map (\(Label str, typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
           $ fields
       | isAppliedVar ty = preludeEq1 l r
       | otherwise = preludeEq l r
@@ -515,7 +501,7 @@ deriveOrd ss mn syns kinds ds tyConNm = do
     ordCompare1 = App . App (Var ss (Qualified (Just dataOrd) (Ident Prelude.compare1)))
 
     mkCtorClauses :: (DataConstructorDeclaration, Bool) -> m [CaseAlternative]
-    mkCtorClauses ((DataConstructorDeclaration _ ctorName tys), isLast) = do
+    mkCtorClauses (DataConstructorDeclaration _ ctorName tys, isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       tys' <- mapM (replaceAllTypeSynonymsM syns kinds . snd) tys
@@ -555,7 +541,7 @@ deriveOrd ss mn syns kinds ds tyConNm = do
       | Just rec <- objectType ty
       , Just fields <- decomposeRec rec =
           appendAll
-          . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
+          . map (\(Label str, typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
           $ fields
       | isAppliedVar ty = ordCompare1 l r
       | otherwise = ordCompare l r
@@ -571,39 +557,26 @@ deriveNewtype
   :: forall m
    . (MonadError MultipleErrors m, MonadSupply m)
   => SourceSpan
-  -> ModuleName
   -> SynonymMap
   -> KindMap
   -> [Declaration]
   -> ProperName 'TypeName
   -> [SourceType]
   -> SourceType
-  -> m ([Declaration], SourceType)
-deriveNewtype ss mn syns kinds ds tyConNm tyConArgs unwrappedTy = do
+  -> m SourceType
+deriveNewtype ss syns kinds ds tyConNm tyConArgs unwrappedTy = do
     checkIsWildcard ss tyConNm unwrappedTy
     go =<< findTypeDecl ss tyConNm ds
   where
-    go :: Declaration -> m ([Declaration], SourceType)
+    go :: Declaration -> m SourceType
     go (DataDeclaration (ss', _) Data name _ _) =
       throwError . errorMessage' ss' $ CannotDeriveNewtypeForData name
-    go (DataDeclaration (ss', _) Newtype name args dctors) = do
+    go (DataDeclaration _ Newtype name args dctors) = do
       checkNewtype name dctors
-      wrappedIdent <- freshIdent "n"
-      unwrappedIdent <- freshIdent "a"
-      let (DataConstructorDeclaration _ ctorName [(_, ty)]) = head dctors
+      let (DataConstructorDeclaration _ _ [(_, ty)]) = head dctors
       ty' <- replaceAllTypeSynonymsM syns kinds ty
-      let inst =
-            [ ValueDecl (ss', []) (Ident "wrap") Public [] $ unguarded $
-                Constructor ss' (Qualified (Just mn) ctorName)
-            , ValueDecl (ss', []) (Ident "unwrap") Public [] $ unguarded $
-                lamCase ss' wrappedIdent
-                  [ CaseAlternative
-                      [ConstructorBinder ss' (Qualified (Just mn) ctorName) [VarBinder ss' unwrappedIdent]]
-                      (unguarded (Var ss' (Qualified Nothing unwrappedIdent)))
-                  ]
-            ]
-          subst = zipWith ((,) . fst) args tyConArgs
-      return (inst, replaceAllTypeVars subst ty')
+      let subst = zipWith ((,) . fst) args tyConArgs
+      return $ replaceAllTypeVars subst ty'
     go _ = internalError "deriveNewtype go: expected DataDeclaration"
 
 findTypeDecl
@@ -642,13 +615,13 @@ objectType (TypeApp _ (TypeConstructor _ Prim.Record) rec) = Just rec
 objectType _ = Nothing
 
 decomposeRec :: SourceType -> Maybe [(Label, SourceType)]
-decomposeRec = fmap (sortBy (comparing fst)) . go
+decomposeRec = fmap (sortOn fst) . go
   where go (RCons _ str typ typs) = fmap ((str, typ) :) (go typs)
         go (REmptyKinded _ _) = Just []
         go _ = Nothing
 
 decomposeRec' :: SourceType -> [(Label, SourceType)]
-decomposeRec' = sortBy (comparing fst) . go
+decomposeRec' = sortOn fst . go
   where go (RCons _ str typ typs) = (str, typ) : go typs
         go _ = []
 
@@ -712,7 +685,7 @@ deriveFunctor ss mn syns kinds ds tyConNm = do
               buildRecord updates = do
                 arg <- freshIdent "o"
                 let argVar = mkVar ss arg
-                    mkAssignment ((Label l), x) = (l, App x (Accessor l argVar))
+                    mkAssignment (Label l, x) = (l, App x (Accessor l argVar))
                 return (lam ss arg (ObjectUpdate argVar (mkAssignment <$> updates)))
 
           -- quantifiers

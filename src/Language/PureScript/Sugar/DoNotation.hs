@@ -1,8 +1,6 @@
 -- | This module implements the desugaring pass which replaces do-notation statements with
 -- appropriate calls to bind.
 
-{-# LANGUAGE PatternGuards #-}
-
 module Language.PureScript.Sugar.DoNotation (desugarDoModule) where
 
 import           Prelude.Compat

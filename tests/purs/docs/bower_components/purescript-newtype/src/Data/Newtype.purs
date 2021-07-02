@@ -1,5 +1,6 @@
 module Data.Newtype where
 
-class Newtype t a | t -> a where
-  wrap :: a -> t
-  unwrap :: t -> a
+import Prim.Coerce (class Coercible)
+
+class Newtype :: Type -> Type -> Constraint
+class Coercible t a <= Newtype t a | t -> a

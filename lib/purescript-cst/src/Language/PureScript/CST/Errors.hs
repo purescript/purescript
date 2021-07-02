@@ -76,7 +76,7 @@ type ParserError = ParserErrorInfo ParserErrorType
 type ParserWarning = ParserErrorInfo ParserWarningType
 
 prettyPrintError :: ParserError -> String
-prettyPrintError pe@(ParserErrorInfo { errRange }) =
+prettyPrintError pe@ParserErrorInfo { errRange } =
   prettyPrintErrorMessage pe <> " at " <> errPos
   where
   errPos = case errRange of
@@ -84,7 +84,7 @@ prettyPrintError pe@(ParserErrorInfo { errRange }) =
       "line " <> show line <> ", column " <> show col
 
 prettyPrintErrorMessage :: ParserError -> String
-prettyPrintErrorMessage (ParserErrorInfo {..}) = case errType of
+prettyPrintErrorMessage ParserErrorInfo {..} = case errType of
   ErrWildcardInType ->
     "Unexpected wildcard in type; type wildcards are only allowed in value annotations"
   ErrConstraintInKind ->
@@ -182,7 +182,7 @@ prettyPrintErrorMessage (ParserErrorInfo {..}) = case errType of
     "U+" <> map toUpper (printf "%0.4x" (fromEnum x))
 
 prettyPrintWarningMessage :: ParserWarning -> String
-prettyPrintWarningMessage (ParserErrorInfo {..}) = case errType of
+prettyPrintWarningMessage ParserErrorInfo {..} = case errType of
   WarnDeprecatedRowSyntax ->
     "Unary '#' syntax for row kinds is deprecated and will be removed in a future release. Use the 'Row' kind instead."
   WarnDeprecatedForeignKindSyntax ->

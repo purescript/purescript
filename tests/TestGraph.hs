@@ -3,8 +3,7 @@ module TestGraph where
 import Prelude ()
 import Prelude.Compat
 
-import Test.Tasty
-import Test.Tasty.Hspec
+import Test.Hspec
 import System.IO.UTF8 (readUTF8FileT)
 import Data.Either (isLeft)
 
@@ -13,16 +12,12 @@ import qualified Data.Text.Encoding as Text
 import qualified Data.Aeson as Json
 import qualified Language.PureScript as P
 
-
-main :: IO TestTree
-main = testSpec "graph" spec
-
 spec :: Spec
 spec = do
   let baseDir = "tests/purs/graph/"
   let sourcesDir = baseDir <> "src/"
   it "should match the graph fixture" $ do
-    let modulePaths = (sourcesDir <>) <$> ["Module.purs", "Module2.purs"]
+    let modulePaths = (sourcesDir <>) <$> ["Module.purs", "Module2.purs", "Module3.purs"]
     let graphFixtureName = "graph.json"
 
     graphFixture <- readUTF8FileT (baseDir <> graphFixtureName)
