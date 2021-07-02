@@ -415,7 +415,7 @@ runAssertion assertion linksCtx Docs.Module{..} =
     TypeSynonymShouldRenderAs mn decl expected ->
       findDecl mn decl $ \Docs.Declaration{..} ->
         case declInfo of
-          Docs.TypeSynonymDeclaration [] ty ->
+          Docs.TypeSynonymDeclaration [] ty _ ->
             let actual = codeToString (Docs.renderType ty) in
             if actual == expected
                then Pass
