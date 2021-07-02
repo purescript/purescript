@@ -235,19 +235,12 @@ codeAsHtml r = outputWith elemAsHtml
         describeNominal = fold
           [ "The 'nominal' role means the type represented by this type "
           , "parameter CANNOT be safely coerced to another type when one "
-          , "coerces the overall type to another type. For example, given "
-          , "`data Foo a` where `a` has the nominal role, the type, "
-          , "`Foo Age`, cannot be safely coerced to the type, "
-          , "`Foo Int`."
+          , "coerces the overall type to another type."
           ]
         describePhantom = fold
           [ "The 'phantom' role means the type represented by this type "
           , "parameter CAN be safely coerced to any other type when one "
-          , "coerces the overall type to another type. For example, given "
-          , "`data Foo a` where `a` has the phantom role, the type, "
-          , "`Foo Age`, can be safely coerced to the type, "
-          , "`Foo Int`, or even a non-sensical type like, "
-          , "`Foo (Foo (Foo String))`."
+          , "coerces the overall type to another type."
           ]
 
   linkToDecl = linkToDeclaration r
