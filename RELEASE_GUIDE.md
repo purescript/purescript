@@ -99,6 +99,8 @@ considering what effects this may have:
 - Run `stack update-changelog.hs`, which will move the entries in `CHANGELOG.d`
   to a new section in `CHANGELOG.md` labeled with the new version.
 
+- Submit a PR with the above commits and get it merged.
+
 - Create a release from the releases tab in GitHub and copy in the release
   notes. This will also create a tag, which will kick off a CI build, which
   will upload prebuilt compiler binaries to the release on GitHub when it
