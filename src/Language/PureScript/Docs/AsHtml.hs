@@ -217,13 +217,13 @@ codeAsHtml r = outputWith elemAsHtml
           text name
     Role role ->
       case role of
-        "nominal" -> renderRole "decl__role_nominal" describeNominal 
-        "phantom" -> renderRole "decl__role_phantom" describePhantom
+        "nominal" -> renderRole describeNominal "decl__role_nominal"
+        "phantom" -> renderRole describePhantom "decl__role_phantom"
 
         -- representational is intentionally not rendered
         _ -> toHtml ("" :: Text)
       where
-        renderRole className hoverTextContent =
+        renderRole hoverTextContent className =
           H.a $ do
             H.abbr ! A.title hoverTextContent $ do
               H.sub ! A.class_ className $ do
