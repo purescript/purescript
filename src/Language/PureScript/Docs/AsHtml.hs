@@ -224,8 +224,8 @@ codeAsHtml r = outputWith elemAsHtml
         _ -> toHtml ("" :: Text)
       where
         renderRole hoverTextContent className =
-          H.a ! A.href (v docRepoRolePage) ! A.target (v "_blank") $ do
-            H.abbr ! A.title (v hoverTextContent) $ do
+          H.a ! A.href (v docRepoRolePage) ! A.target (v "_blank") ! A.class_ "decl__role" $ do
+            H.abbr ! A.class_ "decl__role_hover" ! A.title (v hoverTextContent) $ do
               H.sub ! A.class_ className $ do
                 toHtml ("" :: Text)
 

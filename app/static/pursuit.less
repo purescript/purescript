@@ -496,6 +496,24 @@ ol li {
   white-space: normal;
 }
 
+.decl__role {
+  font-family: "Roboto", sans-serif;
+  font-style: italic;
+  text-decoration-line: none;
+}
+
+/* See https://stackoverflow.com/a/32162038
+   Content licensed under CC BY-SA 3.0
+*/
+.decl__role_hover[title] {
+  /* Remove line that appears under abbr element */
+  border-bottom: none;
+  text-decoration: none;
+
+  /* Ensure cursor doesn't change to question mark */
+  cursor: inherit;
+}
+
 .decl__role_nominal::after {
   content: "nominal";
 }
