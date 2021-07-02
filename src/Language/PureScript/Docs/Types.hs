@@ -169,7 +169,7 @@ data DeclarationInfo
   -- |
   -- A type synonym, with its type arguments and its type.
   --
-  | TypeSynonymDeclaration [(Text, Maybe Type')] Type' [P.Role]
+  | TypeSynonymDeclaration [(Text, Maybe Type')] Type'
 
   -- |
   -- A type class, with its type arguments, its superclasses and functional
@@ -219,7 +219,7 @@ declInfoToString :: DeclarationInfo -> Text
 declInfoToString (ValueDeclaration _) = "value"
 declInfoToString (DataDeclaration _ _ _) = "data"
 declInfoToString (ExternDataDeclaration _) = "externData"
-declInfoToString (TypeSynonymDeclaration _ _ _) = "typeSynonym"
+declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _ _) = "typeClass"
 declInfoToString (AliasDeclaration _ _) = "alias"
 
@@ -639,7 +639,6 @@ asDeclarationInfo = do
     "typeSynonym" ->
       TypeSynonymDeclaration <$> key "arguments" asTypeArguments
                              <*> key "type" asType
-                             <*> keyOrDefault "roles" [] (eachInArray asRole)
     "typeClass" ->
       TypeClassDeclaration <$> key "arguments" asTypeArguments
                            <*> key "superclasses" (eachInArray asConstraint)
@@ -852,7 +851,7 @@ instance A.ToJSON DeclarationInfo where
       ValueDeclaration ty -> ["type" .= ty]
       DataDeclaration ty args roles -> ["dataDeclType" .= ty, "typeArguments" .= args, "roles" .= roles]
       ExternDataDeclaration kind -> ["kind" .= kind]
-      TypeSynonymDeclaration args ty roles -> ["arguments" .= args, "type" .= ty, "roles" .= roles]
+      TypeSynonymDeclaration args ty -> ["arguments" .= args, "type" .= ty]
       TypeClassDeclaration args super fundeps -> ["arguments" .= args, "superclasses" .= super, "fundeps" .= fundeps]
       AliasDeclaration fixity alias -> ["fixity" .= fixity, "alias" .= alias]
 

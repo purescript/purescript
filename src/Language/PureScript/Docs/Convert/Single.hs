@@ -121,12 +121,8 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
       insertRoles = case declInfo d of
         DataDeclaration dataDeclType args [] ->
           DataDeclaration dataDeclType args roles
-        TypeSynonymDeclaration args ty [] ->
-          TypeSynonymDeclaration args ty roles
         DataDeclaration _ _ _ ->
           P.internalError "augmentWith: could not add a second role to data declaration"
-        TypeSynonymDeclaration _ _ _ ->
-          P.internalError "augmentWith: could not add a second role to type synonym declaration"
         _ -> P.internalError "augmentWith: could not add role to declaration"
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
@@ -177,7 +173,7 @@ convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
 convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
   basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
 convertDeclaration (P.TypeSynonymDeclaration sa _ args ty) title =
-  basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()) [])
+  basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()))
 convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
   Just (Right (mkDeclaration sa title info) { declChildren = children })
   where

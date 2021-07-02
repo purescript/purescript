@@ -97,7 +97,7 @@ insertValueTypesAndAdjustKinds env m =
     DataDeclaration dataDeclType _ _ -> Just $ case dataDeclType of
       P.Data -> P.DataSig
       P.Newtype -> P.NewtypeSig
-    TypeSynonymDeclaration _ _ _ -> Just P.TypeSynonymSig
+    TypeSynonymDeclaration _ _ -> Just P.TypeSynonymSig
     TypeClassDeclaration _ _ _ -> Just P.ClassSig
     _ -> Nothing
 

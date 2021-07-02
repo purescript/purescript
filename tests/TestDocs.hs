@@ -436,7 +436,7 @@ runAssertion assertion linksCtx Docs.Module{..} =
     TypeSynonymShouldRenderAs mn decl expected ->
       findDecl mn decl $ \Docs.Declaration{..} ->
         case declInfo of
-          Docs.TypeSynonymDeclaration [] ty _ ->
+          Docs.TypeSynonymDeclaration [] ty ->
             let actual = codeToString (Docs.renderType ty) in
             if actual == expected
                then Pass
@@ -593,7 +593,6 @@ runAssertion assertion linksCtx Docs.Module{..} =
   getRoles :: Docs.DeclarationInfo -> Maybe [P.Role]
   getRoles = \case
     Docs.DataDeclaration _ _ roles -> Just roles
-    Docs.TypeSynonymDeclaration _ _ roles -> Just roles
     _ -> Nothing
 
   extract :: Docs.RenderedCode -> Docs.Namespace -> Text -> Maybe Docs.DocLink
@@ -858,9 +857,6 @@ testCases =
       [ ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_RNP" [P.Representational, P.Nominal, P.Phantom]
       , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_NPR" [P.Nominal, P.Phantom, P.Representational]
       , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_PRN" [P.Phantom, P.Representational, P.Nominal]
-      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "T_RNP" [P.Representational, P.Nominal, P.Phantom]
-      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "T_NPR" [P.Nominal, P.Phantom, P.Representational]
-      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "T_PRN" [P.Phantom, P.Representational, P.Nominal]
       ]
     )
   ]

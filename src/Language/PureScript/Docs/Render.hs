@@ -51,9 +51,9 @@ renderDeclaration Declaration{..} =
       , syntax "::"
       , renderType kind'
       ]
-    TypeSynonymDeclaration args ty roles ->
+    TypeSynonymDeclaration args ty ->
       [ keywordType
-      , renderTypeWithRole roles (typeApp declTitle args)
+      , renderType (typeApp declTitle args)
       , syntax "="
       , renderType ty
       ]
