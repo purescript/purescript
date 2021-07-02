@@ -42,7 +42,7 @@ import Text.PrettyPrint.Boxes hiding ((<+>))
 
 data PrettyPrintType
   = PPTUnknown Int
-  | PPTypeVar Text
+  | PPTypeVar Text (Maybe Text)
   | PPTypeLevelString PSString
   | PPTypeWildcard (Maybe Text)
   | PPTypeConstructor (Qualified (ProperName 'TypeName))
@@ -59,6 +59,7 @@ data PrettyPrintType
   | PPRecord [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
   | PPRow [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
   | PPTruncated
+  deriving (Show)
 
 type PrettyPrintConstraint = (Qualified (ProperName 'ClassName), [PrettyPrintType], [PrettyPrintType])
 
@@ -66,7 +67,7 @@ convertPrettyPrintType :: Int -> Type a -> PrettyPrintType
 convertPrettyPrintType = go
   where
   go _ (TUnknown _ n) = PPTUnknown n
-  go _ (TypeVar _ t) = PPTypeVar t
+  go _ (TypeVar _ t) = PPTypeVar t Nothing
   go _ (TypeLevelString _ s) = PPTypeLevelString s
   go _ (TypeWildcard _ n) = PPTypeWildcard n
   go _ (TypeConstructor _ c) = PPTypeConstructor c
@@ -185,7 +186,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
     typeLiterals :: Pattern () PrettyPrintType Box
     typeLiterals = mkPattern match where
       match (PPTypeWildcard name) = Just $ text $ maybe "_" (('?' :) . T.unpack) name
-      match (PPTypeVar var) = Just $ text $ T.unpack var
+      match (PPTypeVar var _) = Just $ text $ T.unpack var
       match (PPTypeLevelString s) = Just $ text $ T.unpack $ prettyPrintString s
       match (PPTypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
       match (PPTUnknown u)

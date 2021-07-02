@@ -43,7 +43,7 @@ renderDeclaration Declaration{..} =
       ]
     DataDeclaration dtype args roles ->
       [ keyword (P.showDataDeclType dtype)
-      , renderType (typeApp declTitle args)
+      , renderTypeWithRole roles (typeApp declTitle args)
       ]
     ExternDataDeclaration kind' ->
       [ keywordData
@@ -53,7 +53,7 @@ renderDeclaration Declaration{..} =
       ]
     TypeSynonymDeclaration args ty roles ->
       [ keywordType
-      , renderType (typeApp declTitle args)
+      , renderTypeWithRole roles (typeApp declTitle args)
       , syntax "="
       , renderType ty
       ]

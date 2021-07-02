@@ -5,6 +5,7 @@
 
 module Language.PureScript.Docs.RenderedCode.RenderType
   ( renderType
+  , renderTypeWithRole
   , renderType'
   , renderTypeAtom
   , renderTypeAtom'
@@ -23,6 +24,7 @@ import Language.PureScript.Crash
 import Language.PureScript.Label
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Types
+import Language.PureScript.Roles
 import Language.PureScript.Types
 import Language.PureScript.PSString (prettyPrintString)
 
@@ -34,8 +36,8 @@ typeLiterals = mkPattern match
   where
   match (PPTypeWildcard name) =
     Just $ syntax $ maybe "_" ("?" <>) name
-  match (PPTypeVar var) =
-    Just (typeVar var)
+  match (PPTypeVar var role) =
+    Just $ typeVar var <> roleAnn role
   match (PPRecord labels tail_) =
     Just $ mintersperse sp
               [ syntax "{"
@@ -155,6 +157,32 @@ forall_ = mkPattern match
 --
 renderType :: Type a -> RenderedCode
 renderType = renderType' . convertPrettyPrintType maxBound
+
+renderTypeWithRole :: [Role] -> Type a -> RenderedCode
+renderTypeWithRole roleList = renderType' . insertRoles . convertPrettyPrintType maxBound
+  where
+  insertRoles :: PrettyPrintType -> PrettyPrintType
+  insertRoles = snd . addRole roleList
+
+  -- `data Foo first second = Foo` will produce
+  -- ```
+  -- PPTypeApp
+  --  (PPTypeApp (PPTypeConstructor fooName) (PPTypeVar "first" Nothing))
+  --  (PPTypeVar "second" Nothing)
+  -- ```
+  -- So, we recurse down the left side of `TypeApp` first before
+  -- recursing down the right side.
+  addRole :: [Role] -> PrettyPrintType -> ([Role], PrettyPrintType)
+  addRole [] pp = ([], pp)
+  addRole roles@(x:xs) pp = case pp of
+    PPTypeApp f a ->
+      let
+        (remainingRoles1, f') = addRole roles f
+        (remainingRoles2, a') = addRole remainingRoles1 a
+      in (remainingRoles2, PPTypeApp f' a')
+    PPTypeVar t Nothing ->
+      (xs, PPTypeVar t (Just $ displayRole x))
+    other -> (roles, other)
 
 renderType' :: PrettyPrintType -> RenderedCode
 renderType'

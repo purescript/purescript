@@ -215,6 +215,19 @@ codeAsHtml r = outputWith elemAsHtml
             linkToDecl ns target mn (withClass class_ (text name))
         NoLink ->
           text name
+    Role role ->
+      case role of
+        "nominal" -> renderRole "decl__role_nominal" "content"
+        "phantom" -> renderRole "decl__role_phantom" "content"
+
+        -- representational is intentionally not rendered
+        _ -> toHtml ("" :: Text)
+      where
+        renderRole className hoverTextContent =
+          H.a $ do
+            H.abbr ! A.title hoverTextContent $ do
+              H.sub ! A.class_ className $ do
+                toHtml ("" :: Text)
 
   linkToDecl = linkToDeclaration r
 

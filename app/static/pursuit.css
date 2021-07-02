@@ -413,6 +413,12 @@ ol li {
   text-indent: -2.441em;
   white-space: normal;
 }
+.decl__role_nominal::after {
+  content: "nominal";
+}
+.decl__role_phantom::after {
+  content: "phantom";
+}
 .decl__kind {
   border-bottom: 1px solid #cccccc;
 }

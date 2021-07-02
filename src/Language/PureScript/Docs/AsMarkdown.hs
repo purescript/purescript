@@ -67,6 +67,9 @@ codeToString = outputWith elemAsMarkdown
   elemAsMarkdown Space          = " "
   elemAsMarkdown (Symbol _ x _) = x
 
+  -- roles aren't rendered in markdown
+  elemAsMarkdown (Role _) = ""
+
 -- fixityAsMarkdown :: P.Fixity -> Docs
 -- fixityAsMarkdown (P.Fixity associativity precedence) =
 --   tell' $ concat [ "_"
