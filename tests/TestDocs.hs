@@ -179,7 +179,7 @@ displayAssertion = \case
   ShouldMergeDocComments mn decl _ ->
     showQual mn decl <> " should merge its kind declaration and type declaration's doc-comments"
   ShouldHaveRoleAnnotation mn decl expected ->
-    showQual mn decl <> " should have the expected role annotations:\n" <>
+    showQual mn decl <> " should have the expected role annotations: " <>
     T.intercalate ", " (fmap P.displayRole expected)
 
 displayTagsAssertion :: TagsAssertion -> Text
