@@ -22,7 +22,7 @@ import Data.Char (isUpper)
 import Data.Either (isRight)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
-import Data.Foldable (for_)
+import Data.Foldable (for_, fold)
 import Data.String (fromString)
 
 import Data.Text (Text)
@@ -217,8 +217,8 @@ codeAsHtml r = outputWith elemAsHtml
           text name
     Role role ->
       case role of
-        "nominal" -> renderRole "decl__role_nominal" "content"
-        "phantom" -> renderRole "decl__role_phantom" "content"
+        "nominal" -> renderRole "decl__role_nominal" describeNominal 
+        "phantom" -> renderRole "decl__role_phantom" describePhantom
 
         -- representational is intentionally not rendered
         _ -> toHtml ("" :: Text)
@@ -228,6 +228,24 @@ codeAsHtml r = outputWith elemAsHtml
             H.abbr ! A.title hoverTextContent $ do
               H.sub ! A.class_ className $ do
                 toHtml ("" :: Text)
+
+        describeNominal = fold
+          [ "The 'nominal' role means the type represented by this type "
+          , "parameter CANNOT be safely coerced to another type when one "
+          , "coerces the overall type to another type. For example, given "
+          , "`data Foo a` where `a` has the nominal role, a value of type, "
+          , "`Foo Age`, cannot be safely coerced into a value of type, "
+          , "`Foo Int`."
+          ]
+        describePhantom = fold
+          [ "The 'phantom' role means the type represented by this type "
+          , "parameter CAN be safely coerced to any other type when one "
+          , "coerces the overall type to another type. For example, given "
+          , "`data Foo a` where `a` has the phantom role, a value of type, "
+          , "`Foo Age`, can be safely coerced into a value of type, "
+          , "`Foo Int`, or even a non-sensical type like, "
+          , "`Foo (Foo (Foo String))`."
+          ]
 
   linkToDecl = linkToDeclaration r
 
