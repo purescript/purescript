@@ -8,8 +8,8 @@ at tests/purs/failing/PolykindInstanceOverlapping.purs:12:1 - 13:19 (line 12, co
   [33m                      [0m
   The following instances were found:
 
-    Main.test1
-    Main.test2
+    [33mMain.test1[0m
+    [33mMain.test2[0m
 
 
 in type class instance

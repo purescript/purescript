@@ -42,7 +42,7 @@ directiveStrings =
 directiveStrings' :: [(String, Directive)]
 directiveStrings' = concatMap go directiveStrings
   where
-  go (dir, strs) = map (\s -> (s, dir)) strs
+  go (dir, strs) = map (, dir) strs
 
 -- |
 -- List of all directive strings.

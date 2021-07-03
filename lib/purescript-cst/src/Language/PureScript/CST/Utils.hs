@@ -2,7 +2,7 @@ module Language.PureScript.CST.Utils where
 
 import Prelude
 
-import Control.Monad (when)
+import Control.Monad (unless)
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
 import Data.Functor (($>))
@@ -115,12 +115,12 @@ unexpectedToks toRange toCst err old = do
 separated :: [(SourceToken, a)] -> Separated a
 separated = go []
   where
-  go accum ((_, a) : []) = Separated a accum
+  go accum [(_, a)] = Separated a accum
   go accum (x : xs) = go (x : accum) xs
   go _ [] = internalError "Separated should not be empty"
 
 consSeparated :: a -> SourceToken -> Separated a -> Separated a
-consSeparated x sep (Separated {..}) = Separated x ((sep, sepHead) : sepTail)
+consSeparated x sep Separated {..} = Separated x ((sep, sepHead) : sepTail)
 
 internalError :: String -> a
 internalError = error . ("Internal parser error: " <>)
@@ -128,14 +128,14 @@ internalError = error . ("Internal parser error: " <>)
 toModuleName :: SourceToken -> [Text] -> Parser (Maybe N.ModuleName)
 toModuleName _ [] = pure Nothing
 toModuleName tok ns = do
-  when (not (all isValidModuleNamespace ns)) $ addFailure [tok] ErrModuleName
+  unless (all isValidModuleNamespace ns) $ addFailure [tok] ErrModuleName
   pure . Just . N.ModuleName $ Text.intercalate "." ns
 
 upperToModuleName :: SourceToken -> Parser (Name N.ModuleName)
 upperToModuleName tok = case tokValue tok of
   TokUpperName q a -> do
     let ns = q <> [a]
-    when (not (all isValidModuleNamespace ns)) $ addFailure [tok] ErrModuleName
+    unless (all isValidModuleNamespace ns) $ addFailure [tok] ErrModuleName
     pure . Name tok . N.ModuleName $ Text.intercalate "." ns
   _ -> internalError $ "Invalid upper name: " <> show tok
 
@@ -232,7 +232,7 @@ toBinderConstructor = \case
   BinderConstructor a name [] NE.:| bs ->
     pure $ BinderConstructor a name bs
   a NE.:| [] -> pure a
-  a NE.:| _ -> unexpectedToks binderRange (unexpectedBinder) ErrExprInBinder a
+  a NE.:| _ -> unexpectedToks binderRange unexpectedBinder ErrExprInBinder a
 
 toRecordFields
   :: Monoid a

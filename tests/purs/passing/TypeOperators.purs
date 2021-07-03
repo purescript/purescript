@@ -20,4 +20,9 @@ testParens nat = nat
 swap ∷ ∀ a b. a /\ b → b /\ a
 swap (a /\ b) = b /\ a
 
+foreign import data NatData ∷ ∀ f g. (f ~> g) -> f Type -> g Type
+
+type NatKind ∷ ∀ f g. (f ~> g) -> f Type -> g Type
+type NatKind k a = k a
+
 main = log "Done"

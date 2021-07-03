@@ -143,7 +143,7 @@ literals = mkPattern' match'
   match _ = mzero
 
   comment :: (Emit gen) => Comment -> StateT PrinterState Maybe gen
-  comment (LineComment com) = fmap mconcat $ sequence $
+  comment (LineComment com) = mconcat <$> sequence
     [ currentIndent
     , return $ emit "//" <> emit com <> emit "\n"
     ]

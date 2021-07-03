@@ -10,7 +10,7 @@ module Language.PureScript.CoreFn.FromJSON
 import Prelude.Compat
 
 import           Data.Aeson
-import           Data.Aeson.Types (Parser, Value, listParser)
+import           Data.Aeson.Types (Parser, listParser)
 import qualified Data.Map.Strict as M
 import           Data.Text (Text)
 import qualified Data.Text as T

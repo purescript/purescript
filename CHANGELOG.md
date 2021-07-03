@@ -8,6 +8,119 @@ Breaking changes:
 
 New features:
 
+* Display kind signatures and their comments in documentation (#4100 and #4119 by JordanMartinez)
+
+  The compiler now displays kind signatures for data, newtype, type
+  synonym, and type class declarations in generated documentation. The
+  compiler now also includes documentation-comments (i.e. those which start
+  with a `|` character) both above and below the associated kind signature
+  declaration (if any) in generated documentation, whereas previously
+  documentation-comments above a kind signature declaration were ignored.
+
+  Both explicitly declared and inferred kinds are included in documentation.
+  The compiler omits including a kind signature in generated documentation
+  only when the kind is considered "uninteresting". An uninteresting kind is
+  defined as one where all of the declaration's type parameters have kind
+  `Type`.
+
+Bugfixes:
+
+* Ensure unnamed instances appear in documentation (#4109 by @JordanMartinez)
+
+* Allow fixity, kind, role declarations in REPL (#4046, @rhendric)
+
+* Pin OS versions used in CI (#4107, @f-f)
+
+* Fix UnusedName warnings for multiple non-recursive let bindings (#4114 by @nwolverson)
+
+* Remove generated names from errors about instances (#4118 by @rhendric)
+
+Internal:
+
+* Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
+
+* Update RELEASE_GUIDE.md with more details (#4104 by @JordanMartinez)
+
+* Use GenIdent for anonymous instances (#4096, @rhendric)
+
+* Desugar type class instance names in type class desugaring pass (#4099 by @JordanMartinez)
+
+## v0.14.2
+
+New features:
+
+* Make type class instance names optional (#4085, @JordanMartinez)
+
+  Previously, one would be required to define a unique name for a type class
+  instance. For example
+
+  ```purescript
+  -- instance naming convention:
+  -- classNameType1Type2Type3
+  instance fooIntString :: Foo Int String
+  ```
+
+  Now, the name and `::` separator characters are optional. The above instance
+  could be rewritten like so:
+
+  ```purescript
+  instance Foo Int String
+  ```
+
+  and the compiler will generate a unique name for the instance
+  (e.g. `$dollar_FooIntString_4` where `4` is a randomly-generated number
+  that can change across compiler runs). This version of the instance name
+  is not intended for use in FFI.
+
+  Note: if one wrote
+
+  ```purescript
+  instance ReallyLongClassName Int String
+  ```
+
+  the generated name would be something like
+  `$dollar_ReallyLongClassNameIntStr_87` rather than
+  `$dollar_ReallyLongClassNameIntString_87` as the generated part
+  of the name will be truncated to 25 characters (long enough to be readable
+  without being too verbose).
+
+Bugfixes:
+
+* Unused identifier warnings now report smaller and more relevant source spans (#4088, @nwolverson)
+
+  Also fix incorrect warnings in cases involving a let-pattern binding shadowing
+  an existing identifier.
+
+Internal:
+
+* Drop libtinfo dependency (#3696, @hdgarrood)
+
+  Changes the build configuration so that by default, compiler binaries will
+  not have a dynamic library dependency on libncurses/libtinfo. This should
+  alleviate one of the most common pains in getting the compiler successfully
+  installed, especially on Linux. The cost is a slight degradation in the REPL
+  experience when editing long lines, but this can be avoided by building the
+  compiler with the libtinfo dependency by setting the `terminfo` flag of the
+  `haskeline` library to `true`.
+
+* Migrate CI from Travis to GitHub Actions (#4077, @rhendric)
+
+* Remove tasty from test suite and just use hspec (#4056, @hdgarrood)
+
+* Avoid compiling tests with diagnostics twice in test suite (#4079, @hdgarrood)
+
+* Do less work in test initialization (#4080, @rhendric)
+
+* Follow more HLint suggestions (#4090, @rhendric)
+
+* Export `rebuildModule'` to speed up Try PureScript! slightly (#4095 by @JordanMartinez)
+
+* Merge `purescript-ast` into `purescript-cst` (#4094 by @JordanMartinez)
+
+## v0.14.1
+
+New features:
+
 * Support TCO for functions with tail-recursive inner functions (#3958, @rhendric)
 
   Adds support for optimizing functions that contain local functions which call
@@ -19,15 +132,55 @@ New features:
   optimized, but more critically, it also means that case guards which desugar
   to use local functions don't break TCO.
 
+* Add warnings for unused names and values (#3819, @nwolverson)
+
+  The compiler now emits warnings when it encounters unused names in binders
+  and unused value declarations. A declaration is considered to be unused if it
+  is not exported and is also not reachable by any of the exported
+  declarations. The compiler will not currently produce unused warnings about
+  other kinds of declarations such as data and type class declarations, but we
+  intend to produce warnings for these in the future as well.
+
 Bugfixes:
 
 * Make close punctuation printable in errors (#3982, @rhendric)
+* Desugar type operators in top-level kind signatures (#4027, @natefaubion)
+* Use type annotation hint only when needed (#4025, @rhendric)
+* Fix pretty printing of "hiding" imports (#4058, @natefaubion)
+
+* Instantiate polymorphic kinds when unwrapping newtypes while solving Coercible constraints (#4040, @kl0tl)
+
+* Fix row unification with shared unknown in tails (#4048, @rhendric)
+
+* Fix kinded declaration reordering in desugaring (#4047, @rhendric)
+
+* Fix wildly off kind unification positions (#4050, @natefaubion)
+
+* Fix incorrect incremental builds with different `--codegen` options (#3911, #3914, @hdgarrood)
+
+  This bug meant that after invoking the compiler with different `--codegen`
+  options, it was easy to end up with (for example) an outdated docs.json or
+  corefn.json file in your output directory which would be incorrectly
+  considered up-to-date by the compiler.
 
 Other improvements:
 
 * Add white outline stroke to logo in README (#4003, @ptrfrncsmrph)
 
   The previous `logo.png` was not legible against a dark background (#4001).
+
+* Show the constraints that were being solved when encountering a type error (@nwolverson, #4004)
+
+* Removed all shift/reduce conflicts in parser (#4063, @JordanMartinez).
+
+  Happy defaults to using "shift" rather than "reduce" in shift/reduce
+  conflicts. This change merely makes explicit what is already happening
+  implicitly.
+
+Internal:
+
+* Upgrade tests Bower dependencies (#4041, @kl0tl)
+* Remove unused Data.Foldable.foldr import (#4042, @kl0tl)
 
 ## v0.14.0
 

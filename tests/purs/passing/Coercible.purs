@@ -63,6 +63,11 @@ apId1ToApId1 = coerce
 apId1ToApId2 :: forall a. Ap Id1 a -> Ap Id2 a
 apId1ToApId2 = coerce
 
+newtype ApPolykind f = ApPolykind (f ())
+
+apPolykind :: forall f. ApPolykind f -> f ()
+apPolykind = coerce
+
 newtype Phantom1 a b = Phantom1 a
 
 phantom1TypeToPhantom1Symbol :: forall x (y :: Type) (z :: Symbol). Phantom1 x y -> Phantom1 x z

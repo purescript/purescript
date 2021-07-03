@@ -261,8 +261,7 @@ data ClassFundep
 
 data InstanceHead a = InstanceHead
   { instKeyword :: SourceToken
-  , instName :: Name Ident
-  , instSep :: SourceToken
+  , instNameSep :: Maybe (Name Ident, SourceToken)
   , instConstraints :: Maybe (OneOrDelimited (Constraint a), SourceToken)
   , instClass :: QualifiedName (N.ProperName 'N.ClassName)
   , instTypes :: [Type a]

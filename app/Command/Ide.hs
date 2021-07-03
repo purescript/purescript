@@ -12,14 +12,8 @@
 -- The server accepting commands for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Command.Ide (command) where
 
@@ -227,7 +221,7 @@ catchGoneHandle :: IO () -> IO ()
 catchGoneHandle =
   handle (\e -> case e of
     IOError { ioe_type = ResourceVanished } ->
-      putText ("[Error] psc-ide-server tried to interact with the handle, but the connection was already gone.")
+      putText "[Error] psc-ide-server tried to interact with the handle, but the connection was already gone."
     _ -> throwIO e)
 
 acceptCommand

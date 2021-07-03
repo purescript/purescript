@@ -11,7 +11,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Function (on)
 import Data.Foldable (traverse_)
-import Data.List (intersect, groupBy, sortBy)
+import Data.List (intersect, groupBy, sortOn)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 
@@ -217,7 +217,7 @@ resolveExports env ss mn imps exps refs =
   resolve f (Qualified (Just mn'') a) = do
     exps' <- envModuleExports <$> mn'' `M.lookup` env
     src <- a `M.lookup` f exps'
-    return $ (a, src { exportSourceImportedFrom = Just mn'' })
+    return (a, src { exportSourceImportedFrom = Just mn'' })
   resolve _ _ = internalError "Unqualified value in resolve"
 
 -- |
@@ -256,7 +256,7 @@ filterModule mn exps refs = do
     = fmap (\(ss', (tc, dcs)) -> TypeRef ss' tc dcs)
     . fmap (foldr1 $ \(ss, (tc, dcs1)) (_, (_, dcs2)) -> (ss, (tc, liftM2 (++) dcs1 dcs2)))
     . groupBy ((==) `on` (fst . snd))
-    . sortBy (compare `on` (fst . snd))
+    . sortOn (fst . snd)
     . mapMaybe (\ref -> (declRefSourceSpan ref,) <$> getTypeRef ref)
 
   filterTypes

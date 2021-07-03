@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-
 -- |
 -- This module implements the type checker
 --
@@ -159,7 +157,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         let constraintTypeVars = fold (conData >>= snd)
         let solved = solveFrom determinedFromType
         let unsolvedVars = S.difference constraintTypeVars solved
-        when (not (S.null unsolvedVars)) .
+        unless (S.null unsolvedVars) .
           throwError
             . onErrorMessages (replaceTypes currentSubst)
             . errorMessage' ss
@@ -174,7 +172,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     finalState <- get
     let replaceTypes' = replaceTypes (checkSubstitution finalState)
         runTypeSearch' gen = runTypeSearch (guard gen $> foldMap snd inferred) finalState
-        raisePreviousWarnings gen = (escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' gen . replaceTypes'))
+        raisePreviousWarnings gen = escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' gen . replaceTypes')
 
     raisePreviousWarnings False wInfer
     forM_ tys $ \(shouldGeneralize, ((_, (_, _)), w)) ->
@@ -466,7 +464,7 @@ inferLetBinding
   -> Expr
   -> (Expr -> m TypedValue')
   -> m ([Declaration], TypedValue')
-inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
+inferLetBinding seen [] ret j = (seen, ) <$> withBindingGroupVisible (j ret)
 inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (TypedValue checkType val ty)] : rest) ret j = do
   moduleName <- unsafeCheckCurrentModule
   TypedValue' _ val' ty'' <- warnAndRethrowWithPositionTC ss $ do
@@ -730,7 +728,7 @@ check' (DeferredDictionary className tys) ty = do
 check' (TypedValue checkType val ty1) ty2 = do
   (elabTy1, kind1) <- kindOf ty1
   (elabTy2, kind2) <- kindOf ty2
-  unifyKinds kind1 kind2
+  unifyKinds' kind1 kind2
   checkTypeKind ty1 kind1
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy2

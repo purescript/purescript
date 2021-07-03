@@ -1,0 +1,22 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/PolykindUnnamedInstanceOverlapping.purs:12:1 - 13:19 (line 12, column 1 - line 13, column 19)
+
+  Overlapping type class instances found for
+  [33m                      [0m
+  [33m  Main.ShowP (Proxy a)[0m
+  [33m                      [0m
+  The following instances were found:
+
+    instance in module [33mMain[0m with type [33mforall a. ShowP (Proxy a)[0m (line 9, column 1 - line 10, column 19)
+    instance in module [33mMain[0m with type [33mforall a. ShowP (Proxy a)[0m (line 12, column 1 - line 13, column 19)
+
+
+in type class instance
+[33m                             [0m
+[33m  Main.ShowP (Proxy (a :: k))[0m
+[33m                             [0m
+
+See https://github.com/purescript/documentation/blob/master/errors/OverlappingInstances.md for more information,
+or to contribute content related to this error.
+

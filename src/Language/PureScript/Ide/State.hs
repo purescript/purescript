@@ -13,9 +13,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE PackageImports #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Language.PureScript.Ide.State
@@ -252,8 +249,8 @@ resolveLocationsForModule
   :: (DefinitionSites P.SourceSpan, TypeAnnotations)
   -> [IdeDeclarationAnn]
   -> [IdeDeclarationAnn]
-resolveLocationsForModule (defs, types) decls =
-  map convertDeclaration decls
+resolveLocationsForModule (defs, types) =
+  map convertDeclaration
   where
     convertDeclaration :: IdeDeclarationAnn -> IdeDeclarationAnn
     convertDeclaration (IdeDeclarationAnn ann d) = convertDeclaration'
@@ -313,8 +310,8 @@ resolveDocumentationForModule
   :: P.Module
     -> [IdeDeclarationAnn]
     -> [IdeDeclarationAnn]
-resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) decls =
-  map convertDecl decls
+resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) =
+  map convertDecl
   where
   extractDeclComments :: P.Declaration -> [(P.Name, [P.Comment])]
   extractDeclComments = \case

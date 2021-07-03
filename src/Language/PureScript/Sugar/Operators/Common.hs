@@ -104,9 +104,9 @@ matchOperators isBinOp extractOp fromOp reapply modOpTable ops = parseChains
       opInfo :: M.Map (Qualified (OpName nameType)) (Integer, Associativity)
       opInfo = M.fromList $ concatMap (\(n, o) -> map (\(name, assoc) -> (name, (n, assoc))) o) (zip [0..] ops)
       opPrec :: Qualified (OpName nameType) -> Integer
-      opPrec = fromJust . fmap fst . flip M.lookup opInfo
+      opPrec = fst . fromJust . flip M.lookup opInfo
       opAssoc :: Qualified (OpName nameType) -> Associativity
-      opAssoc = fromJust . fmap snd . flip M.lookup opInfo
+      opAssoc = snd . fromJust . flip M.lookup opInfo
       chainOpSpans :: M.Map (Qualified (OpName nameType)) (NEL.NonEmpty SourceSpan)
       chainOpSpans = foldr (\(ss, name) -> M.alter (Just . maybe (pure ss) (NEL.cons ss)) name) M.empty . mapMaybe fromOp $ rights chain
       opUsages :: Qualified (OpName nameType) -> Int
@@ -118,7 +118,7 @@ matchOperators isBinOp extractOp fromOp reapply modOpTable ops = parseChains
       mixedAssoc :: [NEL.NonEmpty (Qualified (OpName nameType))]
       mixedAssoc = fmap join . filter (\precGroup -> NEL.length precGroup > 1) $ assocGrouped
       nonAssoc :: [NEL.NonEmpty (Qualified (OpName nameType))]
-      nonAssoc = join $ fmap (NEL.filter (\assocGroup -> opAssoc (NEL.head assocGroup) == Infix && sum (fmap opUsages assocGroup) > 1)) assocGrouped
+      nonAssoc = NEL.filter (\assocGroup -> opAssoc (NEL.head assocGroup) == Infix && sum (fmap opUsages assocGroup) > 1) =<< assocGrouped
     in
       if null (nonAssoc ++ mixedAssoc)
         then internalError "matchOperators: cannot reorder operators"
@@ -141,4 +141,4 @@ matchOperators isBinOp extractOp fromOp reapply modOpTable ops = parseChains
     -> ErrorMessage
   mkPositionedError chainOpSpans grp =
     ErrorMessage
-      [PositionedError (join . fmap (fromJust . flip M.lookup chainOpSpans) $ grp)]
+      [PositionedError (fromJust . flip M.lookup chainOpSpans =<< grp)]

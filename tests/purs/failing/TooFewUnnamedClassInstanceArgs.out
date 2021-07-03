@@ -1,0 +1,15 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/TooFewUnnamedClassInstanceArgs.purs:8:1 - 8:20 (line 8, column 1 - line 8, column 20)
+
+  The type class [33mMain.Foo[0m expects 2 arguments.
+  But the instance only provided 1.
+
+in type class instance
+[33m                 [0m
+[33m  Main.Foo String[0m
+[33m                 [0m
+
+See https://github.com/purescript/documentation/blob/master/errors/ClassInstanceArityMismatch.md for more information,
+or to contribute content related to this error.
+

@@ -17,7 +17,7 @@ supportModuleName = fst initialInteractivePrint
 
 -- | Checks if the Console module is defined
 supportModuleIsDefined :: [P.ModuleName] -> Bool
-supportModuleIsDefined = any ((== supportModuleName))
+supportModuleIsDefined = elem supportModuleName
 
 -- * Module Management
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Ide.Filter.Declaration
        ( DeclarationType(..)
        ) where
@@ -21,20 +19,19 @@ data DeclarationType
   deriving (Show, Eq, Ord)
 
 instance FromJSON DeclarationType where
-  parseJSON = withText "Declaration type tag" $ \str ->
-    case str of
-      "value"             -> pure Value
-      "type"              -> pure Type
-      "synonym"           -> pure Synonym
-      "dataconstructor"   -> pure DataConstructor
-      "typeclass"         -> pure TypeClass
-      "valueoperator"     -> pure ValueOperator
-      "typeoperator"      -> pure TypeOperator
-      "module"            -> pure Module
-      s                   -> fail ("Unknown declaration type: " <> show s)
+  parseJSON = withText "Declaration type tag" $ \case
+    "value"             -> pure Value
+    "type"              -> pure Type
+    "synonym"           -> pure Synonym
+    "dataconstructor"   -> pure DataConstructor
+    "typeclass"         -> pure TypeClass
+    "valueoperator"     -> pure ValueOperator
+    "typeoperator"      -> pure TypeOperator
+    "module"            -> pure Module
+    s                   -> fail ("Unknown declaration type: " <> show s)
 
 instance ToJSON DeclarationType where
-  toJSON dt = toJSON $ case dt of
+  toJSON = toJSON . \case
     Value           -> "value" :: Text
     Type            -> "type"
     Synonym         -> "synonym"

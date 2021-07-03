@@ -1,0 +1,29 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/3765-kinds.purs:7:28 - 7:29 (line 7, column 28 - line 7, column 29)
+
+  Could not match kind
+  [33m            [0m
+  [33m  ( a :: Int[0m
+  [33m  | t11     [0m
+  [33m  )         [0m
+  [33m            [0m
+  with kind
+  [33m            [0m
+  [33m  ( b :: Int[0m
+  [33m  | t11     [0m
+  [33m  )         [0m
+  [33m            [0m
+
+while checking that type [33mx[0m
+  has kind [33m{ b :: Int[0m
+           [33m| t0      [0m
+           [33m}         [0m
+while inferring the kind of [33mTricky x x[0m
+in type synonym [33mMkTricky[0m
+
+where [33mt0[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

@@ -44,7 +44,7 @@ data PackageError
 data PackageWarning
   = NoResolvedVersion PackageName
   | UnacceptableVersion (PackageName, Text)
-  | DirtyWorkingTree_Warn
+  | DirtyWorkingTreeWarn
   deriving (Show)
 
 -- | An error that should be fixed by the user.
@@ -174,20 +174,17 @@ displayUserError e = case e of
       , spacer
       ] ++ spdxExamples ++
       [ spacer
-      , para $ concat
-          [ "See https://spdx.org/licenses/ for a full list of licenses. For more "
-          , "information on SPDX license expressions, see https://spdx.org/ids-how"
-          ]
+      , para $
+          "See https://spdx.org/licenses/ for a full list of licenses. For more " ++
+          "information on SPDX license expressions, see https://spdx.org/ids-how"
       , spacer
-      , para $ concat
-          [ "Note that distributing code without a license means that nobody will "
-          , "(legally) be able to use it."
-          ]
+      , para $
+          "Note that distributing code without a license means that nobody will " ++
+          "(legally) be able to use it."
       , spacer
-      , para $ concat
-          [ "It is also recommended to add a LICENSE file to the repository, "
-          , "including your name and the current year, although this is not necessary."
-          ]
+      , para $
+          "It is also recommended to add a LICENSE file to the repository, " ++
+          "including your name and the current year, although this is not necessary."
       ]
   InvalidLicense ->
     vcat $
@@ -206,12 +203,11 @@ displayUserError e = case e of
         do_          = pl "do" "does"
         dependencies = pl "dependencies" "dependency"
     in vcat $
-      [ para (concat
+      para (concat
         [ "The following ", dependencies, " ", do_, " not appear to be "
         , "installed:"
-        ])
-      ] ++
-        bulletedListT runPackageName (NonEmpty.toList pkgs)
+        ]) :
+      bulletedListT runPackageName (NonEmpty.toList pkgs)
   CompileError err ->
     vcat
       [ para "Compile error:"
@@ -224,8 +220,8 @@ displayUserError e = case e of
         )
   ResolutionsFileError path err ->
     successivelyIndented $
-      [ "Error in resolutions file (" ++ path ++ "):" ]
-      ++ map T.unpack (displayError D.displayPackageError err)
+      ("Error in resolutions file (" ++ path ++ "):") :
+      map T.unpack (displayError D.displayPackageError err)
 
 spdxExamples :: [Box]
 spdxExamples =
@@ -318,7 +314,7 @@ collectWarnings = foldMap singular
       mempty { noResolvedVersions = [pn] }
     UnacceptableVersion t ->
       mempty { unacceptableVersions = [t] }
-    DirtyWorkingTree_Warn ->
+    DirtyWorkingTreeWarn ->
       mempty { dirtyWorkingTree = Any True }
 
 renderWarnings :: [PackageWarning] -> Box

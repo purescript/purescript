@@ -1,20 +1,19 @@
-resolver: lts-13.26
+resolver: lts-17.6
 pvp-bounds: both
 packages:
 - '.'
-- lib/purescript-ast
 - lib/purescript-cst
 ghc-options:
   # Build with advanced optimizations enabled by default
-  "$locals": -O2
+  "$locals": -O2 -Werror
 extra-deps:
-- serialise-0.2.2.0
-- cborg-0.2.2.0
-- happy-1.19.9
 - language-javascript-0.7.0.0
-- network-3.0.1.1
-- these-1.0.1
-- semialign-1
+- git: https://github.com/hspec/hspec.git
+  commit: 8f628c861d01ec8fc0a94ffdfe31e4399bd049d1
+  subdirs:
+    - .
+    - hspec-core
+    - hspec-discover
 nix:
   enable: false
   packages:
@@ -28,4 +27,6 @@ flags:
     lib-only: true
   these:
     assoc: false
-    quickcheck: false
+  haskeline:
+    # Avoids a libtinfo dynamic library dependency
+    terminfo: false

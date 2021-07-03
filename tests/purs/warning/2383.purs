@@ -9,4 +9,5 @@ import Effect (Effect)
 main :: Effect Unit
 main = do
   x <- let x = pure unit in x
+  let _ = x -- don't warn x is unused
   pure unit

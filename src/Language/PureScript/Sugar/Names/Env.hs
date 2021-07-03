@@ -29,7 +29,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Function (on)
 import Data.Foldable (find)
-import Data.List (groupBy, sortBy, delete)
+import Data.List (groupBy, sortOn, delete)
 import Data.Maybe (fromJust, mapMaybe)
 import Safe (headMay)
 import qualified Data.Map as M
@@ -490,7 +490,7 @@ checkImportConflicts
   -> m (ModuleName, ModuleName)
 checkImportConflicts ss currentModule toName xs =
   let
-    byOrig = sortBy (compare `on` importSourceModule) xs
+    byOrig = sortOn importSourceModule xs
     groups = groupBy ((==) `on` importSourceModule) byOrig
     nonImplicit = filter ((/= FromImplicit) . importProvenance) xs
     name = toName . disqualify . importName $ head xs

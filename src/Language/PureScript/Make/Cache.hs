@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Make.Cache
   ( ContentHash
   , hash
@@ -131,7 +129,7 @@ checkChanged cacheDb mn basePath currentInfo = do
 -- | Remove any modules from the given set from the cache database; used when
 -- they failed to build.
 removeModules :: Set ModuleName -> CacheDb -> CacheDb
-removeModules moduleNames = flip Map.withoutKeys moduleNames
+removeModules = flip Map.withoutKeys
 
 -- | 1. Any path that is beneath our current working directory will be
 -- stored as a normalised relative path
