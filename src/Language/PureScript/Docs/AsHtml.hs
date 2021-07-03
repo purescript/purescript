@@ -222,8 +222,8 @@ codeAsHtml r = outputWith elemAsHtml
 
         -- representational is intentionally not rendered
         "representational" -> toHtml ("" :: Text)
-        
-        x -> P.internalError $ "codeAsHtml: unknown value for role annotation: '" <> (T.unpack x) <> "'"
+
+        x -> P.internalError $ "codeAsHtml: unknown value for role annotation: '" <> T.unpack x <> "'"
       where
         renderRole hoverTextContent className =
           H.a ! A.href (v docRepoRolePage) ! A.target (v "_blank") ! A.class_ "decl__role" $ do
