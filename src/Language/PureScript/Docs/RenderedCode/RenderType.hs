@@ -153,16 +153,24 @@ forall_ = mkPattern match
   match (PPForAll mbKindedIdents ty) = Just (mbKindedIdents, ty)
   match _ = Nothing
 
+renderTypeInternal :: (PrettyPrintType -> PrettyPrintType) -> Type a -> RenderedCode
+renderTypeInternal insertRolesIfAny =
+  renderType' . insertRolesIfAny . convertPrettyPrintType maxBound
+
 -- |
 -- Render code representing a Type
 --
 renderType :: Type a -> RenderedCode
-renderType = renderType' . convertPrettyPrintType maxBound
+renderType = renderTypeInternal id
 
+-- |
+-- Render code representing a Type
+-- but augment the `TypeVar`s with their `Role` if they have one
+--
 renderTypeWithRole :: [Role] -> Type a -> RenderedCode
 renderTypeWithRole = \case
   [] -> renderType
-  roleList -> renderType' . (addRole roleList [] . Left) . convertPrettyPrintType maxBound
+  roleList -> renderTypeInternal (addRole roleList [] . Left)
   where
   -- `data Foo first second = Foo` will produce
   -- ```
