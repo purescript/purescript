@@ -68,14 +68,14 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     comments <- not <$> asks optionsNoComments
     let header = if comments && not (null coms) then AST.Comment Nothing coms else id
     let foreign' = maybe [] (pure . AST.Import Nothing "$foreign") $ if null foreigns then Nothing else foreignInclude
-    let moduleBody = maybe [] (uncurry (:)) . fmap (first header) . uncons $ foreign' ++ jsImports ++ concat optimized
+    let moduleBody = (maybe [] (uncurry (:) . first header) . uncons) $ foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
     let reExps' = M.toList (M.withoutKeys reExps (S.fromList C.primModules))
     return $ moduleBody
       ++ (maybeToList . exportsToJs foreignInclude $ foreignExps)
       ++ (maybeToList . exportsToJs Nothing $ standardExps)
-      ++ (mapMaybe reExportsToJs reExps')
+      ++  mapMaybe reExportsToJs reExps'
 
   where
 

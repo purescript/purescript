@@ -452,7 +452,7 @@ toModule mids mid filename top
     , JSImportNameSpace _ _ jsIdent <- jsImportNameSpace
     , JSFromClause _ _ importPath <- jsFromClause
     , importPath' <- checkImportPath (strValue importPath) mid mids
-    = fromMaybe (err UnsupportedImport) (pure <$> identName jsIdent) >>= \name ->
+    = maybe (err UnsupportedImport) pure (identName jsIdent) >>= \name ->
         pure [Import item name importPath']
   toModuleElements (JSModuleImportDeclaration _ _)
     = err UnsupportedImport
@@ -521,12 +521,12 @@ toModule mids mid filename top
   toExport (Just from) name as
     | from == "./foreign.js" =
         pure . (ForeignReexport, as,, []) $
-                 (JSMemberSquare (JSIdentifier sp "$foreign") JSNoAnnot
-                   (stringLiteral name) JSNoAnnot)
+                JSMemberSquare (JSIdentifier sp "$foreign") JSNoAnnot
+                  (stringLiteral name) JSNoAnnot
     | Just from' <- stripSuffix "/index.js" =<< stripPrefix "../" from =
         pure . (RegularExport name, as,, []) $
-               (JSMemberSquare (JSIdentifier sp (T.unpack . moduleNameToJs . ModuleName $ T.pack from')) JSNoAnnot
-                 (stringLiteral name) JSNoAnnot)
+                JSMemberSquare (JSIdentifier sp (T.unpack . moduleNameToJs . ModuleName $ T.pack from')) JSNoAnnot
+                  (stringLiteral name) JSNoAnnot
     | otherwise = err UnsupportedExport
   toExport Nothing name as =
     pure $ toRegularExport name as
