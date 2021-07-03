@@ -16,6 +16,7 @@ import Prelude.Compat
 
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
+import Data.List (uncons)
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
@@ -159,11 +160,10 @@ renderType :: Type a -> RenderedCode
 renderType = renderType' . convertPrettyPrintType maxBound
 
 renderTypeWithRole :: [Role] -> Type a -> RenderedCode
-renderTypeWithRole roleList = renderType' . insertRoles . convertPrettyPrintType maxBound
+renderTypeWithRole = \case
+  [] -> renderType
+  roleList -> renderType' . (addRole roleList [] . Left) . convertPrettyPrintType maxBound
   where
-  insertRoles :: PrettyPrintType -> PrettyPrintType
-  insertRoles = snd . addRole roleList
-
   -- `data Foo first second = Foo` will produce
   -- ```
   -- PPTypeApp
@@ -171,18 +171,54 @@ renderTypeWithRole roleList = renderType' . insertRoles . convertPrettyPrintType
   --  (PPTypeVar "second" Nothing)
   -- ```
   -- So, we recurse down the left side of `TypeApp` first before
-  -- recursing down the right side.
-  addRole :: [Role] -> PrettyPrintType -> ([Role], PrettyPrintType)
-  addRole [] pp = ([], pp)
-  addRole roles@(x:xs) pp = case pp of
-    PPTypeApp f a ->
-      let
-        (remainingRoles1, f') = addRole roles f
-        (remainingRoles2, a') = addRole remainingRoles1 a
-      in (remainingRoles2, PPTypeApp f' a')
-    PPTypeVar t Nothing ->
-      (xs, PPTypeVar t (Just $ displayRole x))
-    other -> (roles, other)
+  -- recursing down the right side. To make this stack-safe,
+  -- we use a tail-recursive function with its own stack.
+  -- - Left = values that have not yet been examined and need
+  --          a role added to them (if any). There's still work "left" to do.
+  -- - Right = values that have been examined and now need to be
+  --           reassembled into their original value
+  addRole
+    :: [Role]
+    -> [Either PrettyPrintType PrettyPrintType]
+    -> Either PrettyPrintType PrettyPrintType
+    -> PrettyPrintType
+  addRole roles stack pp = case pp of
+    Left next -> case next of
+      PPTypeVar t Nothing
+        | Just (x, xs) <- uncons roles ->
+          addRole xs stack (Right $ PPTypeVar t (Just $ displayRole x))
+        | otherwise ->
+          internalError "addRole: invalid arguments - number of roles doesn't match number of type parameters"
+
+      PPTypeVar _ (Just _) ->
+        internalError "addRole: attempted to add a second role to a type parameter that already has one"
+
+      PPTypeApp leftSide rightSide -> do
+        -- push right-side to stack and continue recursing on left-side
+        addRole roles (Left rightSide : stack) (Left leftSide)
+
+      other ->
+        -- nothing to check, so move on
+        addRole roles stack (Right other)
+
+
+    pendingAssembly@(Right rightSideOrFinalValue) -> case stack of
+      (unfinishedRightSide@(Left _) : remaining) ->
+        -- We've finished recursing through the left-side of a `TypeApp`.
+        -- Now we'll recurse through the right-side.
+        -- We push `pendingAssembly` onto the stack so we can assemble
+        -- the `PPTypeApp` together once it's right-side is done.
+        addRole roles (pendingAssembly : remaining) unfinishedRightSide
+
+      (Right leftSide : remaining) ->
+        -- We've finished recursing through the right-side of a `TypeApp`
+        -- We'll rebulid it and wrap it in `Right` so any other higher-level
+        -- `TypeApp`s can be reassembled now, too.
+        addRole roles remaining (Right (PPTypeApp leftSide rightSideOrFinalValue))
+
+      [] ->
+        -- We've reassembled everything. It's time to return.
+        rightSideOrFinalValue
 
 renderType' :: PrettyPrintType -> RenderedCode
 renderType'
