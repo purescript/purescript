@@ -35,7 +35,7 @@ jobs:
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
-          stack-version: "2.5.1"
+          stack-version: "2.7.1"
           stack-no-global: true
 
       - uses: "actions/cache@v2"

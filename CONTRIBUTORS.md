@@ -94,6 +94,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@passy](https://github.com/passy) | Pascal Hartig | [MIT license](http://opensource.org/licenses/MIT) |
 | [@paulyoung](https://github.com/paulyoung) | Paul Young | [MIT license](http://opensource.org/licenses/MIT) |
 | [@pelotom](https://github.com/pelotom) | Thomas Crockett | [MIT license](http://opensource.org/licenses/MIT) |
+| [@peterbecich](https://github.com/peterbecich) | Peter Becich | [MIT license](http://opensource.org/licenses/MIT) |
 | [@phadej](https://github.com/phadej) | Oleg Grenrus | [MIT license](http://opensource.org/licenses/MIT) |
 | [@phiggins](https://github.com/phiggins) | Pete Higgins | [MIT license](http://opensource.org/licenses/MIT) |
 | [@philopon](https://github.com/philopon) | Hirotomo Moriwaki | [MIT license](http://opensource.org/licenses/MIT) |
