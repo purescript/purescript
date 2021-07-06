@@ -68,7 +68,7 @@ insertValueTypesAndAdjustKinds env m =
   -- Note: `Prim` modules' docs don't go through this conversion process
   -- so `ExternDataDeclaration` values will still exist beyond this point.
   convertFFIDecl d@Declaration { declInfo = ExternDataDeclaration kind roles } =
-    d { declInfo = DataDeclaration P.Data (genFFITypeParams kind) (getRoles roles)
+    d { declInfo = DataDeclaration P.Data (genTypeParams kind) (getRoles roles)
       , declKind = Just (KindInfo P.DataSig kind)
       }
     where
@@ -103,8 +103,8 @@ insertValueTypesAndAdjustKinds env m =
   -- Return a list of values, one for each implicit type parameter
   -- of `(tX, Nothing)` where `X` refers to the index of he parameter
   -- in that list, matching the values expected by `Render.toTypeVar`
-  genFFITypeParams :: Type' -> [(Text, Maybe Type')]
-  genFFITypeParams kind = do
+  genTypeParams :: Type' -> [(Text, Maybe Type')]
+  genTypeParams kind = do
     let n = countParams 0 kind
     if n == 0
       then []
@@ -112,12 +112,9 @@ insertValueTypesAndAdjustKinds env m =
     where
       countParams :: Integer -> Type' -> Integer
       countParams acc = \case
-        -- skip foralls
         P.ForAll _ _ _ rest _ ->
           countParams acc rest
 
-        -- increase count whenever we come across
-        -- `SomeKind -> ...`
         P.TypeApp _ f a@(P.TypeApp _ _ _) | isFunctionApplication f ->
           countParams (acc + 1) a
 
