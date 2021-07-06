@@ -772,13 +772,15 @@ testCases =
 
       -- Declarations with no explicit kind signatures should not be displayed
       -- if each type parameter in their inferred kind signature
-      -- has kind `Type`.
+      -- has kind `Type`, even if there are redundant parenthesis.
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DHidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DNothing"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "THidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "NHidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CHidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CNothing"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataRedundantParenthesis"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassRedundantParenthesis"
 
       -- Declarations with no explicit kind signatures should be displayed
       -- if at least one type parameter has a kind other than `Type`
