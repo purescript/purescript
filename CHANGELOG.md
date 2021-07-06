@@ -8,6 +8,14 @@ Breaking changes:
 
 New features:
 
+Bugfixes:
+
+Internal:
+
+## v0.14.3
+
+New features:
+
 * Display kind signatures and their comments in documentation (#4100 and #4119 by JordanMartinez)
 
   The compiler now displays kind signatures for data, newtype, type
