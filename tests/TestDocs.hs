@@ -838,6 +838,8 @@ testCases =
       [ ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_RNP" [P.Representational, P.Nominal, P.Phantom]
       , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_NPR" [P.Nominal, P.Phantom, P.Representational]
       , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "D_PRN" [P.Phantom, P.Representational, P.Nominal]
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "E_NNN" [P.Nominal, P.Nominal, P.Nominal]
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "E_RNP" [P.Representational, P.Nominal, P.Phantom]
       ]
     )
   , ("DocCommentsMerge",
