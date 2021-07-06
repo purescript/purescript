@@ -182,7 +182,7 @@ primTypeOf gen title comments = Declaration
   , declComments = Just comments
   , declSourceSpan = Nothing
   , declChildren = []
-  , declInfo = ExternDataDeclaration (lookupPrimTypeKindOf gen title)
+  , declInfo = ExternDataDeclaration (lookupPrimTypeKindOf gen title) []
   , declKind = Nothing
   }
 

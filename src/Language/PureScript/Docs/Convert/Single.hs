@@ -123,9 +123,12 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
           DataDeclaration dataDeclType args roles
         DataDeclaration _ _ _ ->
           P.internalError "augmentWith: could not add a second role declaration to a data declaration"
-        ffiDecl@(ExternDataDeclaration _) ->
-          -- we're not yet adding role declarations to FFI declarations
-          ffiDecl
+
+        ExternDataDeclaration kind [] ->
+          ExternDataDeclaration kind roles
+        ExternDataDeclaration _ _ ->
+          P.internalError "augmentWith: could not add a second role declaration to an FFI declaration"
+
         _ -> P.internalError "augmentWith: could not add role to declaration"
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
@@ -174,7 +177,7 @@ convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
   convertCtor P.DataConstructorDeclaration{..} =
     ChildDeclaration (P.runProperName dataCtorName) (convertComments $ snd dataCtorAnn) Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
 convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
-  basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
+  basicDeclaration sa title (ExternDataDeclaration (kind' $> ()) [])
 convertDeclaration (P.TypeSynonymDeclaration sa _ args ty) title =
   basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()))
 convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =

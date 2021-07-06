@@ -164,7 +164,7 @@ data DeclarationInfo
   -- |
   -- A data type foreign import, with its kind.
   --
-  | ExternDataDeclaration Type'
+  | ExternDataDeclaration Type' [P.Role]
 
   -- |
   -- A type synonym, with its type arguments and its type.
@@ -218,7 +218,7 @@ convertFundepsToStrings args fundeps =
 declInfoToString :: DeclarationInfo -> Text
 declInfoToString (ValueDeclaration _) = "value"
 declInfoToString (DataDeclaration _ _ _) = "data"
-declInfoToString (ExternDataDeclaration _) = "externData"
+declInfoToString (ExternDataDeclaration _ _) = "externData"
 declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _ _) = "typeClass"
 declInfoToString (AliasDeclaration _ _) = "alias"
@@ -636,6 +636,7 @@ asDeclarationInfo = do
                       <*> keyOrDefault "roles" [] (eachInArray asRole)
     "externData" ->
       ExternDataDeclaration <$> key "kind" asType
+                            <*> keyOrDefault "roles" [] (eachInArray asRole)
     "typeSynonym" ->
       TypeSynonymDeclaration <$> key "arguments" asTypeArguments
                              <*> key "type" asType
@@ -648,7 +649,7 @@ asDeclarationInfo = do
                        <*> key "alias" asFixityAlias
     -- Backwards compat: kinds are extern data
     "kind" ->
-      pure $ ExternDataDeclaration (P.kindType $> ())
+      pure $ ExternDataDeclaration (P.kindType $> ()) []
     other ->
       throwCustomError (InvalidDeclarationType other)
 
@@ -850,7 +851,7 @@ instance A.ToJSON DeclarationInfo where
     props = case info of
       ValueDeclaration ty -> ["type" .= ty]
       DataDeclaration ty args roles -> ["dataDeclType" .= ty, "typeArguments" .= args, "roles" .= roles]
-      ExternDataDeclaration kind -> ["kind" .= kind]
+      ExternDataDeclaration kind roles -> ["kind" .= kind, "roles" .= roles]
       TypeSynonymDeclaration args ty -> ["arguments" .= args, "type" .= ty]
       TypeClassDeclaration args super fundeps -> ["arguments" .= args, "superclasses" .= super, "fundeps" .= fundeps]
       AliasDeclaration fixity alias -> ["fixity" .= fixity, "alias" .= alias]

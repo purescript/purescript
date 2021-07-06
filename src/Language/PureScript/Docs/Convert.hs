@@ -13,6 +13,7 @@ import Control.Monad.Supply (evalSupplyT)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import Data.String (String)
+import qualified Data.Text as T
 
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
 import Language.PureScript.Docs.Types
@@ -43,6 +44,9 @@ convertModule externs env checkEnv =
   fmap (insertValueTypesAndAdjustKinds checkEnv . convertSingleModule) . partiallyDesugar externs env
 
 -- |
+-- Convert FFI declarations into `DataDeclaration` so that the declaration's
+-- roles (if any) can annotate the generated type parameter names.
+--
 -- Updates all the types of the ValueDeclarations inside the module based on
 -- their types inside the given Environment.
 --
@@ -55,8 +59,61 @@ convertModule externs env checkEnv =
 insertValueTypesAndAdjustKinds ::
   P.Environment -> Module -> Module
 insertValueTypesAndAdjustKinds env m =
-  m { modDeclarations = map go (modDeclarations m) }
+  m { modDeclarations = map (go . convertFFIDecl) (modDeclarations m) }
   where
+  -- |
+  -- Convert FFI declarations into data declaration
+  -- by generating the type parameters' names based on its kind signature.
+  -- Note: `Prim` modules' docs don't go through this conversion process
+  -- so `ExternDataDeclaration` values will still exist beyond this point.
+  convertFFIDecl d@Declaration { declInfo = ExternDataDeclaration kind roles } =
+    d { declInfo = DataDeclaration P.Data (genFFITypeParams kind) roles
+      , declKind = Just (KindInfo P.DataSig kind)
+      }
+
+  convertFFIDecl other = other
+
+  -- |
+  -- Given an FFI declaration like this
+  -- ```
+  -- foreign import data Foo
+  --    :: forall a b c d
+  --     . MyKind a b
+  --    -> OtherKind c d
+  --    -> Symbol
+  --    -> (Type -> Type)
+  --    -> (Type) -- unneeded parens a developer typo
+  --    -> Type
+  -- ```
+  -- Return a list of values, one for each implicit type parameter
+  -- of `(tX, Nothing)` where `X` refers to the index of he parameter
+  -- in that list, matching the values expected by `Render.toTypeVar`
+  genFFITypeParams :: Type' -> [(Text, Maybe Type')]
+  genFFITypeParams kind = do
+    let n = countParams 0 kind
+    if n == 0
+      then []
+      else map (\i -> ("t" <> T.pack (show i), Nothing)) [0..n]
+    where
+      countParams :: Integer -> Type' -> Integer
+      countParams acc = \case
+        -- skip foralls
+        P.ForAll _ _ _ rest _ ->
+          countParams acc rest
+
+        -- increase count whenever we come across
+        -- `SomeKind -> ...`
+        P.TypeApp _ f a@(P.TypeApp _ _ _) | isFunctionApplication f ->
+          countParams (acc + 1) a
+
+        _ ->
+          acc
+
+      isFunctionApplication = \case
+        P.TypeApp _ (P.TypeConstructor () Prim.Function) _ -> True
+        P.ParensInType _ ty -> isFunctionApplication ty
+        _ -> False
+
   -- insert value types
   go d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} } =
     let

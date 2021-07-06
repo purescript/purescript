@@ -45,7 +45,10 @@ renderDeclaration Declaration{..} =
       [ keyword (P.showDataDeclType dtype)
       , renderTypeWithRole roles (typeApp declTitle args)
       ]
-    ExternDataDeclaration kind' ->
+
+    -- All FFI declarations, except for `Prim` modules' doc declarations,
+    -- will have been converted to `DataDeclaration`s by this point.
+    ExternDataDeclaration kind' _ ->
       [ keywordData
       , renderType (P.TypeConstructor () (notQualified declTitle))
       , syntax "::"
