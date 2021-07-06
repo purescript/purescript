@@ -48,6 +48,9 @@ convertModule externs env checkEnv =
 -- Convert FFI declarations into `DataDeclaration` so that the declaration's
 -- roles (if any) can annotate the generated type parameter names.
 --
+-- Inserts all data declarations inferred roles if none were specified
+-- explicitly.
+--
 -- Updates all the types of the ValueDeclarations inside the module based on
 -- their types inside the given Environment.
 --
@@ -60,7 +63,7 @@ convertModule externs env checkEnv =
 insertValueTypesAndAdjustKinds ::
   P.Environment -> Module -> Module
 insertValueTypesAndAdjustKinds env m =
-  m { modDeclarations = map (go . convertFFIDecl) (modDeclarations m) }
+  m { modDeclarations = map (go . insertInferredRoles . convertFFIDecl) (modDeclarations m) }
   where
   -- |
   -- Convert FFI declarations into data declaration
@@ -68,25 +71,32 @@ insertValueTypesAndAdjustKinds env m =
   -- Note: `Prim` modules' docs don't go through this conversion process
   -- so `ExternDataDeclaration` values will still exist beyond this point.
   convertFFIDecl d@Declaration { declInfo = ExternDataDeclaration kind roles } =
-    d { declInfo = DataDeclaration P.Data (genTypeParams kind) (getRoles roles)
+    d { declInfo = DataDeclaration P.Data (genTypeParams kind) roles
       , declKind = Just (KindInfo P.DataSig kind)
       }
-    where
-      getRoles [] = lookupInferredRole
-      getRoles r = r
-
-      lookupInferredRole :: [P.Role]
-      lookupInferredRole = fromMaybe [] $ do
-        let key = P.Qualified (Just (modName m)) (P.ProperName (declTitle d))
-        (_, tyKind) <- Map.lookup key (P.types env)
-        case tyKind of
-          P.DataType _ tySourceTyRole _ ->
-            Just $ map (\(_,_,r) -> r) tySourceTyRole
-          P.ExternData rs ->
-            Just rs
-          _ -> Nothing
 
   convertFFIDecl other = other
+
+  insertInferredRoles d@Declaration { declInfo = DataDeclaration dataDeclType args [] } =
+    d { declInfo = DataDeclaration dataDeclType args inferredRoles }
+
+    where
+    inferredRoles :: [P.Role]
+    inferredRoles = do
+      let key = P.Qualified (Just (modName m)) (P.ProperName (declTitle d))
+      case Map.lookup key (P.types env) of
+        Just (_, tyKind) -> case tyKind of
+          P.DataType _ tySourceTyRole _ ->
+            map (\(_,_,r) -> r) tySourceTyRole
+          P.ExternData rs ->
+            rs
+          _ ->
+            []
+        Nothing ->
+          err $ "type not found: " <> show key
+
+  insertInferredRoles other =
+    other
 
   -- |
   -- Given an FFI declaration like this
