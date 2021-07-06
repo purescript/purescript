@@ -108,15 +108,28 @@ insertValueTypesAndAdjustKinds env m =
   -- - `Constraint` (class declaration only)
   -- - `Type -> K` where `K` is an "uninteresting" kind
   isUninteresting
-    :: P.KindSignatureFor -> P.Type () -> Bool
+    :: P.KindSignatureFor -> Type' -> Bool
   isUninteresting keyword = \case
-    P.TypeApp _ t1 t2 | t1 == kindFunctionType ->
+    -- `Type -> ...`
+    P.TypeApp _ (P.TypeApp _ (P.TypeConstructor () Prim.Function) ty) t2 | isKindPrimType ty ->
       isUninteresting keyword t2
+
     x ->
-      x == kindPrimType || (isClassKeyword && x == kindPrimConstraint)
+      isKindPrimType x || (isClassKeyword && isKindPrimConstraint x)
     where
       isClassKeyword = case keyword of
         P.ClassSig -> True
+        _ -> False
+
+      isKindPrimType = isTypeConstructor Prim.Type
+
+      isKindPrimConstraint = isTypeConstructor Prim.Constraint
+
+      -- account for redundant parenthesis around kinds
+      -- e.g. `(Type) -> Type` or `(Type) -> Constraint`
+      isTypeConstructor k = \case
+        P.TypeConstructor _ k' -> k' == k
+        P.ParensInType _ ty -> isTypeConstructor k ty
         _ -> False
 
   insertInferredKind :: Declaration -> Text -> P.KindSignatureFor -> Declaration
@@ -138,19 +151,12 @@ insertValueTypesAndAdjustKinds env m =
           -- changes `forall (k :: Type). k -> ...`
           -- to      `forall k          . k -> ...`
           dropTypeSortAnnotation = \case
-            P.ForAll sa txt (Just kAnn) rest skol | kAnn == kindPrimType ->
+            P.ForAll sa txt (Just (P.TypeConstructor _ Prim.Type)) rest skol ->
               P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol
             rest -> rest
 
       Nothing ->
         err ("type not found: " ++ show key)
-
-  -- constants for kind signature-related code
-  kindPrimType = P.TypeConstructor () Prim.Type
-  kindPrimFunction = P.TypeConstructor () Prim.Function
-  kindPrimConstraint = P.TypeConstructor () Prim.Constraint
-  -- `Type ->`
-  kindFunctionType = P.TypeApp () kindPrimFunction kindPrimType
 
   err msg =
     P.internalError ("Docs.Convert.insertValueTypes: " ++ msg)
