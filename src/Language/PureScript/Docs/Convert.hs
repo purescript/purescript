@@ -24,6 +24,7 @@ import qualified Language.PureScript.Errors as P
 import qualified Language.PureScript.Externs as P
 import qualified Language.PureScript.Environment as P
 import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Roles as P
 import qualified Language.PureScript.Sugar as P
 import qualified Language.PureScript.Types as P
 import qualified Language.PureScript.Constants.Prim as Prim
@@ -67,9 +68,23 @@ insertValueTypesAndAdjustKinds env m =
   -- Note: `Prim` modules' docs don't go through this conversion process
   -- so `ExternDataDeclaration` values will still exist beyond this point.
   convertFFIDecl d@Declaration { declInfo = ExternDataDeclaration kind roles } =
-    d { declInfo = DataDeclaration P.Data (genFFITypeParams kind) roles
+    d { declInfo = DataDeclaration P.Data (genFFITypeParams kind) (getRoles roles)
       , declKind = Just (KindInfo P.DataSig kind)
       }
+    where
+      getRoles [] = lookupInferredRole
+      getRoles r = r
+
+      lookupInferredRole :: [P.Role]
+      lookupInferredRole = fromMaybe [] $ do
+        let key = P.Qualified (Just (modName m)) (P.ProperName (declTitle d))
+        (_, tyKind) <- Map.lookup key (P.types env)
+        case tyKind of
+          P.DataType _ tySourceTyRole _ ->
+            Just $ map (\(_,_,r) -> r) tySourceTyRole
+          P.ExternData rs ->
+            Just rs
+          _ -> Nothing
 
   convertFFIDecl other = other
 
