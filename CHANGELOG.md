@@ -45,7 +45,7 @@ Bugfixes:
 
 Internal:
 
-* Fix for Haddock (#4072 by @ncaq and @JordanMartinez)
+* Fix for Haddock (#4072 by @ncaq and @JordanMartinez, #4139 by @JordanMartinez)
 
 * Update RELEASE_GUIDE.md with more details (#4104 by @JordanMartinez)
 
