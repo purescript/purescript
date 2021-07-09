@@ -234,16 +234,10 @@ codeAsHtml r = outputWith elemAsHtml
         docRepoRolePage =
           "https://github.com/purescript/documentation/blob/master/language/Roles.md"
 
-        describeNominal = fold
-          [ "The 'nominal' role means the type represented by this type "
-          , "parameter CANNOT be safely coerced to another type when one "
-          , "coerces the overall type to another type."
-          ]
-        describePhantom = fold
-          [ "The 'phantom' role means the type represented by this type "
-          , "parameter CAN be safely coerced to any other type when one "
-          , "coerces the overall type to another type."
-          ]
+        describeNominal =
+          "The 'nominal' role means this argument may not change when coercing the type."
+        describePhantom =
+          "The 'phantom' role means this argument can change freely when coercing the type."
 
   linkToDecl = linkToDeclaration r
 
