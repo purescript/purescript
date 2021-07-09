@@ -114,6 +114,9 @@ insertValueTypesAndAdjustKinds env m =
     P.TypeApp _ (P.TypeApp _ (P.TypeConstructor () Prim.Function) ty) t2 | isKindPrimType ty ->
       isUninteresting keyword t2
 
+    -- `(Type) -> ...` or `Type -> (Type -> Type`)`
+    P.ParensInType _ ty -> isUninteresting keyword ty
+
     x ->
       isKindPrimType x || (isClassKeyword && isKindPrimConstraint x)
     where

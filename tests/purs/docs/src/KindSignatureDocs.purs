@@ -99,6 +99,15 @@ data DataRedundantParenthesis a = DataRedundantParenthesis
 class ClassRedundantParenthesis :: (Type) -> (Constraint)
 class ClassRedundantParenthesis a
 
+data DataHeadParens :: (Type) -> Type -> Type
+data DataHeadParens a b = DataHeadParens
+
+data DataTailParens :: Type -> (Type -> Type)
+data DataTailParens a b = DataTailParens
+
+data DataWholeParens :: (Type -> Type -> Type)
+data DataWholeParens a b = DataWholeParens
+
 ----------
 
 -- | dit

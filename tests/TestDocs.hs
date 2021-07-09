@@ -781,6 +781,9 @@ testCases =
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CNothing"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataRedundantParenthesis"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassRedundantParenthesis"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataHeadParenthesis"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataTailParenthesis"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataWholeParenthesis"
 
       -- Declarations with no explicit kind signatures should be displayed
       -- if at least one type parameter has a kind other than `Type`
