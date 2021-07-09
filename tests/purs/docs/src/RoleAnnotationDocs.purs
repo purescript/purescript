@@ -14,6 +14,18 @@ foreign import data FFI_NNN :: Type -> Type -> Type -> Type
 foreign import data FFI_RNP :: Type -> Type -> Type -> Type
 type role FFI_RNP representational nominal phantom
 
+foreign import data FFI_Higher1 :: (Type -> Type) -> Type -> Type -> Type
+type role FFI_Higher1 representational nominal phantom
+
+foreign import data FFI_Higher2 :: Type -> (Type -> Type) -> Type -> Type
+type role FFI_Higher2 representational nominal phantom
+
+foreign import data FFI_Higher3 :: Type -> Type -> (Type -> Type) -> Type
+type role FFI_Higher3 representational nominal phantom
+
+foreign import data FFI_Higher4 :: Type -> (Type -> (Type -> Type)) -> Type -> Type
+type role FFI_Higher4 representational nominal phantom
+
 foreign import data FFI_HeadParens :: (Type) -> Type -> Type -> Type
 type role FFI_HeadParens representational nominal phantom
 

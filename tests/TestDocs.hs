@@ -841,6 +841,11 @@ testCases =
       , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "FFI_NNN" [P.Nominal, P.Nominal, P.Nominal]
       , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "FFI_RNP" [P.Representational, P.Nominal, P.Phantom]
 
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "FFI_Higher1" [P.Representational, P.Nominal, P.Phantom]
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "FFI_Higher2" [P.Representational, P.Nominal, P.Phantom]
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "FFI_Higher3" [P.Representational, P.Nominal, P.Phantom]
+      , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "FFI_Higher4" [P.Representational, P.Nominal, P.Phantom]
+
       , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "FFI_HeadParens" [P.Representational, P.Nominal, P.Phantom]
       -- , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "FFI_TailParens" [P.Representational, P.Nominal, P.Phantom]
       -- , ShouldHaveRoleAnnotation (n "RoleAnnotationDocs") "FFI_WholeParens" [P.Representational, P.Nominal, P.Phantom]
