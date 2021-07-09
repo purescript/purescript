@@ -779,13 +779,13 @@ testCases =
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "NHidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CHidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CNothing"
-      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataRedundantParenthesis"
-      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassRedundantParenthesis"
-      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataHeadParenthesis"
-      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataTailParenthesis"
-      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataWholeParenthesis"
-      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataSelfParenthesis"
-      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassSelfParenthesis"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataRedundantParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassRedundantParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataHeadParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataTailParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataWholeParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataSelfParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassSelfParens"
 
       -- Declarations with no explicit kind signatures should be displayed
       -- if at least one type parameter has a kind other than `Type`
