@@ -177,7 +177,7 @@ displayAssertion = \case
   ShouldNotHaveKindSignature mn decl ->
     showQual mn decl <> " should not have a kind signature."
   ShouldMergeDocComments mn decl _ ->
-    showQual mn decl <> " should merge the doc-commentsof its kind " <>
+    showQual mn decl <> " should merge the doc-comments of its kind " <>
     "declaration (if any), type declaration, and role declaration (if any) " <>
     "into one doc-comment."
   ShouldHaveRoleAnnotation mn decl expected ->
