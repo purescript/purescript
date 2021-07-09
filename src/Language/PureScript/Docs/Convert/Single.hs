@@ -103,21 +103,11 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
     d { declComments = mergeComments ksiComments $ declComments d
       , declKind = Just $ KindInfo { kiKeyword = ksiKeyword, kiKind = ksiKind }
       }
-    where
-      mergeComments Nothing dc = dc
-      mergeComments kc Nothing = kc
-      mergeComments (Just kcoms) (Just dcoms) =
-        Just $ kcoms <> "\n" <> dcoms
   augmentWith (AugmentRole comms roles) d =
     d { declComments = mergeComments (declComments d) comms
       , declInfo = insertRoles
       }
     where
-      mergeComments Nothing rc = rc
-      mergeComments dc Nothing = dc
-      mergeComments (Just dcoms) (Just rcoms) =
-        Just $ dcoms <> "\n" <> rcoms
-
       insertRoles = case declInfo d of
         DataDeclaration dataDeclType args [] ->
           DataDeclaration dataDeclType args roles
@@ -130,6 +120,12 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
           P.internalError "augmentWith: could not add a second role declaration to an FFI declaration"
 
         _ -> P.internalError "augmentWith: could not add role to declaration"
+
+  mergeComments :: Maybe Text -> Maybe Text -> Maybe Text
+  mergeComments Nothing bot = bot
+  mergeComments top Nothing = top
+  mergeComments (Just topComs) (Just bottomComs) =
+    Just $ topComs <> "\n" <> bottomComs
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
 getDeclarationTitle (P.ValueDeclaration vd) = Just (P.showIdent (P.valdeclIdent vd))
