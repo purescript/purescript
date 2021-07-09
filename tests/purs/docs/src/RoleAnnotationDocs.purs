@@ -9,10 +9,10 @@ type role D_NPR nominal phantom representational
 data D_PRN a b c = D_PRN
 type role D_PRN phantom representational nominal
 
-foreign import data E_NNN :: Type -> Type -> Type -> Type
+foreign import data FFI_NNN :: Type -> Type -> Type -> Type
 
-foreign import data E_RNP :: Type -> Type -> Type -> Type
-type role E_RNP representational nominal phantom
+foreign import data FFI_RNP :: Type -> Type -> Type -> Type
+type role FFI_RNP representational nominal phantom
 
 foreign import data FFI_HeadParens :: (Type) -> Type -> Type -> Type
 type role FFI_HeadParens representational nominal phantom
