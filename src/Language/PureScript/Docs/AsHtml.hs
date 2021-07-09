@@ -22,7 +22,7 @@ import Data.Char (isUpper)
 import Data.Either (isRight)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
-import Data.Foldable (for_, fold)
+import Data.Foldable (for_)
 import Data.String (fromString)
 
 import Data.Text (Text)
