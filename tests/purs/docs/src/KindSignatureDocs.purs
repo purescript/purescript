@@ -108,6 +108,12 @@ data DataTailParens a b = DataTailParens
 data DataWholeParens :: (Type -> Type -> Type)
 data DataWholeParens a b = DataWholeParens
 
+data DataSelfParens :: (Type)
+data DataSelfParens = DataSelfParens
+
+class ClassSelfParens :: (Constraint)
+class ClassSelfParens
+
 ----------
 
 -- | dit
