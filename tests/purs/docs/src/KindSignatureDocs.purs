@@ -116,6 +116,8 @@ data DataSelfParens = DataSelfParens
 class ClassSelfParens :: (Constraint)
 class ClassSelfParens
 
+data DataSortAnnotation (a :: Type) = DataSortAnnotation a
+
 ----------
 
 -- | dit
