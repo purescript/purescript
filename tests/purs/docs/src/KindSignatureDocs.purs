@@ -93,6 +93,8 @@ class CHidden a b c where
 
 class CNothing
 
+----------
+
 data DataRedundantParenthesis :: (Type) -> (Type)
 data DataRedundantParenthesis a = DataRedundantParenthesis
 
