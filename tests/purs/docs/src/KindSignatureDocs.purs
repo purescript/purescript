@@ -116,9 +116,9 @@ data DataSelfParens = DataSelfParens
 class ClassSelfParens :: (Constraint)
 class ClassSelfParens
 
-data DataSortAnnotation (a :: Type) = DataSortAnnotation a
+data DataKindAnnotation (a :: Type) = DataKindAnnotation a
 
-data DataSortAnnotationWithParens (a :: (Type)) = DataSortAnnotationWithParens a
+data DataKindAnnotationWithParens (a :: (Type)) = DataKindAnnotationWithParens a
 
 ----------
 
