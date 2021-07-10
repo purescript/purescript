@@ -116,17 +116,18 @@ insertValueTypesAndAdjustKinds env m =
   genTypeParams :: Type' -> [(Text, Maybe Type')]
   genTypeParams kind = do
     let n = countParams 0 kind
-    if n == 0
-      then []
-      else map (\i -> ("t" <> T.pack (show i), Nothing)) [0..n]
+    map (\(i :: Int) -> ("t" <> T.pack (show i), Nothing)) $ take n [0..]
     where
-      countParams :: Integer -> Type' -> Integer
+      countParams :: Int -> Type' -> Int
       countParams acc = \case
         P.ForAll _ _ _ rest _ ->
           countParams acc rest
 
-        P.TypeApp _ f a@(P.TypeApp _ _ _) | isFunctionApplication f ->
+        P.TypeApp _ f a | isFunctionApplication f ->
           countParams (acc + 1) a
+
+        P.ParensInType _ ty ->
+          countParams acc ty
 
         _ ->
           acc
