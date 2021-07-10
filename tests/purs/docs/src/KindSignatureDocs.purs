@@ -118,6 +118,8 @@ class ClassSelfParens
 
 data DataSortAnnotation (a :: Type) = DataSortAnnotation a
 
+data DataSortAnnotationWithParens (a :: (Type)) = DataSortAnnotationWithParens a
+
 ----------
 
 -- | dit

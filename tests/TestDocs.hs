@@ -791,6 +791,7 @@ testCases =
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataSelfParens"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassSelfParens"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataSortAnnotation"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataSortAnnotationWithParens"
 
       -- Declarations with no explicit kind signatures should be displayed
       -- if at least one type parameter has a kind other than `Type`
