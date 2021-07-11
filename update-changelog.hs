@@ -64,7 +64,13 @@ main = runGitHubT gitHubState $ do
   internal <- processEntriesStartingWith "int" entries
   misc     <- processEntriesStartingWith "misc" entries
 
-  unless (all null [breaks, features, fixes, internal, misc]) $ do
+  let entryFiles = ceFile <$> breaks <> features <> fixes <> internal <> misc
+  unless (null entryFiles) $ do
+
+    changes <- git "status" ("-s" : "--" : "CHANGELOG.md" : entryFiles)
+    unless (null changes) . liftIO . die $
+      "You have uncommitted changes to changelog files. " <>
+      "Please commit, stash, or revert them before running this script."
 
     version <- getVersion
     (changelogPreamble, changelogRest) <- T.breakOn "\n## " <$> readFile "CHANGELOG.md"
@@ -79,7 +85,7 @@ main = runGitHubT gitHubState $ do
       <> changelogRest
 
     git_ "add" ["CHANGELOG.md"]
-    git_ "rm" $ "-q" : (ceFile <$> breaks <> features <> fixes <> internal <> misc)
+    git_ "rm" $ "-q" : entryFiles
 
 gitHubState :: GitHubState
 gitHubState = GitHubState Nothing "purescript/purescript update-changelog.hs" "v3"
@@ -92,7 +98,7 @@ processEntriesStartingWith prefix
 
 updateEntry :: (MonadFail m, MonadGitHubREST m, MonadIO m) => String -> m ChangelogEntry
 updateEntry file = do
-  (header, body) <- T.breakOn "\n" <$> (readFile . normalise) file
+  (header, body) <- T.breakOn "\n" . T.strip <$> (readFile . normalise) file
 
   allCommits <-
         fmap (NEL.fromList . sortOn glcTime)
@@ -116,7 +122,7 @@ updateEntry file = do
         <> commaSeparate (map ("@" <>) prAuthors)
         <> ")"
 
-  pure $ ChangelogEntry file (header <> headerSuffix <> body) (glcTime $ NEL.head allCommits)
+  pure $ ChangelogEntry file (header <> headerSuffix <> body <> "\n") (glcTime $ NEL.head allCommits)
 
 parsePRNumber :: Text -> Maybe (CommitType, Int)
 parsePRNumber = liftA2 (<|>)
