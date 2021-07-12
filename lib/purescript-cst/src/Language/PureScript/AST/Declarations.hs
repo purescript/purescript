@@ -833,3 +833,8 @@ isTrueExpr (Var _ (Qualified (Just (ModuleName "Data.Boolean")) (Ident "otherwis
 isTrueExpr (TypedValue _ e _) = isTrueExpr e
 isTrueExpr (PositionedValue _ _ e) = isTrueExpr e
 isTrueExpr _ = False
+
+isAnonymousArgument :: Expr -> Bool
+isAnonymousArgument AnonymousArgument = True
+isAnonymousArgument (PositionedValue _ _ e) = isAnonymousArgument e
+isAnonymousArgument _ = False
