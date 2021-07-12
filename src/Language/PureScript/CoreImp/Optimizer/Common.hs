@@ -43,14 +43,6 @@ isRebound js d = any (\v -> isReassigned v d || isUpdated v d) (everything (++) 
   variablesOf (Var _ var) = [var]
   variablesOf _ = []
 
-isUsed :: Text -> AST -> Bool
-isUsed var1 = everything (||) check
-  where
-  check :: AST -> Bool
-  check (Var _ var2) | var1 == var2 = True
-  check (Assignment _ target _) | var1 == targetVariable target = True
-  check _ = False
-
 targetVariable :: AST -> Text
 targetVariable (Var _ var) = var
 targetVariable (Indexer _ _ tgt) = targetVariable tgt

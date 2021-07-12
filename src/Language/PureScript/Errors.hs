@@ -1849,12 +1849,6 @@ toTypelevelString _ = Nothing
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError (throwError . f)
 
-reifyErrors :: (MonadError e m) => m a -> m (Either e a)
-reifyErrors ma = catchError (fmap Right ma) (return . Left)
-
-reflectErrors :: (MonadError e m) => m (Either e a) -> m a
-reflectErrors ma = ma >>= either throwError return
-
 warnAndRethrow :: (MonadError e m, MonadWriter e m) => (e -> e) -> m a -> m a
 warnAndRethrow f = rethrow f . censor f
 

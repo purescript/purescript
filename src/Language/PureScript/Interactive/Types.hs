@@ -15,7 +15,6 @@ module Language.PureScript.Interactive.Types
   , psciLetBindings
   , initialPSCiState
   , initialInteractivePrint
-  , psciImportedModuleNames
   , updateImportedModules
   , updateLoadedExterns
   , updateLets
@@ -108,10 +107,6 @@ psciEnvironment st = foldl' (flip P.applyExternsFileToEnvironment) P.initEnviron
 --   module. Otherwise, Nothing.
 --
 type ImportedModule = (P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)
-
-psciImportedModuleNames :: PSCiState -> [P.ModuleName]
-psciImportedModuleNames st =
-  map (\(mn, _, _) -> mn) (psciImportedModules st)
 
 -- * State helpers
 

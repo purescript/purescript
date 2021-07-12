@@ -5,17 +5,11 @@ module Language.PureScript.Interactive.Directive where
 
 import Prelude.Compat
 
-import Data.Maybe (fromJust, listToMaybe)
+import Data.Maybe (fromJust)
 import Data.List (isPrefixOf)
 import Data.Tuple (swap)
 
 import Language.PureScript.Interactive.Types
-
--- |
--- List of all available directives.
---
-directives :: [Directive]
-directives = map fst directiveStrings
 
 -- |
 -- A mapping of directives to the different strings that can be used to invoke
@@ -45,12 +39,6 @@ directiveStrings' = concatMap go directiveStrings
   go (dir, strs) = map (, dir) strs
 
 -- |
--- List of all directive strings.
---
-strings :: [String]
-strings = concatMap snd directiveStrings
-
--- |
 -- Returns all possible string representations of a directive.
 --
 stringsFor :: Directive -> [String]
@@ -76,9 +64,6 @@ directivesFor = map fst . directivesFor'
 
 directiveStringsFor :: String -> [String]
 directiveStringsFor = map snd . directivesFor'
-
-parseDirective :: String -> Maybe Directive
-parseDirective = listToMaybe . directivesFor
 
 -- |
 -- The help menu.

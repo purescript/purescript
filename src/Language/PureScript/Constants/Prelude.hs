@@ -9,29 +9,14 @@ import Language.PureScript.Names
 
 -- Operators
 
-($) :: forall a. (IsString a) => a
-($) = "$"
-
 apply :: forall a. (IsString a) => a
 apply = "apply"
-
-(#) :: forall a. (IsString a) => a
-(#) = "#"
 
 applyFlipped :: forall a. (IsString a) => a
 applyFlipped = "applyFlipped"
 
-(<>) :: forall a. (IsString a) => a
-(<>) = "<>"
-
-(++) :: forall a. (IsString a) => a
-(++) = "++"
-
 append :: forall a. (IsString a) => a
 append = "append"
-
-(>>=) :: forall a. (IsString a) => a
-(>>=) = ">>="
 
 bind :: forall a. (IsString a) => a
 bind = "bind"
@@ -42,71 +27,35 @@ discard = "discard"
 pattern Discard :: Qualified (ProperName 'ClassName)
 pattern Discard = Qualified (Just ControlBind) (ProperName "Discard")
 
-(+) :: forall a. (IsString a) => a
-(+) = "+"
-
 add :: forall a. (IsString a) => a
 add = "add"
-
-(-) :: forall a. (IsString a) => a
-(-) = "-"
 
 sub :: forall a. (IsString a) => a
 sub = "sub"
 
-(*) :: forall a. (IsString a) => a
-(*) = "*"
-
 mul :: forall a. (IsString a) => a
 mul = "mul"
-
-(/) :: forall a. (IsString a) => a
-(/) = "/"
 
 div :: forall a. (IsString a) => a
 div = "div"
 
-(%) :: forall a. (IsString a) => a
-(%) = "%"
-
-mod :: forall a. (IsString a) => a
-mod = "mod"
-
-(<) :: forall a. (IsString a) => a
-(<) = "<"
-
 lessThan :: forall a. (IsString a) => a
 lessThan = "lessThan"
-
-(>) :: forall a. (IsString a) => a
-(>) = ">"
 
 greaterThan :: forall a. (IsString a) => a
 greaterThan = "greaterThan"
 
-(<=) :: forall a. (IsString a) => a
-(<=) = "<="
-
 lessThanOrEq :: forall a. (IsString a) => a
 lessThanOrEq = "lessThanOrEq"
 
-(>=) :: forall a. (IsString a) => a
-(>=) = ">="
-
 greaterThanOrEq :: forall a. (IsString a) => a
 greaterThanOrEq = "greaterThanOrEq"
-
-(==) :: forall a. (IsString a) => a
-(==) = "=="
 
 eq :: forall a. (IsString a) => a
 eq = "eq"
 
 eq1 :: forall a. (IsString a) => a
 eq1 = "eq1"
-
-(/=) :: forall a. (IsString a) => a
-(/=) = "/="
 
 notEq :: forall a. (IsString a) => a
 notEq = "notEq"
@@ -117,14 +66,8 @@ compare = "compare"
 compare1 :: forall a. (IsString a) => a
 compare1 = "compare1"
 
-(&&) :: forall a. (IsString a) => a
-(&&) = "&&"
-
 conj :: forall a. (IsString a) => a
 conj = "conj"
-
-(||) :: forall a. (IsString a) => a
-(||) = "||"
 
 disj :: forall a. (IsString a) => a
 disj = "disj"
@@ -141,14 +84,8 @@ and = "and"
 xor :: forall a. (IsString a) => a
 xor = "xor"
 
-(<<<) :: forall a. (IsString a) => a
-(<<<) = "<<<"
-
 compose :: forall a. (IsString a) => a
 compose = "compose"
-
-(>>>) :: forall a. (IsString a) => a
-(>>>) = ">>>"
 
 composeFlipped :: forall a. (IsString a) => a
 composeFlipped = "composeFlipped"
@@ -190,17 +127,8 @@ bottom = "bottom"
 top :: forall a. (IsString a) => a
 top = "top"
 
-return :: forall a. (IsString a) => a
-return = "return"
-
 pure' :: forall a. (IsString a) => a
 pure' = "pure"
-
-returnEscaped :: forall a. (IsString a) => a
-returnEscaped = "$return"
-
-unit :: forall a. (IsString a) => a
-unit = "unit"
 
 -- Core lib values
 
@@ -292,17 +220,8 @@ ringNumber = "ringNumber"
 ringInt :: forall a. (IsString a) => a
 ringInt = "ringInt"
 
-moduloSemiringNumber :: forall a. (IsString a) => a
-moduloSemiringNumber = "moduloSemiringNumber"
-
-moduloSemiringInt :: forall a. (IsString a) => a
-moduloSemiringInt = "moduloSemiringInt"
-
 euclideanRingNumber :: forall a. (IsString a) => a
 euclideanRingNumber = "euclideanRingNumber"
-
-euclideanRingInt :: forall a. (IsString a) => a
-euclideanRingInt = "euclideanRingInt"
 
 ordBoolean :: forall a. (IsString a) => a
 ordBoolean = "ordBoolean"
@@ -337,9 +256,6 @@ eqBoolean = "eqBoolean"
 boundedBoolean :: forall a. (IsString a) => a
 boundedBoolean = "boundedBoolean"
 
-booleanAlgebraBoolean :: forall a. (IsString a) => a
-booleanAlgebraBoolean = "booleanAlgebraBoolean"
-
 heytingAlgebraBoolean :: forall a. (IsString a) => a
 heytingAlgebraBoolean = "heytingAlgebraBoolean"
 
@@ -349,25 +265,6 @@ semigroupString = "semigroupString"
 semigroupoidFn :: forall a. (IsString a) => a
 semigroupoidFn = "semigroupoidFn"
 
--- Generic Deriving
-
-generic :: forall a. (IsString a) => a
-generic = "Generic"
-
-toSpine :: forall a. (IsString a) => a
-toSpine = "toSpine"
-
-fromSpine :: forall a. (IsString a) => a
-fromSpine = "fromSpine"
-
-toSignature :: forall a. (IsString a) => a
-toSignature = "toSignature"
-
--- Main module
-
-main :: forall a. (IsString a) => a
-main = "main"
-
 -- Data.Symbol
 
 pattern DataSymbol :: ModuleName
@@ -375,9 +272,6 @@ pattern DataSymbol = ModuleName "Data.Symbol"
 
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
 pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
-
-prelude :: forall a. (IsString a) => a
-prelude = "Prelude"
 
 dataArray :: forall a. (IsString a) => a
 dataArray = "Data_Array"

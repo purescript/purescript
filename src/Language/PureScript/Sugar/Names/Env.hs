@@ -8,8 +8,6 @@ module Language.PureScript.Sugar.Names.Env
   , Env
   , primEnv
   , primExports
-  , envModuleSourceSpan
-  , envModuleImports
   , envModuleExports
   , ExportMode(..)
   , exportType
@@ -17,7 +15,6 @@ module Language.PureScript.Sugar.Names.Env
   , exportTypeClass
   , exportValue
   , exportValueOp
-  , getExports
   , checkImportConflicts
   ) where
 
@@ -158,18 +155,6 @@ nullExports = Exports M.empty M.empty M.empty M.empty M.empty
 -- useful information when there is a duplicate module definition.
 --
 type Env = M.Map ModuleName (SourceSpan, Imports, Exports)
-
--- |
--- Extracts the 'SourceSpan' from an 'Env' value.
---
-envModuleSourceSpan :: (SourceSpan, a, b) -> SourceSpan
-envModuleSourceSpan (ss, _, _) = ss
-
--- |
--- Extracts the 'Imports' from an 'Env' value.
---
-envModuleImports :: (a, Imports, b) -> Imports
-envModuleImports (_, imps, _) = imps
 
 -- |
 -- Extracts the 'Exports' from an 'Env' value.
@@ -465,16 +450,6 @@ throwExportConflict'
 throwExportConflict' ss new existing newName existingName =
   throwError . errorMessage' ss $
     ExportConflict (Qualified (Just new) newName) (Qualified (Just existing) existingName)
-
--- |
--- Gets the exports for a module, or raise an error if the module doesn't exist.
---
-getExports :: MonadError MultipleErrors m => Env -> ModuleName -> m Exports
-getExports env mn =
-  maybe
-    (throwError . errorMessage . UnknownName . Qualified Nothing $ ModName mn)
-    (return . envModuleExports)
-  $ M.lookup mn env
 
 -- |
 -- When reading a value from the imports, check that there are no conflicts in

@@ -13,8 +13,7 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Ide.SourceFile
-  ( parseModule
-  , parseModulesFromFiles
+  ( parseModulesFromFiles
   , extractAstInformation
   -- for tests
   , extractSpans
@@ -31,16 +30,8 @@ import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
-parseModule
-  :: (MonadIO m, MonadError IdeError m)
-  => FilePath
-  -> m (Either FilePath (FilePath, P.Module))
-parseModule path = do
-  (absPath, contents) <- ideReadFile path
-  pure (parseModule' absPath contents)
-
-parseModule' :: FilePath -> Text -> Either FilePath (FilePath, P.Module)
-parseModule' path file =
+parseModule :: FilePath -> Text -> Either FilePath (FilePath, P.Module)
+parseModule path file =
   case snd $ CST.parseFromFile path file of
     Left _ -> Left path
     Right m -> Right (path, m)
@@ -51,7 +42,7 @@ parseModulesFromFiles
   -> m [Either FilePath (FilePath, P.Module)]
 parseModulesFromFiles paths = do
   files <- traverse ideReadFile paths
-  pure (inParallel (map (uncurry parseModule') files))
+  pure (inParallel (map (uncurry parseModule) files))
   where
     inParallel :: [Either e (k, a)] -> [Either e (k, a)]
     inParallel = withStrategy (parList rseq)
