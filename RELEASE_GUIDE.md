@@ -120,6 +120,10 @@ considering what effects this may have:
   It's a good idea to check that the package can be installed from npm at this
   point.
 
+Note: if a release does not go as planned (e.g. [`v0.14.3`](https://github.com/purescript/purescript/pull/4139)), we should not delete the broken GitHub release or its Git tag. Rather, we should make a new release and update the release notes for the broken release to
+1. say that it's not a real release, and
+1. refer people to the newer release.
+
 ## After making a release
 
 - Document any language changes in the documentation repo
