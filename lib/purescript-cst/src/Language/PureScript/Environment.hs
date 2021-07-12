@@ -360,7 +360,7 @@ primClass name mkKind =
   [ let k = mkKind kindConstraint
     in (name, (k, ExternData (nominalRolesForKind k)))
   , let k = mkKind kindType
-    in (dictSynonymName <$> name, (k, TypeSynonym))
+    in (dictTypeName <$> name, (k, TypeSynonym))
   ]
 
 -- | The primitive types in the external environment with their
@@ -604,14 +604,14 @@ isNewtypeConstructor e ctor = case lookupConstructor e ctor of
 lookupValue :: Environment -> Qualified Ident -> Maybe (SourceType, NameKind, NameVisibility)
 lookupValue env ident = ident `M.lookup` names env
 
-dictSynonymName' :: Text -> Text
-dictSynonymName' = (<> "$Dict")
+dictTypeName' :: Text -> Text
+dictTypeName' = (<> "$Dict")
 
-dictSynonymName :: ProperName a -> ProperName a
-dictSynonymName = ProperName . dictSynonymName' . runProperName
+dictTypeName :: ProperName a -> ProperName a
+dictTypeName = ProperName . dictTypeName' . runProperName
 
-isDictSynonym :: ProperName a -> Bool
-isDictSynonym = T.isSuffixOf "$Dict" . runProperName
+isDictTypeName :: ProperName a -> Bool
+isDictTypeName = T.isSuffixOf "$Dict" . runProperName
 
 -- |
 -- Given the kind of a type, generate a list @Nominal@ roles. This is used for
