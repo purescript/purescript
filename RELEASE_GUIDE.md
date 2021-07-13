@@ -88,9 +88,8 @@ considering what effects this may have:
   - If `purescript-cst` has changed at all since the last release:
 
       - The `version` field in `lib/purescript-cst/purescript-cst.cabal` (note
-        that the new version should be based on the PVP, according to what
-        changed since the previous release, and not on the actual compiler
-        version)
+        that the new version should be based on the [PVP](https://pvp.haskell.org/),
+        according to what changed since the previous release, and not on the actual compiler version)
 
       - The versions table in `lib/purescript-cst/README.md`,
 
@@ -98,6 +97,8 @@ considering what effects this may have:
 
 - Run `stack update-changelog.hs`, which will move the entries in `CHANGELOG.d`
   to a new section in `CHANGELOG.md` labeled with the new version.
+
+- Submit a PR with the above commits and get it merged.
 
 - Create a release from the releases tab in GitHub and copy in the release
   notes. This will also create a tag, which will kick off a CI build, which
