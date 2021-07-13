@@ -120,6 +120,14 @@ data DataKindAnnotation (a :: Type) = DataKindAnnotation a
 
 data DataKindAnnotationWithParens (a :: (Type)) = DataKindAnnotationWithParens a
 
+data FunctionParens1 :: (->) Type Type
+data FunctionParens1 a = FunctionParens1 a
+
+data FunctionParens2 :: ((->) Type) Type
+data FunctionParens2 a = FunctionParens2 a
+
+data FunctionParens3 :: (((->) Type)) Type
+data FunctionParens3 a = FunctionParens3 a
 ----------
 
 -- | dit
