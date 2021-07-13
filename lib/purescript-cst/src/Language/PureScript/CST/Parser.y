@@ -1,6 +1,7 @@
 {
 module Language.PureScript.CST.Parser
   ( parseType
+  , parseExpr
   , parseDecl
   , parseIdent
   , parseOperator
@@ -37,6 +38,7 @@ import Language.PureScript.PSString (PSString)
 %expect 0
 
 %name parseType type
+%name parseExpr expr
 %name parseIdent ident
 %name parseOperator op
 %name parseModuleBody moduleBody
