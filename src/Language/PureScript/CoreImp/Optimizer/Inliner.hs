@@ -4,6 +4,7 @@ module Language.PureScript.CoreImp.Optimizer.Inliner
   , inlineCommonValues
   , inlineCommonOperators
   , inlineFnComposition
+  , inlineFnIdentity
   , inlineUnsafeCoerce
   , inlineUnsafePartial
   , etaConvert
@@ -77,23 +78,23 @@ inlineVariables = everywhere $ removeFromBlock go
   where
   go :: [AST] -> [AST]
   go [] = []
-  go (VariableIntroduction _ var (Just js) : sts)
+  go (VariableIntroduction _ var (Just (_, js)) : sts)
     | shouldInline js && not (any (isReassigned var) sts) && not (any (isRebound js) sts) && not (any (isUpdated var) sts) =
       go (map (replaceIdent var js) sts)
   go (s:sts) = s : go sts
 
-inlineCommonValues :: AST -> AST
-inlineCommonValues = everywhere convert
+inlineCommonValues :: (AST -> AST) -> AST -> AST
+inlineCommonValues expander = everywhere convert
   where
   convert :: AST -> AST
-  convert (App ss fn [dict])
+  convert (expander -> App ss fn [dict])
     | isDict' [semiringNumber, semiringInt] dict && isDict fnZero fn = NumericLiteral ss (Left 0)
     | isDict' [semiringNumber, semiringInt] dict && isDict fnOne fn = NumericLiteral ss (Left 1)
     | isDict boundedBoolean dict && isDict fnBottom fn = BooleanLiteral ss False
     | isDict boundedBoolean dict && isDict fnTop fn = BooleanLiteral ss True
-  convert (App ss (App _ fn [dict]) [x])
+  convert (App ss (expander -> App _ fn [dict]) [x])
     | isDict ringInt dict && isDict fnNegate fn = Binary ss BitwiseOr (Unary ss Negate x) (NumericLiteral ss (Left 0))
-  convert (App ss (App _ (App _ fn [dict]) [x]) [y])
+  convert (App ss (App _ (expander -> App _ fn [dict]) [x]) [y])
     | isDict semiringInt dict && isDict fnAdd fn = intOp ss Add x y
     | isDict semiringInt dict && isDict fnMultiply fn = intOp ss Multiply x y
     | isDict ringInt dict && isDict fnSubtract fn = intOp ss Subtract x y
@@ -108,8 +109,8 @@ inlineCommonValues = everywhere convert
   fnNegate = (C.dataRing, C.negate)
   intOp ss op x y = Binary ss BitwiseOr (Binary ss op x y) (NumericLiteral ss (Left 0))
 
-inlineCommonOperators :: AST -> AST
-inlineCommonOperators = everywhereTopDown $ applyAll $
+inlineCommonOperators :: (AST -> AST) -> AST -> AST
+inlineCommonOperators expander = everywhereTopDown . applyAll $
   [ binary semiringNumber opAdd Add
   , binary semiringNumber opMul Multiply
 
@@ -175,7 +176,7 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   binary :: (Text, PSString) -> (Text, PSString) -> BinaryOperator -> AST -> AST
   binary dict fns op = convert where
     convert :: AST -> AST
-    convert (App ss (App _ (App _ fn [dict']) [x]) [y]) | isDict dict dict' && isDict fns fn = Binary ss op x y
+    convert (App ss (App _ (expander -> App _ fn [dict']) [x]) [y]) | isDict dict dict' && isDict fns fn = Binary ss op x y
     convert other = other
   binary' :: Text -> PSString -> BinaryOperator -> AST -> AST
   binary' moduleName opString op = convert where
@@ -185,7 +186,7 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   unary :: (Text, PSString) -> (Text, PSString) -> UnaryOperator -> AST -> AST
   unary dicts fns op = convert where
     convert :: AST -> AST
-    convert (App ss (App _ fn [dict']) [x]) | isDict dicts dict' && isDict fns fn = Unary ss op x
+    convert (App ss (expander -> App _ fn [dict']) [x]) | isDict dicts dict' && isDict fns fn = Unary ss op x
     convert other = other
   unary' :: Text -> PSString -> UnaryOperator -> AST -> AST
   unary' moduleName fnName op = convert where
@@ -260,20 +261,21 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
-inlineFnComposition :: forall m. MonadSupply m => AST -> m AST
-inlineFnComposition = everywhereTopDownM convert where
+inlineFnComposition :: forall m. MonadSupply m => (AST -> AST) -> AST -> m AST
+inlineFnComposition expander = everywhereTopDownM convert
+  where
   convert :: AST -> m AST
-  convert (App s1 (App s2 (App _ (App _ fn [dict']) [x]) [y]) [z])
+  convert (App s1 (App s2 (App _ (expander -> App _ fn [dict']) [x]) [y]) [z])
     | isFnCompose dict' fn = return $ App s1 x [App s2 y [z]]
     | isFnComposeFlipped dict' fn = return $ App s2 y [App s1 x [z]]
-  convert app@(App ss (App _ (App _ fn [dict']) _) _)
+  convert app@(App ss (App _ (expander -> App _ fn [dict']) _) _)
     | isFnCompose dict' fn || isFnComposeFlipped dict' fn = mkApps ss <$> goApps app <*> freshName
   convert other = return other
 
   mkApps :: Maybe SourceSpan -> [Either AST (Text, AST)] -> Text -> AST
   mkApps ss fns a = App ss (Function ss Nothing [] (Block ss $ vars <> [Return Nothing comp])) []
     where
-    vars = uncurry (VariableIntroduction ss) . fmap Just <$> rights fns
+    vars = uncurry (VariableIntroduction ss) . fmap (Just . (UnknownPurity,)) <$> rights fns
     comp = Function ss Nothing [a] (Block ss [Return Nothing apps])
     apps = foldr (\fn acc -> App ss (mkApp fn) [acc]) (Var ss a) fns
 
@@ -281,7 +283,7 @@ inlineFnComposition = everywhereTopDownM convert where
   mkApp = either id $ \(name, arg) -> Var (getSourceSpan arg) name
 
   goApps :: AST -> m [Either AST (Text, AST)]
-  goApps (App _ (App _ (App _ fn [dict']) [x]) [y])
+  goApps (App _ (App _ (expander -> App _ fn [dict']) [x]) [y])
     | isFnCompose dict' fn = mappend <$> goApps x <*> goApps y
     | isFnComposeFlipped dict' fn = mappend <$> goApps y <*> goApps x
   goApps app@App {} = pure . Right . (,app) <$> freshName
@@ -298,6 +300,16 @@ inlineFnComposition = everywhereTopDownM convert where
 
   fnComposeFlipped :: forall a b. (IsString a, IsString b) => (a, b)
   fnComposeFlipped = (C.controlSemigroupoid, C.composeFlipped)
+
+inlineFnIdentity :: (AST -> AST) -> AST -> AST
+inlineFnIdentity expander = everywhereTopDown convert
+  where
+  convert :: AST -> AST
+  convert (App _ (expander -> App _ fn [dict]) [x]) | isDict categoryFn dict && isDict fnIdentity fn = x
+  convert other = other
+
+  fnIdentity :: forall a b. (IsString a, IsString b) => (a, b)
+  fnIdentity = (C.controlCategory, C.identity)
 
 inlineUnsafeCoerce :: AST -> AST
 inlineUnsafeCoerce = everywhereTopDown convert where
@@ -371,6 +383,9 @@ heytingAlgebraBoolean = (C.dataHeytingAlgebra, C.heytingAlgebraBoolean)
 
 semigroupoidFn :: forall a b. (IsString a, IsString b) => (a, b)
 semigroupoidFn = (C.controlSemigroupoid, C.semigroupoidFn)
+
+categoryFn :: forall a b. (IsString a, IsString b) => (a, b)
+categoryFn = (C.controlCategory, C.categoryFn)
 
 opAdd :: forall a b. (IsString a, IsString b) => (a, b)
 opAdd = (C.dataSemiring, C.add)

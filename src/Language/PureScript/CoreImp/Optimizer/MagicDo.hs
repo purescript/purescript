@@ -27,17 +27,17 @@ import qualified Language.PureScript.Constants.Prelude as C
 --    var x = m1();
 --    ...
 --  }
-magicDoEff :: AST -> AST
+magicDoEff :: (AST -> AST) -> AST -> AST
 magicDoEff = magicDo C.eff C.effDictionaries
 
-magicDoEffect :: AST -> AST
+magicDoEffect :: (AST -> AST) -> AST -> AST
 magicDoEffect = magicDo C.effect C.effectDictionaries
 
-magicDoST :: AST -> AST
+magicDoST :: (AST -> AST) -> AST -> AST
 magicDoST = magicDo C.st C.stDictionaries
 
-magicDo :: Text -> C.EffectDictionaries -> AST -> AST
-magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
+magicDo :: Text -> C.EffectDictionaries -> (AST -> AST) -> AST -> AST
+magicDo effectModule C.EffectDictionaries{..} expander = everywhereTopDown convert
   where
   -- The name of the function block which is added to denote a do block
   fnName = "__do"
@@ -54,7 +54,7 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
     Function s1 (Just fnName) [] $ Block s2 (App s2 m [] : map applyReturns js )
   -- Desugar bind
   convert (App _ (App _ bind [m]) [Function s1 Nothing [arg] (Block s2 js)]) | isBind bind =
-    Function s1 (Just fnName) [] $ Block s2 (VariableIntroduction s2 arg (Just (App s2 m [])) : map applyReturns js)
+    Function s1 (Just fnName) [] $ Block s2 (VariableIntroduction s2 arg (Just (UnknownPurity, App s2 m [])) : map applyReturns js)
   -- Desugar untilE
   convert (App s1 (App _ f [arg]) []) | isEffFunc edUntil f =
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (Unary s1 Not (App s1 arg [])) (Block s1 []), Return s1 $ ObjectLiteral s1 []])) []
@@ -68,16 +68,16 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
     App s1 (Function s2 Nothing [] (Block ss (applyReturns `fmap` body))) []
   convert other = other
   -- Check if an expression represents a monomorphic call to >>= for the Eff monad
-  isBind (App _ fn [dict]) | isDict (effectModule, edBindDict) dict && isBindPoly fn = True
+  isBind (expander -> App _ fn [dict]) | isDict (effectModule, edBindDict) dict && isBindPoly fn = True
   isBind _ = False
   -- Check if an expression represents a call to @discard@
-  isDiscard (App _ (App _ fn [dict1]) [dict2])
+  isDiscard (expander -> App _ (expander -> App _ fn [dict1]) [dict2])
     | isDict (C.controlBind, C.discardUnitDictionary) dict1 &&
       isDict (effectModule, edBindDict) dict2 &&
       isDiscardPoly fn = True
   isDiscard _ = False
   -- Check if an expression represents a monomorphic call to pure or return for the Eff applicative
-  isPure (App _ fn [dict]) | isDict (effectModule, edApplicativeDict) dict && isPurePoly fn = True
+  isPure (expander -> App _ fn [dict]) | isDict (effectModule, edApplicativeDict) dict && isPurePoly fn = True
   isPure _ = False
   -- Check if an expression represents the polymorphic >>= function
   isBindPoly = isDict (C.controlBind, C.bind)
@@ -130,7 +130,7 @@ inlineST = everywhere convertBlock
   -- Find all ST Refs initialized in this block
   findSTRefsIn = everything (++) isSTRef
     where
-    isSTRef (VariableIntroduction _ ident (Just (App _ (App _ f [_]) []))) | isSTFunc C.newSTRef f = [ident]
+    isSTRef (VariableIntroduction _ ident (Just (_, App _ (App _ f [_]) []))) | isSTFunc C.newSTRef f = [ident]
     isSTRef _ = []
   -- Find all STRefs used as arguments to readSTRef, writeSTRef, modifySTRef
   findAllSTUsagesIn = everything (++) isSTUsage

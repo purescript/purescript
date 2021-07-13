@@ -52,7 +52,7 @@ data Expr a
   -- A let binding
   --
   | Let a [Bind a] (Expr a)
-  deriving (Show, Functor)
+  deriving (Show, Functor, Eq, Ord)
 
 -- |
 -- A let or module binding.
@@ -65,7 +65,7 @@ data Bind a
   -- |
   -- Mutually recursive binding group for several values
   --
-  | Rec [((a, Ident), Expr a)] deriving (Show, Functor)
+  | Rec [((a, Ident), Expr a)] deriving (Show, Functor, Eq, Ord)
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
@@ -84,7 +84,7 @@ data CaseAlternative a = CaseAlternative
     -- The result expression or a collect of guarded expressions
     --
   , caseAlternativeResult :: Either [(Guard a, Expr a)] (Expr a)
-  } deriving (Show)
+  } deriving (Show, Eq, Ord)
 
 instance Functor CaseAlternative where
 

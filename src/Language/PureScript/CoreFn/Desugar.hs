@@ -1,7 +1,7 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
 import Prelude.Compat
-import Protolude (ordNub)
+import Protolude (orEmpty, ordNub)
 
 import Control.Arrow (second)
 
@@ -28,6 +28,7 @@ import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDic
 import Language.PureScript.Types
 import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.AST as A
+import qualified Language.PureScript.Constants.Prelude as C
 import qualified Language.PureScript.Constants.Prim as C
 
 -- | Desugars a module from AST to CoreFn representation.
@@ -98,7 +99,17 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn _ _ _ (A.Abs _ _) =
     internalError "Abs with Binder argument was not desugared before exprToCoreFn mn"
   exprToCoreFn ss com ty (A.App v1 v2) =
-    App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
+    App (ss, com, ty, isSynthetic v2 `orEmpty` IsSyntheticApp) v1' v2'
+    where
+    v1' = exprToCoreFn ss [] Nothing v1
+    v2' = exprToCoreFn ss [] Nothing v2
+    isSynthetic = \case
+      A.App v3 v4                           -> isSynthetic v3 && isSynthetic v4
+      A.Accessor _ v3                       -> isSynthetic v3
+      A.Var NullSourceSpan _                -> True
+      A.Unused{}                            -> True
+      A.TypeClassDictionaryConstructorApp{} -> True
+      _                                     -> False
   exprToCoreFn ss com ty (A.Unused _) =
     Var (ss, com, ty, Nothing) (Qualified (Just C.Prim) (Ident C.undefined))
   exprToCoreFn _ com ty (A.Var ss ident) =
@@ -122,7 +133,8 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal _ (A.ObjectLiteral vs))) =
     let args = exprToCoreFn ss [] Nothing . snd <$> sortOn fst vs
         ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
-    in foldl (App (ss, com, Nothing, Nothing)) ctor args
+        meta = (name == C.IsSymbol) `orEmpty` IsSyntheticApp
+    in foldl (App (ss, com, Nothing, meta)) ctor args
   exprToCoreFn ss com ty  (A.TypeClassDictionaryAccessor _ ident) =
     Abs (ss, com, ty, Nothing) (Ident "dict")
       (Accessor (ssAnn ss) (mkString $ runIdent ident) (Var (ssAnn ss) $ Qualified Nothing (Ident "dict")))

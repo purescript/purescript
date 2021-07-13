@@ -21,6 +21,8 @@ module Language.PureScript.CoreImp.Optimizer (optimize) where
 
 import Prelude.Compat
 
+import Data.Text (Text)
+
 import Control.Monad.Supply.Class (MonadSupply)
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Blocks
@@ -31,17 +33,20 @@ import Language.PureScript.CoreImp.Optimizer.TCO
 import Language.PureScript.CoreImp.Optimizer.Unused
 
 -- | Apply a series of optimizer passes to simplified JavaScript code
-optimize :: MonadSupply m => AST -> m AST
-optimize js = do
-    js' <- untilFixedPoint (inlineFnComposition . inlineUnsafeCoerce . inlineUnsafePartial . tidyUp . applyAll
-      [ inlineCommonValues
-      , inlineCommonOperators
-      ]) js
-    untilFixedPoint (return . tidyUp) . tco . inlineST
-      =<< untilFixedPoint (return . magicDoST)
-      =<< untilFixedPoint (return . magicDoEff)
-      =<< untilFixedPoint (return . magicDoEffect) js'
+optimize :: forall m. MonadSupply m => [Text] -> [[AST]] -> m [[AST]]
+optimize exps jsDecls = removeUnusedPureVars exps <$> traverse (traverse go) jsDecls
   where
+    go :: AST -> m AST
+    go js = do
+      js' <- untilFixedPoint (inlineFnComposition expander . inlineFnIdentity expander . inlineUnsafeCoerce . inlineUnsafePartial . tidyUp . applyAll
+        [ inlineCommonValues expander
+        , inlineCommonOperators expander
+        ]) js
+      untilFixedPoint (return . tidyUp) . tco . inlineST
+        =<< untilFixedPoint (return . magicDoST expander)
+        =<< untilFixedPoint (return . magicDoEff expander)
+        =<< untilFixedPoint (return . magicDoEffect expander) js'
+
     tidyUp :: AST -> AST
     tidyUp = applyAll
       [ collapseNestedBlocks
@@ -54,9 +59,27 @@ optimize js = do
       , inlineVariables
       ]
 
+    expander = buildExpander (concat jsDecls)
+
 untilFixedPoint :: (Monad m, Eq a) => (a -> m a) -> a -> m a
 untilFixedPoint f = go
   where
   go a = do
    a' <- f a
    if a' == a then return a' else go a'
+
+-- |
+-- Take all top-level ASTs and return a function for expanding top-level
+-- variables during the various inlining steps in `optimize`.
+--
+-- Everything that gets inlined as an optimization is of a form that would
+-- have been lifted to a top-level binding during CSE, so for purposes of
+-- inlining we can save some time by only expanding variables bound at that
+-- level and not worrying about any inner scopes.
+--
+buildExpander :: [AST] -> AST -> AST
+buildExpander = replaceIdents . foldr go []
+  where
+  go = \case
+    VariableIntroduction _ name (Just (IsPure, e)) -> ((name, e) :)
+    _ -> id

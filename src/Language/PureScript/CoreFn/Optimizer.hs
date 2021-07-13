@@ -1,11 +1,13 @@
 module Language.PureScript.CoreFn.Optimizer (optimizeCoreFn) where
 
-import Protolude hiding (Type)
+import Protolude hiding (Type, moduleName)
 
+import Control.Monad.Supply (Supply)
 import Data.List (lookup)
 import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CoreFn.Ann
+import Language.PureScript.CoreFn.CSE
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.CoreFn.Traversals
@@ -17,8 +19,8 @@ import qualified Language.PureScript.Constants.Prim as C
 -- |
 -- CoreFn optimization pass.
 --
-optimizeCoreFn :: Module Ann -> Module Ann
-optimizeCoreFn m = m {moduleDecls = optimizeModuleDecls $ moduleDecls m}
+optimizeCoreFn :: Module Ann -> Supply (Module Ann)
+optimizeCoreFn m = fmap (\md -> m {moduleDecls = md}) . optimizeCommonSubexpressions (moduleName m) . optimizeModuleDecls $ moduleDecls m
 
 optimizeModuleDecls :: [Bind Ann] -> [Bind Ann]
 optimizeModuleDecls = map transformBinds

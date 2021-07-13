@@ -197,6 +197,7 @@ library
     Language.PureScript.CoreFn
     Language.PureScript.CoreFn.Ann
     Language.PureScript.CoreFn.Binders
+    Language.PureScript.CoreFn.CSE
     Language.PureScript.CoreFn.Desugar
     Language.PureScript.CoreFn.Expr
     Language.PureScript.CoreFn.FromJSON

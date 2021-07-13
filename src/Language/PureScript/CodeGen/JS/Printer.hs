@@ -71,7 +71,7 @@ literals = mkPattern' match'
   match (Var _ ident) = return $ emit ident
   match (VariableIntroduction _ ident value) = mconcat <$> sequence
     [ return $ emit $ "var " <> ident
-    , maybe (return mempty) (fmap (emit " = " <>) . prettyPrintJS') value
+    , maybe (return mempty) (fmap (emit " = " <>) . prettyPrintJS' . snd) value
     ]
   match (Assignment _ target value) = mconcat <$> sequence
     [ prettyPrintJS' target

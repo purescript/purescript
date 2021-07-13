@@ -28,6 +28,7 @@ import Prelude.Compat
 import qualified Language.PureScript as P
 
 import Control.Arrow ((>>>))
+import qualified Data.ByteString as BS
 import Data.Function (on)
 import Data.List (sort, stripPrefix, minimumBy)
 import Data.Maybe (mapMaybe)
@@ -54,6 +55,7 @@ spec = do
   passingTests
   warningTests
   failingTests
+  optimizeTests
 
 passingTests :: SpecWith SupportModules
 passingTests = do
@@ -86,6 +88,15 @@ failingTests = do
       it ("'" <> takeFileName mainPath <> "' should fail to compile") $ \support -> do
         expectedFailures <- getShouldFailWith mainPath
         assertDoesNotCompile support testPurs expectedFailures
+
+optimizeTests :: SpecWith SupportModules
+optimizeTests = do
+  optimizeTestCases <- runIO $ getTestFiles "optimize"
+
+  describe "Optimization examples" $
+    forM_ optimizeTestCases $ \testPurs ->
+      it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile to expected output") $ \support ->
+        assertCompilesToExpectedOutput support testPurs
 
 checkShouldReport :: [String] -> (P.MultipleErrors -> String) -> P.MultipleErrors -> Expectation
 checkShouldReport expected prettyPrintDiagnostics errs =
@@ -177,6 +188,19 @@ assertDoesNotCompile support inputFiles shouldFailWith = do
         (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest result)
     Right _ ->
       expectationFailure "Should not have compiled"
+
+assertCompilesToExpectedOutput
+  :: SupportModules
+  -> [FilePath]
+  -> Expectation
+assertCompilesToExpectedOutput support inputFiles = do
+  (result, _) <- compile support inputFiles
+  case result of
+    Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+    Right _ ->
+      goldenVsString
+        (replaceExtension (getTestMain inputFiles) ".out.js")
+        (BS.readFile $ modulesDir </> "Main/index.js")
 
 -- Prints a set of diagnostics (i.e. errors or warnings) as a string, in order
 -- to compare it to the contents of a golden test file.

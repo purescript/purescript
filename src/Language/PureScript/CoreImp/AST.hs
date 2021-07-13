@@ -44,6 +44,12 @@ data BinaryOperator
   | ZeroFillShiftRight
   deriving (Show, Eq)
 
+-- |
+-- Indicates whether the initializer of a variable is known not to have side
+-- effects, and thus can be inlined if needed or removed if unneeded.
+--
+data PurityAnnotation = IsPure | UnknownPurity deriving (Show, Eq)
+
 -- | Data type for simplified JavaScript expressions
 data AST
   = NumericLiteral (Maybe SourceSpan) (Either Integer Double)
@@ -70,7 +76,7 @@ data AST
   -- ^ Variable
   | Block (Maybe SourceSpan) [AST]
   -- ^ A block of expressions in braces
-  | VariableIntroduction (Maybe SourceSpan) Text (Maybe AST)
+  | VariableIntroduction (Maybe SourceSpan) Text (Maybe (PurityAnnotation, AST))
   -- ^ A variable introduction and optional initialization
   | Assignment (Maybe SourceSpan) AST AST
   -- ^ A variable assignment
@@ -162,7 +168,7 @@ everywhere f = go where
   go (Function ss name args j) = f (Function ss name args (go j))
   go (App ss j js) = f (App ss (go j) (map go js))
   go (Block ss js) = f (Block ss (map go js))
-  go (VariableIntroduction ss name j) = f (VariableIntroduction ss name (fmap go j))
+  go (VariableIntroduction ss name j) = f (VariableIntroduction ss name (fmap (fmap go) j))
   go (Assignment ss j1 j2) = f (Assignment ss (go j1) (go j2))
   go (While ss j1 j2) = f (While ss (go j1) (go j2))
   go (For ss name j1 j2 j3) = f (For ss name (go j1) (go j2) (go j3))
@@ -188,7 +194,7 @@ everywhereTopDownM f = f >=> go where
   go (Function ss name args j) = Function ss name args <$> f' j
   go (App ss j js) = App ss <$> f' j <*> traverse f' js
   go (Block ss js) = Block ss <$> traverse f' js
-  go (VariableIntroduction ss name j) = VariableIntroduction ss name <$> traverse f' j
+  go (VariableIntroduction ss name j) = VariableIntroduction ss name <$> traverse (traverse f') j
   go (Assignment ss j1 j2) = Assignment ss <$> f' j1 <*> f' j2
   go (While ss j1 j2) = While ss <$> f' j1 <*> f' j2
   go (For ss name j1 j2 j3) = For ss name <$> f' j1 <*> f' j2 <*> f' j3
@@ -210,7 +216,7 @@ everything (<>.) f = go where
   go j@(Function _ _ _ j1) = f j <>. go j1
   go j@(App _ j1 js) = foldl (<>.) (f j <>. go j1) (map go js)
   go j@(Block _ js) = foldl (<>.) (f j) (map go js)
-  go j@(VariableIntroduction _ _ (Just j1)) = f j <>. go j1
+  go j@(VariableIntroduction _ _ (Just (_, j1))) = f j <>. go j1
   go j@(Assignment _ j1 j2) = f j <>. go j1 <>. go j2
   go j@(While _ j1 j2) = f j <>. go j1 <>. go j2
   go j@(For _ _ j1 j2 j3) = f j <>. go j1 <>. go j2 <>. go j3
