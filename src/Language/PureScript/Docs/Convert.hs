@@ -109,30 +109,31 @@ insertValueTypesAndAdjustKinds env m =
   -- - `Type -> K` where `K` is an "uninteresting" kind
   isUninteresting
     :: P.KindSignatureFor -> Type' -> Bool
-  isUninteresting keyword = \case
-    -- `Type -> ...`
-    P.TypeApp _ (P.TypeApp _ (P.TypeConstructor () Prim.Function) ty) t2 | isKindPrimType ty ->
-      isUninteresting keyword t2
-
-    -- `(Type) -> ...` or `Type -> (Type -> Type`)`
-    P.ParensInType _ ty -> isUninteresting keyword ty
-
-    x ->
-      isKindPrimType x || (isClassKeyword && isKindPrimConstraint x)
+  isUninteresting keyword = isUninteresting' . dropParenthesis
     where
+      dropParenthesis = \case
+        P.ParensInType _ ty -> dropParenthesis ty
+        P.TypeApp sa f a -> P.TypeApp sa (dropParenthesis f) (dropParenthesis a)
+        x -> x
+
+      isUninteresting' = \case
+          -- `Type -> ...`
+          P.TypeApp _ (P.TypeApp _ f a) t2 | isKindFunction f && isKindPrimType a ->
+            isUninteresting keyword t2
+
+          x ->
+            isKindPrimType x || (isClassKeyword && isKindPrimConstraint x)
+
       isClassKeyword = case keyword of
         P.ClassSig -> True
         _ -> False
 
+      isKindFunction = isTypeConstructor Prim.Function
       isKindPrimType = isTypeConstructor Prim.Type
-
       isKindPrimConstraint = isTypeConstructor Prim.Constraint
 
-      -- account for redundant parenthesis around kinds
-      -- e.g. `(Type) -> Type` or `(Type) -> Constraint`
       isTypeConstructor k = \case
         P.TypeConstructor _ k' -> k' == k
-        P.ParensInType _ ty -> isTypeConstructor k ty
         _ -> False
 
   insertInferredKind :: Declaration -> Text -> P.KindSignatureFor -> Declaration
