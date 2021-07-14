@@ -7,7 +7,7 @@ import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive.Types
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath (pathSeparator, makeRelative)
-import           System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
+import           System.IO.UTF8 (readUTF8FilesT)
 
 -- * Support Module
 
@@ -20,15 +20,6 @@ supportModuleIsDefined :: [P.ModuleName] -> Bool
 supportModuleIsDefined = elem supportModuleName
 
 -- * Module Management
-
--- | Loads a file for use with imports.
-loadModule :: FilePath -> IO (Either String [P.Module])
-loadModule filename = do
-  pwd <- getCurrentDirectory
-  content <- readUTF8FileT filename
-  return $
-    either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd}) (Right . map (snd . snd)) $
-      CST.parseFromFiles id [(filename, content)]
 
 -- | Load all modules.
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
