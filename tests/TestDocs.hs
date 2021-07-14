@@ -303,7 +303,7 @@ displayAssertionFailure = \case
     "  got `" <> actualTxt <> "`\n" <>
     "Structure of kind: " <> T.pack (show actualKind)
   KindSignaturePresent _ decl actualTxt actualKind ->
-    "the kind signature for " <> decl <> "was not empty.\n" <>
+    "the kind signature for " <> decl <> " was not empty.\n" <>
     "got `" <> actualTxt <> "`\n" <>
     "Structure of kind: " <> T.pack (show actualKind)
   DocCommentMergeFailure _ decl expected actual ->
