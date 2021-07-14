@@ -267,18 +267,11 @@ kindType = primKind C.typ
 kindConstraint :: SourceType
 kindConstraint = primKind C.constraint
 
-isKindType :: Type a -> Bool
-isKindType (TypeConstructor _ n) = n == primName C.typ
-isKindType _ = False
-
 kindSymbol :: SourceType
 kindSymbol = primKind C.symbol
 
 kindDoc :: SourceType
 kindDoc = primSubKind C.typeError C.doc
-
-kindBoolean :: SourceType
-kindBoolean = primSubKind C.moduleBoolean C.kindBoolean
 
 kindOrdering :: SourceType
 kindOrdering = primSubKind C.moduleOrdering C.kindOrdering
@@ -333,18 +326,6 @@ tyVar = TypeVar nullSourceAnn
 
 tyForall :: Text -> SourceType -> SourceType -> SourceType
 tyForall var k ty = ForAll nullSourceAnn var (Just k) ty Nothing
-
--- | Check whether a type is a record
-isObject :: Type a -> Bool
-isObject = isTypeOrApplied tyRecord
-
--- | Check whether a type is a function
-isFunction :: Type a -> Bool
-isFunction = isTypeOrApplied tyFunction
-
-isTypeOrApplied :: Type a -> Type b -> Bool
-isTypeOrApplied t1 (TypeApp _ t2 _) = eqType t1 t2
-isTypeOrApplied t1 t2 = eqType t1 t2
 
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
@@ -593,12 +574,6 @@ primTypeErrorClasses =
 lookupConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
 lookupConstructor env ctor =
   fromMaybe (internalError "Data constructor not found") $ ctor `M.lookup` dataConstructors env
-
--- | Checks whether a data constructor is for a newtype.
-isNewtypeConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> Bool
-isNewtypeConstructor e ctor = case lookupConstructor e ctor of
-  (Newtype, _, _, _) -> True
-  (Data, _, _, _) -> False
 
 -- | Finds information about values from the current environment.
 lookupValue :: Environment -> Qualified Ident -> Maybe (SourceType, NameKind, NameVisibility)
