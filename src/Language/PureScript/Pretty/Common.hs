@@ -17,12 +17,6 @@ import Language.PureScript.CST.Lexer (isUnquotedKey)
 import Text.PrettyPrint.Boxes hiding ((<>))
 import qualified Text.PrettyPrint.Boxes as Box
 
--- |
--- Wrap a string in parentheses
---
-parens :: String -> String
-parens s = "(" <> s <> ")"
-
 parensT :: Text -> Text
 parensT s = "(" <> s <> ")"
 
@@ -108,9 +102,6 @@ addPos (SourcePos n _) (SourcePos n' m') = SourcePos (n+n') m'
 
 data PrinterState = PrinterState { indent :: Int }
 
-emptyPrinterState :: PrinterState
-emptyPrinterState = PrinterState { indent = 0 }
-
 -- |
 -- Number of characters per indentation level
 --
@@ -134,15 +125,6 @@ currentIndent :: (Emit gen) => StateT PrinterState Maybe gen
 currentIndent = do
   current <- get
   return $ emit $ T.replicate (indent current) " "
-
--- |
--- Print many lines
---
-prettyPrintMany :: (Emit gen) => (a -> StateT PrinterState Maybe gen) -> [a] -> StateT PrinterState Maybe gen
-prettyPrintMany f xs = do
-  ss <- mapM f xs
-  indentString <- currentIndent
-  return $ intercalate (emit "\n") $ map (mappend indentString) ss
 
 objectKeyRequiresQuoting :: Text -> Bool
 objectKeyRequiresQuoting = not . isUnquotedKey

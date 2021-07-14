@@ -6,7 +6,6 @@ module Language.PureScript.Sugar.BindingGroups
   ( createBindingGroups
   , createBindingGroupsModule
   , collapseBindingGroups
-  , collapseBindingGroupsModule
   ) where
 
 import Prelude.Compat
@@ -43,14 +42,6 @@ createBindingGroupsModule
   -> m Module
 createBindingGroupsModule (Module ss coms name ds exps) =
   Module ss coms name <$> createBindingGroups name ds <*> pure exps
-
--- |
--- Collapse all binding groups in a module to individual declarations
---
-collapseBindingGroupsModule :: [Module] -> [Module]
-collapseBindingGroupsModule =
-  fmap $ \(Module ss coms name ds exps) ->
-    Module ss coms name (collapseBindingGroups ds) exps
 
 createBindingGroups
   :: forall m

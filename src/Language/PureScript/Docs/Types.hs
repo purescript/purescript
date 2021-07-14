@@ -11,7 +11,7 @@ import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
 import Data.Aeson.BetterErrors
-  (Parse, ParseError, parse, keyOrDefault, throwCustomError, key, asText,
+  (Parse, keyOrDefault, throwCustomError, key, asText,
    keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser',
    fromAesonParser, perhaps, withText, asIntegral, nth, eachInObjectWithKey,
    asString)
@@ -34,9 +34,9 @@ import qualified Paths_purescript as Paths
 import Web.Bower.PackageMeta hiding (Version, displayError)
 
 import Language.PureScript.Docs.RenderedCode as ReExports
-  (RenderedCode, asRenderedCode,
+  (RenderedCode,
    ContainingModule(..), asContainingModule,
-   RenderedCodeElement(..), asRenderedCodeElement,
+   RenderedCodeElement(..),
    Namespace(..), FixityAlias)
 
 type Type' = P.Type ()
@@ -376,13 +376,6 @@ instance Functor InPackage where
   fmap f (Local x) = Local (f x)
   fmap f (FromDep pkgName x) = FromDep pkgName (f x)
 
-takeLocal :: InPackage a -> Maybe a
-takeLocal (Local a) = Just a
-takeLocal _ = Nothing
-
-takeLocals :: [InPackage a] -> [a]
-takeLocals = mapMaybe takeLocal
-
 ignorePackage :: InPackage a -> a
 ignorePackage (Local x) = x
 ignorePackage (FromDep _ x) = x
@@ -477,12 +470,6 @@ getLinksContext Package{..} =
 ----------------------
 -- Parsing
 
-parseUploadedPackage :: Version -> LByteString -> Either (ParseError PackageError) UploadedPackage
-parseUploadedPackage minVersion = parse $ asUploadedPackage minVersion
-
-parseVerifiedPackage :: Version -> LByteString -> Either (ParseError PackageError) VerifiedPackage
-parseVerifiedPackage minVersion = parse $ asVerifiedPackage minVersion
-
 asPackage :: Version -> (forall e. Parse e a) -> Parse PackageError (Package a)
 asPackage minimumVersion uploader = do
   -- If the compilerVersion key is missing, we can be sure that it was produced
@@ -519,9 +506,6 @@ asNotYetKnown = NotYetKnown <$ asNull
 
 instance A.FromJSON NotYetKnown where
   parseJSON = toAesonParser' asNotYetKnown
-
-asVerifiedPackage :: Version -> Parse PackageError VerifiedPackage
-asVerifiedPackage minVersion = asPackage minVersion asGithubUser
 
 displayPackageError :: PackageError -> Text
 displayPackageError e = case e of
@@ -714,12 +698,6 @@ asConstraint = P.Constraint () <$> key "constraintClass" asQualifiedProperName
 
 asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
 asQualifiedProperName = fromAesonParser
-
-asQualifiedIdent :: Parse e (P.Qualified P.Ident)
-asQualifiedIdent = fromAesonParser
-
-asSourceAnn :: Parse e P.SourceAnn
-asSourceAnn = fromAesonParser
 
 asModuleMap :: Parse PackageError (Map P.ModuleName PackageName)
 asModuleMap =

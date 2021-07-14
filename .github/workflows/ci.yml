@@ -20,6 +20,7 @@ jobs:
     strategy:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
+        # If upgrading Ubuntu, also upgrade it in the lint job below
         os: [ "ubuntu-18.04", "macOS-10.15", "windows-2016" ]
 
     runs-on: "${{ matrix.os }}"
@@ -35,6 +36,7 @@ jobs:
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
+          # If upgrading Stack, also upgrade it in the lint job below
           stack-version: "2.5.1"
           stack-no-global: true
 
@@ -52,10 +54,6 @@ jobs:
         run: |
           mkdir -p "$STACK_ROOT"
           echo "local-programs-path: $STACK_ROOT/programs" > $STACK_ROOT/config.yaml
-
-      - run: "ci/run-hlint.sh --git"
-        env:
-          VERSION: "2.2.11"
 
       - run: "ci/build.sh"
 
@@ -88,3 +86,40 @@ jobs:
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           files: "sdist-test/bundle/*.{tar.gz,sha}"
+
+  lint:
+    runs-on: "ubuntu-18.04"
+
+    steps:
+      - uses: "actions/checkout@v2"
+
+      - id: "haskell"
+        uses: "haskell/actions/setup@v1"
+        with:
+          enable-stack: true
+          stack-version: "2.5.1"
+          stack-no-global: true
+
+      - uses: "actions/cache@v2"
+        with:
+          path: |
+            ${{ steps.haskell.outputs.stack-root }}
+          key: "${{ runner.os }}-lint-${{ hashFiles('stack.yaml') }}"
+
+      - run: "ci/run-hlint.sh --git"
+        env:
+          VERSION: "2.2.11"
+
+      - run: "stack --no-terminal --jobs=2 build --copy-compiler-tool weeder"
+
+      - run: "stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
+
+      - run: "stack exec weeder"
+
+      # Now do it again, with the test suite included. We don't want a
+      # reference from our test suite to count in the above check; the fact
+      # that a function is tested is not evidence that it's needed. But we also
+      # don't want to leave weeds lying around in our test suite either.
+      - run: "stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
+
+      - run: "stack exec weeder"

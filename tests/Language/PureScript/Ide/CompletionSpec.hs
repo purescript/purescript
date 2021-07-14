@@ -2,7 +2,6 @@ module Language.PureScript.Ide.CompletionSpec where
 
 import Protolude
 
-import qualified Data.Set as Set
 import qualified Language.PureScript as P
 import Language.PureScript.Ide.Test as Test
 import Language.PureScript.Ide.Command as Command
@@ -10,7 +9,6 @@ import Language.PureScript.Ide.Completion
 import qualified Language.PureScript.Ide.Filter.Declaration as DeclarationType
 import Language.PureScript.Ide.Types
 import Test.Hspec
-import System.FilePath
 
 reexportMatches :: [Match IdeDeclarationAnn]
 reexportMatches =
@@ -28,9 +26,6 @@ typ txt = Type txt [] Nothing
 
 load :: [Text] -> Command
 load = LoadSync . map Test.mn
-
-rebuildSync :: FilePath -> Command
-rebuildSync fp = RebuildSync ("src" </> fp) Nothing (Set.singleton P.JS)
 
 spec :: Spec
 spec = describe "Applying completion options" $ do

@@ -13,9 +13,6 @@ undefined = "undefined"
 
 -- Prim
 
-partial :: forall a. (IsString a) => a
-partial = "Partial"
-
 pattern Prim :: ModuleName
 pattern Prim = ModuleName "Prim"
 
@@ -44,12 +41,6 @@ pattern Row = Qualified (Just Prim) (ProperName "Row")
 
 pattern PrimBoolean :: ModuleName
 pattern PrimBoolean = ModuleName "Prim.Boolean"
-
-booleanTrue :: Qualified (ProperName 'TypeName)
-booleanTrue = Qualified (Just PrimBoolean) (ProperName "True")
-
-booleanFalse :: Qualified (ProperName 'TypeName)
-booleanFalse = Qualified (Just PrimBoolean) (ProperName "False")
 
 -- Prim.Coerce
 
@@ -134,9 +125,6 @@ primModules = [Prim, PrimBoolean, PrimCoerce, PrimOrdering, PrimRow, PrimRowList
 
 typ :: forall a. (IsString a) => a
 typ = "Type"
-
-kindBoolean :: forall a. (IsString a) => a
-kindBoolean = "Boolean"
 
 kindOrdering :: forall a. (IsString a) => a
 kindOrdering = "Ordering"
