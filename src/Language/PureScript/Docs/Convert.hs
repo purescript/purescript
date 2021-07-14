@@ -119,7 +119,7 @@ insertValueTypesAndAdjustKinds env m =
       isUninteresting' = \case
           -- `Type -> ...`
           P.TypeApp _ (P.TypeApp _ f a) t2 | isKindFunction f && isKindPrimType a ->
-            isUninteresting keyword t2
+            isUninteresting' t2
 
           x ->
             isKindPrimType x || (isClassKeyword && isKindPrimConstraint x)
