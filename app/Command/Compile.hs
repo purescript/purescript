@@ -64,7 +64,7 @@ promoteSrcWarnings False w e = (w, e)
 promoteSrcWarnings True w e = (P.MultipleErrors nonSrcWarnings, srcWarningsAndErrors)
   where
   srcWarningsAndErrors = case e of
-    Left errors -> Left $ P.MultipleErrors $ srcWarnings <> (P.runMultipleErrors errors)
+    Left errors -> Left $ P.MultipleErrors $ srcWarnings <> P.runMultipleErrors errors
     r@(Right _)
       | null srcWarnings -> r
       | otherwise -> Left $ P.MultipleErrors srcWarnings
