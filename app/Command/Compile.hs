@@ -36,7 +36,7 @@ data PSCMakeOptions = PSCMakeOptions
   , pscmLibDirs      :: S.Set T.Text
   }
 
--- | Arguments: verbose, use JSON, strict, warnings, errors
+-- | Arguments: verbose, use JSON, warnings, errors
 printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
 printWarningsAndErrors verbose False warnings errors = do
   pwd <- getCurrentDirectory
