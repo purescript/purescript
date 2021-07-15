@@ -8,7 +8,7 @@ import qualified Data.Aeson as A
 import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Data.Maybe (fromMaybe)
-import           Data.List (intercalate, isPrefixOf, partition)
+import           Data.List (intercalate, partition, foldl')
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -33,35 +33,34 @@ data PSCMakeOptions = PSCMakeOptions
   , pscmUsePrefix    :: Bool
   , pscmJSONErrors   :: Bool
   , pscmStrict       :: Bool
+  , pscmLibDirs      :: S.Set T.Text
   }
 
 -- | Arguments: verbose, use JSON, strict, warnings, errors
-printWarningsAndErrors :: Bool -> Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
-printWarningsAndErrors verbose False strict warnings errors = do
+printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
+printWarningsAndErrors verbose False warnings errors = do
   pwd <- getCurrentDirectory
   cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stdout
   let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd }
-      (warnings', errors') = promoteSrcWarnings strict warnings errors
-  when (P.nonEmpty warnings') $
-    putStrLn (P.prettyPrintMultipleWarnings ppeOpts warnings')
-  case errors' of
+  when (P.nonEmpty warnings) $
+    putStrLn (P.prettyPrintMultipleWarnings ppeOpts warnings)
+  case errors of
     Left errs -> do
       putStrLn (P.prettyPrintMultipleErrors ppeOpts errs)
       exitFailure
     Right _ -> return ()
-printWarningsAndErrors verbose True strict warnings errors = do
-  let (warnings', errors') = promoteSrcWarnings strict warnings errors
+printWarningsAndErrors verbose True warnings errors = do
   putStrLn . LBU8.toString . A.encode $
-    JSONResult (toJSONErrors verbose P.Warning warnings')
-               (either (toJSONErrors verbose P.Error) (const []) errors')
-  either (const exitFailure) (const (return ())) errors'
+    JSONResult (toJSONErrors verbose P.Warning warnings)
+               (either (toJSONErrors verbose P.Error) (const []) errors)
+  either (const exitFailure) (const (return ())) errors
 
 -- |
--- Moves all warnings emitted from files in the `src/` directory
+-- Moves all warnings emitted from files not found in library directories
 -- into the errors.
-promoteSrcWarnings :: Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> (P.MultipleErrors, Either P.MultipleErrors a)
-promoteSrcWarnings False w e = (w, e)
-promoteSrcWarnings True w e = (P.MultipleErrors nonSrcWarnings, srcWarningsAndErrors)
+promoteSrcWarnings :: Bool -> S.Set T.Text -> Either P.MultipleErrors a -> P.MultipleErrors -> (Either P.MultipleErrors a, P.MultipleErrors)
+promoteSrcWarnings False _ e w = (e, w)
+promoteSrcWarnings True libDirs e w = (srcWarningsAndErrors, P.MultipleErrors nonSrcWarnings)
   where
   srcWarningsAndErrors = case e of
     Left errors -> Left $ P.MultipleErrors $ srcWarnings <> P.runMultipleErrors errors
@@ -73,13 +72,17 @@ promoteSrcWarnings True w e = (P.MultipleErrors nonSrcWarnings, srcWarningsAndEr
     partition isSrcWarning $ P.runMultipleErrors w
 
   isSrcWarning :: P.ErrorMessage -> Bool
-  isSrcWarning warning = fromSourceDir $ fromMaybe "" $ do
+  isSrcWarning warning = fromMaybe False $ do
     spans <- P.errorSpan warning
-    pure $ P.spanName $ NEL.head spans
+    let fileName = P.spanName $ NEL.head spans
+        -- account for both POSIX and Windows path separators
+        fileDir = T.pack $ takeWhile (not . isPathSeparator) fileName
+    pure $ not $ fileDir `S.member` libDirs
     where
-    -- account for both POSIX and Windows path separators
-    fromSourceDir fileName =
-      isPrefixOf "src/" fileName || isPrefixOf "src\\" fileName
+      isPathSeparator = \case
+        '\\' -> True
+        '/' -> True
+        _ -> False
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
@@ -96,7 +99,8 @@ compile PSCMakeOptions{..} = do
     foreigns <- inferForeignModules filePathMap
     let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
     P.make makeActions (map snd ms)
-  printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors pscmStrict makeWarnings makeErrors
+  let (makeErrors', makeWarnings') = promoteSrcWarnings pscmStrict pscmLibDirs makeErrors makeWarnings
+  printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings' makeErrors'
   exitSuccess
 
 warnFileTypeNotFound :: String -> IO ()
@@ -186,6 +190,20 @@ strictFlag = Opts.switch $
      Opts.long "strict"
   <> Opts.help "Promotes `src/` warnings to errors"
 
+isLibDir :: Opts.Parser (S.Set T.Text)
+isLibDir = Opts.option libDirParser $
+     Opts.long "is-lib"
+  <> Opts.value (S.fromList [ ".spago", "bower_components" ])
+  <> Opts.help
+      ( "A comma-separated list of directories containing libraries. "
+      <> "Defaults to \".spago,bower_components\"."
+      )
+  where
+    libDirParser :: Opts.ReadM (S.Set T.Text)
+    libDirParser =
+      Opts.str >>= \s ->
+        pure $ foldl' (flip S.insert) S.empty $ T.strip <$> T.split (== ',') s
+
 pscMakeOptions :: Opts.Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> outputDirectory
@@ -193,6 +211,7 @@ pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> (not <$> noPrefix)
                                 <*> jsonErrors
                                 <*> strictFlag
+                                <*> isLibDir
 
 command :: Opts.Parser (IO ())
 command = compile <$> (Opts.helper <*> pscMakeOptions)
