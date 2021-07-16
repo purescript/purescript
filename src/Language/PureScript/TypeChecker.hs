@@ -63,7 +63,7 @@ addDataType moduleName dtype name args dctors ctorKind = do
       qualName = Qualified (Just moduleName) name
       hasSig = qualName `M.member` types env
   putEnv $ env { types = M.insert qualName (ctorKind, DataType dtype args (map (mapDataCtor . fst) dctors)) (types env) }
-  unless (hasSig || not (containsForAll ctorKind)) $ do
+  unless (hasSig || isDictTypeName name || not (containsForAll ctorKind)) $ do
     tell . errorMessage $ MissingKindDeclaration (if dtype == Newtype then NewtypeSig else DataSig) name ctorKind
   for_ dctors $ \(DataConstructorDeclaration _ dctor fields, polyType) ->
     warnAndRethrow (addHint (ErrorInDataConstructor dctor)) $
@@ -111,7 +111,7 @@ addTypeSynonym moduleName name args ty kind = do
   checkTypeSynonyms ty
   let qualName = Qualified (Just moduleName) name
       hasSig = qualName `M.member` types env
-  unless (hasSig || isDictSynonym name || not (containsForAll kind)) $ do
+  unless (hasSig || not (containsForAll kind)) $ do
     tell . errorMessage $ MissingKindDeclaration TypeSynonymSig name kind
   putEnv $ env { types = M.insert qualName (kind, TypeSynonym) (types env)
                , typeSynonyms = M.insert qualName (args, ty) (typeSynonyms env) }

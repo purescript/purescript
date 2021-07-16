@@ -109,11 +109,11 @@ convertDecl ed = case ed of
     if isNothing (Text.find (== '$') (edTypeSynonymName^.properNameT))
       then Left (SynonymToResolve edTypeSynonymName edTypeSynonymType)
       else Right Nothing
-  P.EDDataConstructor{..} ->
-    Right
-      (Just
-        (IdeDeclDataConstructor
-          (IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType)))
+  P.EDDataConstructor{..} -> Right do
+    guard (isNothing (Text.find (== '$') (edDataCtorName^.properNameT)))
+    Just
+      (IdeDeclDataConstructor
+        (IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType))
   P.EDValue{..} ->
     Right (Just (IdeDeclValue (IdeValue edValueName edValueType)))
   P.EDClass{..} ->

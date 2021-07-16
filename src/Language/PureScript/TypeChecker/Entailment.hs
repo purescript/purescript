@@ -385,7 +385,7 @@ entails SolverOptions{..} constraint context hints =
               return (useEmptyDict args)
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
-              return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal nullSourceSpan (ObjectLiteral fields))
+              return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsSymbol)) (Literal nullSourceSpan (ObjectLiteral fields))
 
             unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
             unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)

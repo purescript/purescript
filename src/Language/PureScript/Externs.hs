@@ -246,14 +246,14 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsF
     | Just (ty, _, _) <- Qualified (Just mn) ident `M.lookup` names env
     = [ EDValue (lookupRenamedIdent ident) ty ]
   toExternsDeclaration (TypeClassRef _ className)
-    | let dictName = dictSynonymName . coerceProperName $ className
+    | let dictName = dictTypeName . coerceProperName $ className
     , Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
-    , Just (kind, ExternData rs) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
-    , Just (synKind, TypeSynonym) <- Qualified (Just mn) dictName `M.lookup` types env
-    , Just (synArgs, synTy) <- Qualified (Just mn) dictName `M.lookup` typeSynonyms env
-    = [ EDType (coerceProperName className) kind (ExternData rs)
-      , EDType dictName synKind TypeSynonym
-      , EDTypeSynonym dictName synArgs synTy
+    , Just (kind, tk) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
+    , Just (dictKind, dictData@(DataType _ _ [(dctor, _)])) <- Qualified (Just mn) dictName `M.lookup` types env
+    , Just (dty, _, ty, args) <- Qualified (Just mn) dctor `M.lookup` dataConstructors env
+    = [ EDType (coerceProperName className) kind tk
+      , EDType dictName dictKind dictData
+      , EDDataConstructor dctor dty dictName ty args
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef ss' ident ns)

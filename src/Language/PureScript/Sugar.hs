@@ -54,7 +54,7 @@ import Language.PureScript.TypeChecker.Synonyms (SynonymMap)
 --
 --  * Rebracket user-defined binary operators
 --
---  * Introduce type synonyms for type class dictionaries
+--  * Introduce newtypes for type class dictionaries and value declarations for instances
 --
 --  * Group mutually recursive value and data declarations into binding groups.
 --
