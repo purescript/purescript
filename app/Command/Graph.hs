@@ -2,19 +2,14 @@ module Command.Graph (command) where
 
 import Prelude
 
+import           Command.Common (globWarningOnMisses, printWarningsAndErrors)
 import           Control.Applicative (many)
 import           Control.Monad (unless, when)
 import qualified Data.Aeson as Json
-import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as LB
-import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import qualified Language.PureScript as P
-import           Language.PureScript.Errors.JSON
 import qualified Options.Applicative as Opts
-import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitFailure)
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath.Glob (glob)
 import           System.IO (hPutStr, hPutStrLn, stderr)
 
 data GraphOptions = GraphOptions
@@ -34,7 +29,7 @@ graph GraphOptions{..} = do
 
   (makeResult, makeWarnings) <- P.graph input
 
-  printWarningsAndErrors graphJSONErrors makeWarnings makeResult
+  printWarningsAndErrors True graphJSONErrors makeWarnings makeResult
     >>= (LB.putStr . Json.encode)
 
   where
@@ -62,38 +57,3 @@ command = graph <$> (Opts.helper <*> graphOptions)
     Opts.switch $
       Opts.long "json-errors" <>
       Opts.help "Print errors to stderr as JSON"
-
--- | Arguments: use JSON, warnings, errors
-printWarningsAndErrors :: Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO a
-printWarningsAndErrors False warnings errors = do
-  pwd <- getCurrentDirectory
-  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stderr
-  let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = True, P.ppeRelativeDirectory = pwd }
-  when (P.nonEmpty warnings) $
-    hPutStrLn stderr (P.prettyPrintMultipleWarnings ppeOpts warnings)
-  case errors of
-    Left errs -> do
-      hPutStrLn stderr (P.prettyPrintMultipleErrors ppeOpts errs)
-      exitFailure
-    Right res -> pure res
-printWarningsAndErrors True warnings errors = do
-  let verbose = True
-  hPutStrLn stderr . LBU8.toString . Json.encode $
-    JSONResult (toJSONErrors verbose P.Warning warnings)
-               (either (toJSONErrors verbose P.Error) (const []) errors)
-  case errors of
-    Left _errs -> exitFailure
-    Right res -> pure res
-
-
-globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
-globWarningOnMisses warn = concatMapM globWithWarning
-  where
-  globWithWarning :: String -> IO [FilePath]
-  globWithWarning pattern' = do
-    paths <- glob pattern'
-    when (null paths) $ warn pattern'
-    return paths
-
-  concatMapM :: (a -> IO [b]) -> [a] -> IO [b]
-  concatMapM f = fmap concat . mapM f

@@ -146,6 +146,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@woody88](https://github.com/woody88) | Woodson Delhia | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mhmdanas](https://github.com/mhmdanas) | Mohammed Anas | [MIT license](http://opensource.org/licenses/MIT) |
 | [@kl0tl](https://github.com/kl0tl) | Cyril Sobierajewicz | [MIT license](http://opensource.org/licenses/MIT) |
+| [@colinwahl](https://github.com/colinwahl) | Colin Wahl | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 
@@ -159,7 +160,6 @@ If you would prefer to use different terms, please use the section below instead
 | [@nagisa](https://github.com/nagisa) | nagisa | I hereby release my [only contribution](https://github.com/purescript/purescript/commit/80287a5d0de619862d3b4cda9c1ee276d18fdcd8) into public domain. |
 | [@puffnfresh](https://github.com/puffnfresh) | Brian McKenna | All contributions I made during June 2015 were during employment at [SlamData, Inc.](#companies) who owns the copyright. I assign copyright of all my personal contributions before June 2015 to the owners of the PureScript compiler. |
 | [@nwolverson](https://github.com/nwolverson) | Nicholas Wolverson | Contributions I made during March 2020 until further notice are in employment of [Id3as Company](#companies), who own the copyright. All other contributions remain Copyright Nicholas Wolverson, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). |
-
 
 
 ### Companies

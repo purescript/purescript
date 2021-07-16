@@ -2,11 +2,9 @@ module Command.Compile (command) where
 
 import Prelude
 
+import           Command.Common (globWarningOnMisses, printWarningsAndErrors)
 import           Control.Applicative
 import           Control.Monad
-import qualified Data.Aeson as A
-import           Data.Bool (bool)
-import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Data.List (intercalate)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -14,14 +12,10 @@ import qualified Data.Text as T
 import           Data.Traversable (for)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
-import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Make
 import qualified Options.Applicative as Opts
-import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitSuccess, exitFailure)
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath.Glob (glob)
-import           System.IO (hPutStr, hPutStrLn, stderr, stdout)
+import           System.IO (hPutStr, hPutStrLn, stderr)
 import           System.IO.UTF8 (readUTF8FilesT)
 
 data PSCMakeOptions = PSCMakeOptions
@@ -31,25 +25,6 @@ data PSCMakeOptions = PSCMakeOptions
   , pscmUsePrefix    :: Bool
   , pscmJSONErrors   :: Bool
   }
-
--- | Arguments: verbose, use JSON, warnings, errors
-printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
-printWarningsAndErrors verbose False warnings errors = do
-  pwd <- getCurrentDirectory
-  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stdout
-  let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd }
-  when (P.nonEmpty warnings) $
-    putStrLn (P.prettyPrintMultipleWarnings ppeOpts warnings)
-  case errors of
-    Left errs -> do
-      putStrLn (P.prettyPrintMultipleErrors ppeOpts errs)
-      exitFailure
-    Right _ -> return ()
-printWarningsAndErrors verbose True warnings errors = do
-  putStrLn . LBU8.toString . A.encode $
-    JSONResult (toJSONErrors verbose P.Warning warnings)
-               (either (toJSONErrors verbose P.Error) (const []) errors)
-  either (const exitFailure) (const (return ())) errors
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
@@ -71,15 +46,6 @@ compile PSCMakeOptions{..} = do
 
 warnFileTypeNotFound :: String -> IO ()
 warnFileTypeNotFound = hPutStrLn stderr . ("purs compile: No files found using pattern: " ++)
-
-globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
-globWarningOnMisses warn = concatMapM globWithWarning
-  where
-  globWithWarning pattern' = do
-    paths <- glob pattern'
-    when (null paths) $ warn pattern'
-    return paths
-  concatMapM f = fmap concat . mapM f
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
