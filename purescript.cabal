@@ -366,8 +366,10 @@ test-suite tests
   main-is: Main.hs
   build-depends:
       purescript
+    , generic-random
     , hspec
     , HUnit
+    , newtype
     , QuickCheck
     , regex-base
   build-tool-depends:
@@ -386,6 +388,7 @@ test-suite tests
     Language.PureScript.Ide.Test
     Language.PureScript.Ide.UsageSpec
     PscIdeSpec
+    TestAst
     TestBundle
     TestCompiler
     TestCoreFn
