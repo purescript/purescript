@@ -1,0 +1,26 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/LocalStandaloneKindSignatures2.purs:10:19 - 10:20 (line 10, column 19 - line 10, column 20)
+
+  Could not match kind
+  [33m   [0m
+  [33m  k[0m
+  [33m   [0m
+  with kind
+  [33m      [0m
+  [33m  Type[0m
+  [33m      [0m
+
+in type synonym [33mConstK[0m
+while checking that expression [33mProxy  [0m
+                               [33m  where[0m
+  has type [33mProxy @t0 k1[0m
+in value declaration [33mfoo[0m
+
+where [33mk1[0m is a rigid type variable
+        bound at (line 7, column 7 - line 7, column 36)
+      [33mt0[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

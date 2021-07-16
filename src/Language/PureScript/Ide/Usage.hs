@@ -141,7 +141,7 @@ applySearch module_ search =
       P.Var sp i
         | Just ideValue <- preview _IdeDeclValue (P.disqualify search)
         , P.isQualified search
-          || not (P.LocalIdent (_ideValueIdent ideValue) `Set.member` scope) ->
+          || not (P.LocalName (P.IdentName (_ideValueIdent ideValue)) `Set.member` scope) ->
           [sp | map P.runIdent i == map identifierFromIdeDeclaration search]
       P.Constructor sp name
         | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->

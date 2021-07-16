@@ -231,6 +231,24 @@ bindLocalTypeVariables
 bindLocalTypeVariables moduleName bindings =
   bindTypes (M.fromList $ flip map bindings $ \(pn, kind) -> (Qualified (Just moduleName) pn, (kind, LocalTypeVariable)))
 
+-- | Temporarily bind a local type synonym
+bindLocalTypeSynonym
+  :: (MonadState CheckState m)
+  => ProperName 'TypeName
+  -> [(Text, Maybe SourceType)]
+  -> SourceType
+  -> SourceType
+  -> m a
+  -> m a
+bindLocalTypeSynonym name args ty kind action = do
+  let qname = Qualified Nothing name
+  orig <- getEnv
+  modifyEnv $ \env -> env { types = M.insert qname (kind, LocalTypeVariable) (types env)
+                          , typeSynonyms = M.insert qname (args, ty) (typeSynonyms env) }
+  a <- action
+  modifyEnv $ \env -> env { types = types orig, typeSynonyms = typeSynonyms orig }
+  return a
+
 -- | Update the visibility of all names to Defined
 makeBindingGroupVisible :: (MonadState CheckState m) => m ()
 makeBindingGroupVisible = modifyEnv $ \e -> e { names = M.map (\(ty, nk, _) -> (ty, nk, Defined)) (names e) }

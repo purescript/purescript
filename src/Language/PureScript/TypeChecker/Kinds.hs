@@ -7,6 +7,7 @@ module Language.PureScript.TypeChecker.Kinds
   , kindOfWithScopedVars
   , kindOfData
   , kindOfTypeSynonym
+  , kindOfLocalTypeSynonym
   , kindOfClass
   , kindsOfAll
   , unifyKinds
@@ -538,18 +539,18 @@ elaborateKind = \case
   ty ->
     throwError . errorMessage' (fst (getAnnForType ty)) $ UnsupportedTypeInKind ty
 
-checkEscapedSkolems :: MonadError MultipleErrors m => SourceType -> m ()
-checkEscapedSkolems ty =
+checkEscapedSkolems :: (MonadError MultipleErrors m, MonadState CheckState m) => ModuleName -> SourceType -> m ()
+checkEscapedSkolems moduleName ty = do
+  env <- getEnv
+  let typesInScope = E.types env
+      go :: SourceType -> SourceType -> (SourceType, [(SourceSpan, Text, SourceType)])
+      go ty' = \case
+        Skolem ss name _ _ _ | M.notMember (Qualified (Just moduleName) (ProperName name)) typesInScope -> (ty', [(fst ss, name, ty')])
+        _ -> (ty', [])
   traverse_ (throwError . toSkolemError)
     . everythingWithContextOnTypes ty [] (<>) go
     $ ty
   where
-  go :: SourceType -> SourceType -> (SourceType, [(SourceSpan, Text, SourceType)])
-  go ty' = \case
-    Skolem ss name _ _ _ -> (ty', [(fst ss, name, ty')])
-    ty''@(KindApp _ _ _) -> (ty'', [])
-    _ -> (ty', [])
-
   toSkolemError (ss, name, ty') =
     errorMessage' (fst $ getAnnForType ty') $ EscapedSkolem name (Just ss) ty'
 
@@ -651,6 +652,24 @@ kindOfTypeSynonym
   -> m TypeDeclarationResult
 kindOfTypeSynonym moduleName typeDecl =
   head . (^. _1) <$> kindsOfAll moduleName [typeDecl] [] []
+
+-- | Local type synonym kind inference differs from that of top-level type
+-- | synonyms for two reasons: local type synonyms can't appear in
+-- | recursive binding groups, and they are not generalized. Instead of using
+-- | kindsOfAll, they need their own (simpler) logic.
+kindOfLocalTypeSynonym
+  :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
+  => ModuleName
+  -> TypeDeclarationArgs
+  -> m TypeDeclarationResult
+kindOfLocalTypeSynonym moduleName typeDecl@(sa, synName, _, _) = do
+  synKind <- existingSignatureOrFreshKind Nothing (fst sa) synName
+  bindLocalTypeVariables moduleName [(synName, synKind)] $ do
+    synBody <- inferTypeSynonym moduleName typeDecl
+    synKind' <- apply synKind
+    synBody' <- apply synBody
+    checkEscapedSkolems moduleName synBody'
+    pure (synBody', synKind')
 
 inferTypeSynonym
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
@@ -900,13 +919,13 @@ checkKindDeclaration _ ty = do
 
 existingSignatureOrFreshKind
   :: forall m. MonadState CheckState m
-  => ModuleName
+  => Maybe ModuleName
   -> SourceSpan
   -> ProperName 'TypeName
   -> m SourceType
 existingSignatureOrFreshKind moduleName ss name = do
   env <- getEnv
-  case M.lookup (Qualified (Just moduleName) name) (E.types env) of
+  case M.lookup (Qualified moduleName name) (E.types env) of
     Nothing -> freshKind ss
     Just (kind, _) -> pure kind
 
@@ -918,9 +937,9 @@ kindsOfAll
   -> [ClassDeclarationArgs]
   -> m ([TypeDeclarationResult], [DataDeclarationResult], [ClassDeclarationResult])
 kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
-  synDict <- for syns $ \(sa, synName, _, _) -> (synName,) <$> existingSignatureOrFreshKind moduleName (fst sa) synName
-  datDict <- for dats $ \(sa, datName, _, _) -> (datName,) <$> existingSignatureOrFreshKind moduleName (fst sa) datName
-  clsDict <- for clss $ \(sa, clsName, _, _, _) -> fmap (coerceProperName clsName,) $ existingSignatureOrFreshKind moduleName (fst sa) $ coerceProperName clsName
+  synDict <- for syns $ \(sa, synName, _, _) -> (synName,) <$> existingSignatureOrFreshKind (Just moduleName) (fst sa) synName
+  datDict <- for dats $ \(sa, datName, _, _) -> (datName,) <$> existingSignatureOrFreshKind (Just moduleName) (fst sa) datName
+  clsDict <- for clss $ \(sa, clsName, _, _, _) -> fmap (coerceProperName clsName,) $ existingSignatureOrFreshKind (Just moduleName) (fst sa) $ coerceProperName clsName
   let bindingGroup = synDict <> datDict <> clsDict
   bindLocalTypeVariables moduleName bindingGroup $ do
     synResults <- for syns (inferTypeSynonym moduleName)
@@ -978,7 +997,7 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
           unkBinders = unknownVarNames (usedTypeVariables synKind <> usedTypeVariables synBody) tyUnks
           genBody = replaceUnknownsWithVars unkBinders $ replaceTypeCtors synBody
           genSig = generalizeUnknownsWithVars unkBinders synKind
-      checkEscapedSkolems genBody
+      checkEscapedSkolems moduleName genBody
       checkTypeQuantification genBody
       checkVisibleTypeQuantification genSig
       pure (genBody, genSig)

@@ -499,50 +499,56 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   k' s (ConditionGuard e) = ConditionGuard <$> g'' s e
   k' s (PatternGuard b e) = PatternGuard <$> h'' s b <*> g'' s e
 
-data ScopedIdent = LocalIdent Ident | ToplevelIdent Ident
+data ScopedName = LocalName Name | ToplevelName Name
   deriving (Show, Eq, Ord)
 
-inScope :: Ident -> S.Set ScopedIdent -> Bool
-inScope i s = (LocalIdent i `S.member` s) || (ToplevelIdent i `S.member` s)
+inScope' :: (a -> Name) -> a -> S.Set ScopedName -> Bool
+inScope' ctor i s = (LocalName (ctor i) `S.member` s) || (ToplevelName (ctor i) `S.member` s)
+
+inScope :: Ident -> S.Set ScopedName -> Bool
+inScope = inScope' IdentName
+
+typeInScope :: ProperName 'TypeName -> S.Set ScopedName -> Bool
+typeInScope = inScope' TyName
 
 everythingWithScope
   :: forall r
    . (Monoid r)
-  => (S.Set ScopedIdent -> Declaration -> r)
-  -> (S.Set ScopedIdent -> Expr -> r)
-  -> (S.Set ScopedIdent -> Binder -> r)
-  -> (S.Set ScopedIdent -> CaseAlternative -> r)
-  -> (S.Set ScopedIdent -> DoNotationElement -> r)
-  -> ( S.Set ScopedIdent -> Declaration -> r
-     , S.Set ScopedIdent -> Expr -> r
-     , S.Set ScopedIdent -> Binder -> r
-     , S.Set ScopedIdent -> CaseAlternative -> r
-     , S.Set ScopedIdent -> DoNotationElement -> r
+  => (S.Set ScopedName -> Declaration -> r)
+  -> (S.Set ScopedName -> Expr -> r)
+  -> (S.Set ScopedName -> Binder -> r)
+  -> (S.Set ScopedName -> CaseAlternative -> r)
+  -> (S.Set ScopedName -> DoNotationElement -> r)
+  -> ( S.Set ScopedName -> Declaration -> r
+     , S.Set ScopedName -> Expr -> r
+     , S.Set ScopedName -> Binder -> r
+     , S.Set ScopedName -> CaseAlternative -> r
+     , S.Set ScopedName -> DoNotationElement -> r
      )
 everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   where
-  f'' :: S.Set ScopedIdent -> Declaration -> r
+  f'' :: S.Set ScopedName -> Declaration -> r
   f'' s a = f s a <> f' s a
 
-  f' :: S.Set ScopedIdent -> Declaration -> r
+  f' :: S.Set ScopedName -> Declaration -> r
   f' s (DataBindingGroupDeclaration ds) =
-    let s' = S.union s (S.fromList (map ToplevelIdent (mapMaybe getDeclIdent (NEL.toList ds))))
+    let s' = S.union s (S.fromList (map ToplevelName (mapMaybe declName (NEL.toList ds))))
     in foldMap (f'' s') ds
   f' s (ValueDecl _ name _ bs val) =
-    let s' = S.insert (ToplevelIdent name) s
+    let s' = S.insert (ToplevelName (IdentName name)) s
         s'' = S.union s' (S.fromList (concatMap localBinderNames bs))
     in foldMap (h'' s') bs <> foldMap (l' s'') val
   f' s (BindingGroupDeclaration ds) =
-    let s' = S.union s (S.fromList (NEL.toList (fmap (\((_, name), _, _) -> ToplevelIdent name) ds)))
+    let s' = S.union s (S.fromList (NEL.toList (fmap (\((_, name), _, _) -> ToplevelName (IdentName name)) ds)))
     in foldMap (\(_, _, val) -> g'' s' val) ds
   f' s (TypeClassDeclaration _ _ _ _ _ ds) = foldMap (f'' s) ds
   f' s (TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance ds)) = foldMap (f'' s) ds
   f' _ _ = mempty
 
-  g'' :: S.Set ScopedIdent -> Expr -> r
+  g'' :: S.Set ScopedName -> Expr -> r
   g'' s a = g s a <> g' s a
 
-  g' :: S.Set ScopedIdent -> Expr -> r
+  g' :: S.Set ScopedName -> Expr -> r
   g' s (Literal _ l) = lit g'' s l
   g' s (UnaryMinus _ v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g'' s op <> g'' s v1 <> g'' s v2
@@ -560,7 +566,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (Case vs alts) = foldMap (g'' s) vs <> foldMap (i'' s) alts
   g' s (TypedValue _ v1 _) = g'' s v1
   g' s (Let _ ds v1) =
-    let s' = S.union s (S.fromList (map LocalIdent (mapMaybe getDeclIdent ds)))
+    let s' = S.union s (S.fromList (map LocalName (mapMaybe declName ds)))
     in foldMap (f'' s') ds <> g'' s' v1
   g' s (Do _ es) = fold . snd . mapAccumL j'' s $ es
   g' s (Ado _ es v1) =
@@ -569,46 +575,46 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (PositionedValue _ _ v1) = g'' s v1
   g' _ _ = mempty
 
-  h'' :: S.Set ScopedIdent -> Binder -> r
+  h'' :: S.Set ScopedName -> Binder -> r
   h'' s a = h s a <> h' s a
 
-  h' :: S.Set ScopedIdent -> Binder -> r
+  h' :: S.Set ScopedName -> Binder -> r
   h' s (LiteralBinder _ l) = lit h'' s l
   h' s (ConstructorBinder _ _ bs) = foldMap (h'' s) bs
   h' s (BinaryNoParensBinder b1 b2 b3) = foldMap (h'' s) [b1, b2, b3]
   h' s (ParensInBinder b) = h'' s b
-  h' s (NamedBinder _ name b1) = h'' (S.insert (LocalIdent name) s) b1
+  h' s (NamedBinder _ name b1) = h'' (S.insert (LocalName (IdentName name)) s) b1
   h' s (PositionedBinder _ _ b1) = h'' s b1
   h' s (TypedBinder _ b1) = h'' s b1
   h' _ _ = mempty
 
-  lit :: (S.Set ScopedIdent -> a -> r) -> S.Set ScopedIdent -> Literal a -> r
+  lit :: (S.Set ScopedName -> a -> r) -> S.Set ScopedName -> Literal a -> r
   lit go s (ArrayLiteral as) = foldMap (go s) as
   lit go s (ObjectLiteral as) = foldMap (go s . snd) as
   lit _ _ _ = mempty
 
-  i'' :: S.Set ScopedIdent -> CaseAlternative -> r
+  i'' :: S.Set ScopedName -> CaseAlternative -> r
   i'' s a = i s a <> i' s a
 
-  i' :: S.Set ScopedIdent -> CaseAlternative -> r
+  i' :: S.Set ScopedName -> CaseAlternative -> r
   i' s (CaseAlternative bs gs) =
     let s' = S.union s (S.fromList (concatMap localBinderNames bs))
     in foldMap (h'' s) bs <> foldMap (l' s') gs
 
-  j'' :: S.Set ScopedIdent -> DoNotationElement -> (S.Set ScopedIdent, r)
+  j'' :: S.Set ScopedName -> DoNotationElement -> (S.Set ScopedName, r)
   j'' s a = let (s', r) = j' s a in (s', j s a <> r)
 
-  j' :: S.Set ScopedIdent -> DoNotationElement -> (S.Set ScopedIdent, r)
+  j' :: S.Set ScopedName -> DoNotationElement -> (S.Set ScopedName, r)
   j' s (DoNotationValue v) = (s, g'' s v)
   j' s (DoNotationBind b v) =
     let s' = S.union (S.fromList (localBinderNames b)) s
     in (s', h'' s b <> g'' s v)
   j' s (DoNotationLet ds) =
-    let s' = S.union s (S.fromList (map LocalIdent (mapMaybe getDeclIdent ds)))
+    let s' = S.union s (S.fromList (map LocalName (mapMaybe declName ds)))
     in (s', foldMap (f'' s') ds)
   j' s (PositionedDoNotationElement _ _ e1) = j'' s e1
 
-  k' :: S.Set ScopedIdent -> Guard -> (S.Set ScopedIdent, r)
+  k' :: S.Set ScopedName -> Guard -> (S.Set ScopedName, r)
   k' s (ConditionGuard e) = (s, g'' s e)
   k' s (PatternGuard b e) =
     let s' = S.union (S.fromList (localBinderNames b)) s
@@ -619,12 +625,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
     let (s', r) = k' s grd
     in r <> l' s' (GuardedExpr gs e)
 
-  getDeclIdent :: Declaration -> Maybe Ident
-  getDeclIdent (ValueDeclaration vd) = Just (valdeclIdent vd)
-  getDeclIdent (TypeDeclaration td) = Just (tydeclIdent td)
-  getDeclIdent _ = Nothing
-
-  localBinderNames = map LocalIdent . binderNames
+  localBinderNames = map (LocalName . IdentName) . binderNames
 
 accumTypes
   :: (Monoid r)

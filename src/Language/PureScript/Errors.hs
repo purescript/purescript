@@ -134,9 +134,10 @@ data SimpleErrorMessage
   | TransitiveDctorExportError DeclarationRef [ProperName 'ConstructorName]
   | HiddenConstructors DeclarationRef (Qualified (ProperName 'ClassName))
   | ShadowedName Ident
+  | ShadowedTypeName (ProperName 'TypeName)
   | ShadowedTypeVar Text
   | UnusedTypeVar Text
-  | UnusedName Ident
+  | UnusedName Name
   | UnusedDeclaration Ident
   | WildcardInferredType SourceType Context
   | HoleInferredType Text SourceType Context (Maybe TypeSearch)
@@ -307,6 +308,7 @@ errorCode em = case unwrapErrorMessage em of
   ShadowedName{} -> "ShadowedName"
   UnusedName{} -> "UnusedName"
   UnusedDeclaration{} -> "UnusedDeclaration"
+  ShadowedTypeName{} -> "ShadowedTypeName"
   ShadowedTypeVar{} -> "ShadowedTypeVar"
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
@@ -1056,10 +1058,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (ShadowedName nm) =
       line $ "Name " <> markCode (showIdent nm) <> " was shadowed."
+    renderSimpleErrorMessage (ShadowedTypeName nm) =
+      line $ "Type " <> markCode (runProperName nm) <> " was shadowed."
     renderSimpleErrorMessage (ShadowedTypeVar tv) =
       line $ "Type variable " <> markCode tv <> " was shadowed."
     renderSimpleErrorMessage (UnusedName nm) =
-      line $ "Name " <> markCode (showIdent nm) <> " was introduced but not used."
+      line $ "Name " <> markCode (runName (Qualified Nothing nm)) <> " was introduced but not used."
     renderSimpleErrorMessage (UnusedDeclaration nm) =
       line $ "Declaration " <> markCode (showIdent nm) <> " was not used, and is not exported."
     renderSimpleErrorMessage (UnusedTypeVar tv) =

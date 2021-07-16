@@ -163,6 +163,8 @@ flattenLetBinding = \case
   LetBindingSignature _ a -> flattenLabeled flattenName flattenType a
   LetBindingName _ a -> flattenValueBindingFields a
   LetBindingPattern _ a b c -> flattenBinder a <> pure b <> flattenWhere c
+  LetBindingType _ a b c -> flattenDataHead a <> pure b <> flattenType c
+  LetBindingKindSignature _ a b -> pure a <> flattenLabeled flattenName flattenType b
 
 flattenWhere :: Where a -> DList SourceToken
 flattenWhere (Where a b) =

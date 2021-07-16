@@ -137,11 +137,11 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression
 
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
-  usedNamesE :: S.Set ScopedIdent -> Expr -> [Ident]
+  usedNamesE :: S.Set ScopedName -> Expr -> [Ident]
   usedNamesE scope (Var _ (Qualified Nothing name))
-    | LocalIdent name `S.notMember` scope = [name]
+    | LocalName (IdentName name) `S.notMember` scope = [name]
   usedNamesE scope (Var _ (Qualified (Just moduleName') name))
-    | moduleName == moduleName' && ToplevelIdent name `S.notMember` scope = [name]
+    | moduleName == moduleName' && ToplevelName (IdentName name) `S.notMember` scope = [name]
   usedNamesE _ _ = []
 
 usedImmediateIdents :: ModuleName -> Declaration -> [Ident]
@@ -168,6 +168,7 @@ usedTypeNames moduleName = go
 
   usedNames :: SourceType -> [ProperName 'TypeName]
   usedNames (ConstrainedType _ con _) = usedConstraint con
+  usedNames (TypeConstructor _ (Qualified Nothing name)) = [name]
   usedNames (TypeConstructor _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' = [name]
   usedNames _ = []

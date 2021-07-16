@@ -207,16 +207,6 @@ addTypeClassDictionaries mn entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
   where insertState st = M.insertWith (M.unionWith (M.unionWith (<>))) mn entries (typeClassDictionaries . checkEnv $ st)
 
-checkDuplicateTypeArguments
-  :: (MonadState CheckState m, MonadError MultipleErrors m)
-  => [Text]
-  -> m ()
-checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
-  throwError . errorMessage $ DuplicateTypeArgument dup
-  where
-  firstDup :: Maybe Text
-  firstDup = listToMaybe $ args \\ ordNub args
-
 checkTypeClassInstance
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => TypeClassData

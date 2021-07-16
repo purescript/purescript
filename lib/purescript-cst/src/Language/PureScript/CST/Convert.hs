@@ -226,6 +226,16 @@ convertLetBinding fileName = \case
   binding@(LetBindingPattern _ a _ b) -> do
     let ann = uncurry (sourceAnnCommented fileName) $ letBindingRange binding
     AST.BoundValueDeclaration ann (convertBinder fileName a) (convertWhere fileName b)
+  binding@(LetBindingType _ (DataHead _ a vars) _ bd) -> do
+    let ann = uncurry (sourceAnnCommented fileName) $ letBindingRange binding
+    AST.TypeSynonymDeclaration ann (nameValue a) (goTypeVar <$> vars) (convertType fileName bd)
+  binding@(LetBindingKindSignature _ _ (Labeled name _ ty)) -> do
+    let ann = uncurry (sourceAnnCommented fileName) $ letBindingRange binding
+    AST.KindDeclaration ann AST.TypeSynonymSig (nameValue name) $ convertType fileName ty
+  where
+  goTypeVar = \case
+    TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
+    TypeVarName x -> (getIdent $ nameValue x, Nothing)
 
 convertExpr :: forall a. String -> Expr a -> AST.Expr
 convertExpr fileName = go

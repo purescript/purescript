@@ -1,0 +1,11 @@
+Warning found:
+in module [33mMain[0m
+at tests/purs/warning/LocalTypeSynonyms2.purs:9:3 - 9:21 (line 9, column 3 - line 9, column 21)
+
+  Type [33mFoo[0m was shadowed.
+
+in value declaration [33mtest[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/ShadowedTypeName.md for more information,
+or to contribute content related to this warning.
+

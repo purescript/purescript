@@ -1,0 +1,11 @@
+Warning found:
+in module [33mMain[0m
+at tests/purs/warning/LocalTypeSynonyms.purs:10:3 - 10:24 (line 10, column 3 - line 10, column 24)
+
+  Name [33mLocalApp[0m was introduced but not used.
+
+in value declaration [33mgeneralized[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+or to contribute content related to this warning.
+

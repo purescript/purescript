@@ -1,0 +1,24 @@
+Warning 1 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/LocalTypeSynonyms6.purs:12:3 - 12:21 (line 12, column 3 - line 12, column 21)
+
+    Name [33mFoo[0m was introduced but not used.
+
+  in value declaration [33mtest1[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+  or to contribute content related to this warning.
+
+Warning 2 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/LocalTypeSynonyms6.purs:16:7 - 16:25 (line 16, column 7 - line 16, column 25)
+
+    Name [33mFoo[0m was introduced but not used.
+
+  in value declaration [33mtest2[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+  or to contribute content related to this warning.
+

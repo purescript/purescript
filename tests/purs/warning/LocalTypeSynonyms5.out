@@ -1,0 +1,25 @@
+Warning 1 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/LocalTypeSynonyms5.purs:8:3 - 8:47 (line 8, column 3 - line 8, column 47)
+
+    Name [33mFoo[0m was introduced but not used.
+
+  in value declaration [33mtest[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
+  or to contribute content related to this warning.
+
+Warning 2 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/LocalTypeSynonyms5.purs:8:3 - 8:47 (line 8, column 3 - line 8, column 47)
+
+    Type variable [33ma[0m was shadowed.
+
+  in type synonym [33mFoo[0m
+  in value declaration [33mtest[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/ShadowedTypeVar.md for more information,
+  or to contribute content related to this warning.
+

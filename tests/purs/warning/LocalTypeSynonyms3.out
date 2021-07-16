@@ -1,0 +1,12 @@
+Warning found:
+in module [33mMain[0m
+at tests/purs/warning/LocalTypeSynonyms3.purs:7:3 - 7:23 (line 7, column 3 - line 7, column 23)
+
+  Type variable [33ma[0m was shadowed.
+
+in type synonym [33mFoo[0m
+in binding group test
+
+See https://github.com/purescript/documentation/blob/master/errors/ShadowedTypeVar.md for more information,
+or to contribute content related to this warning.
+
