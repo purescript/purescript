@@ -1,4 +1,2 @@
-'use strict';
-
-exports.foo = 1;
-exports.bar = exports.foo;
+export var foo = 1;
+export { foo as bar };

@@ -15,6 +15,7 @@ import qualified Control.Arrow as A
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.List.NonEmpty as NEL (toList)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.CodeGen.JS.Common
@@ -119,6 +120,26 @@ literals = mkPattern' match'
     , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
+  match (Import _ ident from) = return . emit $
+    "import * as " <> ident <> " from " <> prettyPrintStringJS from
+  match (Export _ idents from) = mconcat <$> sequence
+    [ return $ emit "export {\n"
+    , withIndent $ do
+        let exportsStrings = emit . exportedIdentToString from <$> idents
+        indentString <- currentIndent
+        return . intercalate (emit ",\n") . NEL.toList $ (indentString <>) <$> exportsStrings
+    , return $ emit "\n"
+    , currentIndent
+    , return . emit $ "}" <> maybe "" ((" from " <>) . prettyPrintStringJS) from
+    ]
+    where
+    exportedIdentToString Nothing ident
+      | nameIsJsReserved ident || nameIsJsBuiltIn ident
+      = "$$" <> ident <> " as " <> ident
+    exportedIdentToString _ "$main"
+      = T.concatMap identCharToText "$main" <> " as $main"
+    exportedIdentToString _ ident
+      = T.concatMap identCharToText ident
   match _ = mzero
 
   comment :: (Emit gen) => Comment -> StateT PrinterState Maybe gen

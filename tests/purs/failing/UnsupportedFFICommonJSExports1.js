@@ -1,2 +1,2 @@
 export var yes = true;
-export var no = false;
+exports.no = false;

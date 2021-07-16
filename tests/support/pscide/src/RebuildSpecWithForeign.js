@@ -1,1 +1,1 @@
-exports.f = 5;
+export var f = 5;

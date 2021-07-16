@@ -86,7 +86,7 @@ spec = do
       writeFileWithTimestamp modulePath timestampA moduleContent
       compile [modulePath] `shouldReturn` moduleNames ["Module"]
 
-      writeFileWithTimestamp moduleFFIPath timestampB "exports.bar = 1;\n"
+      writeFileWithTimestamp moduleFFIPath timestampB "export var bar = 1;\n"
       compile [modulePath] `shouldReturn` moduleNames ["Module"]
 
     it "recompiles if an FFI file was removed" $ do
@@ -96,7 +96,7 @@ spec = do
           moduleContent = "module Module where\nfoo = 0\n"
 
       writeFileWithTimestamp modulePath timestampA moduleContent
-      writeFileWithTimestamp moduleFFIPath timestampB "exports.bar = 1;\n"
+      writeFileWithTimestamp moduleFFIPath timestampB "export var bar = 1;\n"
       compile [modulePath] `shouldReturn` moduleNames ["Module"]
 
       removeFile moduleFFIPath

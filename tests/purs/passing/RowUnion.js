@@ -1,6 +1,4 @@
-"use strict";
-
-exports.merge = function (dict) {
+export var merge = function (dict) {
   return function (l) {
     return function (r) {
       var o = {};

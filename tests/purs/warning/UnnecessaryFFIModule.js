@@ -1,1 +1,1 @@
-exports.out = null;
+export var out = null;

@@ -44,8 +44,7 @@ import           System.IO.UTF8 (readUTF8File)
 import           System.Exit
 import           System.Directory (doesFileExist, getCurrentDirectory)
 import           System.FilePath ((</>))
-import           System.FilePath.Glob (glob)
-import           System.Process (readProcessWithExitCode)
+import qualified System.FilePath.Glob as Glob
 import qualified Data.ByteString.Lazy.UTF8 as U
 
 -- | Command line options
@@ -108,7 +107,7 @@ pasteMode =
 -- | Make a JavaScript bundle for the browser.
 bundle :: IO (Either Bundle.ErrorMessage String)
 bundle = runExceptT $ do
-  inputFiles <- liftIO (glob (".psci_modules" </> "node_modules" </> "*" </> "*.js"))
+  inputFiles <- liftIO $ concat <$> Glob.globDir [Glob.compile "*/*.js", Glob.compile "*/foreign.cjs"] modulesDir
   input <- for inputFiles $ \filename -> do
     js <- liftIO (readUTF8File filename)
     mid <- Bundle.guessModuleIdentifier filename
@@ -280,13 +279,12 @@ nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
 
     eval :: () -> String -> IO ()
     eval _ _ = do
-      writeFile indexFile "require('$PSCI')['$main']();"
-      process <- maybe findNodeProcess (pure . pure) nodePath
-      result <- traverse (\node -> readProcessWithExitCode node (nodeArgs ++ [indexFile]) "") process
+      writeFile indexFile "import('./$PSCI/index.js').then(({ $main }) => $main());"
+      result <- readNodeProcessWithExitCode nodePath (nodeArgs ++ [indexFile]) ""
       case result of
-        Just (ExitSuccess, out, _)   -> putStrLn out
-        Just (ExitFailure _, _, err) -> putStrLn err
-        Nothing                      -> putStrLn "Could not find node.js. Do you have node.js installed and available in your PATH?"
+        Right (ExitSuccess, out, _)   -> putStrLn out
+        Right (ExitFailure _, _, err) -> putStrLn err
+        Left err                      -> putStrLn err
 
     reload :: () -> IO ()
     reload _ = return ()
@@ -303,7 +301,7 @@ command = loop <$> options
   where
     loop :: PSCiOptions -> IO ()
     loop PSCiOptions{..} = do
-        inputFiles <- concat <$> traverse glob psciInputGlob
+        inputFiles <- concat <$> traverse Glob.glob psciInputGlob
         e <- runExceptT $ do
           modules <- ExceptT (loadAllModules inputFiles)
           when (null modules) . liftIO $ do

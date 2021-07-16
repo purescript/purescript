@@ -1,1 +1,1 @@
-exports.yes = true;
+export var yes = true;

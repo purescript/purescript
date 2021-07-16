@@ -1,12 +1,10 @@
-"use strict";
-
-exports.unsafeGet = function (s) {
+export var unsafeGet = function (s) {
   return function (o) {
     return o[s];
   };
 };
 
-exports.unsafeSet = function(s) {
+export var unsafeSet = function (s) {
   return function(a) {
     return function (o) {
       var o1 = {};

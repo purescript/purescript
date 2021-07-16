@@ -30,7 +30,7 @@ jobs:
 
       - uses: "actions/setup-node@v1"
         with:
-          node-version: "10"
+          node-version: "12"
 
       - id: "haskell"
         uses: "haskell/actions/setup@v1"
