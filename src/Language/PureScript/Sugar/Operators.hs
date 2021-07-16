@@ -27,6 +27,7 @@ import Language.PureScript.Types
 
 import Control.Monad (unless, (<=<))
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class (MonadSupply)
 
 import Data.Either (partitionEithers)
 import Data.Foldable (for_, traverse_)
@@ -67,6 +68,7 @@ type TypeFixityRecord = FixityRecord (OpName 'TypeOpName) (ProperName 'TypeName)
 rebracket
   :: forall m
    . MonadError MultipleErrors m
+  => MonadSupply m
   => [ExternsFile]
   -> Module
   -> m Module
@@ -83,6 +85,7 @@ rebracket =
 rebracketFiltered
   :: forall m
    . MonadError MultipleErrors m
+  => MonadSupply m
   => (Declaration -> Bool)
   -> [ExternsFile]
   -> Module
@@ -178,6 +181,7 @@ rebracketFiltered pred_ externs m = do
 rebracketModule
   :: forall m
    . (MonadError MultipleErrors m)
+  => MonadSupply m
   => (Declaration -> Bool)
   -> [[(Qualified (OpName 'ValueOpName), Associativity)]]
   -> [[(Qualified (OpName 'TypeOpName), Associativity)]]
@@ -189,7 +193,7 @@ rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
   f' :: [Declaration] -> m [Declaration]
   f' =
     fmap (map (\d -> if pred_ d then removeParens d else d)) .
-    flip parU (usingPredicate pred_ f)
+    flip parU (usingPredicate pred_ (g <=< f))
 
   (f, _, _, _, _) =
       everywhereWithContextOnValuesM
@@ -200,6 +204,8 @@ rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
         defS
         defS
 
+  (g, _, _) = everywhereOnValuesTopDownM pure removeBinaryNoParens pure
+
   (goDecl, goExpr', goBinder') = updateTypes goType
 
   goType :: SourceSpan -> SourceType -> m SourceType
@@ -207,6 +213,24 @@ rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
 
   wrap :: (a -> m a) -> (SourceSpan, a) -> m (SourceSpan, a)
   wrap go (ss', a) = (ss',) <$> go a
+
+removeBinaryNoParens :: (MonadError MultipleErrors m, MonadSupply m) => Expr -> m Expr
+removeBinaryNoParens u
+  | isAnonymousArgument u = case u of
+                              PositionedValue p _ _ -> rethrowWithPosition p err
+                              _ -> err
+                            where err = throwError . errorMessage $ IncorrectAnonymousArgument
+removeBinaryNoParens (Parens (stripPositionInfo -> BinaryNoParens op l r))
+  | isAnonymousArgument r = do arg <- freshIdent'
+                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op l) (Var nullSourceSpan (Qualified Nothing arg))
+  | isAnonymousArgument l = do arg <- freshIdent'
+                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op (Var nullSourceSpan (Qualified Nothing arg))) r
+removeBinaryNoParens (BinaryNoParens op l r) = return $ App (App op l) r
+removeBinaryNoParens e = return e
+
+stripPositionInfo :: Expr -> Expr
+stripPositionInfo (PositionedValue _ _ e) = stripPositionInfo e
+stripPositionInfo e = e
 
 removeParens :: Declaration -> Declaration
 removeParens = f

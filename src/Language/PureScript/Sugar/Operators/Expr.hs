@@ -36,13 +36,13 @@ matchExprOperators = matchOperators isBinOp extractOp fromOp reapply modOpTable
   fromOp _ = Nothing
 
   reapply :: SourceSpan -> Qualified (OpName 'ValueOpName) -> Expr -> Expr -> Expr
-  reapply ss op t1 = App (App (Op ss op) t1)
+  reapply ss = BinaryNoParens . Op ss
 
   modOpTable
     :: [[P.Operator (Chain Expr) () Identity Expr]]
     -> [[P.Operator (Chain Expr) () Identity Expr]]
   modOpTable table =
-    [ P.Infix (P.try (parseTicks >>= \op -> return (\t1 t2 -> App (App op t1) t2))) P.AssocLeft ]
+    [ P.Infix (P.try (BinaryNoParens <$> parseTicks)) P.AssocLeft ]
     : table
 
   parseTicks :: P.Parsec (Chain Expr) () Expr

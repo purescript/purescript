@@ -15,4 +15,6 @@ main = do
   let div x y = x.x / y.x
   assert $ (_ `div` foo { x = 4.0 }) { x: 4.0 } == 1.0
   assert $ (foo { x = 4.0 } `div` _) { x: 4.0 } == 1.0
+  assert $ (_ + 2 * 3) 1 == 7
+  assert $ (3 * 2 + _) 1 == 7
   log "Done"

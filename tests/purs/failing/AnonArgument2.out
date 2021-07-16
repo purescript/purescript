@@ -1,5 +1,5 @@
 Error found:
-at tests/purs/failing/AnonArgument2.purs:7:1 - 7:17 (line 7, column 1 - line 7, column 17)
+at tests/purs/failing/AnonArgument2.purs:7:16 - 7:17 (line 7, column 16 - line 7, column 17)
 
   An anonymous function argument appears in an invalid context.
 

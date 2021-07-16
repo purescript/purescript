@@ -13,10 +13,10 @@ while solving type class constraint
 [33m                          [0m
 while applying a function [33mmyShow[0m
   of type [33mMyShow t0 => t0 -> String[0m
-  to argument [33m\$0 ->      [0m
-              [33m  (add $0) 1[0m
-while checking that expression [33mmyShow (\$0 ->      [0m
-                               [33m          (add $0) 1[0m
+  to argument [33m\$1 ->      [0m
+              [33m  (add $1) 1[0m
+while checking that expression [33mmyShow (\$1 ->      [0m
+                               [33m          (add $1) 1[0m
                                [33m       )            [0m
   has type [33mString[0m
 in value declaration [33mmain[0m
