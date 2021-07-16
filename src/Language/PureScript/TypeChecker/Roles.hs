@@ -7,10 +7,12 @@ module Language.PureScript.TypeChecker.Roles
   ( lookupRoles
   , checkRoles
   , checkDataBindingGroupRoles
+  , checkRoleDeclarationArity
   ) where
 
 import Prelude.Compat
 
+import Control.Monad (unless)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State (MonadState(..), runState, state)
 import Data.Coerce (coerce)
@@ -119,22 +121,45 @@ checkDataBindingGroupRoles
   -> [(Text, Maybe SourceType)]
   -> m [Role]
 checkDataBindingGroupRoles env moduleName group =
-  let initialRoleEnv = M.union (roleDeclarations env) (getRoleEnv env)
+  let initialRoleEnv = M.union (snd <$> roleDeclarations env) (getRoleEnv env)
       inferredRoleEnv = inferDataBindingGroupRoles moduleName group initialRoleEnv
   in \tyName tyArgs -> do
     let qualTyName = Qualified (Just moduleName) tyName
         inferredRoles = M.lookup qualTyName inferredRoleEnv
-    rethrow (addHint (ErrorInRoleDeclaration tyName)) $ do
-      case M.lookup qualTyName (roleDeclarations env) of
-        Just declaredRoles -> do
-          let
-            k (var, _) inf dec =
-              if inf < dec
-                then throwError . errorMessage $ RoleMismatch var inf dec
-                else pure dec
-          sequence $ zipWith3 k tyArgs (fromMaybe (repeat Phantom) inferredRoles) declaredRoles
-        Nothing ->
-          pure $ fromMaybe (Phantom <$ tyArgs) inferredRoles
+    case M.lookup qualTyName (roleDeclarations env) of
+      Just (ss, declaredRoles) -> do
+        checkRoleDeclarationArity ss tyName declaredRoles (length tyArgs)
+        let
+          k (var, _) inf dec =
+            if inf < dec
+              then throwErrorInRoleDeclaration tyName . errorMessage $ RoleMismatch var inf dec
+              else pure dec
+        sequence $ zipWith3 k tyArgs (fromMaybe (repeat Phantom) inferredRoles) declaredRoles
+      Nothing ->
+        pure $ fromMaybe (Phantom <$ tyArgs) inferredRoles
+
+checkRoleDeclarationArity
+  :: forall m
+   . (MonadError MultipleErrors m)
+  => SourceSpan
+  -> ProperName 'TypeName
+  -> [Role]
+  -> Int
+  -> m ()
+checkRoleDeclarationArity ss tyName roles expected = do
+  let actual = length roles
+  unless (expected == actual) $
+    throwErrorInRoleDeclaration tyName . errorMessage' ss $
+      RoleDeclarationArityMismatch tyName expected actual
+
+throwErrorInRoleDeclaration
+  :: forall m a
+   . (MonadError MultipleErrors m)
+  => ProperName 'TypeName
+  -> MultipleErrors
+  -> m a
+throwErrorInRoleDeclaration tyName =
+  throwError . addHint (ErrorInRoleDeclaration tyName)
 
 inferDataBindingGroupRoles
   :: ModuleName

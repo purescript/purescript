@@ -1638,6 +1638,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       where
       isSolverHint ErrorSolvingConstraint{} = True
       isSolverHint _ = False
+    stripRedundantHints RoleDeclarationArityMismatch{} = filter (not . isTyConHint)
+      where
+      isTyConHint ErrorInTypeConstructor{} = True
+      isTyConHint _ = False
     stripRedundantHints _ = id
 
     stripFirst :: (ErrorMessageHint -> Bool) -> [ErrorMessageHint] -> [ErrorMessageHint]

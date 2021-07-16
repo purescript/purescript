@@ -91,12 +91,13 @@ addDataConstructor moduleName dtype name dctor dctorArgs polyType = do
 addExplicitRoleDeclaration
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => ModuleName
+  -> SourceSpan
   -> ProperName 'TypeName
   -> [Role]
   -> m ()
-addExplicitRoleDeclaration moduleName name roles = do
+addExplicitRoleDeclaration moduleName ss name roles = do
   env <- getEnv
-  putEnv $ env { roleDeclarations = M.insert (Qualified (Just moduleName) name) roles (roleDeclarations env) }
+  putEnv $ env { roleDeclarations = M.insert (Qualified (Just moduleName) name) (ss, roles) (roleDeclarations env) }
 
 addTypeSynonym
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -337,8 +338,8 @@ typeCheckAll moduleName _ = traverse go
       env <- getEnv
       putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabTy, LocalTypeVariable) (types env) }
       return $ KindDeclaration sa kindFor name elabTy
-  go d@(RoleDeclaration (RoleDeclarationData _sa name roles)) = do
-    addExplicitRoleDeclaration moduleName name roles
+  go d@(RoleDeclaration (RoleDeclarationData (ss, _) name roles)) = do
+    addExplicitRoleDeclaration moduleName ss name roles
     return d
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
@@ -373,8 +374,10 @@ typeCheckAll moduleName _ = traverse go
     elabKind <- withFreshSubstitution $ checkKindDeclaration moduleName kind
     env <- getEnv
     let qualName = Qualified (Just moduleName) name
-    -- If there's an explicit role declaration, just trust it
-    let roles = fromMaybe (nominalRolesForKind elabKind) $ M.lookup qualName (roleDeclarations env)
+    -- If there's an explicit role declaration, check only its arity
+    let declaredRoles = M.lookup qualName (roleDeclarations env)
+    for_ declaredRoles $ \(ss, roles) -> checkRoleDeclarationArity ss name roles (kindArity elabKind)
+    let roles = maybe (nominalRolesForKind elabKind) snd declaredRoles
     putEnv $ env { types = M.insert qualName (elabKind, ExternData roles) (types env) }
     return d
   go d@(ExternDeclaration (ss, _) name ty) = do

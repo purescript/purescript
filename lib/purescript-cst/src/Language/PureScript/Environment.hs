@@ -35,7 +35,7 @@ data Environment = Environment
   , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
   -- ^ Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
-  , roleDeclarations :: M.Map (Qualified (ProperName 'TypeName)) [Role]
+  , roleDeclarations :: M.Map (Qualified (ProperName 'TypeName)) (SourceSpan, [Role])
   -- ^ Explicit role declarations currently in scope. Note that this field is
   -- only used to store declared roles temporarily until they can be checked;
   -- to find a type's real checked and/or inferred roles, refer to the TypeKind
