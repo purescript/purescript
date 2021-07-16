@@ -318,7 +318,7 @@ displayAssertionFailure = \case
     "  got `" <> actualTxt <> "`\n" <>
     "Structure of kind: " <> T.pack (show actualKind)
   KindSignaturePresent _ decl actualTxt actualKind ->
-    "the kind signature for " <> decl <> "was not empty.\n" <>
+    "the kind signature for " <> decl <> " was not empty.\n" <>
     "got `" <> actualTxt <> "`\n" <>
     "Structure of kind: " <> T.pack (show actualKind)
   DocCommentMergeFailure _ decl expected actual ->
@@ -824,6 +824,22 @@ testCases =
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "NHidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CHidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CNothing"
+
+      -- Declarations with an explicit kind signature that is wrapped
+      -- in parenthesis at various points, but which "desugars" so to speak
+      -- to an uninteresting kind signature should not be displayed.
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataRedundantParenthesis"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassRedundantParenthesis"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataHeadParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataTailParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataWholeParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataSelfParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassSelfParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataKindAnnotation"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataKindAnnotationWithParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "FunctionParens1"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "FunctionParens2"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "FunctionParens3"
 
       -- Declarations with no explicit kind signatures should be displayed
       -- if at least one type parameter has a kind other than `Type`
