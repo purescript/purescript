@@ -35,6 +35,7 @@ while checking that expression [33msubtractX hasX[0m
 in value declaration [33mbaz[0m
 
 where [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
 
 See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
 or to contribute content related to this error.
