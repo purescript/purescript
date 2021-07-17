@@ -76,6 +76,8 @@ foreign import data FFI_Shown :: (Type -> Type) -> Type
 
 ----------
 
+foreign import data FFI_RedundantParenthesis :: (Type) -> Type
+
 data DataRedundantParenthesis :: (Type) -> (Type)
 data DataRedundantParenthesis a = DataRedundantParenthesis
 

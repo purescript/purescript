@@ -833,6 +833,7 @@ testCases =
       -- Declarations with an explicit kind signature that is wrapped
       -- in parenthesis at various points, but which "desugars" so to speak
       -- to an uninteresting kind signature should not be displayed.
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "FFI_RedundantParenthesis"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataRedundantParenthesis"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassRedundantParenthesis"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataHeadParens"
