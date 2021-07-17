@@ -6,7 +6,6 @@ module Language.PureScript.Sugar.BindingGroups
   ( createBindingGroups
   , createBindingGroupsModule
   , collapseBindingGroups
-  , collapseBindingGroupsModule
   ) where
 
 import Prelude.Compat
@@ -17,6 +16,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (intersect, (\\))
+import Data.List.NonEmpty (NonEmpty((:|)), nonEmpty)
 import Data.Foldable (find)
 import Data.Maybe (isJust, mapMaybe)
 import qualified Data.List.NonEmpty as NEL
@@ -25,7 +25,7 @@ import qualified Data.Set as S
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Errors
+import Language.PureScript.Errors hiding (nonEmpty)
 import Language.PureScript.Names
 import Language.PureScript.Types
 
@@ -43,14 +43,6 @@ createBindingGroupsModule
   -> m Module
 createBindingGroupsModule (Module ss coms name ds exps) =
   Module ss coms name <$> createBindingGroups name ds <*> pure exps
-
--- |
--- Collapse all binding groups in a module to individual declarations
---
-collapseBindingGroupsModule :: [Module] -> [Module]
-collapseBindingGroupsModule =
-  fmap $ \(Module ss coms name ds exps) ->
-    Module ss coms name (collapseBindingGroups ds) exps
 
 createBindingGroups
   :: forall m
@@ -241,11 +233,11 @@ toDataBindingGroup
   -> m Declaration
 toDataBindingGroup (AcyclicSCC (d, _, _)) = return d
 toDataBindingGroup (CyclicSCC ds')
-  | kds@((ss, _):_) <- concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
+  | Just kds@((ss, _):|_) <- nonEmpty $ concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
   | not (null typeSynonymCycles) =
       throwError
         . MultipleErrors
-        . fmap (\syns -> ErrorMessage [positionedError . declSourceSpan . getDecl $ head syns] . CycleInTypeSynonym $ fmap (fst . getName) syns)
+        . fmap (\syns -> ErrorMessage [positionedError . declSourceSpan . getDecl $ NEL.head syns] . CycleInTypeSynonym $ fmap (fst . getName) syns)
         $ typeSynonymCycles
   | otherwise = return . DataBindingGroupDeclaration . NEL.fromList $ getDecl <$> ds'
   where
@@ -261,7 +253,7 @@ toDataBindingGroup (CyclicSCC ds')
     guard . isJust $ isTypeSynonym decl
     pure (decl, name, filter (maybe False (isJust . isTypeSynonym . getDecl) . lookupVert) deps)
 
-  isCycle (CyclicSCC c) = Just c
+  isCycle (CyclicSCC c) = nonEmpty c
   isCycle _ = Nothing
 
   typeSynonymCycles =

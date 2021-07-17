@@ -1,7 +1,6 @@
 module Language.PureScript.Docs.AsMarkdown
   ( Docs
   , runDocs
-  , modulesAsMarkdown
   , moduleAsMarkdown
   , codeToString
   ) where
@@ -20,9 +19,6 @@ import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs.Render as Render
-
-modulesAsMarkdown :: [Module] -> Docs
-modulesAsMarkdown = mapM_ moduleAsMarkdown
 
 moduleAsMarkdown :: Module -> Docs
 moduleAsMarkdown Module{..} = do

@@ -291,10 +291,6 @@ data ImportDeclarationType
   | Hiding [DeclarationRef]
   deriving (Eq, Show, Generic, Serialise)
 
-isImplicit :: ImportDeclarationType -> Bool
-isImplicit Implicit = True
-isImplicit _ = False
-
 isExplicit :: ImportDeclarationType -> Bool
 isExplicit (Explicit _) = True
 isExplicit _ = False
@@ -323,9 +319,6 @@ data TypeDeclarationData = TypeDeclarationData
   , tydeclType :: !SourceType
   } deriving (Show, Eq)
 
-overTypeDeclaration :: (TypeDeclarationData -> TypeDeclarationData) -> Declaration -> Declaration
-overTypeDeclaration f d = maybe d (TypeDeclaration . f) (getTypeDeclaration d)
-
 getTypeDeclaration :: Declaration -> Maybe TypeDeclarationData
 getTypeDeclaration (TypeDeclaration d) = Just d
 getTypeDeclaration _ = Nothing
@@ -347,9 +340,6 @@ data ValueDeclarationData a = ValueDeclarationData
   , valdeclBinders :: ![Binder]
   , valdeclExpression :: !a
   } deriving (Show, Functor, Foldable, Traversable)
-
-overValueDeclaration :: (ValueDeclarationData [GuardedExpr] -> ValueDeclarationData [GuardedExpr]) -> Declaration -> Declaration
-overValueDeclaration f d = maybe d (ValueDeclaration . f) (getValueDeclaration d)
 
 getValueDeclaration :: Declaration -> Maybe (ValueDeclarationData [GuardedExpr])
 getValueDeclaration (ValueDeclaration d) = Just d
