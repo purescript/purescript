@@ -16,17 +16,11 @@ at tests/purs/failing/DuplicateProperties.purs:12:18 - 12:32 (line 12, column 18
   [33m  )          [0m
   [33m             [0m
 
-while trying to match type [33m             [0m
-                           [33m  ( y :: Unit[0m
-                           [33m  ...        [0m
-                           [33m  )          [0m
-                           [33m             [0m
-  with type [33m             [0m
+while trying to match type [33mTest t1[0m
+  with type [33mTest         [0m
             [33m  ( x :: Unit[0m
-            [33m  ...        [0m
             [33m  | t0       [0m
             [33m  )          [0m
-            [33m             [0m
 while checking that expression [33msubtractX hasX[0m
   has type [33mTest         [0m
            [33m  ( x :: Unit[0m
@@ -35,6 +29,7 @@ while checking that expression [33msubtractX hasX[0m
 in value declaration [33mbaz[0m
 
 where [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
 
 See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
 or to contribute content related to this error.
