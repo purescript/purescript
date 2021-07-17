@@ -861,7 +861,7 @@ testCases =
       , ShouldHaveKindSignature (n "KindSignatureDocs") "DSortAnnotation" "data DSortAnnotation :: forall k. k -> Type"
       , ShouldHaveKindSignature (n "KindSignatureDocs") "TSortAnnotation" "type TSortAnnotation :: forall k. k -> Type"
       , ShouldHaveKindSignature (n "KindSignatureDocs") "NSortAnnotation" "newtype NSortAnnotation :: forall k. k -> Type"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "CSortAnnotation" "class CSortAnnotation :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CSortAnnotation" "class CSortAnnotation :: forall k. k -> Constraint"
       ]
     )
   , ("RoleAnnotationDocs",
