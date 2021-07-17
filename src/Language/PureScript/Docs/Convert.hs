@@ -145,16 +145,28 @@ insertValueTypesAndAdjustKinds env m =
     in
       d { declInfo = ValueDeclaration (ty $> ()) }
 
-  go d@Declaration{..} | Just keyword <- extractKeyword declInfo =
-    case declKind of
-      Just ks ->
-        -- hide explicit kind signatures that are "uninteresting"
-        if isUninteresting keyword $ kiKind ks
-          then d { declKind = Nothing }
-          else d
-      Nothing ->
-        -- insert inferred kinds so long as they are "interesting"
-        insertInferredKind d declTitle keyword
+  go d@Declaration{..} | Just keyword <- extractKeyword declInfo = do
+    -- hide kind signatures that are "uninteresting"
+    -- display "interesting" kind sigs, but drop their sort annotations
+    if isUninteresting keyword finalKind
+      then d { declKind = Nothing }
+      else d { declKind = Just $ KindInfo
+              { kiKeyword = keyword
+              , kiKind = dropTypeSortAnnotation finalKind
+              }
+             }
+    where
+      -- Use the explicit kind signature. If not exist, use inferred one instead
+      finalKind :: Type'
+      finalKind = maybe (lookupInferredKind declTitle) kiKind declKind
+
+      -- changes `forall (k :: Type). k -> ...`
+      -- to      `forall k          . k -> ...`
+      dropTypeSortAnnotation :: Type' -> Type'
+      dropTypeSortAnnotation = \case
+        P.ForAll sa txt (Just (P.TypeConstructor _ Prim.Type)) rest skol ->
+          P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol
+        rest -> rest
 
   go other =
     other
@@ -213,28 +225,12 @@ insertValueTypesAndAdjustKinds env m =
         P.ParensInType _ ty -> isTypeConstructor k ty
         _ -> False
 
-  insertInferredKind :: Declaration -> Text -> P.KindSignatureFor -> Declaration
-  insertInferredKind d name keyword =
+  lookupInferredKind :: Text -> Type'
+  lookupInferredKind name =
     let
       key = P.Qualified (Just (modName m)) (P.ProperName name)
     in case Map.lookup key (P.types env) of
-      Just (inferredKind, _) ->
-        if isUninteresting keyword inferredKind'
-          then  d
-          else  d { declKind = Just $ KindInfo
-                    { kiKeyword = keyword
-                    , kiKind = dropTypeSortAnnotation inferredKind'
-                    }
-                  }
-        where
-          inferredKind' = inferredKind $> ()
-
-          -- changes `forall (k :: Type). k -> ...`
-          -- to      `forall k          . k -> ...`
-          dropTypeSortAnnotation = \case
-            P.ForAll sa txt (Just (P.TypeConstructor _ Prim.Type)) rest skol ->
-              P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol
-            rest -> rest
+      Just (inferredKind, _) -> inferredKind $> ()
 
       Nothing ->
         err ("type not found: " ++ show key)
