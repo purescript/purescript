@@ -1658,6 +1658,17 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
   hintCategory ErrorCheckingKind{}                  = CheckHint
   hintCategory ErrorSolvingConstraint{}             = SolverHint
   hintCategory PositionedError{}                    = PositionHint
+  hintCategory ErrorInDataConstructor{}             = DeclarationHint
+  hintCategory ErrorInTypeConstructor{}             = DeclarationHint
+  hintCategory ErrorInBindingGroup{}                = DeclarationHint
+  hintCategory ErrorInDataBindingGroup{}            = DeclarationHint
+  hintCategory ErrorInTypeSynonym{}                 = DeclarationHint
+  hintCategory ErrorInValueDeclaration{}            = DeclarationHint
+  hintCategory ErrorInTypeDeclaration{}             = DeclarationHint
+  hintCategory ErrorInTypeClassDeclaration{}        = DeclarationHint
+  hintCategory ErrorInKindDeclaration{}             = DeclarationHint
+  hintCategory ErrorInRoleDeclaration{}             = DeclarationHint
+  hintCategory ErrorInForeignImport{}               = DeclarationHint
   hintCategory _                                    = OtherHint
 
   prettyPrintPlainIdent :: Ident -> Text

@@ -1,6 +1,6 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/failing/CoercibleRoleMismatch1.purs:4:1 - 4:29 (line 4, column 1 - line 4, column 29)
+at tests/purs/failing/CoercibleRoleMismatch1.purs:6:1 - 6:27 (line 6, column 1 - line 6, column 27)
 
   Role mismatch for the type parameter [33ma[0m:
 
@@ -8,7 +8,6 @@ at tests/purs/failing/CoercibleRoleMismatch1.purs:4:1 - 4:29 (line 4, column 1 -
 
 
 in role declaration for [33mIdentity[0m
-in type constructor [33mIdentity[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/RoleMismatch.md for more information,
 or to contribute content related to this error.

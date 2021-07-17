@@ -1,8 +1,8 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/failing/RoleDeclarationArityMismatch.purs:5:1 - 5:20 (line 5, column 1 - line 5, column 20)
+at tests/purs/failing/RoleDeclarationArityMismatchForeign4.purs:7:1 - 7:20 (line 7, column 1 - line 7, column 20)
 
-  The type [33mA[0m expects 0 arguments but its role declaration lists 1 role.
+  The type [33mA[0m expects 2 arguments but its role declaration lists only 1 role.
 
 in role declaration for [33mA[0m
 
