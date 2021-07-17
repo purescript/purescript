@@ -71,6 +71,11 @@ class CNothing
 
 ----------
 
+foreign import data FFI_Hidden :: Type -> Type -> Type
+foreign import data FFI_Shown :: (Type -> Type) -> Type
+
+----------
+
 data DataRedundantParenthesis :: (Type) -> (Type)
 data DataRedundantParenthesis a = DataRedundantParenthesis
 

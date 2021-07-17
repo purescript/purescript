@@ -825,6 +825,11 @@ testCases =
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CHidden"
       , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CNothing"
 
+      -- FFI declarations always have an explicit kind signature
+      -- but only show them if they are "interesting."
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "FFI_Hidden"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "FFI_Shown" "data FFI_Shown :: (Type -> Type) -> Type"
+
       -- Declarations with an explicit kind signature that is wrapped
       -- in parenthesis at various points, but which "desugars" so to speak
       -- to an uninteresting kind signature should not be displayed.
