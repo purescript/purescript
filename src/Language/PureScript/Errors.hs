@@ -1492,6 +1492,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ detail
             , line $ "in foreign import " <> markCode (showIdent nm)
             ]
+    renderHint (ErrorInForeignImportData nm) detail =
+      paras [ detail
+            , line $ "in foreign data type declaration for " <> markCode (runProperName nm)
+            ]
     renderHint (ErrorSolvingConstraint (Constraint _ nm _ ts _)) detail =
       paras [ detail
             , line "while solving type class constraint"
