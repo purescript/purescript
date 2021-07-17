@@ -12,6 +12,7 @@ import           Control.Monad
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.State.Lazy
 import           Control.Monad.Writer
+import           Data.Bifunctor (first, second)
 import           Data.Bitraversable (bitraverse)
 import           Data.Char (isSpace)
 import           Data.Either (partitionEithers)
@@ -1511,7 +1512,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
 
     printRow :: (Int -> Type a -> Box.Box) -> Type a -> Box.Box
-    printRow f t = markCodeBox $ indent $ f prettyDepth t
+    printRow f = markCodeBox . indent . f prettyDepth .
+      if full then id else eraseForAllKindAnnotations . eraseKindApps
 
     -- If both rows are not empty, print them as diffs
     -- If verbose print all rows else only print unique rows
@@ -1530,12 +1532,23 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     filterRows :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)
     filterRows (s1, r1) (s2, r2) =
          let sort' = sortOn $ \(RowListItem _ name ty) -> (name, ty)
-             notElem' s (RowListItem _ name ty) = all (\(RowListItem _ name' ty') -> name /= name' || not (eqType ty ty')) s
-             unique1 = filter (notElem' s2) s1
-             unique2 = filter (notElem' s1) s2
-          in ( rowFromList (sort' unique1, r1)
-             , rowFromList (sort' unique2, r2)
+             (unique1, unique2) = diffSortedRowLists (sort' s1, sort' s2)
+          in ( rowFromList (unique1, r1)
+             , rowFromList (unique2, r2)
              )
+
+    -- Importantly, this removes exactly the same number of elements from
+    -- both lists, even if there are repeated (name, ty) keys. It requires
+    -- the inputs to be sorted but ensures that the outputs remain sorted.
+    diffSortedRowLists :: ([RowListItem a], [RowListItem a]) -> ([RowListItem a], [RowListItem a])
+    diffSortedRowLists = go where
+      go = \case
+        (s1@(h1@(RowListItem _ name1 ty1) : t1), s2@(h2@(RowListItem _ name2 ty2) : t2)) ->
+          case (name1, ty1) `compare` (name2, ty2) of
+            EQ ->                go (t1, t2)
+            LT -> first  (h1:) $ go (t1, s2)
+            GT -> second (h2:) $ go (s1, t2)
+        other -> other
 
     renderContext :: Context -> [Box.Box]
     renderContext [] = []
