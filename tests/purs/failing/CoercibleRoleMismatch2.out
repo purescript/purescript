@@ -8,7 +8,6 @@ at tests/purs/failing/CoercibleRoleMismatch2.purs:10:1 - 10:20 (line 10, column 
 
 
 in role declaration for [33mV[0m
-in data binding group V
 
 See https://github.com/purescript/documentation/blob/master/errors/RoleMismatch.md for more information,
 or to contribute content related to this error.
