@@ -369,14 +369,15 @@ typeCheckAll moduleName _ = traverse go
         addValue moduleName name ty nameKind
         return (sai, nameKind, val)
       return . BindingGroupDeclaration $ NEL.fromList vals''
-  go d@(ExternDataDeclaration _ name kind) = do
-    elabKind <- withFreshSubstitution $ checkKindDeclaration moduleName kind
-    env <- getEnv
-    let qualName = Qualified (Just moduleName) name
-    -- If there's an explicit role declaration, just trust it
-    let roles = fromMaybe (nominalRolesForKind elabKind) $ M.lookup qualName (roleDeclarations env)
-    putEnv $ env { types = M.insert qualName (elabKind, ExternData roles) (types env) }
-    return d
+  go d@(ExternDataDeclaration (ss, _) name kind) = do
+    warnAndRethrow (addHint (ErrorInForeignImportData name) . addHint (positionedError ss)) $ do
+      elabKind <- withFreshSubstitution $ checkKindDeclaration moduleName kind
+      env <- getEnv
+      let qualName = Qualified (Just moduleName) name
+      -- If there's an explicit role declaration, just trust it
+      let roles = fromMaybe (nominalRolesForKind elabKind) $ M.lookup qualName (roleDeclarations env)
+      putEnv $ env { types = M.insert qualName (elabKind, ExternData roles) (types env) }
+      return d
   go d@(ExternDeclaration (ss, _) name ty) = do
     warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (positionedError ss)) $ do
       env <- getEnv
