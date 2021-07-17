@@ -16,6 +16,7 @@ import           Control.Monad.State
 import           Control.Monad.Supply.Class
 import           Data.Graph
 import           Data.List (find, partition)
+import           Data.List.NonEmpty (nonEmpty)
 import qualified Data.Map as M
 import           Data.Maybe (catMaybes, mapMaybe, isJust)
 import qualified Data.List.NonEmpty as NEL
@@ -25,7 +26,7 @@ import           Data.Traversable (for)
 import qualified Language.PureScript.Constants.Prim as C
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment
-import           Language.PureScript.Errors hiding (isExported)
+import           Language.PureScript.Errors hiding (isExported, nonEmpty)
 import           Language.PureScript.Externs
 import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
@@ -91,7 +92,9 @@ desugarModule syns kinds (Module ss coms name decls (Just exps)) = do
     -> SCC Declaration
     -> Desugar m (Maybe DeclarationRef, [Declaration])
   desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl syns kinds name' exps' d
-  desugarClassDecl _ _ (CyclicSCC ds') = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeClassDeclaration (map classDeclName ds')
+  desugarClassDecl _ _ (CyclicSCC ds')
+    | Just ds'' <- nonEmpty ds' = throwError . errorMessage' (declSourceSpan (NEL.head ds'')) $ CycleInTypeClassDeclaration (NEL.map classDeclName ds'')
+    | otherwise = internalError "desugarClassDecl: empty CyclicSCC"
 
   superClassesNames :: Declaration -> [Qualified (ProperName 'ClassName)]
   superClassesNames (TypeClassDeclaration _ _ _ implies _ _) = fmap constraintName implies
