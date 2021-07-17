@@ -106,17 +106,19 @@ unknownsInType t = everythingOnTypes (.) go t []
 
 -- | Unify two types, updating the current substitution
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
-unifyTypes t1 t2 = withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes'' False t1 t2
+unifyTypes t1 t2 = withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes'' False False t1 t2
   where
-  unifyTypes'' needsSubstitution t'1 t'2 = if needsSubstitution then do
+  unifyTypes'' doLSub doRSub t'1 t'2 = if doLSub || doRSub then do
       sub <- gets checkSubstitution
-      unifyTypes' True (substituteType sub t'1) (substituteType sub t'2) else unifyTypes' False t'1 t'2
-  unifyTypes' hasDoneSub t'1@(TUnknown _ u1) t'2@(TUnknown _ u2)
-    | not hasDoneSub = unifyTypes'' True t'1 t'2
-    | u1 == u2 = return ()
-  unifyTypes' hasDoneSub t'1@(TUnknown _ u) t'2 = if not hasDoneSub then unifyTypes'' True t'1 t'2 else solveType u t'2
-  unifyTypes' hasDoneSub t'1 t'2@(TUnknown _ u) = if not hasDoneSub then unifyTypes'' True t'1 t'2 else solveType u t'1
-  unifyTypes' _ (ForAll ann1 ident1 mbK1 ty1 sc1) (ForAll ann2 ident2 mbK2 ty2 sc2) =
+      unifyTypes' doLSub doRSub (if doLSub then substituteType sub t'1 else t'1) (if doRSub then substituteType sub t'2 else t'2) else unifyTypes' doLSub doRSub t'1 t'2
+  unifyTypes' didLSub didRSub t'1@(TUnknown _ u1) t'2@(TUnknown _ u2)
+    | not didLSub && not didRSub = unifyTypes'' True True t'1 t'2
+    | didLSub && didRSub && u1 == u2 = return ()
+    | not didLSub = unifyTypes'' True False t'1 t'2
+    | not didRSub = unifyTypes'' False True t'1 t'2
+  unifyTypes' didLSub didRSub t'1@(TUnknown _ u) t'2 = if not didLSub then unifyTypes'' True didRSub t'1 t'2 else solveType u t'2
+  unifyTypes' didLSub didRSub t'1 t'2@(TUnknown _ u) = if not didRSub then unifyTypes'' didLSub True t'1 t'2 else solveType u t'1
+  unifyTypes' _ _ (ForAll ann1 ident1 mbK1 ty1 sc1) (ForAll ann2 ident2 mbK2 ty2 sc2) =
     case (sc1, sc2) of
       (Just sc1', Just sc2') -> do
         sko <- newSkolemConstant
@@ -124,37 +126,37 @@ unifyTypes t1 t2 = withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes'
         let sk2 = skolemize ann2 ident2 mbK2 sko sc2' ty2
         sk1 `unifyTypes` sk2
       _ -> internalError "unifyTypes: unspecified skolem scope"
-  unifyTypes' _ (ForAll ann ident mbK ty1 (Just sc)) ty2 = do
+  unifyTypes' _ _ (ForAll ann ident mbK ty1 (Just sc)) ty2 = do
     sko <- newSkolemConstant
     let sk = skolemize ann ident mbK sko sc ty1
     sk `unifyTypes` ty2
-  unifyTypes' _ ForAll{} _ = internalError "unifyTypes: unspecified skolem scope"
-  unifyTypes' _ ty f@ForAll{} = f `unifyTypes` ty
-  unifyTypes' _ (TypeVar _ v1) (TypeVar _ v2) | v1 == v2 = return ()
-  unifyTypes' _ ty1@(TypeConstructor _ c1) ty2@(TypeConstructor _ c2) =
+  unifyTypes' _ _ ForAll{} _ = internalError "unifyTypes: unspecified skolem scope"
+  unifyTypes' _ _ ty f@ForAll{} = f `unifyTypes` ty
+  unifyTypes' _ _ (TypeVar _ v1) (TypeVar _ v2) | v1 == v2 = return ()
+  unifyTypes' _ _ ty1@(TypeConstructor _ c1) ty2@(TypeConstructor _ c2) =
     guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
-  unifyTypes' _ (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = return ()
-  unifyTypes' _ (TypeApp _ t3 t4) (TypeApp _ t5 t6) = do
+  unifyTypes' _ _ (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = return ()
+  unifyTypes' _ _ (TypeApp _ t3 t4) (TypeApp _ t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
-  unifyTypes' _ (KindApp _ t3 t4) (KindApp _ t5 t6) = do
+  unifyTypes' _ _ (KindApp _ t3 t4) (KindApp _ t5 t6) = do
     t3 `unifyKinds'` t5
     t4 `unifyTypes` t6
-  unifyTypes' _ (Skolem _ _ _ s1 _) (Skolem _ _ _ s2 _) | s1 == s2 = return ()
-  unifyTypes' _ (KindedType _ ty1 _) ty2 = ty1 `unifyTypes` ty2
-  unifyTypes' _ ty1 (KindedType _ ty2 _) = ty1 `unifyTypes` ty2
-  unifyTypes' _ r1@RCons{} r2 = unifyRows r1 r2
-  unifyTypes' _ r1 r2@RCons{} = unifyRows r1 r2
-  unifyTypes' _ r1@REmptyKinded{} r2 = unifyRows r1 r2
-  unifyTypes' _ r1 r2@REmptyKinded{} = unifyRows r1 r2
-  unifyTypes' _ (ConstrainedType _ c1 ty1) (ConstrainedType _ c2 ty2)
+  unifyTypes' _ _ (Skolem _ _ _ s1 _) (Skolem _ _ _ s2 _) | s1 == s2 = return ()
+  unifyTypes' _ _ (KindedType _ ty1 _) ty2 = ty1 `unifyTypes` ty2
+  unifyTypes' _ _ ty1 (KindedType _ ty2 _) = ty1 `unifyTypes` ty2
+  unifyTypes' _ _ r1@RCons{} r2 = unifyRows r1 r2
+  unifyTypes' _ _ r1 r2@RCons{} = unifyRows r1 r2
+  unifyTypes' _ _ r1@REmptyKinded{} r2 = unifyRows r1 r2
+  unifyTypes' _ _ r1 r2@REmptyKinded{} = unifyRows r1 r2
+  unifyTypes' _ _ (ConstrainedType _ c1 ty1) (ConstrainedType _ c2 ty2)
     | constraintClass c1 == constraintClass c2 && constraintData c1 == constraintData c2 = do
         traverse_ (uncurry unifyTypes) (constraintArgs c1 `zip` constraintArgs c2)
         ty1 `unifyTypes` ty2
-  unifyTypes' _ ty1@ConstrainedType{} ty2 =
+  unifyTypes' _ _ ty1@ConstrainedType{} ty2 =
     throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
-  unifyTypes' hasDoneSub t3 t4@ConstrainedType{} = unifyTypes' hasDoneSub t4 t3
-  unifyTypes' _ t3 t4 =
+  unifyTypes' didLSub didRSub t3 t4@ConstrainedType{} = unifyTypes' didLSub didRSub t4 t3
+  unifyTypes' _ _ t3 t4 =
     throwError . errorMessage $ TypesDoNotUnify t3 t4
 
 -- | Unify two rows, updating the current substitution
