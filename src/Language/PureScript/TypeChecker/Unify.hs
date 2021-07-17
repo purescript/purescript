@@ -114,8 +114,8 @@ unifyTypes t1 t2 = withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes'
   unifyTypes' didLSub didRSub t'1@(TUnknown _ u1) t'2@(TUnknown _ u2)
     | not didLSub && not didRSub = unifyTypes'' True True t'1 t'2
     | didLSub && didRSub && u1 == u2 = return ()
-    | not didLSub = unifyTypes'' True False t'1 t'2
-    | not didRSub = unifyTypes'' False True t'1 t'2
+    | not didLSub = unifyTypes'' True didRSub t'1 t'2
+    | not didRSub = unifyTypes'' didLSub True t'1 t'2
   unifyTypes' didLSub didRSub t'1@(TUnknown _ u) t'2 = if not didLSub then unifyTypes'' True didRSub t'1 t'2 else solveType u t'2
   unifyTypes' didLSub didRSub t'1 t'2@(TUnknown _ u) = if not didRSub then unifyTypes'' didLSub True t'1 t'2 else solveType u t'1
   unifyTypes' _ _ (ForAll ann1 ident1 mbK1 ty1 sc1) (ForAll ann2 ident2 mbK2 ty2 sc2) =
