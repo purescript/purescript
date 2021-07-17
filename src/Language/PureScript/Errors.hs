@@ -786,7 +786,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
       where
       cycleError = case names of
-        []   -> pure . line $ "A cycle appears in a set of type synonym definitions."
         [pn] -> pure . line $ "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
         _    -> [ line " A cycle appears in a set of type synonym definitions:"
                 , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName) names) <> "}"
