@@ -25,6 +25,25 @@
   `nominal` role annotations are displayed in documentation whereas the
   `representational` role is not, similar to "unintersting" kind signatures.
 
+  Lastly, FFI declarations like below...
+
+  ```purescript
+  foreign import data Foo :: (Type -> Type) -> Type
+  type role Foo nominal
+  ```
+
+  ...will be rendered as though they are data declarations:
+
+  ```purescript
+  data Foo :: (Type -> Type) -> Type
+  data Foo t0
+  type role Foo nominal
+  ```
+
+  One can distinguish FFI declarations with roles separately from normal `data`
+  declarations that have roles based on the name of the type parameters. Since FFI declarations' type parameters are implicit and thus unnamed, the compiler will generate their name: `t0`, `t1`, ..., `tN` where `N` is a zero-based
+  index of the type parameter.
+
   Note: the resulting documentation will display the roles, but the roles
   will not be selectable when selecting the type in case one wants to
   copy-paste the type into source code.
