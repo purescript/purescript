@@ -28,6 +28,7 @@ import qualified Language.PureScript.CoreFn.FromJSON as P
 import qualified Language.PureScript.Crash as P
 import qualified Language.PureScript.Environment as P
 import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Roles as P
 import qualified Language.PureScript.Types as P
 import qualified Paths_purescript as Paths
 
@@ -158,12 +159,12 @@ data DeclarationInfo
   -- newtype) and its type arguments. Constructors are represented as child
   -- declarations.
   --
-  | DataDeclaration P.DataDeclType [(Text, Maybe Type')]
+  | DataDeclaration P.DataDeclType [(Text, Maybe Type')] [P.Role]
 
   -- |
   -- A data type foreign import, with its kind.
   --
-  | ExternDataDeclaration Type'
+  | ExternDataDeclaration Type' [P.Role]
 
   -- |
   -- A type synonym, with its type arguments and its type.
@@ -216,8 +217,8 @@ convertFundepsToStrings args fundeps =
 
 declInfoToString :: DeclarationInfo -> Text
 declInfoToString (ValueDeclaration _) = "value"
-declInfoToString (DataDeclaration _ _) = "data"
-declInfoToString (ExternDataDeclaration _) = "externData"
+declInfoToString (DataDeclaration _ _ _) = "data"
+declInfoToString (ExternDataDeclaration _ _) = "externData"
 declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _ _) = "typeClass"
 declInfoToString (AliasDeclaration _ _) = "alias"
@@ -361,6 +362,7 @@ data PackageError
   | InvalidDataDeclType Text
   | InvalidKindSignatureFor Text
   | InvalidTime
+  | InvalidRole Text
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData PackageError
@@ -531,6 +533,8 @@ displayPackageError e = case e of
     "Invalid kind signature keyword: \"" <> str <> "\""
   InvalidTime ->
     "Invalid time"
+  InvalidRole str ->
+    "Invalid role keyword: \"" <> str <> "\""
 
 instance A.FromJSON a => A.FromJSON (Package a) where
   parseJSON = toAesonParser displayPackageError
@@ -613,8 +617,10 @@ asDeclarationInfo = do
     "data" ->
       DataDeclaration <$> key "dataDeclType" asDataDeclType
                       <*> key "typeArguments" asTypeArguments
+                      <*> keyOrDefault "roles" [] (eachInArray asRole)
     "externData" ->
       ExternDataDeclaration <$> key "kind" asType
+                            <*> keyOrDefault "roles" [] (eachInArray asRole)
     "typeSynonym" ->
       TypeSynonymDeclaration <$> key "arguments" asTypeArguments
                              <*> key "type" asType
@@ -627,7 +633,7 @@ asDeclarationInfo = do
                        <*> key "alias" asFixityAlias
     -- Backwards compat: kinds are extern data
     "kind" ->
-      pure $ ExternDataDeclaration (P.kindType $> ())
+      pure $ ExternDataDeclaration (P.kindType $> ()) []
     other ->
       throwCustomError (InvalidDeclarationType other)
 
@@ -649,6 +655,14 @@ asTypeArguments :: Parse PackageError [(Text, Maybe Type')]
 asTypeArguments = eachInArray asTypeArgument
   where
   asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asType)
+
+asRole :: Parse PackageError P.Role
+asRole =
+  withText $ \case
+    "Representational" -> Right P.Representational
+    "Nominal" -> Right P.Nominal
+    "Phantom" -> Right P.Phantom
+    other -> Left (InvalidRole other)
 
 asType :: Parse e Type'
 asType = fromAesonParser
@@ -814,8 +828,8 @@ instance A.ToJSON DeclarationInfo where
     where
     props = case info of
       ValueDeclaration ty -> ["type" .= ty]
-      DataDeclaration ty args -> ["dataDeclType" .= ty, "typeArguments" .= args]
-      ExternDataDeclaration kind -> ["kind" .= kind]
+      DataDeclaration ty args roles -> ["dataDeclType" .= ty, "typeArguments" .= args, "roles" .= roles]
+      ExternDataDeclaration kind roles -> ["kind" .= kind, "roles" .= roles]
       TypeSynonymDeclaration args ty -> ["arguments" .= args, "type" .= ty]
       TypeClassDeclaration args super fundeps -> ["arguments" .= args, "superclasses" .= super, "fundeps" .= fundeps]
       AliasDeclaration fixity alias -> ["fixity" .= fixity, "alias" .= alias]

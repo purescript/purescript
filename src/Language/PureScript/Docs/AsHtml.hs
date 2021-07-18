@@ -33,6 +33,7 @@ import qualified Cheapskate
 
 import qualified Language.PureScript as P
 
+import Language.PureScript.Docs.Roles (docRepoRolesPage, describeNominal, describePhantom)
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.RenderedCode hiding (sp)
 import qualified Language.PureScript.Docs.Render as Render
@@ -211,6 +212,21 @@ codeAsHtml r = outputWith elemAsHtml
             linkToDecl ns target mn (withClass class_ (text name))
         NoLink ->
           text name
+    Role role ->
+      case role of
+        "nominal" -> renderRole describeNominal "decl__role_nominal"
+        "phantom" -> renderRole describePhantom "decl__role_phantom"
+
+        -- representational is intentionally not rendered
+        "representational" -> toHtml ("" :: Text)
+
+        x -> P.internalError $ "codeAsHtml: unknown value for role annotation: '" <> T.unpack x <> "'"
+      where
+        renderRole hoverTextContent className =
+          H.a ! A.href (v docRepoRolesPage) ! A.target (v "_blank") ! A.class_ "decl__role" $ do
+            H.abbr ! A.class_ "decl__role_hover" ! A.title (v hoverTextContent) $ do
+              H.sub ! A.class_ className $ do
+                toHtml ("" :: Text)
 
   linkToDecl = linkToDeclaration r
 

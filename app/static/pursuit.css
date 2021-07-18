@@ -413,6 +413,27 @@ ol li {
   text-indent: -2.441em;
   white-space: normal;
 }
+.decl__role {
+  font-family: "Roboto", sans-serif;
+  font-style: italic;
+  font-weight: normal;
+}
+/* See https://stackoverflow.com/a/32162038
+   Content licensed under CC BY-SA 3.0
+*/
+.decl__role_hover[title] {
+  /* Remove line that appears under abbr element */
+  border-bottom: none;
+  text-decoration: none;
+  /* Ensure cursor doesn't change to question mark */
+  cursor: inherit;
+}
+.decl__role_nominal::after {
+  content: "nominal";
+}
+.decl__role_phantom::after {
+  content: "phantom";
+}
 .decl__kind {
   border-bottom: 1px solid #cccccc;
 }
