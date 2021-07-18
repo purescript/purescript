@@ -16,11 +16,9 @@ at tests/purs/failing/DuplicateProperties.purs:12:18 - 12:32 (line 12, column 18
   [33m  )          [0m
   [33m             [0m
 
-while trying to match type [33m             [0m
-                           [33m  ( y :: Unit[0m
-                           [33m  ...        [0m
-                           [33m  )          [0m
-                           [33m             [0m
+while trying to match type [33m    [0m
+                           [33m  t1[0m
+                           [33m    [0m
   with type [33m             [0m
             [33m  ( x :: Unit[0m
             [33m  ...        [0m
