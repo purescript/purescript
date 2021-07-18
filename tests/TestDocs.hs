@@ -882,20 +882,32 @@ testCases =
       ]
     )
   , ("DocCommentsMerge",
-      [ ShouldMergeDocComments (n "DocCommentsMerge") "DeclOnly" $ Just "decl\n"
-      , ShouldMergeDocComments (n "DocCommentsMerge") "KindAndDecl" $ Just "kind\n\ndecl\n"
-      , ShouldMergeDocComments (n "DocCommentsMerge") "DeclAndRole" $ Just "decl\n\nrole\n"
-      , ShouldMergeDocComments (n "DocCommentsMerge") "KindDeclAndRole" $ Just "kind\n\ndecl\n\nrole\n"
+      [ ShouldMergeDocComments (n "DocCommentsMerge") "DataOnly" $ Just "decl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindOnlyData" $ Just "kind\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindAndData" $ Just "kind\n\ndecl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "DataRoleOnly" $ Just "role\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "DataAndRole" $ Just "decl\n\nrole\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindOnlyDataRoleOnly" $ Just "kind\n\nrole\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindDataAndRole" $ Just "kind\n\ndecl\n\nrole\n"
+
+      , ShouldMergeDocComments (n "DocCommentsMerge") "FFIOnly" $ Just "decl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "FFIRoleOnly" $ Just "role\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "FFIAndRole" $ Just "decl\n\nrole\n"
 
       , ShouldMergeDocComments (n "DocCommentsMerge") "NewtypeOnly" $ Just "decl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindOnlyNewtype" $ Just "kind\n"
       , ShouldMergeDocComments (n "DocCommentsMerge") "KindAndNewtype" $ Just "kind\n\ndecl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "NewtypeRoleOnly" $ Just "role\n"
       , ShouldMergeDocComments (n "DocCommentsMerge") "NewtypeAndRole" $ Just "decl\n\nrole\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindOnlyNewtypeRoleOnly" $ Just "kind\n\nrole\n"
       , ShouldMergeDocComments (n "DocCommentsMerge") "KindNewtypeAndRole" $ Just "kind\n\ndecl\n\nrole\n"
 
       , ShouldMergeDocComments (n "DocCommentsMerge") "TypeOnly" $ Just "decl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindOnlyType" $ Just "kind\n"
       , ShouldMergeDocComments (n "DocCommentsMerge") "KindAndType" $ Just "kind\n\ndecl\n"
 
       , ShouldMergeDocComments (n "DocCommentsMerge") "ClassOnly" $ Just "decl\n"
+      , ShouldMergeDocComments (n "DocCommentsMerge") "KindOnlyClass" $ Just "kind\n"
       , ShouldMergeDocComments (n "DocCommentsMerge") "KindAndClass" $ Just "kind\n\ndecl\n"
       ]
     )
