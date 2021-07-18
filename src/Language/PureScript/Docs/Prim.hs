@@ -11,6 +11,7 @@ import Data.Functor (($>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map
+import Language.PureScript.Docs.Roles (docRepoRolesPage)
 import Language.PureScript.Docs.Types
 
 import qualified Language.PureScript.Crash as P
@@ -412,7 +413,7 @@ coercible = primClassOf (P.primSubName "Coerce") "Coercible" $ T.unlines
   , "representation so coercing between them would be unsafe. In addition their"
   , "arguments may need to be identical or coercible, depending on the _roles_"
   , "of the head's type parameters. Roles are documented in [the PureScript"
-  , "language reference](https://github.com/purescript/documentation/blob/master/language/Roles.md)."
+  , "language reference](" <> docRepoRolesPage <> ")."
   , ""
   , "Coercible being polykinded, we can also coerce more than types of kind `Type`:"
   , ""
