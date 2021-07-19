@@ -1,0 +1,1 @@
+* Avoids unnecessary substitution checks when running `unifyTypes`. By only checking substitutions for unknown types, this leads to a 1.5-2x speedup for heavily constrained files.
