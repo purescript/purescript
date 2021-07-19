@@ -105,6 +105,9 @@ unknownsInType t = everythingOnTypes (.) go t []
   go _ = id
 
 -- | Unify two types, updating the current substitution
+-- | TODO: it is not clear why substitution has to be done on _both_ t1 and t2 if only t1
+-- | or only t2 is unknown. If we limit substitution to only the unknown, it results in an
+-- | ExitFailure (-9).
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
 unifyTypes t1 t2 = withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes'' False t1 t2
   where
