@@ -21,6 +21,7 @@ jobs:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
         # If upgrading Ubuntu, also upgrade it in the lint job below
+        # and the package-set job below
         os: [ "ubuntu-18.04", "macOS-10.15", "windows-2016" ]
 
     runs-on: "${{ matrix.os }}"
@@ -37,6 +38,7 @@ jobs:
         with:
           enable-stack: true
           # If upgrading Stack, also upgrade it in the lint job below
+          # and the package-set job below
           stack-version: "2.7.1"
           stack-no-global: true
 
@@ -123,3 +125,57 @@ jobs:
       - run: "stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
 
       - run: "stack exec weeder"
+
+  package-set:
+    runs-on: "ubuntu-18.04"
+
+    steps:
+      - uses: "actions/checkout@v2"
+
+      - id: "haskell"
+        uses: "haskell/actions/setup@v1"
+        with:
+          enable-stack: true
+          stack-version: "2.7.1"
+          stack-no-global: true
+
+      - uses: "actions/cache@v2"
+        with:
+          path: |
+            ${{ steps.haskell.outputs.stack-root }}
+          key: "${{ runner.os }}-package-set-${{ hashFiles('stack.yaml') }}"
+
+      - run: "stack --no-terminal --jobs=2 build"
+
+      - run: "stack exec bash"
+
+      - name:
+        run: |
+          mkdir -p packageSetCI
+          cd packageSetCI
+
+          (echo "::group::Init Spago project") 2>/dev/null
+          spago init --no-comments
+          (echo "::endgroup::"; "::group::Upgrade to latest package set") 2>/dev/null
+
+          # Ensure we're on the latest package set
+          spago upgrade-set
+
+          (echo "::endgroup::"; "::group::Override metadata package version") 2>/dev/null
+
+          # Override the `metadata` package's version to match `purs` version
+          # so that `spago build` actually works
+          META_PACKAGE_VERSION="v$(purs --version | cut -d ' ' -f 1)"
+          echo $(head --lines=-1 packages.dhall) > packages.dhall
+          echo "in upstream with metadata.version = \"$META_PACKAGE_VERSION\"" >> packages.dhall
+
+          (echo "::endgroup::"; "::group::Install package set") 2>/dev/null
+          spago install $(spago ls packages | cut -d ' ' -f 1 | tr '\n' ' ')
+
+          (echo "::endgroup::"; "::group::Compile package set") 2>/dev/null
+          spago build
+
+          (echo "::endgroup::"; "::group::Document package set") 2>/dev/null
+          spago docs --no-search
+
+          (echo "::endgroup::") 2>/dev/null
