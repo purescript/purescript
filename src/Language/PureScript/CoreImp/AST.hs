@@ -93,6 +93,8 @@ data AST
   -- ^ instanceof check
   | Comment (Maybe SourceSpan) [Comment] AST
   -- ^ Commented JavaScript
+  | Pure (Maybe SourceSpan) AST
+  -- ^ Purity annotation
   | Import (Maybe SourceSpan) Text PSString
   -- ^ Imported identifier and path to its module
   | Export (Maybe SourceSpan) (NEL.NonEmpty Text) (Maybe PSString)
@@ -128,6 +130,7 @@ withSourceSpan withSpan = go where
   go (Throw _ js) = Throw ss js
   go (InstanceOf _ j1 j2) = InstanceOf ss j1 j2
   go (Comment _ com j) = Comment ss com j
+  go (Pure _ js) = Pure ss js
   go (Import _ ident from) = Import ss ident from
   go (Export _ idents from) = Export ss idents from
 
@@ -157,6 +160,7 @@ getSourceSpan = go where
   go (Throw ss _) = ss
   go (InstanceOf ss _ _) = ss
   go (Comment ss _ _) = ss
+  go (Pure ss _) = ss
   go (Import ss _ _) = ss
   go (Export ss _ _) = ss
 
@@ -181,6 +185,7 @@ everywhere f = go where
   go (Throw ss js) = f (Throw ss (go js))
   go (InstanceOf ss j1 j2) = f (InstanceOf ss (go j1) (go j2))
   go (Comment ss com j) = f (Comment ss com (go j))
+  go (Pure ss j) = f (Pure ss (go j))
   go other = f other
 
 everywhereTopDown :: (AST -> AST) -> AST -> AST
@@ -207,6 +212,7 @@ everywhereTopDownM f = f >=> go where
   go (Throw ss j) = Throw ss <$> f' j
   go (InstanceOf ss j1 j2) = InstanceOf ss <$> f' j1 <*> f' j2
   go (Comment ss com j) = Comment ss com <$> f' j
+  go (Pure ss j) = Pure ss <$> f' j
   go other = f other
 
 everything :: (r -> r -> r) -> (AST -> r) -> AST -> r
@@ -230,4 +236,5 @@ everything (<>.) f = go where
   go j@(Throw _ j1) = f j <>. go j1
   go j@(InstanceOf _ j1 j2) = f j <>. go j1 <>. go j2
   go j@(Comment _ _ j1) = f j <>. go j1
+  go j@(Pure _ j1) = f j <>. go j1
   go other = f other

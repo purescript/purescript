@@ -27,6 +27,7 @@ import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.Common as Common
+import Language.PureScript.Constants.Effect.Unsafe as EffectUnsafe
 import Language.PureScript.CoreImp.AST (AST, everywhereTopDownM, withSourceSpan)
 import qualified Language.PureScript.CoreImp.AST as AST
 import Language.PureScript.CoreImp.Optimizer
@@ -175,8 +176,15 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
        then nonRecToJS a i (modifyAnn removeComments e)
        else AST.Comment Nothing com <$> nonRecToJS a i (modifyAnn removeComments e)
   nonRecToJS (ss, _, _, _) ident val = do
-    js <- valueToJs val
+    js <- withPureAnnotation <$> valueToJs val
     withPos ss $ AST.VariableIntroduction Nothing (identToJs ident) (Just js)
+
+  withPureAnnotation :: AST -> AST
+  withPureAnnotation js = case js of
+    AST.App _ (AST.Indexer _ (AST.StringLiteral _ f) (AST.Var _ m)) _
+      | m == EffectUnsafe.effectUnsafe && f == EffectUnsafe.unsafePerformEffect -> js
+    AST.App a f args -> AST.Pure Nothing $ AST.App a f $ map withPureAnnotation args
+    _ -> js
 
   withPos :: SourceSpan -> AST -> m AST
   withPos ss js = do
@@ -235,7 +243,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     case f of
       Var (_, _, _, Just IsNewtype) _ -> return (head args')
       Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
-        return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
+        return $ AST.Pure Nothing $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
       _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args' <$> valueToJs f
     where
     unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
