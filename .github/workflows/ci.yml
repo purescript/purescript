@@ -66,7 +66,7 @@ jobs:
           popd
 
           pushd sdist-test
-          cp $(stack path --doc-root)/../bin/purs ~/bin/purs
+          cp $(stack path --local-doc-root)/../bin/purs ~/bin/purs
           popd
 
       - name: "Make `purs` binary available for package-set job"
