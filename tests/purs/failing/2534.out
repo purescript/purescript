@@ -7,14 +7,13 @@ at tests/purs/failing/2534.purs:8:14 - 8:18 (line 8, column 14 - line 8, column 
   [33m  Array t0[0m
   [33m          [0m
 
-while trying to match type [33mArray t1[0m
+while trying to match type [33mArray t0[0m
   with type [33mt0[0m
 while checking that expression [33mxs[0m
   has type [33mt0[0m
 in value declaration [33mfoo[0m
 
-where [33mt1[0m is an unknown type
-      [33mt0[0m is an unknown type
+where [33mt0[0m is an unknown type
 
 See https://github.com/purescript/documentation/blob/master/errors/InfiniteType.md for more information,
 or to contribute content related to this error.
