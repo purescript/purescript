@@ -185,7 +185,7 @@ jobs:
 
       - name: Compile and run docs on package set
         run: |
-          PATH=~/bin:$PATH
+          export PATH=~/bin:$PATH
 
           (echo "::group::Init Spago project") 2>/dev/null
           spago init --no-comments
