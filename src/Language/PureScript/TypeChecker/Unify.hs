@@ -109,7 +109,7 @@ unknownsInType t = everythingOnTypes (.) go t []
 -- | or only t2 is unknown. If we limit substitution to only the unknown, it results in an
 -- | ExitFailure (-9).
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
-unifyTypes t1 t2 = withErrorMessageHint' (do
+unifyTypes t1 t2 = withErrorMessageHintM (do
       sub <- gets checkSubstitution
       return (ErrorUnifyingTypes (substituteType sub t1) (substituteType sub t2))) (unifyTypes'' False t1 t2)
   where

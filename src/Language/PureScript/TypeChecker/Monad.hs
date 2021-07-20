@@ -138,12 +138,12 @@ withScopedTypeVars mn ks ma = do
       tell . errorMessage $ ShadowedTypeVar name
   bindTypes (M.fromList (map (\(name, k) -> (Qualified (Just mn) (ProperName name), (k, ScopedTypeVar))) ks)) ma
 
-withErrorMessageHint'
+withErrorMessageHintM
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => m ErrorMessageHint
   -> m a
   -> m a
-withErrorMessageHint' hint' action = do
+withErrorMessageHintM hint' action = do
   hint <- hint'
   orig <- get
   modify $ \st -> st { checkHints = hint : checkHints st }
@@ -157,7 +157,7 @@ withErrorMessageHint
   => ErrorMessageHint
   -> m a
   -> m a
-withErrorMessageHint = withErrorMessageHint' . return
+withErrorMessageHint = withErrorMessageHintM . return
 
 -- | These hints are added at the front, so the most nested hint occurs
 -- at the front, but the simplifier assumes the reverse order.
