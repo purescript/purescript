@@ -229,6 +229,9 @@ insertValueTypesAndAdjustKinds env m =
         where
           inferredKind' = inferredKind $> ()
 
+          -- Note: the below change to the final kind used is intentionally
+          -- NOT being done for explicit kind signatures:
+          --
           -- changes `forall (k :: Type). k -> ...`
           -- to      `forall k          . k -> ...`
           dropTypeSortAnnotation = \case
