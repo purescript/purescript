@@ -104,10 +104,14 @@ unknownsInType t = everythingOnTypes (.) go t []
   go (TUnknown ann u) = ((ann, u) :)
   go _ = id
 
--- | Unify two types, updating the current substitution
--- | TODO: it is not clear why substitution has to be done on _both_ t1 and t2 if only t1
--- | or only t2 is unknown. If we limit substitution to only the unknown, it results in an
--- | ExitFailure (-9).
+-- | Unify two types, updating the current substitution.
+-- |
+-- | To optimize should only ever make substitutions to:
+-- | - unknown SourceTypes (TUnknown)
+-- | - types we are solving against via solveType
+-- | The second point above may be able to be further optimized,
+-- | meaning that we may be able to solve against types that have not gone through `checkSubstitutions`.
+-- | See https://github.com/purescript/purescript/pull/4163#issuecomment-883515152
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
 unifyTypes t1 t2 = withErrorMessageHintM (do
       sub <- gets checkSubstitution
