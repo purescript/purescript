@@ -149,11 +149,39 @@ jobs:
 
       - run: "stack exec bash"
 
-      - name:
+      - uses: "actions/setup-node@v1"
+        with:
+          node-version: "10"
+
+      - run: mkdir -p packageSetCI
+
+      - name: Cache PureScript dependencies
+        uses: actions/cache@v2
+        with:
+          key: ${{ runner.os }}-spago-${{ hashFiles('packageSetCI/**/*.dhall') }}
+          path: |
+            packageSetCI/.spago
+            packageSetCI/output
+
+      - name: Cache NPM dependencies
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('packageSetCI/**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+
+      - name: Change directory to `packageSetCI`
         run: |
-          mkdir -p packageSetCI
           cd packageSetCI
 
+      - name: Install NPM dependencies
+        run: npm install spago
+
+      - name: Compile and run docs on package set
+        run: |
           (echo "::group::Init Spago project") 2>/dev/null
           spago init --no-comments
           (echo "::endgroup::"; "::group::Upgrade to latest package set") 2>/dev/null
