@@ -109,7 +109,9 @@ unknownsInType t = everythingOnTypes (.) go t []
 -- | or only t2 is unknown. If we limit substitution to only the unknown, it results in an
 -- | ExitFailure (-9).
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
-unifyTypes t1 t2 = withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes'' False t1 t2
+unifyTypes t1 t2 = withErrorMessageHint' (do
+      sub <- gets checkSubstitution
+      return (ErrorUnifyingTypes (substituteType sub t1) (substituteType sub t2))) (unifyTypes'' False t1 t2)
   where
   unifyTypes'' needsSubstitution t'1 t'2 = if needsSubstitution then do
       sub <- gets checkSubstitution
@@ -135,7 +137,9 @@ unifyTypes t1 t2 = withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes'
   unifyTypes' _ ty f@ForAll{} = f `unifyTypes` ty
   unifyTypes' _ (TypeVar _ v1) (TypeVar _ v2) | v1 == v2 = return ()
   unifyTypes' _ ty1@(TypeConstructor _ c1) ty2@(TypeConstructor _ c2) =
-    guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
+    if c1 == c2 then return () else do
+      sub <- gets checkSubstitution
+      throwError . errorMessage $ TypesDoNotUnify (substituteType sub ty1) (substituteType sub ty2)
   unifyTypes' _ (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = return ()
   unifyTypes' _ (TypeApp _ t3 t4) (TypeApp _ t5 t6) = do
     t3 `unifyTypes` t5
@@ -154,11 +158,17 @@ unifyTypes t1 t2 = withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes'
     | constraintClass c1 == constraintClass c2 && constraintData c1 == constraintData c2 = do
         traverse_ (uncurry unifyTypes) (constraintArgs c1 `zip` constraintArgs c2)
         ty1 `unifyTypes` ty2
-  unifyTypes' _ ty1@ConstrainedType{} ty2 =
-    throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
+  -- | When there is an error, we do substitutions to make sure the error message is as
+  -- | complete as possible.
+  unifyTypes' _ ty1@ConstrainedType{} ty2 = do
+    sub <- gets checkSubstitution
+    throwError . errorMessage $ ConstrainedTypeUnified (substituteType sub ty1) (substituteType sub ty2)
   unifyTypes' hasDoneSub t3 t4@ConstrainedType{} = unifyTypes' hasDoneSub t4 t3
-  unifyTypes' _ t3 t4 =
-    throwError . errorMessage $ TypesDoNotUnify t3 t4
+  -- | When there is an error, we do substitutions to make sure the error message is as
+  -- | complete as possible.
+  unifyTypes' _ t3 t4 = do
+    sub <- gets checkSubstitution
+    throwError . errorMessage $ TypesDoNotUnify (substituteType sub t3) (substituteType sub t4)
 
 -- | Unify two rows, updating the current substitution
 --

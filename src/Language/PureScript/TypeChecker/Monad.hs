@@ -138,18 +138,26 @@ withScopedTypeVars mn ks ma = do
       tell . errorMessage $ ShadowedTypeVar name
   bindTypes (M.fromList (map (\(name, k) -> (Qualified (Just mn) (ProperName name), (k, ScopedTypeVar))) ks)) ma
 
-withErrorMessageHint
+withErrorMessageHint'
   :: (MonadState CheckState m, MonadError MultipleErrors m)
-  => ErrorMessageHint
+  => m ErrorMessageHint
   -> m a
   -> m a
-withErrorMessageHint hint action = do
+withErrorMessageHint' hint' action = do
+  hint <- hint'
   orig <- get
   modify $ \st -> st { checkHints = hint : checkHints st }
   -- Need to use 'rethrow' anyway, since we have to handle regular errors
   a <- rethrow (addHint hint) action
   modify $ \st -> st { checkHints = checkHints orig }
   return a
+
+withErrorMessageHint
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => ErrorMessageHint
+  -> m a
+  -> m a
+withErrorMessageHint = withErrorMessageHint' . return
 
 -- | These hints are added at the front, so the most nested hint occurs
 -- at the front, but the simplifier assumes the reverse order.
