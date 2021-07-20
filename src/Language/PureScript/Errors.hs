@@ -19,6 +19,7 @@ import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
 import           Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn)
 import qualified Data.List.NonEmpty as NEL
+import           Data.List.NonEmpty (NonEmpty((:|)))
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import           Data.Ord (Down(..))
@@ -89,10 +90,10 @@ data SimpleErrorMessage
   | InvalidDoBind
   | InvalidDoLet
   | CycleInDeclaration Ident
-  | CycleInTypeSynonym [ProperName 'TypeName]
-  | CycleInTypeClassDeclaration [Qualified (ProperName 'ClassName)]
-  | CycleInKindDeclaration [Qualified (ProperName 'TypeName)]
-  | CycleInModules [ModuleName]
+  | CycleInTypeSynonym (NEL.NonEmpty (ProperName 'TypeName))
+  | CycleInTypeClassDeclaration (NEL.NonEmpty (Qualified (ProperName 'ClassName)))
+  | CycleInKindDeclaration (NEL.NonEmpty (Qualified (ProperName 'TypeName)))
+  | CycleInModules (NEL.NonEmpty ModuleName)
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
@@ -103,7 +104,6 @@ data SimpleErrorMessage
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified (Either SourceType Ident)]
   | NoInstanceFound
       SourceConstraint -- ^ constraint that could not be solved
-      [Qualified (Either SourceType Ident)] -- ^ a list of instances that stopped further progress in instance chains due to ambiguity
       Bool -- ^ whether eliminating unknowns with annotations might help
   | AmbiguousTypeVariables SourceType [Int]
   | UnknownClass (Qualified (ProperName 'ClassName))
@@ -452,7 +452,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-  gSimple (NoInstanceFound con ambig unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure ambig <*> pure unks
+  gSimple (NoInstanceFound con unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure unks
   gSimple (AmbiguousTypeVariables t us) = AmbiguousTypeVariables <$> f t <*> pure us
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> traverse (traverse $ bitraverse f pure) insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
@@ -774,11 +774,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "The value of " <> markCode (showIdent nm) <> " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
       case mns of
-        [mn] ->
+        mn :| [] ->
           line $ "Module " <> markCode (runModuleName mn) <> " imports itself."
         _ ->
           paras [ line "There is a cycle in module dependencies in these modules: "
-                , indent $ paras (map (line . markCode . runModuleName) mns)
+                , indent $ paras (line . markCode . runModuleName <$> NEL.toList mns)
                 ]
     renderSimpleErrorMessage (CycleInTypeSynonym names) =
       paras $ cycleError <>
@@ -787,23 +787,22 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
       where
       cycleError = case names of
-        []   -> pure . line $ "A cycle appears in a set of type synonym definitions."
-        [pn] -> pure . line $ "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
-        _    -> [ line " A cycle appears in a set of type synonym definitions:"
-                , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName) names) <> "}"
-                ]
-    renderSimpleErrorMessage (CycleInTypeClassDeclaration [name]) =
+        pn :| [] -> pure . line $ "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
+        _ -> [ line " A cycle appears in a set of type synonym definitions:"
+             , indent $ line $ "{" <> T.intercalate ", " (markCode . runProperName <$> NEL.toList names) <> "}"
+             ]
+    renderSimpleErrorMessage (CycleInTypeClassDeclaration (name :| [])) =
       paras [ line $ "A type class '" <> markCode (runProperName (disqualify name)) <> "' may not have itself as a superclass." ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration names) =
       paras [ line "A cycle appears in a set of type class definitions:"
-            , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName . disqualify) names) <> "}"
+            , indent $ line $ "{" <> T.intercalate ", " (markCode . runProperName . disqualify <$> NEL.toList names) <> "}"
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             ]
-    renderSimpleErrorMessage (CycleInKindDeclaration [name]) =
+    renderSimpleErrorMessage (CycleInKindDeclaration (name :| [])) =
       paras [ line $ "A kind declaration '" <> markCode (runProperName (disqualify name)) <> "' may not refer to itself in its own signature." ]
     renderSimpleErrorMessage (CycleInKindDeclaration names) =
       paras [ line "A cycle appears in a set of kind declarations:"
-            , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName . disqualify) names) <> "}"
+            , indent $ line $ "{" <> T.intercalate ", " (markCode . runProperName . disqualify <$> NEL.toList names) <> "}"
             , line "Kind declarations may not refer to themselves in their own signatures."
             ]
     renderSimpleErrorMessage (NameIsUndefined ident) =
@@ -860,14 +859,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ line (showQualified runProperName nm)
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _) _ _) | Just box <- toTypelevelString ty =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _) _) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Partial
                                                           _
                                                           _
-                                                          (Just (PartialConstraintData bs b))) _ _) =
+                                                          (Just (PartialConstraintData bs b))) _) =
       paras [ line "A case expression could not be determined to cover all inputs."
             , line "The following additional cases are required to cover all inputs:"
             , indent $ paras $
@@ -876,26 +875,18 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _) _ _) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _) _) =
       paras [ line "A result of type"
             , markCodeBox $ indent $ prettyType ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _) ambiguous unks) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _) unks) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
-            , paras $ let useMessage msg =
-                            [ line msg
-                            , indent $ paras (map prettyInstanceName ambiguous)
-                            ]
-                      in case ambiguous of
-                        [] -> []
-                        [_] -> useMessage "The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:"
-                        _ -> useMessage "The following instances partially overlap the above constraint, which means the rest of their instance chains will not be considered:"
             , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
                     | unks
                     ]
@@ -1501,6 +1492,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ detail
             , line $ "in foreign import " <> markCode (showIdent nm)
             ]
+    renderHint (ErrorInForeignImportData nm) detail =
+      paras [ detail
+            , line $ "in foreign data type declaration for " <> markCode (runProperName nm)
+            ]
     renderHint (ErrorSolvingConstraint (Constraint _ nm _ ts _)) detail =
       paras [ detail
             , line "while solving type class constraint"
@@ -1639,7 +1634,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       where
       isUnifyHint ErrorUnifyingTypes{} = True
       isUnifyHint _ = False
-    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _) _ _) = filter (not . isSolverHint)
+    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _) _) = filter (not . isSolverHint)
       where
       isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
       isSolverHint _ = False
@@ -1857,12 +1852,6 @@ toTypelevelString _ = Nothing
 -- | Rethrow an error with a more detailed error message in the case of failure
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError (throwError . f)
-
-reifyErrors :: (MonadError e m) => m a -> m (Either e a)
-reifyErrors ma = catchError (fmap Right ma) (return . Left)
-
-reflectErrors :: (MonadError e m) => m (Either e a) -> m a
-reflectErrors ma = ma >>= either throwError return
 
 warnAndRethrow :: (MonadError e m, MonadWriter e m) => (e -> e) -> m a -> m a
 warnAndRethrow f = rethrow f . censor f

@@ -18,12 +18,11 @@ import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
-import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (findIndices, minimumBy, groupBy, nubBy, sortOn, tails)
-import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
+import Data.List (findIndices, minimumBy, groupBy, nubBy, sortOn, delete)
+import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (for)
@@ -230,23 +229,22 @@ entails SolverOptions{..} constraint context hints =
 
             dicts <- lift . lift $ forClassNameM env (combineContexts context inferred) className' kinds'' tys''
 
-            let (catMaybes -> ambiguous, instances) = partitionEithers $ do
+            let instances = do
                   chain <- groupBy ((==) `on` tcdChain) $
                            sortOn (tcdChain &&& tcdIndex)
                            dicts
                   -- process instances in a chain in index order
-                  let found = for (init $ tails chain) $ \(tcd:tl) ->
+                  let found = for chain $ \tcd ->
                                 -- Make sure the type unifies with the type in the type instance definition
                                 case matches typeClassDependencies tcd tys'' of
-                                  Apart        -> Right ()                   -- keep searching
-                                  Match substs -> Left (Right (substs, tcd)) -- found a match
-                                  Unknown ->
-                                    if null (tcdChain tcd) || null tl
-                                    then Right ()                                   -- need proof of apartness but this is either not in a chain or at the end
-                                    else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
-
-                  lefts [found]
-            solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
+                                  Apart        -> Right ()                  -- keep searching
+                                  Match substs -> Left (Just (substs, tcd)) -- found a match
+                                  Unknown      -> Left Nothing              -- can't continue with this chain yet, need proof of apartness
+                  case found of
+                    Right _               -> []          -- all apart
+                    Left Nothing          -> []          -- last unknown
+                    Left (Just substsTcd) -> [substsTcd] -- found a match
+            solution <- lift . lift $ unique kinds'' tys'' instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
@@ -324,16 +322,16 @@ entails SolverOptions{..} constraint context hints =
                       (substituteType currentSubst . replaceAllTypeVars (M.toList subst) $ instKind)
                       (substituteType currentSubst tyKind)
 
-            unique :: [SourceType] -> [SourceType] -> [Qualified (Either SourceType Ident)] -> [(a, TypeClassDict)] -> Bool -> m (EntailsResult a)
-            unique kindArgs tyArgs ambiguous [] unks
+            unique :: [SourceType] -> [SourceType] -> [(a, TypeClassDict)] -> Bool -> m (EntailsResult a)
+            unique kindArgs tyArgs [] unks
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
               | solverShouldGeneralize && ((null kindArgs && null tyArgs) || any canBeGeneralized kindArgs || any canBeGeneralized tyArgs) =
                   return (Unsolved (srcConstraint className' kindArgs tyArgs conInfo))
-              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' kindArgs tyArgs conInfo) ambiguous unks
-            unique _ _ _ [(a, dict)] _ = return $ Solved a dict
-            unique _ tyArgs _ tcds _
+              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' kindArgs tyArgs conInfo) unks
+            unique _ _ [(a, dict)] _ = return $ Solved a dict
+            unique _ tyArgs tcds _
               | pairwiseAny overlapping (map snd tcds) =
                   throwError . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . tcdToInstanceDescription . snd))
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
@@ -387,7 +385,7 @@ entails SolverOptions{..} constraint context hints =
               return (useEmptyDict args)
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
-              return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal nullSourceSpan (ObjectLiteral fields))
+              return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsSymbol)) (Literal nullSourceSpan (ObjectLiteral fields))
 
             unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
             unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)
@@ -483,19 +481,42 @@ entails SolverOptions{..} constraint context hints =
     solveUnion _ _ = Nothing
 
     -- | Left biased union of two row types
+
     unionRows :: [SourceType] -> SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType, Maybe [SourceConstraint], [(Text, SourceType)])
-    unionRows kinds l r _ =
-        guard canMakeProgress $> (l, r, rowFromList out, cons, vars)
+    unionRows kinds l r u =
+        guard canMakeProgress $> (lOut, rOut, uOut, cons, vars)
       where
         (fixed, rest) = rowToList l
 
         rowVar = srcTypeVar "r"
 
-        (canMakeProgress, out, cons, vars) =
+        (canMakeProgress, lOut, rOut, uOut, cons, vars) =
           case rest of
             -- If the left hand side is a closed row, then we can merge
             -- its labels into the right hand side.
-            REmptyKinded _ _ -> (True, (fixed, r), Nothing, [])
+            REmptyKinded _ _ -> (True, l, r, rowFromList (fixed, r), Nothing, [])
+            -- If the right hand side and output are closed rows, then we can
+            -- compute the left hand side by subtracting the right hand side
+            -- from the output.
+            _ | (right, rightu@(REmptyKinded _ _)) <- rowToList r
+              , (output, restu@(REmptyKinded _ _)) <- rowToList u ->
+              let
+                -- Partition the output rows into those that belong in right
+                -- (taken off the end) and those that must end up in left.
+                grabLabel e (left', right', remaining)
+                  | rowListLabel e `elem` remaining =
+                    (left', e : right', delete (rowListLabel e) remaining)
+                  | otherwise =
+                    (e : left', right', remaining)
+                (outL, outR, leftover) =
+                  foldr grabLabel ([], [], fmap rowListLabel right) output
+              in ( null leftover
+                 , rowFromList (outL, restu)
+                 , rowFromList (outR, rightu)
+                 , u
+                 , Nothing
+                 , []
+                 )
             -- If the left hand side is not definitely closed, then the only way we
             -- can safely make progress is to move any known labels from the left
             -- input into the output, and add a constraint for any remaining labels.
@@ -503,7 +524,8 @@ entails SolverOptions{..} constraint context hints =
             -- the right hand side, and we can't be certain we won't reorder the
             -- types for such labels.
             _ -> ( not (null fixed)
-                 , (fixed, rowVar)
+                 , l, r
+                 , rowFromList (fixed, rowVar)
                  , Just [ srcConstraint C.RowUnion kinds [rest, r, rowVar] Nothing ]
                  , [("r", kindRow (head kinds))]
                  )
@@ -640,7 +662,6 @@ matches deps TypeClassDictionaryInScope{..} tys =
         go (sd, r)                 ([], TypeVar _ v)                   = (Match (), M.singleton v [rowFromList (sd, r)])
         go _ _                                                         = (Apart, M.empty)
     typeHeadsAreEqual (TUnknown _ _) _ = (Unknown, M.empty)
-    typeHeadsAreEqual Skolem{} _       = (Unknown, M.empty)
     typeHeadsAreEqual _ _ = (Apart, M.empty)
 
     both :: (Matched (), Matching [Type a]) -> (Matched (), Matching [Type a]) -> (Matched (), Matching [Type a])
@@ -658,11 +679,9 @@ matches deps TypeClassDictionaryInScope{..} tys =
       typesAreEqual (KindedType _ t1 _)    t2                     = typesAreEqual t1 t2
       typesAreEqual t1                     (KindedType _ t2 _)    = typesAreEqual t1 t2
       typesAreEqual (TUnknown _ u1)        (TUnknown _ u2)        | u1 == u2 = Match ()
-      typesAreEqual (TUnknown _ u1)        t2                     = if t2 `containsUnknown` u1 then Apart else Unknown
-      typesAreEqual t1                     (TUnknown _ u2)        = if t1 `containsUnknown` u2 then Apart else Unknown
-      typesAreEqual (Skolem _ _ _ s1 _)    (Skolem _ _ _ s2 _)    | s1 == s2 = Match ()
-      typesAreEqual (Skolem _ _ _ s1 _)    t2                     = if t2 `containsSkolem` s1 then Apart else Unknown
-      typesAreEqual t1                     (Skolem _ _ _ s2 _)    = if t1 `containsSkolem` s2 then Apart else Unknown
+      typesAreEqual (Skolem _ _ _ s1 _)      (Skolem _ _ _ s2 _)      | s1 == s2 = Match ()
+      typesAreEqual (Skolem _ _ _ _ _)       _                      = Unknown
+      typesAreEqual _                      (Skolem _ _ _ _ _)       = Unknown
       typesAreEqual (TypeVar _ v1)         (TypeVar _ v2)         | v1 == v2 = Match ()
       typesAreEqual (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = Match ()
       typesAreEqual (TypeConstructor _ c1) (TypeConstructor _ c2) | c1 == c2 = Match ()
@@ -678,8 +697,6 @@ matches deps TypeClassDictionaryInScope{..} tys =
           go (l, t1)                (r, KindedType _ t2 _)            = go (l, t1) (r, t2)
           go ([], KindApp _ t1 k1)  ([], KindApp _ t2 k2)             = typesAreEqual t1 t2 <> typesAreEqual k1 k2
           go ([], TUnknown _ u1)    ([], TUnknown _ u2)    | u1 == u2 = Match ()
-          go ([], TUnknown _ _)     ([], _)                           = Unknown
-          go ([], _)                ([], TUnknown _ _)                = Unknown
           go ([], Skolem _ _ _ s1 _)  ([], Skolem _ _ _ s2 _)  | s1 == s2 = Match ()
           go ([], Skolem _ _ _ _ _)   _                               = Unknown
           go _                      ([], Skolem _ _ _ _ _)            = Unknown
@@ -691,12 +708,6 @@ matches deps TypeClassDictionaryInScope{..} tys =
       isRCons :: Type a -> Bool
       isRCons RCons{}    = True
       isRCons _          = False
-
-      containsSkolem :: Type a -> Int -> Bool
-      containsSkolem t s = everythingOnTypes (||) (\case Skolem _ _ _ s' _ -> s == s'; _ -> False) t
-
-      containsUnknown :: Type a -> Int -> Bool
-      containsUnknown t u = everythingOnTypes (||) (\case TUnknown _ u' -> u == u'; _ -> False) t
 
 -- | Add a dictionary for the constraint to the scope, and dictionaries
 -- for all implied superclass instances.

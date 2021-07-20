@@ -5,6 +5,20 @@ import Prim.Row
 import Effect
 import Effect.Console
 
+data Proxy a = Proxy
+
+solve :: forall l r u. Union l r u => Proxy r -> Proxy u -> Proxy l
+solve _ _ = Proxy
+
+solveUnionBackwardsNil :: Proxy _
+solveUnionBackwardsNil = solve (Proxy :: Proxy ()) (Proxy :: Proxy ())
+
+solveUnionBackwardsCons :: Proxy _
+solveUnionBackwardsCons = solve (Proxy  :: Proxy ( a :: Int )) (Proxy :: Proxy ( a :: Int, b :: String ))
+
+solveUnionBackwardsDblCons :: Proxy _
+solveUnionBackwardsDblCons = solve (Proxy :: Proxy ( a :: Int, a :: String )) (Proxy :: Proxy ( a :: Boolean, a :: Int, a :: String ))
+
 foreign import merge
   :: forall r1 r2 r3
    . Union r1 r2 r3

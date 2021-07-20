@@ -310,25 +310,14 @@ putEnv env = modify (\s -> s { checkEnv = env })
 modifyEnv :: (MonadState CheckState m) => (Environment -> Environment) -> m ()
 modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 
--- | Run a computation in the typechecking monad, starting with an empty @Environment@
-runCheck :: (Functor m) => StateT CheckState m a -> m (a, Environment)
-runCheck = runCheck' (emptyCheckState initEnvironment)
-
 -- | Run a computation in the typechecking monad, failing with an error, or succeeding with a return value and the final @Environment@.
-runCheck' :: (Functor m) => CheckState -> StateT CheckState m a -> m (a, Environment)
-runCheck' st check = second checkEnv <$> runStateT check st
+runCheck :: (Functor m) => CheckState -> StateT CheckState m a -> m (a, Environment)
+runCheck st check = second checkEnv <$> runStateT check st
 
 -- | Make an assertion, failing with an error message
 guardWith :: (MonadError e m) => e -> Bool -> m ()
 guardWith _ True = return ()
 guardWith e False = throwError e
-
--- | Run a computation in the substitution monad, generating a return value and the final substitution.
-captureSubstitution
-  :: MonadState CheckState m
-  => m a
-  -> m (a, Substitution)
-captureSubstitution = capturingSubstitution (,)
 
 capturingSubstitution
   :: MonadState CheckState m

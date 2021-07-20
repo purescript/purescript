@@ -125,7 +125,6 @@ makeLenses ''IdeType
 makeLenses ''IdeTypeSynonym
 makeLenses ''IdeDataConstructor
 makeLenses ''IdeTypeClass
-makeLenses ''IdeInstance
 makeLenses ''IdeValueOperator
 makeLenses ''IdeTypeOperator
 
