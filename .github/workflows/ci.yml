@@ -59,6 +59,23 @@ jobs:
 
       - run: "ci/build.sh"
 
+      - name: "Copy `purs` binary to static easily-referrable location"
+        run: |
+          pushd ~/
+          mkdir -p bin
+          popd
+
+          pushd sdist-test
+          cp $(stack path --doc-root)/../bin/purs ~/bin/purs
+          popd
+
+      - name: "Make `purs` binary available for package-set job"
+        uses: actions/upload-artifact@v2
+        with:
+          name: purs-binary
+          path: ~/bin/purs
+          retention-days: 1
+
       - name: "(Release only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
         run: |
@@ -128,40 +145,30 @@ jobs:
 
   package-set:
     runs-on: "ubuntu-18.04"
+    needs: build
 
     steps:
-      - uses: "actions/checkout@v2"
-
-      - id: "haskell"
-        uses: "haskell/actions/setup@v1"
+      - uses: actions/download-artifact@v2
         with:
-          enable-stack: true
-          stack-version: "2.7.1"
-          stack-no-global: true
+          name: purs-binary
+          path: ~/bin/purs
 
-      - uses: "actions/cache@v2"
-        with:
-          path: |
-            ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ runner.os }}-package-set-${{ hashFiles('stack.yaml') }}"
-
-      - run: "stack --no-terminal --jobs=2 build"
-
-      - run: "stack exec bash"
+      - run: |
+          # Uploading/Downloading artifact does not retain
+          # file permissions
+          chmod +x ~/bin/purs
 
       - uses: "actions/setup-node@v1"
         with:
           node-version: "10"
 
-      - run: mkdir -p packageSetCI
-
       - name: Cache PureScript dependencies
         uses: actions/cache@v2
         with:
-          key: ${{ runner.os }}-spago-${{ hashFiles('packageSetCI/**/*.dhall') }}
+          key: ${{ runner.os }}-spago-${{ hashFiles('**/*.dhall') }}
           path: |
-            packageSetCI/.spago
-            packageSetCI/output
+            .spago
+            output
 
       - name: Cache NPM dependencies
         uses: actions/cache@v2
@@ -169,19 +176,17 @@ jobs:
           cache-name: cache-node-modules
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('packageSetCI/**/package.json') }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package.json') }}
           restore-keys: |
             ${{ runner.os }}-build-${{ env.cache-name }}-
 
-      - name: Change directory to `packageSetCI`
-        run: |
-          cd packageSetCI
-
       - name: Install NPM dependencies
-        run: npm install spago
+        run: npm install -g spago
 
       - name: Compile and run docs on package set
         run: |
+          PATH=~/bin:$PATH
+
           (echo "::group::Init Spago project") 2>/dev/null
           spago init --no-comments
           (echo "::endgroup::"; "::group::Upgrade to latest package set") 2>/dev/null
