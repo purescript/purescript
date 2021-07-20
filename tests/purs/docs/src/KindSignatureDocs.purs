@@ -121,20 +121,3 @@ newtype NShown a f c = NShown (DShown a c f)
 
 class CShown f a b where
   fooShown :: f Int -> a -> b -> String
-
-----------
-
-foreign import data FFI_SortAnnotation :: forall (k :: Type). k -> Type
-
-data DSortAnnotation :: forall (k :: Type). k -> Type
-data DSortAnnotation a = DSortAnnotation
-
-type TSortAnnotation :: forall (k :: Type). k -> Type
-type TSortAnnotation a = Int
-
-newtype NSortAnnotation :: forall (k :: Type). k -> Type
-newtype NSortAnnotation a = NSortAnnotation Int
-
-class CSortAnnotation :: forall (k :: Type). k -> Constraint
-class CSortAnnotation a where
-  fooSortAnnotation :: forall proxy. proxy a -> String

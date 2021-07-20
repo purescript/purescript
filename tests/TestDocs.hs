@@ -854,14 +854,6 @@ testCases =
       , ShouldHaveKindSignature (n "KindSignatureDocs") "TShown" "type TShown :: (Type -> Type) -> Type -> Type -> Type"
       , ShouldHaveKindSignature (n "KindSignatureDocs") "NShown" "newtype NShown :: Type -> (Type -> Type) -> Type -> Type"
       , ShouldHaveKindSignature (n "KindSignatureDocs") "CShown" "class CShown :: (Type -> Type) -> Type -> Type -> Constraint"
-
-      -- Declarations with sort annotations should have those annotations removed
-      -- in their kind signature.
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "FFI_SortAnnotation" "data FFI_SortAnnotation :: forall k. k -> Type"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "DSortAnnotation" "data DSortAnnotation :: forall k. k -> Type"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "TSortAnnotation" "type TSortAnnotation :: forall k. k -> Type"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "NSortAnnotation" "newtype NSortAnnotation :: forall k. k -> Type"
-      , ShouldHaveKindSignature (n "KindSignatureDocs") "CSortAnnotation" "class CSortAnnotation :: forall k. k -> Constraint"
       ]
     )
   , ("RoleAnnotationDocs",
