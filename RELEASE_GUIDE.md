@@ -136,5 +136,6 @@ Note: if a release does not go as planned (e.g. [`v0.14.3`](https://github.com/p
 - Update Try PureScript
 - Make release announcements:
   - Discourse
+  - Discord
   - Twitter
   - /r/purescript

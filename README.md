@@ -19,6 +19,6 @@ A small strongly typed programming language with expressive types that compiles 
 
 ## Help!
 
-- [#purescript @ FP Slack](https://functionalprogramming.slack.com/)
-- [PureScript Language Forum](https://discourse.purescript.org/)
+- [PureScript Discord](https://discord.gg/sMqwYUbvz6/)
+- [PureScript Discourse](https://discourse.purescript.org/)
 - [PureScript on StackOverflow](http://stackoverflow.com/questions/tagged/purescript)
