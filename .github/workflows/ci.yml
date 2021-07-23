@@ -59,7 +59,8 @@ jobs:
 
       - run: "ci/build.sh"
 
-      - name: "Copy `purs` binary to static easily-referrable location"
+      - name: "(Ubuntu only) Copy `purs` binary to static easily-referrable location"
+        if: "${{ runner.os == 'Linux' }}"
         run: |
           pushd ~/
           mkdir -p bin
@@ -73,7 +74,8 @@ jobs:
           popd
           popd
 
-      - name: "Make `purs` binary available for package-set job"
+      - name: "(Ubuntu only) Make `purs` binary available for package-set job"
+        if: "${{ runner.os == 'Linux' }}"
         uses: actions/upload-artifact@v2
         with:
           name: purs-binary
