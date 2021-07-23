@@ -23,7 +23,7 @@
   Since role annotations are an advanced feature and since most type
   parameters' roles are the `representational` role, the `phantom` and
   `nominal` role annotations are displayed in documentation whereas the
-  `representational` role is not, similar to "unintersting" kind signatures.
+  `representational` role is not, similar to "uninteresting" kind signatures.
 
   Lastly, FFI declarations like below...
 
