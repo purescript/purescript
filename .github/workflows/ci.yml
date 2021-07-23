@@ -68,7 +68,7 @@ jobs:
           pushd sdist-test
           cp $(stack path --local-doc-root)/../bin/purs ~/bin/purs
           pushd ~
-          chmod +x /bin/purs
+          chmod +x bin/purs
           ./bin/purs --version
           popd
           popd
