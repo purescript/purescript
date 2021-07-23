@@ -205,7 +205,7 @@ jobs:
           purs --version
 
           (echo "::group::Init Spago project") 2>/dev/null
-          spago init --no-comments
+          spago -V init --no-comments
           (echo "::endgroup::"; "::group::Upgrade to latest package set") 2>/dev/null
 
           # Ensure we're on the latest package set
