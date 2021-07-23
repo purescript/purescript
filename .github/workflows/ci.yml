@@ -155,11 +155,14 @@ jobs:
 
     steps:
       - uses: actions/download-artifact@v2
+        id: purs-binary-step-id
         with:
           name: purs-binary
           path: ~/bin
 
       - run: |
+          echo "Downloaded purs to ${{steps.purs-binary-step-id.outputs.downloaded-path}}"
+          
           # Uploading/Downloading artifact does not retain
           # file permissions
           pushd ~/bin
