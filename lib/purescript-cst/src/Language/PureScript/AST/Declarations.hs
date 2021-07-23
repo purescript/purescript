@@ -84,6 +84,7 @@ data ErrorMessageHint
   | ErrorInKindDeclaration (ProperName 'TypeName)
   | ErrorInRoleDeclaration (ProperName 'TypeName)
   | ErrorInForeignImport Ident
+  | ErrorInForeignImportData (ProperName 'TypeName)
   | ErrorSolvingConstraint SourceConstraint
   | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   | PositionedError (NEL.NonEmpty SourceSpan)
@@ -710,11 +711,6 @@ data Expr
   --
   | Ado (Maybe ModuleName) [DoNotationElement] Expr
   -- |
-  -- An application of a typeclass dictionary constructor. The value should be
-  -- an ObjectLiteral.
-  --
-  | TypeClassDictionaryConstructorApp (Qualified (ProperName 'ClassName)) Expr
-  -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
   -- can be evaluated at runtime. The constructor arguments represent (in order): whether or not to look
@@ -724,10 +720,6 @@ data Expr
   | TypeClassDictionary SourceConstraint
                         (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
                         [ErrorMessageHint]
-  -- |
-  -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
-  --
-  | TypeClassDictionaryAccessor (Qualified (ProperName 'ClassName)) Ident
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --

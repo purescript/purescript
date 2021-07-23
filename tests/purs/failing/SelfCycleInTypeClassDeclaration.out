@@ -1,0 +1,9 @@
+Error found:
+at tests/purs/failing/SelfCycleInTypeClassDeclaration.purs:4:1 - 4:23 (line 4, column 1 - line 4, column 23)
+
+  A type class '[33mFoo[0m' may not have itself as a superclass.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CycleInTypeClassDeclaration.md for more information,
+or to contribute content related to this error.
+
