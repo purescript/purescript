@@ -157,20 +157,9 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: purs-binary
-          path: ~/bin/purs
+          path: ~/bin
 
       - run: |
-          ls -l .
-          pushd ~
-          ls -l
-          pushd bin
-          ls -l
-          pushd purs
-          ls -l
-          popd
-          popd
-          popd
-
           # Uploading/Downloading artifact does not retain
           # file permissions
           pushd ~/bin
