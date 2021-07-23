@@ -10,7 +10,6 @@ module Language.PureScript.Pretty.Types
   , convertPrettyPrintType
   , typeAsBox
   , typeDiffAsBox
-  , suggestedTypeAsBox
   , prettyPrintType
   , prettyPrintTypeWithUnicode
   , prettyPrintSuggestedType
@@ -258,9 +257,6 @@ typeDiffAsBox' = typeAsBoxImpl diffOptions
 
 typeDiffAsBox :: Int -> Type a -> Box
 typeDiffAsBox maxDepth = typeDiffAsBox' . convertPrettyPrintType maxDepth
-
-suggestedTypeAsBox :: PrettyPrintType -> Box
-suggestedTypeAsBox = typeAsBoxImpl suggestingOptions
 
 data TypeRenderOptions = TypeRenderOptions
   { troSuggesting :: Bool

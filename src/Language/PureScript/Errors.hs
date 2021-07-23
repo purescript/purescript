@@ -19,6 +19,7 @@ import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
 import           Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn)
 import qualified Data.List.NonEmpty as NEL
+import           Data.List.NonEmpty (NonEmpty((:|)))
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import           Data.Ord (Down(..))
@@ -92,10 +93,10 @@ data SimpleErrorMessage
   | InvalidDoBind
   | InvalidDoLet
   | CycleInDeclaration Ident
-  | CycleInTypeSynonym [ProperName 'TypeName]
-  | CycleInTypeClassDeclaration [Qualified (ProperName 'ClassName)]
-  | CycleInKindDeclaration [Qualified (ProperName 'TypeName)]
-  | CycleInModules [ModuleName]
+  | CycleInTypeSynonym (NEL.NonEmpty (ProperName 'TypeName))
+  | CycleInTypeClassDeclaration (NEL.NonEmpty (Qualified (ProperName 'ClassName)))
+  | CycleInKindDeclaration (NEL.NonEmpty (Qualified (ProperName 'TypeName)))
+  | CycleInModules (NEL.NonEmpty ModuleName)
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
@@ -792,11 +793,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "The value of " <> markCode (showIdent nm) <> " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
       case mns of
-        [mn] ->
+        mn :| [] ->
           line $ "Module " <> markCode (runModuleName mn) <> " imports itself."
         _ ->
           paras [ line "There is a cycle in module dependencies in these modules: "
-                , indent $ paras (map (line . markCode . runModuleName) mns)
+                , indent $ paras (line . markCode . runModuleName <$> NEL.toList mns)
                 ]
     renderSimpleErrorMessage (CycleInTypeSynonym names) =
       paras $ cycleError <>
@@ -805,23 +806,22 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
       where
       cycleError = case names of
-        []   -> pure . line $ "A cycle appears in a set of type synonym definitions."
-        [pn] -> pure . line $ "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
-        _    -> [ line " A cycle appears in a set of type synonym definitions:"
-                , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName) names) <> "}"
-                ]
-    renderSimpleErrorMessage (CycleInTypeClassDeclaration [name]) =
+        pn :| [] -> pure . line $ "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
+        _ -> [ line " A cycle appears in a set of type synonym definitions:"
+             , indent $ line $ "{" <> T.intercalate ", " (markCode . runProperName <$> NEL.toList names) <> "}"
+             ]
+    renderSimpleErrorMessage (CycleInTypeClassDeclaration (name :| [])) =
       paras [ line $ "A type class '" <> markCode (runProperName (disqualify name)) <> "' may not have itself as a superclass." ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration names) =
       paras [ line "A cycle appears in a set of type class definitions:"
-            , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName . disqualify) names) <> "}"
+            , indent $ line $ "{" <> T.intercalate ", " (markCode . runProperName . disqualify <$> NEL.toList names) <> "}"
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             ]
-    renderSimpleErrorMessage (CycleInKindDeclaration [name]) =
+    renderSimpleErrorMessage (CycleInKindDeclaration (name :| [])) =
       paras [ line $ "A kind declaration '" <> markCode (runProperName (disqualify name)) <> "' may not refer to itself in its own signature." ]
     renderSimpleErrorMessage (CycleInKindDeclaration names) =
       paras [ line "A cycle appears in a set of kind declarations:"
-            , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName . disqualify) names) <> "}"
+            , indent $ line $ "{" <> T.intercalate ", " (markCode . runProperName . disqualify <$> NEL.toList names) <> "}"
             , line "Kind declarations may not refer to themselves in their own signatures."
             ]
     renderSimpleErrorMessage (NameIsUndefined ident) =
@@ -1511,6 +1511,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ detail
             , line $ "in foreign import " <> markCode (showIdent nm)
             ]
+    renderHint (ErrorInForeignImportData nm) detail =
+      paras [ detail
+            , line $ "in foreign data type declaration for " <> markCode (runProperName nm)
+            ]
     renderHint (ErrorSolvingConstraint (Constraint _ nm _ ts _)) detail =
       paras [ detail
             , line "while solving type class constraint"
@@ -1867,12 +1871,6 @@ toTypelevelString _ = Nothing
 -- | Rethrow an error with a more detailed error message in the case of failure
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError (throwError . f)
-
-reifyErrors :: (MonadError e m) => m a -> m (Either e a)
-reifyErrors ma = catchError (fmap Right ma) (return . Left)
-
-reflectErrors :: (MonadError e m) => m (Either e a) -> m a
-reflectErrors ma = ma >>= either throwError return
 
 warnAndRethrow :: (MonadError e m, MonadWriter e m) => (e -> e) -> m a -> m a
 warnAndRethrow f = rethrow f . censor f

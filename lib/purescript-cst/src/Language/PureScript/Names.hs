@@ -57,10 +57,6 @@ getClassName :: Name -> Maybe (ProperName 'ClassName)
 getClassName (TyClassName name) = Just name
 getClassName _ = Nothing
 
-getModName :: Name -> Maybe ModuleName
-getModName (ModName name) = Just name
-getModName _ = Nothing
-
 -- |
 -- Names for value identifiers
 --
