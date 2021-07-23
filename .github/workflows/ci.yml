@@ -164,9 +164,10 @@ jobs:
 
           # Uploading/Downloading artifact does not retain
           # file permissions
-          chmod +x ~/bin/purs
-
+          pushd ~
+          chmod +x bin/purs
           ./bin/purs --version
+          popd
 
           # See https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#adding-a-system-path
           echo "~/bin" >> $GITHUB_PATH
