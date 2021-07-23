@@ -158,15 +158,19 @@ jobs:
           path: ~/bin/purs
 
       - run: |
-          set -o xtrace
           ls -l .
-          ls -l ~/bin/purs
+          pushd ~
+          ls -l
+          pushd bin
+          ls -l
+          popd
+          popd
 
           # Uploading/Downloading artifact does not retain
           # file permissions
-          pushd ~
-          chmod +x bin/purs
-          ./bin/purs --version
+          pushd ~/bin
+          chmod +x purs
+          ./purs --version
           popd
 
           # See https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#adding-a-system-path
