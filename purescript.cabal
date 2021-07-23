@@ -228,7 +228,6 @@ library
     Language.PureScript.Docs.RenderedCode
     Language.PureScript.Docs.RenderedCode.RenderType
     Language.PureScript.Docs.RenderedCode.Types
-    Language.PureScript.Docs.Roles
     Language.PureScript.Docs.Tags
     Language.PureScript.Docs.Types
     Language.PureScript.Docs.Utils.MonoidExtras

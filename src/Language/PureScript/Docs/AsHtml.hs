@@ -33,7 +33,6 @@ import qualified Cheapskate
 
 import qualified Language.PureScript as P
 
-import Language.PureScript.Docs.Roles (docRepoRolesPage, describeNominal, describePhantom)
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.RenderedCode hiding (sp)
 import qualified Language.PureScript.Docs.Render as Render
@@ -223,10 +222,18 @@ codeAsHtml r = outputWith elemAsHtml
         x -> P.internalError $ "codeAsHtml: unknown value for role annotation: '" <> T.unpack x <> "'"
       where
         renderRole hoverTextContent className =
-          H.a ! A.href (v docRepoRolesPage) ! A.target (v "_blank") ! A.class_ "decl__role" $ do
+          H.a ! A.href (v docRepoRolePage) ! A.target (v "_blank") ! A.class_ "decl__role" $ do
             H.abbr ! A.class_ "decl__role_hover" ! A.title (v hoverTextContent) $ do
               H.sub ! A.class_ className $ do
                 toHtml ("" :: Text)
+
+        docRepoRolePage =
+          "https://github.com/purescript/documentation/blob/master/language/Roles.md"
+
+        describeNominal =
+          "The 'nominal' role means this argument may not change when coercing the type."
+        describePhantom =
+          "The 'phantom' role means this argument can change freely when coercing the type."
 
   linkToDecl = linkToDeclaration r
 

@@ -15,7 +15,6 @@ import Data.List (partition)
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import Language.PureScript.Docs.Roles (docRepoRolesPage, describeNominal, describePhantom)
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
@@ -65,19 +64,7 @@ codeToString = outputWith elemAsMarkdown
   elemAsMarkdown (Symbol _ x _) = x
 
   -- roles aren't rendered in markdown
-  elemAsMarkdown (Role r) = case r of
-    "nominal" -> renderRole describeNominal
-    "phantom" -> renderRole describePhantom
-
-    -- representational is intentionally not rendered
-    "representational" -> ""
-
-    _ -> P.internalError $ "elemAsMarkdown: got non-existant role: \"" <> T.unpack r <> "\""
-
-    where
-      renderRole explanation =
-        "<sub title=\"" <> explanation <> "\"><em><a href=\"" <>
-          docRepoRolesPage <> "\">" <> r <> "</a></em></sub>"
+  elemAsMarkdown (Role _) = ""
 
 -- fixityAsMarkdown :: P.Fixity -> Docs
 -- fixityAsMarkdown (P.Fixity associativity precedence) =
