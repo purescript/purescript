@@ -67,6 +67,10 @@ jobs:
 
           pushd sdist-test
           cp $(stack path --local-doc-root)/../bin/purs ~/bin/purs
+          pushd ~
+          chmod +x /bin/purs
+          ./bin/purs --version
+          popd
           popd
 
       - name: "Make `purs` binary available for package-set job"
@@ -154,9 +158,18 @@ jobs:
           path: ~/bin/purs
 
       - run: |
+          set -o xtrace
+          ls -l .
+          ls -l ~/bin/purs
+
           # Uploading/Downloading artifact does not retain
           # file permissions
           chmod +x ~/bin/purs
+
+          ./bin/purs --version
+
+          # See https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#adding-a-system-path
+          echo "~/bin" >> $GITHUB_PATH
 
       - uses: "actions/setup-node@v1"
         with:
@@ -185,8 +198,8 @@ jobs:
 
       - name: Compile and run docs on package set
         run: |
-          # See https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#adding-a-system-path
-          echo "~/bin" >> $GITHUB_PATH
+          echo $PATH
+          purs --version
 
           (echo "::group::Init Spago project") 2>/dev/null
           spago init --no-comments
