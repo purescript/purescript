@@ -160,9 +160,10 @@ jobs:
           name: purs-binary
           path: ~/bin
 
-      - run: |
-          echo "Downloaded purs to ${{steps.purs-binary-step-id.outputs.downloaded-path}}"
-          
+      - name: Make the downloaded `purs` binary executable again
+        run: |
+          echo "Downloaded purs to ${{steps.purs-binary-step-id.outputs.download-path}}"
+
           # Uploading/Downloading artifact does not retain
           # file permissions
           pushd ~/bin
