@@ -198,20 +198,12 @@ jobs:
 
       - name: Compile and run docs on package set
         run: |
-          echo $PATH
-
-          # See https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#adding-a-system-path
-          echo "~/bin" >> $GITHUB_PATH
-
-          echo $PATH
-          purs --version
-
           (echo "::group::Init Spago project") 2>/dev/null
-          spago -V init --no-comments
+          PATH=~/bin:$PATH spago -V init --no-comments
           (echo "::endgroup::"; "::group::Upgrade to latest package set") 2>/dev/null
 
           # Ensure we're on the latest package set
-          spago upgrade-set
+          PATH=~/bin:$PATH spago upgrade-set
 
           (echo "::endgroup::"; "::group::Override metadata package version") 2>/dev/null
 
@@ -222,12 +214,12 @@ jobs:
           echo "in upstream with metadata.version = \"$META_PACKAGE_VERSION\"" >> packages.dhall
 
           (echo "::endgroup::"; "::group::Install package set") 2>/dev/null
-          spago install $(spago ls packages | cut -d ' ' -f 1 | tr '\n' ' ')
+          PATH=~/bin:$PATH spago install $(spago ls packages | cut -d ' ' -f 1 | tr '\n' ' ')
 
           (echo "::endgroup::"; "::group::Compile package set") 2>/dev/null
-          spago build
+          PATH=~/bin:$PATH spago build
 
           (echo "::endgroup::"; "::group::Document package set") 2>/dev/null
-          spago docs --no-search
+          PATH=~/bin:$PATH spago docs --no-search
 
           (echo "::endgroup::") 2>/dev/null
