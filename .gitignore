@@ -34,3 +34,7 @@ TAGS
 *.ps
 *.svg
 tests/purs/make/
+
+# CI related
+ci/packageSet/.spago
+ci/packageSet/.purs*

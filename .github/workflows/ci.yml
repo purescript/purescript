@@ -154,6 +154,8 @@ jobs:
     needs: build
 
     steps:
+      - uses: "actions/checkout@v2"
+
       - uses: actions/download-artifact@v2
         id: purs-binary-step-id
         with:
@@ -178,7 +180,7 @@ jobs:
       - name: Cache PureScript dependencies
         uses: actions/cache@v2
         with:
-          key: ${{ runner.os }}-spago-${{ hashFiles('**/*.dhall') }}
+          key: ${{ runner.os }}-spago-${{ hashFiles('ci/packageSet/**/*.dhall') }}
           path: |
             .spago
             output
@@ -196,11 +198,15 @@ jobs:
       - name: Install NPM dependencies
         run: npm install -g spago
 
-      - name: Compile and run docs on package set
+      - name: Add the purs binary to PATH
+        run: echo "~/bin" >> $GITHUB_PATH
+
+      - name: Compile and run docs on the latest package set
         run: |
-          (echo "::group::Init Spago project") 2>/dev/null
-          PATH=~/bin:$PATH spago -V init --no-comments
-          (echo "::endgroup::"; "::group::Upgrade to latest package set") 2>/dev/null
+          ls -l
+          cd ci/packageSet
+
+          ("::group::Upgrade to latest package set") 2>/dev/null
 
           # Ensure we're on the latest package set
           PATH=~/bin:$PATH spago upgrade-set
