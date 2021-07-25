@@ -1,8 +1,6 @@
 # Installation information
 
-If you are having difficulty installing the PureScript compiler, feel free to
-ask for help! A good place is the #purescript IRC channel on Freenode, the #purescript channel on [FPChat Slack](https://fpchat-invite.herokuapp.com/), or
-alternatively Stack Overflow.
+If you are having difficulty installing the PureScript compiler, feel free to ask for help! The best places are the [PureScript Discord](https://discord.gg/sMqwYUbvz6) or [PureScript Discourse](https://discourse.purescript.org).
 
 ## Requirements
 
