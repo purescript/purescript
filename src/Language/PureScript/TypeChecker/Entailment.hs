@@ -38,6 +38,7 @@ import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Entailment.Coercible
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
@@ -161,7 +162,7 @@ entails
   -- ^ Error message hints to apply to any instance errors
   -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
 entails SolverOptions{..} constraint context hints =
-    solve constraint
+  overConstraintArgsAll (lift . lift . traverse replaceAllTypeSynonyms) constraint >>= solve
   where
     forClassNameM :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> m [TypeClassDict]
     forClassNameM env ctx cn@C.Coercible kinds args =

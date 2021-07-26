@@ -84,8 +84,8 @@ desugar externs =
       -- We cannot prevent ill-kinded expansions of type synonyms without
       -- knowing their kinds but they're not available yet.
           kinds = mempty
-       in deriveInstances externs syns kinds m
-      >>= desugarTypeClasses externs syns kinds)
+       in deriveInstances externs syns kinds m)
+    >=> desugarTypeClasses externs
     >=> createBindingGroupsModule
 
 findTypeSynonyms :: [ExternsFile] -> ModuleName -> [Declaration] -> SynonymMap
