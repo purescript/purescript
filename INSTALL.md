@@ -1,6 +1,6 @@
 # Installation information
 
-If you are having difficulty installing the PureScript compiler, feel free to ask for help! The best places are the [PureScript Discord](https://discord.gg/sMqwYUbvz6) or [PureScript Discourse](https://discourse.purescript.org).
+If you are having difficulty installing the PureScript compiler, feel free to ask for help! The best places are the [PureScript Discord](https://purescript.org/chat) or [PureScript Discourse](https://discourse.purescript.org).
 
 ## Requirements
 
