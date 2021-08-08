@@ -12,5 +12,5 @@ example3 =
   case _ of{
     Foo a -> 1;
     Bar b -> 2}
-  `append` 3}
+    `append` 3}
   <eof>
