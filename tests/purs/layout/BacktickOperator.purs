@@ -13,4 +13,9 @@ example3 =
     Foo a -> 1
     Bar b -> 2
     `append` 3
-  
+
+example4 =
+  case _ of
+    Foo a -> 1
+    Bar b -> 2
+    + 3
