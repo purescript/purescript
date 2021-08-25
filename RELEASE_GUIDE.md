@@ -130,9 +130,11 @@ Note: if a release does not go as planned (e.g. [`v0.14.3`](https://github.com/p
 - Document any language changes in the documentation repo
   - In particular, it's worth checking that the getting started guide in the
     documentation repo still works
-- If there have been changes to any `Prim` modules (even if they are just
-  documentation changes), update Pursuit to depend on the latest compiler so
-  that these docs appear on pursuit.purescript.org
+- If any of the below conditions are true, update Pursuit to depend on the latest release
+  and redploy it:
+    - there have been changes to any `Prim` modules (even if they are just
+  documentation changes)
+    - there have been changes to the documentation JSON format
 - Create a new package set for the release
 - Update Try PureScript to the latest release and package set and reploy TryPureScript
 - Make release announcements:
