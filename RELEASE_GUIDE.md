@@ -23,7 +23,7 @@ spago install $(spago ls packages | cut -f 1 -d ' ' | tr '\n' ' ')
 # Verify that code compiles and docs are properly created
 stack exec bash <<EOF
 spago build
-spago docs
+spago docs -S
 EOF
 popd
 # rm -rf wPackageSet
