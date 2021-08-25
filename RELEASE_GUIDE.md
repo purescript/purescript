@@ -134,7 +134,7 @@ Note: if a release does not go as planned (e.g. [`v0.14.3`](https://github.com/p
   documentation changes), update Pursuit to depend on the latest compiler so
   that these docs appear on pursuit.purescript.org
 - Create a new package set for the release
-- Update Try PureScript
+- Update Try PureScript to the latest release and package set and reploy TryPureScript
 - Make release announcements:
   - Discourse
   - Discord
