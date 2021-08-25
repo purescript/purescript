@@ -136,7 +136,7 @@ Note: if a release does not go as planned (e.g. [`v0.14.3`](https://github.com/p
   documentation changes)
     - there have been changes to the documentation JSON format
 - Create a new package set for the release
-- Update Try PureScript to the latest release and package set and reploy TryPureScript
+- Update Try PureScript to the latest release and package set and redeploy it
 - Make release announcements:
   - Discourse
   - Discord
