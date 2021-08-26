@@ -71,7 +71,8 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
     liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets }) do
       newExterns <- P.rebuildModule (shushProgress makeEnv) externs m
-      updateCacheDb codegenTargets outputDirectory file actualFile moduleName
+      unless (S.null codegenTargets)
+        $ updateCacheDb codegenTargets outputDirectory file actualFile moduleName
       pure newExterns
   case result of
     Left errors ->
