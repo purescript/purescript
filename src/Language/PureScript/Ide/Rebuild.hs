@@ -14,6 +14,7 @@ import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Data.Time                       as Time
+import qualified Data.Text                       as Text
 import qualified Language.PureScript             as P
 import           Language.PureScript.Make.Cache (CacheInfo(..), normaliseForCache)
 import qualified Language.PureScript.CST         as CST
@@ -51,7 +52,10 @@ rebuildFile
   -- ^ A runner for the second build with open exports
   -> m Success
 rebuildFile file actualFile codegenTargets runOpenBuild = do
-  (fp, input) <- ideReadFile file
+  (fp, input) <-
+    case List.stripPrefix "data:" file of
+      Just source -> pure ("", Text.pack source)
+      _ -> ideReadFile file
   let fp' = fromMaybe fp actualFile
   (pwarnings, m) <- case sequence $ CST.parseFromFile fp' input of
     Left parseError ->
@@ -65,13 +69,16 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton moduleName (Left P.RebuildAlways)
+  let pureRebuild = S.null codegenTargets
   foreigns <- P.inferForeignModules (M.singleton moduleName (Right file))
   let makeEnv = P.buildMakeActions outputDirectory filePathMap foreigns False
+        & (if pureRebuild then shushCodegen else identity)
+        & shushProgress
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
     liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets }) do
-      newExterns <- P.rebuildModule (shushProgress makeEnv) externs m
-      unless (S.null codegenTargets)
+      newExterns <- P.rebuildModule makeEnv externs m
+      unless pureRebuild
         $ updateCacheDb codegenTargets outputDirectory file actualFile moduleName
       pure newExterns
   case result of
