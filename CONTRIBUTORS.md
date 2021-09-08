@@ -89,6 +89,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@noraesae](https://github.com/noraesae) | Hyunje Jun | [MIT license](http://opensource.org/licenses/MIT) |
 | [@nullobject](https://github.com/nullobject) | Josh Bassett | [MIT license](http://opensource.org/licenses/MIT) |
 | [@osa1](https://github.com/osa1) | Ömer Sinan Ağacan | MIT license |
+| [@ozkutuk](https://github.com/ozkutuk) | Berk Özkütük | [MIT license](http://opensource.org/licenses/MIT) |
 | [@paf31](https://github.com/paf31) | Phil Freeman | [MIT license](http://opensource.org/licenses/MIT) |
 | [@parsonsmatt](https://github.com/parsonsmatt) | Matt Parsons | [MIT license](http://opensource.org/licenses/MIT) |
 | [@passy](https://github.com/passy) | Pascal Hartig | [MIT license](http://opensource.org/licenses/MIT) |
