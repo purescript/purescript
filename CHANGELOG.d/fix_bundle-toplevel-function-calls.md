@@ -1,0 +1,1 @@
+* Do not remove function declarations that are referenced by top-level function calls when bundling
