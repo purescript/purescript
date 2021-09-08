@@ -94,6 +94,7 @@ guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory f
 data Visibility
   = Public
   | Internal
+  | TopLevelCall
   deriving (Show, Eq, Ord)
 
 -- | A piece of code is identified by its module, its name, and whether it is an internal variable
@@ -478,6 +479,10 @@ matchMember stmt
   | JSFunction a0 jsIdent a1 args a2 body _ <- stmt
   , JSIdentName _ name <- jsIdent
   = pure (Internal, name, JSFunctionExpression a0 jsIdent a1 args a2 body)
+  -- foo(...args);
+  | JSMethodCall jsIdent a0 args a1 _ <- stmt
+  , JSIdentifier _ name <- jsIdent
+  = pure (TopLevelCall, name, JSCallExpression jsIdent a0 args a1)
   -- exports.foo = expr; exports["foo"] = expr;
   | JSAssignStatement e (JSAssign _) decl _ <- stmt
   , Just name <- exportsAccessor e
@@ -543,8 +548,8 @@ compile modules entryPoints = filteredModules
   -- | The set of vertices whose connected components we are interested in keeping.
   entryPointVertices :: [Vertex]
   entryPointVertices = catMaybes $ do
-    (_, k@(mid, _, Public), _) <- verts
-    guard $ mid `elem` entryPoints
+    (_, k@(mid, _, visibility), _) <- verts
+    guard $ mid `elem` entryPoints && visibility == Public || visibility == TopLevelCall
     return (vertexFor k)
 
   -- | The set of vertices reachable from an entry point
