@@ -665,7 +665,7 @@ inferTypeSynonym moduleName (ann, tyName, tyArgs, tyBody) = do
     tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) kindRes tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
-      tyBodyAndKind <- inferKind tyBody
+      tyBodyAndKind <- traverse apply =<< inferKind tyBody
       instantiateKind tyBodyAndKind =<< apply kindRes
 
 -- | Checks that a particular generalization is valid and well-scoped.

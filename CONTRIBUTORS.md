@@ -64,6 +64,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@japesinator](https://github.com/japesinator) | JP Smith | [MIT license](http://opensource.org/licenses/MIT) |
 | [@jkachmar](https://github.com/jkachmar) | Joe Kachmar | MIT license |
 | [@joneshf](https://github.com/joneshf) | Hardy Jones | MIT license |
+| [@jy14898](https://github.com/jy14898) | Joseph Young | MIT license |
 | [@kika](https://github.com/kika) | Kirill Pertsev | MIT license |
 | [@kRITZCREEK](https://github.com/kRITZCREEK) | Christoph Hegemann | MIT license |
 | [@L8D](https://github.com/L8D) | Tenor Biel | [MIT license](http://opensource.org/licenses/MIT) |
