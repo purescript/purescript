@@ -46,12 +46,13 @@ flattenInstance (Instance a b) =
   flattenInstanceHead a <> foldMap (\(c, d) -> pure c <> foldMap flattenInstanceBinding d) b
 
 flattenInstanceHead :: InstanceHead a -> DList SourceToken
-flattenInstanceHead (InstanceHead a b c d e) =
+flattenInstanceHead (InstanceHead a b c d e f) =
   pure a <>
   foldMap (\(n, s) -> flattenName n <> pure s) b <>
-  foldMap (\(g, h) -> flattenOneOrDelimited flattenConstraint g <> pure h) c <>
-  flattenQualifiedName d <>
-  foldMap flattenType e
+  foldMap (\(forall_, tys, dot) -> pure forall_ <> foldMap flattenTypeVarBinding tys <> pure dot) c <>
+  foldMap (\(g, h) -> flattenOneOrDelimited flattenConstraint g <> pure h) d <>
+  flattenQualifiedName e <>
+  foldMap flattenType f
 
 flattenInstanceBinding :: InstanceBinding a -> DList SourceToken
 flattenInstanceBinding = \case

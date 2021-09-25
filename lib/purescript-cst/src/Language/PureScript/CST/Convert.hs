@@ -471,7 +471,7 @@ convertDeclaration fileName decl = case decl of
   DeclInstanceChain _ insts -> do
     let
       chainId = mkChainId fileName $ startSourcePos $ instKeyword $ instHead $ sepHead insts
-      goInst ix inst@(Instance (InstanceHead _ nameSep ctrs cls args) bd) = do
+      goInst ix inst@(Instance (InstanceHead _ nameSep _ ctrs cls args) bd) = do
         let ann' = uncurry (sourceAnnCommented fileName) $ instanceRange inst
         AST.TypeInstanceDeclaration ann' chainId ix
           (mkPartialInstanceName nameSep cls args)
@@ -480,7 +480,7 @@ convertDeclaration fileName decl = case decl of
           (convertType fileName <$> args)
           (AST.ExplicitInstance $ goInstanceBinding <$> maybe [] (NE.toList . snd) bd)
     uncurry goInst <$> zip [0..] (toList insts)
-  DeclDerive _ _ new (InstanceHead kw nameSep ctrs cls args) -> do
+  DeclDerive _ _ new (InstanceHead kw nameSep _ ctrs cls args) -> do
     let
       chainId = mkChainId fileName $ startSourcePos kw
       name' = mkPartialInstanceName nameSep cls args

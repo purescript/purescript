@@ -746,19 +746,19 @@ classMember :: { Labeled (Name Ident) (Type ()) }
 -- has forall      || x |   |   | x |   |   |
 instHead :: { InstanceHead () }
   : 'instance' forall many(typeVarBinding) '.' constraints '=>' qualProperName manyOrEmpty(typeAtom)
-      { InstanceHead $1 Nothing         (Just ($5, $6)) (getQualifiedProperName $7) $8 }
+      { InstanceHead $1 Nothing         (Just ($2, $3, $4)) (Just ($5, $6)) (getQualifiedProperName $7) $8 }
   | 'instance' constraints '=>' qualProperName manyOrEmpty(typeAtom)
       {% addWarning (toList (flattenOneOrDelimited flattenConstraint $2)) WarnDeprecatedInstHeadForallSyntax *> pure
-      ( InstanceHead $1 Nothing         (Just ($2, $3)) (getQualifiedProperName $4) $5 )}
+      ( InstanceHead $1 Nothing         Nothing             (Just ($2, $3)) (getQualifiedProperName $4) $5 )}
   | 'instance' qualProperName manyOrEmpty(typeAtom)
-      { InstanceHead $1 Nothing         Nothing         (getQualifiedProperName $2) $3 }
+      { InstanceHead $1 Nothing         Nothing             Nothing         (getQualifiedProperName $2) $3 }
   | 'instance' ident '::' forall many(typeVarBinding) '.' constraints '=>' qualProperName manyOrEmpty(typeAtom)
-      { InstanceHead $1 (Just ($2, $3)) (Just ($7, $8)) (getQualifiedProperName $9) $10 }
+      { InstanceHead $1 (Just ($2, $3)) (Just ($4, $5, $6)) (Just ($7, $8)) (getQualifiedProperName $9) $10 }
   | 'instance' ident '::' constraints '=>' qualProperName manyOrEmpty(typeAtom)
       {% addWarning (toList (flattenOneOrDelimited flattenConstraint $4)) WarnDeprecatedInstHeadForallSyntax *> pure
-      ( InstanceHead $1 (Just ($2, $3)) (Just ($4, $5)) (getQualifiedProperName $6) $7 )}
+      ( InstanceHead $1 (Just ($2, $3)) Nothing             (Just ($4, $5)) (getQualifiedProperName $6) $7 )}
   | 'instance' ident '::' qualProperName manyOrEmpty(typeAtom)
-      { InstanceHead $1 (Just ($2, $3)) Nothing         (getQualifiedProperName $4) $5 }
+      { InstanceHead $1 (Just ($2, $3)) Nothing             Nothing         (getQualifiedProperName $4) $5 }
 
 constraints :: { OneOrDelimited (Constraint ()) }
   : constraint { One $1 }
