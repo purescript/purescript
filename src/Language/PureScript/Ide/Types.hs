@@ -125,7 +125,6 @@ makeLenses ''IdeType
 makeLenses ''IdeTypeSynonym
 makeLenses ''IdeDataConstructor
 makeLenses ''IdeTypeClass
-makeLenses ''IdeInstance
 makeLenses ''IdeValueOperator
 makeLenses ''IdeTypeOperator
 
@@ -228,7 +227,7 @@ data Completion = Completion
   } deriving (Show, Eq, Ord)
 
 instance ToJSON Completion where
-  toJSON (Completion {..}) =
+  toJSON Completion {..} =
     Aeson.object
       [ "module" .= complModule
       , "identifier" .= complIdentifier

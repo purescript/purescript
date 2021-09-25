@@ -1,0 +1,34 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/4158.purs:9:10 - 9:11 (line 9, column 10 - line 9, column 11)
+
+  Could not match type
+  [33m    [0m
+  [33m  a1[0m
+  [33m    [0m
+  with type
+  [33m    [0m
+  [33m  b0[0m
+  [33m    [0m
+
+while trying to match type [33m{ foo :: Int[0m
+                           [33m| a1        [0m
+                           [33m}           [0m
+  with type [33m{ foo :: Int[0m
+            [33m| b0        [0m
+            [33m}           [0m
+while checking that expression [33mr[0m
+  has type [33mMaybe         [0m
+           [33m  { foo :: Int[0m
+           [33m  | b0        [0m
+           [33m  }           [0m
+in value declaration [33mevil[0m
+
+where [33ma1[0m is a rigid type variable
+        bound at (line 0, column 0 - line 0, column 0)
+      [33mb0[0m is a rigid type variable
+        bound at (line 0, column 0 - line 0, column 0)
+
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+or to contribute content related to this error.
+

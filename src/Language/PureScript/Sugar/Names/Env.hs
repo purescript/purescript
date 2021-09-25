@@ -8,8 +8,6 @@ module Language.PureScript.Sugar.Names.Env
   , Env
   , primEnv
   , primExports
-  , envModuleSourceSpan
-  , envModuleImports
   , envModuleExports
   , ExportMode(..)
   , exportType
@@ -17,7 +15,6 @@ module Language.PureScript.Sugar.Names.Env
   , exportTypeClass
   , exportValue
   , exportValueOp
-  , getExports
   , checkImportConflicts
   ) where
 
@@ -29,7 +26,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Function (on)
 import Data.Foldable (find)
-import Data.List (groupBy, sortBy, delete)
+import Data.List (groupBy, sortOn, delete)
 import Data.Maybe (fromJust, mapMaybe)
 import Safe (headMay)
 import qualified Data.Map as M
@@ -158,18 +155,6 @@ nullExports = Exports M.empty M.empty M.empty M.empty M.empty
 -- useful information when there is a duplicate module definition.
 --
 type Env = M.Map ModuleName (SourceSpan, Imports, Exports)
-
--- |
--- Extracts the 'SourceSpan' from an 'Env' value.
---
-envModuleSourceSpan :: (SourceSpan, a, b) -> SourceSpan
-envModuleSourceSpan (ss, _, _) = ss
-
--- |
--- Extracts the 'Imports' from an 'Env' value.
---
-envModuleImports :: (a, Imports, b) -> Imports
-envModuleImports (_, imps, _) = imps
 
 -- |
 -- Extracts the 'Exports' from an 'Env' value.
@@ -467,16 +452,6 @@ throwExportConflict' ss new existing newName existingName =
     ExportConflict (Qualified (Just new) newName) (Qualified (Just existing) existingName)
 
 -- |
--- Gets the exports for a module, or raise an error if the module doesn't exist.
---
-getExports :: MonadError MultipleErrors m => Env -> ModuleName -> m Exports
-getExports env mn =
-  maybe
-    (throwError . errorMessage . UnknownName . Qualified Nothing $ ModName mn)
-    (return . envModuleExports)
-  $ M.lookup mn env
-
--- |
 -- When reading a value from the imports, check that there are no conflicts in
 -- scope.
 --
@@ -490,7 +465,7 @@ checkImportConflicts
   -> m (ModuleName, ModuleName)
 checkImportConflicts ss currentModule toName xs =
   let
-    byOrig = sortBy (compare `on` importSourceModule) xs
+    byOrig = sortOn importSourceModule xs
     groups = groupBy ((==) `on` importSourceModule) byOrig
     nonImplicit = filter ((/= FromImplicit) . importProvenance) xs
     name = toName . disqualify . importName $ head xs

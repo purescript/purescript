@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 -- |
 -- This module generates code for \"externs\" files, i.e. files containing only
 -- foreign import declarations.
@@ -19,6 +17,7 @@ module Language.PureScript.Externs
 import Prelude.Compat
 
 import Codec.Serialise (Serialise)
+import Control.Monad (join)
 import GHC.Generics (Generic)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
@@ -30,6 +29,7 @@ import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
+import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Names
@@ -150,8 +150,10 @@ data ExternsDeclaration =
       , edInstanceKinds           :: [SourceType]
       , edInstanceTypes           :: [SourceType]
       , edInstanceConstraints     :: Maybe [SourceConstraint]
-      , edInstanceChain           :: [Qualified Ident]
+      , edInstanceChain           :: Maybe ChainId
       , edInstanceChainIndex      :: Integer
+      , edInstanceNameSource      :: NameSource
+      , edInstanceSourceSpan      :: SourceSpan
       }
   deriving (Show, Generic)
 
@@ -173,47 +175,55 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
   applyDecl env (EDClass pn args members cs deps tcIsEmpty) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps tcIsEmpty) (typeClasses env) }
-  applyDecl env (EDInstance className ident vars kinds tys cs ch idx) =
+  applyDecl env (EDInstance className ident vars kinds tys cs ch idx ns ss) =
     env { typeClassDictionaries =
             updateMap
               (updateMap (M.insertWith (<>) (qual ident) (pure dict)) className)
               (Just efModuleName) (typeClassDictionaries env) }
     where
     dict :: NamedDict
-    dict = TypeClassDictionaryInScope ch idx (qual ident) [] className vars kinds tys cs
+    dict = TypeClassDictionaryInScope ch idx (qual ident) [] className vars kinds tys cs instTy
 
     updateMap :: (Ord k, Monoid a) => (a -> a) -> k -> M.Map k a -> M.Map k a
     updateMap f = M.alter (Just . f . fold)
 
+    instTy :: Maybe SourceType
+    instTy = case ns of
+      CompilerNamed -> Just $ srcInstanceType ss vars className tys
+      UserNamed -> Nothing
+
   qual :: a -> Qualified a
   qual = Qualified (Just efModuleName)
 
--- | Generate an externs file for all declarations in a module
-moduleToExternsFile :: Module -> Environment -> ExternsFile
-moduleToExternsFile (Module _ _ _ _ Nothing) _ = internalError "moduleToExternsFile: module exports were not elaborated"
-moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
+-- | Generate an externs file for all declarations in a module.
+--
+-- The `Map Ident Ident` argument should contain any top-level `GenIdent`s that
+-- were rewritten to `Ident`s when the module was compiled; this rewrite only
+-- happens in the CoreFn, not the original module AST, so it needs to be
+-- applied to the exported names here also. (The appropriate map is returned by
+-- `L.P.Renamer.renameInModule`.)
+moduleToExternsFile :: Module -> Environment -> M.Map Ident Ident -> ExternsFile
+moduleToExternsFile (Module _ _ _ _ Nothing) _ _ = internalError "moduleToExternsFile: module exports were not elaborated"
+moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsFile{..}
   where
   efVersion       = T.pack (showVersion Paths.version)
   efModuleName    = mn
-  efExports       = exps
+  efExports       = map renameRef exps
   efImports       = mapMaybe importDecl ds
   efFixities      = mapMaybe fixityDecl ds
   efTypeFixities  = mapMaybe typeFixityDecl ds
-  efDeclarations  = concatMap toExternsDeclaration efExports
+  efDeclarations  = concatMap toExternsDeclaration exps
   efSourceSpan    = ss
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
   fixityDecl (ValueFixityDeclaration _ (Fixity assoc prec) name op) =
-    fmap (const (ExternsFixity assoc prec op name)) (find (findOp getValueOpRef op) exps)
+    fmap (const (ExternsFixity assoc prec op name)) (find ((== Just op) . getValueOpRef) exps)
   fixityDecl _ = Nothing
 
   typeFixityDecl :: Declaration -> Maybe ExternsTypeFixity
   typeFixityDecl (TypeFixityDeclaration _ (Fixity assoc prec) name op) =
-    fmap (const (ExternsTypeFixity assoc prec op name)) (find (findOp getTypeOpRef op) exps)
+    fmap (const (ExternsTypeFixity assoc prec op name)) (find ((== Just op) . getTypeOpRef) exps)
   typeFixityDecl _ = Nothing
-
-  findOp :: (DeclarationRef -> Maybe (OpName a)) -> OpName a -> DeclarationRef -> Bool
-  findOp g op = maybe False (== op) . g
 
   importDecl :: Declaration -> Maybe ExternsImport
   importDecl (ImportDeclaration _ m mt qmn) = Just (ExternsImport m mt qmn)
@@ -234,26 +244,35 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       _ -> internalError "toExternsDeclaration: Invalid input"
   toExternsDeclaration (ValueRef _ ident)
     | Just (ty, _, _) <- Qualified (Just mn) ident `M.lookup` names env
-    = [ EDValue ident ty ]
+    = [ EDValue (lookupRenamedIdent ident) ty ]
   toExternsDeclaration (TypeClassRef _ className)
-    | let dictName = dictSynonymName . coerceProperName $ className
+    | let dictName = dictTypeName . coerceProperName $ className
     , Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
-    , Just (kind, ExternData rs) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
-    , Just (synKind, TypeSynonym) <- Qualified (Just mn) dictName `M.lookup` types env
-    , Just (synArgs, synTy) <- Qualified (Just mn) dictName `M.lookup` typeSynonyms env
-    = [ EDType (coerceProperName className) kind (ExternData rs)
-      , EDType dictName synKind TypeSynonym
-      , EDTypeSynonym dictName synArgs synTy
+    , Just (kind, tk) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
+    , Just (dictKind, dictData@(DataType _ _ [(dctor, _)])) <- Qualified (Just mn) dictName `M.lookup` types env
+    , Just (dty, _, ty, args) <- Qualified (Just mn) dctor `M.lookup` dataConstructors env
+    = [ EDType (coerceProperName className) kind tk
+      , EDType dictName dictKind dictData
+      , EDDataConstructor dctor dty dictName ty args
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
-  toExternsDeclaration (TypeInstanceRef _ ident)
-    = [ EDInstance tcdClassName ident tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex
+  toExternsDeclaration (TypeInstanceRef ss' ident ns)
+    = [ EDInstance tcdClassName (lookupRenamedIdent ident) tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex ns ss'
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
       , TypeClassDictionaryInScope{..} <- NEL.toList nel
       ]
   toExternsDeclaration _ = []
+
+  renameRef :: DeclarationRef -> DeclarationRef
+  renameRef = \case
+    ValueRef ss' ident -> ValueRef ss' $ lookupRenamedIdent ident
+    TypeInstanceRef ss' ident _ | not $ isPlainIdent ident -> TypeInstanceRef ss' (lookupRenamedIdent ident) CompilerNamed
+    other -> other
+
+  lookupRenamedIdent :: Ident -> Ident
+  lookupRenamedIdent = flip (join M.findWithDefault) renamedIdents
 
 externsFileName :: FilePath
 externsFileName = "externs.cbor"

@@ -1,15 +1,9 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module TestDocs where
 
 import Prelude ()
 import Prelude.Compat
 
-import Control.Arrow (first)
+import Data.Bifunctor (first)
 import Data.List (findIndex)
 import Data.Foldable
 import Safe (headMay)
@@ -29,77 +23,40 @@ import Web.Bower.PackageMeta (parsePackageName, runPackageName)
 
 import TestPscPublish (preparePackage)
 
-import Test.Tasty
-import Test.Tasty.Hspec (Spec, it, context, expectationFailure, runIO, testSpec)
-
-main :: IO TestTree
-main = testSpec "docs" spec
+import Test.Hspec
 
 spec :: Spec
-spec = do
-  packageResult <- runIO (preparePackage "tests/purs/docs" "resolutions.json")
-
-  case packageResult of
-    Left e ->
-      it "failed to produce docs" $ do
-        expectationFailure (Boxes.render (Publish.renderError e))
-    Right pkg ->
-      mkSpec pkg
-
-mkSpec :: Docs.Package Docs.NotYetKnown -> Spec
-mkSpec pkg@Docs.Package{..} = do
-  let linksCtx = Docs.getLinksContext pkg
-
+spec = beforeAll (handleDocPrepFailure <$> preparePackage "tests/purs/docs" "resolutions.json") $
   context "Language.PureScript.Docs" $ do
     context "Doc generation tests:" $
-      forM_ testCases $ \(mnString, assertions) -> do
-        let mn = P.moduleNameFromString mnString
-            mdl = find ((==) mn . Docs.modName) pkgModules
-
-        context ("in module " ++ T.unpack mnString) $
-          case mdl of
-            Nothing ->
-              it "exists in docs output" $
-                expectationFailure ("module not found in docs: " ++ T.unpack mnString)
-            Just mdl' ->
-              toHspec linksCtx mdl' assertions
-
-    context "Tag generation tests:" $
-      forM_ testTagsCases $ \(mnString, assertions) -> do
-        let mn = P.moduleNameFromString mnString
-            mdl = find ((==) mn . Docs.modName) pkgModules
-        context ("in module " ++ T.unpack mnString) $
-          case mdl of
-            Nothing ->
-              it "exists in docs output" $
-                expectationFailure ("module not found in docs: " ++ T.unpack mnString)
-            Just mdl' ->
-              tagAssertionsToHspec mdl' assertions
-
-  where
-  toHspec :: Docs.LinksContext -> Docs.Module -> [DocsAssertion] -> Spec
-  toHspec linksCtx mdl assertions =
-    forM_ assertions $ \a ->
-      it (T.unpack (displayAssertion a)) $ do
-        case runAssertion a linksCtx mdl of
+      mkSpec testCases displayAssertion $ \a pkg mdl ->
+        case runAssertion a (Docs.getLinksContext pkg) mdl of
           Pass ->
             pure ()
           Fail reason ->
             expectationFailure (T.unpack (displayAssertionFailure reason))
 
-  tagAssertionsToHspec :: Docs.Module -> [TagsAssertion] -> Spec
-  tagAssertionsToHspec mdl assertions =
-    let tags = Map.fromList $ Docs.tags mdl
-    in forM_ assertions $ \a ->
-      it (T.unpack (displayTagsAssertion a)) $ do
-        case runTagsAssertion a tags of
+    context "Tag generation tests:" $
+      mkSpec testTagsCases displayTagsAssertion $ \a _ mdl ->
+        case runTagsAssertion a (Map.fromList $ Docs.tags mdl) of
           TagsPass ->
             pure ()
           TagsFail reason ->
             expectationFailure (T.unpack (displayTagsAssertionFailure reason))
+  where
+  handleDocPrepFailure = first (expectationFailure . ("failed to produce docs: " <>) . Boxes.render . Publish.renderError)
 
-takeJust :: String -> Maybe a -> a
-takeJust msg = fromMaybe (error msg)
+  mkSpec cases displayAssertion' runner =
+    forM_ cases $ \(mnString, assertions) -> do
+      let mn = P.moduleNameFromString mnString
+      context ("in module " ++ T.unpack mnString) $
+        forM_ assertions $ \a ->
+          it (T.unpack (displayAssertion' a)) . either id $ \pkg@Docs.Package{..} ->
+            case find ((==) mn . Docs.modName) pkgModules of
+              Nothing ->
+                expectationFailure ("module not found in docs: " ++ T.unpack mnString)
+              Just mdl ->
+                runner a pkg mdl
 
 data DocsAssertion
   -- | Assert that a particular declaration is documented with the given
@@ -149,6 +106,14 @@ data DocsAssertion
   | ShouldHaveLink P.ModuleName Text Text Docs.Namespace Docs.LinkLocation
   -- | Assert that a given declaration comes before another in the output
   | ShouldComeBefore P.ModuleName Text Text
+  -- | Assert that a given declaration has the given kind signature
+  | ShouldHaveKindSignature P.ModuleName Text Text
+  -- | Assert that a given declaration does not have a kind signature
+  | ShouldNotHaveKindSignature P.ModuleName Text
+  -- | Assert that a given declaration with doc-comments on its
+  -- kind signature and type declaration are properly merged into one
+  -- doc-comment.
+  | ShouldMergeDocComments P.ModuleName Text (Maybe Text)
 
 data TagsAssertion
   -- | Assert that a particular declaration is tagged
@@ -204,6 +169,12 @@ displayAssertion = \case
   ShouldComeBefore mn declA declB ->
     showQual mn declA <> " should come before " <> showQual mn declB <>
     " in the docs"
+  ShouldHaveKindSignature mn decl expected ->
+    showQual mn decl <> " should have the kind signature `" <> expected <> "`"
+  ShouldNotHaveKindSignature mn decl ->
+    showQual mn decl <> " should not have a kind signature."
+  ShouldMergeDocComments mn decl _ ->
+    showQual mn decl <> " should merge its kind declaration and type declaration's doc-comments"
 
 displayTagsAssertion :: TagsAssertion -> Text
 displayTagsAssertion = \case
@@ -258,6 +229,22 @@ data DocsAssertionFailure
   | BadLinkLocation P.ModuleName Text Text Docs.LinkLocation Docs.LinkLocation
   -- | Declarations were in the wrong order
   | WrongOrder P.ModuleName Text Text
+  -- | Expected a kind signature for a declaration, but did not find one
+  -- Fields: module name, declaration title.
+  | KindSignatureMissing P.ModuleName Text
+  -- | The rendered kind signature did not match the expected one.
+  -- Fields: module name, declaration title, expected kind signature (text),
+  -- actual kind signature (text), actual kind signature (structure)
+  | KindSignatureMismatch P.ModuleName Text Text Text (P.Type ())
+  -- | A kind signature was found where none was expected.
+  -- Fields: module name, declaration title, actual kind signature (text),
+  -- actual kind signature (structure)
+  | KindSignaturePresent P.ModuleName Text Text (P.Type ())
+  -- | The doc comments for the kind signature and type declaration were
+  -- not properly merged into the expected one.
+  -- Fields: module name, declaration title, expected doc-comments,
+  -- actual doc-comments
+  | DocCommentMergeFailure P.ModuleName Text Text Text
 
 data TagsAssertionFailure
   -- | A declaration was not tagged, but should have been
@@ -306,8 +293,22 @@ displayAssertionFailure = \case
     "in rendered code for " <> decl <> ", bad link location for " <> target <>
     ": expected " <> T.pack (show expected) <>
     " got " <> T.pack (show actual)
-  WrongOrder _ before after' ->
-    "expected to see " <> before <> " before " <> after'
+  WrongOrder _ before' after' ->
+    "expected to see " <> before' <> " before " <> after'
+  KindSignatureMissing _ decl ->
+    "the kind signature for " <> decl <> " is missing."
+  KindSignatureMismatch _ decl expected actualTxt actualKind ->
+    "expected the kind signature for " <> decl <> "\n" <>
+    "to be `" <> expected <> "`\n" <>
+    "  got `" <> actualTxt <> "`\n" <>
+    "Structure of kind: " <> T.pack (show actualKind)
+  KindSignaturePresent _ decl actualTxt actualKind ->
+    "the kind signature for " <> decl <> " was not empty.\n" <>
+    "got `" <> actualTxt <> "`\n" <>
+    "Structure of kind: " <> T.pack (show actualKind)
+  DocCommentMergeFailure _ decl expected actual ->
+    "Expected the doc-comment for " <> decl <> " to merge comments and be `" <>
+    expected <> "`; got `" <> actual <> "`"
 
 displayTagsAssertionFailure :: TagsAssertionFailure -> Text
 displayTagsAssertionFailure = \case
@@ -462,23 +463,50 @@ runAssertion assertion linksCtx Docs.Module{..} =
             Nothing ->
               Fail (LinkedDeclarationMissing mn decl destTitle)
 
-    ShouldComeBefore mn before after' ->
+    ShouldComeBefore mn before' after' ->
       let
         decls = declarationsFor mn
 
         indexOf :: Text -> Maybe Int
         indexOf title = findIndex ((==) title . Docs.declTitle) decls
       in
-        case (indexOf before, indexOf after') of
+        case (indexOf before', indexOf after') of
           (Just i, Just j) ->
             if i < j
               then Pass
-              else Fail (WrongOrder mn before after')
+              else Fail (WrongOrder mn before' after')
           (Nothing, _) ->
-            Fail (NotDocumented mn before)
+            Fail (NotDocumented mn before')
           (_, Nothing) ->
             Fail (NotDocumented mn after')
 
+    ShouldHaveKindSignature mn decl expected ->
+      findDeclKinds mn decl $ \case
+        Just Docs.KindInfo{..} ->
+          if expected /= actual
+              then Fail (KindSignatureMismatch mn decl expected actual kiKind)
+              else Pass
+          where
+            actual = codeToString $ Docs.renderKindSig decl $
+              Docs.KindInfo kiKeyword kiKind
+        Nothing -> Fail (KindSignatureMissing mn decl)
+
+    ShouldNotHaveKindSignature mn decl ->
+      findDeclKinds mn decl $ \case
+        Just Docs.KindInfo{..} ->
+          Fail (KindSignaturePresent mn decl actual kiKind)
+          where
+            actual = codeToString $ Docs.renderKindSig decl $
+              Docs.KindInfo kiKeyword kiKind
+        Nothing -> Pass
+
+    ShouldMergeDocComments mn decl expected ->
+      findDecl mn decl $ \Docs.Declaration{..} ->
+        if expected == declComments
+            then Pass
+            else Fail (DocCommentMergeFailure mn decl (display expected) (display declComments))
+        where
+          display = fromMaybe ""
   where
   declarationsFor mn =
     if mn == modName
@@ -494,6 +522,13 @@ runAssertion assertion linksCtx Docs.Module{..} =
           Fail (NotDocumented mn title)
         Just decl ->
           f decl
+
+  findDeclKinds mn title f =
+      case find ((==) title . Docs.declTitle) (declarationsFor mn) of
+        Nothing ->
+          Fail (NotDocumented mn title)
+        Just Docs.Declaration{..} ->
+          f declKind
 
   findDeclChildren mn title child f =
     findDecl mn title $ \Docs.Declaration{..} ->
@@ -708,6 +743,87 @@ testCases =
 
   , ("TypeSynonymInstance",
       [ ShouldBeDocumented (n "TypeSynonymInstance") "MyNT" ["MyNT", "ntMyNT"]
+      ]
+    )
+  , ("KindSignatureDocs",
+      -- expected kind signatures
+      [ ShouldHaveKindSignature (n "KindSignatureDocs") "DKindAndType" "data DKindAndType :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TKindAndType" "type TKindAndType :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NKindAndType" "newtype NKindAndType :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CKindAndType" "class CKindAndType :: forall k. (k -> Type) -> k -> Constraint"
+
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DKindOnly" "data DKindOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TKindOnly" "type TKindOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NKindOnly" "newtype NKindOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CKindOnly" "class CKindOnly :: forall k. (k -> Type) -> k -> Constraint"
+
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DTypeOnly" "data DTypeOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TTypeOnly" "type TTypeOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NTypeOnly" "newtype NTypeOnly :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CTypeOnly" "class CTypeOnly :: forall k. (k -> Type) -> k -> Constraint"
+
+      -- Declarations with no explicit kind signatures should still have
+      -- their inferred kind signatures displayed as long as at least one
+      -- type parameter does not have kind `Type`.
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DImplicit" "data DImplicit :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TImplicit" "type TImplicit :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NImplicit" "newtype NImplicit :: forall k. k -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CImplicit" "class CImplicit :: forall k1. (k1 -> Type) -> k1 -> Constraint"
+
+      -- Declarations with no explicit kind signatures should not be displayed
+      -- if each type parameter in their inferred kind signature
+      -- has kind `Type`.
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DHidden"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DNothing"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "THidden"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "NHidden"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CHidden"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "CNothing"
+
+      -- Declarations with an explicit kind signature that is wrapped
+      -- in parenthesis at various points, but which "desugars" so to speak
+      -- to an uninteresting kind signature should not be displayed.
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataRedundantParenthesis"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassRedundantParenthesis"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataHeadParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataTailParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataWholeParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataSelfParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "ClassSelfParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataKindAnnotation"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "DataKindAnnotationWithParens"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "FunctionParens1"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "FunctionParens2"
+      , ShouldNotHaveKindSignature (n "KindSignatureDocs") "FunctionParens3"
+
+      -- Declarations with no explicit kind signatures should be displayed
+      -- if at least one type parameter has a kind other than `Type`
+      -- despite all others having kind `Type`.
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "DShown" "data DShown :: Type -> Type -> (Type -> Type) -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "TShown" "type TShown :: (Type -> Type) -> Type -> Type -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "NShown" "newtype NShown :: Type -> (Type -> Type) -> Type -> Type"
+      , ShouldHaveKindSignature (n "KindSignatureDocs") "CShown" "class CShown :: (Type -> Type) -> Type -> Type -> Constraint"
+
+      -- expected docs
+      , ShouldMergeDocComments (n "KindSignatureDocs") "DKindAndType" $ Just "dkatk\n\ndkatt\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "TKindAndType" $ Just "tkatk\n\ntkatt\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "NKindAndType" $ Just "nkatk\n\nnkatt\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "CKindAndType" $ Just "ckatk\n\nckatt\n"
+
+      , ShouldMergeDocComments (n "KindSignatureDocs") "DKindOnly" $ Just "dkok\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "TKindOnly" $ Just "tkok\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "NKindOnly" $ Just "nkok\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "CKindOnly" $ Just "ckok\n"
+
+      , ShouldMergeDocComments (n "KindSignatureDocs") "DTypeOnly" $ Just "dtot\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "TTypeOnly" $ Just "ttot\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "NTypeOnly" $ Just "ntot\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "CTypeOnly" $ Just "ctot\n"
+
+      , ShouldMergeDocComments (n "KindSignatureDocs") "DImplicit" $ Just "dit\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "TImplicit" $ Just "tit\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "NImplicit" $ Just "nit\n"
+      , ShouldMergeDocComments (n "KindSignatureDocs") "CImplicit" $ Just "cit\n"
       ]
     )
   ]

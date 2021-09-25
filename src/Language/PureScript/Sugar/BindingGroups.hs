@@ -6,7 +6,6 @@ module Language.PureScript.Sugar.BindingGroups
   ( createBindingGroups
   , createBindingGroupsModule
   , collapseBindingGroups
-  , collapseBindingGroupsModule
   ) where
 
 import Prelude.Compat
@@ -16,7 +15,8 @@ import Control.Monad ((<=<), guard)
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
-import Data.List (intersect)
+import Data.List (intersect, (\\))
+import Data.List.NonEmpty (NonEmpty((:|)), nonEmpty)
 import Data.Foldable (find)
 import Data.Maybe (isJust, mapMaybe)
 import qualified Data.List.NonEmpty as NEL
@@ -25,7 +25,7 @@ import qualified Data.Set as S
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Errors
+import Language.PureScript.Errors hiding (nonEmpty)
 import Language.PureScript.Names
 import Language.PureScript.Types
 
@@ -43,14 +43,6 @@ createBindingGroupsModule
   -> m Module
 createBindingGroupsModule (Module ss coms name ds exps) =
   Module ss coms name <$> createBindingGroups name ds <*> pure exps
-
--- |
--- Collapse all binding groups in a module to individual declarations
---
-collapseBindingGroupsModule :: [Module] -> [Module]
-collapseBindingGroupsModule =
-  fmap $ \(Module ss coms name ds exps) ->
-    Module ss coms name (collapseBindingGroups ds) exps
 
 createBindingGroups
   :: forall m
@@ -73,21 +65,29 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
-        kindDecls = fmap (,VertexKindSignature) $ filter (\a -> isKindDecl a || isExternDataDecl a) ds
-        dataDecls = fmap (,VertexDefinition) $ filter (\a -> isDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
-        kindSigs = fmap (declTypeName . fst) kindDecls
-        typeSyns = fmap declTypeName $ filter isTypeSynonymDecl ds
+        kindDecls = (,VertexKindSignature) <$> filter isKindDecl ds
+        dataDecls = (,VertexDefinition) <$> filter (\a -> isDataDecl a || isExternDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
+        kindSigs = declTypeName . fst <$> kindDecls
+        typeSyns = declTypeName <$> filter isTypeSynonymDecl ds
+        nonTypeSynKindSigs = kindSigs \\ typeSyns
         allDecls = kindDecls ++ dataDecls
-        allProperNames = fmap (declTypeName . fst) allDecls
+        allProperNames = declTypeName . fst <$> allDecls
         mkVert (d, vty) =
           let names = usedTypeNames moduleName d `intersect` allProperNames
               name = declTypeName d
-              -- If a dependency has a kind signature, than that's all we need to depend on, except
-              -- in the case that we are defining a kind signature and using a type synonym. In order
-              -- to expand the type synonym, we must depend on the synonym declaration itself.
+              -- If a dependency of a kind signature has a kind signature, than that's all we need to
+              -- depend on, except in the case that we are using a type synonym. In order to expand
+              -- the type synonym, we must depend on the synonym declaration itself.
+              --
+              -- Arguably, type declarations (as opposed to just kind signatures) could also depend
+              -- on kind signatures when present. Attempting this caused one known issue (#4038); the
+              -- type checker might not expect type declarations not to be preceded or grouped by
+              -- their actual dependencies in all cases. But in principle, if done carefully, this
+              -- approach could be used to reduce the number or size of data binding group cycles.
+              -- (It's critical that kind signatures not appear in groups, which is why they get
+              -- special treatment.)
               vtype n
-                | vty == VertexKindSignature && n `elem` typeSyns = VertexDefinition
-                | n `elem` kindSigs = VertexKindSignature
+                | vty == VertexKindSignature && n `elem` nonTypeSynKindSigs = VertexKindSignature
                 | otherwise = VertexDefinition
               deps = fmap (\n -> (n, vtype n)) names
               self
@@ -228,15 +228,16 @@ toBindingGroup moduleName (CyclicSCC ds') = do
 
 toDataBindingGroup
   :: MonadError MultipleErrors m
-  => SCC (Declaration, (ProperName 'TypeName, VertexType), [(ProperName 'TypeName, VertexType)])
+  => Ord a
+  => SCC (Declaration, (ProperName 'TypeName, a), [(ProperName 'TypeName, a)])
   -> m Declaration
 toDataBindingGroup (AcyclicSCC (d, _, _)) = return d
 toDataBindingGroup (CyclicSCC ds')
-  | kds@((ss, _):_) <- concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
+  | Just kds@((ss, _):|_) <- nonEmpty $ concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
   | not (null typeSynonymCycles) =
       throwError
         . MultipleErrors
-        . fmap (\syns -> ErrorMessage [positionedError . declSourceSpan . getDecl $ head syns] . CycleInTypeSynonym $ fmap (fst . getName) syns)
+        . fmap (\syns -> ErrorMessage [positionedError . declSourceSpan . getDecl $ NEL.head syns] . CycleInTypeSynonym $ fmap (fst . getName) syns)
         $ typeSynonymCycles
   | otherwise = return . DataBindingGroupDeclaration . NEL.fromList $ getDecl <$> ds'
   where
@@ -252,7 +253,7 @@ toDataBindingGroup (CyclicSCC ds')
     guard . isJust $ isTypeSynonym decl
     pure (decl, name, filter (maybe False (isJust . isTypeSynonym . getDecl) . lookupVert) deps)
 
-  isCycle (CyclicSCC c) = Just c
+  isCycle (CyclicSCC c) = nonEmpty c
   isCycle _ = Nothing
 
   typeSynonymCycles =

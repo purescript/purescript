@@ -17,8 +17,7 @@ import Control.Monad (unless)
 import Control.Monad.Writer.Class
 import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 
-import Data.Function (on)
-import Data.List (foldl', sortBy)
+import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import Data.Text (Text)
@@ -133,7 +132,7 @@ missingCasesSingle env mn (LiteralBinder _ (ObjectLiteral bs)) (LiteralBinder ss
   where
   (allMisses, pr) = uncurry (missingCasesMultiple env mn) (unzip binders)
 
-  sortNames = sortBy (compare `on` fst)
+  sortNames = sortOn fst
 
   (sbs, sbs') = (sortNames bs, sortNames bs')
 
@@ -294,7 +293,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     where
       partial :: Text -> Text -> Declaration
       partial var tyVar =
-        ValueDecl (ss, []) UnusedIdent Private [] $
+        ValueDecl (ss, []) UnusedIdent Private []
         [MkUnguarded
           (TypedValue
            True
@@ -339,7 +338,6 @@ checkExhaustiveExpr initSS env mn = onExpr initSS
   onExpr _ (UnaryMinus ss e) = UnaryMinus ss <$> onExpr ss e
   onExpr _ (Literal ss (ArrayLiteral es)) = Literal ss . ArrayLiteral <$> mapM (onExpr ss) es
   onExpr _ (Literal ss (ObjectLiteral es)) = Literal ss . ObjectLiteral <$> mapM (sndM (onExpr ss)) es
-  onExpr ss (TypeClassDictionaryConstructorApp x e) = TypeClassDictionaryConstructorApp x <$> onExpr ss e
   onExpr ss (Accessor x e) = Accessor x <$> onExpr ss e
   onExpr ss (ObjectUpdate o es) = ObjectUpdate <$> onExpr ss o <*> mapM (sndM (onExpr ss)) es
   onExpr ss (Abs x e) = Abs x <$> onExpr ss e

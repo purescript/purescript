@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-
 -- |
 -- Type class entailment
 --
@@ -23,7 +21,7 @@ import Control.Monad.Writer
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (findIndices, minimumBy, groupBy, nubBy, sortBy)
+import Data.List (findIndices, minimumBy, groupBy, nubBy, sortOn, delete)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -38,8 +36,9 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Entailment.Coercible
-import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds)
+import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
@@ -163,12 +162,12 @@ entails
   -- ^ Error message hints to apply to any instance errors
   -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
 entails SolverOptions{..} constraint context hints =
-    solve constraint
+  overConstraintArgsAll (lift . lift . traverse replaceAllTypeSynonyms) constraint >>= solve
   where
     forClassNameM :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> m [TypeClassDict]
     forClassNameM env ctx cn@C.Coercible kinds args =
-      solveCoercible env ctx kinds args >>=
-        pure . fromMaybe (forClassName env ctx cn kinds args)
+      fromMaybe (forClassName env ctx cn kinds args) <$>
+        solveCoercible env ctx kinds args
     forClassNameM env ctx cn kinds args =
       pure $ forClassName env ctx cn kinds args
 
@@ -176,7 +175,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ ctx cn@C.Warn _ [msg] =
       -- Prefer a warning dictionary in scope if there is one available.
       -- This allows us to defer a warning by propagating the constraint.
-      findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope [] 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing]
+      findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope Nothing 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing Nothing]
     forClassName _ _ C.IsSymbol _ args | Just dicts <- solveIsSymbol args = dicts
     forClassName _ _ C.SymbolCompare _ args | Just dicts <- solveSymbolCompare args = dicts
     forClassName _ _ C.SymbolAppend _ args | Just dicts <- solveSymbolAppend args = dicts
@@ -204,11 +203,11 @@ entails SolverOptions{..} constraint context hints =
     valUndefined = Var nullSourceSpan (Qualified (Just C.Prim) (Ident C.undefined))
 
     solve :: SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
-    solve con = go 0 hints con
+    solve = go 0 hints
       where
         go :: Int -> [ErrorMessageHint] -> SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
         go work _ (Constraint _ className' _ tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
-        go work hints' con'@(Constraint _ className' kinds' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con') .) . runStateT . runWriterT $ do
+        go work hints' con@(Constraint _ className' kinds' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con) .) . runStateT . runWriterT $ do
             -- We might have unified types by solving other constraints, so we need to
             -- apply the latest substitution.
             latestSubst <- lift . lift $ gets checkSubstitution
@@ -233,7 +232,7 @@ entails SolverOptions{..} constraint context hints =
 
             let instances = do
                   chain <- groupBy ((==) `on` tcdChain) $
-                           sortBy (compare `on` (tcdChain &&& tcdIndex)) $
+                           sortOn (tcdChain &&& tcdIndex)
                            dicts
                   -- process instances in a chain in index order
                   let found = for chain $ \tcd ->
@@ -265,7 +264,7 @@ entails SolverOptions{..} constraint context hints =
                 currentSubst' <- lift . lift $ gets checkSubstitution
                 let subst'' = fmap (substituteType currentSubst') subst'
                 -- Solve any necessary subgoals
-                args <- solveSubgoals subst'' (ErrorSolvingConstraint con') (tcdDependencies tcd)
+                args <- solveSubgoals subst'' (ErrorSolvingConstraint con) (tcdDependencies tcd)
 
                 initDict <- lift . lift $ mkDictionary (tcdValue tcd) args
 
@@ -320,7 +319,7 @@ entails SolverOptions{..} constraint context hints =
                   for_ (lookup var tcdForAll) $ \instKind -> do
                     tyKind <- elaborateKind ty
                     currentSubst <- gets checkSubstitution
-                    unifyKinds
+                    unifyKinds'
                       (substituteType currentSubst . replaceAllTypeVars (M.toList subst) $ instKind)
                       (substituteType currentSubst tyKind)
 
@@ -335,8 +334,15 @@ entails SolverOptions{..} constraint context hints =
             unique _ _ [(a, dict)] _ = return $ Solved a dict
             unique _ tyArgs tcds _
               | pairwiseAny overlapping (map snd tcds) =
-                  throwError . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
+                  throwError . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . tcdToInstanceDescription . snd))
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
+
+            tcdToInstanceDescription :: TypeClassDict -> Maybe (Qualified (Either SourceType Ident))
+            tcdToInstanceDescription TypeClassDictionaryInScope{ tcdDescription, tcdValue } =
+              let nii = namedInstanceIdentifier tcdValue
+              in case tcdDescription of
+                Just ty -> flip Qualified (Left ty) <$> fmap getQual nii
+                Nothing -> fmap Right <$> nii
 
             canBeGeneralized :: Type a -> Bool
             canBeGeneralized TUnknown{} = True
@@ -380,7 +386,7 @@ entails SolverOptions{..} constraint context hints =
               return (useEmptyDict args)
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
-              return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal nullSourceSpan (ObjectLiteral fields))
+              return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsSymbol)) (Literal nullSourceSpan (ObjectLiteral fields))
 
             unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
             unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)
@@ -409,13 +415,13 @@ entails SolverOptions{..} constraint context hints =
       -- We may have collected hints for the solving failure along the way, in
       -- which case we decorate the error with the first one.
       maybe id addHint (listToMaybe hints') `rethrow` case inertWanteds of
-        [] -> pure $ Just [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing]
+        [] -> pure $ Just [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.Coercible [] kinds [a, b] Nothing Nothing]
         (k, a', b') : _ | a' == b && b' == a -> throwError $ insoluble k b' a'
         (k, a', b') : _ -> throwError $ insoluble k a' b'
     solveCoercible _ _ _ _ = pure Nothing
 
     solveIsSymbol :: [SourceType] -> Maybe [TypeClassDict]
-    solveIsSymbol [TypeLevelString ann sym] = Just [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [] [] [TypeLevelString ann sym] Nothing]
+    solveIsSymbol [TypeLevelString ann sym] = Just [TypeClassDictionaryInScope Nothing 0 (IsSymbolInstance sym) [] C.IsSymbol [] [] [TypeLevelString ann sym] Nothing Nothing]
     solveIsSymbol _ = Nothing
 
     solveSymbolCompare :: [SourceType] -> Maybe [TypeClassDict]
@@ -425,14 +431,14 @@ entails SolverOptions{..} constraint context hints =
                   EQ -> C.orderingEQ
                   GT -> C.orderingGT
           args' = [arg0, arg1, srcTypeConstructor ordering]
-      in Just [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolCompare [] [] args' Nothing]
+      in Just [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.SymbolCompare [] [] args' Nothing Nothing]
     solveSymbolCompare _ = Nothing
 
     solveSymbolAppend :: [SourceType] -> Maybe [TypeClassDict]
     solveSymbolAppend [arg0, arg1, arg2] = do
       (arg0', arg1', arg2') <- appendSymbols arg0 arg1 arg2
       let args' = [arg0', arg1', arg2']
-      pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolAppend [] [] args' Nothing]
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.SymbolAppend [] [] args' Nothing Nothing]
     solveSymbolAppend _ = Nothing
 
     -- | Append type level symbols, or, run backwards, strip a prefix or suffix
@@ -454,7 +460,7 @@ entails SolverOptions{..} constraint context hints =
     solveSymbolCons [arg0, arg1, arg2] = do
       (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2
       let args' = [arg0', arg1', arg2']
-      pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolCons [] [] args' Nothing]
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.SymbolCons [] [] args' Nothing Nothing]
     solveSymbolCons _ = Nothing
 
     consSymbol :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
@@ -472,23 +478,46 @@ entails SolverOptions{..} constraint context hints =
     solveUnion :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveUnion kinds [l, r, u] = do
       (lOut, rOut, uOut, cst, vars) <- unionRows kinds l r u
-      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowUnion vars kinds [lOut, rOut, uOut] cst ]
+      pure [ TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.RowUnion vars kinds [lOut, rOut, uOut] cst Nothing ]
     solveUnion _ _ = Nothing
 
     -- | Left biased union of two row types
+
     unionRows :: [SourceType] -> SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType, Maybe [SourceConstraint], [(Text, SourceType)])
-    unionRows kinds l r _ =
-        guard canMakeProgress $> (l, r, rowFromList out, cons, vars)
+    unionRows kinds l r u =
+        guard canMakeProgress $> (lOut, rOut, uOut, cons, vars)
       where
         (fixed, rest) = rowToList l
 
         rowVar = srcTypeVar "r"
 
-        (canMakeProgress, out, cons, vars) =
+        (canMakeProgress, lOut, rOut, uOut, cons, vars) =
           case rest of
             -- If the left hand side is a closed row, then we can merge
             -- its labels into the right hand side.
-            REmptyKinded _ _ -> (True, (fixed, r), Nothing, [])
+            REmptyKinded _ _ -> (True, l, r, rowFromList (fixed, r), Nothing, [])
+            -- If the right hand side and output are closed rows, then we can
+            -- compute the left hand side by subtracting the right hand side
+            -- from the output.
+            _ | (right, rightu@(REmptyKinded _ _)) <- rowToList r
+              , (output, restu@(REmptyKinded _ _)) <- rowToList u ->
+              let
+                -- Partition the output rows into those that belong in right
+                -- (taken off the end) and those that must end up in left.
+                grabLabel e (left', right', remaining)
+                  | rowListLabel e `elem` remaining =
+                    (left', e : right', delete (rowListLabel e) remaining)
+                  | otherwise =
+                    (e : left', right', remaining)
+                (outL, outR, leftover) =
+                  foldr grabLabel ([], [], fmap rowListLabel right) output
+              in ( null leftover
+                 , rowFromList (outL, restu)
+                 , rowFromList (outR, rightu)
+                 , u
+                 , Nothing
+                 , []
+                 )
             -- If the left hand side is not definitely closed, then the only way we
             -- can safely make progress is to move any known labels from the left
             -- input into the output, and add a constraint for any remaining labels.
@@ -496,20 +525,21 @@ entails SolverOptions{..} constraint context hints =
             -- the right hand side, and we can't be certain we won't reorder the
             -- types for such labels.
             _ -> ( not (null fixed)
-                 , (fixed, rowVar)
+                 , l, r
+                 , rowFromList (fixed, rowVar)
                  , Just [ srcConstraint C.RowUnion kinds [rest, r, rowVar] Nothing ]
                  , [("r", kindRow (head kinds))]
                  )
 
     solveRowCons :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveRowCons kinds [TypeLevelString ann sym, ty, r, _] =
-      Just [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowCons [] kinds [TypeLevelString ann sym, ty, r, srcRCons (Label sym) ty r] Nothing ]
+      Just [ TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.RowCons [] kinds [TypeLevelString ann sym, ty, r, srcRCons (Label sym) ty r] Nothing Nothing ]
     solveRowCons _ _ = Nothing
 
     solveRowToList :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveRowToList [kind] [r, _] = do
       entries <- rowToRowList kind r
-      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowToList [] [kind] [r, entries] Nothing ]
+      pure [ TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.RowToList [] [kind] [r, entries] Nothing Nothing ]
     solveRowToList _ _ = Nothing
 
     -- | Convert a closed row to a sorted list of entries
@@ -528,7 +558,7 @@ entails SolverOptions{..} constraint context hints =
     solveNub :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveNub kinds [r, _] = do
       r' <- nubRows r
-      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowNub [] kinds [r, r'] Nothing ]
+      pure [ TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.RowNub [] kinds [r, r'] Nothing Nothing ]
     solveNub _ _ = Nothing
 
     nubRows :: SourceType -> Maybe SourceType
@@ -540,10 +570,10 @@ entails SolverOptions{..} constraint context hints =
 
     solveLacks :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveLacks kinds tys@[_, REmptyKinded _ _] =
-      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowLacks [] kinds tys Nothing ]
+      pure [ TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.RowLacks [] kinds tys Nothing Nothing ]
     solveLacks kinds [TypeLevelString ann sym, r] = do
       (r', cst) <- rowLacks kinds sym r
-      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowLacks [] kinds [TypeLevelString ann sym, r'] cst ]
+      pure [ TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.RowLacks [] kinds [TypeLevelString ann sym, r'] cst Nothing ]
     solveLacks _ _ = Nothing
 
     rowLacks :: [SourceType] -> PSString -> SourceType -> Maybe (SourceType, Maybe [SourceConstraint])
@@ -553,7 +583,7 @@ entails SolverOptions{..} constraint context hints =
         (fixed, rest) = rowToList r
 
         lacksSym =
-          not $ sym `elem` (runLabel . rowListLabel <$> fixed)
+          sym `notElem` (runLabel . rowListLabel <$> fixed)
 
         (canMakeProgress, cst) = case rest of
             REmptyKinded _ _ -> (True, Nothing)
@@ -700,7 +730,7 @@ newDictionaries path name (Constraint _ className instanceKinds instanceTy _) = 
                                                         (replaceAllTypeVars sub <$> supArgs)
                                                         Nothing)
                                   ) typeClassSuperclasses [0..]
-    return (TypeClassDictionaryInScope [] 0 name path className [] instanceKinds instanceTy Nothing : supDicts)
+    return (TypeClassDictionaryInScope Nothing 0 name path className [] instanceKinds instanceTy Nothing Nothing : supDicts)
 
 mkContext :: [NamedDict] -> InstanceContext
 mkContext = foldr combineContexts M.empty . map fromDict where

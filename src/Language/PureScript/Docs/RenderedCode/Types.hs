@@ -1,37 +1,26 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveGeneric #-}
-
 -- | Data types and functions for representing a simplified form of PureScript
 -- code, intended for use in e.g. HTML documentation.
 
 module Language.PureScript.Docs.RenderedCode.Types
  ( RenderedCodeElement(..)
- , asRenderedCodeElement
  , ContainingModule(..)
  , asContainingModule
- , containingModuleToMaybe
  , maybeToContainingModule
- , fromContainingModule
  , fromQualified
  , Namespace(..)
  , Link(..)
  , FixityAlias
  , RenderedCode
- , asRenderedCode
  , outputWith
  , sp
- , parens
  , syntax
  , keyword
  , keywordForall
  , keywordData
- , keywordNewtype
  , keywordType
  , keywordClass
- , keywordInstance
  , keywordWhere
  , keywordFixity
- , keywordKind
  , keywordAs
  , ident
  , dataCtor
@@ -48,7 +37,7 @@ import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Data.Aeson.BetterErrors (Parse, nth, withText, withValue, toAesonParser, perhaps, asText, eachInArray)
+import Data.Aeson.BetterErrors (Parse, nth, withText, withValue, toAesonParser, perhaps, asText)
 import qualified Data.Aeson as A
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -126,21 +115,6 @@ maybeToContainingModule :: Maybe ModuleName -> ContainingModule
 maybeToContainingModule Nothing = ThisModule
 maybeToContainingModule (Just mn) = OtherModule mn
 
--- |
--- Convert a 'ContainingModule' to a 'Maybe' 'ModuleName', using the obvious
--- isomorphism.
---
-containingModuleToMaybe :: ContainingModule -> Maybe ModuleName
-containingModuleToMaybe ThisModule = Nothing
-containingModuleToMaybe (OtherModule mn) = Just mn
-
--- |
--- A version of 'fromMaybe' for 'ContainingModule' values.
---
-fromContainingModule :: ModuleName -> ContainingModule -> ModuleName
-fromContainingModule def ThisModule = def
-fromContainingModule _ (OtherModule mn) = mn
-
 fromQualified :: Qualified a -> (ContainingModule, a)
 fromQualified (Qualified mn x) =
   (maybeToContainingModule mn, x)
@@ -211,30 +185,6 @@ instance A.ToJSON RenderedCodeElement where
   toJSON (Symbol ns str link) =
     A.toJSON ["symbol", A.toJSON ns, A.toJSON str, A.toJSON link]
 
-asRenderedCodeElement :: Parse Text RenderedCodeElement
-asRenderedCodeElement =
-  tryParse "RenderedCodeElement" $
-    [ a Syntax "syntax"
-    , a Keyword "keyword"
-    , asSpace
-    , asSymbol
-    ] ++ backwardsCompat
-  where
-  a ctor' ctorStr = firstEq ctorStr (ctor' <$> nth 1 asText)
-  asSymbol = firstEq "symbol" (Symbol <$> nth 1 asNamespace <*> nth 2 asText <*> nth 3 asLink)
-  asSpace = firstEq "space" (pure Space)
-
-  -- These will make some mistakes e.g. treating data constructors as types,
-  -- because the old code did not save information which is necessary to
-  -- distinguish these cases. This is the best we can do.
-  backwardsCompat =
-    [ oldAsIdent
-    , oldAsCtor
-    ]
-
-  oldAsIdent = firstEq "ident" (Symbol ValueLevel <$> nth 1 asText <*> nth 2 (Link <$> asContainingModule))
-  oldAsCtor = firstEq "ctor" (Symbol TypeLevel <$> nth 1 asText <*> nth 2 (Link <$> asContainingModule))
-
 -- |
 -- A type representing a highly simplified version of PureScript code, intended
 -- for use in output formats like plain text or HTML.
@@ -245,9 +195,6 @@ newtype RenderedCode
 
 instance A.ToJSON RenderedCode where
   toJSON (RC elems) = A.toJSON elems
-
-asRenderedCode :: Parse Text RenderedCode
-asRenderedCode = RC <$> eachInArray asRenderedCodeElement
 
 -- |
 -- This function allows conversion of a 'RenderedCode' value into a value of
@@ -264,11 +211,6 @@ outputWith f = foldMap f . unRC
 sp :: RenderedCode
 sp = RC [Space]
 
--- |
--- Wrap a RenderedCode value in parens.
-parens :: RenderedCode -> RenderedCode
-parens x = syntax "(" <> x <> syntax ")"
-
 -- possible TODO: instead of this function, export RenderedCode values for
 -- each syntax element, eg syntaxArr (== syntax "->"), syntaxLBrace,
 -- syntaxRBrace, etc.
@@ -284,17 +226,11 @@ keywordForall = keyword "forall"
 keywordData :: RenderedCode
 keywordData = keyword "data"
 
-keywordNewtype :: RenderedCode
-keywordNewtype = keyword "newtype"
-
 keywordType :: RenderedCode
 keywordType = keyword "type"
 
 keywordClass :: RenderedCode
 keywordClass = keyword "class"
-
-keywordInstance :: RenderedCode
-keywordInstance = keyword "instance"
 
 keywordWhere :: RenderedCode
 keywordWhere = keyword "where"
@@ -303,9 +239,6 @@ keywordFixity :: Associativity -> RenderedCode
 keywordFixity Infixl = keyword "infixl"
 keywordFixity Infixr = keyword "infixr"
 keywordFixity Infix = keyword "infix"
-
-keywordKind :: RenderedCode
-keywordKind = keyword "kind"
 
 keywordAs :: RenderedCode
 keywordAs = keyword "as"

@@ -1,17 +1,15 @@
 # Installation information
 
-If you are having difficulty installing the PureScript compiler, feel free to
-ask for help! A good place is the #purescript IRC channel on Freenode, the #purescript channel on [FPChat Slack](https://fpchat-invite.herokuapp.com/), or
-alternatively Stack Overflow.
+If you are having difficulty installing the PureScript compiler, feel free to ask for help! The best places are the [PureScript Discord](https://purescript.org/chat) or [PureScript Discourse](https://discourse.purescript.org).
 
 ## Requirements
 
-The PureScript compiler is built using GHC 8.6.4, and should be able to run on any operating system supported by GHC 8.6.4. In particular:
+The PureScript compiler is built using GHC 8.10.4, and should be able to run on any operating system supported by GHC 8.10.4. In particular:
 
 * for Windows users, versions predating Vista are not officially supported,
 * for macOS / OS X users, versions predating Mac OS X 10.7 (Lion) are not officially supported.
 
-See also <https://www.haskell.org/ghc/download_ghc_8_6_4.html> for more details about the operating systems which GHC 8.6.4 supports.
+See also <https://www.haskell.org/ghc/download_ghc_8_10_4.html> for more details about the operating systems which GHC 8.10.4 supports.
 
 ## Official prebuilt binaries
 
@@ -25,7 +23,7 @@ There are several other distributions of the PureScript compiler available, whic
 
 * NPM: `npm install -g purescript`
 * Homebrew (for macOS): `brew install purescript`
-* [PSVM](https://github.com/ThomasCrevoisier/psvm-js): `npm install -g psvm`
+* FreeBSD binary packages: `pkg install hs-purescript`
 
 ## Compiling from source
 
@@ -44,10 +42,10 @@ If you don't have stack installed, please see the [stack install documentation](
 
 ## The "curses" library
 
-The PureScript REPL depends on the `curses` library (via the Haskell package
-`terminfo`). If you are having difficulty running the compiler, it may be
-because the `curses` library is missing. This problem may appear as a `libtinfo`
-error:
+Prior to version v0.14.2, the PureScript REPL depends on the `curses` library
+by default (via the Haskell package `terminfo`). If you are having difficulty
+running the compiler, it may be because the `curses` library is missing. This
+problem may appear as a `libtinfo` error:
 ```
 error while loading shared libraries: libtinfo.so.5: cannot open shared object file: No such file or directory
 ```
@@ -57,6 +55,12 @@ example, this can be done by running:
 ```
 $ sudo apt install libtinfo5 libncurses5-dev
 ```
+
+As of v0.14.2, this should no longer be necessary if you are using the prebuilt
+binaries or building the compiler from source with the default configuration.
+However, you can still opt into using `curses` by setting the Haskeline
+`terminfo` flag to `true`. This may improve the REPL experience slightly - for
+example, by providing better editing of long input lines.
 
 ## EACCES error
 

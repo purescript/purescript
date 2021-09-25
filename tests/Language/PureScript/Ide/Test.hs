@@ -1,7 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports    #-}
-{-# LANGUAGE DataKinds         #-}
 module Language.PureScript.Ide.Test where
 
 import           Control.Concurrent.STM
@@ -46,18 +43,11 @@ volatileState s ds =
     vs = IdeVolatileState (AstData Map.empty) (Map.fromList decls) Nothing
     decls = map (first P.moduleNameFromString) ds
 
--- | Adding Annotations to IdeDeclarations
-ann :: IdeDeclarationAnn -> Annotation -> IdeDeclarationAnn
-ann (IdeDeclarationAnn _ d) a = IdeDeclarationAnn a d
-
 annLoc :: IdeDeclarationAnn -> P.SourceSpan -> IdeDeclarationAnn
 annLoc (IdeDeclarationAnn a d) loc = IdeDeclarationAnn a {_annLocation = Just loc} d
 
 annExp :: IdeDeclarationAnn -> Text -> IdeDeclarationAnn
 annExp (IdeDeclarationAnn a d) e = IdeDeclarationAnn a {_annExportedFrom = Just (mn e)} d
-
-annTyp :: IdeDeclarationAnn -> P.SourceType -> IdeDeclarationAnn
-annTyp (IdeDeclarationAnn a d) ta = IdeDeclarationAnn a {_annTypeAnnotation = Just ta} d
 
 
 ida :: IdeDeclaration -> IdeDeclarationAnn
@@ -85,7 +75,7 @@ ideValueOp opName ident precedence assoc t =
        (IdeValueOperator
         (P.OpName opName)
         (bimap P.Ident P.ProperName <$> ident)
-        (precedence)
+        precedence
         (fromMaybe P.Infix assoc)
         t))
 
@@ -95,7 +85,7 @@ ideTypeOp opName ident precedence assoc k =
        (IdeTypeOperator
         (P.OpName opName)
         (P.ProperName <$> ident)
-        (precedence)
+        precedence
         (fromMaybe P.Infix assoc)
         k))
 
@@ -137,9 +127,9 @@ inProject f = do
 compileTestProject :: IO Bool
 compileTestProject = inProject $ do
   (_, _, _, procHandle) <-
-    createProcess $ (shell $ "purs compile \"src/**/*.purs\"")
+    createProcess $ shell "purs compile \"src/**/*.purs\""
   r <- tryNTimes 10 (getProcessExitCode procHandle)
-  pure (fromMaybe False (isSuccess <$> r))
+  pure (maybe False isSuccess r)
 
 isSuccess :: ExitCode -> Bool
 isSuccess ExitSuccess = True

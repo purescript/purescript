@@ -1,7 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
-
-
 module TestUtils where
 
 import Prelude ()
@@ -17,23 +13,27 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Writer.Class (tell)
 import Control.Exception
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import Data.Char (isSpace)
 import Data.Function (on)
 import Data.List (sort, sortBy, stripPrefix, groupBy)
 import qualified Data.Map as M
+import Data.Maybe (isJust)
 import qualified Data.Text as T
-import Data.Time.Clock (UTCTime())
+import qualified Data.Text.Encoding as T
+import Data.Time.Clock (UTCTime(), diffUTCTime, getCurrentTime, nominalDay)
 import Data.Tuple (swap)
-import System.Process hiding (cwd)
 import System.Directory
-import System.Info
-import System.IO.UTF8 (readUTF8FileT)
 import System.Exit (exitFailure)
+import System.Environment (lookupEnv)
 import System.FilePath
+import System.IO.Error (isDoesNotExistError)
+import System.IO.UTF8 (readUTF8FileT)
+import System.Process hiding (cwd)
 import qualified System.FilePath.Glob as Glob
 import System.IO
-import Test.Tasty.Hspec
-
+import Test.Hspec
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
@@ -49,23 +49,54 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
 -- updating.
 --
 updateSupportCode :: IO ()
-updateSupportCode = do
-  setCurrentDirectory "tests/support"
-  if System.Info.os == "mingw32"
-    then callProcess "setup-win.cmd" []
-    else do
-      callProcess "npm" ["install"]
-      -- bower uses shebang "/usr/bin/env node", but we might have nodejs
-      node <- maybe cannotFindNode pure =<< findNodeProcess
-      -- Sometimes we run as a root (e.g. in simple docker containers)
-      -- And we are non-interactive: https://github.com/bower/bower/issues/1162
-      callProcess node ["node_modules/.bin/bower", "--allow-root", "install", "--config.interactive=false"]
-  setCurrentDirectory "../.."
+updateSupportCode = withCurrentDirectory "tests/support" $ do
+  let lastUpdatedFile = ".last_updated"
+  skipUpdate <- fmap isJust . runMaybeT $ do
+    -- We skip the update if: `.last_updated` exists,
+    lastUpdated <- MaybeT $ getModificationTimeMaybe lastUpdatedFile
+
+    -- ... and it was modified less than a day ago (no particular reason why
+    -- "one day" specifically),
+    now <- lift getCurrentTime
+    guard $ now `diffUTCTime` lastUpdated < nominalDay
+
+    -- ... and the needed directories exist,
+    contents <- lift $ listDirectory "."
+    guard $ "node_modules" `elem` contents && "bower_components" `elem` contents
+
+    -- ... and everything else in `tests/support` is at least as old as
+    -- `.last_updated`.
+    modTimes <- lift $ traverse getModificationTime . filter (/= lastUpdatedFile) $ contents
+    guard $ all (<= lastUpdated) modTimes
+
+    pure ()
+
+  unless skipUpdate $ do
+    heading "Updating support code"
+    callCommand "npm install"
+    -- bower uses shebang "/usr/bin/env node", but we might have nodejs
+    node <- maybe cannotFindNode pure =<< findNodeProcess
+    -- Sometimes we run as a root (e.g. in simple docker containers)
+    -- And we are non-interactive: https://github.com/bower/bower/issues/1162
+    callProcess node ["node_modules/bower/bin/bower", "--allow-root", "install", "--config.interactive=false"]
+    writeFile lastUpdatedFile ""
   where
   cannotFindNode :: IO a
   cannotFindNode = do
     hPutStrLn stderr "Cannot find node (or nodejs) executable"
     exitFailure
+
+  getModificationTimeMaybe :: FilePath -> IO (Maybe UTCTime)
+  getModificationTimeMaybe f = catch (Just <$> getModificationTime f) $ \case
+    e | isDoesNotExistError e -> pure Nothing
+      | otherwise             -> throw e
+
+  heading msg = do
+    putStrLn ""
+    putStrLn $ replicate 79 '#'
+    putStrLn $ "# " ++ msg
+    putStrLn $ replicate 79 '#'
+    putStrLn ""
 
 readInput :: [FilePath] -> IO [(FilePath, T.Text)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
@@ -107,7 +138,13 @@ createOutputFile logfileName = do
   createDirectoryIfMissing False (tmp </> logpath)
   openFile (tmp </> logpath </> logfileName) WriteMode
 
-setupSupportModules :: IO ([P.Module], [P.ExternsFile], M.Map P.ModuleName FilePath)
+data SupportModules = SupportModules
+  { supportModules :: [P.Module]
+  , supportExterns :: [P.ExternsFile]
+  , supportForeigns :: M.Map P.ModuleName FilePath
+  }
+
+setupSupportModules :: IO SupportModules
 setupSupportModules = do
   ms <- getSupportModuleTuples
   let modules = map snd ms
@@ -117,7 +154,7 @@ setupSupportModules = do
     return (externs, foreigns)
   case supportExterns of
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
-    Right (externs, foreigns) -> return (modules, externs, foreigns)
+    Right (externs, foreigns) -> return $ SupportModules modules externs foreigns
 
 getTestFiles :: FilePath -> IO [[FilePath]]
 getTestFiles testDir = do
@@ -162,42 +199,20 @@ getTestFiles testDir = do
        else dir
 
 compile
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  :: SupportModules
   -> [FilePath]
-  -> ([P.Module] -> IO ())
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile supportModules supportExterns supportForeigns inputFiles check = runTest $ do
-  fs <- liftIO $ readInput inputFiles
+compile SupportModules{..} inputFiles = runTest $ do
+  -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
+  fs <- liftIO $ readInput (sort inputFiles)
   msWithWarnings <- CST.parseFromFiles id fs
   tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
   let ms = fmap snd <$> msWithWarnings
   foreigns <- inferForeignModules ms
-  liftIO (check (map snd ms))
   let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
   case ms of
     [singleModule] -> pure <$> P.rebuildModule actions supportExterns (snd singleModule)
     _ -> P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
-
-assert
-  :: [P.Module]
-  -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
-  -> [FilePath]
-  -> ([P.Module] -> IO ())
-  -> (Either P.MultipleErrors P.MultipleErrors -> IO (Maybe String))
-  -> Expectation
-assert supportModules supportExterns supportForeigns inputFiles check f = do
-  (e, w) <- compile supportModules supportExterns supportForeigns inputFiles check
-  maybeErr <- f (const w <$> e)
-  maybe (return ()) expectationFailure maybeErr
-
-checkMain :: [P.Module] -> IO ()
-checkMain ms =
-  unless (any ((== P.moduleNameFromString "Main") . P.getModuleName) ms)
-    (fail "Main module missing")
-
 
 makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
 makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
@@ -240,3 +255,41 @@ modulesDir = ".test_modules" </> "node_modules"
 
 logpath :: FilePath
 logpath = "purescript-output"
+
+-- | Assert that the contents of the provided file path match the result of the
+-- provided action. If the "HSPEC_ACCEPT" environment variable is set, or if the
+-- file does not already exist, we write the resulting ByteString out to the
+-- provided file path instead. However, if the "CI" environment variable is
+-- set, "HSPEC_ACCEPT" is ignored and we require that the file does exist with
+-- the correct contents (see #3808). Based (very loosely) on the tasty-golden
+-- package.
+goldenVsString
+  :: HasCallStack -- For expectationFailure; use the call site for better failure locations
+  => FilePath
+  -> IO ByteString
+  -> Expectation
+goldenVsString goldenFile testAction = do
+  accept <- isJust <$> lookupEnv "HSPEC_ACCEPT"
+  ci <- isJust <$> lookupEnv "CI"
+  goldenContents <- tryJust (guard . isDoesNotExistError) (BS.readFile goldenFile)
+  case goldenContents of
+    Left () ->
+      -- The golden file does not exist
+      if ci
+        then expectationFailure $ "Missing golden file: " ++ goldenFile
+        else createOrReplaceGoldenFile
+
+    Right _ | not ci && accept ->
+      createOrReplaceGoldenFile
+
+    Right expected -> do
+      actual <- testAction
+      if expected == actual
+        then pure ()
+        else expectationFailure $
+          "Test output differed from '" ++ goldenFile ++ "'; got:\n" ++
+          T.unpack (T.decodeUtf8With (\_ _ -> Just '\xFFFD') actual)
+  where
+  createOrReplaceGoldenFile = do
+    testAction >>= BS.writeFile goldenFile
+    pendingWith "Accepting new output"

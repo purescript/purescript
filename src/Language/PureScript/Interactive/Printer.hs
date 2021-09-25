@@ -122,7 +122,7 @@ printModuleSignatures moduleName P.Environment{..} =
                     Box.moveRight 2 $
                     Box.vcat Box.left $
                     mapFirstRest (Box.text "=" Box.<+>) (Box.text "|" Box.<+>) $
-                    map (\(cons,idents) -> (textT (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents))) pt
+                    map (\(cons,idents) -> textT (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents)) pt
 
                 prettyPrintType t = Box.text " " Box.<> P.typeAtomAsBox maxBound t
 

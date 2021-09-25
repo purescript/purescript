@@ -1,6 +1,6 @@
 Warning found:
 in module [33mMain[0m
-at tests/purs/warning/ShadowedNameParens.purs:5:9 - 5:10 (line 5, column 9 - line 5, column 10)
+at tests/purs/warning/ShadowedNameParens.purs:7:5 - 7:6 (line 7, column 5 - line 7, column 6)
 
   Name [33mn[0m was shadowed.
 

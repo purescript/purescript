@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-
 -- |
 -- This module implements the type checker
 --
@@ -159,7 +157,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         let constraintTypeVars = fold (conData >>= snd)
         let solved = solveFrom determinedFromType
         let unsolvedVars = S.difference constraintTypeVars solved
-        when (not (S.null unsolvedVars)) .
+        unless (S.null unsolvedVars) .
           throwError
             . onErrorMessages (replaceTypes currentSubst)
             . errorMessage' ss
@@ -174,7 +172,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     finalState <- get
     let replaceTypes' = replaceTypes (checkSubstitution finalState)
         runTypeSearch' gen = runTypeSearch (guard gen $> foldMap snd inferred) finalState
-        raisePreviousWarnings gen = (escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' gen . replaceTypes'))
+        raisePreviousWarnings gen = escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' gen . replaceTypes')
 
     raisePreviousWarnings False wInfer
     forM_ tys $ \(shouldGeneralize, ((_, (_, _)), w)) ->
@@ -466,7 +464,7 @@ inferLetBinding
   -> Expr
   -> (Expr -> m TypedValue')
   -> m ([Declaration], TypedValue')
-inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
+inferLetBinding seen [] ret j = (seen, ) <$> withBindingGroupVisible (j ret)
 inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (TypedValue checkType val ty)] : rest) ret j = do
   moduleName <- unsafeCheckCurrentModule
   TypedValue' _ val' ty'' <- warnAndRethrowWithPositionTC ss $ do
@@ -730,7 +728,7 @@ check' (DeferredDictionary className tys) ty = do
 check' (TypedValue checkType val ty1) ty2 = do
   (elabTy1, kind1) <- kindOf ty1
   (elabTy2, kind2) <- kindOf ty2
-  unifyKinds kind1 kind2
+  unifyKinds' kind1 kind2
   checkTypeKind ty1 kind1
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy2
@@ -752,9 +750,6 @@ check' e@(Literal ss (ObjectLiteral ps)) t@(TypeApp _ obj row) | obj == tyRecord
   ensureNoDuplicateProperties ps
   ps' <- checkProperties e ps row False
   return $ TypedValue' True (Literal ss (ObjectLiteral ps')) t
-check' (TypeClassDictionaryConstructorApp name ps) t = do
-  ps' <- tvToExpr <$> check' ps t
-  return $ TypedValue' True (TypeClassDictionaryConstructorApp name ps') t
 check' e@(ObjectUpdate obj ps) t@(TypeApp _ o row) | o == tyRecord = do
   ensureNoDuplicateProperties ps
   -- We need to be careful to avoid duplicate labels here.
@@ -855,7 +850,7 @@ checkFunctionApplication
   -- ^ The argument expression
   -> m (SourceType, Expr)
   -- ^ The result type, and the elaborated term
-checkFunctionApplication fn fnTy arg = withErrorMessageHint (ErrorInApplication fn fnTy arg) $ do
+checkFunctionApplication fn fnTy arg = withErrorMessageHint' fn (ErrorInApplication fn fnTy arg) $ do
   subst <- gets checkSubstitution
   checkFunctionApplication' fn (substituteType subst fnTy) arg
 
@@ -900,3 +895,20 @@ ensureNoDuplicateProperties ps =
   case ls \\ ordNub ls of
     l : _ -> throwError . errorMessage $ DuplicateLabel (Label l) Nothing
     _ -> return ()
+
+-- | Test if this is an internal value to be excluded from error hints
+isInternal :: Expr -> Bool
+isInternal = \case
+  PositionedValue _ _ v -> isInternal v
+  TypedValue _ v _ -> isInternal v
+  Constructor _ (Qualified _ name) -> isDictTypeName name
+  _ -> False
+
+-- | Introduce a hint only if the given expression is not internal
+withErrorMessageHint'
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => Expr
+  -> ErrorMessageHint
+  -> m a
+  -> m a
+withErrorMessageHint' expr = if isInternal expr then const id else withErrorMessageHint

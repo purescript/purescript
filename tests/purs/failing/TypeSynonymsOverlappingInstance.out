@@ -9,8 +9,8 @@ at tests/purs/failing/TypeSynonymsOverlappingInstance.purs:14:1 - 15:16 (line 14
   [33m                     [0m
   The following instances were found:
 
-    Main.convertSB
-    Main.convertSS
+    [33mMain.convertSB[0m
+    [33mMain.convertSS[0m
 
 
 in type class instance

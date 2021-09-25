@@ -9,6 +9,7 @@ import Prelude.Compat
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
 
+import Control.Concurrent (threadDelay)
 import Control.Monad
 import Control.Exception (tryJust)
 import Control.Monad.IO.Class (liftIO)
@@ -25,22 +26,16 @@ import System.Directory
 import System.IO.Error (isDoesNotExistError)
 import System.IO.UTF8 (readUTF8FilesT, writeUTF8FileT)
 
-import Test.Tasty
-import Test.Tasty.Hspec
+import Test.Hspec
 
 utcMidnightOnDate :: Integer -> Int -> Int -> UTCTime
-utcMidnightOnDate day month year = UTCTime (fromGregorian day month year) (secondsToDiffTime 0)
+utcMidnightOnDate year month day = UTCTime (fromGregorian year month day) (secondsToDiffTime 0)
 
-timestampA, timestampB, timestampC, timestampD, timestampE, timestampF :: UTCTime
+timestampA, timestampB, timestampC, timestampD :: UTCTime
 timestampA = utcMidnightOnDate 2019 1 1
 timestampB = utcMidnightOnDate 2019 1 2
 timestampC = utcMidnightOnDate 2019 1 3
 timestampD = utcMidnightOnDate 2019 1 4
-timestampE = utcMidnightOnDate 2019 1 5
-timestampF = utcMidnightOnDate 2019 1 6
-
-main :: IO TestTree
-main = testSpec "make" spec
 
 spec :: Spec
 spec = do
@@ -166,17 +161,73 @@ spec = do
       compileAllowingFailures [modulePath] `shouldReturn` moduleNames ["Module"]
       compileAllowingFailures [modulePath] `shouldReturn` moduleNames ["Module"]
 
+    it "recompiles if docs are requested but not up to date" $ do
+      let modulePath = sourcesDir </> "Module.purs"
+          moduleContent1 = "module Module where\nx :: Int\nx = 1"
+          moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
+          optsWithDocs = P.defaultOptions { P.optionsCodegenTargets = Set.fromList [P.JS, P.Docs] }
+          go opts = compileWithOptions opts [modulePath] >>= assertSuccess
+          oneSecond = 10^(6::Int) -- microseconds.
+
+      writeFileWithTimestamp modulePath timestampA moduleContent1
+      go optsWithDocs `shouldReturn` moduleNames ["Module"]
+      writeFileWithTimestamp modulePath timestampB moduleContent2
+      -- See Note [Sleeping to avoid flaky tests]
+      threadDelay oneSecond
+      go P.defaultOptions `shouldReturn` moduleNames ["Module"]
+      -- Since the existing docs.json is now outdated, the module should be
+      -- recompiled.
+      go optsWithDocs `shouldReturn` moduleNames ["Module"]
+
+    it "recompiles if corefn is requested but not up to date" $ do
+      let modulePath = sourcesDir </> "Module.purs"
+          moduleContent1 = "module Module where\nx :: Int\nx = 1"
+          moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
+          optsCorefnOnly = P.defaultOptions { P.optionsCodegenTargets = Set.singleton P.CoreFn }
+          go opts = compileWithOptions opts [modulePath] >>= assertSuccess
+          oneSecond = 10^(6::Int) -- microseconds.
+
+      writeFileWithTimestamp modulePath timestampA moduleContent1
+      go optsCorefnOnly `shouldReturn` moduleNames ["Module"]
+      writeFileWithTimestamp modulePath timestampB moduleContent2
+      -- See Note [Sleeping to avoid flaky tests]
+      threadDelay oneSecond
+      go P.defaultOptions `shouldReturn` moduleNames ["Module"]
+      -- Since the existing corefn.json is now outdated, the module should be
+      -- recompiled.
+      go optsCorefnOnly `shouldReturn` moduleNames ["Module"]
+
+-- Note [Sleeping to avoid flaky tests]
+--
+-- One of the things we want to test here is that all requested output files
+-- (via the --codegen CLI option) must be up to date if we are to skip
+-- recompiling a particular module. Since we check for outdatedness by
+-- comparing the timestamp of the output files (eg. corefn.json, index.js) to
+-- the timestamp of the externs file, this check is susceptible to flakiness
+-- if the timestamp resolution is sufficiently coarse. To get around this, we
+-- delay for one second.
+--
+-- Note that most of the compiler behaviour here doesn't depend on file
+-- timestamps (instead, content hashes are usually more important) and so
+-- sleeping should not be necessary in most of these tests.
+--
+-- See also discussion on https://github.com/purescript/purescript/pull/4053
+
 rimraf :: FilePath -> IO ()
 rimraf =
   void . tryJust (guard . isDoesNotExistError) . removeDirectoryRecursive
 
--- | Returns a set of the modules for which a rebuild was attempted, including
--- the make result.
-compileWithResult :: [FilePath] -> IO (Either P.MultipleErrors [P.ExternsFile], Set P.ModuleName)
-compileWithResult input = do
+-- | Compile a group of modules, returning a set of the modules for which a
+-- rebuild was attempted, allowing the caller to set the compiler options and
+-- including the make result in the return value.
+compileWithOptions ::
+  P.Options ->
+  [FilePath] ->
+  IO (Either P.MultipleErrors [P.ExternsFile], Set P.ModuleName)
+compileWithOptions opts input = do
   recompiled <- newMVar Set.empty
   moduleFiles <- readUTF8FilesT input
-  (makeResult, _) <- P.runMake P.defaultOptions $ do
+  (makeResult, _) <- P.runMake opts $ do
     ms <- CST.parseModulesFromFiles id moduleFiles
     let filePathMap = M.fromList $ map (\(fp, pm) -> (P.getModuleName $ CST.resPartial pm, Right fp)) ms
     foreigns <- P.inferForeignModules filePathMap
@@ -190,16 +241,26 @@ compileWithResult input = do
   recompiledModules <- readMVar recompiled
   pure (makeResult, recompiledModules)
 
--- | Compile, returning the set of modules which were rebuilt, and failing if
--- any errors occurred.
-compile :: [FilePath] -> IO (Set P.ModuleName)
-compile input = do
-  (result, recompiled) <- compileWithResult input
+-- | Compile a group of modules using the default options, and including the
+-- make result in the return value.
+compileWithResult ::
+  [FilePath] ->
+  IO (Either P.MultipleErrors [P.ExternsFile], Set P.ModuleName)
+compileWithResult = compileWithOptions P.defaultOptions
+
+assertSuccess :: (Either P.MultipleErrors a, Set P.ModuleName) -> IO (Set P.ModuleName)
+assertSuccess (result, recompiled) =
   case result of
     Left errs ->
       fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
     Right _ ->
       pure recompiled
+
+-- | Compile, returning the set of modules which were rebuilt, and failing if
+-- any errors occurred.
+compile :: [FilePath] -> IO (Set P.ModuleName)
+compile input =
+  compileWithResult input >>= assertSuccess
 
 compileAllowingFailures :: [FilePath] -> IO (Set P.ModuleName)
 compileAllowingFailures input = fmap snd (compileWithResult input)

@@ -1,12 +1,11 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
 import Prelude.Compat
-import Protolude (ordNub)
+import Protolude (ordNub, orEmpty)
 
 import Control.Arrow (second)
 
 import Data.Function (on)
-import Data.List (sort, sortBy)
 import Data.Maybe (mapMaybe)
 import Data.Tuple (swap)
 import qualified Data.List.NonEmpty as NEL
@@ -24,9 +23,7 @@ import Language.PureScript.CoreFn.Module
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Names
-import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDictionaryNames)
 import Language.PureScript.Types
-import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.AST as A
 import qualified Language.PureScript.Constants.Prim as C
 
@@ -65,8 +62,10 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   -- | Desugars member declarations from AST to CoreFn representation.
   declToCoreFn :: A.Declaration -> [Bind Ann]
   declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [ctor]) =
-    [NonRec (ssA ss) (properToIdent $ A.dataCtorName ctor) $
+    [NonRec (ss, [], Nothing, declMeta) (properToIdent $ A.dataCtorName ctor) $
       Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var (ssAnn ss) $ Qualified Nothing (Ident "x"))]
+    where
+    declMeta = isDictTypeName (A.dataCtorName ctor) `orEmpty` IsTypeClassConstructor
   declToCoreFn d@(A.DataDeclaration _ Newtype _ _ _) =
     error $ "Found newtype with multiple constructors: " ++ show d
   declToCoreFn (A.DataDeclaration (ss, com) Data tyName _ ctors) =
@@ -81,8 +80,6 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
   declToCoreFn (A.BindingGroupDeclaration ds) =
     [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]
-  declToCoreFn (A.TypeClassDeclaration sa@(ss, _) name _ supers _ members) =
-    [NonRec (ssA ss) (properToIdent name) $ mkTypeClassConstructor sa supers members]
   declToCoreFn _ = []
 
   -- | Desugars expressions from AST to CoreFn representation.
@@ -117,15 +114,6 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     exprToCoreFn ss com (Just ty) v
   exprToCoreFn ss com ty (A.Let w ds v) =
     Let (ss, com, ty, getLetMeta w) (concatMap declToCoreFn ds) (exprToCoreFn ss [] Nothing v)
-  exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal _ (A.ObjectLiteral _)) _)) =
-    exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
-  exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal _ (A.ObjectLiteral vs))) =
-    let args = fmap (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
-        ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
-    in foldl (App (ss, com, Nothing, Nothing)) ctor args
-  exprToCoreFn ss com ty  (A.TypeClassDictionaryAccessor _ ident) =
-    Abs (ss, com, ty, Nothing) (Ident "dict")
-      (Accessor (ssAnn ss) (mkString $ runIdent ident) (Var (ssAnn ss) $ Qualified Nothing (Ident "dict")))
   exprToCoreFn _ com ty (A.PositionedValue ss com1 v) =
     exprToCoreFn ss (com ++ com1) ty v
   exprToCoreFn _ _ _ e =
@@ -221,10 +209,6 @@ findQualModules decls =
   fqValues :: A.Expr -> [ModuleName]
   fqValues (A.Var _ q) = getQual' q
   fqValues (A.Constructor _ q) = getQual' q
-  -- Some instances are automatically solved and have their class dictionaries
-  -- built inline instead of having a named instance defined and imported.
-  -- We therefore need to import these constructors if they aren't already.
-  fqValues (A.TypeClassDictionaryConstructorApp c _) = getQual' c
   fqValues _ = []
 
   fqBinders :: A.Binder -> [ModuleName]
@@ -245,31 +229,18 @@ externToCoreFn (A.ExternDeclaration _ name _) = Just name
 externToCoreFn _ = Nothing
 
 -- | Desugars export declarations references from AST to CoreFn representation.
--- CoreFn modules only export values, so all data constructors, class
--- constructor, instances and values are flattened into one list.
+-- CoreFn modules only export values, so all data constructors, instances and
+-- values are flattened into one list.
 exportToCoreFn :: A.DeclarationRef -> [Ident]
 exportToCoreFn (A.TypeRef _ _ (Just dctors)) = fmap properToIdent dctors
 exportToCoreFn (A.TypeRef _ _ Nothing) = []
 exportToCoreFn (A.TypeOpRef _ _) = []
 exportToCoreFn (A.ValueRef _ name) = [name]
 exportToCoreFn (A.ValueOpRef _ _) = []
-exportToCoreFn (A.TypeClassRef _ name) = [properToIdent name]
-exportToCoreFn (A.TypeInstanceRef _ name) = [name]
+exportToCoreFn (A.TypeClassRef _ _) = []
+exportToCoreFn (A.TypeInstanceRef _ name _) = [name]
 exportToCoreFn (A.ModuleRef _ _) = []
 exportToCoreFn (A.ReExportRef _ _ _) = []
-
--- | Makes a typeclass dictionary constructor function. The returned expression
--- is a function that accepts the superclass instances and member
--- implementations and returns a record for the instance dictionary.
-mkTypeClassConstructor :: SourceAnn -> [SourceConstraint] -> [A.Declaration] -> Expr Ann
-mkTypeClassConstructor (ss, com) [] [] = Literal (ss, com, Nothing, Just IsTypeClassConstructor) (ObjectLiteral [])
-mkTypeClassConstructor (ss, com) supers members =
-  let args@(a:as) = sort $ fmap typeClassMemberName members ++ superClassDictionaryNames supers
-      props = [ (mkString arg, Var (ssAnn ss) $ Qualified Nothing (Ident arg)) | arg <- args ]
-      dict = Literal (ssAnn ss) (ObjectLiteral props)
-  in Abs (ss, com, Nothing, Just IsTypeClassConstructor)
-         (Ident a)
-         (foldr (Abs (ssAnn ss) . Ident) dict as)
 
 -- | Converts a ProperName to an Ident.
 properToIdent :: ProperName a -> Ident

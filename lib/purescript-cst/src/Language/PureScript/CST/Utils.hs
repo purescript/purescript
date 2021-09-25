@@ -2,7 +2,7 @@ module Language.PureScript.CST.Utils where
 
 import Prelude
 
-import Control.Monad (when)
+import Control.Monad (unless)
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
 import Data.Functor (($>))
@@ -85,17 +85,8 @@ unexpectedLabel tok = Label tok "<unexpected>"
 unexpectedExpr :: Monoid a => [SourceToken] -> Expr a
 unexpectedExpr toks = ExprIdent mempty (unexpectedQual (head toks))
 
-unexpectedDecl :: Monoid a => [SourceToken] -> Declaration a
-unexpectedDecl toks = DeclValue mempty (ValueBindingFields (unexpectedName (head toks)) [] (error "<unexpected"))
-
 unexpectedBinder :: Monoid a => [SourceToken] -> Binder a
 unexpectedBinder toks = BinderVar mempty (unexpectedName (head toks))
-
-unexpectedLetBinding :: Monoid a => [SourceToken] -> LetBinding a
-unexpectedLetBinding toks = LetBindingName mempty (ValueBindingFields (unexpectedName (head toks)) [] (error "<unexpected>"))
-
-unexpectedInstBinding :: Monoid a => [SourceToken] -> InstanceBinding a
-unexpectedInstBinding toks = InstanceBindingName mempty (ValueBindingFields (unexpectedName (head toks)) [] (error "<unexpected>"))
 
 unexpectedRecordUpdate :: Monoid a => [SourceToken] -> RecordUpdate a
 unexpectedRecordUpdate toks = RecordUpdateLeaf (unexpectedLabel (head toks)) (head toks) (unexpectedExpr toks)
@@ -115,12 +106,9 @@ unexpectedToks toRange toCst err old = do
 separated :: [(SourceToken, a)] -> Separated a
 separated = go []
   where
-  go accum ((_, a) : []) = Separated a accum
+  go accum [(_, a)] = Separated a accum
   go accum (x : xs) = go (x : accum) xs
   go _ [] = internalError "Separated should not be empty"
-
-consSeparated :: a -> SourceToken -> Separated a -> Separated a
-consSeparated x sep (Separated {..}) = Separated x ((sep, sepHead) : sepTail)
 
 internalError :: String -> a
 internalError = error . ("Internal parser error: " <>)
@@ -128,14 +116,14 @@ internalError = error . ("Internal parser error: " <>)
 toModuleName :: SourceToken -> [Text] -> Parser (Maybe N.ModuleName)
 toModuleName _ [] = pure Nothing
 toModuleName tok ns = do
-  when (not (all isValidModuleNamespace ns)) $ addFailure [tok] ErrModuleName
+  unless (all isValidModuleNamespace ns) $ addFailure [tok] ErrModuleName
   pure . Just . N.ModuleName $ Text.intercalate "." ns
 
 upperToModuleName :: SourceToken -> Parser (Name N.ModuleName)
 upperToModuleName tok = case tokValue tok of
   TokUpperName q a -> do
     let ns = q <> [a]
-    when (not (all isValidModuleNamespace ns)) $ addFailure [tok] ErrModuleName
+    unless (all isValidModuleNamespace ns) $ addFailure [tok] ErrModuleName
     pure . Name tok . N.ModuleName $ Text.intercalate "." ns
   _ -> internalError $ "Invalid upper name: " <> show tok
 
@@ -169,9 +157,6 @@ toLabel tok = case tokValue tok of
   TokRawString a    -> Label tok $ mkString a
   TokForall ASCII   -> Label tok $ mkString "forall"
   _                 -> internalError $ "Invalid label: " <> show tok
-
-labelToIdent :: Label -> Parser (Name Ident)
-labelToIdent (Label tok _) = toName Ident tok
 
 toString :: SourceToken -> (SourceToken, PSString)
 toString tok = case tokValue tok of
@@ -232,7 +217,7 @@ toBinderConstructor = \case
   BinderConstructor a name [] NE.:| bs ->
     pure $ BinderConstructor a name bs
   a NE.:| [] -> pure a
-  a NE.:| _ -> unexpectedToks binderRange (unexpectedBinder) ErrExprInBinder a
+  a NE.:| _ -> unexpectedToks binderRange unexpectedBinder ErrExprInBinder a
 
 toRecordFields
   :: Monoid a

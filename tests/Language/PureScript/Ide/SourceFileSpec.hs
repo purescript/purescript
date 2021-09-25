@@ -1,5 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.SourceFileSpec where
 
 import           Protolude
@@ -11,13 +9,11 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Test
 import           Test.Hspec
 
-span0, span1, span2 :: P.SourceSpan
-span0 = P.SourceSpan "ModuleLevel" (P.SourcePos 0 0) (P.SourcePos 1 1)
+span1, span2 :: P.SourceSpan
 span1 = P.SourceSpan "" (P.SourcePos 1 1) (P.SourcePos 2 2)
 span2 = P.SourceSpan "" (P.SourcePos 2 2) (P.SourcePos 3 3)
 
-ann0, ann1, ann2 :: P.SourceAnn
-ann0 = (span0, [])
+ann1, ann2 :: P.SourceAnn
 ann1 = (span1, [])
 ann2 = (span2, [])
 
@@ -80,7 +76,7 @@ spec = do
       r `shouldBe` synonymSS
     it "finds a data declaration and its constructors" $ do
       rs <- traverse getLocation ["SFData", "SFOne", "SFTwo", "SFThree"]
-      traverse_ (`shouldBe` (Just typeSS)) rs
+      traverse_ (`shouldBe` Just typeSS) rs
     it "finds a class declaration" $ do
       Just r <- getLocation "SFClass"
       r `shouldBe` classSS

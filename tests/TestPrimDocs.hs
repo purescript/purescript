@@ -10,12 +10,7 @@ import qualified Data.Text as Text
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 
-import Test.Tasty
-import Test.Tasty.Hspec (Spec, testSpec, it)
-import Test.Hspec (shouldBe)
-
-main :: IO TestTree
-main = testSpec "prim docs" spec
+import Test.Hspec
 
 spec :: Spec
 spec = do
@@ -26,7 +21,7 @@ spec = do
   it "all Prim modules are fully documented" $ do
     let actualPrimNames =
           -- note that prim type classes are listed in P.primTypes
-          (filter (not . Text.any (== '$')) . map (P.runProperName . P.disqualify . fst) $ Map.toList
+          filter (not . Text.any (== '$')) . map (P.runProperName . P.disqualify . fst) $ Map.toList
             ( P.primTypes <>
               P.primBooleanTypes <>
               P.primCoerceTypes <>
@@ -34,7 +29,7 @@ spec = do
               P.primRowTypes <>
               P.primRowListTypes <>
               P.primTypeErrorTypes <>
-              P.primSymbolTypes ))
+              P.primSymbolTypes )
     let documentedPrimNames =
           map D.declTitle (concatMap D.modDeclarations D.primModules)
 

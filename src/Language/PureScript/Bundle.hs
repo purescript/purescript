@@ -311,9 +311,9 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
             mapMaybe unPropertyIdentRef $
             trailingCommaList props
         in
-          (map (\name -> (m, name, Internal)) shorthandNames, bn)
+          (map (m, , Internal) shorthandNames, bn)
     toReference (JSFunctionExpression _ _ _ params _ _) bn
-      = ([], bn \\ (mapMaybe unIdentifier $ commaList params))
+      = ([], bn \\ mapMaybe unIdentifier (commaList params))
     toReference e bn
       | Just nm <- exportsAccessor e
       -- exports.foo means there's a dependency on the public member "foo" of
@@ -474,6 +474,10 @@ matchMember stmt
   , JSIdentifier _ name <- var
   , JSVarInit _ decl <- varInit
   = Just (Internal, name, decl)
+  -- function foo(...args) { body }
+  | JSFunction a0 jsIdent a1 args a2 body _ <- stmt
+  , JSIdentName _ name <- jsIdent
+  = pure (Internal, name, JSFunctionExpression a0 jsIdent a1 args a2 body)
   -- exports.foo = expr; exports["foo"] = expr;
   | JSAssignStatement e (JSAssign _) decl _ <- stmt
   , Just name <- exportsAccessor e
@@ -650,7 +654,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
           map (\(porig, pgen) -> Mapping {
                 mapOriginal = Just (Pos (fromIntegral $ porig + 1) 0)
               , mapSourceFile = pathToFile <$> file
-              , mapGenerated = (Pos (fromIntegral $ pos + pgen) 0)
+              , mapGenerated = Pos (fromIntegral $ pos + pgen) 0
               , mapName = Nothing
               })
             (offsets (0,0) (Right 1 : positions)))

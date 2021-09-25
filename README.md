@@ -2,7 +2,7 @@
 
 A small strongly typed programming language with expressive types that compiles to JavaScript, written in and inspired by Haskell.
 
-[![Hackage](https://img.shields.io/hackage/v/purescript.svg)](http://hackage.haskell.org/package/purescript) [![Build Status](https://api.travis-ci.org/purescript/purescript.svg?branch=master)](http://travis-ci.org/purescript/purescript)
+[![Hackage](https://img.shields.io/hackage/v/purescript.svg)](http://hackage.haskell.org/package/purescript) [![Build Status](https://github.com/purescript/purescript/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/purescript/purescript/actions/workflows/ci.yml)
 
 ## Language info
 
@@ -19,6 +19,6 @@ A small strongly typed programming language with expressive types that compiles 
 
 ## Help!
 
-- [#purescript @ FP Slack](https://functionalprogramming.slack.com/)
-- [PureScript Language Forum](https://discourse.purescript.org/)
+- [PureScript Discord](https://purescript.org/chat)
+- [PureScript Discourse](https://discourse.purescript.org/)
 - [PureScript on StackOverflow](http://stackoverflow.com/questions/tagged/purescript)

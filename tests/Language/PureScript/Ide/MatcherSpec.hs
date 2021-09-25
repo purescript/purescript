@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-
 module Language.PureScript.Ide.MatcherSpec where
 
 import           Protolude

@@ -1,8 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Command.Compile (command) where
 
 import Prelude
@@ -154,7 +149,7 @@ options =
   where
     -- Ensure that the JS target is included if sourcemaps are
     handleTargets :: [P.CodegenTarget] -> S.Set P.CodegenTarget
-    handleTargets ts = S.fromList (if elem P.JSSourceMap ts then P.JS : ts else ts)
+    handleTargets ts = S.fromList (if P.JSSourceMap `elem` ts then P.JS : ts else ts)
 
 pscMakeOptions :: Opts.Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile

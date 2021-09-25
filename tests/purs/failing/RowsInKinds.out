@@ -5,7 +5,7 @@ at tests/purs/failing/RowsInKinds.purs:14:16 - 14:17 (line 14, column 16 - line 
   Could not match kind
   [33m             [0m
   [33m  ( z :: Type[0m
-  [33m  | t24      [0m
+  [33m  | t25      [0m
   [33m  )          [0m
   [33m             [0m
   with kind

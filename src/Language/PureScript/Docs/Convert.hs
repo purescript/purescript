@@ -25,6 +25,7 @@ import qualified Language.PureScript.Environment as P
 import qualified Language.PureScript.Names as P
 import qualified Language.PureScript.Sugar as P
 import qualified Language.PureScript.Types as P
+import qualified Language.PureScript.Constants.Prim as Prim
 
 -- |
 -- Convert a single module to a Docs.Module, making use of a pre-existing
@@ -39,23 +40,42 @@ convertModule ::
   P.Module ->
   m Module
 convertModule externs env checkEnv =
-  fmap (insertValueTypes checkEnv . convertSingleModule) . partiallyDesugar externs env
+  fmap (insertValueTypesAndAdjustKinds checkEnv . convertSingleModule) . partiallyDesugar externs env
 
 -- |
 -- Updates all the types of the ValueDeclarations inside the module based on
 -- their types inside the given Environment.
 --
-insertValueTypes ::
+-- Removes explicit kind signatures if they are "uninteresting."
+--
+-- Inserts inferred kind signatures into the corresponding declarations
+-- if no kind signature was declared explicitly and the kind
+-- signature is "interesting."
+--
+insertValueTypesAndAdjustKinds ::
   P.Environment -> Module -> Module
-insertValueTypes env m =
+insertValueTypesAndAdjustKinds env m =
   m { modDeclarations = map go (modDeclarations m) }
   where
-  go (d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} }) =
+  -- insert value types
+  go d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} } =
     let
       ident = P.Ident . CST.getIdent . CST.nameValue . parseIdent $ declTitle d
       ty = lookupName ident
     in
       d { declInfo = ValueDeclaration (ty $> ()) }
+
+  go d@Declaration{..} | Just keyword <- extractKeyword declInfo =
+    case declKind of
+      Just ks ->
+        -- hide explicit kind signatures that are "uninteresting"
+        if isUninteresting keyword $ kiKind ks
+          then d { declKind = Nothing }
+          else d
+      Nothing ->
+        -- insert inferred kinds so long as they are "interesting"
+        insertInferredKind d declTitle keyword
+
   go other =
     other
 
@@ -69,6 +89,75 @@ insertValueTypes env m =
         ty
       Nothing ->
         err ("name not found: " ++ show key)
+
+  -- |
+  -- Extracts the keyword for a declaration (if there is one)
+  extractKeyword :: DeclarationInfo -> Maybe P.KindSignatureFor
+  extractKeyword = \case
+    DataDeclaration dataDeclType _ -> Just $ case dataDeclType of
+      P.Data -> P.DataSig
+      P.Newtype -> P.NewtypeSig
+    TypeSynonymDeclaration _ _ -> Just P.TypeSynonymSig
+    TypeClassDeclaration _ _ _ -> Just P.ClassSig
+    _ -> Nothing
+
+  -- |
+  -- Returns True if the kind signature is "uninteresting", which
+  -- is a kind that follows this form:
+  -- - `Type`
+  -- - `Constraint` (class declaration only)
+  -- - `Type -> K` where `K` is an "uninteresting" kind
+  isUninteresting
+    :: P.KindSignatureFor -> Type' -> Bool
+  isUninteresting keyword = \case
+    -- `Type -> ...`
+    P.TypeApp _ f a | isTypeAppFunctionType f -> isUninteresting keyword a
+    P.ParensInType _ ty -> isUninteresting keyword ty
+    x -> isKindPrimType x || (isClassKeyword && isKindPrimConstraint x)
+    where
+      isClassKeyword = case keyword of
+        P.ClassSig -> True
+        _ -> False
+
+      isTypeAppFunctionType = \case
+        P.TypeApp _ f a -> isKindFunction f && isKindPrimType a
+        P.ParensInType _ ty -> isTypeAppFunctionType ty
+        _ -> False
+
+      isKindFunction = isTypeConstructor Prim.Function
+      isKindPrimType = isTypeConstructor Prim.Type
+      isKindPrimConstraint = isTypeConstructor Prim.Constraint
+
+      isTypeConstructor k = \case
+        P.TypeConstructor _ k' -> k' == k
+        P.ParensInType _ ty -> isTypeConstructor k ty
+        _ -> False
+
+  insertInferredKind :: Declaration -> Text -> P.KindSignatureFor -> Declaration
+  insertInferredKind d name keyword =
+    let
+      key = P.Qualified (Just (modName m)) (P.ProperName name)
+    in case Map.lookup key (P.types env) of
+      Just (inferredKind, _) ->
+        if isUninteresting keyword inferredKind'
+          then  d
+          else  d { declKind = Just $ KindInfo
+                    { kiKeyword = keyword
+                    , kiKind = dropTypeSortAnnotation inferredKind'
+                    }
+                  }
+        where
+          inferredKind' = inferredKind $> ()
+
+          -- changes `forall (k :: Type). k -> ...`
+          -- to      `forall k          . k -> ...`
+          dropTypeSortAnnotation = \case
+            P.ForAll sa txt (Just (P.TypeConstructor _ Prim.Type)) rest skol ->
+              P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol
+            rest -> rest
+
+      Nothing ->
+        err ("type not found: " ++ show key)
 
   err msg =
     P.internalError ("Docs.Convert.insertValueTypes: " ++ msg)
@@ -100,5 +189,5 @@ partiallyDesugar externs env = evalSupplyT 0 . desugar'
       >=> fmap fst . runWriterT . flip evalStateT (env, mempty) . P.desugarImports
       >=> P.rebracketFiltered isInstanceDecl externs
 
-  isInstanceDecl (P.TypeInstanceDeclaration {}) = True
+  isInstanceDecl P.TypeInstanceDeclaration {} = True
   isInstanceDecl _ = False

@@ -1,14 +1,15 @@
 -- |
 -- Renaming pass that prevents shadowing of local identifiers.
 --
-module Language.PureScript.Renamer (renameInModules) where
+module Language.PureScript.Renamer (renameInModule) where
 
 import Prelude.Compat
 
 import Control.Monad.State
 
+import Data.Functor ((<&>))
 import Data.List (find)
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromJust, fromMaybe, isNothing)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -39,8 +40,8 @@ initState scope = RenameState (M.fromList (zip scope scope)) (S.fromList scope)
 -- |
 -- Runs renaming starting with a list of idents for the initial scope.
 --
-runRename :: [Ident] -> Rename a -> a
-runRename scope = flip evalState (initState scope)
+runRename :: [Ident] -> Rename a -> (a, RenameState)
+runRename scope = flip runState (initState scope)
 
 -- |
 -- Creates a new renaming scope using the current as a basis. Used to backtrack
@@ -93,48 +94,68 @@ lookupIdent name = do
     Just name'' -> return name''
     Nothing -> error $ "Rename scope is missing ident '" ++ T.unpack (showIdent name) ++ "'"
 
--- |
--- Finds idents introduced by declarations.
---
-findDeclIdents :: [Bind Ann] -> [Ident]
-findDeclIdents = concatMap go
-  where
-  go (NonRec _ ident _) = [ident]
-  go (Rec ds) = map (snd . fst) ds
 
 -- |
--- Renames within each declaration in a module.
+-- Renames within each declaration in a module. Returns the map of renamed
+-- identifiers in the top-level scope, so that they can be renamed in the
+-- externs files as well.
 --
-renameInModules :: [Module Ann] -> [Module Ann]
-renameInModules = map go
+renameInModule :: Module Ann -> (M.Map Ident Ident, Module Ann)
+renameInModule m@(Module _ _ _ _ _ exports _ foreigns decls) = (rsBoundNames, m { moduleExports, moduleDecls })
   where
-  go :: Module Ann -> Module Ann
-  go m@(Module _ _ _ _ _ _ _ _ decls) = m { moduleDecls = map (renameInDecl' (findDeclIdents decls)) decls }
-
-  renameInDecl' :: [Ident] -> Bind Ann -> Bind Ann
-  renameInDecl' scope = runRename scope . renameInDecl True
+  ((moduleDecls, moduleExports), RenameState{..}) = runRename foreigns $
+    (,) <$> renameInDecls decls <*> traverse lookupIdent exports
 
 -- |
--- Renames within a declaration. isTopLevel is used to determine whether the
--- declaration is a module member or appearing within a Let. At the top level
--- declarations are not renamed or added to the scope (they should already have
--- been added), whereas in a Let declarations are renamed if their name shadows
--- another in the current scope.
+-- Renames within a list of declarations. The list is processed in three
+-- passes:
 --
-renameInDecl :: Bool -> Bind Ann -> Rename (Bind Ann)
-renameInDecl isTopLevel (NonRec a name val) = do
-  name' <- if isTopLevel then return name else updateScope name
-  NonRec a name' <$> renameInValue val
-renameInDecl isTopLevel (Rec ds) = do
-  ds' <- traverse updateNames ds
-  Rec <$> traverse updateValues ds'
+--  1) Declarations with user-provided names are added to the scope, renaming
+--     them only if necessary to prevent shadowing.
+--  2) Declarations with compiler-provided names are added to the scope,
+--     renaming them to prevent shadowing or collision with a user-provided
+--     name.
+--  3) The bodies of the declarations are processed recursively.
+--
+-- The distinction between passes 1 and 2 is critical in the top-level module
+-- scope, where declarations can be exported and named declarations must not
+-- be renamed. Below the top level, this only matters for programmers looking
+-- at the generated code or using a debugger; we want them to see the names
+-- they used as much as possible.
+--
+-- The distinction between the first two passes and pass 3 is important because
+-- a `GenIdent` can appear before its declaration in a depth-first traversal,
+-- and we need to visit the declaration first in order to rename all of its
+-- uses. Similarly, a plain `Ident` could shadow another declared in an outer
+-- scope but later in a depth-first traversal, and we need to visit the
+-- outer declaration first in order to know to rename the inner one.
+--
+renameInDecls :: [Bind Ann] -> Rename [Bind Ann]
+renameInDecls =
+      traverse (renameDecl False)
+  >=> traverse (renameDecl True)
+  >=> traverse renameValuesInDecl
+
   where
-  updateNames :: ((Ann, Ident), Expr Ann) -> Rename ((Ann, Ident), Expr Ann)
-  updateNames ((a, name), val) = do
-    name' <- if isTopLevel then return name else updateScope name
-    return ((a, name'), val)
-  updateValues :: ((Ann, Ident), Expr Ann) -> Rename ((Ann, Ident), Expr Ann)
-  updateValues (aname, val) = (,) aname <$> renameInValue val
+
+  renameDecl :: Bool -> Bind Ann -> Rename (Bind Ann)
+  renameDecl isSecondPass = \case
+    NonRec a name val -> updateName name <&> \name' -> NonRec a name' val
+    Rec ds -> Rec <$> traverse updateNames ds
+    where
+    updateName :: Ident -> Rename Ident
+    updateName name = (if isSecondPass == isPlainIdent name then pure else updateScope) name
+
+    updateNames :: ((Ann, Ident), Expr Ann) -> Rename ((Ann, Ident), Expr Ann)
+    updateNames ((a, name), val) = updateName name <&> \name' -> ((a, name'), val)
+
+  renameValuesInDecl :: Bind Ann -> Rename (Bind Ann)
+  renameValuesInDecl = \case
+    NonRec a name val -> NonRec a name <$> renameInValue val
+    Rec ds -> Rec <$> traverse updateValues ds
+    where
+    updateValues :: ((Ann, Ident), Expr Ann) -> Rename ((Ann, Ident), Expr Ann)
+    updateValues (aname, val) = (aname, ) <$> renameInValue val
 
 -- |
 -- Renames within a value.
@@ -146,19 +167,22 @@ renameInValue c@Constructor{} = return c
 renameInValue (Accessor ann prop v) =
   Accessor ann prop <$> renameInValue v
 renameInValue (ObjectUpdate ann obj vs) =
-  ObjectUpdate ann <$> renameInValue obj <*> traverse (\(name, v) -> (,) name <$> renameInValue v) vs
-renameInValue e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) = return e
+  ObjectUpdate ann <$> renameInValue obj <*> traverse (\(name, v) -> (name, ) <$> renameInValue v) vs
 renameInValue (Abs ann name v) =
   newScope $ Abs ann <$> updateScope name <*> renameInValue v
 renameInValue (App ann v1 v2) =
   App ann <$> renameInValue v1 <*> renameInValue v2
-renameInValue (Var ann (Qualified Nothing name)) =
-  Var ann . Qualified Nothing <$> lookupIdent name
+renameInValue (Var ann (Qualified mn name)) | isNothing mn || not (isPlainIdent name) =
+  -- This should only rename identifiers local to the current module: either
+  -- they aren't qualified, or they are but they have a name that should not
+  -- have appeared in a module's externs, so they must be from this module's
+  -- top-level scope.
+  Var ann . Qualified mn <$> lookupIdent name
 renameInValue v@Var{} = return v
 renameInValue (Case ann vs alts) =
   newScope $ Case ann <$> traverse renameInValue vs <*> traverse renameInCaseAlternative alts
 renameInValue (Let ann ds v) =
-  newScope $ Let ann <$> traverse (renameInDecl False) ds <*> renameInValue v
+  newScope $ Let ann <$> renameInDecls ds <*> renameInValue v
 
 -- |
 -- Renames within literals.
