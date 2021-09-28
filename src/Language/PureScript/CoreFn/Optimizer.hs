@@ -13,6 +13,7 @@ import Language.PureScript.Names (Ident(UnusedIdent), Qualified(Qualified))
 import Language.PureScript.Label
 import Language.PureScript.Types
 import qualified Language.PureScript.Constants.Prim as C
+import qualified Language.PureScript.Constants.Prelude as C
 
 -- |
 -- CoreFn optimization pass.

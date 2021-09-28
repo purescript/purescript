@@ -70,7 +70,7 @@ desugar
 desugar externs =
   desugarSignedLiterals
     >>> desugarObjectConstructors
-    >>> fmap (map (desugarAccessorModule externs))
+    >>> fmap (desugarAccessorModule externs)
     >=> desugarDoModule
     >=> desugarAdoModule
     >=> desugarLetPatternModule

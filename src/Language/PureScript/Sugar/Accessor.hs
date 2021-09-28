@@ -3,14 +3,13 @@ module Language.PureScript.Sugar.Accessor (desugarAccessorModule) where
 
 import Prelude.Compat
 
-import Data.Monoid (Any(..))
 import Control.Monad.Writer
 
 import Language.PureScript.AST
 import Language.PureScript.Types
 import Language.PureScript.Externs
 import Language.PureScript.Names
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prelude as C
 
 -- | Replace every @BoundValueDeclaration@ in @Let@ expressions with @Case@
 -- expressions.
