@@ -2,9 +2,9 @@ name: "CI"
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "restaumatic" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "restaumatic" ]
   release:
     types: [ "published" ]
 
