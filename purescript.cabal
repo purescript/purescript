@@ -284,6 +284,7 @@ library
     Language.PureScript.Publish.Utils
     Language.PureScript.Renamer
     Language.PureScript.Sugar
+    Language.PureScript.Sugar.Accessor
     Language.PureScript.Sugar.AdoNotation
     Language.PureScript.Sugar.BindingGroups
     Language.PureScript.Sugar.CaseDeclarations
