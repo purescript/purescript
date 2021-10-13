@@ -9,9 +9,9 @@ import           Protolude hiding (to, from, (&))
 
 import           Codec.CBOR.Term as Term
 import           "monad-logger" Control.Monad.Logger
-import           Data.Version (showVersion)
 import qualified Data.Text as Text
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Externs as Externs
 import qualified Language.PureScript.Make.Monad as Make
 import           Language.PureScript.Ide.Error (IdeError (..))
 import           Language.PureScript.Ide.Types
@@ -40,7 +40,7 @@ readExternFile fp = do
         _ ->
           throwError (GeneralError ("Parsing the extern at: " <> toS fp <> " failed"))
     where
-      version = toS (showVersion P.version)
+      version = toS Externs.currentVersion
 
 convertExterns :: P.ExternsFile -> ([IdeDeclarationAnn], [(P.ModuleName, P.DeclarationRef)])
 convertExterns ef =
