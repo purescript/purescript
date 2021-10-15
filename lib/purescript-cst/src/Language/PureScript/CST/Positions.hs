@@ -114,9 +114,6 @@ nameRange a = (nameTok a, nameTok a)
 qualRange :: QualifiedName a -> TokenRange
 qualRange a = (qualTok a, qualTok a)
 
-labelRange :: Label -> TokenRange
-labelRange a = (lblTok a, lblTok a)
-
 wrappedRange :: Wrapped a -> TokenRange
 wrappedRange Wrapped { wrpOpen, wrpClose } = (wrpOpen, wrpClose)
 
@@ -338,8 +335,3 @@ recordUpdateRange :: RecordUpdate a -> TokenRange
 recordUpdateRange = \case
   RecordUpdateLeaf a _ b -> (lblTok a, snd $ exprRange b)
   RecordUpdateBranch a (Wrapped _ _ b) -> (lblTok a, b)
-
-recordLabeledExprRange :: RecordLabeled (Expr a) -> TokenRange
-recordLabeledExprRange = \case
-  RecordPun a -> nameRange a
-  RecordField a _ b -> (fst $ labelRange a, snd $ exprRange b)

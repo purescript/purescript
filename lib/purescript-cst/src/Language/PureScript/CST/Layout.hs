@@ -265,7 +265,7 @@ insertLayout src@(SourceToken tokAnn tok) nextPos stack =
         ((_, LytTick) : stk', acc') ->
           (stk', acc') & insertToken src
         _ ->
-          state & insertDefault & pushStack tokPos LytTick
+          state & collapse offsideEndP & insertSep & insertToken src & pushStack tokPos LytTick
 
     -- In general, commas should close all indented contexts.
     --     example = [ do foo

@@ -83,7 +83,7 @@ toModule (CyclicSCC ms) =
     Just ms' ->
       throwError
         . errorMessage'' (fmap (sigSourceSpan . snd) ms')
-        $ CycleInModules (map (sigModuleName . snd) ms)
+        $ CycleInModules (map (sigModuleName . snd) ms')
 
 moduleSignature :: Module -> ModuleSignature
 moduleSignature (Module ss _ mn ds _) = ModuleSignature ss mn (ordNub (mapMaybe usedModules ds))

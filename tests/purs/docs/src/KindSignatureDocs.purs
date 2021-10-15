@@ -95,6 +95,41 @@ class CNothing
 
 ----------
 
+data DataRedundantParenthesis :: (Type) -> (Type)
+data DataRedundantParenthesis a = DataRedundantParenthesis
+
+class ClassRedundantParenthesis :: (Type) -> (Constraint)
+class ClassRedundantParenthesis a
+
+data DataHeadParens :: (Type) -> Type -> Type
+data DataHeadParens a b = DataHeadParens
+
+data DataTailParens :: Type -> (Type -> Type)
+data DataTailParens a b = DataTailParens
+
+data DataWholeParens :: (Type -> Type -> Type)
+data DataWholeParens a b = DataWholeParens
+
+data DataSelfParens :: (Type)
+data DataSelfParens = DataSelfParens
+
+class ClassSelfParens :: (Constraint)
+class ClassSelfParens
+
+data DataKindAnnotation (a :: Type) = DataKindAnnotation a
+
+data DataKindAnnotationWithParens (a :: (Type)) = DataKindAnnotationWithParens a
+
+data FunctionParens1 :: (->) Type Type
+data FunctionParens1 a = FunctionParens1 a
+
+data FunctionParens2 :: ((->) Type) Type
+data FunctionParens2 a = FunctionParens2 a
+
+data FunctionParens3 :: (((->) Type)) Type
+data FunctionParens3 a = FunctionParens3 a
+----------
+
 -- | dit
 data DShown a b f = DShown (f Int) a b
 

@@ -85,17 +85,8 @@ unexpectedLabel tok = Label tok "<unexpected>"
 unexpectedExpr :: Monoid a => [SourceToken] -> Expr a
 unexpectedExpr toks = ExprIdent mempty (unexpectedQual (head toks))
 
-unexpectedDecl :: Monoid a => [SourceToken] -> Declaration a
-unexpectedDecl toks = DeclValue mempty (ValueBindingFields (unexpectedName (head toks)) [] (error "<unexpected"))
-
 unexpectedBinder :: Monoid a => [SourceToken] -> Binder a
 unexpectedBinder toks = BinderVar mempty (unexpectedName (head toks))
-
-unexpectedLetBinding :: Monoid a => [SourceToken] -> LetBinding a
-unexpectedLetBinding toks = LetBindingName mempty (ValueBindingFields (unexpectedName (head toks)) [] (error "<unexpected>"))
-
-unexpectedInstBinding :: Monoid a => [SourceToken] -> InstanceBinding a
-unexpectedInstBinding toks = InstanceBindingName mempty (ValueBindingFields (unexpectedName (head toks)) [] (error "<unexpected>"))
 
 unexpectedRecordUpdate :: Monoid a => [SourceToken] -> RecordUpdate a
 unexpectedRecordUpdate toks = RecordUpdateLeaf (unexpectedLabel (head toks)) (head toks) (unexpectedExpr toks)
@@ -118,9 +109,6 @@ separated = go []
   go accum [(_, a)] = Separated a accum
   go accum (x : xs) = go (x : accum) xs
   go _ [] = internalError "Separated should not be empty"
-
-consSeparated :: a -> SourceToken -> Separated a -> Separated a
-consSeparated x sep Separated {..} = Separated x ((sep, sepHead) : sepTail)
 
 internalError :: String -> a
 internalError = error . ("Internal parser error: " <>)
@@ -169,9 +157,6 @@ toLabel tok = case tokValue tok of
   TokRawString a    -> Label tok $ mkString a
   TokForall ASCII   -> Label tok $ mkString "forall"
   _                 -> internalError $ "Invalid label: " <> show tok
-
-labelToIdent :: Label -> Parser (Name Ident)
-labelToIdent (Label tok _) = toName Ident tok
 
 toString :: SourceToken -> (SourceToken, PSString)
 toString tok = case tokValue tok of

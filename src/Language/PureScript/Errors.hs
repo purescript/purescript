@@ -12,6 +12,7 @@ import           Control.Monad
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.State.Lazy
 import           Control.Monad.Writer
+import           Data.Bifunctor (first, second)
 import           Data.Bitraversable (bitraverse)
 import           Data.Char (isSpace)
 import           Data.Either (partitionEithers)
@@ -19,6 +20,7 @@ import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
 import           Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn)
 import qualified Data.List.NonEmpty as NEL
+import           Data.List.NonEmpty (NonEmpty((:|)))
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import           Data.Ord (Down(..))
@@ -92,10 +94,10 @@ data SimpleErrorMessage
   | InvalidDoBind
   | InvalidDoLet
   | CycleInDeclaration Ident
-  | CycleInTypeSynonym [ProperName 'TypeName]
-  | CycleInTypeClassDeclaration [Qualified (ProperName 'ClassName)]
-  | CycleInKindDeclaration [Qualified (ProperName 'TypeName)]
-  | CycleInModules [ModuleName]
+  | CycleInTypeSynonym (NEL.NonEmpty (ProperName 'TypeName))
+  | CycleInTypeClassDeclaration (NEL.NonEmpty (Qualified (ProperName 'ClassName)))
+  | CycleInKindDeclaration (NEL.NonEmpty (Qualified (ProperName 'TypeName)))
+  | CycleInModules (NEL.NonEmpty ModuleName)
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
@@ -792,11 +794,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "The value of " <> markCode (showIdent nm) <> " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
       case mns of
-        [mn] ->
+        mn :| [] ->
           line $ "Module " <> markCode (runModuleName mn) <> " imports itself."
         _ ->
           paras [ line "There is a cycle in module dependencies in these modules: "
-                , indent $ paras (map (line . markCode . runModuleName) mns)
+                , indent $ paras (line . markCode . runModuleName <$> NEL.toList mns)
                 ]
     renderSimpleErrorMessage (CycleInTypeSynonym names) =
       paras $ cycleError <>
@@ -805,23 +807,22 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
       where
       cycleError = case names of
-        []   -> pure . line $ "A cycle appears in a set of type synonym definitions."
-        [pn] -> pure . line $ "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
-        _    -> [ line " A cycle appears in a set of type synonym definitions:"
-                , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName) names) <> "}"
-                ]
-    renderSimpleErrorMessage (CycleInTypeClassDeclaration [name]) =
+        pn :| [] -> pure . line $ "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
+        _ -> [ line " A cycle appears in a set of type synonym definitions:"
+             , indent $ line $ "{" <> T.intercalate ", " (markCode . runProperName <$> NEL.toList names) <> "}"
+             ]
+    renderSimpleErrorMessage (CycleInTypeClassDeclaration (name :| [])) =
       paras [ line $ "A type class '" <> markCode (runProperName (disqualify name)) <> "' may not have itself as a superclass." ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration names) =
       paras [ line "A cycle appears in a set of type class definitions:"
-            , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName . disqualify) names) <> "}"
+            , indent $ line $ "{" <> T.intercalate ", " (markCode . runProperName . disqualify <$> NEL.toList names) <> "}"
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             ]
-    renderSimpleErrorMessage (CycleInKindDeclaration [name]) =
+    renderSimpleErrorMessage (CycleInKindDeclaration (name :| [])) =
       paras [ line $ "A kind declaration '" <> markCode (runProperName (disqualify name)) <> "' may not refer to itself in its own signature." ]
     renderSimpleErrorMessage (CycleInKindDeclaration names) =
       paras [ line "A cycle appears in a set of kind declarations:"
-            , indent $ line $ "{" <> T.intercalate ", " (map (markCode . runProperName . disqualify) names) <> "}"
+            , indent $ line $ "{" <> T.intercalate ", " (markCode . runProperName . disqualify <$> NEL.toList names) <> "}"
             , line "Kind declarations may not refer to themselves in their own signatures."
             ]
     renderSimpleErrorMessage (NameIsUndefined ident) =
@@ -1511,6 +1512,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ detail
             , line $ "in foreign import " <> markCode (showIdent nm)
             ]
+    renderHint (ErrorInForeignImportData nm) detail =
+      paras [ detail
+            , line $ "in foreign data type declaration for " <> markCode (runProperName nm)
+            ]
     renderHint (ErrorSolvingConstraint (Constraint _ nm _ ts _)) detail =
       paras [ detail
             , line "while solving type class constraint"
@@ -1530,7 +1535,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
 
     printRow :: (Int -> Type a -> Box.Box) -> Type a -> Box.Box
-    printRow f t = markCodeBox $ indent $ f prettyDepth t
+    printRow f = markCodeBox . indent . f prettyDepth .
+      if full then id else eraseForAllKindAnnotations . eraseKindApps
 
     -- If both rows are not empty, print them as diffs
     -- If verbose print all rows else only print unique rows
@@ -1549,12 +1555,23 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     filterRows :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)
     filterRows (s1, r1) (s2, r2) =
          let sort' = sortOn $ \(RowListItem _ name ty) -> (name, ty)
-             notElem' s (RowListItem _ name ty) = all (\(RowListItem _ name' ty') -> name /= name' || not (eqType ty ty')) s
-             unique1 = filter (notElem' s2) s1
-             unique2 = filter (notElem' s1) s2
-          in ( rowFromList (sort' unique1, r1)
-             , rowFromList (sort' unique2, r2)
+             (unique1, unique2) = diffSortedRowLists (sort' s1, sort' s2)
+          in ( rowFromList (unique1, r1)
+             , rowFromList (unique2, r2)
              )
+
+    -- Importantly, this removes exactly the same number of elements from
+    -- both lists, even if there are repeated (name, ty) keys. It requires
+    -- the inputs to be sorted but ensures that the outputs remain sorted.
+    diffSortedRowLists :: ([RowListItem a], [RowListItem a]) -> ([RowListItem a], [RowListItem a])
+    diffSortedRowLists = go where
+      go = \case
+        (s1@(h1@(RowListItem _ name1 ty1) : t1), s2@(h2@(RowListItem _ name2 ty2) : t2)) ->
+          case (name1, ty1) `compare` (name2, ty2) of
+            EQ ->                go (t1, t2)
+            LT -> first  (h1:) $ go (t1, s2)
+            GT -> second (h2:) $ go (s1, t2)
+        other -> other
 
     renderContext :: Context -> [Box.Box]
     renderContext [] = []
@@ -1867,12 +1884,6 @@ toTypelevelString _ = Nothing
 -- | Rethrow an error with a more detailed error message in the case of failure
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError (throwError . f)
-
-reifyErrors :: (MonadError e m) => m a -> m (Either e a)
-reifyErrors ma = catchError (fmap Right ma) (return . Left)
-
-reflectErrors :: (MonadError e m) => m (Either e a) -> m a
-reflectErrors ma = ma >>= either throwError return
 
 warnAndRethrow :: (MonadError e m, MonadWriter e m) => (e -> e) -> m a -> m a
 warnAndRethrow f = rethrow f . censor f
