@@ -9,17 +9,18 @@ module Language.PureScript.CodeGen.JS
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Arrow ((&&&))
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
-import Data.List ((\\), intersect)
+import Data.Bifunctor (first)
+import Data.List ((\\), intersect, uncons)
+import qualified Data.List.NonEmpty as NEL (nonEmpty)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe (fromMaybe, isNothing)
+import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -48,9 +49,9 @@ moduleToJs
   :: forall m
    . (Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
   => Module Ann
-  -> Maybe AST
+  -> Maybe PSString
   -> m [AST]
-moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
+moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
@@ -65,17 +66,16 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
       . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
-    let strict = AST.StringLiteral Nothing "use strict"
-    let header = if comments && not (null coms) then AST.Comment Nothing coms strict else strict
-    let foreign' = [AST.VariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
-    let moduleBody = header : foreign' ++ jsImports ++ concat optimized
+    let header = if comments && not (null coms) then AST.Comment Nothing coms else id
+    let foreign' = maybe [] (pure . AST.Import Nothing "$foreign") $ if null foreigns then Nothing else foreignInclude
+    let moduleBody = (maybe [] (uncurry (:) . first header) . uncons) $ foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
     let reExps' = M.toList (M.withoutKeys reExps (S.fromList C.primModules))
-    let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToJs) standardExps
-                               ++ map (mkString . runIdent &&& foreignIdent) foreignExps
-                               ++ concatMap (reExportPairs mnLookup) reExps'
-    return $ moduleBody ++ [AST.Assignment Nothing (accessorString "exports" (AST.Var Nothing "module")) exps']
+    return $ moduleBody
+      ++ (maybeToList . exportsToJs foreignInclude $ foreignExps)
+      ++ (maybeToList . exportsToJs Nothing $ standardExps)
+      ++  mapMaybe reExportsToJs reExps'
 
   where
 
@@ -84,21 +84,6 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
   getNames (NonRec _ ident _) = [ident]
   getNames (Rec vals) = map (snd . fst) vals
 
-  -- | Generate code in the JavaScript IR for re-exported declarations, prepending
-  -- the module name from whence it was imported.
-  reExportPairs :: M.Map ModuleName (Ann, ModuleName) -> (ModuleName, [Ident]) -> [(PSString, AST)]
-  reExportPairs mnLookup (mn', idents) =
-    let toExportedMember :: Ident -> AST
-        toExportedMember =
-          maybe
-            (AST.Var Nothing . identToJs)
-            (flip accessor . AST.Var Nothing . moduleNameToJs . snd)
-            (M.lookup mn' mnLookup)
-    in
-      map
-        (mkString . runIdent &&& toExportedMember)
-        idents
-
   -- | Creates alternative names for each module to ensure they don't collide
   -- with declaration names.
   renameImports :: [Ident] -> [(Ann, ModuleName)] -> M.Map ModuleName (Ann, ModuleName)
@@ -106,7 +91,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
     where
     go :: M.Map ModuleName (Ann, ModuleName) -> [Ident] -> [(Ann, ModuleName)] -> M.Map ModuleName (Ann, ModuleName)
     go acc used ((ann, mn') : mns') =
-      let mni = Ident $ runModuleName mn'
+      let mni = Ident $ moduleNameToJs mn'
       in if mn' /= mn && mni `elem` used
          then let newName = freshModuleName 1 mn' used
               in go (M.insert mn' (ann, newName) acc) (Ident (runModuleName newName) : used) mns'
@@ -125,9 +110,20 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
   importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m AST
   importToJs mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
-    let moduleBody = AST.App Nothing (AST.Var Nothing "require")
-          [AST.StringLiteral Nothing (fromString (".." </> T.unpack (runModuleName mn') </> "index.js"))]
-    withPos ss $ AST.VariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
+    withPos ss $ AST.Import Nothing (moduleNameToJs mnSafe) (moduleImportPath mn')
+
+  -- | Generates JavaScript code for exporting at least one identifier,
+  -- eventually from another module.
+  exportsToJs :: Maybe PSString -> [Ident] -> Maybe AST
+  exportsToJs from = fmap (flip (AST.Export Nothing) from) . NEL.nonEmpty . fmap runIdent
+
+  -- | Generates JavaScript code for re-exporting at least one identifier from
+  -- from another module.
+  reExportsToJs :: (ModuleName, [Ident]) -> Maybe AST
+  reExportsToJs = uncurry exportsToJs . first (Just . moduleImportPath)
+
+  moduleImportPath :: ModuleName -> PSString
+  moduleImportPath mn' = fromString (".." </> T.unpack (runModuleName mn') </> "index.js")
 
   -- | Replaces the `ModuleName`s in the AST so that the generated code refers to
   -- the collision-avoiding renamed module imports.
@@ -197,10 +193,13 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
   -- | Generate code in the simplified JavaScript intermediate representation for an accessor based on
   -- a PureScript identifier. If the name is not valid in JavaScript (symbol based, reserved name) an
   -- indexer is returned.
-  accessor :: Ident -> AST -> AST
-  accessor (Ident prop) = accessorString $ mkString prop
-  accessor (GenIdent _ _) = internalError "GenIdent in accessor"
-  accessor UnusedIdent = internalError "UnusedIdent in accessor"
+  moduleAccessor :: Ident -> AST -> AST
+  moduleAccessor (Ident prop) = moduleAccessorString prop
+  moduleAccessor (GenIdent _ _) = internalError "GenIdent in moduleAccessor"
+  moduleAccessor UnusedIdent = internalError "UnusedIdent in moduleAccessor"
+
+  moduleAccessorString :: Text -> AST -> AST
+  moduleAccessorString = accessorString . mkString . T.replace "'" "$prime"
 
   accessorString :: PSString -> AST -> AST
   accessorString prop = AST.Indexer Nothing (AST.StringLiteral Nothing prop)
@@ -318,7 +317,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
   -- variable that may have a qualified name.
   qualifiedToJS :: (a -> Ident) -> Qualified a -> AST
   qualifiedToJS f (Qualified (Just C.Prim) a) = AST.Var Nothing . runIdent $ f a
-  qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (AST.Var Nothing (moduleNameToJs mn'))
+  qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = moduleAccessor (f a) (AST.Var Nothing (moduleNameToJs mn'))
   qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToJs (f a)
 
   foreignIdent :: Ident -> AST
