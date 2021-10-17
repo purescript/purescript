@@ -666,6 +666,10 @@ matchInternalMember stmt
   , JSIdentifier _ name <- var
   , JSVarInit _ decl <- varInit
   = pure (name, decl)
+  -- function foo(...args) { body }
+  | JSFunction a0 jsIdent a1 args a2 body _ <- stmt
+  , JSIdentName _ name <- jsIdent
+  = pure (name, JSFunctionExpression a0 jsIdent a1 args a2 body)
   | otherwise
   = Nothing
 
