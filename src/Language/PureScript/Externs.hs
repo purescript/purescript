@@ -161,7 +161,7 @@ data ExternsDeclaration =
 instance Serialise ExternsDeclaration
 
 currentVersion :: String
-currentVersion = showVersion Paths.version ++ "-restaumatic1"
+currentVersion = showVersion Paths.version ++ "-restaumatic-esm1"
 
 -- | Check whether the version in an externs file matches the currently running
 -- version.
