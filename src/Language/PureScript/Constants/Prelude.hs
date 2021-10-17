@@ -290,14 +290,11 @@ pattern SProxyIdent = Qualified (Just DataSymbol) (Ident "SProxy")
 pattern DataRecord :: ModuleName
 pattern DataRecord = ModuleName "Data.Record"
 
-pattern DataRecord_getField :: Qualified Ident
-pattern DataRecord_getField = Qualified (Just DataRecord) (Ident "getField")
+pattern GetField :: Qualified Ident
+pattern GetField = Qualified (Just DataRecord) (Ident "getField")
 
-pattern DataRecord_hasFieldRecord :: Qualified Ident
-pattern DataRecord_hasFieldRecord = Qualified (Just DataRecord) (Ident "hasFieldRecord")
-
-getField :: Qualified Ident
-getField = DataRecord_getField
+pattern HasFieldRecord :: Qualified Ident
+pattern HasFieldRecord = Qualified (Just DataRecord) (Ident "hasFieldRecord")
 
 
 dataArray :: forall a. (IsString a) => a

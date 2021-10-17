@@ -36,7 +36,7 @@ desugarAccessor decl =
     tell (Any True)
     pure $ App
       (App
-        (Var nullSourceSpan C.getField)
+        (Var nullSourceSpan C.GetField)
         (TypedValue False (Constructor nullSourceSpan C.SProxy)
           (TypeApp nullSourceAnn
             (TypeConstructor nullSourceAnn C.SProxyType)

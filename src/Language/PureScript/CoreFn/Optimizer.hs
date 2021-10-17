@@ -65,10 +65,10 @@ optimizeRecordGetField
   (App ann
     (App _
       (App _
-        (Var _ C.DataRecord_getField)
+        (Var _ C.GetField)
         (App _
           (App _
-            (Var _ C.DataRecord_hasFieldRecord)
+            (Var _ C.HasFieldRecord)
             (App _
               (Var _ C.IsSymbolIdent)
               (Abs _ _
