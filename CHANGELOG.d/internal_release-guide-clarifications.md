@@ -1,1 +1,0 @@
-* Fix command and clarify a few other requirements in release guide
