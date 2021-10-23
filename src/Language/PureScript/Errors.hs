@@ -1792,7 +1792,7 @@ prettyPrintMultipleErrorsWith :: PPEOptions -> String -> String -> MultipleError
 prettyPrintMultipleErrorsWith ppeOptions intro _ (MultipleErrors [e]) =
   let result = prettyPrintSingleError ppeOptions e
       codeColor = codeWarningOrErrorColor ppeOptions
-  in [ Box.vcat Box.left [ colorCodeBox codeColor  $ Box.text intro
+  in [ Box.vcat Box.left [ colorCodeBox codeColor $ Box.text intro
                          , result
                          ]
      ]
