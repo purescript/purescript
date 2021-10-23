@@ -67,7 +67,7 @@ command = graph <$> (Opts.helper <*> graphOptions)
 printWarningsAndErrors :: Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO a
 printWarningsAndErrors False warnings errors = do
   pwd <- getCurrentDirectory
-  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stderr
+  cc <- bool Nothing (Just P.defaultCodeColors) <$> ANSI.hSupportsANSI stderr
   let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = True, P.ppeRelativeDirectory = pwd }
   when (P.nonEmpty warnings) $
     hPutStrLn stderr (P.prettyPrintMultipleWarnings ppeOpts warnings)

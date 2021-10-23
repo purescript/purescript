@@ -575,24 +575,49 @@ colorCodeBox codeColor b = case codeColor of
         , Box.vcat Box.top $ replicate (Box.rows b) $ Box.text ansiColorReset
         ]
 
+-- | Default color intensity and color for codes
+defaultErrorCodeColor :: (ANSI.ColorIntensity , ANSI.Color)
+defaultErrorCodeColor = (ANSI.Dull, ANSI.Red )
 
--- | Default color intensity and color for code
-defaultCodeColor :: (ANSI.ColorIntensity, ANSI.Color)
-defaultCodeColor = (ANSI.Dull, ANSI.Yellow)
+defaultWarningCodeColor :: (ANSI.ColorIntensity , ANSI.Color)
+defaultWarningCodeColor = (ANSI.Dull, ANSI.Yellow )
+
+defaultMarkCodeColor :: (ANSI.ColorIntensity, ANSI.Color)
+defaultMarkCodeColor = (ANSI.Dull, ANSI.Yellow)
+
+codeWarningOrErrorColor :: PPEOptions -> Maybe (ANSI.ColorIntensity, ANSI.Color)
+codeWarningOrErrorColor ppeOpts = case ppeLevel ppeOpts of
+  Error -> errorCodeColor <$> ppeCodeColor ppeOpts
+  Warning -> warningCodeColor <$> ppeCodeColor ppeOpts
+
+-- | Code colors 
+data CodeColors = CodeColors 
+  { errorCodeColor       :: (ANSI.ColorIntensity, ANSI.Color)
+  , warningCodeColor     :: (ANSI.ColorIntensity, ANSI.Color)
+  , markCodeColor        :: (ANSI.ColorIntensity, ANSI.Color)
+  }
 
 -- | `prettyPrintSingleError` Options
 data PPEOptions = PPEOptions
-  { ppeCodeColor         :: Maybe (ANSI.ColorIntensity, ANSI.Color) -- ^ Color code with this color... or not
+  { ppeCodeColor         :: Maybe CodeColors -- ^ Color code with this color... or not
   , ppeFull              :: Bool -- ^ Should write a full error message?
   , ppeLevel             :: Level -- ^ Should this report an error or a warning?
   , ppeShowDocs          :: Bool -- ^ Should show a link to error message's doc page?
   , ppeRelativeDirectory :: FilePath -- ^ FilePath to which the errors are relative
   }
 
+-- | Default code colors
+defaultCodeColors :: CodeColors
+defaultCodeColors = CodeColors 
+  { errorCodeColor       = defaultErrorCodeColor
+  , warningCodeColor     = defaultWarningCodeColor
+  , markCodeColor        = defaultMarkCodeColor
+  }
+
 -- | Default options for PPEOptions
 defaultPPEOptions :: PPEOptions
 defaultPPEOptions = PPEOptions
-  { ppeCodeColor         = Just defaultCodeColor
+  { ppeCodeColor         = Just defaultCodeColors
   , ppeFull              = False
   , ppeLevel             = Error
   , ppeShowDocs          = True
@@ -606,7 +631,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
   um <- get
   return (prettyPrintErrorMessage um em)
   where
-  (markCode, markCodeBox) = (colorCode &&& colorCodeBox) codeColor
+  (markCode, markCodeBox) = (colorCode &&& colorCodeBox) $ markCodeColor <$> codeColor
 
   -- Pretty print an ErrorMessage
   prettyPrintErrorMessage :: TypeMap -> ErrorMessage -> Box.Box
@@ -1766,7 +1791,8 @@ prettyPrintMultipleErrorsBox ppeOptions = prettyPrintMultipleErrorsWith (ppeOpti
 prettyPrintMultipleErrorsWith :: PPEOptions -> String -> String -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleErrorsWith ppeOptions intro _ (MultipleErrors [e]) =
   let result = prettyPrintSingleError ppeOptions e
-  in [ Box.vcat Box.left [ Box.text intro
+      codeColor = codeWarningOrErrorColor ppeOptions
+  in [ Box.vcat Box.left [ colorCodeBox codeColor  $ Box.text intro
                          , result
                          ]
      ]
@@ -1774,7 +1800,8 @@ prettyPrintMultipleErrorsWith ppeOptions _ intro (MultipleErrors es) =
   let result = map (prettyPrintSingleError ppeOptions) es
   in concat $ zipWith withIntro [1 :: Int ..] result
   where
-  withIntro i err = [ Box.text (intro ++ " " ++ show i ++ " of " ++ show (length es) ++ ":")
+  codeColor = codeWarningOrErrorColor ppeOptions
+  withIntro i err = [ colorCodeBox codeColor $ Box.text (intro ++ " " ++ show i ++ " of " ++ show (length es) ++ ":")
                     , Box.moveRight 2 err
                     ]
 

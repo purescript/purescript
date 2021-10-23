@@ -36,7 +36,7 @@ data PSCMakeOptions = PSCMakeOptions
 printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
 printWarningsAndErrors verbose False warnings errors = do
   pwd <- getCurrentDirectory
-  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stdout
+  cc <- bool Nothing (Just P.defaultCodeColors) <$> ANSI.hSupportsANSI stdout
   let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd }
   when (P.nonEmpty warnings) $
     putStrLn (P.prettyPrintMultipleWarnings ppeOpts warnings)
