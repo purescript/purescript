@@ -276,6 +276,9 @@ pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 pattern IsSymbolIdent :: Qualified Ident
 pattern IsSymbolIdent = Qualified (Just DataSymbol) (Ident "IsSymbol")
 
+pattern IsSymbolDict :: Qualified Ident
+pattern IsSymbolDict = Qualified (Just DataSymbol) (Ident "IsSymbol$Dict")
+
 pattern SProxyType :: Qualified (ProperName 'TypeName)
 pattern SProxyType = Qualified (Just DataSymbol) (ProperName "SProxy")
 

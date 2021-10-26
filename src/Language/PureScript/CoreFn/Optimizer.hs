@@ -6,7 +6,7 @@ import Data.List (lookup)
 import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CoreFn.Ann
-import Language.PureScript.CoreFn.Expr
+import Language.PureScript.CoreFn.Expr as Expr
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.CoreFn.Traversals
 import Language.PureScript.Names (Ident(UnusedIdent), Qualified(Qualified))
@@ -70,9 +70,11 @@ optimizeRecordGetField
           (App _
             (Var _ C.HasFieldRecord)
             (App _
-              (Var _ C.IsSymbolIdent)
-              (Abs _ _
-                (Literal _ (StringLiteral label)))))
+              (Var _ C.IsSymbolDict)
+              (Literal _ (ObjectLiteral
+                [ ("reflectSymbol", Abs _ _
+                    (Literal _ (StringLiteral label)))
+                ]))))
           _))
       (Var _ C.SProxyIdent))
     object) =
