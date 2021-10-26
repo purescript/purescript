@@ -12,7 +12,11 @@ import Control.Monad.Writer
 import Data.Text (Text, pack)
 
 class Monad m => MonadSupply m where
+  -- |
+  -- Get a new unique Integer
   fresh :: m Integer
+  -- |
+  -- See what the next unique Integer will be
   peek :: m Integer
   default fresh :: (MonadTrans t, MonadSupply n, m ~ t n) => m Integer
   fresh = lift fresh
@@ -29,5 +33,6 @@ instance Monad m => MonadSupply (SupplyT m) where
 instance MonadSupply m => MonadSupply (StateT s m)
 instance (Monoid w, MonadSupply m) => MonadSupply (WriterT w m)
 
+-- | Convenience function for returning "$x" where `x` is the next unique integer
 freshName :: MonadSupply m => m Text
 freshName = fmap (("$" <> ) . pack . show) fresh
