@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMultipleTypeOpFixities[0m
 at tests/purs/failing/MultipleTypeOpFixities.purs:9:1 - 9:22 (line 9, column 1 - line 9, column 22)
 

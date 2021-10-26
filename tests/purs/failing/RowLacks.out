@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/RowLacks.purs:16:9 - 16:68 (line 16, column 9 - line 16, column 68)
 

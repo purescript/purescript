@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/CoercibleRepresentational5.purs:15:38 - 15:44 (line 15, column 38 - line 15, column 44)
 

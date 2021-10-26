@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mDoNotSuggestComposition[0m
 at tests/purs/failing/DoNotSuggestComposition.purs:13:11 - 13:12 (line 13, column 11 - line 13, column 12)
 

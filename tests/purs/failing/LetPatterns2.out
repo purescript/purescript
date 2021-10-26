@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/LetPatterns2.purs:11:9 - 11:10 (line 11, column 9 - line 11, column 10)
 

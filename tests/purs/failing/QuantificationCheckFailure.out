@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/QuantificationCheckFailure.purs:13:48 - 13:69 (line 13, column 48 - line 13, column 69)
 

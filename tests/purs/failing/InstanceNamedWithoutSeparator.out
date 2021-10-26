@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/InstanceNamedWithoutSeparator.purs:9:23 - 9:26 (line 9, column 23 - line 9, column 26)
 
   Unable to parse module:

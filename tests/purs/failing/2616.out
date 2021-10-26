@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/2616.purs:9:1 - 9:38 (line 9, column 1 - line 9, column 38)
 

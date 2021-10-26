@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/OperatorSections.purs:7:3 - 7:17 (line 7, column 3 - line 7, column 17)
 

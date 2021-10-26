@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/CycleInKindDeclaration.purs:7:1 - 7:24 (line 7, column 1 - line 7, column 24)
 
   A cycle appears in a set of kind declarations:

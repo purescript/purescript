@@ -1,4 +1,4 @@
-Warning found:
+[33mWarning found:[0m
 in module [33mMain[0m
 at tests/purs/warning/2140.purs:5:3 - 5:36 (line 5, column 3 - line 5, column 36)
 

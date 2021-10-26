@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mUnknownSuperclassTypeVar[0m
 at tests/purs/failing/Superclasses3.purs:8:12 - 8:13 (line 8, column 12 - line 8, column 13)
 

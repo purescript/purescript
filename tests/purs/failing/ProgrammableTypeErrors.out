@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/ProgrammableTypeErrors.purs:17:13 - 17:27 (line 17, column 13 - line 17, column 27)
 

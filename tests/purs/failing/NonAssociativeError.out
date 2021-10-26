@@ -1,4 +1,4 @@
-Error 1 of 2:
+[31mError 1 of 2:[0m
 
   at tests/purs/failing/NonAssociativeError.purs:7:10 - 7:12 (line 7, column 10 - line 7, column 12)
 
@@ -9,7 +9,7 @@ Error 1 of 2:
   See https://github.com/purescript/documentation/blob/master/errors/NonAssociativeError.md for more information,
   or to contribute content related to this error.
 
-Error 2 of 2:
+[31mError 2 of 2:[0m
 
   at tests/purs/failing/NonAssociativeError.purs:8:19 - 8:21 (line 8, column 19 - line 8, column 21)
 

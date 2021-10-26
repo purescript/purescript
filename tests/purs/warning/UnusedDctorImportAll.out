@@ -1,4 +1,4 @@
-Warning found:
+[33mWarning found:[0m
 in module [33mMain[0m
 at tests/purs/warning/UnusedDctorImportAll.purs:4:1 - 4:36 (line 4, column 1 - line 4, column 36)
 

@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/Arrays.purs:6:26 - 6:27 (line 6, column 26 - line 6, column 27)
 

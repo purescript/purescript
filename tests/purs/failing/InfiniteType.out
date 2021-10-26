@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/InfiniteType.purs:5:7 - 5:10 (line 5, column 7 - line 5, column 10)
 

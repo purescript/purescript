@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/2128-instance.purs:8:9 - 8:12 (line 8, column 9 - line 8, column 12)
 
   Unable to parse module:

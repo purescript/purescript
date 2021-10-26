@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/MissingClassMember.purs:9:1 - 10:10 (line 9, column 1 - line 10, column 10)
 
   The following type class members have not been implemented:

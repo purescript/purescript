@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/ExportExplicit3.purs:8:9 - 8:12 (line 8, column 9 - line 8, column 12)
 

@@ -1,4 +1,4 @@
-Warning found:
+[33mWarning found:[0m
 in module [33mMain[0m
 at tests/purs/warning/WildcardInferredType2.purs:4:6 - 4:7 (line 4, column 6 - line 4, column 7)
 

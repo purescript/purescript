@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mSuggestComposition[0m
 at tests/purs/failing/SuggestComposition.purs:7:5 - 7:6 (line 7, column 5 - line 7, column 6)
 

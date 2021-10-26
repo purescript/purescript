@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/InvalidOperatorInBinder.purs:12:12 - 12:13 (line 12, column 12 - line 12, column 13)
 
   Operator [33mMain.(:)[0m cannot be used in a pattern as it is an alias for function Main.cons.

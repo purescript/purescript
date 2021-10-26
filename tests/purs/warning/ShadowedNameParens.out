@@ -1,4 +1,4 @@
-Warning found:
+[33mWarning found:[0m
 in module [33mMain[0m
 at tests/purs/warning/ShadowedNameParens.purs:7:5 - 7:6 (line 7, column 5 - line 7, column 6)
 

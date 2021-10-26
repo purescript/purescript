@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/OverlappingInstances.purs:10:1 - 11:13 (line 10, column 1 - line 11, column 13)
 

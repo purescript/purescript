@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/3335-TypeOpAssociativityError.purs:6:1 - 6:33 (line 6, column 1 - line 6, column 33)
 
   Cannot parse an expression that uses multiple instances of the non-associative operator [33mMain.(>>)[0m.

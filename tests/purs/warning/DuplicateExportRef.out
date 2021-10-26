@@ -1,4 +1,4 @@
-Warning 1 of 7:
+[33mWarning 1 of 7:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -9,7 +9,7 @@ Warning 1 of 7:
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
   or to contribute content related to this warning.
 
-Warning 2 of 7:
+[33mWarning 2 of 7:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -20,7 +20,7 @@ Warning 2 of 7:
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
   or to contribute content related to this warning.
 
-Warning 3 of 7:
+[33mWarning 3 of 7:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -31,7 +31,7 @@ Warning 3 of 7:
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
   or to contribute content related to this warning.
 
-Warning 4 of 7:
+[33mWarning 4 of 7:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -42,7 +42,7 @@ Warning 4 of 7:
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
   or to contribute content related to this warning.
 
-Warning 5 of 7:
+[33mWarning 5 of 7:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -53,7 +53,7 @@ Warning 5 of 7:
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
   or to contribute content related to this warning.
 
-Warning 6 of 7:
+[33mWarning 6 of 7:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)
@@ -64,7 +64,7 @@ Warning 6 of 7:
   See https://github.com/purescript/documentation/blob/master/errors/DuplicateExportRef.md for more information,
   or to contribute content related to this warning.
 
-Warning 7 of 7:
+[33mWarning 7 of 7:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/DuplicateExportRef.purs:8:1 - 30:28 (line 8, column 1 - line 30, column 28)

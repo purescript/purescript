@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/ScopedKindVariableSynonym.purs:7:14 - 7:15 (line 7, column 14 - line 7, column 15)
 

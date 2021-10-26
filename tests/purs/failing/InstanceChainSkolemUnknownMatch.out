@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mInstanceChainSkolemUnknownMatch[0m
 at tests/purs/failing/InstanceChainSkolemUnknownMatch.purs:14:13 - 14:36 (line 14, column 13 - line 14, column 36)
 

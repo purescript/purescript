@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mInstanceChains.BothUnknownAndMatch[0m
 at tests/purs/failing/InstanceChainBothUnknownAndMatch.purs:17:13 - 17:55 (line 17, column 13 - line 17, column 55)
 

@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/InstanceSigsDifferentTypes.purs:10:9 - 10:12 (line 10, column 9 - line 10, column 12)
 

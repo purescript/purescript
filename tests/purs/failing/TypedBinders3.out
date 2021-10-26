@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/TypedBinders3.purs:8:4 - 8:15 (line 8, column 4 - line 8, column 15)
 

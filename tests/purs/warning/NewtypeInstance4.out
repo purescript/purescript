@@ -1,4 +1,4 @@
-Warning found:
+[33mWarning found:[0m
 at tests/purs/warning/NewtypeInstance4.purs:23:1 - 23:86 (line 23, column 1 - line 23, column 86)
 
   The derived newtype instance for

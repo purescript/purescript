@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/PrimRow.purs:8:6 - 8:42 (line 8, column 6 - line 8, column 42)
 

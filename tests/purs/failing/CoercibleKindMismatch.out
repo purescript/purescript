@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/CoercibleKindMismatch.purs:15:17 - 15:23 (line 15, column 17 - line 15, column 23)
 

@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/CoercibleNonCanonical1.purs:11:27 - 11:33 (line 11, column 27 - line 11, column 33)
 

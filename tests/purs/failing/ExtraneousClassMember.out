@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/ExtraneousClassMember.purs:11:3 - 11:10 (line 11, column 3 - line 11, column 10)
 
   [33mb[0m is not a member of type class [33mMain.A[0m

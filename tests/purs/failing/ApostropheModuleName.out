@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/ApostropheModuleName.purs:3:8 - 3:18 (line 3, column 8 - line 3, column 18)
 
   Unable to parse module:

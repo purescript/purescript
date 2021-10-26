@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/TypeError.purs:6:13 - 6:16 (line 6, column 13 - line 6, column 16)
 

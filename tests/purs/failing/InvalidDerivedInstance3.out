@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/InvalidDerivedInstance3.purs:8:15 - 8:16 (line 8, column 15 - line 8, column 16)
 
   Type synonym [33mMain.S[0m is partially applied.

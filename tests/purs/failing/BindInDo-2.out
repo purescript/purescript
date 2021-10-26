@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/BindInDo-2.purs:7:7 - 7:16 (line 7, column 7 - line 7, column 16)
 
   The name [33mbind[0m cannot be brought into scope in a do notation block, since do notation uses the same name.

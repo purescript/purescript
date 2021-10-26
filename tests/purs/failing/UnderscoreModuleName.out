@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/UnderscoreModuleName.purs:2:8 - 2:18 (line 2, column 8 - line 2, column 18)
 
   Unable to parse module:

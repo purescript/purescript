@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/CoercibleHigherKindedNewtypes.purs:13:8 - 13:14 (line 13, column 8 - line 13, column 14)
 

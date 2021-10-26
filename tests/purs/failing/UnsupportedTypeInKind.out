@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/UnsupportedTypeInKind.purs:7:28 - 7:38 (line 7, column 28 - line 7, column 38)
 

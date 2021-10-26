@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/SkolemEscape.purs:8:1 - 8:19 (line 8, column 1 - line 8, column 19)
 

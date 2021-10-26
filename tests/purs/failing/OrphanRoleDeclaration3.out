@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/OrphanRoleDeclaration3.purs:8:1 - 8:21 (line 8, column 1 - line 8, column 21)
 

@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/DuplicateRoleDeclaration.purs:6:1 - 6:20 (line 6, column 1 - line 6, column 20)
 

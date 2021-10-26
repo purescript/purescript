@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mTypeSynonyms4[0m
 at tests/purs/failing/TypeSynonyms4.purs:8:12 - 8:15 (line 8, column 12 - line 8, column 15)
 

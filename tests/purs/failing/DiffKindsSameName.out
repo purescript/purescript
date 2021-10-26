@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mDiffKindsSameName[0m
 at tests/purs/failing/DiffKindsSameName.purs:13:18 - 13:31 (line 13, column 18 - line 13, column 31)
 

@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/ConflictingQualifiedImports.purs:7:7 - 7:14 (line 7, column 7 - line 7, column 14)
 

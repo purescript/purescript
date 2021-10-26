@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/Generalization2.purs:6:1 - 7:45 (line 6, column 1 - line 7, column 45)
 

@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/IntOutOfRange.purs:6:5 - 6:15 (line 6, column 5 - line 6, column 15)
 

@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/TypeClasses2.purs:7:8 - 7:22 (line 7, column 8 - line 7, column 22)
 

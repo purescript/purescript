@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mDataBindingGroupErrorPos[0m
 at tests/purs/failing/3275-DataBindingGroupErrorPos.purs:7:19 - 7:22 (line 7, column 19 - line 7, column 22)
 

@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/StandaloneKindSignatures2.purs:8:35 - 8:36 (line 8, column 35 - line 8, column 36)
 

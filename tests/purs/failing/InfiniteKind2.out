@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mInfiniteKind2[0m
 at tests/purs/failing/InfiniteKind2.purs:5:23 - 5:27 (line 5, column 23 - line 5, column 27)
 

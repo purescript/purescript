@@ -1,4 +1,4 @@
-Error 1 of 2:
+[31mError 1 of 2:[0m
 
   at tests/purs/failing/Do.purs:7:12 - 7:21 (line 7, column 12 - line 7, column 21)
 
@@ -8,7 +8,7 @@ Error 1 of 2:
   See https://github.com/purescript/documentation/blob/master/errors/InvalidDoLet.md for more information,
   or to contribute content related to this error.
 
-Error 2 of 2:
+[31mError 2 of 2:[0m
 
   at tests/purs/failing/Do.purs:9:14 - 9:20 (line 9, column 14 - line 9, column 20)
 

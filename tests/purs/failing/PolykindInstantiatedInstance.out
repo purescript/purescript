@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/PolykindInstantiatedInstance.purs:12:26 - 12:42 (line 12, column 26 - line 12, column 42)
 

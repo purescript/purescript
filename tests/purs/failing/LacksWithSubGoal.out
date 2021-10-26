@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mLacksWithSubGoal[0m
 at tests/purs/failing/LacksWithSubGoal.purs:14:11 - 14:33 (line 14, column 11 - line 14, column 33)
 

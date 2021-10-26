@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mOverlappingBinders[0m
 at tests/purs/failing/OverlappingBinders.purs:8:7 - 9:28 (line 8, column 7 - line 9, column 28)
 

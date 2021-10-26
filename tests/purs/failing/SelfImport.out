@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/SelfImport.purs:3:1 - 9:12 (line 3, column 1 - line 9, column 12)
 
   Module [33mMain[0m imports itself.

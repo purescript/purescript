@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMissingRecordField[0m
 at tests/purs/failing/MissingRecordField.purs:10:19 - 10:23 (line 10, column 19 - line 10, column 23)
 

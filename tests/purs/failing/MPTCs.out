@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/MPTCs.purs:9:1 - 10:10 (line 9, column 1 - line 10, column 10)
 

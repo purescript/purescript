@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/ImportHidingModule.purs:4:18 - 4:24 (line 4, column 18 - line 4, column 24)
 
   Unable to parse module:

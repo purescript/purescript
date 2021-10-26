@@ -1,4 +1,4 @@
-Warning 1 of 4:
+[33mWarning 1 of 4:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVarDo.purs:12:3 - 12:15 (line 12, column 3 - line 12, column 15)
@@ -10,7 +10,7 @@ Warning 1 of 4:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 2 of 4:
+[33mWarning 2 of 4:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVarDo.purs:24:7 - 24:23 (line 24, column 7 - line 24, column 23)
@@ -22,7 +22,7 @@ Warning 2 of 4:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 3 of 4:
+[33mWarning 3 of 4:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVarDo.purs:29:3 - 29:16 (line 29, column 3 - line 29, column 16)
@@ -34,7 +34,7 @@ Warning 3 of 4:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 4 of 4:
+[33mWarning 4 of 4:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVarDo.purs:34:7 - 34:24 (line 34, column 7 - line 34, column 24)

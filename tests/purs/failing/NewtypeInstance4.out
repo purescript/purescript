@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 at tests/purs/failing/NewtypeInstance4.purs:8:1 - 8:40 (line 8, column 1 - line 8, column 40)
 
   Cannot derive newtype instance for

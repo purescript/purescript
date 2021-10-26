@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/CaseBinderLengthsDiffer.purs:5:3 - 5:10 (line 5, column 3 - line 5, column 10)
 

@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/CoercibleOpenRowsDoNotUnify.purs:7:12 - 7:18 (line 7, column 12 - line 7, column 18)
 

@@ -1,4 +1,4 @@
-Warning found:
+[33mWarning found:[0m
 in module [33mMain[0m
 at tests/purs/warning/HiddenConstructorsGeneric.purs:2:1 - 8:40 (line 2, column 1 - line 8, column 40)
 

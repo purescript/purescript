@@ -1,4 +1,4 @@
-Error found:
+[31mError found:[0m
 in module [33mMain[0m
 at tests/purs/failing/RowsInKinds.purs:14:16 - 14:17 (line 14, column 16 - line 14, column 17)
 
