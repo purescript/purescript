@@ -2,6 +2,20 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.14.5
+
+Bugfixes:
+
+* Fix a case where kind inference inferred the wrong kind for type synonyms (#4184 by @jy14898)
+
+* Properly rename module imports in case of conflicts with declarations (#4188 by @PureFunctor)
+
+Internal:
+
+* Fix command and clarify a few other requirements in release guide (#4177 by @JordanMartinez)
+
+* Add `Functor` instance for `Language.PureScript.CoreFn.Module`. (#4186 by @cdepillabout)
+
 ## v0.14.4
 
 Bugfixes:
