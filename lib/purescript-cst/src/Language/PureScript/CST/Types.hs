@@ -17,16 +17,24 @@ import qualified Language.PureScript.Names as N
 import qualified Language.PureScript.Roles as R
 import Language.PureScript.PSString (PSString)
 
+-- |
+-- Source code's line and column for a token.
 data SourcePos = SourcePos
   { srcLine :: {-# UNPACK #-} !Int
   , srcColumn :: {-# UNPACK #-} !Int
   } deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- Source code's start and end range for a token.
 data SourceRange = SourceRange
   { srcStart :: !SourcePos
   , srcEnd :: !SourcePos
   } deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- Non-code related content in the source code.
+-- The @l@ type parameter is either `Void`, making the @Line@ data constructor imposible for that usage,
+-- or `LineFeed`.
 data Comment l
   = Comment !Text
   | Space {-# UNPACK #-} !Int
@@ -36,12 +44,18 @@ data Comment l
 data LineFeed = LF | CRLF
   deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- The position of a token in source code as well as
+-- its surrounding comments (if any)
 data TokenAnn = TokenAnn
-  { tokRange :: !SourceRange
-  , tokLeadingComments :: ![Comment LineFeed]
-  , tokTrailingComments :: ![Comment Void]
+  { tokRange :: !SourceRange -- ^ The position of the token in source code
+  , tokLeadingComments :: ![Comment LineFeed] -- ^ Comments before the token
+  , tokTrailingComments :: ![Comment Void] -- ^ Comments after the token
   } deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- Used to indicate whether a given keyword (e.g. "forall")
+-- is using the text or unicode symbol version.
 data SourceStyle = ASCII | Unicode
   deriving (Show, Eq, Ord, Generic)
 
@@ -81,11 +95,16 @@ data Token
   | TokEof
   deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- Source code token and annotation (i.e. position and comments)
 data SourceToken = SourceToken
   { tokAnn :: !TokenAnn
   , tokValue :: !Token
   } deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- An identifier as it appears in the source code. For example
+-- - the @x@ in @functionName arg1 x = arg1@
 data Ident = Ident
   { getIdent :: Text
   } deriving (Show, Eq, Ord, Generic)
@@ -95,64 +114,193 @@ data Name a = Name
   , nameValue :: a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- A name (e.g. @name@) that may have a qualified module preceding it (e.g. @ModuleAlias.name@).
 data QualifiedName a = QualifiedName
   { qualTok :: SourceToken
   , qualModule :: Maybe N.ModuleName
   , qualName :: a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Represents a label in a row
 data Label = Label
   { lblTok :: SourceToken
   , lblName :: PSString
   } deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- An @a@ wrapped by an opening and closing boundary token (e.g. parenthesis)
 data Wrapped a = Wrapped
   { wrpOpen :: SourceToken
   , wrpValue :: a
   , wrpClose :: SourceToken
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- A non-empty list of @a@ where each @a@ is separated by some delimiter `SourceToken`.
+-- Conceptually, if the @a@ was @Int@ and the `SourceToken` was @Text@ and the below syntax was supported:
+-- - @[1]@
+-- - @[1, "a", 2]@
+-- - @[1, "a", 2, "b", 3, "c", 4]@
 data Separated a = Separated
   { sepHead :: a
   , sepTail :: [(SourceToken, a)]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Represents @a :: b@, such as what is found in a row
+-- (e.g. the @label :: String@ part in @( label :: String )@)
 data Labeled a b = Labeled
   { lblLabel :: a
   , lblSep :: SourceToken
   , lblValue  :: b
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- A potentially empty list of @a@ that is wrapped in some opening and closing boundary
+-- `SourceToken` (e.g. parenthesis). Each @a@ element is separated by some delimiter `SourceToken`.
+--
+-- Conceptually, if the @a@ was @Int@ and the `SourceToken` was @Text@ and the boundary
+-- tokens were parenthesis and the below syntax was supported,
+-- - @([])@
+-- - @([1])@
+-- - @([1, "a", 2])@
+-- - @([1, "a", 2, "b", 3, "c", 4])@
 type Delimited a = Wrapped (Maybe (Separated a))
+
+-- |
+-- A non-empty list of @a@ that is wrapped in some opening and closing boundary
+-- `SourceToken` (e.g. parenthesis). Each @a@ element is separated by some delimiter `SourceToken.
+--
+-- Conceptually, if the @a@ was @Int@ and the `SourceToken` was @Text@ and the boundary
+-- tokens were parenthesis and the below syntax was supported,
+-- - @([1])@
+-- - @([1, "a", 2])@
+-- - @([1, "a", 2, "b", 3, "c", 4])@
 type DelimitedNonEmpty a = Wrapped (Separated a)
 
+-- |
+-- A single @a@ or a non-empty list of @a@ where each @a@ is separated by some delimiter `SourceToken`
+-- that is wrapped in some opening and closing boundary `SourceToken` (e.g. parenthesis).
+--
+-- Conceptually, if the @a@ was @Int@ and the `SourceToken` was @Text@ and the boundary
+-- tokens were parenthesis and the below syntax was supported,
+-- - @One 1@
+-- - @Many ([1])@ -- only difference here is the boundary tokens surrounding the value
+-- - @Many ([1, "a", 2])@
+-- - @Many ([1, "a", 2, "b", 3, "c", 4])@
 data OneOrDelimited a
   = One a
   | Many (DelimitedNonEmpty a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- The main @Type@ type. The @a@ type typically refers to the token's annotation
+-- (e.g. position and comments) and always appears as the first argument for each constructor.
 data Type a
+  -- |
+  -- An identifier in the source code, such as
+  -- - The @x@ in @let x = 4 in ...@
+  -- - The @x@ in @foo :: { x :: String }@
+  -- - The @x@ in @foreign import foo :: { x :: String }@
+  -- - The @x@ in @case y of Something x -> ...@
+  -- - The @x@ in @class Bar x where ...@
+  -- - The @x@ in @instance x :: Bar String where ...@
+  -- - The @x@ in @module Foo (x) where ...@
+  -- - The @x@ in @module Foo where import Bar (x) ...@
   = TypeVar a (Name Ident)
+  -- |
+  -- The name of a type (e.g. @Maybe@ or @ModuleAlias.Maybe@)
   | TypeConstructor a (QualifiedName (N.ProperName 'N.TypeName))
+  -- |
+  -- The @_@ character in
+  -- > x :: Array _
+  -- > x = [ 1 ]
   | TypeWildcard a SourceToken
+  -- |
+  -- The @?Help@ in
+  -- > x :: Array ?Help
+  -- > x = [ 1 ]
   | TypeHole a (Name Ident)
+  -- |
+  -- A Symbol (i.e. type-level String) written as a literal string
   | TypeString a SourceToken PSString
+  -- |
+  -- A few possible options
+  -- - an empty row: @()@
+  -- - an open row: @( | otherRows )@
+  -- - a closed row with labels: @( label :: Type, label2 :: Type2 )@
+  -- - an open row with labels: @( label :: Type | otherRows )@
   | TypeRow a (Wrapped (Row a))
+  -- |
+  -- A literal record type, whether open or closed:
+  -- - an empty record: @{}@
+  -- - an open record: @{ | otherRows @
+  -- - a closed record with labels: @{ label :: Type, label2 :: Type2 }@
+  -- - an open record with labels: @{ label :: Type | otherRows }@
   | TypeRecord a (Wrapped (Row a))
-  | TypeForall a SourceToken (NonEmpty (TypeVarBinding a)) SourceToken (Type a)
+  -- |
+  -- Given...
+  -- > x :: forall a b c. a -> b -> c -> String
+  -- > x _ _ _ = "foo"
+  -- Arguments would be:
+  -- - SourceToken: @forall@
+  -- - NonEmpty (TypeVarBinding a): @a b c@
+  -- - SourceToken: @.@
+  -- - Type a - @a -> b -> c -> String@
+  | TypeForall a SourceToken {- ^ The 'forall' keyword -} (NonEmpty (TypeVarBinding a)) SourceToken (Type a)
+  -- |
+  -- A type that is annotated with a kind. For example,
+  -- > value :: Type
+  -- Due to clashing with row syntax, this data constructor will often
+  -- have its first type argument wrapped in a @TypeParens@
+  -- For example, @(a :: Foo)@ is a row whereas @((a) :: Foo)@ is @a@ annotated with kind, @Foo@.
   | TypeKinded a (Type a) SourceToken (Type a)
+  -- |
+  -- Constructs a type via type application
+  -- @Maybe String@ would be encoded as @TypeApp sourceAnnotation maybeType stringType@
   | TypeApp a (Type a) (Type a)
+  -- |
+  -- A potentially qualified operator (e.g. a sequence of symbols) in an infix position.
+  -- For example, @Type1 %%% Type2@
   | TypeOp a (Type a) (QualifiedName (N.OpName 'N.TypeOpName)) (Type a)
+  -- A potentially qualified operator (e.g. a sequence of symbols) in a prefix position.
+  -- For example, @(%%%) Type1 Type2@
   | TypeOpName a (QualifiedName (N.OpName 'N.TypeOpName))
+  -- |
+  -- The first type for a Function in its infix position.
+  -- For example, @InputType -> OutputType@
   | TypeArr a (Type a) SourceToken (Type a)
+  -- |
+  -- The second type for a Function in its prefix position.
+  -- For example, the @(->)@ in @(->) InputType OutputType@
   | TypeArrName a SourceToken
+  -- |
+  -- The @(Show a, Eq a) => ShowEq (f a)@ in
+  -- > instance instName :: (Show a, Eq a) => ShowEq (f a) where ...
   | TypeConstrained a (Constraint a) SourceToken (Type a)
+  -- |
+  -- Wraps the type in parenthesis source tokens
   | TypeParens a (Wrapped (Type a))
+  -- |
+  -- Deprecated row syntax via the @#@ character
+  -- The kind, @Row Type@, was previously @# Type@
   | TypeUnaryRow a SourceToken (Type a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Represents the identifier used for a type variable as found in the following
+-- non-exhaustive examples:
+-- - @functionName :: forall typeVarBinding. InputType -> OutputType@
+-- - @data TypeName typeVarBinding = TypeName@
 data TypeVarBinding a
+  -- |
+  -- A type variable that has a kind annotation. For example
+  -- @data TypeName (a :: Symbol) = TypeName@
   = TypeVarKinded (Wrapped (Labeled (Name Ident) (Type a)))
+  -- |
+  -- A type variable that does not have a kind annotation.
   | TypeVarName (Name Ident)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
@@ -161,11 +309,20 @@ data Constraint a
   | ConstraintParens a (Wrapped (Constraint a))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Represents a row without the surrounding boundary characters
+-- (e.g. parenthesis if row, curly braces if record):
+-- - @@ -- empty
+-- - @label1 :: Type1, label2 :: Type2@ -- has labels, but no open tail
+-- - @| allOtherRows@ -- no labels, but has open tail
+-- - @label1 :: Type1, label2 :: Type2 | allOtherRows@ -- has labels and open tail
 data Row a = Row
   { rowLabels :: Maybe (Separated (Labeled Label (Type a)))
   , rowTail :: Maybe (SourceToken, Type a)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Represents a CST module
 data Module a = Module
   { modAnn :: a
   , modKeyword :: SourceToken
@@ -177,33 +334,194 @@ data Module a = Module
   , modTrailingComments :: [Comment LineFeed]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Represents a CST export
 data Export a
+  -- |
+  -- Exports a value. For example
+  -- @
+  -- module Main (value) where
+  --
+  -- value :: String
+  -- value = "exported value"
+  -- @
   = ExportValue a (Name Ident)
+  -- |
+  -- Exports a value-level symbolic operator. For example
+  -- @
+  -- module Main ((++++)) where
+  --
+  -- value :: String
+  -- value = "exported value"
+  --
+  -- infixl 4 value as ++++
+  -- @
   | ExportOp a (Name (N.OpName 'N.ValueOpName))
+  -- |
+  -- Exports a Type and potentially its members. For example
+  -- @
+  -- module Main (Type(..)) where
+  --
+  -- data Type = Constructor
+  -- @
+  -- or...
+  -- @
+  -- module Main (Type) where
+  --
+  -- data Type = Constructor
+  -- @
   | ExportType a (Name (N.ProperName 'N.TypeName)) (Maybe (DataMembers a))
+  -- |
+  -- Exports a type-level symbolic operator. For example
+  -- @
+  -- module Main ((++++)) where
+  --
+  -- data RowApply f a = f a
+  --
+  -- infixl 4 type RowApply as ++++
+  -- @
   | ExportTypeOp a SourceToken (Name (N.OpName 'N.TypeOpName))
+  -- |
+  -- Exports a type class. For example
+  -- @
+  -- module Main (class TypeClassName) where
+  --
+  -- class TypeClassName
+  -- @
   | ExportClass a SourceToken (Name (N.ProperName 'N.ClassName))
+  -- |
+  -- Deprecated syntax for exporting a kind. Will be removed in next breaking change. For example
+  -- @
+  -- module Main (kind MyKind) where
+  --
+  -- foreign import data MyKind :: Type
+  -- @
   | ExportKind a SourceToken (Name (N.ProperName 'N.TypeName))
+  -- |
+  -- Syntax for exporting a module. For example.
+  -- @
+  -- module Main (module ModuleName) where
+  --
+  -- import Module (a, className, class Foo) as ModuleName
+  -- @
   | ExportModule a SourceToken (Name N.ModuleName)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Indicates whether all, some, or none of a type's members are exported.
 data DataMembers a
+  -- |
+  -- All of the type's members are exported
   = DataAll a SourceToken
+  -- |
+  -- Some or none of the type's members are exported
   | DataEnumerated a (Delimited (Name (N.ProperName 'N.ConstructorName)))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Represents a CST declaration, or everything that comes after a module's imports section
+-- that is not a comment.
 data Declaration a
+  -- |
+  -- Represents a data type declaration:
+  -- @
+  -- data MyType possibleTypeVariables
+  --   = DataConstructor1
+  --   | DataConstructor2 WithArguments
+  -- @
   = DeclData a (DataHead a) (Maybe (SourceToken, Separated (DataCtor a)))
+  -- |
+  -- Represents a type alias declaration:
+  -- @
+  -- type MyType possibleTypeVariables = Int
+  -- @
   | DeclType a (DataHead a) SourceToken (Type a)
+  -- |
+  -- Represents a newtype declaration:
+  -- @
+  -- newtype MyType possibleTypeVariables = DataConstructor ActualType
+  -- @
   | DeclNewtype a (DataHead a) SourceToken (Name (N.ProperName 'N.ConstructorName)) (Type a)
+  -- |
+  -- Represents a type class declaration:
+  -- @
+  -- class ClassName possibleTypeVariables where
+  --   possibleMember :: possibleTypeVariables -> String
+  -- @
   | DeclClass a (ClassHead a) (Maybe (SourceToken, NonEmpty (Labeled (Name Ident) (Type a))))
+  -- |
+  -- Represents a type class instance declaration:
+  -- @
+  -- instance possibleInstanceName :: ClassName TypeName where
+  --   possibleMember :: possibleTypeVariables -> String
+  --   possibleMember _ = "foo"
+  -- else
+  -- instance ClassName Bar where
+  --   posibleMember _ = "bar"
+  -- @
   | DeclInstanceChain a (Separated (Instance a))
+  -- |
+  -- Represents a derived type class instance declaration:
+  --
+  -- @derive instance possibleInstanceName :: Newtype NewtypeName _@
+  --
+  -- or
+  --
+  -- @derive newtype instance possibleInstanceName :: Show NewtypeName@
   | DeclDerive a SourceToken (Maybe SourceToken) (InstanceHead a)
+  -- |
+  -- Represents a kind signature declaration:
+  --
+  -- @
+  -- data Type :: forall k. k -> Type
+  -- @
+  --
+  -- or similarly for @type@ or @newtype@.
   | DeclKindSignature a SourceToken (Labeled (Name (N.ProperName 'N.TypeName)) (Type a))
+  -- |
+  -- Represents a type signature declaration:
+  --
+  -- @
+  -- functionName :: forall a. a -> String
+  -- @
   | DeclSignature a (Labeled (Name Ident) (Type a))
+  -- |
+  -- Represents a function or value declaration
+  -- (i.e. the part under a function/value's type signature):
+  --
+  -- @
+  -- function arg1 arg2 _ | true || (arg1 == arg2) = doSomthing
+  -- @
+  --
+  -- or
+  --
+  -- @
+  -- value = "foo"
+  -- @
   | DeclValue a (ValueBindingFields a)
+  -- |
+  -- Represents an infix declaration.
+  --
+  -- @
+  -- infix 4 functionName as ###
+  -- @
   | DeclFixity a FixityFields
+  -- |
+  -- Represents a foreign function interface (FFI) value, function, or data type declaration.
+  --
+  -- @
+  -- -- A couple of examples:
+  -- foreign import functionName :: Int -> String
+  -- foreign import valueName :: Int
+  -- foreign import data TypeName :: Int -> String
+  -- @
   | DeclForeign a SourceToken SourceToken (Foreign a)
+  -- |
+  -- Represents a role declaration
+  --
+  -- @
+  -- type role SomeType phantom representational nomainl
+  -- @
   | DeclRole a SourceToken SourceToken (Name (N.ProperName 'N.TypeName)) (NonEmpty Role)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
