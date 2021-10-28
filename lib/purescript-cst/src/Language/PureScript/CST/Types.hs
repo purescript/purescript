@@ -524,97 +524,187 @@ data Declaration a
   | DeclRole a SourceToken SourceToken (Name (N.ProperName 'N.TypeName)) (NonEmpty Role)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- A single type class instance
 data Instance a = Instance
-  { instHead :: InstanceHead a
-  , instBody :: Maybe (SourceToken, NonEmpty (InstanceBinding a))
+  { instHead :: InstanceHead a -- ^ Everything before the @where@ keyword
+  , instBody :: Maybe (SourceToken, NonEmpty (InstanceBinding a)) -- ^ the @where@ keyword followed by the body
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Either the type signature declaration for a type class member
+-- (e.g. @Functor@'s @map :: forall a b. (a -> b) -> f a -> f b@)
+-- or a member's implementation.
 data InstanceBinding a
+  -- |
+  -- The type signature declaration for a type class member
+  -- (e.g. @Functor@'s @map :: forall a b. (a -> b) -> f a -> f b@)
   = InstanceBindingSignature a (Labeled (Name Ident) (Type a))
+  -- |
+  -- The implementation for a type class member
+  -- (e.g. @map (Identity a) f = Identity (f a)@).
   | InstanceBindingName a (ValueBindingFields a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- A module's imports
 data ImportDecl a = ImportDecl
-  { impAnn :: a
-  , impKeyword :: SourceToken
-  , impModule :: Name N.ModuleName
+  { impAnn :: a -- ^ any leading comments
+  , impKeyword :: SourceToken -- ^ @import@ keyword
+  , impModule :: Name N.ModuleName -- ^ imported module name
   , impNames :: Maybe (Maybe SourceToken, DelimitedNonEmpty (Import a))
-  , impQual :: Maybe (SourceToken, Name N.ModuleName)
+    -- ^ if a @Just@, then a potential @hiding@ keyword, followed by the imported names of the module's members
+  , impQual :: Maybe (SourceToken, Name N.ModuleName) -- ^ potential module qualifier or alias
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- The type of the import declaration
 data Import a
+  -- |
+  -- Imports a value or function
   = ImportValue a (Name Ident)
+  -- |
+  -- Imports a value-level symbolic operator
   | ImportOp a (Name (N.OpName 'N.ValueOpName))
+  -- |
+  -- Imports a data type or newtype and potentially its constructor(s)
   | ImportType a (Name (N.ProperName 'N.TypeName)) (Maybe (DataMembers a))
+  -- |
+  -- Imports a type alias
   | ImportTypeOp a SourceToken (Name (N.OpName 'N.TypeOpName))
+  -- |
+  -- Imports a type class
   | ImportClass a SourceToken (Name (N.ProperName 'N.ClassName))
+  -- |
+  -- Deprecated syntax for importing kinds. This will be removed in a future breaking release.
   | ImportKind a SourceToken (Name (N.ProperName 'N.TypeName))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Everything for a data type, newtype, or type alias that appears on the left side of the @=@ character
 data DataHead a = DataHead
-  { dataHdKeyword :: SourceToken
-  , dataHdName :: Name (N.ProperName 'N.TypeName)
-  , dataHdVars :: [TypeVarBinding a]
+  { dataHdKeyword :: SourceToken -- ^ either `data`, `newtype`, or `type` keyword
+  , dataHdName :: Name (N.ProperName 'N.TypeName) -- ^ the name of the type
+  , dataHdVars :: [TypeVarBinding a] -- ^ a list of type variables
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Represents a data constructor (i.e. what appears on the right of the @=@ character)
 data DataCtor a = DataCtor
   { dataCtorAnn :: a
   , dataCtorName :: Name (N.ProperName 'N.ConstructorName)
   , dataCtorFields :: [Type a]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Represents the head of a type class (i.e. everything after the @class@ keyword
+-- and the part that goes under a type class kind signature).
 data ClassHead a = ClassHead
-  { clsKeyword :: SourceToken
+  { clsKeyword :: SourceToken -- ^ @class@ keyword
   , clsSuper :: Maybe (OneOrDelimited (Constraint a), SourceToken)
+    -- ^ any type classes upon which this type class builds
   , clsName :: Name (N.ProperName 'N.ClassName)
+    -- ^ the name of the type class
   , clsVars :: [TypeVarBinding a]
+    -- ^ type variables (if any)
   , clsFundeps :: Maybe (SourceToken, Separated ClassFundep)
+    -- ^ functional dependencies (if any)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Indicates the type of functional dependency in a type class
 data ClassFundep
+  -- |
+  -- @-> tyVar3@
   = FundepDetermined SourceToken (NonEmpty (Name Ident))
+  -- |
+  -- @tyVar1 tyVar2 -> tyVar3@
   | FundepDetermines (NonEmpty (Name Ident)) SourceToken (NonEmpty (Name Ident))
   deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- Represents the head of a type class instance (e.g. everything before the @where@ keyword)
 data InstanceHead a = InstanceHead
-  { instKeyword :: SourceToken
-  , instNameSep :: Maybe (Name Ident, SourceToken)
-  , instConstraints :: Maybe (OneOrDelimited (Constraint a), SourceToken)
-  , instClass :: QualifiedName (N.ProperName 'N.ClassName)
-  , instTypes :: [Type a]
+  { instKeyword :: SourceToken -- ^ the @instance@ keyword
+  , instNameSep :: Maybe (Name Ident, SourceToken) -- ^ the optional name and @::@ separator
+  , instConstraints :: Maybe (OneOrDelimited (Constraint a), SourceToken) -- ^ type class constraints
+  , instClass :: QualifiedName (N.ProperName 'N.ClassName) -- ^ the type clsas name
+  , instTypes :: [Type a] -- ^ the types that fill in the the type class' type variables
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- The association direction of an symbolic operator (if any).
 data Fixity
+  -- |
+  -- @ "a" $$$$$ "b"  $$$$$  "c" $$$$$ "d"@
+  --
+  -- becomes
+  --
+  -- @("a" $$$$$ "b") $$$$$ ("c" $$$$$ "d")@
   = Infix
+  -- |
+  -- @  "a" |>>| "b"  |>>| "c"  |>>| "d"@
+  --
+  -- becomes
+  --
+  -- @(("a" |>>| "b") |>>| "c") |>>| "d"@
   | Infixl
+  -- |
+  -- @"a" |<<|  "b" |<<|  "c" |<<| "d"@
+  --
+  -- becomes
+  --
+  -- @"a" |<<| ("b" |<<| ("c" |<<| "d"))@
   | Infixr
   deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- Defines whether the symbolic operator is an alias for a value-level identifier
+-- or a type-level identifier
 data FixityOp
+  -- |
+  -- The @valueName as ***@ part in @infixl 4 valueName as ***@
   = FixityValue (QualifiedName (Either Ident (N.ProperName 'N.ConstructorName))) SourceToken (Name (N.OpName 'N.ValueOpName))
+  -- |
+  -- The @TypeName as ***@ part in @infixl 4 type TypeName as ***@
   | FixityType SourceToken (QualifiedName (N.ProperName 'N.TypeName)) SourceToken (Name (N.OpName 'N.TypeOpName))
   deriving (Show, Eq, Ord, Generic)
 
 data FixityFields = FixityFields
-  { fxtKeyword :: (SourceToken, Fixity)
-  , fxtPrec :: (SourceToken, Integer)
-  , fxtOp :: FixityOp
+  { fxtKeyword :: (SourceToken, Fixity) -- ^ infixl, infixr, or infix keyword
+  , fxtPrec :: (SourceToken, Integer) -- ^ the infix precendence level
+  , fxtOp :: FixityOp -- ^ the infix type (i.e. value or type)
   } deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- Represents a value or a function's implementation
+-- (i.e. the part that appears under the type signature).
+--
+-- @
+-- let x arg1 arg2
+--   | guard arg1 = arg2
+--   | otherwise = arg1
+-- @
 data ValueBindingFields a = ValueBindingFields
-  { valName :: Name Ident
-  , valBinders :: [Binder a]
+  { valName :: Name Ident -- ^ the name of the value or function
+  , valBinders :: [Binder a] -- ^ the arguments (if any) to a function
   , valGuarded :: Guarded a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Indicates whether a guard exists in a function or value's implementation
 data Guarded a
+  -- |
+  -- No guards are used
   = Unconditional SourceToken (Where a)
+  -- |
+  -- One or more guards are used
   | Guarded (NonEmpty (GuardedExpr a))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data GuardedExpr a = GuardedExpr
-  { grdBar :: SourceToken
-  , grdPatterns :: Separated (PatternGuard a)
+  { grdBar :: SourceToken -- ^ the @|@ character
+  , grdPatterns :: Separated (PatternGuard a) -- ^ a list of guards separated by the @,@ character
   , grdSep :: SourceToken
   , grdWhere :: Where a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
@@ -624,9 +714,20 @@ data PatternGuard a = PatternGuard
   , patExpr :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- The content after the @foreign import@ syntax. For example,
+-- @valueName :: String@ in @foreign import valueName :: String@.
 data Foreign a
+  -- |
+  -- A foreign value, such as @foreign import value :: String@
   = ForeignValue (Labeled (Name Ident) (Type a))
+  -- |
+  -- A foreign data type, such as @foreign import data TypeName :: Type -> Type@
   | ForeignData SourceToken (Labeled (Name (N.ProperName 'N.TypeName)) (Type a))
+  -- |
+  -- Deprecated syntax for defining kinds. This will be removed in a future breaking release.
+  --
+  -- A kind defintion, such as @foreign import kind KindName@
   | ForeignKind SourceToken (Name (N.ProperName 'N.TypeName))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
@@ -635,31 +736,75 @@ data Role = Role
   , roleValue :: R.Role
   } deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- A value-level term in the language.
 data Expr a
+  -- |
+  -- The @?WhatIsThis@ text in
+  --
+  -- @
+  -- myVal :: String
+  -- myVal = ?WhatIsThis
+  -- @
   = ExprHole a (Name Ident)
+  -- |
+  -- The @_@ text in
+  --
+  -- @
+  -- myVal :: String
+  -- myVal = _
+  -- @
   | ExprSection a SourceToken
+  -- |
+  -- The second @name@ text in
+  --
+  -- @
+  -- myVal :: String -> String
+  -- myVal name = name
+  -- @
   | ExprIdent a (QualifiedName Ident)
   | ExprConstructor a (QualifiedName (N.ProperName 'N.ConstructorName))
+  -- | A literal @true@ or @false@ value
   | ExprBoolean a SourceToken Bool
+  -- | A literal @Char@ value
   | ExprChar a SourceToken Char
+  -- | A literal @String@ value
   | ExprString a SourceToken PSString
+  -- | A literal @Int@ or @Number@ value
   | ExprNumber a SourceToken (Either Integer Double)
+  -- | A literal @Array@ value
   | ExprArray a (Delimited (Expr a))
+  -- | A literal @Record@ value
   | ExprRecord a (Delimited (RecordLabeled (Expr a)))
+  -- | An expression wrapped in parenthesis
   | ExprParens a (Wrapped (Expr a))
+  -- | An expression followed by a type annotation (e.g. @expr :: Type@)
   | ExprTyped a (Expr a) SourceToken (Type a)
+  -- | An infixed version of a function call (e.g. @arg1 `functionName` arg2).
   | ExprInfix a (Expr a) (Wrapped (Expr a)) (Expr a)
+  -- | An infixed version of a symbolic operator (e.g. @1 + 2@)
   | ExprOp a (Expr a) (QualifiedName (N.OpName 'N.ValueOpName)) (Expr a)
+  -- | A standalone version of a symbolic operator (e.g. @(+)@ in @fold (+) 0 [1]@)
   | ExprOpName a (QualifiedName (N.OpName 'N.ValueOpName))
+  -- | Negate a numerical value
   | ExprNegate a SourceToken (Expr a)
+  -- | Access a field within a record (e.g. @record.field@)
   | ExprRecordAccessor a (RecordAccessor a)
+  -- | Update a field within a record with a new value (e.g. @record { field = new }@)
   | ExprRecordUpdate a (Expr a) (DelimitedNonEmpty (RecordUpdate a))
+  -- | Apply an argument to a function (e.g. @(\x -> x) 4@)
   | ExprApp a (Expr a) (Expr a)
+  -- | Define an anonymous function (e.g. @\x -> x + 1@)
   | ExprLambda a (Lambda a)
+  -- | An @if cond then truePath else falsePath@ expression
   | ExprIf a (IfThenElse a)
+  -- | A @case b1, b2, ..., bn of@ expression
   | ExprCase a (CaseOf a)
+  -- | A @let ... in ...@ expression
   | ExprLet a (LetIn a)
+  -- | A monadic do expression
   | ExprDo a (DoBlock a)
+  -- | An applicative do expression
   | ExprAdo a (AdoBlock a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
@@ -674,82 +819,154 @@ data RecordUpdate a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data RecordAccessor a = RecordAccessor
-  { recExpr :: Expr a
-  , recDot :: SourceToken
-  , recPath :: Separated Label
+  { recExpr :: Expr a -- ^ Record expression
+  , recDot :: SourceToken -- ^ The @.@ character
+  , recPath :: Separated Label -- ^ A list of labels interleaved by a @.@ character
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data Lambda a = Lambda
-  { lmbSymbol :: SourceToken
-  , lmbBinders :: NonEmpty (Binder a)
-  , lmbArr :: SourceToken
-  , lmbBody :: Expr a
+  { lmbSymbol :: SourceToken -- ^ The @\@ character
+  , lmbBinders :: NonEmpty (Binder a) -- ^ The arguments of the function
+  , lmbArr :: SourceToken -- ^ The @->@ text
+  , lmbBody :: Expr a -- ^ The body of the function
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data IfThenElse a = IfThenElse
-  { iteIf :: SourceToken
+  { iteIf :: SourceToken -- ^ @if@ keyword
   , iteCond :: Expr a
-  , iteThen :: SourceToken
+  , iteThen :: SourceToken -- ^ @then@ keyword
   , iteTrue :: Expr a
-  , iteElse :: SourceToken
+  , iteElse :: SourceToken -- ^ @else@ keyword
   , iteFalse :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data CaseOf a = CaseOf
-  { caseKeyword :: SourceToken
+  { caseKeyword :: SourceToken -- ^ @case@ keyword
   , caseHead :: Separated (Expr a)
-  , caseOf :: SourceToken
+  , caseOf :: SourceToken -- ^ @of@ keyword
   , caseBranches :: NonEmpty (Separated (Binder a), Guarded a)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data LetIn a = LetIn
-  { letKeyword :: SourceToken
+  { letKeyword :: SourceToken -- ^ @let@ keyword
   , letBindings :: NonEmpty (LetBinding a)
-  , letIn :: SourceToken
+  , letIn :: SourceToken -- ^ @in@ keyword
   , letBody :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- The body of a function, let binding, etc., which may have a @where@ block
+-- that follows that body.
 data Where a = Where
-  { whereExpr :: Expr a
+  { whereExpr :: Expr a -- ^ The expression block
   , whereBindings :: Maybe (SourceToken, NonEmpty (LetBinding a))
+    -- ^ A possible @where@ keyword followed by the contents of a where block
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data LetBinding a
+  -- | The type signature for a let binding (e.g. @let x :: String@)
   = LetBindingSignature a (Labeled (Name Ident) (Type a))
+  -- | The implementation for a let binding (e.g. @let x arg1 arg2 = ...)
   | LetBindingName a (ValueBindingFields a)
+  -- | The implementation for a let binding (e.g. @let x arg1 arg2 = ...)
   | LetBindingPattern a (Binder a) SourceToken (Where a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- A monadic do block
+--
+-- @
+--    do
+--  let value = 1
+--  x <- foo
+--  bar
+-- @
 data DoBlock a = DoBlock
-  { doKeyword :: SourceToken
+  { doKeyword :: SourceToken -- ^ @do@ keyword
   , doStatements :: NonEmpty (DoStatement a)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- One bind expression in a monadic do block
+--
+-- @
+--    do
+--  let          -- DoLet
+--    value1 = 1
+--    value2 = 1
+--  x <- foo     -- DoBind
+--  bar          -- DoDiscard
+-- @
 data DoStatement a
+  -- |
+  -- @
+  --    do
+  --  let
+  --    value1 = 1
+  --    value2 = 1
+  -- @
   = DoLet SourceToken (NonEmpty (LetBinding a))
+  -- |
+  -- @
+  --    do
+  --  x <- foo
+  -- @
   | DoDiscard (Expr a)
+  -- |
+  -- @
+  --    do
+  --  bar
+  -- @
   | DoBind (Binder a) SourceToken (Expr a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- One bind expression in an applicative do block
+--
+-- @
+--    ado
+--  let          -- DoLet
+--    value1 = 1
+--    value2 = 1
+--  x <- foo     -- DoBind
+--  bar          -- DoDiscard
+--  in x + value1 + value2
+-- @
 data AdoBlock a = AdoBlock
-  { adoKeyword :: SourceToken
-  , adoStatements :: [DoStatement a]
-  , adoIn :: SourceToken
-  , adoResult :: Expr a
+  { adoKeyword :: SourceToken -- ^ @ado@ keyword
+  , adoStatements :: [DoStatement a] -- ^ a list of expressions composed via `apply`
+  , adoIn :: SourceToken -- ^ @in@ keyword
+  , adoResult :: Expr a -- ^ the expression used for `map`
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+-- |
+-- Syntax for pattern matching (e.g. "case _ of" branches, let bindings, etc.)
 data Binder a
+  -- | Binder for @_@, which ignores the argument completely.
   = BinderWildcard a SourceToken
+  -- | Binds the given name to a value (e.g. @someNameInCaseBranch -> ...@)
   | BinderVar a (Name Ident)
+  -- | Binds the given name to a value that may have additional binders
+  -- (e.g. @name\@{ literal: "record" }@)
   | BinderNamed a (Name Ident) SourceToken (Binder a)
+  -- | Binds the given constructor
   | BinderConstructor a (QualifiedName (N.ProperName 'N.ConstructorName)) [Binder a]
+  -- | Binds to a literal true or false value
   | BinderBoolean a SourceToken Bool
+  -- | Binds to a literal char value
   | BinderChar a SourceToken Char
+  -- | Binds to a literal String value
   | BinderString a SourceToken PSString
+  -- | Binds to a literal numerical value that may have a @-@ character in front of it
   | BinderNumber a (Maybe SourceToken) SourceToken (Either Integer Double)
+  -- | Binds to a literal array value
   | BinderArray a (Delimited (Binder a))
+  -- | Binds to a literal record value
   | BinderRecord a (Delimited (RecordLabeled (Binder a)))
+  -- | Binds to a value wrapped in parenthesis
   | BinderParens a (Wrapped (Binder a))
+  -- | Binds to a value with a type annotation (e.g. @(foo :: Int) <- ...@)
   | BinderTyped a (Binder a) SourceToken (Type a)
+  -- | Binds to a symbolic operator (e.g. @(value1 :| value2)@)
   | BinderOp a (Binder a) (QualifiedName (N.OpName 'N.ValueOpName)) (Binder a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
