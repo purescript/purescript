@@ -90,8 +90,13 @@ data Token
   | TokInt !Text !Integer
   | TokNumber !Text !Double
   | TokLayoutStart
+    -- ^ Indicates the start of a new indentation block.
+    -- All expressions must be indented at least to here to be considered part of the block.
   | TokLayoutSep
+    -- ^ Indicates a separator between two entities within the same indentation block.
   | TokLayoutEnd
+    -- ^ Indicates the end of an indentation block.
+    -- All expressions after this one will be part of the previous block.
   | TokEof
   deriving (Show, Eq, Ord, Generic)
 
