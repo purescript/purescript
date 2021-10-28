@@ -149,8 +149,7 @@ data Separated a = Separated
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 -- |
--- Represents @a :: b@, such as what is found in a row
--- (e.g. the @label :: String@ part in @( label :: String )@)
+-- Stores two values separated by @::@.
 data Labeled a b = Labeled
   { lblLabel :: a
   , lblSep :: SourceToken
