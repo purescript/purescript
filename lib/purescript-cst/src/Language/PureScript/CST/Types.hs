@@ -144,10 +144,6 @@ data Wrapped a = Wrapped
 
 -- |
 -- A non-empty list of @a@ where each @a@ is separated by some delimiter `SourceToken`.
--- Conceptually, if the @a@ was @Int@ and the `SourceToken` was @Text@ and the below syntax was supported:
--- - @[1]@
--- - @[1, "a", 2]@
--- - @[1, "a", 2, "b", 3, "c", 4]@
 data Separated a = Separated
   { sepHead :: a
   , sepTail :: [(SourceToken, a)]
@@ -164,36 +160,16 @@ data Labeled a b = Labeled
 -- |
 -- A potentially empty list of @a@ that is wrapped in some opening and closing boundary
 -- `SourceToken` (e.g. parenthesis). Each @a@ element is separated by some delimiter `SourceToken`.
---
--- Conceptually, if the @a@ was @Int@ and the `SourceToken` was @Text@ and the boundary
--- tokens were parenthesis and the below syntax was supported,
--- - @([])@
--- - @([1])@
--- - @([1, "a", 2])@
--- - @([1, "a", 2, "b", 3, "c", 4])@
 type Delimited a = Wrapped (Maybe (Separated a))
 
 -- |
 -- A non-empty list of @a@ that is wrapped in some opening and closing boundary
 -- `SourceToken` (e.g. parenthesis). Each @a@ element is separated by some delimiter `SourceToken.
---
--- Conceptually, if the @a@ was @Int@ and the `SourceToken` was @Text@ and the boundary
--- tokens were parenthesis and the below syntax was supported,
--- - @([1])@
--- - @([1, "a", 2])@
--- - @([1, "a", 2, "b", 3, "c", 4])@
 type DelimitedNonEmpty a = Wrapped (Separated a)
 
 -- |
 -- A single @a@ or a non-empty list of @a@ where each @a@ is separated by some delimiter `SourceToken`
 -- that is wrapped in some opening and closing boundary `SourceToken` (e.g. parenthesis).
---
--- Conceptually, if the @a@ was @Int@ and the `SourceToken` was @Text@ and the boundary
--- tokens were parenthesis and the below syntax was supported,
--- - @One 1@
--- - @Many ([1])@ -- only difference here is the boundary tokens surrounding the value
--- - @Many ([1, "a", 2])@
--- - @Many ([1, "a", 2, "b", 3, "c", 4])@
 data OneOrDelimited a
   = One a
   | Many (DelimitedNonEmpty a)
