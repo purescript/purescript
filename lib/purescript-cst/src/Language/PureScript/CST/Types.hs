@@ -48,9 +48,9 @@ data LineFeed = LF | CRLF
 -- The position of a token in source code as well as
 -- its surrounding comments (if any)
 data TokenAnn = TokenAnn
-  { tokRange :: !SourceRange -- ^ The position of the token in source code
-  , tokLeadingComments :: ![Comment LineFeed] -- ^ Comments before the token
-  , tokTrailingComments :: ![Comment Void] -- ^ Comments after the token
+  { tokRange :: !SourceRange
+  , tokLeadingComments :: ![Comment LineFeed]
+  , tokTrailingComments :: ![Comment Void]
   } deriving (Show, Eq, Ord, Generic)
 
 -- |
@@ -530,12 +530,12 @@ data InstanceBinding a
 -- |
 -- A module's imports
 data ImportDecl a = ImportDecl
-  { impAnn :: a -- ^ any leading comments
-  , impKeyword :: SourceToken -- ^ @import@ keyword
-  , impModule :: Name N.ModuleName -- ^ imported module name
+  { impAnn :: a
+  , impKeyword :: SourceToken
+  , impModule :: Name N.ModuleName
   , impNames :: Maybe (Maybe SourceToken, DelimitedNonEmpty (Import a))
     -- ^ if a @Just@, then a potential @hiding@ keyword, followed by the imported names of the module's members
-  , impQual :: Maybe (SourceToken, Name N.ModuleName) -- ^ potential module qualifier or alias
+  , impQual :: Maybe (SourceToken, Name N.ModuleName)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 -- |
@@ -564,9 +564,9 @@ data Import a
 -- |
 -- Everything for a data type, newtype, or type alias that appears on the left side of the @=@ character
 data DataHead a = DataHead
-  { dataHdKeyword :: SourceToken -- ^ either `data`, `newtype`, or `type` keyword
-  , dataHdName :: Name (N.ProperName 'N.TypeName) -- ^ the name of the type
-  , dataHdVars :: [TypeVarBinding a] -- ^ a list of type variables
+  { dataHdKeyword :: SourceToken
+  , dataHdName :: Name (N.ProperName 'N.TypeName)
+  , dataHdVars :: [TypeVarBinding a]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 -- |
@@ -581,15 +581,11 @@ data DataCtor a = DataCtor
 -- Represents the head of a type class (i.e. everything after the @class@ keyword
 -- and the part that goes under a type class kind signature).
 data ClassHead a = ClassHead
-  { clsKeyword :: SourceToken -- ^ @class@ keyword
+  { clsKeyword :: SourceToken
   , clsSuper :: Maybe (OneOrDelimited (Constraint a), SourceToken)
-    -- ^ any type classes upon which this type class builds
   , clsName :: Name (N.ProperName 'N.ClassName)
-    -- ^ the name of the type class
   , clsVars :: [TypeVarBinding a]
-    -- ^ type variables (if any)
   , clsFundeps :: Maybe (SourceToken, Separated ClassFundep)
-    -- ^ functional dependencies (if any)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 -- |
@@ -606,11 +602,11 @@ data ClassFundep
 -- |
 -- Represents the head of a type class instance (e.g. everything before the @where@ keyword)
 data InstanceHead a = InstanceHead
-  { instKeyword :: SourceToken -- ^ the @instance@ keyword
-  , instNameSep :: Maybe (Name Ident, SourceToken) -- ^ the optional name and @::@ separator
-  , instConstraints :: Maybe (OneOrDelimited (Constraint a), SourceToken) -- ^ type class constraints
-  , instClass :: QualifiedName (N.ProperName 'N.ClassName) -- ^ the type clsas name
-  , instTypes :: [Type a] -- ^ the types that fill in the the type class' type variables
+  { instKeyword :: SourceToken
+  , instNameSep :: Maybe (Name Ident, SourceToken)
+  , instConstraints :: Maybe (OneOrDelimited (Constraint a), SourceToken)
+  , instClass :: QualifiedName (N.ProperName 'N.ClassName)
+  , instTypes :: [Type a]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 -- |
@@ -667,8 +663,8 @@ data FixityFields = FixityFields
 --   | otherwise = arg1
 -- @
 data ValueBindingFields a = ValueBindingFields
-  { valName :: Name Ident -- ^ the name of the value or function
-  , valBinders :: [Binder a] -- ^ the arguments (if any) to a function
+  { valName :: Name Ident
+  , valBinders :: [Binder a]
   , valGuarded :: Guarded a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
@@ -684,8 +680,8 @@ data Guarded a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data GuardedExpr a = GuardedExpr
-  { grdBar :: SourceToken -- ^ the @|@ character
-  , grdPatterns :: Separated (PatternGuard a) -- ^ a list of guards separated by the @,@ character
+  { grdBar :: SourceToken
+  , grdPatterns :: Separated (PatternGuard a)
   , grdSep :: SourceToken
   , grdWhere :: Where a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
@@ -800,38 +796,38 @@ data RecordUpdate a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data RecordAccessor a = RecordAccessor
-  { recExpr :: Expr a -- ^ Record expression
-  , recDot :: SourceToken -- ^ The @.@ character
-  , recPath :: Separated Label -- ^ A list of labels interleaved by a @.@ character
+  { recExpr :: Expr a
+  , recDot :: SourceToken
+  , recPath :: Separated Label
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data Lambda a = Lambda
-  { lmbSymbol :: SourceToken -- ^ The @\@ character
-  , lmbBinders :: NonEmpty (Binder a) -- ^ The arguments of the function
-  , lmbArr :: SourceToken -- ^ The @->@ text
-  , lmbBody :: Expr a -- ^ The body of the function
+  { lmbSymbol :: SourceToken
+  , lmbBinders :: NonEmpty (Binder a)
+  , lmbArr :: SourceToken
+  , lmbBody :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data IfThenElse a = IfThenElse
-  { iteIf :: SourceToken -- ^ @if@ keyword
+  { iteIf :: SourceToken
   , iteCond :: Expr a
-  , iteThen :: SourceToken -- ^ @then@ keyword
+  , iteThen :: SourceToken
   , iteTrue :: Expr a
-  , iteElse :: SourceToken -- ^ @else@ keyword
+  , iteElse :: SourceToken
   , iteFalse :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data CaseOf a = CaseOf
-  { caseKeyword :: SourceToken -- ^ @case@ keyword
+  { caseKeyword :: SourceToken
   , caseHead :: Separated (Expr a)
-  , caseOf :: SourceToken -- ^ @of@ keyword
+  , caseOf :: SourceToken
   , caseBranches :: NonEmpty (Separated (Binder a), Guarded a)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data LetIn a = LetIn
-  { letKeyword :: SourceToken -- ^ @let@ keyword
+  { letKeyword :: SourceToken
   , letBindings :: NonEmpty (LetBinding a)
-  , letIn :: SourceToken -- ^ @in@ keyword
+  , letIn :: SourceToken
   , letBody :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
@@ -839,9 +835,8 @@ data LetIn a = LetIn
 -- The body of a function, let binding, etc., which may have a @where@ block
 -- that follows that body.
 data Where a = Where
-  { whereExpr :: Expr a -- ^ The expression block
+  { whereExpr :: Expr a
   , whereBindings :: Maybe (SourceToken, NonEmpty (LetBinding a))
-    -- ^ A possible @where@ keyword followed by the contents of a where block
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data LetBinding a
@@ -863,7 +858,7 @@ data LetBinding a
 --  bar
 -- @
 data DoBlock a = DoBlock
-  { doKeyword :: SourceToken -- ^ @do@ keyword
+  { doKeyword :: SourceToken
   , doStatements :: NonEmpty (DoStatement a)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
@@ -914,10 +909,10 @@ data DoStatement a
 --  in x + value1 + value2
 -- @
 data AdoBlock a = AdoBlock
-  { adoKeyword :: SourceToken -- ^ @ado@ keyword
-  , adoStatements :: [DoStatement a] -- ^ a list of expressions composed via `apply`
-  , adoIn :: SourceToken -- ^ @in@ keyword
-  , adoResult :: Expr a -- ^ the expression used for `map`
+  { adoKeyword :: SourceToken
+  , adoStatements :: [DoStatement a]
+  , adoIn :: SourceToken
+  , adoResult :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 -- |
