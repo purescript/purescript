@@ -184,7 +184,7 @@ data Type a
   -- A type variable (e.g. @typeVariableName@ in @data TypeName typeVariableName = Foo@)
   = TypeVar a (Name Ident)
   -- |
-  -- The name of a type (e.g. @Maybe@ or @ModuleAlias.Maybe@)
+  -- A potentially-qualified uppercase name in the type language
   | TypeConstructor a (QualifiedName (N.ProperName 'N.TypeName))
   -- |
   -- The @_@ character in
