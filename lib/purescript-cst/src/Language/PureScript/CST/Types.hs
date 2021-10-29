@@ -814,7 +814,7 @@ data DoBlock a = DoBlock
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 -- |
--- One bind expression in a monadic do block
+-- Defines the expressions that can exist in a monadic do or applicative do block.
 --
 -- @
 --    do
