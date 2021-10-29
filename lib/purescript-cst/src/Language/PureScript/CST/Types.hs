@@ -534,7 +534,7 @@ data ImportDecl a = ImportDecl
   , impKeyword :: SourceToken
   , impModule :: Name N.ModuleName
   , impNames :: Maybe (Maybe SourceToken, DelimitedNonEmpty (Import a))
-    -- ^ if a @Just@, then a potential @hiding@ keyword, followed by the imported names of the module's members
+    -- ^ Depending on the 'Maybe SourceToken', these names are either imported or hidden
   , impQual :: Maybe (SourceToken, Name N.ModuleName)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
