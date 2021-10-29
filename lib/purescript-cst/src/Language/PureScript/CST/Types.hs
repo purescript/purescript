@@ -178,7 +178,7 @@ data OneOrDelimited a
 
 -- |
 -- The main @Type@ type. The @a@ type typically refers to the token's annotation
--- (e.g. position and comments) and always appears as the first argument for each constructor.
+-- and always appears as the first argument for each constructor.
 data Type a
   -- |
   -- An identifier in the source code, such as
