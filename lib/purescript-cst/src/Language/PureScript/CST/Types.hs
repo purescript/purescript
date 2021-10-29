@@ -181,15 +181,7 @@ data OneOrDelimited a
 -- and always appears as the first argument for each constructor.
 data Type a
   -- |
-  -- An identifier in the source code, such as
-  -- - The @x@ in @let x = 4 in ...@
-  -- - The @x@ in @foo :: { x :: String }@
-  -- - The @x@ in @foreign import foo :: { x :: String }@
-  -- - The @x@ in @case y of Something x -> ...@
-  -- - The @x@ in @class Bar x where ...@
-  -- - The @x@ in @instance x :: Bar String where ...@
-  -- - The @x@ in @module Foo (x) where ...@
-  -- - The @x@ in @module Foo where import Bar (x) ...@
+  -- A type variable (e.g. @typeVariableName@ in @data TypeName typeVariableName = Foo@)
   = TypeVar a (Name Ident)
   -- |
   -- The name of a type (e.g. @Maybe@ or @ModuleAlias.Maybe@)
