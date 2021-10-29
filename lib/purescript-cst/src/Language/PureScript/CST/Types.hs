@@ -794,11 +794,8 @@ data Where a = Where
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data LetBinding a
-  -- | The type signature for a let binding (e.g. @let x :: String@)
   = LetBindingSignature a (Labeled (Name Ident) (Type a))
-  -- | The implementation for a let binding (e.g. @let x arg1 arg2 = ...)
   | LetBindingName a (ValueBindingFields a)
-  -- | The implementation for a let binding (e.g. @let x arg1 arg2 = ...)
   | LetBindingPattern a (Binder a) SourceToken (Where a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
