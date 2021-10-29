@@ -612,26 +612,8 @@ data InstanceHead a = InstanceHead
 -- |
 -- The association direction of an symbolic operator (if any).
 data Fixity
-  -- |
-  -- @ "a" $$$$$ "b"  $$$$$  "c" $$$$$ "d"@
-  --
-  -- becomes
-  --
-  -- @("a" $$$$$ "b") $$$$$ ("c" $$$$$ "d")@
   = Infix
-  -- |
-  -- @  "a" |>>| "b"  |>>| "c"  |>>| "d"@
-  --
-  -- becomes
-  --
-  -- @(("a" |>>| "b") |>>| "c") |>>| "d"@
   | Infixl
-  -- |
-  -- @"a" |<<|  "b" |<<|  "c" |<<| "d"@
-  --
-  -- becomes
-  --
-  -- @"a" |<<| ("b" |<<| ("c" |<<| "d"))@
   | Infixr
   deriving (Show, Eq, Ord, Generic)
 
