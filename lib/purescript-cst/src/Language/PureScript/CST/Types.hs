@@ -653,11 +653,7 @@ data ValueBindingFields a = ValueBindingFields
 -- |
 -- Indicates whether a guard exists in a function or value's implementation
 data Guarded a
-  -- |
-  -- No guards are used
   = Unconditional SourceToken (Where a)
-  -- |
-  -- One or more guards are used
   | Guarded (NonEmpty (GuardedExpr a))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
