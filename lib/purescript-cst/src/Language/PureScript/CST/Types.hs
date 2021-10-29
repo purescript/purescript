@@ -630,9 +630,9 @@ data FixityOp
   deriving (Show, Eq, Ord, Generic)
 
 data FixityFields = FixityFields
-  { fxtKeyword :: (SourceToken, Fixity) -- ^ infixl, infixr, or infix keyword
-  , fxtPrec :: (SourceToken, Integer) -- ^ the infix precendence level
-  , fxtOp :: FixityOp -- ^ the infix type (i.e. value or type)
+  { fxtKeyword :: (SourceToken, Fixity)
+  , fxtPrec :: (SourceToken, Integer) -- ^ The infix precendence level
+  , fxtOp :: FixityOp
   } deriving (Show, Eq, Ord, Generic)
 
 -- |
