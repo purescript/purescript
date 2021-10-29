@@ -59,6 +59,12 @@ data TokenAnn = TokenAnn
 data SourceStyle = ASCII | Unicode
   deriving (Show, Eq, Ord, Generic)
 
+-- |
+-- Most tokens here are self-explanatory. The exception
+-- is the @TokLayoutStart@, @TokLayoutSep@, @TokLayoutEnd@ tokens.
+-- These tokens are inserted to delimit whitespace-sensitive blocks of code, and
+-- mark the boundaries of layout blocks, such as braces and commas.
+-- Refer to the 'Language.PureScript.CST.Layout' module for more details.
 data Token
   = TokLeftParen
   | TokRightParen
@@ -90,13 +96,8 @@ data Token
   | TokInt !Text !Integer
   | TokNumber !Text !Double
   | TokLayoutStart
-    -- ^ Indicates the start of a new indentation block.
-    -- All expressions must be indented at least to here to be considered part of the block.
   | TokLayoutSep
-    -- ^ Indicates a separator between two entities within the same indentation block.
   | TokLayoutEnd
-    -- ^ Indicates the end of an indentation block.
-    -- All expressions after this one will be part of the previous block.
   | TokEof
   deriving (Show, Eq, Ord, Generic)
 
