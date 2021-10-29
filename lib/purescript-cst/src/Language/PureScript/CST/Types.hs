@@ -710,28 +710,14 @@ data Expr a
   -- myVal = _
   -- @
   | ExprSection a SourceToken
-  -- |
-  -- The second @name@ text in
-  --
-  -- @
-  -- myVal :: String -> String
-  -- myVal name = name
-  -- @
   | ExprIdent a (QualifiedName Ident)
   | ExprConstructor a (QualifiedName (N.ProperName 'N.ConstructorName))
-  -- | A literal @true@ or @false@ value
   | ExprBoolean a SourceToken Bool
-  -- | A literal @Char@ value
   | ExprChar a SourceToken Char
-  -- | A literal @String@ value
   | ExprString a SourceToken PSString
-  -- | A literal @Int@ or @Number@ value
   | ExprNumber a SourceToken (Either Integer Double)
-  -- | A literal @Array@ value
   | ExprArray a (Delimited (Expr a))
-  -- | A literal @Record@ value
   | ExprRecord a (Delimited (RecordLabeled (Expr a)))
-  -- | An expression wrapped in parenthesis
   | ExprParens a (Wrapped (Expr a))
   -- | An expression followed by a type annotation (e.g. @expr :: Type@)
   | ExprTyped a (Expr a) SourceToken (Type a)
@@ -741,25 +727,15 @@ data Expr a
   | ExprOp a (Expr a) (QualifiedName (N.OpName 'N.ValueOpName)) (Expr a)
   -- | A standalone version of a symbolic operator (e.g. @(+)@ in @fold (+) 0 [1]@)
   | ExprOpName a (QualifiedName (N.OpName 'N.ValueOpName))
-  -- | Negate a numerical value
   | ExprNegate a SourceToken (Expr a)
-  -- | Access a field within a record (e.g. @record.field@)
   | ExprRecordAccessor a (RecordAccessor a)
-  -- | Update a field within a record with a new value (e.g. @record { field = new }@)
   | ExprRecordUpdate a (Expr a) (DelimitedNonEmpty (RecordUpdate a))
-  -- | Apply an argument to a function (e.g. @(\x -> x) 4@)
   | ExprApp a (Expr a) (Expr a)
-  -- | Define an anonymous function (e.g. @\x -> x + 1@)
   | ExprLambda a (Lambda a)
-  -- | An @if cond then truePath else falsePath@ expression
   | ExprIf a (IfThenElse a)
-  -- | A @case b1, b2, ..., bn of@ expression
   | ExprCase a (CaseOf a)
-  -- | A @let ... in ...@ expression
   | ExprLet a (LetIn a)
-  -- | A monadic do expression
   | ExprDo a (DoBlock a)
-  -- | An applicative do expression
   | ExprAdo a (AdoBlock a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
