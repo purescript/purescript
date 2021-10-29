@@ -878,19 +878,12 @@ data Binder a
   | BinderNamed a (Name Ident) SourceToken (Binder a)
   -- | Binds the given constructor
   | BinderConstructor a (QualifiedName (N.ProperName 'N.ConstructorName)) [Binder a]
-  -- | Binds to a literal true or false value
   | BinderBoolean a SourceToken Bool
-  -- | Binds to a literal char value
   | BinderChar a SourceToken Char
-  -- | Binds to a literal String value
   | BinderString a SourceToken PSString
-  -- | Binds to a literal numerical value that may have a @-@ character in front of it
   | BinderNumber a (Maybe SourceToken) SourceToken (Either Integer Double)
-  -- | Binds to a literal array value
   | BinderArray a (Delimited (Binder a))
-  -- | Binds to a literal record value
   | BinderRecord a (Delimited (RecordLabeled (Binder a)))
-  -- | Binds to a value wrapped in parenthesis
   | BinderParens a (Wrapped (Binder a))
   -- | Binds to a value with a type annotation (e.g. @(foo :: Int) <- ...@)
   | BinderTyped a (Binder a) SourceToken (Type a)
