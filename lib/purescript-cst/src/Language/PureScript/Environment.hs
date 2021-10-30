@@ -134,7 +134,59 @@ makeTypeClassData
   -> TypeClassData
 makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
   where
-    argumentIndices = [0 .. length args - 1]
+    ( determinedArgs, coveringSets ) = computeCoveringSets (length args) deps
+
+computeCoveringSets :: Int -> [FunctionalDependency] -> (S.Set Int, S.Set (S.Set Int))
+computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
+  where
+    argumentIndices = [0 .. nargs - 1]
+
+    -- Map from an argument to the set of all dependency-sets that will determine it
+    revDeps :: M.Map Int (S.Set (S.Set Int))
+    revDeps = M.fromListWith (<>) $ do
+      fd <- deps
+      tgt <- fdDetermined fd
+      pure (tgt, S.singleton (S.fromList (fdDeterminers fd)))
+
+    -- Compute the closure of `determined` under the `deps`
+    close determined =
+      -- These are the arguments that can be determined in one step
+      let more = close1 determined in
+      if more `S.isSubsetOf` determined
+        then determined
+        else close (determined <> more)
+    -- An argument can be determined in one step if all of its dependencies are met
+    close1 determined = M.keysSet (M.filterWithKey adding revDeps)
+      where adding k v = S.notMember k determined && any (`S.isSubsetOf` determined) v
+
+    -- Populate the empty and singleton sets first
+    closeMap0, closeMap1, closeMap2, closeMap :: M.Map (S.Set Int) (S.Set Int)
+    closeMap0 = M.singleton S.empty S.empty
+    closeMap1 = M.fromSet close (S.fromList (S.singleton <$> argumentIndices))
+    closeMap2 = closeMap0 <> closeMap1
+
+    -- Populate the full map of closures:
+    -- For sets v1 and v2, close (v1 <> v2) = close (close v1 <> close v2)
+    -- So we save some work by looking up smaller items in `closeMap`
+    closeMap = M.fromSet close' (S.powerSet (S.fromList argumentIndices))
+      where
+        close' v0 = case closeMap2 M.!? v0 of
+          Just v1 -> v1
+          _ -> case S.maxView v0 of
+            Just (k, v1)
+              | Just v2 <- closeMap2 M.!? (S.singleton k)
+              , Just v3 <- closeMap M.!? v1 ->
+                close (v2 <> v3)
+            _ -> S.empty
+
+    -- Find all the covering sets: sets that have reached all arguments in their closure
+    allCoveringSets = M.keysSet (M.filter (== (S.fromList argumentIndices)) closeMap)
+    -- Reduce to the inclusion-minimal sets
+    coveringSets = S.filter (\v -> not (any (\c -> c `S.isProperSubsetOf` v) allCoveringSets)) allCoveringSets
+
+    -- An argument is determined if determining any argument determines it?
+    -- determinedArgs = S.fromList $ filter argIsDetermined argumentIndices
+    -- argIsDetermined k = all (S.member k) closeMap1
 
     -- each argument determines themselves
     identities = (\i -> (i, [i])) <$> argumentIndices
@@ -174,9 +226,11 @@ makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs cov
       | otherwise = Just (argFromVertex <$> toList tree)
 
     -- find the covering sets
+    {-
     coveringSets :: S.Set (S.Set Int)
     coveringSets = let funDepSets = sequence (mapMaybe sccNonDetermined (G.scc depGraph))
                    in S.fromList (S.fromList <$> funDepSets)
+    -}
 
 -- | The visibility of a name in scope
 data NameVisibility
