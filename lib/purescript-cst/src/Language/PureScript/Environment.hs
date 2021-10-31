@@ -10,12 +10,10 @@ import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Tree (Tree, rootLabel)
 import qualified Data.Graph as G
-import Data.Foldable (toList)
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST.SourcePos
@@ -198,7 +196,7 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
       (src, fdDetermined fd) : map (, []) (fdDetermined fd)
 
     -- build a graph of which arguments determine other arguments
-    (depGraph, fromVertex, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, ordNub v)) <$> M.toList contributingDeps)
+    (depGraph, _, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, ordNub v)) <$> M.toList contributingDeps)
 
     -- do there exist any arguments that contribute to `arg` that `arg` doesn't contribute to
     isFunDepDetermined :: Int -> Bool
@@ -211,26 +209,6 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
     -- find all the arguments that are determined
     determinedArgs :: S.Set Int
     determinedArgs = S.fromList $ filter isFunDepDetermined argumentIndices
-
-    argFromVertex :: G.Vertex -> Int
-    argFromVertex index = let (_, arg, _) = fromVertex index in arg
-
-    isVertexDetermined :: G.Vertex -> Bool
-    isVertexDetermined = isFunDepDetermined . argFromVertex
-
-    -- from an scc find the non-determined args
-    sccNonDetermined :: Tree G.Vertex -> Maybe [Int]
-    sccNonDetermined tree
-      -- if any arg in an scc is determined then all of them are
-      | isVertexDetermined (rootLabel tree) = Nothing
-      | otherwise = Just (argFromVertex <$> toList tree)
-
-    -- find the covering sets
-    {-
-    coveringSets :: S.Set (S.Set Int)
-    coveringSets = let funDepSets = sequence (mapMaybe sccNonDetermined (G.scc depGraph))
-                   in S.fromList (S.fromList <$> funDepSets)
-    -}
 
 -- | The visibility of a name in scope
 data NameVisibility
