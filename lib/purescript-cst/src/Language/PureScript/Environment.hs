@@ -172,13 +172,13 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
           Just v1 -> v1
           _ -> case S.maxView v0 of
             Just (k, v1)
-              | Just v2 <- closeMap2 M.!? (S.singleton k)
+              | Just v2 <- closeMap2 M.!? S.singleton k
               , Just v3 <- closeMap M.!? v1 ->
                 close (v2 <> v3)
             _ -> S.empty
 
     -- Find all the covering sets: sets that have reached all arguments in their closure
-    allCoveringSets = M.keysSet (M.filter (== (S.fromList argumentIndices)) closeMap)
+    allCoveringSets = M.keysSet (M.filter (== S.fromList argumentIndices) closeMap)
     -- Reduce to the inclusion-minimal sets
     coveringSets = S.filter (\v -> not (any (\c -> c `S.isProperSubsetOf` v) allCoveringSets)) allCoveringSets
 
