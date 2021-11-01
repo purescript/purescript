@@ -710,7 +710,8 @@ check' v@(Var _ var) ty = do
   checkVisibility var
   repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable $ var
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
-  elaborate <- subsumes repl ty'
+  currentSubst <- gets checkSubstitution
+  elaborate <- subsumes (substituteType currentSubst repl) ty'
   return $ TypedValue' True (elaborate v) ty'
 check' (DeferredDictionary className tys) ty = do
   {-
