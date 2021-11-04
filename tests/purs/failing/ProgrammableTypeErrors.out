@@ -1,28 +1,29 @@
 [31mError found:[0m
-in module [33mMain[0m
-at tests/purs/failing/ProgrammableTypeErrors.purs:17:13 - 17:27 (line 17, column 13 - line 17, column 27)
 
-  A custom type error occurred while solving type class constraints:
+  in module [33mMain[0m
+  at tests/purs/failing/ProgrammableTypeErrors.purs:17:13 - 17:27 (line 17, column 13 - line 17, column 27)
 
-    Cannot show functions
+    A custom type error occurred while solving type class constraints:
+
+      Cannot show functions
 
 
-while solving type class constraint
-[33m                          [0m
-[33m  Main.MyShow (Int -> Int)[0m
-[33m                          [0m
-while applying a function [33mmyShow[0m
-  of type [33mMyShow t0 => t0 -> String[0m
-  to argument [33m\$0 ->      [0m
-              [33m  (add $0) 1[0m
-while checking that expression [33mmyShow (\$0 ->      [0m
-                               [33m          (add $0) 1[0m
-                               [33m       )            [0m
-  has type [33mString[0m
-in value declaration [33mmain[0m
+  while solving type class constraint
+  [33m                          [0m
+  [33m  Main.MyShow (Int -> Int)[0m
+  [33m                          [0m
+  while applying a function [33mmyShow[0m
+    of type [33mMyShow t0 => t0 -> String[0m
+    to argument [33m\$0 ->      [0m
+                [33m  (add $0) 1[0m
+  while checking that expression [33mmyShow (\$0 ->      [0m
+                                 [33m          (add $0) 1[0m
+                                 [33m       )            [0m
+    has type [33mString[0m
+  in value declaration [33mmain[0m
 
-where [33mt0[0m is an unknown type
+  where [33mt0[0m is an unknown type
 
-See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
-or to contribute content related to this error.
+  See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+  or to contribute content related to this error.
 

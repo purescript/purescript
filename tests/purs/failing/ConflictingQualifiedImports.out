@@ -1,14 +1,15 @@
 [31mError found:[0m
-in module [33mMain[0m
-at tests/purs/failing/ConflictingQualifiedImports.purs:7:7 - 7:14 (line 7, column 7 - line 7, column 14)
 
-  Conflicting definitions are in scope for value [33mthing[0m from the following modules:
+  in module [33mMain[0m
+  at tests/purs/failing/ConflictingQualifiedImports.purs:7:7 - 7:14 (line 7, column 7 - line 7, column 14)
 
-    [33mA[0m
-    [33mB[0m
+    Conflicting definitions are in scope for value [33mthing[0m from the following modules:
+
+      [33mA[0m
+      [33mB[0m
 
 
 
-See https://github.com/purescript/documentation/blob/master/errors/ScopeConflict.md for more information,
-or to contribute content related to this error.
+  See https://github.com/purescript/documentation/blob/master/errors/ScopeConflict.md for more information,
+  or to contribute content related to this error.
 

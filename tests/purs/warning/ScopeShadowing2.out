@@ -1,14 +1,15 @@
 [33mWarning found:[0m
-in module [33mMain[0m
-at tests/purs/warning/ScopeShadowing2.purs:7:1 - 7:22 (line 7, column 1 - line 7, column 22)
 
-  Shadowed definitions are in scope for value [33mappend[0m from the following open imports:
+  in module [33mMain[0m
+  at tests/purs/warning/ScopeShadowing2.purs:7:1 - 7:22 (line 7, column 1 - line 7, column 22)
 
-    [33mimport Data.Semigroup[0m
+    Shadowed definitions are in scope for value [33mappend[0m from the following open imports:
 
-  These will be ignored and the local declaration will be used.
+      [33mimport Data.Semigroup[0m
+
+    These will be ignored and the local declaration will be used.
 
 
-See https://github.com/purescript/documentation/blob/master/errors/ScopeShadowing.md for more information,
-or to contribute content related to this warning.
+  See https://github.com/purescript/documentation/blob/master/errors/ScopeShadowing.md for more information,
+  or to contribute content related to this warning.
 

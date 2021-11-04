@@ -1,17 +1,18 @@
 [33mWarning found:[0m
-in module [33mMain[0m
-at tests/purs/warning/UnusedDctorExplicitImport.purs:4:1 - 4:40 (line 4, column 1 - line 4, column 40)
 
-  The import of type [33mOrdering[0m from module [33mData.Ordering[0m includes the following unused data constructors:
+  in module [33mMain[0m
+  at tests/purs/warning/UnusedDctorExplicitImport.purs:4:1 - 4:40 (line 4, column 1 - line 4, column 40)
 
-    [33mLT[0m
+    The import of type [33mOrdering[0m from module [33mData.Ordering[0m includes the following unused data constructors:
 
-  It could be replaced with:
+      [33mLT[0m
 
-    [33mimport Data.Ordering (Ordering(EQ))[0m
+    It could be replaced with:
+
+      [33mimport Data.Ordering (Ordering(EQ))[0m
 
 
 
-See https://github.com/purescript/documentation/blob/master/errors/UnusedDctorExplicitImport.md for more information,
-or to contribute content related to this warning.
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedDctorExplicitImport.md for more information,
+  or to contribute content related to this warning.
 

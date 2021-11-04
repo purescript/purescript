@@ -1,24 +1,25 @@
 [31mError found:[0m
-in module [33mBindingGroupErrorPos[0m
-at tests/purs/failing/3275-BindingGroupErrorPos.purs:11:17 - 11:23 (line 11, column 17 - line 11, column 23)
 
-  Could not match kind
-  [33m      [0m
-  [33m  Type[0m
-  [33m      [0m
-  with kind
-  [33m            [0m
-  [33m  Type -> t3[0m
-  [33m            [0m
+  in module [33mBindingGroupErrorPos[0m
+  at tests/purs/failing/3275-BindingGroupErrorPos.purs:11:17 - 11:23 (line 11, column 17 - line 11, column 23)
 
-while checking that type [33mResult[0m
-  has kind [33mType -> t0[0m
-while inferring the kind of [33mResult String[0m
-while inferring the kind of [33mInt -> Result String[0m
-in binding group wrong
+    Could not match kind
+    [33m      [0m
+    [33m  Type[0m
+    [33m      [0m
+    with kind
+    [33m            [0m
+    [33m  Type -> t3[0m
+    [33m            [0m
 
-where [33mt0[0m is an unknown type
+  while checking that type [33mResult[0m
+    has kind [33mType -> t0[0m
+  while inferring the kind of [33mResult String[0m
+  while inferring the kind of [33mInt -> Result String[0m
+  in binding group wrong
 
-See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
-or to contribute content related to this error.
+  where [33mt0[0m is an unknown type
+
+  See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+  or to contribute content related to this error.
 

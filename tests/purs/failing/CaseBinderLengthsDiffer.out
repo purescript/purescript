@@ -1,14 +1,15 @@
 [31mError found:[0m
-in module [33mMain[0m
-at tests/purs/failing/CaseBinderLengthsDiffer.purs:5:3 - 5:10 (line 5, column 3 - line 5, column 10)
 
-  Binder list length differs in case alternative:
+  in module [33mMain[0m
+  at tests/purs/failing/CaseBinderLengthsDiffer.purs:5:3 - 5:10 (line 5, column 3 - line 5, column 10)
 
-    1, 2, 3
+    Binder list length differs in case alternative:
 
-  Expecting 2 binders.
+      1, 2, 3
+
+    Expecting 2 binders.
 
 
-See https://github.com/purescript/documentation/blob/master/errors/CaseBinderLengthDiffers.md for more information,
-or to contribute content related to this error.
+  See https://github.com/purescript/documentation/blob/master/errors/CaseBinderLengthDiffers.md for more information,
+  or to contribute content related to this error.
 

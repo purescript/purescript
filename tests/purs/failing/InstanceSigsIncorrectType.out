@@ -1,25 +1,26 @@
 [31mError found:[0m
-in module [33mMain[0m
-at tests/purs/failing/InstanceSigsIncorrectType.purs:8:1 - 10:13 (line 8, column 1 - line 10, column 13)
 
-  Could not match type
-  [33m         [0m
-  [33m  Boolean[0m
-  [33m         [0m
-  with type
-  [33m        [0m
-  [33m  Number[0m
-  [33m        [0m
+  in module [33mMain[0m
+  at tests/purs/failing/InstanceSigsIncorrectType.purs:8:1 - 10:13 (line 8, column 1 - line 10, column 13)
 
-while trying to match type [33mFoo$Dict t0[0m
-  with type [33mFoo$Dict Number[0m
-while checking that expression [33mFoo$Dict { foo: true[0m
-                               [33m         }          [0m
-  has type [33mFoo$Dict Number[0m
-in value declaration [33mfooNumber[0m
+    Could not match type
+    [33m         [0m
+    [33m  Boolean[0m
+    [33m         [0m
+    with type
+    [33m        [0m
+    [33m  Number[0m
+    [33m        [0m
 
-where [33mt0[0m is an unknown type
+  while trying to match type [33mFoo$Dict t0[0m
+    with type [33mFoo$Dict Number[0m
+  while checking that expression [33mFoo$Dict { foo: true[0m
+                                 [33m         }          [0m
+    has type [33mFoo$Dict Number[0m
+  in value declaration [33mfooNumber[0m
 
-See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
-or to contribute content related to this error.
+  where [33mt0[0m is an unknown type
+
+  See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+  or to contribute content related to this error.
 

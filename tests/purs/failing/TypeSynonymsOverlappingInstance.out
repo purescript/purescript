@@ -1,24 +1,25 @@
 [31mError found:[0m
-in module [33mMain[0m
-at tests/purs/failing/TypeSynonymsOverlappingInstance.purs:14:1 - 15:16 (line 14, column 1 - line 15, column 16)
 
-  Overlapping type class instances found for
+  in module [33mMain[0m
+  at tests/purs/failing/TypeSynonymsOverlappingInstance.purs:14:1 - 15:16 (line 14, column 1 - line 15, column 16)
+
+    Overlapping type class instances found for
+    [33m                     [0m
+    [33m  Main.Convert String[0m
+    [33m               String[0m
+    [33m                     [0m
+    The following instances were found:
+
+      [33mMain.convertSB[0m
+      [33mMain.convertSS[0m
+
+
+  in type class instance
   [33m                     [0m
   [33m  Main.Convert String[0m
   [33m               String[0m
   [33m                     [0m
-  The following instances were found:
 
-    [33mMain.convertSB[0m
-    [33mMain.convertSS[0m
-
-
-in type class instance
-[33m                     [0m
-[33m  Main.Convert String[0m
-[33m               String[0m
-[33m                     [0m
-
-See https://github.com/purescript/documentation/blob/master/errors/OverlappingInstances.md for more information,
-or to contribute content related to this error.
+  See https://github.com/purescript/documentation/blob/master/errors/OverlappingInstances.md for more information,
+  or to contribute content related to this error.
 

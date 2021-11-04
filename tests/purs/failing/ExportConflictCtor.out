@@ -1,10 +1,11 @@
 [31mError found:[0m
-in module [33mC[0m
-at tests/purs/failing/ExportConflictCtor.purs:2:21 - 2:29 (line 2, column 21 - line 2, column 29)
 
-  Export for data constructor [33mB.X[0m conflicts with data constructor [33mA.X[0m
+  in module [33mC[0m
+  at tests/purs/failing/ExportConflictCtor.purs:2:21 - 2:29 (line 2, column 21 - line 2, column 29)
+
+    Export for data constructor [33mB.X[0m conflicts with data constructor [33mA.X[0m
 
 
-See https://github.com/purescript/documentation/blob/master/errors/ExportConflict.md for more information,
-or to contribute content related to this error.
+  See https://github.com/purescript/documentation/blob/master/errors/ExportConflict.md for more information,
+  or to contribute content related to this error.
 

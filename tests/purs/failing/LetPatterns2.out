@@ -1,10 +1,11 @@
 [31mError found:[0m
-in module [33mMain[0m
-at tests/purs/failing/LetPatterns2.purs:11:9 - 11:10 (line 11, column 9 - line 11, column 10)
 
-  Unknown value [33ma[0m
+  in module [33mMain[0m
+  at tests/purs/failing/LetPatterns2.purs:11:9 - 11:10 (line 11, column 9 - line 11, column 10)
+
+    Unknown value [33ma[0m
 
 
-See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
-or to contribute content related to this error.
+  See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+  or to contribute content related to this error.
 

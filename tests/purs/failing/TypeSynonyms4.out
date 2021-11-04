@@ -1,12 +1,13 @@
 [31mError found:[0m
-in module [33mTypeSynonyms4[0m
-at tests/purs/failing/TypeSynonyms4.purs:8:12 - 8:15 (line 8, column 12 - line 8, column 15)
 
-  Type synonym [33mTypeSynonyms4.F[0m is partially applied.
-  Type synonyms must be applied to all of their type arguments.
+  in module [33mTypeSynonyms4[0m
+  at tests/purs/failing/TypeSynonyms4.purs:8:12 - 8:15 (line 8, column 12 - line 8, column 15)
 
-in type synonym [33mG[0m
+    Type synonym [33mTypeSynonyms4.F[0m is partially applied.
+    Type synonyms must be applied to all of their type arguments.
 
-See https://github.com/purescript/documentation/blob/master/errors/PartiallyAppliedSynonym.md for more information,
-or to contribute content related to this error.
+  in type synonym [33mG[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/PartiallyAppliedSynonym.md for more information,
+  or to contribute content related to this error.
 

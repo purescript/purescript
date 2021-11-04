@@ -1,11 +1,12 @@
 [33mWarning found:[0m
-in module [33mMain[0m
-at tests/purs/warning/ShadowedNameParens.purs:7:5 - 7:6 (line 7, column 5 - line 7, column 6)
 
-  Name [33mn[0m was shadowed.
+  in module [33mMain[0m
+  at tests/purs/warning/ShadowedNameParens.purs:7:5 - 7:6 (line 7, column 5 - line 7, column 6)
 
-in value declaration [33mf[0m
+    Name [33mn[0m was shadowed.
 
-See https://github.com/purescript/documentation/blob/master/errors/ShadowedName.md for more information,
-or to contribute content related to this warning.
+  in value declaration [33mf[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/ShadowedName.md for more information,
+  or to contribute content related to this warning.
 
