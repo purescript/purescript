@@ -43,25 +43,29 @@
 --
 -- @
 -- -- Example 1
--- let foo = 5 in foo
+-- let foo = 5
+--     x = 2 in foo
 --
 -- -- Example 2
 -- let
 --   bar = 5
+--   y = 2
 -- in bar
 --
 -- -- Example 3
 -- let        baz
 --                  =
---              5 in baz
+--              5
+--            z= 2 in baz
 -- @
 --
 -- Each block of code might appear to the parser as a stream of the
 -- following source tokens where the @\{@ sequence represents
--- @TokLayoutStart@ and the @\}@ sequence represents @TokLayoutEnd@:
--- - @\{let\{foo\}=\{5\}\}@
--- - @\{let\{bar\}=\{5\}\}@
--- - @\{let\{baz\}=\{5\}\}@
+-- @TokLayoutStart@, the @\;@ sequence represents @TokLayoutSep@,
+-- and the @\}@ sequence represents @TokLayoutEnd@:
+-- - @let \{foo = 5\;x = 2\} in foo@
+-- - @let \{bar = 5\;y = 2\} in bar@
+-- - @let \{baz = 5\;z = 2\} in baz@
 --
 --
 -- For a more complex example, consider commas:
