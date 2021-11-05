@@ -1,9 +1,9 @@
 -- |
 -- ## High-Level Summary
 --
--- Other than this paragraph, this section was written by Nate, the author
--- of most of this code. For those who know more about compiler-development,
--- the below explanation is likely enough. For everyone else, see the next section.
+-- This section provides a high-level summary of this file. For those who
+-- know more about compiler-development, the below explanation is likely enough.
+-- For everyone else, see the next section.
 --
 -- The parser itself is unaware of indentation, and instead only parses explicit
 -- delimiters which are inserted by this layout algorithm (much like Haskell).
