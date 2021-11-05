@@ -61,7 +61,7 @@ common defaults
     bytestring >=0.10.12.0 && <0.11,
     containers >=0.6.2.1 && <0.7,
     deepseq >=1.4.4.0 && <1.5,
-    dlist >=0.8.0.8 && <0.9,
+    dlist >=1.0 && <1.1,
     filepath >=1.4.2.1 && <1.5,
     microlens >=0.4.11.2 && <0.5,
     mtl >=2.2.2 && <2.3,
