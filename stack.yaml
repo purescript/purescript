@@ -7,12 +7,11 @@ ghc-options:
   # Build with advanced optimizations enabled by default
   "$locals": -O2 -Werror
 extra-deps:
-- git: https://github.com/hspec/hspec.git
-  commit: 8f628c861d01ec8fc0a94ffdfe31e4399bd049d1
-  subdirs:
-    - .
-    - hspec-core
-    - hspec-discover
+# The ./.hspec file uses the --times flag, which was added in hspec-2.8.0.
+# LTS-18 has only hspec-2.7.
+- hspec-2.8.3
+- hspec-core-2.8.3
+- hspec-discover-2.8.3
 nix:
   enable: false
   packages:
