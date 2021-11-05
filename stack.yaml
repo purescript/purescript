@@ -18,7 +18,6 @@ extra-deps:
 - hspec-core-2.8.3
 - hspec-discover-2.8.3
 nix:
-  enable: false
   packages:
   - zlib
   # Test dependencies
