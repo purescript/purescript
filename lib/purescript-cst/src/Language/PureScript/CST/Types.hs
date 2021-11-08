@@ -145,7 +145,7 @@ data Type a
   | TypeString a SourceToken PSString
   | TypeRow a (Wrapped (Row a))
   | TypeRecord a (Wrapped (Row a))
-  | TypeForall a SourceToken {- ^ The 'forall' keyword -} (NonEmpty (TypeVarBinding a)) SourceToken (Type a)
+  | TypeForall a SourceToken (NonEmpty (TypeVarBinding a)) SourceToken (Type a)
   | TypeKinded a (Type a) SourceToken (Type a)
   | TypeApp a (Type a) (Type a)
   | TypeOp a (Type a) (QualifiedName (N.OpName 'N.TypeOpName)) (Type a)
