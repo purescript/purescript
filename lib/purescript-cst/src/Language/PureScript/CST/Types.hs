@@ -130,7 +130,6 @@ data Labeled a b = Labeled
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 type Delimited a = Wrapped (Maybe (Separated a))
-
 type DelimitedNonEmpty a = Wrapped (Separated a)
 
 data OneOrDelimited a
