@@ -145,7 +145,7 @@ common defaults
     fsnotify >=0.3.0.1 && <0.4,
     Glob >=0.10.1 && <0.11,
     haskeline >=0.8.2 && <0.9,
-    language-javascript ==0.7.1.0,
+    language-javascript ==0.7.0.0,
     lifted-async >=0.10.2.2 && <0.11,
     lifted-base >=0.2.3.12 && <0.3,
     memory >=0.15.0 && <0.16,

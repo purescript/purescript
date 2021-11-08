@@ -7,6 +7,11 @@ ghc-options:
   # Build with advanced optimizations enabled by default
   "$locals": -O2 -Werror
 extra-deps:
+# As of 2021-11-08, the latest releease of `language-javascript` is 0.7.1.0,
+# but it has a problem with parsing the `async` keyword.  It doesn't allow
+# `async` to be used as an object key:
+# https://github.com/erikd/language-javascript/issues/131
+- language-javascript-0.7.0.0
 # The ./.hspec file uses the --times flag, which was added in hspec-2.8.0.
 # LTS-18 has only hspec-2.7.
 - hspec-2.8.3
