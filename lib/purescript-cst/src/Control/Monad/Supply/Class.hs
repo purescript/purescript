@@ -33,6 +33,15 @@ instance Monad m => MonadSupply (SupplyT m) where
 instance MonadSupply m => MonadSupply (StateT s m)
 instance (Monoid w, MonadSupply m) => MonadSupply (WriterT w m)
 
--- | Convenience function for returning "$x" where `x` is the next unique integer
+-- |
+-- `fresh`, but formatted to be usable as the name of an identifier in JS code
+-- generation.
+--
+-- At any point in the compilation pipeline prior to the renaming phase (which
+-- takes place after CoreFn optimization and before converting to CoreImp and
+-- optimizing that), if you want an Ident with a name that is guaranteed (by
+-- the renamer) not to collide with an existing Ident, you should probably use
+-- `Language.PureScript.Names.freshIdent` instead of this function.
+--
 freshName :: MonadSupply m => m Text
 freshName = fmap (("$" <> ) . pack . show) fresh
