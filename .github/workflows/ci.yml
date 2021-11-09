@@ -111,8 +111,23 @@ jobs:
           VERSION: "2.2.11"
 
       # Note: the weeder version will need to be updated when we next update our version
-      # of GHC
-      - run: "stack --no-terminal --jobs=2 build --copy-compiler-tool weeder-2.2.0"
+      # of GHC.
+      #
+      # weeder-2.2.0 has somewhat strange version deps. It doesn't appear to
+      # support the exact versions of dhall and generic-lens in LTS-18.
+      # However, forcing it to use the versions of dhall and generic-lens in
+      # LTS-18 doesn't cause any problems when building, so the following
+      # commands build weeder while ignoring version constraints.
+      - name: Install weeder
+        run: |
+          # The `stack.yaml` file is copied to a separate file so that
+          # adding `allow-newer: true` doesn't affect any subsequant
+          # calls to `stack`.
+          cp stack.yaml stack-weeder.yaml
+          # `allow-newer: true` is needed so that weeder-2.2.0 can be
+          # installed with the dependencies present in LTS-18.
+          echo 'allow-newer: true' >> stack-weeder.yaml
+          stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.2.0
 
       - run: "stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
 

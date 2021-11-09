@@ -48,7 +48,7 @@ main = do
     -- | Displays full command help when invoked with no arguments.
     execParserPure :: Opts.ParserInfo a -> [String] -> Opts.ParserResult a
     execParserPure pinfo [] = Opts.Failure $
-      Opts.parserFailure Opts.defaultPrefs pinfo Opts.ShowHelpText mempty
+      Opts.parserFailure Opts.defaultPrefs pinfo (Opts.ShowHelpText Nothing) mempty
     execParserPure pinfo args = Opts.execParserPure Opts.defaultPrefs pinfo args
 
     versionInfo :: Opts.Parser (a -> a)

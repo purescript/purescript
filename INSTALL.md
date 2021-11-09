@@ -4,12 +4,12 @@ If you are having difficulty installing the PureScript compiler, feel free to as
 
 ## Requirements
 
-The PureScript compiler is built using GHC 8.10.4, and should be able to run on any operating system supported by GHC 8.10.4. In particular:
+The PureScript compiler is built using GHC 8.10.7, and should be able to run on any operating system supported by GHC 8.10.7. In particular:
 
 * for Windows users, versions predating Vista are not officially supported,
 * for macOS / OS X users, versions predating Mac OS X 10.7 (Lion) are not officially supported.
 
-See also <https://www.haskell.org/ghc/download_ghc_8_10_4.html> for more details about the operating systems which GHC 8.10.4 supports.
+See also <https://www.haskell.org/ghc/download_ghc_8_10_7.html> for more details about the operating systems which GHC 8.10.7 supports.
 
 ## Official prebuilt binaries
 
