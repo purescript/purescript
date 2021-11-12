@@ -42,6 +42,8 @@ import qualified Language.PureScript.Constants.Prim as C
 
 import System.FilePath.Posix ((</>))
 
+import System.IO.Unsafe (unsafePerformIO)
+
 -- | Generate code in the simplified JavaScript intermediate representation for all declarations in a
 -- module.
 moduleToJs
@@ -233,7 +235,16 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
   valueToJs' e@App{} = do
     let (f, args) = unApp e []
     args' <- mapM valueToJs args
+    let _ = unsafePerformIO (print (unApp (head args) (tail args)) >> pure f)
     case f of
+      Var _ (Qualified _ (Ident "apply")) -> do
+        let (g, args'') = unApp (head args) (tail args)
+        args''' <- mapM valueToJs args''
+        case g of
+          Var (_, _, _, Just IsNewtype) _ -> return (head args''')
+          Var (_, _, _, Just (IsConstructor _ fields)) name | length args'' == length fields ->
+            return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'''
+          _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args''' <$> valueToJs f
       Var (_, _, _, Just IsNewtype) _ -> return (head args')
       Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
         return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
