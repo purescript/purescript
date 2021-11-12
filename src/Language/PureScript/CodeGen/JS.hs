@@ -245,6 +245,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
     unApp (App _ val arg) args = unApp val (arg : args)
     unApp other args = (other, args)
 
+    mkApp :: Expr Ann -> [Expr Ann] -> m AST
     mkApp f args = do
       args' <- mapM valueToJs args
       case f of
