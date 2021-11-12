@@ -39,6 +39,7 @@ import Language.PureScript.Options
 import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants.Prim as C
+import qualified Language.PureScript.Constants.Prelude as C
 
 import System.FilePath.Posix ((</>))
 
@@ -233,9 +234,11 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
   valueToJs' e@App{} = do
     let (f, args) = unApp e []
     case f of
-      Var _ (Qualified _ (Ident "apply")) -> do
-        let (f', args') = unApp (head args) (tail args)
-        mkApp f' args'
+      Var _ (Qualified (Just applyFnModule) (Ident applyFn))
+        | moduleNameToJs applyFnModule == C.dataFunction
+        , applyFn == C.apply -> do
+            let (f', args') = unApp (head args) (tail args)
+            mkApp f' args'
       _ -> mkApp f args
     where
     unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
