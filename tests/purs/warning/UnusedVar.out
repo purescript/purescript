@@ -1,4 +1,4 @@
-Warning 1 of 9:
+[33mWarning 1 of 9:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVar.purs:16:20 - 16:32 (line 16, column 20 - line 16, column 32)
@@ -10,7 +10,7 @@ Warning 1 of 9:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 2 of 9:
+[33mWarning 2 of 9:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVar.purs:20:7 - 20:20 (line 20, column 7 - line 20, column 20)
@@ -22,7 +22,7 @@ Warning 2 of 9:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 3 of 9:
+[33mWarning 3 of 9:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVar.purs:26:9 - 26:24 (line 26, column 9 - line 26, column 24)
@@ -34,7 +34,7 @@ Warning 3 of 9:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 4 of 9:
+[33mWarning 4 of 9:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVar.purs:30:11 - 30:23 (line 30, column 11 - line 30, column 23)
@@ -46,7 +46,7 @@ Warning 4 of 9:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 5 of 9:
+[33mWarning 5 of 9:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVar.purs:44:5 - 44:15 (line 44, column 5 - line 44, column 15)
@@ -58,7 +58,7 @@ Warning 5 of 9:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 6 of 9:
+[33mWarning 6 of 9:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVar.purs:62:34 - 62:35 (line 62, column 34 - line 62, column 35)
@@ -70,7 +70,7 @@ Warning 6 of 9:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 7 of 9:
+[33mWarning 7 of 9:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVar.purs:69:8 - 69:9 (line 69, column 8 - line 69, column 9)
@@ -82,7 +82,7 @@ Warning 7 of 9:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 8 of 9:
+[33mWarning 8 of 9:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVar.purs:87:7 - 87:8 (line 87, column 7 - line 87, column 8)
@@ -94,7 +94,7 @@ Warning 8 of 9:
   See https://github.com/purescript/documentation/blob/master/errors/UnusedName.md for more information,
   or to contribute content related to this warning.
 
-Warning 9 of 9:
+[33mWarning 9 of 9:[0m
 
   in module [33mMain[0m
   at tests/purs/warning/UnusedVar.purs:63:7 - 63:16 (line 63, column 7 - line 63, column 16)

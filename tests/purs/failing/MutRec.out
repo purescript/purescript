@@ -1,4 +1,4 @@
-Error 1 of 2:
+[31mError 1 of 2:[0m
 
   at tests/purs/failing/MutRec.purs:7:1 - 7:6 (line 7, column 1 - line 7, column 6)
 
@@ -8,7 +8,7 @@ Error 1 of 2:
   See https://github.com/purescript/documentation/blob/master/errors/CycleInDeclaration.md for more information,
   or to contribute content related to this error.
 
-Error 2 of 2:
+[31mError 2 of 2:[0m
 
   at tests/purs/failing/MutRec.purs:9:1 - 9:6 (line 9, column 1 - line 9, column 6)
 

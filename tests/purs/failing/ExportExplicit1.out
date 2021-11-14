@@ -1,4 +1,4 @@
-Error 1 of 2:
+[31mError 1 of 2:[0m
 
   in module [33mMain[0m
   at tests/purs/failing/ExportExplicit1.purs:9:9 - 9:10 (line 9, column 9 - line 9, column 10)
@@ -9,7 +9,7 @@ Error 1 of 2:
   See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
   or to contribute content related to this error.
 
-Error 2 of 2:
+[31mError 2 of 2:[0m
 
   in module [33mMain[0m
   at tests/purs/failing/ExportExplicit1.purs:10:9 - 10:10 (line 10, column 9 - line 10, column 10)

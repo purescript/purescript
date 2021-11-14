@@ -1,4 +1,4 @@
-Error 1 of 2:
+[31mError 1 of 2:[0m
 
   in module [33mMultipleErrors[0m
   at tests/purs/failing/MultipleErrors.purs:8:9 - 8:15 (line 8, column 9 - line 8, column 15)
@@ -21,7 +21,7 @@ Error 1 of 2:
   See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
   or to contribute content related to this error.
 
-Error 2 of 2:
+[31mError 2 of 2:[0m
 
   in module [33mMultipleErrors[0m
   at tests/purs/failing/MultipleErrors.purs:12:9 - 12:15 (line 12, column 9 - line 12, column 15)
