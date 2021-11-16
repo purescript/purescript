@@ -29,10 +29,8 @@ type role FFI_Higher4 representational nominal phantom
 foreign import data FFI_HeadParens :: (Type) -> Type -> Type -> Type
 type role FFI_HeadParens representational nominal phantom
 
--- This produces a compiler error as of v0.14.2
--- foreign import data FFI_TailParens :: Type -> (Type -> Type -> Type)
--- type role FFI_TailParens representational nominal phantom
+foreign import data FFI_TailParens :: Type -> (Type -> Type -> Type)
+type role FFI_TailParens representational nominal phantom
 
--- This produces a compiler error as of v0.14.2
--- foreign import data FFI_WholeParens :: (Type -> Type -> Type -> Type)
--- type role FFI_WholeParens representational nominal phantom
+foreign import data FFI_WholeParens :: (Type -> Type -> Type -> Type)
+type role FFI_WholeParens representational nominal phantom
