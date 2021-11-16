@@ -1,17 +1,15 @@
 # Installation information
 
-If you are having difficulty installing the PureScript compiler, feel free to
-ask for help! A good place is the #purescript IRC channel on Freenode, the #purescript channel on [FPChat Slack](https://fpchat-invite.herokuapp.com/), or
-alternatively Stack Overflow.
+If you are having difficulty installing the PureScript compiler, feel free to ask for help! The best places are the [PureScript Discord](https://purescript.org/chat) or [PureScript Discourse](https://discourse.purescript.org).
 
 ## Requirements
 
-The PureScript compiler is built using GHC 8.10.4, and should be able to run on any operating system supported by GHC 8.10.4. In particular:
+The PureScript compiler is built using GHC 8.10.7, and should be able to run on any operating system supported by GHC 8.10.7. In particular:
 
 * for Windows users, versions predating Vista are not officially supported,
 * for macOS / OS X users, versions predating Mac OS X 10.7 (Lion) are not officially supported.
 
-See also <https://www.haskell.org/ghc/download_ghc_8_10_4.html> for more details about the operating systems which GHC 8.10.4 supports.
+See also <https://www.haskell.org/ghc/download_ghc_8_10_7.html> for more details about the operating systems which GHC 8.10.7 supports.
 
 ## Official prebuilt binaries
 

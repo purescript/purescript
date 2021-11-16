@@ -12,11 +12,12 @@ module Language.PureScript.Make
 import           Prelude.Compat
 
 import           Control.Concurrent.Lifted as C
+import           Control.Exception.Base (onException)
 import           Control.Monad hiding (sequence)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Supply
-import           Control.Monad.Trans.Control (MonadBaseControl(..))
+import           Control.Monad.Trans.Control (MonadBaseControl(..), control)
 import           Control.Monad.Trans.State (runStateT)
 import           Control.Monad.Writer.Class (MonadWriter(..), censor)
 import           Control.Monad.Writer.Strict (runWriterT)
@@ -146,6 +147,10 @@ make ma@MakeActions{..} ms = do
       (fmap importPrim . snd $ CST.resFull m)
       (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
+      -- Prevent hanging on other modules when there is an internal error
+      -- (the exception is thrown, but other threads waiting on MVars are released)
+      `onExceptionLifted` BuildPlan.markComplete buildPlan moduleName (BuildJobFailed mempty)
+
   -- Wait for all threads to complete, and collect results (and errors).
   (failures, successes) <-
     let
@@ -236,6 +241,9 @@ make ma@MakeActions{..} ms = do
         Nothing -> return BuildJobSkipped
 
     BuildPlan.markComplete buildPlan moduleName result
+
+  onExceptionLifted :: m a -> m b -> m a
+  onExceptionLifted l r = control $ \runInIO -> runInIO l `onException` runInIO r
 
 -- | Infer the module name for a module by looking for the same filename with
 -- a .js extension.

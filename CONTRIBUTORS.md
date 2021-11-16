@@ -64,6 +64,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@japesinator](https://github.com/japesinator) | JP Smith | [MIT license](http://opensource.org/licenses/MIT) |
 | [@jkachmar](https://github.com/jkachmar) | Joe Kachmar | MIT license |
 | [@joneshf](https://github.com/joneshf) | Hardy Jones | MIT license |
+| [@jy14898](https://github.com/jy14898) | Joseph Young | MIT license |
 | [@kika](https://github.com/kika) | Kirill Pertsev | MIT license |
 | [@kRITZCREEK](https://github.com/kRITZCREEK) | Christoph Hegemann | MIT license |
 | [@L8D](https://github.com/L8D) | Tenor Biel | [MIT license](http://opensource.org/licenses/MIT) |
@@ -94,6 +95,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@passy](https://github.com/passy) | Pascal Hartig | [MIT license](http://opensource.org/licenses/MIT) |
 | [@paulyoung](https://github.com/paulyoung) | Paul Young | [MIT license](http://opensource.org/licenses/MIT) |
 | [@pelotom](https://github.com/pelotom) | Thomas Crockett | [MIT license](http://opensource.org/licenses/MIT) |
+| [@peterbecich](https://github.com/peterbecich) | Peter Becich | [MIT license](http://opensource.org/licenses/MIT) |
 | [@phadej](https://github.com/phadej) | Oleg Grenrus | [MIT license](http://opensource.org/licenses/MIT) |
 | [@phiggins](https://github.com/phiggins) | Pete Higgins | [MIT license](http://opensource.org/licenses/MIT) |
 | [@philopon](https://github.com/philopon) | Hirotomo Moriwaki | [MIT license](http://opensource.org/licenses/MIT) |
@@ -146,6 +148,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@woody88](https://github.com/woody88) | Woodson Delhia | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mhmdanas](https://github.com/mhmdanas) | Mohammed Anas | [MIT license](http://opensource.org/licenses/MIT) |
 | [@kl0tl](https://github.com/kl0tl) | Cyril Sobierajewicz | [MIT license](http://opensource.org/licenses/MIT) |
+| [@PureFunctor](https://github.com/PureFunctor) | Justin Garcia | [MIT license](http://opensource.org/licenses/MIT) |
 | [@xgrommx](https://github.com/xgrommx) | Denis Stoyanov | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms

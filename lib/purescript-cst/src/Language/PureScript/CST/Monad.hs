@@ -110,10 +110,6 @@ addFailure :: [SourceToken] -> ParserErrorType -> Parser ()
 addFailure toks ty = Parser $ \st _ ksucc ->
   ksucc (st { parserErrors = mkParserError [] toks ty : parserErrors st }) ()
 
-addFailures :: [ParserError] -> Parser ()
-addFailures errs = Parser $ \st _ ksucc ->
-  ksucc (st { parserErrors = errs <> parserErrors st }) ()
-
 parseFail' :: [SourceToken] -> ParserErrorType -> Parser a
 parseFail' toks msg = Parser $ \st kerr _ -> kerr st (mkParserError [] toks msg)
 

@@ -84,6 +84,7 @@ data ErrorMessageHint
   | ErrorInKindDeclaration (ProperName 'TypeName)
   | ErrorInRoleDeclaration (ProperName 'TypeName)
   | ErrorInForeignImport Ident
+  | ErrorInForeignImportData (ProperName 'TypeName)
   | ErrorSolvingConstraint SourceConstraint
   | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   | PositionedError (NEL.NonEmpty SourceSpan)
@@ -96,6 +97,7 @@ data HintCategory
   | CheckHint
   | PositionHint
   | SolverHint
+  | DeclarationHint
   | OtherHint
   deriving (Show, Eq)
 
@@ -291,10 +293,6 @@ data ImportDeclarationType
   | Hiding [DeclarationRef]
   deriving (Eq, Show, Generic, Serialise)
 
-isImplicit :: ImportDeclarationType -> Bool
-isImplicit Implicit = True
-isImplicit _ = False
-
 isExplicit :: ImportDeclarationType -> Bool
 isExplicit (Explicit _) = True
 isExplicit _ = False
@@ -323,9 +321,6 @@ data TypeDeclarationData = TypeDeclarationData
   , tydeclType :: !SourceType
   } deriving (Show, Eq)
 
-overTypeDeclaration :: (TypeDeclarationData -> TypeDeclarationData) -> Declaration -> Declaration
-overTypeDeclaration f d = maybe d (TypeDeclaration . f) (getTypeDeclaration d)
-
 getTypeDeclaration :: Declaration -> Maybe TypeDeclarationData
 getTypeDeclaration (TypeDeclaration d) = Just d
 getTypeDeclaration _ = Nothing
@@ -347,9 +342,6 @@ data ValueDeclarationData a = ValueDeclarationData
   , valdeclBinders :: ![Binder]
   , valdeclExpression :: !a
   } deriving (Show, Functor, Foldable, Traversable)
-
-overValueDeclaration :: (ValueDeclarationData [GuardedExpr] -> ValueDeclarationData [GuardedExpr]) -> Declaration -> Declaration
-overValueDeclaration f d = maybe d (ValueDeclaration . f) (getValueDeclaration d)
 
 getValueDeclaration :: Declaration -> Maybe (ValueDeclarationData [GuardedExpr])
 getValueDeclaration (ValueDeclaration d) = Just d
@@ -719,11 +711,6 @@ data Expr
   --
   | Ado (Maybe ModuleName) [DoNotationElement] Expr
   -- |
-  -- An application of a typeclass dictionary constructor. The value should be
-  -- an ObjectLiteral.
-  --
-  | TypeClassDictionaryConstructorApp (Qualified (ProperName 'ClassName)) Expr
-  -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
   -- can be evaluated at runtime. The constructor arguments represent (in order): whether or not to look
@@ -733,10 +720,6 @@ data Expr
   | TypeClassDictionary SourceConstraint
                         (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
                         [ErrorMessageHint]
-  -- |
-  -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
-  --
-  | TypeClassDictionaryAccessor (Qualified (ProperName 'ClassName)) Ident
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
