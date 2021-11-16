@@ -81,7 +81,6 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
   checkRoleDeclarations (Just d) (rd@(RoleDeclaration RoleDeclarationData{..}) : rest) = do
     unless (matchesDeclaration d) . throwError . errorMessage' (fst rdeclSourceAnn) $ OrphanRoleDeclaration rdeclIdent
     unless (isSupported d) . throwError . errorMessage' (fst rdeclSourceAnn) $ UnsupportedRoleDeclaration
-    checkRoleDeclarationArity d
     checkRoleDeclarations (Just rd) rest
     where
     isSupported :: Declaration -> Bool
@@ -94,17 +93,5 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
     matchesDeclaration (TypeSynonymDeclaration _ name' _ _) = rdeclIdent == name'
     matchesDeclaration (TypeClassDeclaration _ name' _ _ _ _) = rdeclIdent == coerceProperName name'
     matchesDeclaration _ = False
-    checkRoleDeclarationArity :: Declaration -> m ()
-    checkRoleDeclarationArity (DataDeclaration _ _ _ args _) =
-      throwRoleDeclarationArityMismatch $ length args
-    checkRoleDeclarationArity (ExternDataDeclaration _ _ kind) =
-      throwRoleDeclarationArityMismatch $ kindArity kind
-    checkRoleDeclarationArity _ = return ()
-    throwRoleDeclarationArityMismatch :: Int -> m ()
-    throwRoleDeclarationArityMismatch expected = do
-      let actual = length rdeclRoles
-      unless (expected == actual) $
-        throwError . errorMessage' (fst rdeclSourceAnn) $
-          RoleDeclarationArityMismatch rdeclIdent expected actual
   checkRoleDeclarations _ (d : rest) = checkRoleDeclarations (Just d) rest
   checkRoleDeclarations _ [] = return ()

@@ -16,7 +16,9 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (intersect, (\\))
+import Data.List.NonEmpty (NonEmpty((:|)), nonEmpty)
 import Data.Foldable (find)
+import Data.Functor (($>))
 import Data.Maybe (isJust, mapMaybe)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
@@ -24,13 +26,14 @@ import qualified Data.Set as S
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Errors
+import Language.PureScript.Errors hiding (nonEmpty)
 import Language.PureScript.Names
 import Language.PureScript.Types
 
 data VertexType
   = VertexDefinition
   | VertexKindSignature
+  | VertexRoleDeclaration
   deriving (Eq, Ord, Show)
 
 -- |
@@ -66,10 +69,12 @@ createBindingGroups moduleName = mapM f <=< handleDecls
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
         kindDecls = (,VertexKindSignature) <$> filter isKindDecl ds
         dataDecls = (,VertexDefinition) <$> filter (\a -> isDataDecl a || isExternDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
+        roleDecls = (,VertexRoleDeclaration) <$> filter isRoleDecl ds
+        roleAnns = declTypeName . fst <$> roleDecls
         kindSigs = declTypeName . fst <$> kindDecls
         typeSyns = declTypeName <$> filter isTypeSynonymDecl ds
         nonTypeSynKindSigs = kindSigs \\ typeSyns
-        allDecls = kindDecls ++ dataDecls
+        allDecls = kindDecls ++ dataDecls ++ roleDecls
         allProperNames = declTypeName . fst <$> allDecls
         mkVert (d, vty) =
           let names = usedTypeNames moduleName d `intersect` allProperNames
@@ -90,7 +95,10 @@ createBindingGroups moduleName = mapM f <=< handleDecls
                 | otherwise = VertexDefinition
               deps = fmap (\n -> (n, vtype n)) names
               self
-                | vty == VertexDefinition && name `elem` kindSigs = [(name, VertexKindSignature)]
+                | vty == VertexDefinition =
+                       (guard (name `elem` kindSigs) $> (name, VertexKindSignature))
+                    ++ (guard (name `elem` roleAnns && not (isExternDataDecl d)) $> (name, VertexRoleDeclaration))
+                | vty == VertexRoleDeclaration = [(name, VertexDefinition)]
                 | otherwise = []
           in (d, (name, vty), self ++ deps)
         dataVerts = fmap mkVert allDecls
@@ -99,7 +107,6 @@ createBindingGroups moduleName = mapM f <=< handleDecls
         valueVerts = fmap (\d -> (d, valdeclIdent d, usedIdents moduleName d `intersect` allIdents)) values
     bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
-             filter isRoleDecl ds ++
              dataBindingGroupDecls ++
              filter isTypeClassInstanceDecl ds ++
              filter isFixityDecl ds ++
@@ -187,6 +194,7 @@ declTypeName (ExternDataDeclaration _ pn _) = pn
 declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
 declTypeName (TypeClassDeclaration _ pn _ _ _ _) = coerceProperName pn
 declTypeName (KindDeclaration _ _ pn _) = pn
+declTypeName (RoleDeclaration (RoleDeclarationData _ pn _)) = pn
 declTypeName _ = internalError "Expected DataDeclaration"
 
 -- |
@@ -232,11 +240,11 @@ toDataBindingGroup
   -> m Declaration
 toDataBindingGroup (AcyclicSCC (d, _, _)) = return d
 toDataBindingGroup (CyclicSCC ds')
-  | kds@((ss, _):_) <- concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
+  | Just kds@((ss, _):|_) <- nonEmpty $ concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
   | not (null typeSynonymCycles) =
       throwError
         . MultipleErrors
-        . fmap (\syns -> ErrorMessage [positionedError . declSourceSpan . getDecl $ head syns] . CycleInTypeSynonym $ fmap (fst . getName) syns)
+        . fmap (\syns -> ErrorMessage [positionedError . declSourceSpan . getDecl $ NEL.head syns] . CycleInTypeSynonym $ fmap (fst . getName) syns)
         $ typeSynonymCycles
   | otherwise = return . DataBindingGroupDeclaration . NEL.fromList $ getDecl <$> ds'
   where
@@ -252,7 +260,7 @@ toDataBindingGroup (CyclicSCC ds')
     guard . isJust $ isTypeSynonym decl
     pure (decl, name, filter (maybe False (isJust . isTypeSynonym . getDecl) . lookupVert) deps)
 
-  isCycle (CyclicSCC c) = Just c
+  isCycle (CyclicSCC c) = nonEmpty c
   isCycle _ = Nothing
 
   typeSynonymCycles =

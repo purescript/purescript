@@ -35,11 +35,6 @@ data Environment = Environment
   , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
   -- ^ Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
-  , roleDeclarations :: M.Map (Qualified (ProperName 'TypeName)) [Role]
-  -- ^ Explicit role declarations currently in scope. Note that this field is
-  -- only used to store declared roles temporarily until they can be checked;
-  -- to find a type's real checked and/or inferred roles, refer to the TypeKind
-  -- in the `types` field.
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceType)], SourceType)
   -- ^ Type synonyms currently in scope
   , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
@@ -103,7 +98,7 @@ instance A.ToJSON FunctionalDependency where
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
-initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty M.empty allPrimClasses
+initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPrimClasses
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
@@ -341,7 +336,7 @@ primClass name mkKind =
   [ let k = mkKind kindConstraint
     in (name, (k, ExternData (nominalRolesForKind k)))
   , let k = mkKind kindType
-    in (dictSynonymName <$> name, (k, TypeSynonym))
+    in (dictTypeName <$> name, (k, TypeSynonym))
   ]
 
 -- | The primitive types in the external environment with their
@@ -579,14 +574,14 @@ lookupConstructor env ctor =
 lookupValue :: Environment -> Qualified Ident -> Maybe (SourceType, NameKind, NameVisibility)
 lookupValue env ident = ident `M.lookup` names env
 
-dictSynonymName' :: Text -> Text
-dictSynonymName' = (<> "$Dict")
+dictTypeName' :: Text -> Text
+dictTypeName' = (<> "$Dict")
 
-dictSynonymName :: ProperName a -> ProperName a
-dictSynonymName = ProperName . dictSynonymName' . runProperName
+dictTypeName :: ProperName a -> ProperName a
+dictTypeName = ProperName . dictTypeName' . runProperName
 
-isDictSynonym :: ProperName a -> Bool
-isDictSynonym = T.isSuffixOf "$Dict" . runProperName
+isDictTypeName :: ProperName a -> Bool
+isDictTypeName = T.isSuffixOf "$Dict" . runProperName
 
 -- |
 -- Given the kind of a type, generate a list @Nominal@ roles. This is used for

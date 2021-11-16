@@ -54,7 +54,7 @@ import Language.PureScript.TypeChecker.Synonyms (SynonymMap)
 --
 --  * Rebracket user-defined binary operators
 --
---  * Introduce type synonyms for type class dictionaries
+--  * Introduce newtypes for type class dictionaries and value declarations for instances
 --
 --  * Group mutually recursive value and data declarations into binding groups.
 --
@@ -84,8 +84,8 @@ desugar externs =
       -- We cannot prevent ill-kinded expansions of type synonyms without
       -- knowing their kinds but they're not available yet.
           kinds = mempty
-       in deriveInstances externs syns kinds m
-      >>= desugarTypeClasses externs syns kinds)
+       in deriveInstances externs syns kinds m)
+    >=> desugarTypeClasses externs
     >=> createBindingGroupsModule
 
 findTypeSynonyms :: [ExternsFile] -> ModuleName -> [Declaration] -> SynonymMap

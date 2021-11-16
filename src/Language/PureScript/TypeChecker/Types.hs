@@ -750,9 +750,6 @@ check' e@(Literal ss (ObjectLiteral ps)) t@(TypeApp _ obj row) | obj == tyRecord
   ensureNoDuplicateProperties ps
   ps' <- checkProperties e ps row False
   return $ TypedValue' True (Literal ss (ObjectLiteral ps')) t
-check' (TypeClassDictionaryConstructorApp name ps) t = do
-  ps' <- tvToExpr <$> check' ps t
-  return $ TypedValue' True (TypeClassDictionaryConstructorApp name ps') t
 check' e@(ObjectUpdate obj ps) t@(TypeApp _ o row) | o == tyRecord = do
   ensureNoDuplicateProperties ps
   -- We need to be careful to avoid duplicate labels here.
@@ -853,7 +850,7 @@ checkFunctionApplication
   -- ^ The argument expression
   -> m (SourceType, Expr)
   -- ^ The result type, and the elaborated term
-checkFunctionApplication fn fnTy arg = withErrorMessageHint (ErrorInApplication fn fnTy arg) $ do
+checkFunctionApplication fn fnTy arg = withErrorMessageHint' fn (ErrorInApplication fn fnTy arg) $ do
   subst <- gets checkSubstitution
   checkFunctionApplication' fn (substituteType subst fnTy) arg
 
@@ -898,3 +895,20 @@ ensureNoDuplicateProperties ps =
   case ls \\ ordNub ls of
     l : _ -> throwError . errorMessage $ DuplicateLabel (Label l) Nothing
     _ -> return ()
+
+-- | Test if this is an internal value to be excluded from error hints
+isInternal :: Expr -> Bool
+isInternal = \case
+  PositionedValue _ _ v -> isInternal v
+  TypedValue _ v _ -> isInternal v
+  Constructor _ (Qualified _ name) -> isDictTypeName name
+  _ -> False
+
+-- | Introduce a hint only if the given expression is not internal
+withErrorMessageHint'
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => Expr
+  -> ErrorMessageHint
+  -> m a
+  -> m a
+withErrorMessageHint' expr = if isInternal expr then const id else withErrorMessageHint

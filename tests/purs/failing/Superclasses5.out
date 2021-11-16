@@ -10,20 +10,17 @@ at tests/purs/failing/Superclasses5.purs:17:1 - 18:18 (line 17, column 1 - line 
   Alternatively, add a Partial constraint to the type of the enclosing value.
 
 while applying a function [33m$__unused[0m
-  of type [33mPartial => t1 -> t1[0m
+  of type [33mPartial => t0 -> t0[0m
   to argument [33mcase $0 of       [0m
               [33m  [ x ] -> [ su x[0m
               [33m           ]     [0m
-while checking that expression [33m$__unused (case $0 of      [0m
-                               [33m             [ x ] -> [ ...[0m
-                               [33m                      ]    [0m
-                               [33m          )                [0m
-  has type [33mArray a0[0m
+while inferring the type of [33m$__unused (case $0 of      [0m
+                            [33m             [ x ] -> [ ...[0m
+                            [33m                      ]    [0m
+                            [33m          )                [0m
 in value declaration [33msuArray[0m
 
-where [33ma0[0m is a rigid type variable
-        bound at (line 0, column 0 - line 0, column 0)
-      [33mt1[0m is an unknown type
+where [33mt0[0m is an unknown type
 
 See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
 or to contribute content related to this error.
