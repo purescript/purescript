@@ -5,7 +5,6 @@ at tests/purs/warning/2140.purs:5:3 - 5:36 (line 5, column 3 - line 5, column 36
   Type variable [33ma[0m was shadowed.
 
 in type declaration for [33mf[0m
-in type class declaration for [33mTest[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/ShadowedTypeVar.md for more information,
 or to contribute content related to this warning.

@@ -97,6 +97,7 @@ data HintCategory
   | CheckHint
   | PositionHint
   | SolverHint
+  | DeclarationHint
   | OtherHint
   deriving (Show, Eq)
 
