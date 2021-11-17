@@ -1861,7 +1861,7 @@ toTypelevelString (TypeLevelString _ s) =
   Just . Box.text $ decodeStringWithReplacement s
 toTypelevelString (TypeApp _ (TypeConstructor _ f) x)
   | f == primSubName C.typeError "Text" = toTypelevelString x
-toTypelevelString (TypeApp _ (TypeConstructor _ f) x)
+toTypelevelString (TypeApp _ (KindApp _ (TypeConstructor _ f) _) x)
   | f == primSubName C.typeError "Quote" = Just (typeAsBox maxBound x)
 toTypelevelString (TypeApp _ (TypeConstructor _ f) (TypeLevelString _ x))
   | f == primSubName C.typeError "QuoteLabel" = Just . line . prettyPrintLabel . Label $ x

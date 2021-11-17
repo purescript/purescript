@@ -429,7 +429,7 @@ primTypeErrorTypes =
     , (primSubName C.typeError "Fail", (kindDoc -:> kindConstraint, ExternData [Nominal]))
     , (primSubName C.typeError "Warn", (kindDoc -:> kindConstraint, ExternData [Nominal]))
     , (primSubName C.typeError "Text", (kindSymbol -:> kindDoc, ExternData [Phantom]))
-    , (primSubName C.typeError "Quote", (kindType -:> kindDoc, ExternData [Phantom]))
+    , (primSubName C.typeError "Quote", (tyForall "k" kindType $ tyVar "k" -:> kindDoc, ExternData [Phantom]))
     , (primSubName C.typeError "QuoteLabel", (kindSymbol -:> kindDoc, ExternData [Phantom]))
     , (primSubName C.typeError "Beside", (kindDoc -:> kindDoc -:> kindDoc, ExternData [Phantom, Phantom]))
     , (primSubName C.typeError "Above", (kindDoc -:> kindDoc -:> kindDoc, ExternData [Phantom, Phantom]))
