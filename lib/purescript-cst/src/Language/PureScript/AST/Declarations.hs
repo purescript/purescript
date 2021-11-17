@@ -505,13 +505,13 @@ declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
 declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = IdentName <$> hush n
+declName (RoleDeclaration RoleDeclarationData{..}) = Just (TyName rdeclIdent)
 declName ImportDeclaration{} = Nothing
 declName BindingGroupDeclaration{} = Nothing
 declName DataBindingGroupDeclaration{} = Nothing
 declName BoundValueDeclaration{} = Nothing
 declName KindDeclaration{} = Nothing
 declName TypeDeclaration{} = Nothing
-declName RoleDeclaration{} = Nothing
 
 -- |
 -- Test if a declaration is a value declaration
