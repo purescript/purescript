@@ -76,9 +76,8 @@ New features:
   instance Foo Int String
   ```
 
-  and the compiler will generate a unique name for the instance. Note that
-  generated instance names contain numeric suffixes which can change without
-  warning, and should therefore not be relied on.
+  Note that generated instance names can change without warning as a result of changes
+  elsewhere in your code, so do not rely upon these names in any FFI code.
 
 Bugfixes:
 
