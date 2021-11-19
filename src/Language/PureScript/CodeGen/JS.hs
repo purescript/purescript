@@ -39,7 +39,6 @@ import Language.PureScript.Options
 import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants.Prim as C
-import qualified Language.PureScript.Constants.Prelude as C
 
 import System.FilePath.Posix ((</>))
 
@@ -233,27 +232,16 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreign_ =
     return $ AST.Function Nothing Nothing jsArg (AST.Block Nothing [AST.Return Nothing ret])
   valueToJs' e@App{} = do
     let (f, args) = unApp e []
+    args' <- mapM valueToJs args
     case f of
-      Var _ (Qualified (Just applyFnModule) (Ident applyFn))
-        | moduleNameToJs applyFnModule == C.dataFunction
-        , applyFn == C.apply -> do
-            let (f', args') = unApp (head args) (tail args)
-            mkApp f' args'
-      _ -> mkApp f args
+      Var (_, _, _, Just IsNewtype) _ -> return (head args')
+      Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
+        return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
+      _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args' <$> valueToJs f
     where
     unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
     unApp (App _ val arg) args = unApp val (arg : args)
     unApp other args = (other, args)
-
-    mkApp :: Expr Ann -> [Expr Ann] -> m AST
-    mkApp f args = do
-      args' <- mapM valueToJs args
-      case f of
-        Var (_, _, _, Just IsNewtype) _ -> return (head args')
-        Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
-          return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
-        _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args' <$> valueToJs f
-
   valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
     return $ if mn' == mn
              then foreignIdent ident
