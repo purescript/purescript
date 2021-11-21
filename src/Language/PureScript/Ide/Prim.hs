@@ -29,6 +29,9 @@ idePrimDeclarations = Map.fromList
   , ( C.PrimSymbol
     , mconcat [primSymbolTypes, primSymbolClasses]
     )
+  , ( C.PrimNat
+    , mconcat [primNatTypes, primNatClasses]
+    )
   , ( C.PrimTypeError
     , mconcat [primTypeErrorTypes, primTypeErrorClasses]
     )
@@ -55,10 +58,12 @@ idePrimDeclarations = Map.fromList
     primRowTypes = annType (removeClasses PEnv.primRowTypes PEnv.primRowClasses)
     primRowListTypes = annType (removeClasses PEnv.primRowListTypes PEnv.primRowListClasses)
     primSymbolTypes = annType (removeClasses PEnv.primSymbolTypes PEnv.primSymbolClasses)
+    primNatTypes = annType (removeClasses PEnv.primNatTypes PEnv.primNatClasses)
     primTypeErrorTypes = annType (removeClasses PEnv.primTypeErrorTypes PEnv.primTypeErrorClasses)
 
     primClasses = annClass PEnv.primClasses
     primRowClasses = annClass PEnv.primRowClasses
     primRowListClasses = annClass PEnv.primRowListClasses
     primSymbolClasses = annClass PEnv.primSymbolClasses
+    primNatClasses = annClass PEnv.primNatClasses
     primTypeErrorClasses = annClass PEnv.primTypeErrorClasses

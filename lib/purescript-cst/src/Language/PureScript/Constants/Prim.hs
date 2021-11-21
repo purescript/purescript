@@ -95,6 +95,14 @@ pattern RowListNil = Qualified (Just PrimRowList) (ProperName "Nil")
 pattern RowListCons :: Qualified (ProperName 'TypeName)
 pattern RowListCons = Qualified (Just PrimRowList) (ProperName "Cons")
 
+-- Prim.Nat
+
+pattern PrimNat :: ModuleName
+pattern PrimNat = ModuleName "Prim.Nat"
+
+pattern NatAdd :: Qualified (ProperName 'ClassName)
+pattern NatAdd = Qualified (Just PrimNat) (ProperName "Add")
+
 -- Prim.Symbol
 
 pattern PrimSymbol :: ModuleName
@@ -121,7 +129,7 @@ pattern Warn :: Qualified (ProperName 'ClassName)
 pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
 
 primModules :: [ModuleName]
-primModules = [Prim, PrimBoolean, PrimCoerce, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimTypeError]
+primModules = [Prim, PrimBoolean, PrimCoerce, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimNat, PrimTypeError]
 
 typ :: forall a. (IsString a) => a
 typ = "Type"
@@ -169,6 +177,9 @@ moduleRowList = "RowList"
 
 moduleSymbol :: forall a. (IsString a) => a
 moduleSymbol = "Symbol"
+
+moduleNat :: forall a. (IsString a) => a
+moduleNat = "Nat"
 
 typeError :: forall a. (IsString a) => a
 typeError = "TypeError"

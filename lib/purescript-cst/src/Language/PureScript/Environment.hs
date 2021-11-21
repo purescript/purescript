@@ -374,6 +374,7 @@ allPrimTypes = M.unions
   , primRowTypes
   , primRowListTypes
   , primSymbolTypes
+  , primNatTypes
   , primTypeErrorTypes
   ]
 
@@ -426,6 +427,12 @@ primSymbolTypes =
     , primClass (primSubName C.moduleSymbol "Cons")    (\kind -> kindSymbol -:> kindSymbol -:> kindSymbol -:> kind)
     ]
 
+primNatTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
+primNatTypes =
+  M.fromList $ mconcat
+    [ primClass (primSubName C.moduleNat "Add")  (\nat -> kindNat -:> kindNat -:> kindNat -:> nat)
+    ]
+
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primTypeErrorTypes =
   M.fromList $
@@ -458,6 +465,7 @@ allPrimClasses = M.unions
   , primRowClasses
   , primRowListClasses
   , primSymbolClasses
+  , primNatClasses
   , primTypeErrorClasses
   ]
 
@@ -554,6 +562,19 @@ primSymbolClasses =
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [2] [0, 1]
+        ] True)
+    ]
+
+primNatClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primNatClasses =
+  M.fromList
+    -- class Add (left :: Nat) (right :: Nat) (result :: Nat) | left right -> result
+    [ (primSubName C.moduleNat "Add", makeTypeClassData
+        [ ("left", Just kindNat)
+        , ("right", Just kindNat)
+        , ("result", Just kindNat)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
         ] True)
     ]
 

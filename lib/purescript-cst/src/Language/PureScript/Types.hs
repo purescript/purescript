@@ -100,6 +100,9 @@ srcTypeVar = TypeVar NullSourceAnn
 srcTypeLevelString :: PSString -> SourceType
 srcTypeLevelString = TypeLevelString NullSourceAnn
 
+srcTypeLevelNat :: Integer -> SourceType
+srcTypeLevelNat = TypeLevelNat NullSourceAnn
+
 srcTypeWildcard :: SourceType
 srcTypeWildcard = TypeWildcard NullSourceAnn Nothing
 

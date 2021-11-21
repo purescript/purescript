@@ -26,6 +26,7 @@ primModules =
   , primRowDocsModule
   , primRowListDocsModule
   , primSymbolDocsModule
+  , primNatDocsModule
   , primTypeErrorDocsModule
   ]
 
@@ -50,6 +51,7 @@ primDocsModule = Module
       , kindType
       , kindConstraint
       , kindSymbol
+      , kindNat
       , kindRow
       ]
   , modReExports = []
@@ -127,6 +129,16 @@ primSymbolDocsModule = Module
   , modReExports = []
   }
 
+primNatDocsModule :: Module
+primNatDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.Nat"
+  , modComments = Just "The Prim.Nat module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with `Nats`."
+  , modDeclarations =
+      [ natAdd
+      ]
+  , modReExports = []
+  }
+
 primTypeErrorDocsModule :: Module
 primTypeErrorDocsModule = Module
   { modName = P.moduleNameFromString "Prim.TypeError"
@@ -195,6 +207,7 @@ lookupPrimClassOf g = unsafeLookupOf g
     P.primRowClasses <>
     P.primRowListClasses <>
     P.primSymbolClasses <>
+    P.primNatClasses <>
     P.primTypeErrorClasses
   ) "Docs.Prim: No such Prim class: "
 
@@ -243,6 +256,14 @@ kindSymbol = primType "Symbol" $ T.unlines
   , ""
   , "Construct types of this kind using the same literal syntax as documented"
   , "for strings."
+  ]
+
+kindNat :: Declaration
+kindNat = primType "Nat" $ T.unlines
+  [ "`Nat` is the kind of type-level natural numbers."
+  , ""
+  , "Construct types of this kind using the same literal syntax as documented"
+  , "for integers."
   ]
 
 kindRow :: Declaration
@@ -518,6 +539,11 @@ symbolCons = primClassOf (P.primSubName "Symbol") "Cons" $ T.unlines
   , "head and tail or for combining a head and tail into a new symbol."
   , "Requires the head to be a single character and the combined string"
   , "cannot be empty."
+  ]
+
+natAdd :: Declaration
+natAdd = primClassOf (P.primSubName "Nat") "Add" $ T.unlines
+  [ "Compiler solved type class for adding `Nat`s."
   ]
 
 fail :: Declaration

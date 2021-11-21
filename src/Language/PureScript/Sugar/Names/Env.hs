@@ -205,6 +205,11 @@ primSymbolExports :: Exports
 primSymbolExports = mkPrimExports primSymbolTypes primSymbolClasses
 
 -- |
+-- The exported types from the @Prim.Nat@ module
+primNatExports :: Exports
+primNatExports = mkPrimExports primNatTypes primNatClasses
+
+-- |
 -- The exported types from the @Prim.TypeError@ module
 --
 primTypeErrorExports :: Exports
@@ -255,6 +260,9 @@ primEnv = M.fromList
     )
   , ( C.PrimSymbol
     , (internalModuleSourceSpan "<Prim.Symbol>", nullImports, primSymbolExports)
+    )
+  , ( C.PrimNat
+    , (internalModuleSourceSpan "<Prim.Nat>", nullImports, primNatExports)
     )
   , ( C.PrimTypeError
     , (internalModuleSourceSpan "<Prim.TypeError>", nullImports, primTypeErrorExports)
