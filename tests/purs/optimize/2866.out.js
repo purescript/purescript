@@ -6,8 +6,10 @@
 var Area = function (x) {
     return x;
 };
+var areaFlipped = 42;
 var area = 42;
 module.exports = {
     Area: Area,
-    area: area
+    area: area,
+    areaFlipped: areaFlipped
 };

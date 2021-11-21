@@ -8,3 +8,5 @@ import Prelude
 newtype Area = Area Int
 
 area = Area $ 42
+
+areaFlipped = 42 # Area
