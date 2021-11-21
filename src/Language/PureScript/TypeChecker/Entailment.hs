@@ -183,6 +183,8 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.SymbolCons _ args | Just dicts <- solveSymbolCons args = dicts
     forClassName _ _ C.IsNat _ args | Just dicts <- solveIsNat args = dicts
     forClassName _ _ C.NatAdd _ args | Just dicts <- solveNatAdd args = dicts
+    forClassName _ _ C.NatCompare _ args | Just dicts <- solveNatCompare args = dicts
+    forClassName _ _ C.NatMul _ args | Just dicts <- solveNatMul args = dicts
     forClassName _ _ C.RowUnion kinds args | Just dicts <- solveUnion kinds args = dicts
     forClassName _ _ C.RowNub kinds args | Just dicts <- solveNub kinds args = dicts
     forClassName _ _ C.RowLacks kinds args | Just dicts <- solveLacks kinds args = dicts
@@ -485,10 +487,33 @@ entails SolverOptions{..} constraint context hints =
     solveIsNat _ = Nothing
 
     solveNatAdd :: [SourceType] -> Maybe [TypeClassDict]
-    solveNatAdd [arg0@(TypeLevelNat _ x), arg1@(TypeLevelNat _ y), _] =
-      let args' = [arg0, arg1, srcTypeLevelNat (x + y) ]
-      in Just [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatAdd [] [] args' Nothing Nothing]
+    solveNatAdd [arg0, arg1, arg2] = do
+      (arg0', arg1', arg2') <- addNats arg0 arg1 arg2
+      let args' = [arg0', arg1', arg2']
+      pure $ [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatAdd [] [] args' Nothing Nothing]
     solveNatAdd _ = Nothing
+
+    addNats :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
+    addNats arg0@(TypeLevelNat _ l) arg1@(TypeLevelNat _ r) _ = pure $ (arg0, arg1, srcTypeLevelNat (l + r))
+    addNats arg0@(TypeLevelNat _ l) _ arg2@(TypeLevelNat _ r) = pure $ (arg0, srcTypeLevelNat (l + r), arg2)
+    addNats _ arg1@(TypeLevelNat _ l) arg2@(TypeLevelNat _ r) = pure $ (srcTypeLevelNat (l + r), arg1, arg2)
+    addNats _ _ _                                             = Nothing
+
+    solveNatCompare :: [SourceType] -> Maybe [TypeClassDict]
+    solveNatCompare [arg0@(TypeLevelNat _ l), arg1@(TypeLevelNat _ r), _] =
+      let ordering = case compare l r of
+            LT -> C.orderingLT
+            EQ -> C.orderingEQ
+            GT -> C.orderingGT
+          args' = [arg0, arg1, srcTypeConstructor ordering]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatCompare [] [] args' Nothing Nothing]
+    solveNatCompare _ = Nothing
+
+    solveNatMul :: [SourceType] -> Maybe [TypeClassDict]
+    solveNatMul [arg0@(TypeLevelNat _ l), arg1@(TypeLevelNat _ r), _] =
+      let args' = [arg0, arg1, srcTypeLevelNat (l * r)]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatMul [] [] args' Nothing Nothing]
+    solveNatMul _ = Nothing
 
     solveUnion :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveUnion kinds [l, r, u] = do

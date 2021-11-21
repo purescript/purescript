@@ -430,7 +430,11 @@ primSymbolTypes =
 primNatTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primNatTypes =
   M.fromList $ mconcat
-    [ primClass (primSubName C.moduleNat "Add")  (\nat -> kindNat -:> kindNat -:> kindNat -:> nat)
+    [ primClass (primSubName C.moduleNat "Add")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
+    , primClass (primSubName C.moduleNat "Compare") (\kind -> kindNat -:> kindNat -:> kindOrdering -:> kind)
+    -- , primClass (primSubName C.moduleNat "Div")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
+    , primClass (primSubName C.moduleNat "Mul")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
+    -- , primClass (primSubName C.moduleNat "Sub")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
     ]
 
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
@@ -568,11 +572,31 @@ primSymbolClasses =
 primNatClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primNatClasses =
   M.fromList
-    -- class Add (left :: Nat) (right :: Nat) (result :: Nat) | left right -> result
+    -- class Add (left :: Nat) (right :: Nat) (result :: Nat) | left right -> result, left result -> right, right result -> left
     [ (primSubName C.moduleNat "Add", makeTypeClassData
         [ ("left", Just kindNat)
         , ("right", Just kindNat)
         , ("result", Just kindNat)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        , FunctionalDependency [0, 2] [1]
+        , FunctionalDependency [1, 2] [0]
+        ] True)
+
+    -- class Compare (left :: Nat) (right :: Nat) (ordering :: Ordering) | left right -> ordering
+    , (primSubName C.moduleNat "Compare", makeTypeClassData
+        [ ("left", Just kindNat)
+        , ("right", Just kindSymbol)
+        , ("ordering", Just kindSymbol)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        ] True)
+
+    -- class Mul (multiplicand :: Nat) (multiplier :: Nat) (product :: Nat) | multiplicand multiplier -> product
+    , (primSubName C.moduleNat "Mul", makeTypeClassData
+        [ ("multiplicand", Just kindNat)
+        , ("multiplier", Just kindNat)
+        , ("product", Just kindNat)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         ] True)

@@ -103,6 +103,12 @@ pattern PrimNat = ModuleName "Prim.Nat"
 pattern NatAdd :: Qualified (ProperName 'ClassName)
 pattern NatAdd = Qualified (Just PrimNat) (ProperName "Add")
 
+pattern NatCompare :: Qualified (ProperName 'ClassName)
+pattern NatCompare = Qualified (Just PrimNat) (ProperName "Compare")
+
+pattern NatMul :: Qualified (ProperName 'ClassName)
+pattern NatMul = Qualified (Just PrimNat) (ProperName "Mul")
+
 -- Prim.Symbol
 
 pattern PrimSymbol :: ModuleName

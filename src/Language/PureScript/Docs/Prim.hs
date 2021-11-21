@@ -135,6 +135,8 @@ primNatDocsModule = Module
   , modComments = Just "The Prim.Nat module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with `Nats`."
   , modDeclarations =
       [ natAdd
+      , natCompare
+      , natMul
       ]
   , modReExports = []
   }
@@ -544,6 +546,17 @@ symbolCons = primClassOf (P.primSubName "Symbol") "Cons" $ T.unlines
 natAdd :: Declaration
 natAdd = primClassOf (P.primSubName "Nat") "Add" $ T.unlines
   [ "Compiler solved type class for adding `Nat`s."
+  ]
+
+natCompare :: Declaration
+natCompare = primClassOf (P.primSubName "Nat") "Compare" $ T.unlines
+  [ "Compiler solved type class for comparing two `Nat`s."
+  , "Produces an `Ordering`."
+  ]
+
+natMul :: Declaration
+natMul = primClassOf (P.primSubName "Nat") "Mul" $ T.unlines
+  [ "Compiler solved type class for multiplying `Nat`s."
   ]
 
 fail :: Declaration
