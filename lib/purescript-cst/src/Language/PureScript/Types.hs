@@ -52,6 +52,8 @@ data Type a
   | TypeVar a Text
   -- | A type-level string
   | TypeLevelString a PSString
+  -- | A type-level natural
+  | TypeLevelNat a Integer
   -- | A type wildcard, as would appear in a partial type synonym
   | TypeWildcard a (Maybe Text)
   -- | A type constructor
@@ -212,6 +214,8 @@ typeToJSON annToJSON ty =
       variant "TypeVar" a b
     TypeLevelString a b ->
       variant "TypeLevelString" a b
+    TypeLevelNat a b ->
+      variant "TypeLevelNat" a b
     TypeWildcard a b ->
       variant "TypeWildcard" a b
     TypeConstructor a b ->
@@ -648,6 +652,7 @@ annForType :: Lens' (Type a) a
 annForType k (TUnknown a b) = (\z -> TUnknown z b) <$> k a
 annForType k (TypeVar a b) = (\z -> TypeVar z b) <$> k a
 annForType k (TypeLevelString a b) = (\z -> TypeLevelString z b) <$> k a
+annForType k (TypeLevelNat a b) = (\z -> TypeLevelNat z b) <$> k a
 annForType k (TypeWildcard a b) = (\z -> TypeWildcard z b) <$> k a
 annForType k (TypeConstructor a b) = (\z -> TypeConstructor z b) <$> k a
 annForType k (TypeOp a b) = (\z -> TypeOp z b) <$> k a
@@ -702,6 +707,7 @@ compareType :: Type a -> Type b -> Ordering
 compareType (TUnknown _ a) (TUnknown _ a') = compare a a'
 compareType (TypeVar _ a) (TypeVar _ a') = compare a a'
 compareType (TypeLevelString _ a) (TypeLevelString _ a') = compare a a'
+compareType (TypeLevelNat _ a) (TypeLevelNat _ a') = compare a a'
 compareType (TypeWildcard _ a) (TypeWildcard _ a') = compare a a'
 compareType (TypeConstructor _ a) (TypeConstructor _ a') = compare a a'
 compareType (TypeOp _ a) (TypeOp _ a') = compare a a'
@@ -722,19 +728,20 @@ compareType typ typ' =
       orderOf TUnknown{} = 0
       orderOf TypeVar{} = 1
       orderOf TypeLevelString{} = 2
-      orderOf TypeWildcard{} = 3
-      orderOf TypeConstructor{} = 4
-      orderOf TypeOp{} = 5
-      orderOf TypeApp{} = 6
-      orderOf KindApp{} = 7
-      orderOf ForAll{} = 8
-      orderOf ConstrainedType{} = 9
-      orderOf Skolem{} = 10
-      orderOf REmpty{} = 11
-      orderOf RCons{} = 12
-      orderOf KindedType{} = 13
-      orderOf BinaryNoParensType{} = 14
-      orderOf ParensInType{} = 15
+      orderOf TypeLevelNat{} = 3
+      orderOf TypeWildcard{} = 4
+      orderOf TypeConstructor{} = 5
+      orderOf TypeOp{} = 6
+      orderOf TypeApp{} = 7
+      orderOf KindApp{} = 8
+      orderOf ForAll{} = 9
+      orderOf ConstrainedType{} = 10
+      orderOf Skolem{} = 11
+      orderOf REmpty{} = 12
+      orderOf RCons{} = 13
+      orderOf KindedType{} = 14
+      orderOf BinaryNoParensType{} = 15
+      orderOf ParensInType{} = 16
 
 compareMaybeType :: Maybe (Type a) -> Maybe (Type b) -> Ordering
 compareMaybeType (Just a) (Just b) = compareType a b
