@@ -55,6 +55,7 @@ data Evidence
   -- | Computed instances
   | WarnInstance SourceType -- ^ Warn type class with a user-defined warning message
   | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
+  | IsNatInstance Integer -- ^ The IsNat type class for a given Nat literal
   | EmptyClassInstance        -- ^ For any solved type class with no members
   deriving (Show, Eq)
 
@@ -177,6 +178,7 @@ entails SolverOptions{..} constraint context hints =
       -- This allows us to defer a warning by propagating the constraint.
       findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope Nothing 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing Nothing]
     forClassName _ _ C.IsSymbol _ args | Just dicts <- solveIsSymbol args = dicts
+    forClassName _ _ C.IsNat _ args | Just dicts <- solveIsNat args = dicts
     forClassName _ _ C.SymbolCompare _ args | Just dicts <- solveSymbolCompare args = dicts
     forClassName _ _ C.SymbolAppend _ args | Just dicts <- solveSymbolAppend args = dicts
     forClassName _ _ C.SymbolCons _ args | Just dicts <- solveSymbolCons args = dicts
@@ -387,7 +389,9 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
               return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsSymbol)) (Literal nullSourceSpan (ObjectLiteral fields))
-
+            mkDictionary (IsNatInstance nat) _ =
+              let fields = [ ("reflectNat", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (NumericLiteral $ Left nat))) ] in
+              return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsNat)) (Literal nullSourceSpan (ObjectLiteral fields))
             unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
             unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)
               where unkIndices = findIndices containsUnknowns tyArgs
@@ -423,6 +427,10 @@ entails SolverOptions{..} constraint context hints =
     solveIsSymbol :: [SourceType] -> Maybe [TypeClassDict]
     solveIsSymbol [TypeLevelString ann sym] = Just [TypeClassDictionaryInScope Nothing 0 (IsSymbolInstance sym) [] C.IsSymbol [] [] [TypeLevelString ann sym] Nothing Nothing]
     solveIsSymbol _ = Nothing
+
+    solveIsNat :: [SourceType] -> Maybe [TypeClassDict]
+    solveIsNat [TypeLevelNat ann nat] = Just [TypeClassDictionaryInScope Nothing 0 (IsNatInstance nat) [] C.IsNat [] [] [TypeLevelNat ann nat] Nothing Nothing]
+    solveIsNat _ = Nothing
 
     solveSymbolCompare :: [SourceType] -> Maybe [TypeClassDict]
     solveSymbolCompare [arg0@(TypeLevelString _ lhs), arg1@(TypeLevelString _ rhs), _] =
