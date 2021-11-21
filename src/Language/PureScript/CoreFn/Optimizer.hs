@@ -60,7 +60,7 @@ optimizeUnusedPartialFn (Let _
   originalCoreFn
 optimizeUnusedPartialFn e = e
 
-optimizeDataFunctionApply :: Expr Ann -> Expr Ann
+optimizeDataFunctionApply :: Expr a -> Expr a
 optimizeDataFunctionApply e = case e of
   (App a (App _ (Var _ (Qualified (Just (ModuleName mn)) (Ident fn))) x) y)
     | mn == dataFunction && fn == C.apply -> App a x y
