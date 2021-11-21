@@ -303,6 +303,8 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
       TypeVar a <$> contents
     "TypeLevelString" ->
       TypeLevelString a <$> contents
+    "TypeLevelNat" ->
+      TypeLevelNat a <$> contents
     "TypeWildcard" -> do
       b <- contents <|> pure Nothing
       pure $ TypeWildcard a b
