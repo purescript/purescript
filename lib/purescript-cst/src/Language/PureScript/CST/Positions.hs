@@ -246,6 +246,7 @@ typeRange = \case
   TypeWildcard _ a -> (a, a)
   TypeHole _ a -> nameRange a
   TypeString _ a _ -> (a, a)
+  TypeNat _ a _ -> (a, a)
   TypeRow _ a -> wrappedRange a
   TypeRecord _ a -> wrappedRange a
   TypeForall _ a _ _ b -> (a, snd $ typeRange b)

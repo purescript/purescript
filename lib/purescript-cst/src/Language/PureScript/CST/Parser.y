@@ -321,6 +321,7 @@ typeAtom :: { Type ()}
   | qualProperName { TypeConstructor () (getQualifiedProperName $1) }
   | qualSymbol { TypeOpName () (getQualifiedOpName $1) }
   | string { uncurry (TypeString ()) $1 }
+  | int { uncurry (TypeNat ()) $1 }
   | hole { TypeHole () $1 }
   | '(->)' { TypeArrName () $1 }
   | '{' row '}' { TypeRecord () (Wrapped $1 $2 $3) }

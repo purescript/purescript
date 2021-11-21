@@ -284,6 +284,7 @@ flattenType = \case
   TypeWildcard _ a -> pure a
   TypeHole _ a -> pure $ nameTok a
   TypeString _ a _ -> pure a
+  TypeNat _ a _ -> pure a
   TypeRow _ a -> flattenWrapped flattenRow a
   TypeRecord _ a -> flattenWrapped flattenRow a
   TypeForall _ a b c d -> pure a <> foldMap flattenTypeVarBinding b <> pure c <> flattenType d
