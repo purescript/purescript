@@ -1,5 +1,7 @@
 module Lib where
 
+import Prim hiding (Nat)
+
 type Nat ∷ ∀ k. (k → Type) → (k → Type) → Type
 type Nat f g = ∀ x. f x → g x
 
