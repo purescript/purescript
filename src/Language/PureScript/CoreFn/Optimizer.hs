@@ -53,7 +53,7 @@ closedRecordFields (TypeApp _ (TypeConstructor _ C.Record) row) =
 closedRecordFields _ = Nothing
 
 -- | See https://github.com/purescript/purescript/issues/3157
-optimizeUnusedPartialFn :: Expr Ann -> Expr Ann
+optimizeUnusedPartialFn :: Expr a -> Expr a
 optimizeUnusedPartialFn (Let _
   [NonRec _ UnusedIdent _]
   (App _ (App _ (Var _ (Qualified _ UnusedIdent)) _) originalCoreFn)) =
