@@ -265,6 +265,9 @@ kindConstraint = primKind C.constraint
 kindSymbol :: SourceType
 kindSymbol = primKind C.symbol
 
+kindNat :: SourceType
+kindNat = primKind C.nat
+
 kindDoc :: SourceType
 kindDoc = primSubKind C.typeError C.doc
 
@@ -348,6 +351,7 @@ primTypes =
     [ (primName "Type",             (kindType, ExternData []))
     , (primName "Constraint",       (kindType, ExternData []))
     , (primName "Symbol",           (kindType, ExternData []))
+    , (primName "Nat",              (kindType, ExternData []))
     , (primName "Row",              (kindType -:> kindType, ExternData [Phantom]))
     , (primName "Function",         (kindType -:> kindType -:> kindType, ExternData [Representational, Representational]))
     , (primName "Array",            (kindType -:> kindType, ExternData [Representational]))

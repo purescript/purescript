@@ -135,6 +135,9 @@ kindRowList = "RowList"
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"
 
+nat :: forall a. (IsString a) => a
+nat = "Nat"
+
 doc :: forall a. (IsString a) => a
 doc = "Doc"
 
