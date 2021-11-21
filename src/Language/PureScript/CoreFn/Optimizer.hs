@@ -3,6 +3,7 @@ module Language.PureScript.CoreFn.Optimizer (optimizeCoreFn) where
 import Protolude hiding (Type)
 
 import Data.List (lookup)
+import qualified Data.Text as T
 import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CoreFn.Ann
@@ -12,6 +13,7 @@ import Language.PureScript.CoreFn.Traversals
 import Language.PureScript.Names (Ident(..), ModuleName(..), Qualified(..))
 import Language.PureScript.Label
 import Language.PureScript.Types
+import qualified Language.PureScript.Constants.Prelude as C
 import qualified Language.PureScript.Constants.Prim as C
 
 -- |
@@ -58,10 +60,12 @@ optimizeUnusedPartialFn (Let _
   originalCoreFn
 optimizeUnusedPartialFn e = e
 
--- | TODO: Fixup the annotations here.
 optimizeDataFunctionApply :: Expr Ann -> Expr Ann
 optimizeDataFunctionApply e = case e of
-  (App a (App _ (Var _ (Qualified (Just (ModuleName dataFunction)) (Ident applyFn))) x) y)
-    | dataFunction == "Data.Function" && applyFn == "apply" -> App a x y
-    | dataFunction == "Data.Function" && applyFn == "applyFlipped" -> App a y x
+  (App a (App _ (Var _ (Qualified (Just (ModuleName mn)) (Ident fn))) x) y)
+    | mn == dataFunction && fn == C.apply -> App a x y
+    | mn == dataFunction && fn == C.applyFlipped -> App a y x
   _ -> e
+  where
+  dataFunction :: Text
+  dataFunction = T.replace "_" "." C.dataFunction
