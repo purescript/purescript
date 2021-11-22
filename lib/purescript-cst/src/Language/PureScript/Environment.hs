@@ -572,15 +572,15 @@ primSymbolClasses =
 primNatClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primNatClasses =
   M.fromList
-    -- class Add (left :: Nat) (right :: Nat) (result :: Nat) | left right -> result, left result -> right, right result -> left
+    -- class Add (left :: Nat) (right :: Nat) (result :: Nat) | left right -> result {- , left result -> right, right result -> left -}
     [ (primSubName C.moduleNat "Add", makeTypeClassData
         [ ("left", Just kindNat)
         , ("right", Just kindNat)
         , ("result", Just kindNat)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
-        , FunctionalDependency [0, 2] [1]
-        , FunctionalDependency [1, 2] [0]
+        -- , FunctionalDependency [0, 2] [1]
+        -- , FunctionalDependency [1, 2] [0]
         ] True)
 
     -- class Compare (left :: Nat) (right :: Nat) (ordering :: Ordering) | left right -> ordering
