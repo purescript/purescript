@@ -132,7 +132,7 @@ primSymbolDocsModule = Module
 primNatDocsModule :: Module
 primNatDocsModule = Module
   { modName = P.moduleNameFromString "Prim.Nat"
-  , modComments = Just "The Prim.Nat module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with `Nats`."
+  , modComments = Just "The Prim.Nat module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with type-level natural numbers."
   , modDeclarations =
       [ natAdd
       , natCompare
