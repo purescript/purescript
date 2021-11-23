@@ -525,13 +525,13 @@ entails SolverOptions{..} constraint context hints =
     mulNats arg0@(TypeLevelNat _ l) arg1@(TypeLevelNat _ r) _ = pure (arg0, arg1, srcTypeLevelNat (l * r))
     -- | l o -> r, o / l = r, given o % l == 0
     mulNats arg0@(TypeLevelNat _ l) _ arg2@(TypeLevelNat _ o) =
-      if (mod o l == 0) then
+      if mod o l == 0 then
         pure (arg0, srcTypeLevelNat (div o l), arg2)
       else
         Nothing
     -- | r o -> l, o / r = l, given o % r == 0
     mulNats _ arg1@(TypeLevelNat _ r) arg2@(TypeLevelNat _ o) =
-      if (mod o r == 0) then
+      if mod o r == 0 then
         pure (srcTypeLevelNat (div o r), arg1, arg2)
       else
         Nothing
