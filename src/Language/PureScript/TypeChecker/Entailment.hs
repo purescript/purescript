@@ -494,9 +494,12 @@ entails SolverOptions{..} constraint context hints =
     solveNatAdd _ = Nothing
 
     addNats :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
+    -- | l r -> o, l + r = o
     addNats arg0@(TypeLevelNat _ l) arg1@(TypeLevelNat _ r) _ = pure (arg0, arg1, srcTypeLevelNat (l + r))
-    -- addNats arg0@(TypeLevelNat _ l) _ arg2@(TypeLevelNat _ r) = pure (arg0, srcTypeLevelNat (l + r), arg2)
-    -- addNats _ arg1@(TypeLevelNat _ l) arg2@(TypeLevelNat _ r) = pure (srcTypeLevelNat (l + r), arg1, arg2)
+    -- | l o -> r, o - l = r
+    addNats arg0@(TypeLevelNat _ l) _ arg2@(TypeLevelNat _ o) = pure (arg0, srcTypeLevelNat (o - l), arg2)
+    -- | r o -> l, o - r = l
+    addNats _ arg1@(TypeLevelNat _ r) arg2@(TypeLevelNat _ o) = pure (srcTypeLevelNat (o - r), arg1, arg2)
     addNats _ _ _                                             = Nothing
 
     solveNatCompare :: [SourceType] -> Maybe [TypeClassDict]
