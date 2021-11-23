@@ -185,6 +185,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.NatAdd _ args | Just dicts <- solveNatAdd args = dicts
     forClassName _ _ C.NatCompare _ args | Just dicts <- solveNatCompare args = dicts
     forClassName _ _ C.NatMul _ args | Just dicts <- solveNatMul args = dicts
+    forClassName _ _ C.NatNegate _ args | Just dicts <- solveNatNegate args = dicts
     forClassName _ _ C.RowUnion kinds args | Just dicts <- solveUnion kinds args = dicts
     forClassName _ _ C.RowNub kinds args | Just dicts <- solveNub kinds args = dicts
     forClassName _ _ C.RowLacks kinds args | Just dicts <- solveLacks kinds args = dicts
@@ -517,6 +518,15 @@ entails SolverOptions{..} constraint context hints =
       let args' = [arg0, arg1, srcTypeLevelNat (l * r)]
       in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatMul [] [] args' Nothing Nothing]
     solveNatMul _ = Nothing
+
+    solveNatNegate :: [SourceType] -> Maybe [TypeClassDict]
+    solveNatNegate [arg0@(TypeLevelNat _ n), _] =
+      let args' = [arg0, srcTypeLevelNat (negate n)]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatNegate [] [] args' Nothing Nothing]
+    solveNatNegate [_, arg1@(TypeLevelNat _ o)] =
+      let args' = [srcTypeLevelNat (negate o), arg1]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatNegate [] [] args' Nothing Nothing]
+    solveNatNegate _ = Nothing
 
     solveUnion :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveUnion kinds [l, r, u] = do

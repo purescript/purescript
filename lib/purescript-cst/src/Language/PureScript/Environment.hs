@@ -435,6 +435,7 @@ primNatTypes =
     -- , primClass (primSubName C.moduleNat "Div")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
     , primClass (primSubName C.moduleNat "Mul")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
     -- , primClass (primSubName C.moduleNat "Sub")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
+    , primClass (primSubName C.moduleNat "Negate") (\kind -> kindNat -:> kindNat -:> kind)
     ]
 
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
@@ -599,6 +600,15 @@ primNatClasses =
         , ("product", Just kindNat)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
+        ] True)
+
+    -- class Negate (n :: Nat) (o :: Nat) | n -> o, o -> n
+    , (primSubName C.moduleNat "Negate", makeTypeClassData
+        [ ("n", Just kindNat)
+        , ("o", Just kindNat)
+        ] [] []
+        [ FunctionalDependency [0] [1]
+        , FunctionalDependency [1] [0]
         ] True)
     ]
 
