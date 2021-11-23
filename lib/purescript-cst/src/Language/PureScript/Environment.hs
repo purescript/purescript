@@ -593,13 +593,16 @@ primNatClasses =
         [ FunctionalDependency [0, 1] [2]
         ] True)
 
-    -- class Mul (multiplicand :: Nat) (multiplier :: Nat) (product :: Nat) | multiplicand multiplier -> product
+    -- class Mul (multiplicand :: Nat) (multiplier :: Nat) (product :: Nat)
+    --   | multiplicand multiplier -> product, multiplicand product -> multiplier, multiplier product -> multiplicand
     , (primSubName C.moduleNat "Mul", makeTypeClassData
         [ ("multiplicand", Just kindNat)
         , ("multiplier", Just kindNat)
         , ("product", Just kindNat)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
+        , FunctionalDependency [0, 2] [1]
+        , FunctionalDependency [1, 2] [0]
         ] True)
 
     -- class Negate (n :: Nat) (o :: Nat) | n -> o, o -> n
