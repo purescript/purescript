@@ -184,6 +184,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.IsNat _ args | Just dicts <- solveIsNat args = dicts
     forClassName _ _ C.NatAdd _ args | Just dicts <- solveNatAdd args = dicts
     forClassName _ _ C.NatCompare _ args | Just dicts <- solveNatCompare args = dicts
+    forClassName _ _ C.NatMod _ args | Just dicts <- solveNatMod args = dicts
     forClassName _ _ C.NatMul _ args | Just dicts <- solveNatMul args = dicts
     forClassName _ _ C.NatNegate _ args | Just dicts <- solveNatNegate args = dicts
     forClassName _ _ C.RowUnion kinds args | Just dicts <- solveUnion kinds args = dicts
@@ -512,6 +513,12 @@ entails SolverOptions{..} constraint context hints =
           args' = [arg0, arg1, srcTypeConstructor ordering]
       in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatCompare [] [] args' Nothing Nothing]
     solveNatCompare _ = Nothing
+
+    solveNatMod :: [SourceType] -> Maybe [TypeClassDict]
+    solveNatMod [arg0@(TypeLevelNat _ l), arg1@(TypeLevelNat _ r), _] =
+      let args' = [arg0, arg1, srcTypeLevelNat (mod l r)]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatMod [] [] args' Nothing Nothing]
+    solveNatMod _ = Nothing
 
     solveNatMul :: [SourceType] -> Maybe [TypeClassDict]
     solveNatMul [arg0, arg1, arg2] = do

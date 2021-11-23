@@ -432,10 +432,9 @@ primNatTypes =
   M.fromList $ mconcat
     [ primClass (primSubName C.moduleNat "Add")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
     , primClass (primSubName C.moduleNat "Compare") (\kind -> kindNat -:> kindNat -:> kindOrdering -:> kind)
-    -- , primClass (primSubName C.moduleNat "Div")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
+    , primClass (primSubName C.moduleNat "Mod")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
     , primClass (primSubName C.moduleNat "Mul")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
-    -- , primClass (primSubName C.moduleNat "Sub")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
-    , primClass (primSubName C.moduleNat "Negate") (\kind -> kindNat -:> kindNat -:> kind)
+    , primClass (primSubName C.moduleNat "Negate")  (\kind -> kindNat -:> kindNat -:> kind)
     ]
 
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
@@ -589,6 +588,15 @@ primNatClasses =
         [ ("left", Just kindNat)
         , ("right", Just kindSymbol)
         , ("ordering", Just kindSymbol)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        ] True)
+
+    -- class Mod (dividend :: Nat) (divisor :: Nat) (remainder :: Nat) | dividend divisor -> remainder
+    , (primSubName C.moduleNat "Mod", makeTypeClassData
+        [ ("dividend", Just kindNat)
+        , ("divisor", Just kindNat)
+        , ("remainder", Just kindNat)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         ] True)

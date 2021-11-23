@@ -136,6 +136,7 @@ primNatDocsModule = Module
   , modDeclarations =
       [ natAdd
       , natCompare
+      , natMod
       , natMul
       , natNegate
       ]
@@ -555,13 +556,18 @@ natCompare = primClassOf (P.primSubName "Nat") "Compare" $ T.unlines
   , "Produces an `Ordering`."
   ]
 
+natMod :: Declaration
+natMod = primClassOf (P.primSubName "Nat") "Mod" $ T.unlines
+  [ "Compiler solved type class for the modulo operation on `Nat`s."
+  ]
+
 natMul :: Declaration
 natMul = primClassOf (P.primSubName "Nat") "Mul" $ T.unlines
   [ "Compiler solved type class for multiplying `Nat`s."
   ]
 
 natNegate :: Declaration
-natNegate = primClassOf (P.primSubname "Nat") "Negate" $ T.unlines
+natNegate = primClassOf (P.primSubName "Nat") "Negate" $ T.unlines
   [ "Compiler solved type class for negating a `Nat`."
   ]
 
