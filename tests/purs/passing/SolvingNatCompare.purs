@@ -1,5 +1,6 @@
 module Main where
 
+import Effect.Console (log)
 import Prim.Nat (class Compare)
 import Prim.Ordering (EQ, GT, LT)
 
@@ -68,3 +69,5 @@ transSymmEqGt _ = assertGreater
 
 transSymmEq :: forall m n p. Compare n m EQ => Compare n p EQ => Proxy n -> Proxy ( left :: m, right :: p )
 transSymmEq _ = assertEqual
+
+main = log "Done"
