@@ -70,4 +70,13 @@ transSymmEqGt _ = assertGreater
 transSymmEq :: forall m n p. Compare n m EQ => Compare n p EQ => Proxy n -> Proxy ( left :: m, right :: p )
 transSymmEq _ = assertEqual
 
+litLt :: Proxy ( left :: 0, right :: 1 )
+litLt = assertLesser
+
+litGt :: Proxy ( left :: 1, right :: 0 )
+litGt = assertGreater
+
+litEq :: Proxy ( left :: 0, right :: 0 )
+litEq = assertEqual
+
 main = log "Done"

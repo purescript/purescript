@@ -506,6 +506,13 @@ entails SolverOptions{..} constraint context hints =
     addNats _ _ _                                             = Nothing
 
     solveNatCompare :: InstanceContext -> [SourceType] -> Maybe [TypeClassDict]
+    solveNatCompare _ [arg0@(TypeLevelNat _ a), arg1@(TypeLevelNat _ b), _] =
+      let ordering = case compare a b of
+            EQ -> C.orderingEQ
+            LT -> C.orderingLT
+            GT -> C.orderingGT
+          args' = [arg0, arg1, srcTypeConstructor ordering]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.SymbolCompare [] [] args' Nothing Nothing]
     solveNatCompare ctx [a, b, c] = do
       let compareDictsInScope = findDicts ctx C.NatCompare Nothing
           givens = flip mapMaybe compareDictsInScope $ \case
