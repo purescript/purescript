@@ -306,6 +306,7 @@ library
     Language.PureScript.TypeChecker
     Language.PureScript.TypeChecker.Entailment
     Language.PureScript.TypeChecker.Entailment.Coercible
+    Language.PureScript.TypeChecker.Entailment.IntCompare
     Language.PureScript.TypeChecker.Kinds
     Language.PureScript.TypeChecker.Monad
     Language.PureScript.TypeChecker.Roles

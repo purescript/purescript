@@ -36,6 +36,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Entailment.Coercible
+import Language.PureScript.TypeChecker.Entailment.IntCompare
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
@@ -169,7 +170,7 @@ entails SolverOptions{..} constraint context hints =
     forClassNameM env ctx cn@C.Coercible kinds args =
       fromMaybe (forClassName env ctx cn kinds args) <$>
         solveCoercible env ctx kinds args
-    forClassNameM env ctx cn kinds args =
+    forClassNameM env ctx cn kinds args = do
       pure $ forClassName env ctx cn kinds args
 
     forClassName :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> [TypeClassDict]
@@ -183,7 +184,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.SymbolCons _ args | Just dicts <- solveSymbolCons args = dicts
     forClassName _ _ C.IsNat _ args | Just dicts <- solveIsNat args = dicts
     forClassName _ _ C.NatAdd _ args | Just dicts <- solveNatAdd args = dicts
-    forClassName _ _ C.NatCompare _ args | Just dicts <- solveNatCompare args = dicts
+    forClassName _ ctx C.NatCompare _ args | Just dicts <- solveNatCompare ctx args = dicts
     forClassName _ _ C.NatMod _ args | Just dicts <- solveNatMod args = dicts
     forClassName _ _ C.NatMul _ args | Just dicts <- solveNatMul args = dicts
     forClassName _ _ C.NatNegate _ args | Just dicts <- solveNatNegate args = dicts
@@ -504,15 +505,18 @@ entails SolverOptions{..} constraint context hints =
     addNats _ arg1@(TypeLevelNat _ r) arg2@(TypeLevelNat _ o) = pure (srcTypeLevelNat (o - r), arg1, arg2)
     addNats _ _ _                                             = Nothing
 
-    solveNatCompare :: [SourceType] -> Maybe [TypeClassDict]
-    solveNatCompare [arg0@(TypeLevelNat _ l), arg1@(TypeLevelNat _ r), _] =
-      let ordering = case compare l r of
-            LT -> C.orderingLT
-            EQ -> C.orderingEQ
-            GT -> C.orderingGT
-          args' = [arg0, arg1, srcTypeConstructor ordering]
-      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatCompare [] [] args' Nothing Nothing]
-    solveNatCompare _ = Nothing
+    solveNatCompare :: InstanceContext -> [SourceType] -> Maybe [TypeClassDict]
+    solveNatCompare ctx [a, b, c] = do
+      let compareDictsInScope = findDicts ctx C.NatCompare Nothing
+          givens = flip mapMaybe compareDictsInScope $ \case
+            dict | [a', b', c'] <- tcdInstanceTypes dict -> mkComparison a' b' c'
+                 | otherwise -> Nothing
+      solved <- solveComparison givens <$> mkComparison a b c
+      if solved then
+        pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatCompare [] [] [a, b, c] Nothing Nothing]
+      else
+        Nothing
+    solveNatCompare _ _ = Nothing
 
     solveNatMod :: [SourceType] -> Maybe [TypeClassDict]
     solveNatMod [arg0@(TypeLevelNat _ l), arg1@(TypeLevelNat _ r), _] =
