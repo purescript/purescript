@@ -85,8 +85,8 @@ solveComparison context comparison = case comparison of
     makeStrong = G.stronglyConnComp . fmap make
 
   inequalities ::
-    ( ( G.Graph, (S.Set a) -> Maybe G.Vertex )
-    , ( G.Graph, (S.Set a) -> Maybe G.Vertex )
+    ( ( G.Graph, S.Set a -> Maybe G.Vertex )
+    , ( G.Graph, S.Set a -> Maybe G.Vertex )
     )
   inequalities = lts &&& gts $ foldMap convert context
     where
@@ -96,7 +96,7 @@ solveComparison context comparison = case comparison of
         | GreaterThan a b <- c -> [c, LessThan b a]
       _ -> []
 
-    asGraph :: [Comparison (S.Set a)] -> (G.Graph, (S.Set a) -> Maybe G.Vertex)
+    asGraph :: [Comparison (S.Set a)] -> (G.Graph, S.Set a -> Maybe G.Vertex)
     asGraph = makeGraph . clean . foldMap asNode
       where
       asNode :: Comparison (S.Set a) -> [(S.Set a, [S.Set a])]
