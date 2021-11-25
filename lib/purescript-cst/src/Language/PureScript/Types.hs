@@ -688,6 +688,7 @@ eqType :: Type a -> Type b -> Bool
 eqType (TUnknown _ a) (TUnknown _ a') = a == a'
 eqType (TypeVar _ a) (TypeVar _ a') = a == a'
 eqType (TypeLevelString _ a) (TypeLevelString _ a') = a == a'
+eqType (TypeLevelNat _ a) (TypeLevelNat _ a') = a == a'
 eqType (TypeWildcard _ a) (TypeWildcard _ a') = a == a'
 eqType (TypeConstructor _ a) (TypeConstructor _ a') = a == a'
 eqType (TypeOp _ a) (TypeOp _ a') = a == a'
