@@ -11,16 +11,4 @@ a = Proxy
 a' :: Proxy 16
 a' = a
 
-b :: forall n. Mul 4 n 16 => Proxy n
-b = Proxy
-
-b' :: Proxy 4
-b' = b
-
-c :: forall n. Mul n 4 16 => Proxy n
-c = Proxy
-
-c' :: Proxy 4
-c' = c
-
 main = log "Done"

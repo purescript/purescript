@@ -432,7 +432,6 @@ primNatTypes =
   M.fromList $ mconcat
     [ primClass (primSubName C.moduleNat "Add")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
     , primClass (primSubName C.moduleNat "Compare") (\kind -> kindNat -:> kindNat -:> kindOrdering -:> kind)
-    , primClass (primSubName C.moduleNat "Mod")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
     , primClass (primSubName C.moduleNat "Mul")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
     , primClass (primSubName C.moduleNat "Negate")  (\kind -> kindNat -:> kindNat -:> kind)
     ]
@@ -592,25 +591,13 @@ primNatClasses =
         [ FunctionalDependency [0, 1] [2]
         ] True)
 
-    -- class Mod (dividend :: Nat) (divisor :: Nat) (remainder :: Nat) | dividend divisor -> remainder
-    , (primSubName C.moduleNat "Mod", makeTypeClassData
-        [ ("dividend", Just kindNat)
-        , ("divisor", Just kindNat)
-        , ("remainder", Just kindNat)
-        ] [] []
-        [ FunctionalDependency [0, 1] [2]
-        ] True)
-
-    -- class Mul (multiplicand :: Nat) (multiplier :: Nat) (product :: Nat)
-    --   | multiplicand multiplier -> product, multiplicand product -> multiplier, multiplier product -> multiplicand
+    -- class Mul (multiplicand :: Nat) (multiplier :: Nat) (product :: Nat) | multiplicand multiplier -> product
     , (primSubName C.moduleNat "Mul", makeTypeClassData
         [ ("multiplicand", Just kindNat)
         , ("multiplier", Just kindNat)
         , ("product", Just kindNat)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
-        , FunctionalDependency [0, 2] [1]
-        , FunctionalDependency [1, 2] [0]
         ] True)
 
     -- class Negate (n :: Nat) (o :: Nat) | n -> o, o -> n

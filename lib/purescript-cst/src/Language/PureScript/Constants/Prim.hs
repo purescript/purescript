@@ -106,9 +106,6 @@ pattern NatAdd = Qualified (Just PrimNat) (ProperName "Add")
 pattern NatCompare :: Qualified (ProperName 'ClassName)
 pattern NatCompare = Qualified (Just PrimNat) (ProperName "Compare")
 
-pattern NatMod :: Qualified (ProperName 'ClassName)
-pattern NatMod = Qualified (Just PrimNat) (ProperName "Mod")
-
 pattern NatMul :: Qualified (ProperName 'ClassName)
 pattern NatMul = Qualified (Just PrimNat) (ProperName "Mul")
 

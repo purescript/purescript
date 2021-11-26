@@ -185,7 +185,6 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.IsNat _ args | Just dicts <- solveIsNat args = dicts
     forClassName _ _ C.NatAdd _ args | Just dicts <- solveNatAdd args = dicts
     forClassName _ ctx C.NatCompare _ args | Just dicts <- solveNatCompare ctx args = dicts
-    forClassName _ _ C.NatMod _ args | Just dicts <- solveNatMod args = dicts
     forClassName _ _ C.NatMul _ args | Just dicts <- solveNatMul args = dicts
     forClassName _ _ C.NatNegate _ args | Just dicts <- solveNatNegate args = dicts
     forClassName _ _ C.RowUnion kinds args | Just dicts <- solveUnion kinds args = dicts
@@ -526,35 +525,11 @@ entails SolverOptions{..} constraint context hints =
         Nothing
     solveNatCompare _ _ = Nothing
 
-    solveNatMod :: [SourceType] -> Maybe [TypeClassDict]
-    solveNatMod [arg0@(TypeLevelNat _ l), arg1@(TypeLevelNat _ r), _] =
-      let args' = [arg0, arg1, srcTypeLevelNat (mod l r)]
-      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatMod [] [] args' Nothing Nothing]
-    solveNatMod _ = Nothing
-
     solveNatMul :: [SourceType] -> Maybe [TypeClassDict]
-    solveNatMul [arg0, arg1, arg2] = do
-      (arg0', arg1', arg2') <- mulNats arg0 arg1 arg2
-      let args' = [arg0', arg1', arg2']
-      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatMul [] [] args' Nothing Nothing]
+    solveNatMul [arg0@(TypeLevelNat _ l), arg1@(TypeLevelNat _ r), _] =
+      let args' = [arg0, arg1, srcTypeLevelNat (l * r)]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatMul [] [] args' Nothing Nothing]
     solveNatMul _ = Nothing
-
-    mulNats :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
-    -- | l r -> o, l * r = o
-    mulNats arg0@(TypeLevelNat _ l) arg1@(TypeLevelNat _ r) _ = pure (arg0, arg1, srcTypeLevelNat (l * r))
-    -- | l o -> r, o / l = r, given o % l == 0
-    mulNats arg0@(TypeLevelNat _ l) _ arg2@(TypeLevelNat _ o) =
-      if mod o l == 0 then
-        pure (arg0, srcTypeLevelNat (div o l), arg2)
-      else
-        Nothing
-    -- | r o -> l, o / r = l, given o % r == 0
-    mulNats _ arg1@(TypeLevelNat _ r) arg2@(TypeLevelNat _ o) =
-      if mod o r == 0 then
-        pure (srcTypeLevelNat (div o r), arg1, arg2)
-      else
-        Nothing
-    mulNats _ _ _                                             = Nothing
 
     solveNatNegate :: [SourceType] -> Maybe [TypeClassDict]
     solveNatNegate [arg0@(TypeLevelNat _ n), _] =
