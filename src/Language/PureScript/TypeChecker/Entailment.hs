@@ -512,7 +512,7 @@ entails SolverOptions{..} constraint context hints =
             LT -> C.orderingLT
             GT -> C.orderingGT
           args' = [arg0, arg1, srcTypeConstructor ordering]
-      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.SymbolCompare [] [] args' Nothing Nothing]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatCompare [] [] args' Nothing Nothing]
     solveNatCompare ctx [a, b, c] = do
       let compareDictsInScope = findDicts ctx C.NatCompare Nothing
           givens = flip mapMaybe compareDictsInScope $ \case
