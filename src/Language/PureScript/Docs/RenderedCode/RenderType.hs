@@ -55,7 +55,7 @@ typeLiterals = mkPattern match
     Just (typeOp n)
   match (PPTypeLevelString str) =
     Just (syntax (prettyPrintString str))
-  match (PPTypeLevelNat nat) =
+  match (PPTypeLevelInt nat) =
     Just (syntax $ pack $ show nat)
   match _ =
     Nothing

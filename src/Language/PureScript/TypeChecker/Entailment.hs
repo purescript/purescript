@@ -183,9 +183,9 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.SymbolAppend _ args | Just dicts <- solveSymbolAppend args = dicts
     forClassName _ _ C.SymbolCons _ args | Just dicts <- solveSymbolCons args = dicts
     forClassName _ _ C.IsNat _ args | Just dicts <- solveIsNat args = dicts
-    forClassName _ _ C.NatAdd _ args | Just dicts <- solveNatAdd args = dicts
-    forClassName _ ctx C.NatCompare _ args | Just dicts <- solveNatCompare ctx args = dicts
-    forClassName _ _ C.NatMul _ args | Just dicts <- solveNatMul args = dicts
+    forClassName _ _ C.IntAdd _ args | Just dicts <- solveIntAdd args = dicts
+    forClassName _ ctx C.IntCompare _ args | Just dicts <- solveIntCompare ctx args = dicts
+    forClassName _ _ C.IntMul _ args | Just dicts <- solveIntMul args = dicts
     forClassName _ _ C.RowUnion kinds args | Just dicts <- solveUnion kinds args = dicts
     forClassName _ _ C.RowNub kinds args | Just dicts <- solveNub kinds args = dicts
     forClassName _ _ C.RowLacks kinds args | Just dicts <- solveLacks kinds args = dicts
@@ -394,7 +394,7 @@ entails SolverOptions{..} constraint context hints =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
               return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsSymbol)) (Literal nullSourceSpan (ObjectLiteral fields))
             mkDictionary (IsNatInstance nat) _ =
-              let fields = [ ("reflectNat", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (NumericLiteral $ Left nat))) ] in
+              let fields = [ ("reflectInt", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (NumericLiteral $ Left nat))) ] in
               return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsNat)) (Literal nullSourceSpan (ObjectLiteral fields))
 
             unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
@@ -485,50 +485,50 @@ entails SolverOptions{..} constraint context hints =
     consSymbol _ _ _ = Nothing
 
     solveIsNat :: [SourceType] -> Maybe [TypeClassDict]
-    solveIsNat [TypeLevelNat ann nat] = Just [TypeClassDictionaryInScope Nothing 0 (IsNatInstance nat) [] C.IsNat [] [] [TypeLevelNat ann nat] Nothing Nothing]
+    solveIsNat [TypeLevelInt ann nat] = Just [TypeClassDictionaryInScope Nothing 0 (IsNatInstance nat) [] C.IsNat [] [] [TypeLevelInt ann nat] Nothing Nothing]
     solveIsNat _ = Nothing
 
-    solveNatAdd :: [SourceType] -> Maybe [TypeClassDict]
-    solveNatAdd [arg0, arg1, arg2] = do
-      (arg0', arg1', arg2') <- addNats arg0 arg1 arg2
+    solveIntAdd :: [SourceType] -> Maybe [TypeClassDict]
+    solveIntAdd [arg0, arg1, arg2] = do
+      (arg0', arg1', arg2') <- addInts arg0 arg1 arg2
       let args' = [arg0', arg1', arg2']
-      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatAdd [] [] args' Nothing Nothing]
-    solveNatAdd _ = Nothing
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntAdd [] [] args' Nothing Nothing]
+    solveIntAdd _ = Nothing
 
-    addNats :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
+    addInts :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
     -- | l r -> o, l + r = o
-    addNats arg0@(TypeLevelNat _ l) arg1@(TypeLevelNat _ r) _ = pure (arg0, arg1, srcTypeLevelNat (l + r))
+    addInts arg0@(TypeLevelInt _ l) arg1@(TypeLevelInt _ r) _ = pure (arg0, arg1, srcTypeLevelInt (l + r))
     -- | l o -> r, o - l = r
-    addNats arg0@(TypeLevelNat _ l) _ arg2@(TypeLevelNat _ o) = pure (arg0, srcTypeLevelNat (o - l), arg2)
+    addInts arg0@(TypeLevelInt _ l) _ arg2@(TypeLevelInt _ o) = pure (arg0, srcTypeLevelInt (o - l), arg2)
     -- | r o -> l, o - r = l
-    addNats _ arg1@(TypeLevelNat _ r) arg2@(TypeLevelNat _ o) = pure (srcTypeLevelNat (o - r), arg1, arg2)
-    addNats _ _ _                                             = Nothing
+    addInts _ arg1@(TypeLevelInt _ r) arg2@(TypeLevelInt _ o) = pure (srcTypeLevelInt (o - r), arg1, arg2)
+    addInts _ _ _                                             = Nothing
 
-    solveNatCompare :: InstanceContext -> [SourceType] -> Maybe [TypeClassDict]
-    solveNatCompare _ [arg0@(TypeLevelNat _ a), arg1@(TypeLevelNat _ b), _] =
+    solveIntCompare :: InstanceContext -> [SourceType] -> Maybe [TypeClassDict]
+    solveIntCompare _ [arg0@(TypeLevelInt _ a), arg1@(TypeLevelInt _ b), _] =
       let ordering = case compare a b of
             EQ -> C.orderingEQ
             LT -> C.orderingLT
             GT -> C.orderingGT
           args' = [arg0, arg1, srcTypeConstructor ordering]
-      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatCompare [] [] args' Nothing Nothing]
-    solveNatCompare ctx [a, b, c] = do
-      let compareDictsInScope = findDicts ctx C.NatCompare Nothing
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] args' Nothing Nothing]
+    solveIntCompare ctx [a, b, c] = do
+      let compareDictsInScope = findDicts ctx C.IntCompare Nothing
           givens = flip mapMaybe compareDictsInScope $ \case
             dict | [a', b', c'] <- tcdInstanceTypes dict -> mkComparison a' b' c'
                  | otherwise -> Nothing
       solved <- solveComparison givens <$> mkComparison a b c
       if solved then
-        pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatCompare [] [] [a, b, c] Nothing Nothing]
+        pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, c] Nothing Nothing]
       else
         Nothing
-    solveNatCompare _ _ = Nothing
+    solveIntCompare _ _ = Nothing
 
-    solveNatMul :: [SourceType] -> Maybe [TypeClassDict]
-    solveNatMul [arg0@(TypeLevelNat _ l), arg1@(TypeLevelNat _ r), _] =
-      let args' = [arg0, arg1, srcTypeLevelNat (l * r)]
-      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.NatMul [] [] args' Nothing Nothing]
-    solveNatMul _ = Nothing
+    solveIntMul :: [SourceType] -> Maybe [TypeClassDict]
+    solveIntMul [arg0@(TypeLevelInt _ l), arg1@(TypeLevelInt _ r), _] =
+      let args' = [arg0, arg1, srcTypeLevelInt (l * r)]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntMul [] [] args' Nothing Nothing]
+    solveIntMul _ = Nothing
 
     solveUnion :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveUnion kinds [l, r, u] = do
@@ -696,7 +696,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
     typeHeadsAreEqual t                      (TypeVar _ v)                     = (Match (), M.singleton v [t])
     typeHeadsAreEqual (TypeConstructor _ c1) (TypeConstructor _ c2) | c1 == c2 = (Match (), M.empty)
     typeHeadsAreEqual (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = (Match (), M.empty)
-    typeHeadsAreEqual (TypeLevelNat _ n1)    (TypeLevelNat _ n2)    | n1 == n2 = (Match (), M.empty)
+    typeHeadsAreEqual (TypeLevelInt _ n1)    (TypeLevelInt _ n2)    | n1 == n2 = (Match (), M.empty)
     typeHeadsAreEqual (TypeApp _ h1 t1)      (TypeApp _ h2 t2)                 =
       both (typeHeadsAreEqual h1 h2) (typeHeadsAreEqual t1 t2)
     typeHeadsAreEqual (KindApp _ h1 t1)      (KindApp _ h2 t2)                 =
@@ -741,7 +741,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
       typesAreEqual _                      (Skolem _ _ _ _ _)       = Unknown
       typesAreEqual (TypeVar _ v1)         (TypeVar _ v2)         | v1 == v2 = Match ()
       typesAreEqual (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = Match ()
-      typesAreEqual (TypeLevelNat _ n1)    (TypeLevelNat _ n2)    | n1 == n2 = Match ()
+      typesAreEqual (TypeLevelInt _ n1)    (TypeLevelInt _ n2)    | n1 == n2 = Match ()
       typesAreEqual (TypeConstructor _ c1) (TypeConstructor _ c2) | c1 == c2 = Match ()
       typesAreEqual (TypeApp _ h1 t1)      (TypeApp _ h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2
       typesAreEqual (KindApp _ h1 t1)      (KindApp _ h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2

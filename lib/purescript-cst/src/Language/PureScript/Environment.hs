@@ -265,9 +265,6 @@ kindConstraint = primKind C.constraint
 kindSymbol :: SourceType
 kindSymbol = primKind C.symbol
 
-kindNat :: SourceType
-kindNat = primKind C.nat
-
 kindDoc :: SourceType
 kindDoc = primSubKind C.typeError C.doc
 
@@ -351,7 +348,6 @@ primTypes =
     [ (primName "Type",             (kindType, ExternData []))
     , (primName "Constraint",       (kindType, ExternData []))
     , (primName "Symbol",           (kindType, ExternData []))
-    , (primName "Nat",              (kindType, ExternData []))
     , (primName "Row",              (kindType -:> kindType, ExternData [Phantom]))
     , (primName "Function",         (kindType -:> kindType -:> kindType, ExternData [Representational, Representational]))
     , (primName "Array",            (kindType -:> kindType, ExternData [Representational]))
@@ -374,7 +370,7 @@ allPrimTypes = M.unions
   , primRowTypes
   , primRowListTypes
   , primSymbolTypes
-  , primNatTypes
+  , primIntTypes
   , primTypeErrorTypes
   ]
 
@@ -427,12 +423,12 @@ primSymbolTypes =
     , primClass (primSubName C.moduleSymbol "Cons")    (\kind -> kindSymbol -:> kindSymbol -:> kindSymbol -:> kind)
     ]
 
-primNatTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
-primNatTypes =
+primIntTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
+primIntTypes =
   M.fromList $ mconcat
-    [ primClass (primSubName C.moduleNat "Add")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
-    , primClass (primSubName C.moduleNat "Compare") (\kind -> kindNat -:> kindNat -:> kindOrdering -:> kind)
-    , primClass (primSubName C.moduleNat "Mul")     (\kind -> kindNat -:> kindNat -:> kindNat -:> kind)
+    [ primClass (primSubName C.moduleInt "Add")     (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
+    , primClass (primSubName C.moduleInt "Compare") (\kind -> tyInt -:> tyInt -:> kindOrdering -:> kind)
+    , primClass (primSubName C.moduleInt "Mul")     (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
     ]
 
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
@@ -467,7 +463,7 @@ allPrimClasses = M.unions
   , primRowClasses
   , primRowListClasses
   , primSymbolClasses
-  , primNatClasses
+  , primIntClasses
   , primTypeErrorClasses
   ]
 
@@ -567,34 +563,34 @@ primSymbolClasses =
         ] True)
     ]
 
-primNatClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
-primNatClasses =
+primIntClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primIntClasses =
   M.fromList
-    -- class Add (left :: Nat) (right :: Nat) (output :: Nat) | left right -> output, left output -> right, right output -> left
-    [ (primSubName C.moduleNat "Add", makeTypeClassData
-        [ ("left", Just kindNat)
-        , ("right", Just kindNat)
-        , ("output", Just kindNat)
+    -- class Add (left :: Int) (right :: Int) (output :: Int) | left right -> output, left output -> right, right output -> left
+    [ (primSubName C.moduleInt "Add", makeTypeClassData
+        [ ("left", Just tyInt)
+        , ("right", Just tyInt)
+        , ("output", Just tyInt)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [0, 2] [1]
         , FunctionalDependency [1, 2] [0]
         ] True)
 
-    -- class Compare (left :: Nat) (right :: Nat) (ordering :: Ordering) | left right -> ordering
-    , (primSubName C.moduleNat "Compare", makeTypeClassData
-        [ ("left", Just kindNat)
+    -- class Compare (left :: Int) (right :: Int) (ordering :: Ordering) | left right -> ordering
+    , (primSubName C.moduleInt "Compare", makeTypeClassData
+        [ ("left", Just tyInt)
         , ("right", Just kindSymbol)
         , ("ordering", Just kindSymbol)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         ] True)
 
-    -- class Mul (multiplicand :: Nat) (multiplier :: Nat) (product :: Nat) | multiplicand multiplier -> product
-    , (primSubName C.moduleNat "Mul", makeTypeClassData
-        [ ("multiplicand", Just kindNat)
-        , ("multiplier", Just kindNat)
-        , ("product", Just kindNat)
+    -- class Mul (multiplicand :: Int) (multiplier :: Int) (product :: Int) | multiplicand multiplier -> product
+    , (primSubName C.moduleInt "Mul", makeTypeClassData
+        [ ("multiplicand", Just tyInt)
+        , ("multiplier", Just tyInt)
+        , ("product", Just tyInt)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         ] True)

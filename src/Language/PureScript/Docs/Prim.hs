@@ -26,7 +26,7 @@ primModules =
   , primRowDocsModule
   , primRowListDocsModule
   , primSymbolDocsModule
-  , primNatDocsModule
+  , primIntDocsModule
   , primTypeErrorDocsModule
   ]
 
@@ -51,7 +51,6 @@ primDocsModule = Module
       , kindType
       , kindConstraint
       , kindSymbol
-      , kindNat
       , kindRow
       ]
   , modReExports = []
@@ -129,14 +128,14 @@ primSymbolDocsModule = Module
   , modReExports = []
   }
 
-primNatDocsModule :: Module
-primNatDocsModule = Module
-  { modName = P.moduleNameFromString "Prim.Nat"
-  , modComments = Just "The Prim.Nat module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with type-level natural numbers."
+primIntDocsModule :: Module
+primIntDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.Int"
+  , modComments = Just "The Prim.Int module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with type-level intural numbers."
   , modDeclarations =
-      [ natAdd
-      , natCompare
-      , natMul
+      [ intAdd
+      , intCompare
+      , intMul
       ]
   , modReExports = []
   }
@@ -209,7 +208,7 @@ lookupPrimClassOf g = unsafeLookupOf g
     P.primRowClasses <>
     P.primRowListClasses <>
     P.primSymbolClasses <>
-    P.primNatClasses <>
+    P.primIntClasses <>
     P.primTypeErrorClasses
   ) "Docs.Prim: No such Prim class: "
 
@@ -258,14 +257,6 @@ kindSymbol = primType "Symbol" $ T.unlines
   , ""
   , "Construct types of this kind using the same literal syntax as documented"
   , "for strings."
-  ]
-
-kindNat :: Declaration
-kindNat = primType "Nat" $ T.unlines
-  [ "`Nat` is the kind of type-level natural numbers."
-  , ""
-  , "Construct types of this kind using the same literal syntax as documented"
-  , "for integers."
   ]
 
 kindRow :: Declaration
@@ -543,20 +534,20 @@ symbolCons = primClassOf (P.primSubName "Symbol") "Cons" $ T.unlines
   , "cannot be empty."
   ]
 
-natAdd :: Declaration
-natAdd = primClassOf (P.primSubName "Nat") "Add" $ T.unlines
-  [ "Compiler solved type class for adding `Nat`s."
+intAdd :: Declaration
+intAdd = primClassOf (P.primSubName "Int") "Add" $ T.unlines
+  [ "Compiler solved type class for adding type-level `Int`s."
   ]
 
-natCompare :: Declaration
-natCompare = primClassOf (P.primSubName "Nat") "Compare" $ T.unlines
-  [ "Compiler solved type class for comparing two `Nat`s."
+intCompare :: Declaration
+intCompare = primClassOf (P.primSubName "Int") "Compare" $ T.unlines
+  [ "Compiler solved type class for comparing two type-level `Int`s."
   , "Produces an `Ordering`."
   ]
 
-natMul :: Declaration
-natMul = primClassOf (P.primSubName "Nat") "Mul" $ T.unlines
-  [ "Compiler solved type class for multiplying `Nat`s."
+intMul :: Declaration
+intMul = primClassOf (P.primSubName "Int") "Mul" $ T.unlines
+  [ "Compiler solved type class for multiplying type-level `Int`s."
   ]
 
 fail :: Declaration

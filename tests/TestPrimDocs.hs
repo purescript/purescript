@@ -30,7 +30,7 @@ spec = do
               P.primRowListTypes <>
               P.primTypeErrorTypes <>
               P.primSymbolTypes <>
-              P.primNatTypes )
+              P.primIntTypes )
     let documentedPrimNames =
           map D.declTitle (concatMap D.modDeclarations D.primModules)
 

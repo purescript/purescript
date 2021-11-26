@@ -95,19 +95,19 @@ pattern RowListNil = Qualified (Just PrimRowList) (ProperName "Nil")
 pattern RowListCons :: Qualified (ProperName 'TypeName)
 pattern RowListCons = Qualified (Just PrimRowList) (ProperName "Cons")
 
--- Prim.Nat
+-- Prim.Int
 
-pattern PrimNat :: ModuleName
-pattern PrimNat = ModuleName "Prim.Nat"
+pattern PrimInt :: ModuleName
+pattern PrimInt = ModuleName "Prim.Int"
 
-pattern NatAdd :: Qualified (ProperName 'ClassName)
-pattern NatAdd = Qualified (Just PrimNat) (ProperName "Add")
+pattern IntAdd :: Qualified (ProperName 'ClassName)
+pattern IntAdd = Qualified (Just PrimInt) (ProperName "Add")
 
-pattern NatCompare :: Qualified (ProperName 'ClassName)
-pattern NatCompare = Qualified (Just PrimNat) (ProperName "Compare")
+pattern IntCompare :: Qualified (ProperName 'ClassName)
+pattern IntCompare = Qualified (Just PrimInt) (ProperName "Compare")
 
-pattern NatMul :: Qualified (ProperName 'ClassName)
-pattern NatMul = Qualified (Just PrimNat) (ProperName "Mul")
+pattern IntMul :: Qualified (ProperName 'ClassName)
+pattern IntMul = Qualified (Just PrimInt) (ProperName "Mul")
 
 -- Prim.Symbol
 
@@ -135,7 +135,7 @@ pattern Warn :: Qualified (ProperName 'ClassName)
 pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
 
 primModules :: [ModuleName]
-primModules = [Prim, PrimBoolean, PrimCoerce, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimNat, PrimTypeError]
+primModules = [Prim, PrimBoolean, PrimCoerce, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimInt, PrimTypeError]
 
 typ :: forall a. (IsString a) => a
 typ = "Type"
@@ -148,9 +148,6 @@ kindRowList = "RowList"
 
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"
-
-nat :: forall a. (IsString a) => a
-nat = "Nat"
 
 doc :: forall a. (IsString a) => a
 doc = "Doc"
@@ -184,8 +181,8 @@ moduleRowList = "RowList"
 moduleSymbol :: forall a. (IsString a) => a
 moduleSymbol = "Symbol"
 
-moduleNat :: forall a. (IsString a) => a
-moduleNat = "Nat"
+moduleInt :: forall a. (IsString a) => a
+moduleInt = "Int"
 
 typeError :: forall a. (IsString a) => a
 typeError = "TypeError"

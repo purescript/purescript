@@ -1,7 +1,7 @@
 module Main where
 
 import Effect.Console (log)
-import Prim.Nat (class Compare)
+import Prim.Int (class Compare)
 import Prim.Ordering (EQ, GT, LT)
 
 data Proxy :: forall k. k -> Type
@@ -25,7 +25,7 @@ symmGt = assertGreater
 symmEq :: forall m n. Compare m n EQ => Proxy ( left :: n, right :: m )
 symmEq = assertEqual
 
-reflEq :: forall (n :: Nat). Proxy ( left :: n, right :: n )
+reflEq :: forall (n :: Int). Proxy ( left :: n, right :: n )
 reflEq = assertEqual
 
 transLt :: forall m n p. Compare m n LT => Compare n p LT => Proxy n -> Proxy ( left :: m, right :: p )

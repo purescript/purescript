@@ -1,7 +1,7 @@
 module Main where
 
 import Effect.Console (log)
-import Prim.Nat (class Mul)
+import Prim.Int (class Mul)
 
 data Proxy k = Proxy
 
