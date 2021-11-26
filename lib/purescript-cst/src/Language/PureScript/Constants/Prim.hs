@@ -109,9 +109,6 @@ pattern NatCompare = Qualified (Just PrimNat) (ProperName "Compare")
 pattern NatMul :: Qualified (ProperName 'ClassName)
 pattern NatMul = Qualified (Just PrimNat) (ProperName "Mul")
 
-pattern NatNegate :: Qualified (ProperName 'ClassName)
-pattern NatNegate = Qualified (Just PrimNat) (ProperName "Negate")
-
 -- Prim.Symbol
 
 pattern PrimSymbol :: ModuleName
