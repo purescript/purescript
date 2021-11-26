@@ -170,7 +170,7 @@ entails SolverOptions{..} constraint context hints =
     forClassNameM env ctx cn@C.Coercible kinds args =
       fromMaybe (forClassName env ctx cn kinds args) <$>
         solveCoercible env ctx kinds args
-    forClassNameM env ctx cn kinds args = do
+    forClassNameM env ctx cn kinds args =
       pure $ forClassName env ctx cn kinds args
 
     forClassName :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> [TypeClassDict]
@@ -398,6 +398,7 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary (IsNatInstance nat) _ =
               let fields = [ ("reflectNat", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (NumericLiteral $ Left nat))) ] in
               return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsNat)) (Literal nullSourceSpan (ObjectLiteral fields))
+
             unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
             unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)
               where unkIndices = findIndices containsUnknowns tyArgs
