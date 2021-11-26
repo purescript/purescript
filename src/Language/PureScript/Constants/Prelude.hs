@@ -273,11 +273,11 @@ pattern DataSymbol = ModuleName "Data.Symbol"
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
 pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 
-pattern DataNat :: ModuleName
-pattern DataNat = ModuleName "Data.Nat"
+pattern DataReflectable :: ModuleName
+pattern DataReflectable = ModuleName "Data.Reflectable"
 
-pattern IsNat :: Qualified (ProperName 'ClassName)
-pattern IsNat = Qualified (Just DataNat) (ProperName "IsNat")
+pattern IsReflectable :: Qualified (ProperName 'ClassName)
+pattern IsReflectable = Qualified (Just DataReflectable) (ProperName "IsReflectable")
 
 dataArray :: forall a. (IsString a) => a
 dataArray = "Data_Array"
