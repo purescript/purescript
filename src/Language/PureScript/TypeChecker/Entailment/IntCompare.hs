@@ -31,20 +31,49 @@ data Comparison a
 
 type Context a = [Comparison a]
 
+-- | An algorithm for solving comparisons nominally, with respect to
+-- properties like reflexivity, symmetry, and transitivity.
 solveComparison :: forall a. Ord a => Context a -> Comparison a -> Bool
 solveComparison context comparison = case comparison of
-    Equal a b
-      | a == b -> True
-      | otherwise ->
-          let
-            comparison' = alpha comparison
-            context' = alpha <$> context
-          in
-            comparison' `elem` context'
-    LessThan a b ->
-      solveInequality fst a b
-    GreaterThan a b ->
-      solveInequality snd a b
+  -- Proving that an equality exists between two nominal values has the
+  -- following requirements:
+  --
+  -- 1. Two types are directly equal.
+  --
+  -- 2. When renamed with respect to all other equalities in the
+  -- context, the renamed comparison must appear in the renamed context.
+  --
+  -- For example, given the context:
+  -- > [ a .=. b, b .=. c, x .=. y, y .=. z ]
+  --
+  -- and when verifying if a comparison holds true:
+  -- > solveComparison context (a .=. c)
+  --
+  -- the context and comparison is renamed as:
+  -- > [ abc .=. abc, xyz .=. xyz ] & (abc .=. abc)
+  Equal a b
+    | a == b -> True
+    | otherwise ->
+        let
+          comparison' = alpha comparison
+          context' = alpha <$> context
+        in
+          comparison' `elem` context'
+  -- Proving that an inequality exists between two nominal values takes
+  -- a very different code path compared to Equal; to summarize, it:
+  --
+  -- 1. Creates a directed graph of all inequalities in the renamed
+  -- context.
+  --
+  -- 2. Searches whether a path exists from point a to point b, allowing
+  -- symmetry to be solved.
+  --
+  -- 3. Also searches whether a path exists from point b to point a,
+  -- solving both the symmetry and reflexivity properties.
+  LessThan a b ->
+    solveInequality fst a b
+  GreaterThan a b ->
+    solveInequality snd a b
   where
   solveInequality
     :: ( ( (G.Graph, S.Set a -> Maybe G.Vertex)
@@ -69,9 +98,15 @@ solveComparison context comparison = case comparison of
     LessThan a b    -> LessThan (rename a) (rename b)
     GreaterThan a b -> GreaterThan (rename a) (rename b)
 
+  -- Determine which "equality bucket" a value lands on, then replace
+  -- that value using that bucket.
   rename :: a -> S.Set a
   rename n = fromMaybe (S.singleton n) (find (S.member n) equalities)
 
+  -- This determines which names are equal within the context, each set
+  -- in this list is a combination of all equal names, and it's built by
+  -- deliberately creating a cyclic graph between the equalities so as
+  -- to group them together.
   equalities :: [S.Set a]
   equalities = fmap (S.fromList . G.flattenSCC) $ makeStrong $ clean $ foldMap asNode context
     where
@@ -83,6 +118,13 @@ solveComparison context comparison = case comparison of
     makeStrong :: [(a, [a])] -> [G.SCC a]
     makeStrong = G.stronglyConnComp . fmap make
 
+  -- This determines the directed graphs for the "less than" and
+  -- "greater than" inequalities. This is fairly terse but what
+  -- it essentially does is:
+  --
+  -- 1. Collects all inequalities, renaming them on the way.
+  --
+  -- 2. Creates graphs for less than and greater than inequalities.
   inequalities ::
     ( ( G.Graph, S.Set a -> Maybe G.Vertex )
     , ( G.Graph, S.Set a -> Maybe G.Vertex )
@@ -114,6 +156,7 @@ solveComparison context comparison = case comparison of
     gts :: [Comparison (S.Set a)] -> (G.Graph, S.Set a -> Maybe G.Vertex)
     gts = asGraph . go where go n = [GreaterThan a b | GreaterThan a b <- n]
 
+  -- Combine all key-value pairs
   clean :: forall k. Ord k => [(k, [k])] -> [(k, [k])]
   clean = M.toList . M.fromListWith (<>)
 
