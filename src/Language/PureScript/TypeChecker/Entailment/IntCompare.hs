@@ -55,13 +55,12 @@ solveComparison context comparison = case comparison of
     -> a
     -> Bool
   solveInequality f a b =
-    let
-      (graph, search) = f inequalities
-      a' = rename a
-      b' = rename b
+    let (graph, search) = f inequalities
     in fromMaybe False $ do
-      norm <- G.path graph <$> search a' <*> search b'
-      symm <- G.path (G.transposeG graph) <$> search b' <*> search a'
+      a' <- search $ rename a
+      b' <- search $ rename b
+      let norm = G.path graph a' b'
+          symm = G.path (G.transposeG graph) b' a'
       pure $ norm || symm
 
   alpha :: Comparison a -> Comparison (S.Set a)
