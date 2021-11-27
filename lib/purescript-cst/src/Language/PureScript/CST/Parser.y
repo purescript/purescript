@@ -312,8 +312,12 @@ type4 :: { Type () }
   | '#' type4 {% addWarning ($1 : toList (flattenType $2)) WarnDeprecatedRowSyntax *> pure (TypeUnaryRow () $1 $2) }
 
 type5 :: { Type () }
+  : type6 %shift { $1 }
+  | '-' LIT_INT { uncurry (TypeInt ()) (toNegativeInt $1 $2) }
+
+type6 :: { Type () }
   : typeAtom { $1 }
-  | type5 typeAtom { TypeApp () $1 $2 }
+  | type6 typeAtom { TypeApp () $1 $2 }
 
 typeAtom :: { Type ()}
   : '_' { TypeWildcard () $1 }
@@ -336,6 +340,7 @@ typeKindedAtom :: { Type () }
   : '_' { TypeWildcard () $1 }
   | qualProperName { TypeConstructor () (getQualifiedProperName $1) }
   | qualSymbol { TypeOpName () (getQualifiedOpName $1) }
+  | int { uncurry (TypeInt ()) $1  }
   | hole { TypeHole () $1 }
   | '{' row '}' { TypeRecord () (Wrapped $1 $2 $3) }
   | '(' row ')' { TypeRow () (Wrapped $1 $2 $3) }

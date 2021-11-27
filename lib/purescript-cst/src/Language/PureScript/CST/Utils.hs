@@ -180,6 +180,21 @@ toInt tok = case tokValue tok of
   TokInt _ a    -> (tok, a)
   _             -> internalError $ "Invalid integer literal: " <> show tok
 
+toNegativeInt :: SourceToken -> SourceToken -> (SourceToken, Integer)
+toNegativeInt tokMinus tokInt = case (tokValue tokMinus, tokValue tokInt) of
+  (TokOperator _ "-", TokInt t i) ->
+    let
+      range = widen (srcRange tokMinus) (srcRange tokInt)
+      tokInt' = tokInt
+        { tokAnn = (tokAnn tokInt) { tokRange = range }
+        , tokValue = TokInt ("-" <> t) (negate i)
+        }
+    in
+      (tokInt', negate i)
+  _ ->
+    internalError $
+      "Invalid negative integer literal: " <> show tokMinus <> " " <> show tokInt
+
 toBoolean :: SourceToken -> (SourceToken, Bool)
 toBoolean tok = case tokValue tok of
   TokLowerName [] "true"  -> (tok, True)
