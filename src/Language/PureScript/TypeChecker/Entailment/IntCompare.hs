@@ -99,9 +99,10 @@ solveComparison context comparison = case comparison of
     asGraph = makeGraph . clean . foldMap asNode
       where
       asNode :: Comparison (S.Set a) -> [(S.Set a, [S.Set a])]
-      asNode (LessThan a b)    = [(a, [b]), (b, [])]
-      asNode (GreaterThan a b) = [(a, [b]), (b, [])]
-      asNode _                 = []
+      asNode = \case
+        (LessThan a b)    -> [(a, [b]), (b, [])]
+        (GreaterThan a b) -> [(a, [b]), (b, [])]
+        _                 -> []
 
       makeGraph :: [(S.Set a, [S.Set a])] -> (G.Graph, S.Set a -> Maybe G.Vertex)
       makeGraph m = case G.graphFromEdges $ make <$> m of
