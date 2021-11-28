@@ -532,9 +532,9 @@ entails SolverOptions{..} constraint context hints =
     solveIntCompare ctx [a, b, c] = do
       let compareDictsInScope = findDicts ctx C.IntCompare Nothing
           givens = flip mapMaybe compareDictsInScope $ \case
-            dict | [a', b', c'] <- tcdInstanceTypes dict -> mkComparison a' b' c'
+            dict | [a', b', c'] <- tcdInstanceTypes dict -> mkRelation a' b' c'
                  | otherwise -> Nothing
-      solved <- solveComparison givens <$> mkComparison a b c
+      solved <- solveRelation givens <$> mkRelation a b c
       if solved then
         pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, c] Nothing Nothing]
       else

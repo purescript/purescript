@@ -6,7 +6,6 @@ module Language.PureScript.TypeChecker.Entailment.IntCompare where
 
 import Protolude
 
-import Control.Arrow ((&&&))
 import qualified Data.Graph as G
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -14,89 +13,42 @@ import qualified Data.Set as S
 import qualified Language.PureScript.Types as P
 import qualified Language.PureScript.Constants.Prim as P
 
-data Comparison a
+data Relation a
   = Equal a a
-  | LessThan a a
-  | GreaterThan a a
-  deriving (Show, Eq, Ord)
+  | Unequal a a
+  deriving (Functor, Show, Eq, Ord)
 
-(.=.) :: a -> a -> Comparison a
-(.=.) = Equal
+type Context a = [Relation a]
 
-(.<.) :: a -> a -> Comparison a
-(.<.) = LessThan
-
-(.>.) :: a -> a -> Comparison a
-(.>.) = GreaterThan
-
-type Context a = [Comparison a]
-
--- | An algorithm for solving comparisons nominally, with respect to
+-- | An algorithm for solving relations nominally, with respect to
 -- properties like reflexivity, symmetry, and transitivity.
-solveComparison :: forall a. Ord a => Context a -> Comparison a -> Bool
-solveComparison context comparison = case comparison of
-  -- Proving that an equality exists between two nominal values has the
-  -- following requirements:
-  --
-  -- 1. Two types are directly equal.
-  --
-  -- 2. When renamed with respect to all other equalities in the
-  -- context, the renamed comparison must appear in the renamed context.
-  --
-  -- For example, given the context:
-  -- > [ a .=. b, b .=. c, x .=. y, y .=. z ]
-  --
-  -- and when verifying if a comparison holds true:
-  -- > solveComparison context (a .=. c)
-  --
-  -- the context and comparison is renamed as:
-  -- > [ abc .=. abc, xyz .=. xyz ] & (abc .=. abc)
-  Equal a b
-    | a == b -> True
-    | otherwise ->
-        let
-          comparison' = alpha comparison
-          context' = alpha <$> context
-        in
-          comparison' `elem` context'
+solveRelation :: forall a. Ord a => Context a -> Relation a -> Bool
+solveRelation context relation = case relation of
+  -- Proving that an equality exists between two nominal values requires
+  -- that if they're renamed with respect to all other equalities in the
+  -- context, they're still equal.
+  Equal a b ->
+    rename a == rename b
   -- Proving that an inequality exists between two nominal values takes
-  -- a very different code path compared to Equal; to summarize, it:
-  --
-  -- 1. Creates a directed graph of all inequalities in the renamed
-  -- context.
-  --
-  -- 2. Searches whether a path exists from point a to point b, allowing
-  -- symmetry to be solved.
-  --
-  -- 3. Also searches whether a path exists from point b to point a,
-  -- solving both the symmetry and reflexivity properties.
-  LessThan a b ->
-    solveInequality fst a b
-  GreaterThan a b ->
-    solveInequality snd a b
+  -- a very different code path compared to Equal; to summarize, it
+  -- creates a directed graph of all inequalities in the renamed
+  -- context, and searches whether a path exists from point a to point b.
+  Unequal a b
+    | a /= b ->
+        solveInequality a b
+    | otherwise ->
+        False
   where
-  solveInequality
-    :: ( ( (G.Graph, S.Set a -> Maybe G.Vertex)
-         , (G.Graph, S.Set a -> Maybe G.Vertex)
-         ) -> (G.Graph, S.Set a -> Maybe G.Vertex)
-       )
-    -> a
-    -> a
-    -> Bool
-  solveInequality f a b =
-    let (graph, search) = f inequalities
+  solveInequality :: a -> a -> Bool
+  solveInequality a b =
+    let (graph, search) = inequalities
     in fromMaybe False $ do
       a' <- search $ rename a
       b' <- search $ rename b
-      let norm = G.path graph a' b'
-          symm = G.path (G.transposeG graph) b' a'
-      pure $ norm || symm
+      pure $ G.path graph a' b'
 
-  alpha :: Comparison a -> Comparison (S.Set a)
-  alpha = \case
-    Equal a b       -> Equal (rename a) (rename b)
-    LessThan a b    -> LessThan (rename a) (rename b)
-    GreaterThan a b -> GreaterThan (rename a) (rename b)
+  alpha :: Relation a -> Relation (S.Set a)
+  alpha = fmap rename
 
   -- Determine which "equality bucket" a value lands on, then replace
   -- that value using that bucket.
@@ -110,7 +62,7 @@ solveComparison context comparison = case comparison of
   equalities :: [S.Set a]
   equalities = fmap (S.fromList . G.flattenSCC) $ makeStrong $ clean $ foldMap asNode context
     where
-    asNode :: Comparison a -> [(a, [a])]
+    asNode :: Relation a -> [(a, [a])]
     asNode = \case
       Equal a b -> [(a, [b]), (b, [a])]
       _         -> []
@@ -118,43 +70,25 @@ solveComparison context comparison = case comparison of
     makeStrong :: [(a, [a])] -> [G.SCC a]
     makeStrong = G.stronglyConnComp . fmap make
 
-  -- This determines the directed graphs for the "less than" and
-  -- "greater than" inequalities. This is fairly terse but what
-  -- it essentially does is:
-  --
-  -- 1. Collects all inequalities, renaming them on the way.
-  --
-  -- 2. Creates graphs for less than and greater than inequalities.
-  inequalities ::
-    ( ( G.Graph, S.Set a -> Maybe G.Vertex )
-    , ( G.Graph, S.Set a -> Maybe G.Vertex )
-    )
-  inequalities = lts &&& gts $ foldMap convert context
+  inequalities :: (G.Graph, S.Set a -> Maybe G.Vertex)
+  inequalities = asGraph $ foldMap convert context
     where
-    convert :: Comparison a -> [Comparison (S.Set a)]
+    convert :: Relation a -> [Relation (S.Set a)]
     convert = fmap alpha . \case
-      c | LessThan a b <- c -> [c, GreaterThan b a]
-        | GreaterThan a b <- c -> [c, LessThan b a]
+      c | Unequal a b <- c -> [c, Unequal b a]
       _ -> []
 
-    asGraph :: [Comparison (S.Set a)] -> (G.Graph, S.Set a -> Maybe G.Vertex)
+    asGraph :: [Relation (S.Set a)] -> (G.Graph, S.Set a -> Maybe G.Vertex)
     asGraph = makeGraph . clean . foldMap asNode
       where
-      asNode :: Comparison (S.Set a) -> [(S.Set a, [S.Set a])]
+      asNode :: Relation (S.Set a) -> [(S.Set a, [S.Set a])]
       asNode = \case
-        (LessThan a b)    -> [(a, [b]), (b, [])]
-        (GreaterThan a b) -> [(a, [b]), (b, [])]
+        (Unequal a b)    -> [(a, [b]), (b, [])]
         _                 -> []
 
       makeGraph :: [(S.Set a, [S.Set a])] -> (G.Graph, S.Set a -> Maybe G.Vertex)
       makeGraph m = case G.graphFromEdges $ make <$> m of
         (g, _, f) -> (g, f)
-
-    lts :: [Comparison (S.Set a)] -> (G.Graph, S.Set a -> Maybe G.Vertex)
-    lts = asGraph . go where go n = [LessThan a b | LessThan a b <- n]
-
-    gts :: [Comparison (S.Set a)] -> (G.Graph, S.Set a -> Maybe G.Vertex)
-    gts = asGraph . go where go n = [GreaterThan a b | GreaterThan a b <- n]
 
   -- Combine all key-value pairs
   clean :: forall k. Ord k => [(k, [k])] -> [(k, [k])]
@@ -163,11 +97,11 @@ solveComparison context comparison = case comparison of
   make :: forall k. (k, [k]) -> (k, k, [k])
   make (a, b) = (a, a, b)
 
-mkComparison :: P.Type a -> P.Type a -> P.Type a -> Maybe (Comparison (P.Type a))
-mkComparison lhs rhs cmp = case cmp of
+mkRelation :: P.Type a -> P.Type a -> P.Type a -> Maybe (Relation (P.Type a))
+mkRelation lhs rhs rel = case rel of
   P.TypeConstructor _ ordering
-    | ordering == P.orderingEQ -> pure $ lhs .=. rhs
-    | ordering == P.orderingLT -> pure $ lhs .<. rhs
-    | ordering == P.orderingGT -> pure $ lhs .>. rhs
+    | ordering == P.orderingEQ -> pure $ Equal lhs rhs
+    | ordering == P.orderingLT -> pure $ Unequal lhs rhs
+    | ordering == P.orderingGT -> pure $ Unequal rhs lhs
   _ ->
     Nothing
