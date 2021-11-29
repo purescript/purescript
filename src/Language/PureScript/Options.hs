@@ -11,6 +11,8 @@ data Options = Options
   { optionsVerboseErrors :: Bool
   -- ^ Verbose error message
   , optionsNoComments :: Bool
+  -- ^ Do not check foreign declarations
+  , optionsNoForeignDeclCheck :: Bool
   -- ^ Remove the comments from the generated js
   , optionsCodegenTargets :: S.Set CodegenTarget
   -- ^ Codegen targets (JS, CoreFn, etc.)
@@ -18,7 +20,7 @@ data Options = Options
 
 -- Default make options
 defaultOptions :: Options
-defaultOptions = Options False False (S.singleton JS)
+defaultOptions = Options False False False (S.singleton JS)
 
 data CodegenTarget = JS | JSSourceMap | CoreFn | Docs
   deriving (Eq, Ord, Show)

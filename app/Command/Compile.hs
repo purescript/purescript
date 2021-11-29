@@ -106,6 +106,13 @@ verboseErrors = Opts.switch $
   <> Opts.long "verbose-errors"
   <> Opts.help "Display verbose error messages"
 
+noForeignDeclCheck :: Opts.Parser Bool
+noForeignDeclCheck = Opts.switch $
+     Opts.short 'n'
+  <> Opts.long "no-foreign-decl-check"
+  <> Opts.help "Do not check foreign declaration files"
+
+
 noPrefix :: Opts.Parser Bool
 noPrefix = Opts.switch $
      Opts.short 'p'
@@ -145,6 +152,7 @@ options =
   P.Options
     <$> verboseErrors
     <*> (not <$> comments)
+    <*> noForeignDeclCheck
     <*> (handleTargets <$> codegenTargets)
   where
     -- Ensure that the JS target is included if sourcemaps are

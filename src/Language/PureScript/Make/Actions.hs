@@ -260,8 +260,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         Just path
           | not $ requiresForeign m ->
               tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
-          | otherwise ->
-              checkForeignDecls m path
+          | otherwise -> do
+              noForeignDeclCheck <- asks optionsNoForeignDeclCheck
+              unless noForeignDeclCheck $ do
+                checkForeignDecls m path
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return ()
       for_ (mn `M.lookup` foreigns) $ \path ->
