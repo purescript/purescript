@@ -79,6 +79,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@mrkgnao](https://github.com/mrkgnao) | Soham Chowdhury | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mgmeier](https://github.com/mgmeier) | Michael Gilliland | [MIT license](http://opensource.org/licenses/MIT) |
 | [@michaelficarra](https://github.com/michaelficarra) | Michael Ficarra | [MIT license](http://opensource.org/licenses/MIT) |
+| [@mikesol](https://github.com/mikesol) | Mike Solomon | MIT license |
 | [@MichaelXavier](https://github.com/MichaelXavier) | Michael Xavier | MIT license |
 | [@milesfrain](https://github.com/milesfrain) | Miles Frain | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mjgpy3](https://github.com/mjgpy3) | Michael Gilliland | [MIT license](http://opensource.org/licenses/MIT) |
