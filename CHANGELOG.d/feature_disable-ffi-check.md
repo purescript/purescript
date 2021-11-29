@@ -1,0 +1,1 @@
+* Adds a `no-foreign-decl-check` flag to `purs compile` to skip foreign declaration checks.
