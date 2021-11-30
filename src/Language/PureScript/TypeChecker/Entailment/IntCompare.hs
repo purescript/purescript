@@ -33,18 +33,20 @@ solveRelation context relation = case relation of
   -- a very different code path compared to Equal; to summarize, it
   -- creates a directed graph of all inequalities in the renamed
   -- context, and searches whether a path exists from point a to point b.
-  Unequal a b
-    | a /= b ->
-        solveInequality a b
-    | otherwise ->
-        False
+  Unequal a b ->
+    let a' = rename a
+        b' = rename b
+    in if a' /= b' then
+      solveInequality a' b'
+    else
+      False
   where
-  solveInequality :: a -> a -> Bool
+  solveInequality :: S.Set a -> S.Set a -> Bool
   solveInequality a b =
     let (graph, search) = inequalities
     in fromMaybe False $ do
-      a' <- search $ rename a
-      b' <- search $ rename b
+      a' <- search a
+      b' <- search b
       pure $ G.path graph a' b'
 
   alpha :: Relation a -> Relation (S.Set a)
@@ -63,9 +65,8 @@ solveRelation context relation = case relation of
   equalities = fmap (S.fromList . G.flattenSCC) $ makeStrong $ clean $ foldMap asNode context
     where
     asNode :: Relation a -> [(a, [a])]
-    asNode = \case
-      Equal a b -> [(a, [b]), (b, [a])]
-      _         -> []
+    asNode (Equal a b) = [(a, [b]), (b, [a])]
+    asNode _           = mempty
 
     makeStrong :: [(a, [a])] -> [G.SCC a]
     makeStrong = G.stronglyConnComp . fmap make
@@ -74,17 +75,15 @@ solveRelation context relation = case relation of
   inequalities = asGraph $ foldMap convert context
     where
     convert :: Relation a -> [Relation (S.Set a)]
-    convert = fmap alpha . \case
-      c | Unequal a b <- c -> [c, Unequal b a]
-      _ -> []
+    convert (Unequal a b) = pure $ alpha (Unequal a b)
+    convert _             = mempty
 
     asGraph :: [Relation (S.Set a)] -> (G.Graph, S.Set a -> Maybe G.Vertex)
     asGraph = makeGraph . clean . foldMap asNode
       where
       asNode :: Relation (S.Set a) -> [(S.Set a, [S.Set a])]
-      asNode = \case
-        (Unequal a b)    -> [(a, [b]), (b, [])]
-        _                 -> []
+      asNode (Unequal a b) = [(a, [b]), (b, [])]
+      asNode _             = mempty
 
       makeGraph :: [(S.Set a, [S.Set a])] -> (G.Graph, S.Set a -> Maybe G.Vertex)
       makeGraph m = case G.graphFromEdges $ make <$> m of
