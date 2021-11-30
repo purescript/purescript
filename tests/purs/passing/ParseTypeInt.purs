@@ -20,4 +20,9 @@ d = Proxy
 e :: Proxy ((-42) :: Int)
 e = Proxy
 
+f :: Proxy (-
+  -- here's a comment
+  1)
+f = Proxy
+
 main = log "Done"

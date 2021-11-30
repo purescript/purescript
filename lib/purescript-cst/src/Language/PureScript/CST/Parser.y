@@ -19,6 +19,7 @@ module Language.PureScript.CST.Parser
 import Prelude hiding (lex)
 
 import Control.Monad ((<=<), when)
+import Data.Bifunctor (second)
 import Data.Foldable (foldl', for_, toList)
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
@@ -313,7 +314,7 @@ type4 :: { Type () }
 
 type5 :: { Type () }
   : type6 %shift { $1 }
-  | '-' LIT_INT { uncurry (TypeInt ()) (toNegativeInt $1 $2) }
+  | '-' int { uncurry (TypeInt () (Just $1)) (second negate $2) }
 
 type6 :: { Type () }
   : typeAtom { $1 }
@@ -325,7 +326,7 @@ typeAtom :: { Type ()}
   | qualProperName { TypeConstructor () (getQualifiedProperName $1) }
   | qualSymbol { TypeOpName () (getQualifiedOpName $1) }
   | string { uncurry (TypeString ()) $1 }
-  | int { uncurry (TypeInt ()) $1 }
+  | int { uncurry (TypeInt () Nothing) $1 }
   | hole { TypeHole () $1 }
   | '(->)' { TypeArrName () $1 }
   | '{' row '}' { TypeRecord () (Wrapped $1 $2 $3) }
@@ -340,7 +341,7 @@ typeKindedAtom :: { Type () }
   : '_' { TypeWildcard () $1 }
   | qualProperName { TypeConstructor () (getQualifiedProperName $1) }
   | qualSymbol { TypeOpName () (getQualifiedOpName $1) }
-  | int { uncurry (TypeInt ()) $1  }
+  | int { uncurry (TypeInt () Nothing) $1 }
   | hole { TypeHole () $1 }
   | '{' row '}' { TypeRecord () (Wrapped $1 $2 $3) }
   | '(' row ')' { TypeRow () (Wrapped $1 $2 $3) }
