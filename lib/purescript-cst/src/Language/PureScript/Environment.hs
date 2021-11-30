@@ -566,11 +566,11 @@ primSymbolClasses =
 primIntClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primIntClasses =
   M.fromList
-    -- class Add (left :: Int) (right :: Int) (output :: Int) | left right -> output, left output -> right, right output -> left
+    -- class Add (left :: Int) (right :: Int) (sum :: Int) | left right -> sum, left sum -> right, right sum -> left
     [ (primSubName C.moduleInt "Add", makeTypeClassData
         [ ("left", Just tyInt)
         , ("right", Just tyInt)
-        , ("output", Just tyInt)
+        , ("sum", Just tyInt)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [0, 2] [1]
@@ -586,10 +586,10 @@ primIntClasses =
         [ FunctionalDependency [0, 1] [2]
         ] True)
 
-    -- class Mul (multiplicand :: Int) (multiplier :: Int) (product :: Int) | multiplicand multiplier -> product
+    -- class Mul (left :: Int) (right :: Int) (product :: Int) | left right -> product
     , (primSubName C.moduleInt "Mul", makeTypeClassData
-        [ ("multiplicand", Just tyInt)
-        , ("multiplier", Just tyInt)
+        [ ("left", Just tyInt)
+        , ("right", Just tyInt)
         , ("product", Just tyInt)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
