@@ -10,6 +10,7 @@ import qualified Data.Graph as G
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import qualified Language.PureScript.Names as P
 import qualified Language.PureScript.Types as P
 import qualified Language.PureScript.Constants.Prim as P
 
@@ -20,26 +21,22 @@ data Relation a
 
 type Context a = [Relation a]
 
--- | An algorithm for solving relations nominally, with respect to
--- properties like reflexivity, symmetry, and transitivity.
-solveRelation :: forall a. Ord a => Context a -> Relation a -> Bool
-solveRelation context relation = case relation of
-  -- Proving that an equality exists between two nominal values requires
-  -- that if they're renamed with respect to all other equalities in the
-  -- context, they're still equal.
-  Equal a b ->
-    rename a == rename b
-  -- Proving that an inequality exists between two nominal values takes
-  -- a very different code path compared to Equal; to summarize, it
-  -- creates a directed graph of all inequalities in the renamed
-  -- context, and searches whether a path exists from point a to point b.
-  Unequal a b ->
-    let a' = rename a
-        b' = rename b
-    in if a' /= b' then
-      solveInequality a' b'
+type PSOrdering = P.Qualified (P.ProperName 'P.TypeName)
+
+solveRelation :: forall a. Ord a => Context a -> a -> a -> Maybe PSOrdering
+solveRelation context lhs rhs =
+  let
+    lhs' = rename lhs
+    rhs' = rename rhs
+  in
+    if lhs' == rhs' then
+      pure P.orderingEQ
+    else if solveInequality lhs' rhs' then
+      pure P.orderingLT
+    else if solveInequality rhs' lhs' then
+      pure P.orderingGT
     else
-      False
+      Nothing
   where
   solveInequality :: S.Set a -> S.Set a -> Bool
   solveInequality a b =

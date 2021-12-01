@@ -529,16 +529,13 @@ entails SolverOptions{..} constraint context hints =
             GT -> C.orderingGT
           args' = [arg0, arg1, srcTypeConstructor ordering]
       in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] args' Nothing Nothing]
-    solveIntCompare ctx [a, b, c] = do
+    solveIntCompare ctx [a, b, _] = do
       let compareDictsInScope = findDicts ctx C.IntCompare Nothing
           givens = flip mapMaybe compareDictsInScope $ \case
             dict | [a', b', c'] <- tcdInstanceTypes dict -> mkRelation a' b' c'
                  | otherwise -> Nothing
-      solved <- solveRelation givens <$> mkRelation a b c
-      if solved then
-        pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, c] Nothing Nothing]
-      else
-        Nothing
+      c' <- solveRelation givens a b
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, srcTypeConstructor c'] Nothing Nothing]
     solveIntCompare _ _ = Nothing
 
     solveIntMul :: [SourceType] -> Maybe [TypeClassDict]
