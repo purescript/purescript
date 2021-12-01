@@ -1,0 +1,43 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/CompareInt4.purs:14:14 - 14:26 (line 14, column 14 - line 14, column 26)
+
+  Could not match type
+  [33m    [0m
+  [33m  GT[0m
+  [33m    [0m
+  with type
+  [33m    [0m
+  [33m  LT[0m
+  [33m    [0m
+
+while solving type class constraint
+[33m                     [0m
+[33m  Prim.Int.Compare b0[0m
+[33m                   a1[0m
+[33m                   LT[0m
+[33m                     [0m
+while checking that type [33mforall (l :: Int) (r :: Int).       [0m
+                         [33m  Compare l r LT => Proxy @(Row Int)[0m
+                         [33m                      ( left :: l   [0m
+                         [33m                      , right :: r  [0m
+                         [33m                      )             [0m
+  is at least as general as type [33mProxy @(Row Int)[0m
+                                 [33m  ( left :: b0  [0m
+                                 [33m  , right :: a1 [0m
+                                 [33m  )             [0m
+while checking that expression [33massertLesser[0m
+  has type [33mProxy @(Row Int)[0m
+           [33m  ( left :: b0  [0m
+           [33m  , right :: a1 [0m
+           [33m  )             [0m
+in value declaration [33mimpossible[0m
+
+where [33ma1[0m is a rigid type variable
+        bound at (line 14, column 14 - line 14, column 26)
+      [33mb0[0m is a rigid type variable
+        bound at (line 14, column 14 - line 14, column 26)
+
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+or to contribute content related to this error.
+
