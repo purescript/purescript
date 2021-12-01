@@ -79,4 +79,10 @@ litGt = assertGreater
 litEq :: Proxy ( left :: 0, right :: 0 )
 litEq = assertEqual
 
+infer :: forall l r o. Compare l r o => Proxy l -> Proxy r -> Proxy o
+infer _ _ = Proxy
+
+inferSolved :: forall m n p. Compare m n GT => Compare n p GT => Proxy m -> Proxy n -> Proxy p -> Proxy GT
+inferSolved m _ p = infer m p
+
 main = log "Done"
