@@ -93,7 +93,7 @@ data ImportParse = ImportParse
 
 parseModuleHeader :: Text -> Either (NE.NonEmpty CST.ParserError) ImportParse
 parseModuleHeader src = do
-  CST.PartialResult md _ <- CST.parseModule $ CST.lenient $ CST.lex src
+  CST.PartialResult md _ <- CST.parseModule shebang $ CST.lenient $ CST.lex shebang rest
   let
     mn = CST.nameValue $ CST.modNamespace md
     decls = flip fmap (CST.modImports md) $ \decl -> do
@@ -108,6 +108,14 @@ parseModuleHeader src = do
     _ -> do
       let pos = CST.sourcePos . CST.srcEnd . CST.tokRange . CST.tokAnn $ CST.modWhere md
       pure $ ImportParse mn pos pos []
+  where
+  shebang = map mkSourceToken $ zip [0..] $ takeWhile ((==) "#!" . T.take 2) $ T.lines src
+  rest = T.unlines $ dropWhile ((==) "#!" . T.take 2) $ T.lines src
+
+  mkSourceToken (line, content) =
+    CST.SourceToken
+      (CST.TokenAnn (CST.SourceRange (CST.SourcePos line 0) (CST.SourcePos line (T.length content))) [] [])
+      (CST.TokShebang content)
 
 sliceImportSection :: [Text] -> Either Text (P.ModuleName, [Text], [Import], [Text])
 sliceImportSection fileLines = first (toS . CST.prettyPrintError . NE.head) $ do
@@ -368,7 +376,7 @@ parseImport :: Text -> Maybe Import
 parseImport t =
   case fmap (CST.convertImportDecl "<purs-ide>" . snd)
         $ CST.runTokenParser CST.parseImportDeclP
-        $ CST.lex t of
+        $ CST.lex [] t of
     Right (_, mn, idt, mmn) ->
       Just (Import mn idt mmn)
     _ -> Nothing

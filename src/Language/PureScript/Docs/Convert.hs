@@ -249,7 +249,7 @@ runParser :: CST.Parser a -> Text -> Either String a
 runParser p =
   bimap (CST.prettyPrintError . NE.head) snd
     . CST.runTokenParser p
-    . CST.lex
+    . CST.lex []
 
 -- |
 -- Partially desugar modules so that they are suitable for extracting

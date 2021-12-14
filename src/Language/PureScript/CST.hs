@@ -24,6 +24,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Parallel.Strategies (withStrategy, parList, evalTuple2, r0, rseq)
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
+import qualified Data.Text as Text
 import qualified Language.PureScript.AST as AST
 import qualified Language.PureScript.Errors as E
 import Language.PureScript.CST.Convert
@@ -62,7 +63,15 @@ parseFromFiles toFilePath input =
     $ \(k, a) -> (k, sequence $ parseFromFile (toFilePath k) a)
 
 parseModuleFromFile :: FilePath -> Text -> Either (NE.NonEmpty ParserError) (PartialResult AST.Module)
-parseModuleFromFile fp content = fmap (convertModule fp) <$> parseModule (lex content)
+parseModuleFromFile fp content = fmap (convertModule fp) <$> parseModule shebang (lex shebang rest)
+  where
+  shebang = map mkSourceToken $ zip [0..] $ takeWhile ((==) "#!" . Text.take 2) $ Text.lines content
+  rest = Text.unlines $ dropWhile ((==) "#!" . Text.take 2) $ Text.lines content
+
+  mkSourceToken (line, contents) =
+    SourceToken
+      (TokenAnn (SourceRange (SourcePos line 0) (SourcePos line (Text.length contents))) [] [])
+      (TokShebang contents)
 
 parseFromFile :: FilePath -> Text -> ([ParserWarning], Either (NE.NonEmpty ParserError) AST.Module)
 parseFromFile fp content = fmap (convertModule fp) <$> parse content

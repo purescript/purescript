@@ -60,6 +60,7 @@ tokenDelta = \case
   TokNumber raw _          -> (0, Text.length raw)
   TokString raw _          -> multiLine 1 $ textDelta raw
   TokRawString raw         -> multiLine 3 $ textDelta raw
+  TokShebang shebang       -> (0, Text.length shebang)
   TokLayoutStart           -> (0, 0)
   TokLayoutSep             -> (0, 0)
   TokLayoutEnd             -> (0, 0)
@@ -118,11 +119,15 @@ wrappedRange :: Wrapped a -> TokenRange
 wrappedRange Wrapped { wrpOpen, wrpClose } = (wrpOpen, wrpClose)
 
 moduleRange :: Module a -> TokenRange
-moduleRange Module { modKeyword, modWhere, modImports, modDecls } =
+moduleRange Module { modShebang, modKeyword, modWhere, modImports, modDecls } =
   case (modImports, modDecls) of
-    ([], []) -> (modKeyword, modWhere)
-    (is, []) -> (modKeyword, snd . importDeclRange $ last is)
-    (_,  ds) -> (modKeyword, snd . declRange $ last ds)
+    ([], []) -> (start, modWhere)
+    (is, []) -> (start, snd . importDeclRange $ last is)
+    (_,  ds) -> (start, snd . declRange $ last ds)
+  where
+  start = case modShebang of
+    [] -> modKeyword
+    sh -> head sh
 
 exportRange :: Export a -> TokenRange
 exportRange = \case

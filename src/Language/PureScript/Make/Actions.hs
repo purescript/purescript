@@ -364,5 +364,5 @@ checkForeignDecls m path = do
   parseIdent str =
     bimap (const str) (Ident . CST.getIdent . CST.nameValue . snd)
       . CST.runTokenParser CST.parseIdent
-      . CST.lex
+      . CST.lex []
       $ T.pack str

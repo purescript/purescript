@@ -7,17 +7,18 @@ import Language.PureScript.CST.Types
 import Language.PureScript.CST.Positions
 
 flattenModule :: Module a -> DList SourceToken
-flattenModule m@(Module _ a b c d e f g) =
-  pure a <>
-  flattenName b <>
-  foldMap (flattenWrapped (flattenSeparated flattenExport)) c <>
-  pure d <>
-  foldMap flattenImportDecl e <>
-  foldMap flattenDeclaration f <>
-  pure (SourceToken (TokenAnn eofRange g []) TokEof)
+flattenModule m@(Module _ a b c d e f g h) =
+  foldMap pure a <>
+  pure b <>
+  flattenName c <>
+  foldMap (flattenWrapped (flattenSeparated flattenExport)) d <>
+  pure e <>
+  foldMap flattenImportDecl f <>
+  foldMap flattenDeclaration g <>
+  pure (SourceToken (TokenAnn eofRange h []) TokEof)
   where
     (_, endTkn) = moduleRange m
-    eofPos = advanceLeading (srcEnd (srcRange endTkn)) g
+    eofPos = advanceLeading (srcEnd (srcRange endTkn)) h
     eofRange = SourceRange eofPos eofPos
 
 flattenDataHead :: DataHead a -> DList SourceToken
