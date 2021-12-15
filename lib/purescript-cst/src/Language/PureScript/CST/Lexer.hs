@@ -41,15 +41,13 @@ lenient = go
 lex :: [SourceToken] -> Text -> [LexResult]
 lex shebang src = do
   let (leading, src') = comments src
-  let start = case shebang of
-                [] -> SourcePos 0 0
-                shebangs -> srcEnd $ tokRange $ tokAnn $ last shebangs
+  let start = SourcePos (length shebang + 1) 1
 
   lexWithState $ LexState
     { lexPos = advanceLeading start leading
     , lexLeading = leading
     , lexSource = src'
-    , lexStack = [(start, LytRoot)]
+    , lexStack = [(SourcePos 0 0, LytRoot)]
     }
 
 -- | Lexes according to top-level declaration context rules.
