@@ -35,7 +35,7 @@ layoutSpec = do
   where
   runLexer file = do
     src <- Text.readFile file
-    case sequence $ CST.lex src of
+    case sequence $ CST.lex [] src of
       Left (_, err) ->
         pure $ Text.pack $ CST.prettyPrintError err
       Right toks -> do
@@ -64,7 +64,7 @@ literalsSpec = describe "Literals" $ do
   testProperty name test = specify name (property test)
 
 readTok' :: String -> Text -> Gen SourceToken
-readTok' failMsg t = case CST.lex t of
+readTok' failMsg t = case CST.lex [] t of
   Right tok : _ ->
     pure tok
   Left (_, err) : _ ->
