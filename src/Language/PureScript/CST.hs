@@ -24,7 +24,6 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Parallel.Strategies (withStrategy, parList, evalTuple2, r0, rseq)
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
-import qualified Data.Text as Text
 import qualified Language.PureScript.AST as AST
 import qualified Language.PureScript.Errors as E
 import Language.PureScript.CST.Convert
@@ -34,6 +33,7 @@ import Language.PureScript.CST.Monad (Parser, ParserM(..), ParserState(..), LexR
 import Language.PureScript.CST.Parser
 import Language.PureScript.CST.Print
 import Language.PureScript.CST.Types
+import Language.PureScript.CST.Utils
 
 pureResult :: a -> PartialResult a
 pureResult a = PartialResult a ([], pure a)
@@ -65,13 +65,7 @@ parseFromFiles toFilePath input =
 parseModuleFromFile :: FilePath -> Text -> Either (NE.NonEmpty ParserError) (PartialResult AST.Module)
 parseModuleFromFile fp content = fmap (convertModule fp) <$> parseModule shebang (lex shebang rest)
   where
-  shebang = map mkSourceToken $ zip [0..] $ takeWhile ((==) "#!" . Text.take 2) $ Text.lines content
-  rest = Text.unlines $ dropWhile ((==) "#!" . Text.take 2) $ Text.lines content
-
-  mkSourceToken (line, contents) =
-    SourceToken
-      (TokenAnn (SourceRange (SourcePos line 0) (SourcePos line (Text.length contents))) [] [])
-      (TokShebang contents)
+  (shebang, rest) = chompShebang content
 
 parseFromFile :: FilePath -> Text -> ([ParserWarning], Either (NE.NonEmpty ParserError) AST.Module)
 parseFromFile fp content = fmap (convertModule fp) <$> parse content

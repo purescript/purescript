@@ -350,3 +350,16 @@ isValidModuleNamespace = Text.null . snd . Text.span (\c -> c /= '_' && c /= '\'
 -- Related GHC issue: https://gitlab.haskell.org/ghc/ghc/issues/8167
 isLeftFatArrow :: Text -> Bool
 isLeftFatArrow str = str == "<=" || str == "⇐"
+
+chompShebang :: Text -> ([SourceToken], Text)
+chompShebang content = (shebang, rest)
+  where
+  prefix = "#!"
+
+  shebang = map mkSourceToken $ zip [0..] $ takeWhile ((==) prefix . Text.take 2) $ Text.lines content
+  rest = Text.unlines $ dropWhile ((==) prefix . Text.take 2) $ Text.lines content
+
+  mkSourceToken (line, contents) =
+    SourceToken
+      (TokenAnn (SourceRange (SourcePos line 0) (SourcePos line (Text.length contents))) [] [])
+      (TokShebang contents)

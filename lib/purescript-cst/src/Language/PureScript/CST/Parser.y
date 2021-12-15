@@ -802,13 +802,7 @@ lexer k = munch >>= k
 parse :: Text -> ([ParserWarning], Either (NE.NonEmpty ParserError) (Module ()))
 parse content = either (([],) . Left) resFull $ parseModule shebang $ lex shebang rest
   where
-  shebang = map mkSourceToken $ zip [0..] $ takeWhile ((==) "#!" . Text.take 2) $ Text.lines content
-  rest = Text.unlines $ dropWhile ((==) "#!" . Text.take 2) $ Text.lines content
-
-  mkSourceToken (line, contents) =
-    SourceToken
-      (TokenAnn (SourceRange (SourcePos line 0) (SourcePos line (Text.length contents))) [] [])
-      (TokShebang contents)
+  (shebang, rest) = chompShebang content
 
 data PartialResult a = PartialResult
   { resPartial :: a

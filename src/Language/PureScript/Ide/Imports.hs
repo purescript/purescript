@@ -39,6 +39,7 @@ import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
 import qualified Language.PureScript.Constants.Prim as C
 import qualified Language.PureScript.CST            as CST
+import           Language.PureScript.CST.Utils            (chompShebang)
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Filter
@@ -109,13 +110,7 @@ parseModuleHeader src = do
       let pos = CST.sourcePos . CST.srcEnd . CST.tokRange . CST.tokAnn $ CST.modWhere md
       pure $ ImportParse mn pos pos []
   where
-  shebang = map mkSourceToken $ zip [0..] $ takeWhile ((==) "#!" . T.take 2) $ T.lines src
-  rest = T.unlines $ dropWhile ((==) "#!" . T.take 2) $ T.lines src
-
-  mkSourceToken (line, content) =
-    CST.SourceToken
-      (CST.TokenAnn (CST.SourceRange (CST.SourcePos line 0) (CST.SourcePos line (T.length content))) [] [])
-      (CST.TokShebang content)
+  (shebang, rest) = chompShebang src
 
 sliceImportSection :: [Text] -> Either Text (P.ModuleName, [Text], [Import], [Text])
 sliceImportSection fileLines = first (toS . CST.prettyPrintError . NE.head) $ do
