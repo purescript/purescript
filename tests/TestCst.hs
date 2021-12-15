@@ -41,7 +41,7 @@ layoutSpec = do
       Left (_, err) ->
         pure $ Text.pack $ CST.prettyPrintError err
       Right toks -> do
-        pure $ CST.printTokens toks
+        pure $ CST.printTokens (shebang <> toks)
 
 literalsSpec :: Spec
 literalsSpec = describe "Literals" $ do
