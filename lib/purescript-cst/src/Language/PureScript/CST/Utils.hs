@@ -352,15 +352,15 @@ isLeftFatArrow :: Text -> Bool
 isLeftFatArrow str = str == "<=" || str == "⇐"
 
 chompShebang :: Text -> ([SourceToken], Text)
-chompShebang content = (shebang, (if length shebang > 0 then "\n" else "") <> rest)
+chompShebang content = (shebang, (if not (null shebang) then "\n" else "") <> rest)
   where
   prefix = "#!"
 
-  shebang = map mkSourceToken $ zip [0..] $ takeWhile ((==) prefix . Text.take 2) $ Text.lines content
+  shebang = zipWith mkSourceToken [0..] $ takeWhile ((==) prefix . Text.take 2) $ Text.lines content
   rest = Text.unlines $ dropWhile ((==) prefix . Text.take 2) $ Text.lines content
 
-  mkSourceToken (line, contents) = do
-    let leadingComments = if line > 0 then [Line LF] else []
+  mkSourceToken line contents = do
+    let leadingComments = [Line LF | line > 0]
     SourceToken
       (TokenAnn (SourceRange (SourcePos line 0) (SourcePos line (Text.length contents))) leadingComments [])
       (TokShebang contents)
