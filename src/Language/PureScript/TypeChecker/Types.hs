@@ -726,7 +726,8 @@ check' (DeferredDictionary className tys) ty = do
              (TypeClassDictionary con dicts hints)
              ty
 check' (TypedValue checkType val ty1) ty2 = do
-  (elabTy1, kind1) <- kindOf ty1
+  moduleName <- unsafeCheckCurrentModule
+  ((args, elabTy1), kind1) <- kindOfWithScopedVars ty1
   (elabTy2, kind2) <- kindOf ty2
   unifyKinds' kind1 kind2
   checkTypeKind ty1 kind1
@@ -734,7 +735,7 @@ check' (TypedValue checkType val ty1) ty2 = do
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy2
   elaborate <- subsumes ty1' ty2'
   val' <- if checkType
-            then tvToExpr <$> check val ty1'
+            then withScopedTypeVars moduleName args $ tvToExpr <$> check val ty1'
             else pure val
   return $ TypedValue' True (TypedValue checkType (elaborate val') ty1') ty2'
 check' (Case vals binders) ret = do
