@@ -57,6 +57,10 @@ jobs:
 
       - run: "ci/build.sh"
 
+      - name: "(Linux only) Build the entire package set"
+        if: "${{ runner.os == 'Linux' }}"
+        run: "ci/build-package-set.sh"
+
       - name: "(Release only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
         run: |
