@@ -25,4 +25,10 @@ foreign import data NatData ∷ ∀ f g. (f ~> g) -> f Type -> g Type
 type NatKind ∷ ∀ f g. (f ~> g) -> f Type -> g Type
 type NatKind k a = k a
 
+data UseOperatorInDataParamKind (a :: Type /\ Type) = UseOperatorInDataParamKind
+
+type UseOperatorInTypeParamKind (a :: Type /\ Type) = Int
+
+class UseOperatorInClassParamKind (a :: Type /\ Type)
+
 main = log "Done"
