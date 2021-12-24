@@ -8,7 +8,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
 ENV PATH=$HOME/.cabal/bin:$HOME/.ghcup/bin:$PATH
 ENV STACK_ROOT=/workspace/.stack
 
-RUN ghcup install ghc && \
+RUN mkdir /workspace/.stack && \
+    ghcup install ghc && \
     ghcup install cabal && \
     ghcup install stack && \
     ghcup install hls && \
