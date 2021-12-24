@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y curl xz-utils gcc make libtinfo5 libgmp
 USER gitpod
 RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
 ENV PATH=$HOME/.cabal/bin:$HOME/.ghcup/bin:$PATH
+ENV STACK_ROOT=/workspace/.stack
 
 RUN ghcup install ghc && \
     ghcup install cabal && \
