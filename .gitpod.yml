@@ -1,3 +1,7 @@
+tasks:
+  - name: Setup & Build
+    init: stack update && stack build --fast
+
 image:
   file: .gitpod.Dockerfile
 
