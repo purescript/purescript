@@ -1,0 +1,64 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/3701.purs:39:8 - 39:34 (line 39, column 8 - line 39, column 34)
+
+  Could not match type
+  [33m         [0m
+  [33m  ( ... )[0m
+  [33m         [0m
+  with type
+  [33m                    [0m
+  [33m  ( thing1 :: String[0m
+  [33m  ...               [0m
+  [33m  )                 [0m
+  [33m                    [0m
+
+while solving type class constraint
+[33m                                 [0m
+[33m  Prim.Row.Nub ( thing1 :: String[0m
+[33m               , thing1 :: String[0m
+[33m               , thing2 :: Int   [0m
+[33m               )                 [0m
+[33m               ( thing1 :: String[0m
+[33m               , thing1 :: String[0m
+[33m               , thing2 :: Int   [0m
+[33m               )                 [0m
+[33m                                 [0m
+while applying a function [33mfooMerge[0m
+  of type [33mUnion @Type t0               [0m
+          [33m  ( thing1 :: String         [0m
+          [33m  , thing2 :: Int            [0m
+          [33m  )                          [0m
+          [33m  ( thing1 :: String         [0m
+          [33m  , thing2 :: Int            [0m
+          [33m  | t0                       [0m
+          [33m  )                          [0m
+          [33m => Nub @Type                [0m
+          [33m      ( thing1 :: String     [0m
+          [33m      , thing2 :: Int        [0m
+          [33m      | t0                   [0m
+          [33m      )                      [0m
+          [33m      ( thing1 :: String     [0m
+          [33m      , thing2 :: Int        [0m
+          [33m      | t0                   [0m
+          [33m      )                      [0m
+          [33m     => Record t0            [0m
+          [33m        -> { thing1 :: String[0m
+          [33m           , thing2 :: Int   [0m
+          [33m           | t0              [0m
+          [33m           }                 [0m
+  to argument [33m{ thing1: "foo"[0m
+              [33m}              [0m
+while checking that expression [33mfooMerge { thing1: "foo"[0m
+                               [33m         }              [0m
+  has type [33m{ thing1 :: String[0m
+           [33m, thing1 :: String[0m
+           [33m, thing2 :: Int   [0m
+           [33m}                 [0m
+in value declaration [33mfoo2[0m
+
+where [33mt0[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+or to contribute content related to this error.
+

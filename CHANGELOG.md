@@ -2,6 +2,66 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.14.5
+
+Bugfixes:
+
+* Fix a case where kind inference inferred the wrong kind for type synonyms (#4184 by @jy14898)
+
+* Properly rename module imports in case of conflicts with declarations (#4188 by @PureFunctor)
+
+Internal:
+
+* Fix command and clarify a few other requirements in release guide (#4177 by @JordanMartinez)
+
+* Add `Functor` instance for `Language.PureScript.CoreFn.Module`. (#4186 by @cdepillabout)
+
+## v0.14.4
+
+Bugfixes:
+
+* Solve `Prim.Row.Union left right all` constraint for `left` when `all` and `right` are already closed rows, (#3720 by @MonoidMusician)
+  reflecting the existing functional dependency `all right -> left`
+
+* Account for redundant parens when excluding uninteresting kind sigs from docs (#4137 by @JordanMartinez)
+
+* Add a hint for errors in foreign data type declarations (#4161 by @kl0tl)
+
+* Do not remove bindings referenced in function declarations when bundling (#4044 by @kl0tl)
+
+* Improve row type error messages (#4159 by @rhendric)
+  * Remove a redundant hint that repeats the types in the error
+  * Correctly diff rows containing duplicate items
+  * Erase kind applications from rows in errors (by default)
+
+* Fix bad interaction between superclasses and type synonyms (#4164 by @rhendric)
+
+  See #4101.
+
+* Fix regression in row unification (#4168 by @rhendric)
+
+* Fix backtick operator rule (#4172 by @JordanMartinez)
+
+Other improvements:
+
+* Add developer guide to readme (#3900 by @milesfrain)
+
+Internal:
+
+* Move unreleased changelog entries to CHANGELOG.d (#4132 by @rhendric)
+
+  See CHANGELOG.d/README.md for details.
+
+* Clarify in RELEASE_GUIDE what to do when broken releases are made (#4147 by @JordanMartinez)
+
+* Miscellaneous updates/clarifications to the release guide (#4131 by @JordanMartinez)
+
+* Run Weeder in CI and make it happy (#4148 by @rhendric)
+
+* Add golden tests for self cycles in type class declarations, kind declarations and foreign data type declarations (#4162 by @kl0tl)
+
+* Represent class dictionaries as newtypes (#4125 by @rhendric)
+
 ## v0.14.3
 
 New features:
@@ -65,22 +125,8 @@ New features:
   instance Foo Int String
   ```
 
-  and the compiler will generate a unique name for the instance
-  (e.g. `$dollar_FooIntString_4` where `4` is a randomly-generated number
-  that can change across compiler runs). This version of the instance name
-  is not intended for use in FFI.
-
-  Note: if one wrote
-
-  ```purescript
-  instance ReallyLongClassName Int String
-  ```
-
-  the generated name would be something like
-  `$dollar_ReallyLongClassNameIntStr_87` rather than
-  `$dollar_ReallyLongClassNameIntString_87` as the generated part
-  of the name will be truncated to 25 characters (long enough to be readable
-  without being too verbose).
+  Note that generated instance names can change without warning as a result of changes
+  elsewhere in your code, so do not rely upon these names in any FFI code.
 
 Bugfixes:
 

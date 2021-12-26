@@ -5,8 +5,8 @@
 When reporting issues, please be aware of the following:
 
 * Please use the appropriate issue template if there is one: filling out all of the sections in the template makes it much easier for us to understand what the problem is and how we might want to address it.
-* We prefer to reserve the issue tracker in this repository for tasks which involve work on the compiler. If your report or proposal doesn't involve work on the compiler, please open it on the repository where the work would be done. If you're unsure, you can always ask in [the #purescript channel in FP Slack][] or [Discourse][].
-* If you have a question or need help, please ask in [the #purescript channel in FP Slack][] or [Discourse][] instead.
+* We prefer to reserve the issue tracker in this repository for tasks which involve work on the compiler. If your report or proposal doesn't involve work on the compiler, please open it on the repository where the work would be done. If you're unsure, you can always ask on [Discord](https://purescript.org/chat) or [Discourse](https://discourse.purescript.org).
+* If you have a question or need help, please ask on [Discord](https://purescript.org/chat) or [Discourse](https://discourse.purescript.org) instead.
 * When submitting feature proposals, please be aware that we prefer to be conservative about adding things to the language/compiler. A feature proposal is much more likely to be accepted if it includes a clear description of the problem it intends to solve, as well as not only a strong justification for why adding the feature will solve that problem, but also for why any existing features or techniques that could be used to solve that problem are insufficient.
 
 We have defined some [Project Values](https://github.com/purescript/governance#project-values) in our organization's governance document; referring to these may help you get a better idea of what is likely to be accepted and what isn't.

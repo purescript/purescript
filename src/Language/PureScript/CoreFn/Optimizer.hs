@@ -3,15 +3,17 @@ module Language.PureScript.CoreFn.Optimizer (optimizeCoreFn) where
 import Protolude hiding (Type)
 
 import Data.List (lookup)
+import qualified Data.Text as T
 import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.CoreFn.Traversals
-import Language.PureScript.Names (Ident(UnusedIdent), Qualified(Qualified))
+import Language.PureScript.Names (Ident(..), ModuleName(..), Qualified(..))
 import Language.PureScript.Label
 import Language.PureScript.Types
+import qualified Language.PureScript.Constants.Prelude as C
 import qualified Language.PureScript.Constants.Prim as C
 
 -- |
@@ -24,7 +26,10 @@ optimizeModuleDecls :: [Bind Ann] -> [Bind Ann]
 optimizeModuleDecls = map transformBinds
   where
   (transformBinds, _, _) = everywhereOnValues identity transformExprs identity
-  transformExprs = optimizeUnusedPartialFn . optimizeClosedRecordUpdate
+  transformExprs
+    = optimizeUnusedPartialFn
+    . optimizeClosedRecordUpdate
+    . optimizeDataFunctionApply
 
 optimizeClosedRecordUpdate :: Expr Ann -> Expr Ann
 optimizeClosedRecordUpdate ou@(ObjectUpdate a@(_, _, Just t, _) r updatedFields) =
@@ -54,3 +59,13 @@ optimizeUnusedPartialFn (Let _
   (App _ (App _ (Var _ (Qualified _ UnusedIdent)) _) originalCoreFn)) =
   originalCoreFn
 optimizeUnusedPartialFn e = e
+
+optimizeDataFunctionApply :: Expr a -> Expr a
+optimizeDataFunctionApply e = case e of
+  (App a (App _ (Var _ (Qualified (Just (ModuleName mn)) (Ident fn))) x) y)
+    | mn == dataFunction && fn == C.apply -> App a x y
+    | mn == dataFunction && fn == C.applyFlipped -> App a y x
+  _ -> e
+  where
+  dataFunction :: Text
+  dataFunction = T.replace "_" "." C.dataFunction
