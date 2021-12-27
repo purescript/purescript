@@ -23,7 +23,7 @@ moduleNameToJs (ModuleName mn) =
 identToJs :: Ident -> Text
 identToJs (Ident name) = anyNameToJs name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
-identToJs UnusedIdent = "$__unused"
+identToJs UnusedIdent = unusedIdent
 
 -- | Convert a 'ProperName' into a valid JavaScript identifier:
 --
