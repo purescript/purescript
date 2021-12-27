@@ -149,6 +149,15 @@ spec = context "CoreFnFromJson" $ do
                 ]
       parseMod m `shouldSatisfy` isSuccess
 
+    specify "should parse UnusedIdent in Abs" $ do
+      let i = NonRec ann (Ident "f") (Abs ann UnusedIdent (Var ann (Qualified Nothing (Ident "x"))))
+      let r = parseMod $ Module ss [] mn mp [] [] M.empty [] [i]
+      r `shouldSatisfy` isSuccess
+      case r of
+        Error _ -> pure ()
+        Aeson.Success Module{..} ->
+          moduleDecls `shouldBe` [i]
+
     specify "should parse Case" $ do
       let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
