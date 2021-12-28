@@ -8,7 +8,7 @@ RUN mkdir /workspace/.stack && chown gitpod /workspace/.stack && \
 
 USER gitpod
 RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
-ENV PATH=/workspace/.cabal/bin:$HOME/.ghcup/bin:$PATH
+ENV PATH=/workspace/.local/bin:/workspace/.cabal/bin:$HOME/.ghcup/bin:$PATH
 ENV STACK_ROOT=/workspace/.stack
 ENV CABAL_DIR=/workspace/.cabal
 
@@ -18,7 +18,7 @@ RUN ghcup install ghc && \
     ghcup install hls && \
     ghcup set ghc && \
     stack config set install-ghc false --global && \
-    stack config set system-ghc true  --global && \
+    stack config set system-ghc true --global && \
     stack config set local-bin-path /workspace/.local/bin --global
 
 RUN cabal update && stack update
