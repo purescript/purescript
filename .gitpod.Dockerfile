@@ -19,6 +19,6 @@ RUN ghcup install ghc && \
     ghcup set ghc && \
     stack config set install-ghc false --global && \
     stack config set system-ghc true --global && \
-    stack config set local-bin-path /workspace/.local/bin --global
+    echo 'local-bin-path: /workspace/.local/bin' >> /workspace/.stack/config.yaml
 
 RUN cabal update && stack update
