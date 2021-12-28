@@ -120,9 +120,10 @@ literals = mkPattern' match'
     , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
-  match (Pure _ js) = mconcat <$> sequence
-    [ return $ emit "/* @__PURE__ */"
-    , prettyPrintJS' js
+  match (Pure _ js) = mconcat <$> sequence 
+    [ return $ emit  "/* @__PURE__ */("
+    , prettyPrintJS' js 
+    , return $ emit ")"
     ]
   match (Import _ ident from) = return . emit $
     "import * as " <> ident <> " from " <> prettyPrintStringJS from
