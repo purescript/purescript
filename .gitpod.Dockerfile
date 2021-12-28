@@ -3,7 +3,8 @@ FROM gitpod/workspace-full:latest
 USER root
 RUN apt-get update && apt-get install -y curl xz-utils gcc make libtinfo5 libgmp-dev zlib1g-dev
 RUN mkdir /workspace/.stack && chown gitpod /workspace/.stack && \
-    mkdir /workspace/.cabal && chown gitpod /workspace/.cabal
+    mkdir /workspace/.cabal && chown gitpod /workspace/.cabal && \
+    mkdir /workspace/.local && chown gitpod /workspace/.local
 
 USER gitpod
 RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
@@ -17,6 +18,7 @@ RUN ghcup install ghc && \
     ghcup install hls && \
     ghcup set ghc && \
     stack config set install-ghc false --global && \
-    stack config set system-ghc  true  --global
+    stack config set system-ghc true  --global && \
+    stack config set local-bin-path /workspace/.local/bin --global
 
 RUN cabal update && stack update
