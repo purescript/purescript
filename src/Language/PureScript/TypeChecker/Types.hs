@@ -534,7 +534,8 @@ inferBinder val (LiteralBinder _ (ObjectLiteral props)) = do
   rest <- freshTypeWithKind (kindRow kindType)
   m1 <- inferRowProperties row rest props
   unifyTypes val (srcTypeApp tyRecord row)
-  return m1
+  sub <- gets checkSubstitution
+  pure $ M.map (substituteType sub) m1
   where
   inferRowProperties :: SourceType -> SourceType -> [(PSString, Binder)] -> m (M.Map Ident SourceType)
   inferRowProperties nrow row [] = unifyTypes nrow row >> return M.empty
