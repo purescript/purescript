@@ -14,16 +14,22 @@ defaults:
 
 env:
   CI_RELEASE: "${{ github.event_name == 'release' }}"
+  STACK_VERSION: "2.7.3"
 
 jobs:
   build:
     strategy:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
-        # If upgrading Ubuntu, also upgrade it in the lint job below
-        os: [ "ubuntu-18.04", "macOS-10.15", "windows-2019" ]
+        include:
+          - # If upgrading the Haskell image, also upgrade it in the lint job below
+            os: "ubuntu-latest"
+            image: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
+          - os: "macOS-10.15"
+          - os: "windows-2019"
 
     runs-on: "${{ matrix.os }}"
+    container: "${{ matrix.image }}"
 
     steps:
       - uses: "actions/checkout@v2"
@@ -33,18 +39,28 @@ jobs:
           node-version: "12"
 
       - id: "haskell"
+        name: "(Non-Linux only) Install Haskell"
+        if: "${{ runner.os != 'Linux' }}"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
           # If upgrading Stack, also upgrade it in the lint job below
-          stack-version: "2.7.1"
+          stack-version: "${{ env.STACK_VERSION }}"
           stack-no-global: true
+
+      - name: "(Linux only) Check Stack version and ensure a (dummy) accessible local repository"
+        if: "${{ runner.os == 'Linux' }}"
+        run: |
+          [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
+          echo 'allow-different-user: true' >>/root/.stack/config.yaml
+          git -C .. init
 
       - uses: "actions/cache@v2"
         with:
           path: |
+            /root/.stack
             ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ runner.os }}-${{ hashFiles('stack.yaml') }}"
+          key: "${{ runner.os }}-MdyPsf-${{ hashFiles('stack.yaml') }}"
 
       - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
         # This ensures that the local GHC and MSYS binaries that Stack installs
@@ -55,7 +71,7 @@ jobs:
           mkdir -p "$STACK_ROOT"
           echo "local-programs-path: $STACK_ROOT/programs" > $STACK_ROOT/config.yaml
 
-      - run: "ci/build.sh"
+      - run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Build the entire package set"
         if: "${{ runner.os == 'Linux' }}"
@@ -67,7 +83,7 @@ jobs:
         # into which stack places all build artifacts. Since we use --haddock
         # in our CI builds, in order to actually get stack to find the purs
         # binary it created, we need to use the flag here as well.
-        run: "stack --haddock exec ../ci/build-package-set.sh"
+        run: "../ci/fix-home stack --haddock exec ../ci/build-package-set.sh"
 
       - name: "(Release only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
@@ -85,7 +101,7 @@ jobs:
               exit 1;;
           esac
           cd sdist-test
-          bundle/build.sh "$bundle_os"
+          ci/fix-home bundle/build.sh "$bundle_os"
 
       - name: "(Release only) Publish bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
@@ -100,25 +116,24 @@ jobs:
           files: "sdist-test/bundle/*.{tar.gz,sha}"
 
   lint:
-    runs-on: "ubuntu-18.04"
+    runs-on: "ubuntu-latest"
+    container: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
 
     steps:
       - uses: "actions/checkout@v2"
 
-      - id: "haskell"
-        uses: "haskell/actions/setup@v1"
-        with:
-          enable-stack: true
-          stack-version: "2.7.1"
-          stack-no-global: true
+      - name: "Ensure a (dummy) accessible local repository"
+        run: |
+          echo 'allow-different-user: true' >>/root/.stack/config.yaml
+          git -C .. init
 
       - uses: "actions/cache@v2"
         with:
           path: |
-            ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ runner.os }}-lint-${{ hashFiles('stack.yaml') }}"
+            /root/.stack
+          key: "${{ runner.os }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
 
-      - run: "ci/run-hlint.sh --git"
+      - run: "ci/fix-home ci/run-hlint.sh --git"
         env:
           VERSION: "2.2.11"
 
@@ -139,16 +154,16 @@ jobs:
           # `allow-newer: true` is needed so that weeder-2.2.0 can be
           # installed with the dependencies present in LTS-18.
           echo 'allow-newer: true' >> stack-weeder.yaml
-          stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.2.0
+          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.2.0
 
-      - run: "stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
+      - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
 
-      - run: "stack exec weeder"
+      - run: "ci/fix-home stack exec weeder"
 
       # Now do it again, with the test suite included. We don't want a
       # reference from our test suite to count in the above check; the fact
       # that a function is tested is not evidence that it's needed. But we also
       # don't want to leave weeds lying around in our test suite either.
-      - run: "stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
+      - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
 
-      - run: "stack exec weeder"
+      - run: "ci/fix-home stack exec weeder"

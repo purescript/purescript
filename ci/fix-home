@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+# CI Steps are known to mess with container environment variables like USER or HOME
+if [ "$(whoami)" = root ]; then
+  HOME=/root "$@"
+else
+  "$@"
+fi
