@@ -27,7 +27,6 @@ import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.Common as Common
-import Language.PureScript.Constants.Effect.Unsafe as EffectUnsafe
 import Language.PureScript.CoreImp.AST (AST, everywhereTopDownM, withSourceSpan)
 import qualified Language.PureScript.CoreImp.AST as AST
 import Language.PureScript.CoreImp.Optimizer
@@ -58,7 +57,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     let mnLookup = renameImports usedNames imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
-    optimized <- traverse (traverse optimize) jsDecls
+    optimized <- traverse (traverse (fmap annotatePure . optimize)) jsDecls
     let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
     let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
           `S.union` M.keysSet reExps
@@ -79,6 +78,11 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
       ++  mapMaybe reExportsToJs reExps'
 
   where
+  -- | Adds purity annotations to top-level applications.
+  annotatePure :: AST -> AST
+  annotatePure (AST.VariableIntroduction ss name (Just app@(AST.App _ _ _))) = AST.VariableIntroduction ss name (Just (AST.Pure Nothing app))
+  annotatePure (AST.Comment a b js) = AST.Comment a b (annotatePure js)
+  annotatePure js = js
 
   -- | Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]
@@ -176,15 +180,8 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
        then nonRecToJS a i (modifyAnn removeComments e)
        else AST.Comment Nothing com <$> nonRecToJS a i (modifyAnn removeComments e)
   nonRecToJS (ss, _, _, _) ident val = do
-    js <- withPureAnnotation <$> valueToJs val
+    js <- valueToJs val
     withPos ss $ AST.VariableIntroduction Nothing (identToJs ident) (Just js)
-
-  withPureAnnotation :: AST -> AST
-  withPureAnnotation js = case js of
-    AST.App _ (AST.Indexer _ (AST.StringLiteral _ f) (AST.Var _ m)) _
-      | m == EffectUnsafe.effectUnsafe && f == EffectUnsafe.unsafePerformEffect -> js
-    AST.App a f args -> AST.Pure Nothing $ AST.App a f $ map withPureAnnotation args
-    _ -> js
 
   withPos :: SourceSpan -> AST -> m AST
   withPos ss js = do
@@ -243,7 +240,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     case f of
       Var (_, _, _, Just IsNewtype) _ -> return (head args')
       Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
-        return $ AST.Pure Nothing $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
+        return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
       _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args' <$> valueToJs f
     where
     unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
