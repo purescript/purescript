@@ -80,7 +80,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   where
   -- | Adds purity annotations to top-level applications.
   annotatePure :: AST -> AST
-  annotatePure app@(AST.App _ _ _) = AST.Pure Nothing app
+  annotatePure (AST.App ss a bs) = AST.Pure Nothing (AST.App ss (annotatePure a) (annotatePure <$> bs))
   annotatePure (AST.ObjectLiteral ss props) = AST.ObjectLiteral ss (fmap annotatePure <$> props)
   annotatePure (AST.ArrayLiteral ss js) = AST.ArrayLiteral ss (annotatePure <$> js)
   annotatePure (AST.VariableIntroduction ss name (Just js)) = AST.VariableIntroduction ss name (Just (annotatePure js))
