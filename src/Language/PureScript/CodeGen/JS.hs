@@ -78,7 +78,11 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
       ++  mapMaybe reExportsToJs reExps'
 
   where
-  -- | Adds purity annotations to top-level applications.
+  -- | Adds purity annotations to top-level reachable applications for bundlers.
+  -- The semantics here derive from treating top-level module evaluation as pure, which lets
+  -- us remove any unreferenced top-level declarations. To achieve this, we traverse top-level
+  -- ASTs, annotating applications that are obviously reachable during module initialization.
+  -- That is, we specifically do not traverse under function abstractions that aren't immediately invoked.
   annotatePure :: AST -> AST
   annotatePure (AST.App ss (AST.Function ss' n args body) bs) = AST.Pure Nothing (AST.App ss (AST.Function ss' n args (annotatePureFn body)) (annotatePure <$> bs))
   annotatePure (AST.App ss a@(AST.App _ _ _) bs) = AST.App ss (annotatePure a) (annotatePure <$> bs)
@@ -96,9 +100,6 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   annotatePureFn :: AST -> AST
   annotatePureFn (AST.Block ss js) = AST.Block ss (annotatePureFn <$> js)
   annotatePureFn (AST.IfElse ss a b c) = AST.IfElse ss (annotatePureFn a) (annotatePureFn b) (annotatePureFn <$> c)
-  annotatePureFn (AST.While ss a b) = AST.While ss (annotatePureFn a) (annotatePureFn b)
-  annotatePureFn (AST.For ss n a b c) = AST.For ss n (annotatePureFn a) (annotatePureFn b) (annotatePureFn c)
-  annotatePureFn (AST.ForIn ss n a b) = AST.ForIn ss n (annotatePureFn a) (annotatePureFn b)
   annotatePureFn (AST.Return ss a) = AST.Return ss (annotatePureFn a)
   annotatePureFn (AST.InstanceOf ss a b) = AST.InstanceOf ss (annotatePureFn a) (annotatePureFn b)
   annotatePureFn js = annotatePure js
