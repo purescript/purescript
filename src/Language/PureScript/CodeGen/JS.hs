@@ -78,31 +78,26 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
       ++  mapMaybe reExportsToJs reExps'
 
   where
-  -- | Adds purity annotations to top-level reachable applications for bundlers.
+  -- | Adds purity annotations to top-level values for bundlers.
   -- The semantics here derive from treating top-level module evaluation as pure, which lets
-  -- us remove any unreferenced top-level declarations. To achieve this, we traverse top-level
-  -- ASTs, annotating applications that are obviously reachable during module initialization.
-  -- That is, we specifically do not traverse under function abstractions that aren't immediately invoked.
+  -- us remove any unreferenced top-level declarations. To achieve this, we wrap any non-trivial
+  -- top-level values in an IIFE marked with a pure annotation.
   annotatePure :: AST -> AST
-  annotatePure (AST.App ss (AST.Function ss' n args body) bs) = AST.Pure Nothing (AST.App ss (AST.Function ss' n args (annotatePureFn body)) (annotatePure <$> bs))
-  annotatePure (AST.App ss a@(AST.App _ _ _) bs) = AST.App ss (annotatePure a) (annotatePure <$> bs)
-  annotatePure (AST.App ss a bs) = AST.Pure Nothing (AST.App ss (annotatePure a) (annotatePure <$> bs))
-  annotatePure (AST.Unary ss AST.New js) = AST.Pure Nothing $ AST.Unary ss AST.New (annotatePure js)
-  annotatePure (AST.Unary ss op js) = AST.Unary ss op (annotatePure js)
-  annotatePure (AST.Binary ss op a b) = AST.Binary ss op (annotatePure a) (annotatePure b)
-  annotatePure (AST.Indexer ss a b) = AST.Indexer ss (annotatePure a) (annotatePure b)
-  annotatePure (AST.ObjectLiteral ss props) = AST.ObjectLiteral ss (fmap annotatePure <$> props)
-  annotatePure (AST.ArrayLiteral ss js) = AST.ArrayLiteral ss (annotatePure <$> js)
+  annotatePure js@(AST.App _ (AST.Function _ _ _ _) _) = AST.Pure Nothing js
+  annotatePure js@(AST.App _ _ _) = pureIife js
+  annotatePure js@(AST.Unary _ _ _) = pureIife js
+  annotatePure js@(AST.Binary _ _ _ _) = pureIife js
+  annotatePure js@(AST.Indexer _ _ _) = pureIife js
+  annotatePure js@(AST.ObjectLiteral _ []) = js
+  annotatePure js@(AST.ObjectLiteral _ _) = pureIife js
+  annotatePure js@(AST.ArrayLiteral _ []) = js
+  annotatePure js@(AST.ArrayLiteral _ _) = pureIife js
   annotatePure (AST.VariableIntroduction ss name (Just js)) = AST.VariableIntroduction ss name (Just (annotatePure js))
   annotatePure (AST.Comment a b js) = AST.Comment a b (annotatePure js)
   annotatePure js = js
 
-  annotatePureFn :: AST -> AST
-  annotatePureFn (AST.Block ss js) = AST.Block ss (annotatePureFn <$> js)
-  annotatePureFn (AST.IfElse ss a b c) = AST.IfElse ss (annotatePureFn a) (annotatePureFn b) (annotatePureFn <$> c)
-  annotatePureFn (AST.Return ss a) = AST.Return ss (annotatePureFn a)
-  annotatePureFn (AST.InstanceOf ss a b) = AST.InstanceOf ss (annotatePureFn a) (annotatePureFn b)
-  annotatePureFn js = annotatePure js
+  pureIife :: AST -> AST
+  pureIife val = AST.Pure Nothing $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing [AST.Return Nothing val])) []
 
   -- | Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]
