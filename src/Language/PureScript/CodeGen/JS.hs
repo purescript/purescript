@@ -80,12 +80,28 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   where
   -- | Adds purity annotations to top-level applications.
   annotatePure :: AST -> AST
+  annotatePure (AST.App ss (AST.Function ss' n args body) bs) = AST.Pure Nothing (AST.App ss (AST.Function ss' n args (annotatePureFn body)) (annotatePure <$> bs))
+  annotatePure (AST.App ss a@(AST.App _ _ _) bs) = AST.App ss (annotatePure a) (annotatePure <$> bs)
   annotatePure (AST.App ss a bs) = AST.Pure Nothing (AST.App ss (annotatePure a) (annotatePure <$> bs))
+  annotatePure (AST.Unary ss AST.New js) = AST.Pure Nothing $ AST.Unary ss AST.New (annotatePure js)
+  annotatePure (AST.Unary ss op js) = AST.Unary ss op (annotatePure js)
+  annotatePure (AST.Binary ss op a b) = AST.Binary ss op (annotatePure a) (annotatePure b)
+  annotatePure (AST.Indexer ss a b) = AST.Indexer ss (annotatePure a) (annotatePure b)
   annotatePure (AST.ObjectLiteral ss props) = AST.ObjectLiteral ss (fmap annotatePure <$> props)
   annotatePure (AST.ArrayLiteral ss js) = AST.ArrayLiteral ss (annotatePure <$> js)
   annotatePure (AST.VariableIntroduction ss name (Just js)) = AST.VariableIntroduction ss name (Just (annotatePure js))
   annotatePure (AST.Comment a b js) = AST.Comment a b (annotatePure js)
   annotatePure js = js
+
+  annotatePureFn :: AST -> AST
+  annotatePureFn (AST.Block ss js) = AST.Block ss (annotatePureFn <$> js)
+  annotatePureFn (AST.IfElse ss a b c) = AST.IfElse ss (annotatePureFn a) (annotatePureFn b) (annotatePureFn <$> c)
+  annotatePureFn (AST.While ss a b) = AST.While ss (annotatePureFn a) (annotatePureFn b)
+  annotatePureFn (AST.For ss n a b c) = AST.For ss n (annotatePureFn a) (annotatePureFn b) (annotatePureFn c)
+  annotatePureFn (AST.ForIn ss n a b) = AST.ForIn ss n (annotatePureFn a) (annotatePureFn b)
+  annotatePureFn (AST.Return ss a) = AST.Return ss (annotatePureFn a)
+  annotatePureFn (AST.InstanceOf ss a b) = AST.InstanceOf ss (annotatePureFn a) (annotatePureFn b)
+  annotatePureFn js = annotatePure js
 
   -- | Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]
