@@ -27,8 +27,7 @@ optimizeModuleDecls = map transformBinds
   where
   (transformBinds, _, _) = everywhereOnValues identity transformExprs identity
   transformExprs
-    = optimizeUnusedPartialFn
-    . optimizeClosedRecordUpdate
+    = optimizeClosedRecordUpdate
     . optimizeDataFunctionApply
 
 optimizeClosedRecordUpdate :: Expr Ann -> Expr Ann
@@ -51,14 +50,6 @@ closedRecordFields (TypeApp _ (TypeConstructor _ C.Record) row) =
     collect (RCons _ l _ r) = (l :) <$> collect r
     collect _ = Nothing
 closedRecordFields _ = Nothing
-
--- | See https://github.com/purescript/purescript/issues/3157
-optimizeUnusedPartialFn :: Expr a -> Expr a
-optimizeUnusedPartialFn (Let _
-  [NonRec _ UnusedIdent _]
-  (App _ (App _ (Var _ (Qualified _ UnusedIdent)) _) originalCoreFn)) =
-  originalCoreFn
-optimizeUnusedPartialFn e = e
 
 optimizeDataFunctionApply :: Expr a -> Expr a
 optimizeDataFunctionApply e = case e of
