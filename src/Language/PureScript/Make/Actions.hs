@@ -11,7 +11,6 @@ module Language.PureScript.Make.Actions
 
 import           Prelude
 
-import           Control.Arrow ((&&&))
 import           Control.Monad hiding (sequence)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
@@ -20,7 +19,7 @@ import           Control.Monad.Supply
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Aeson (Value(String), (.=), object)
-import           Data.Bifunctor (bimap)
+import           Data.Bifunctor (bimap, first)
 import           Data.Either (partitionEithers)
 import           Data.Foldable (for_)
 import qualified Data.List.NonEmpty as NEL
@@ -274,33 +273,16 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
           | not $ requiresForeign m ->
               tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
           | otherwise -> do
-              (foreignModuleType, foreignIdents) <- checkForeignDecls m path
-              case foreignModuleType of
-                ESModule -> copyFile path (outputFilename mn "foreign.js")
-                CJSModule -> do
-                  tell $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
-                  copyFile path (outputFilename mn "foreign.cjs")
-                  writeESForeignModuleWrapper mn foreignIdents
+              checkResult <- checkForeignDecls m path
+              case checkResult of
+                Left _ -> copyFile path (outputFilename mn "foreign.js")
+                Right (ESModule, _) -> copyFile path (outputFilename mn "foreign.js")
+                Right (CJSModule, _) -> do
+                  throwError $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
 
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return ()
 
-  writeESForeignModuleWrapper :: ModuleName -> S.Set Ident -> Make ()
-  writeESForeignModuleWrapper mn idents =
-    writeTextFile (outputFilename mn "foreign.js") wrapper
-    where
-    xs = (J.identToJs &&& runIdent) <$> S.toList idents
-    wrapper = TE.encodeUtf8 . T.intercalate "\n" $
-      "import $foreign from \"./foreign.cjs\";" :
-      fmap (uncurry toLocalDeclaration) xs ++
-      [ "export { " <> T.intercalate ", " (uncurry toNamedExport <$> xs) <> " };"
-      , ""
-      ]
-    toLocalDeclaration local exported =
-      "var " <> local <> " = $foreign." <> exported <> ";"
-    toNamedExport local exported
-      | local == exported = local
-      | otherwise = local <> " as " <> exported
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
@@ -345,55 +327,61 @@ data ForeignModuleType = ESModule | CJSModule deriving (Show)
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
-checkForeignDecls :: CF.Module ann -> FilePath -> Make (ForeignModuleType, S.Set Ident)
+checkForeignDecls :: CF.Module ann -> FilePath -> Make (Either MultipleErrors (ForeignModuleType, S.Set Ident))
 checkForeignDecls m path = do
   jsStr <- T.unpack <$> readTextFile path
-  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parseModule jsStr path
 
-  (foreignModuleType, foreignIdentsStrs) <-
-    case (,) <$> getForeignModuleExports js <*> getForeignModuleImports js of
-      Left reason -> errorParsingModule reason
-      Right (Bundle.ForeignModuleExports{..}, Bundle.ForeignModuleImports{..})
-        | not (null cjsExports && null cjsImports)
-        , null esExports
-        , null esImports -> do
-            let deprecatedFFI = filter (elem '\'') cjsExports
-            unless (null deprecatedFFI) $
-              errorDeprecatedForeignPrimes deprecatedFFI
+  let
+    parseResult :: Either MultipleErrors JS.JSAST
+    parseResult = first (errorParsingModule . Bundle.UnableToParseModule) $ JS.parseModule jsStr path
+  either (pure . Left) (fmap Right . checkFFI) parseResult
 
-            pure (CJSModule, cjsExports)
-        | otherwise -> do
-            unless (null cjsImports) $
-              errorUnsupportedFFICommonJSImports cjsImports
-
-            unless (null cjsExports) $
-              errorUnsupportedFFICommonJSExports cjsExports
-
-            pure (ESModule, esExports)
-
-  foreignIdents <- either
-                     errorInvalidForeignIdentifiers
-                     (pure . S.fromList)
-                     (parseIdents foreignIdentsStrs)
-  let importedIdents = S.fromList (CF.moduleForeign m)
-
-  let unusedFFI = foreignIdents S.\\ importedIdents
-  unless (null unusedFFI) $
-    tell . errorMessage' modSS . UnusedFFIImplementations mname $
-      S.toList unusedFFI
-
-  let missingFFI = importedIdents S.\\ foreignIdents
-  unless (null missingFFI) $
-    throwError . errorMessage' modSS . MissingFFIImplementations mname $
-      S.toList missingFFI
-
-  pure (foreignModuleType, foreignIdents)
   where
   mname = CF.moduleName m
   modSS = CF.moduleSourceSpan m
 
-  errorParsingModule :: Bundle.ErrorMessage -> Make a
-  errorParsingModule = throwError . errorMessage' modSS . ErrorParsingFFIModule path . Just
+  checkFFI :: JS.JSAST -> Make (ForeignModuleType, S.Set Ident)
+  checkFFI js = do 
+    (foreignModuleType, foreignIdentsStrs) <-
+        case (,) <$> getForeignModuleExports js <*> getForeignModuleImports js of
+          Left reason -> throwError $ errorParsingModule reason
+          Right (Bundle.ForeignModuleExports{..}, Bundle.ForeignModuleImports{..})
+            | not (null cjsExports && null cjsImports)
+            , null esExports
+            , null esImports -> do
+                let deprecatedFFI = filter (elem '\'') cjsExports
+                unless (null deprecatedFFI) $
+                  errorDeprecatedForeignPrimes deprecatedFFI
+
+                pure (CJSModule, cjsExports)
+            | otherwise -> do
+                unless (null cjsImports) $
+                  errorUnsupportedFFICommonJSImports cjsImports
+
+                unless (null cjsExports) $
+                  errorUnsupportedFFICommonJSExports cjsExports
+
+                pure (ESModule, esExports)
+
+    foreignIdents <- either
+                      errorInvalidForeignIdentifiers
+                      (pure . S.fromList)
+                      (parseIdents foreignIdentsStrs)
+    let importedIdents = S.fromList (CF.moduleForeign m)
+
+    let unusedFFI = foreignIdents S.\\ importedIdents
+    unless (null unusedFFI) $
+      tell . errorMessage' modSS . UnusedFFIImplementations mname $
+        S.toList unusedFFI
+
+    let missingFFI = importedIdents S.\\ foreignIdents
+    unless (null missingFFI) $
+      throwError . errorMessage' modSS . MissingFFIImplementations mname $
+        S.toList missingFFI
+    pure (foreignModuleType, foreignIdents)
+
+  errorParsingModule :: Bundle.ErrorMessage -> MultipleErrors
+  errorParsingModule = errorMessage' modSS . ErrorParsingFFIModule path . Just
 
   getForeignModuleExports :: JS.JSAST -> Either Bundle.ErrorMessage  Bundle.ForeignModuleExports
   getForeignModuleExports = Bundle.getExportedIdentifiers (T.unpack (runModuleName mname))
