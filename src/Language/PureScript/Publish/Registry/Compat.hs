@@ -9,10 +9,9 @@ module Language.PureScript.Publish.Registry.Compat where
 
 import Protolude
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Web.Bower.PackageMeta as Bower
 import Data.Bitraversable (Bitraversable(..))
-import Data.Aeson.BetterErrors (key, asText, keyMay, eachInObject, Parse, asObject)
+import Data.Aeson.BetterErrors (key, asText, keyMay, eachInObject, Parse)
 
 -- | Convert a valid .purs.json manifest into a bower.json manifest
 toBowerPackage :: PursJson -> Either Bower.BowerError Bower.PackageMeta
@@ -85,23 +84,3 @@ asPursJson = do
     githubOwner <- key "githubOwner" asText
     githubRepo <- key "githubRepo" asText
     pure $ "https://github.com/" <> githubOwner <> "/" <> githubRepo <> ".git"
-
--- | A partial representation of the registry metadata stored for a package,
--- | including only the fields required for publishing.
--- |
--- | https://github.com/purescript/registry/blob/master/v1/Metadata.dhall
-data PackageMetadata = PackageMetadata
-  { -- | A set of package versions that have been released
-    packageMetadataReleases :: Set Text
-    -- | A set of package versions that were released, and then were unpublished
-  , packageMetadataUnpublished :: Set Text
-  }
-
-asPackageMetadata :: Parse e PackageMetadata
-asPackageMetadata = do
-  releases <- key "release" (eachInObject asObject)
-  unpublished <- key "unpublished" (eachInObject asText)
-  let toSet = Set.fromList . map fst
-  let packageMetadataReleases = toSet releases
-  let packageMetadataUnpublished = toSet unpublished
-  pure $ PackageMetadata {..}
