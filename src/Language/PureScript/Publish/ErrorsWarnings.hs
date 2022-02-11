@@ -48,8 +48,9 @@ data PackageWarning
 
 -- | An error that should be fixed by the user.
 data UserError
-  = PackageManifestNotFound
+  = PackageManifestNotFound FilePath
   | ResolutionsFileNotFound
+  | CouldntConvertPackageManifest D.ManifestError
   | CouldntDecodePackageManifest (ParseError D.ManifestError)
   | TagMustBeCheckedOut
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
@@ -115,13 +116,21 @@ renderError err =
 
 displayUserError :: UserError -> Box
 displayUserError e = case e of
-  PackageManifestNotFound ->
+  PackageManifestNotFound path -> do
     para (
-      "The package manifest file was not found. Please create one, or run " ++
-      "`pulp init`."
+      "The package manifest file was not found (expected " ++
+      path ++
+      "). Please create one."
       )
   ResolutionsFileNotFound ->
     para "The resolutions file was not found."
+  CouldntConvertPackageManifest err ->
+    vcat
+      [ para "Unable to convert your package manifest file to the Bower format:"
+      , indented ((para . T.unpack) (showBowerError err))
+      , spacer
+      , para "Please ensure that your package manifest file is valid."
+      ]
   CouldntDecodePackageManifest err ->
     vcat
       [ para "There was a problem with your package manifest file:"

@@ -23,7 +23,6 @@ import Control.Arrow ((***))
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
-import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, key, asString, withString)
 import qualified Data.ByteString.Lazy as BL
 import Data.String (String, lines)
 import Data.List (stripPrefix, (\\))
@@ -42,18 +41,18 @@ import Web.Bower.PackageMeta (PackageMeta(..), PackageName, Repository(..))
 import qualified Web.Bower.PackageMeta as Bower
 
 import Language.PureScript.Publish.ErrorsWarnings
-import Language.PureScript.Publish.Registry
+import Language.PureScript.Publish.Registry.Compat
 import Language.PureScript.Publish.Utils
 import qualified Language.PureScript as P (version, ModuleName)
 import qualified Language.PureScript.CoreFn.FromJSON as P
 import qualified Language.PureScript.Docs as D
-
-data ManifestType = PursManifest PursJson | BowerManifest Bower.PackageMeta
+import Data.Aeson.BetterErrors (Parse, withString, eachInObjectWithKey, asString, key, keyMay, parse)
 
 data PublishOptions = PublishOptions
   { -- | How to obtain the version tag and version that the data being
     -- generated will refer to.
     publishGetVersion :: PrepareM (Text, Version)
+    -- | How to obtain at what time the version was committed
   , publishGetTagTime :: Text -> PrepareM UTCTime
   , -- | What to do when the working tree is dirty
     publishWorkingTreeDirty :: PrepareM ()
@@ -131,11 +130,24 @@ catchLeft a f = either f pure a
 
 preparePackage' :: PublishOptions -> PrepareM D.UploadedPackage
 preparePackage' opts = do
-  unlessM (liftIO (doesFileExist (publishManifestFile opts))) (userError PackageManifestNotFound)
+  let manifestPath = publishManifestFile opts
+  let isPursJson = "purs.json" `T.isInfixOf` T.pack manifestPath
+
   checkCleanWorkingTree opts
 
-  pkgMeta <- liftIO (Bower.decodeFile (publishManifestFile opts))
-               >>= flip catchLeft (userError . CouldntDecodePackageManifest)
+  pkgMeta <- liftIO (try (BL.readFile manifestPath)) >>= \case
+    Left (_ :: IOException) ->
+      userError $ PackageManifestNotFound manifestPath
+    Right found -> do
+      -- We can determine the type of the manifest file based on the file path,
+      -- as both the PureScript and Bower registries require their manifest
+      -- files to have specific names.
+      if isPursJson then do
+        pursJson <- catchLeft (parse asPursJson found) (userError . CouldntDecodePackageManifest)
+        catchLeft (toBowerPackage pursJson) (userError . CouldntConvertPackageManifest)
+      else
+        catchLeft (parse Bower.asPackageMeta found) (userError . CouldntDecodePackageManifest)
+
   checkLicense pkgMeta
 
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
@@ -146,14 +158,11 @@ preparePackage' opts = do
 
   (pkgModules, pkgModuleMap)  <- getModules opts (map (second fst) resolvedDeps)
 
-  let declaredDeps = map fst $
-                       Bower.bowerDependencies pkgMeta
-                       ++ Bower.bowerDevDependencies pkgMeta
+  let declaredDeps = map fst $ Bower.bowerDependencies pkgMeta ++ Bower.bowerDevDependencies pkgMeta
   pkgResolvedDependencies <- handleDeps declaredDeps (map (second snd) resolvedDeps)
 
   let pkgUploader = D.NotYetKnown
   let pkgCompilerVersion = P.version
-
 
   return D.Package{..}
 
@@ -172,17 +181,24 @@ getModules opts paths = do
 
 data TreeStatus = Clean | Dirty deriving (Show, Eq, Ord, Enum)
 
-getGitWorkingTreeStatus :: PrepareM TreeStatus
-getGitWorkingTreeStatus = do
-  out <- readProcess' "git" ["status", "--porcelain"] ""
+getGitWorkingTreeStatus :: FilePath -> PrepareM TreeStatus
+getGitWorkingTreeStatus manifestFilePath = do
+  output <- lines <$> readProcess' "git" ["status", "--porcelain"] ""
+  -- The PureScript registry generates .purs.json files when publishing legacy
+  -- packages. To ensure these packages can also be published to Pursuit, we
+  -- include an exemption to the working tree status check that will ignore
+  -- untracked .purs.json files. Note that _modified_ .purs.json files will
+  -- still fail this check.
+  let untrackedPursJson = "?? " <> manifestFilePath
+  let filtered = filter (/= untrackedPursJson) output
   return $
-    if all null . lines $ out
+    if all null filtered
       then Clean
       else Dirty
 
 checkCleanWorkingTree :: PublishOptions -> PrepareM ()
 checkCleanWorkingTree opts = do
-  status <- getGitWorkingTreeStatus
+  status <- getGitWorkingTreeStatus (publishManifestFile opts)
   unless (status == Clean) $
     publishWorkingTreeDirty opts
 

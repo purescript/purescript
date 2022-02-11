@@ -281,6 +281,7 @@ library
     Language.PureScript.Publish
     Language.PureScript.Publish.BoxesHelpers
     Language.PureScript.Publish.ErrorsWarnings
+    Language.PureScript.Publish.Registry.Compat
     Language.PureScript.Publish.Utils
     Language.PureScript.Renamer
     Language.PureScript.Sugar
