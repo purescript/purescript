@@ -547,12 +547,12 @@ entails SolverOptions{..} constraint context hints =
 
     solveIntDivMod :: [SourceType] -> Maybe [TypeClassDict]
     solveIntDivMod [arg0@(TypeLevelInt _ n), arg1@(TypeLevelInt _ d), _, _] =
-      if not $ 0 < d then
-        Nothing
-      else
+      if 0 < d then
         let (q, r) = divMod n d
             args' = [arg0, arg1, srcTypeLevelInt q, srcTypeLevelInt r]
-        in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntMul [] [] args' Nothing Nothing]
+        in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntDivMod [] [] args' Nothing Nothing]
+      else
+        Nothing
     solveIntDivMod _ = Nothing
 
     solveUnion :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
