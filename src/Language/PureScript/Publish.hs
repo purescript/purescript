@@ -130,11 +130,9 @@ catchLeft a f = either f pure a
 
 preparePackage' :: PublishOptions -> PrepareM D.UploadedPackage
 preparePackage' opts = do
-  let manifestPath = publishManifestFile opts
-  let isPursJson = "purs.json" `T.isInfixOf` T.pack manifestPath
-
   checkCleanWorkingTree opts
 
+  let manifestPath = publishManifestFile opts
   pkgMeta <- liftIO (try (BL.readFile manifestPath)) >>= \case
     Left (_ :: IOException) ->
       userError $ PackageManifestNotFound manifestPath
@@ -142,6 +140,7 @@ preparePackage' opts = do
       -- We can determine the type of the manifest file based on the file path,
       -- as both the PureScript and Bower registries require their manifest
       -- files to have specific names.
+      let isPursJson = "purs.json" `T.isInfixOf` T.pack manifestPath
       if isPursJson then do
         pursJson <- catchLeft (parse asPursJson found) (userError . CouldntDecodePackageManifest)
         catchLeft (toBowerPackage pursJson) (userError . CouldntConvertPackageManifest)
