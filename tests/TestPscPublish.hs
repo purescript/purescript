@@ -29,19 +29,19 @@ spec = do
     it "purescript-prelude" $ do
       testPackage
         "tests/support/bower_components/purescript-prelude"
-        "tests/support/bower_components/purescript-prelude/bower.json"
+        "bower.json"
         "../../prelude-resolutions.json"
 
     it "basic example (bower.json)" $ do
       testPackage
         "tests/purs/publish/basic-example"
-        "tests/purs/publish/basic-example/bower.json"
+        "bower.json"
         "resolutions.json"
 
     it "basic example (.purs.json)" $ do
       testPackage
         "tests/purs/publish/basic-example"
-        "tests/purs/publish/basic-example/.purs.json"
+        ".purs.json"
         "resolutions.json"
 
   context "json compatibility" $ do

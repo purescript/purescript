@@ -32,7 +32,7 @@ toBowerPackage PursJson{..} = do
     bowerResolutions = []
     bowerPrivate = False
 
-  let parseDependencies = traverse (bitraverse Bower.parsePackageName (pure . Bower.VersionRange))
+  let parseDependencies = traverse (bitraverse (Bower.parsePackageName . ("purescript-" <>)) (pure . Bower.VersionRange))
   bowerDependencies <- parseDependencies $ Map.toAscList pursJsonDependencies
 
   pure $ Bower.PackageMeta {..}

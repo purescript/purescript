@@ -117,11 +117,12 @@ renderError err =
 displayUserError :: UserError -> Box
 displayUserError e = case e of
   PackageManifestNotFound path -> do
-    para (
-      "The package manifest file was not found (expected " ++
-      path ++
-      "). Please create one."
-      )
+    vcat
+      [ para "The package manifest file was not found:"
+      , indented (para path)
+      , spacer
+      , para "Please create one."
+      ]
   ResolutionsFileNotFound ->
     para "The resolutions file was not found."
   CouldntConvertPackageManifest err ->
