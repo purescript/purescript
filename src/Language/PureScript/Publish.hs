@@ -42,10 +42,13 @@ import Web.Bower.PackageMeta (PackageMeta(..), PackageName, Repository(..))
 import qualified Web.Bower.PackageMeta as Bower
 
 import Language.PureScript.Publish.ErrorsWarnings
+import Language.PureScript.Publish.Registry
 import Language.PureScript.Publish.Utils
 import qualified Language.PureScript as P (version, ModuleName)
 import qualified Language.PureScript.CoreFn.FromJSON as P
 import qualified Language.PureScript.Docs as D
+
+data ManifestType = PursManifest PursJson | BowerManifest Bower.PackageMeta
 
 data PublishOptions = PublishOptions
   { -- | How to obtain the version tag and version that the data being
