@@ -8,7 +8,6 @@ import Protolude
 
 import qualified Data.Graph as G
 import qualified Data.Map as M
-import qualified Data.Set as S
 
 import qualified Language.PureScript.Names as P
 import qualified Language.PureScript.Types as P
@@ -16,88 +15,72 @@ import qualified Language.PureScript.Constants.Prim as P
 
 data Relation a
   = Equal a a
-  | Unequal a a
+  | LessThan a a
   deriving (Functor, Show, Eq, Ord)
 
 type Context a = [Relation a]
 
 type PSOrdering = P.Qualified (P.ProperName 'P.TypeName)
 
+-- Commentary:
+--
+-- In essence, this solver builds a directed graph using the provided
+-- context, which is then used to determine the relationship between
+-- the two elements being compared.
+--
+-- Given the context [a < b, b < c], we can infer that a < c as a
+-- path exists from a to c. Likewise, we can also infer that c > a
+-- as a path exists from c to a.
+--
+-- ╔═══╗    ╔═══╗    ╔═══╗
+-- ║ a ║ -> ║ b ║ -> ║ c ║
+-- ╚═══╝    ╚═══╝    ╚═══╝
+--
+-- Introducing equality to the context augments the graph further,
+-- and it is represented by creating cycles between equal nodes.
+-- For example, [a < b, b < c, c = d] yields the following graph:
+--
+-- ╔═══╗    ╔═══╗    ╔═══╗     ╔═══╗
+-- ║ a ║ -> ║ b ║ -> ║ c ║ <-> ║ d ║
+-- ╚═══╝    ╚═══╝    ╚═══╝     ╚═══╝
 solveRelation :: forall a. Ord a => Context a -> a -> a -> Maybe PSOrdering
 solveRelation context lhs rhs =
-  let
-    lhs' = rename lhs
-    rhs' = rename rhs
-  in
-    if lhs' == rhs' then
-      pure P.orderingEQ
-    else if solveInequality lhs' rhs' then
-      pure P.orderingLT
-    else if solveInequality rhs' lhs' then
-      pure P.orderingGT
-    else
-      Nothing
-  where
-  solveInequality :: S.Set a -> S.Set a -> Bool
-  solveInequality a b =
+  if lhs == rhs then
+    pure P.orderingEQ
+  else do
     let (graph, search) = inequalities
-    in fromMaybe False $ do
-      a' <- search a
-      b' <- search b
-      pure $ G.path graph a' b'
-
-  alpha :: Relation a -> Relation (S.Set a)
-  alpha = fmap rename
-
-  -- Determine which "equality bucket" a value lands on, then replace
-  -- that value using that bucket.
-  rename :: a -> S.Set a
-  rename n = fromMaybe (S.singleton n) (find (S.member n) equalities)
-
-  -- This determines which names are equal within the context, each set
-  -- in this list is a combination of all equal names, and it's built by
-  -- deliberately creating a cyclic graph between the equalities so as
-  -- to group them together.
-  equalities :: [S.Set a]
-  equalities = fmap (S.fromList . G.flattenSCC) $ makeStrong $ clean $ foldMap asNode context
+    lhs' <- search lhs
+    rhs' <- search rhs
+    case (G.path graph lhs' rhs', G.path graph rhs' lhs') of
+      (True, True) ->
+        pure P.orderingEQ
+      (True, False) ->
+        pure P.orderingLT
+      (False, True) ->
+        pure P.orderingGT
+      _ ->
+        Nothing
+  where
+  inequalities :: (G.Graph, a -> Maybe G.Vertex)
+  inequalities = makeGraph $ clean $ foldMap convert context
     where
-    asNode :: Relation a -> [(a, [a])]
-    asNode (Equal a b) = [(a, [b]), (b, [a])]
-    asNode _           = mempty
+    convert :: Relation a -> [(a, [a])]
+    convert (Equal a b)    = [(a, [b]), (b, [a])]
+    convert (LessThan a b) = [(a, [b]), (b, [])]
 
-    makeStrong :: [(a, [a])] -> [G.SCC a]
-    makeStrong = G.stronglyConnComp . fmap make
-
-  inequalities :: (G.Graph, S.Set a -> Maybe G.Vertex)
-  inequalities = asGraph $ foldMap convert context
-    where
-    convert :: Relation a -> [Relation (S.Set a)]
-    convert (Unequal a b) = pure $ alpha (Unequal a b)
-    convert _             = mempty
-
-    asGraph :: [Relation (S.Set a)] -> (G.Graph, S.Set a -> Maybe G.Vertex)
-    asGraph = makeGraph . clean . foldMap asNode
-      where
-      asNode :: Relation (S.Set a) -> [(S.Set a, [S.Set a])]
-      asNode (Unequal a b) = [(a, [b]), (b, [])]
-      asNode _             = mempty
-
-      makeGraph :: [(S.Set a, [S.Set a])] -> (G.Graph, S.Set a -> Maybe G.Vertex)
-      makeGraph m = case G.graphFromEdges $ make <$> m of
+    makeGraph :: [(a, [a])] -> (G.Graph, a -> Maybe G.Vertex)
+    makeGraph m =
+      case G.graphFromEdges $ (\(a, b) -> (a, a, b)) <$> m of
         (g, _, f) -> (g, f)
 
-  -- Combine all key-value pairs
-  clean :: forall k. Ord k => [(k, [k])] -> [(k, [k])]
-  clean = M.toList . M.fromListWith (<>)
-
-  make :: forall k. (k, [k]) -> (k, k, [k])
-  make (a, b) = (a, a, b)
+    clean :: forall k. Ord k => [(k, [k])] -> [(k, [k])]
+    clean = M.toList . M.fromListWith (<>)
 
 mkRelation :: P.Type a -> P.Type a -> P.Type a -> Maybe (Relation (P.Type a))
 mkRelation lhs rhs rel = case rel of
   P.TypeConstructor _ ordering
     | ordering == P.orderingEQ -> pure $ Equal lhs rhs
-    | ordering == P.orderingLT -> pure $ Unequal lhs rhs
-    | ordering == P.orderingGT -> pure $ Unequal rhs lhs
+    | ordering == P.orderingLT -> pure $ LessThan lhs rhs
+    | ordering == P.orderingGT -> pure $ LessThan rhs lhs
   _ ->
     Nothing
