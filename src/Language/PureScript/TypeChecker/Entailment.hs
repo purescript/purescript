@@ -197,6 +197,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.IntAdd _ args | Just dicts <- solveIntAdd args = dicts
     forClassName _ ctx C.IntCompare _ args | Just dicts <- solveIntCompare ctx args = dicts
     forClassName _ _ C.IntMul _ args | Just dicts <- solveIntMul args = dicts
+    forClassName _ _ C.IntDivMod _ args | Just dicts <- solveIntDivMod args = dicts
     forClassName _ _ C.IsReflectable _ args | Just dicts <- solveIsReflectable args = dicts
     forClassName _ _ C.RowUnion kinds args | Just dicts <- solveUnion kinds args = dicts
     forClassName _ _ C.RowNub kinds args | Just dicts <- solveNub kinds args = dicts
@@ -543,6 +544,16 @@ entails SolverOptions{..} constraint context hints =
       let args' = [arg0, arg1, srcTypeLevelInt (l * r)]
       in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntMul [] [] args' Nothing Nothing]
     solveIntMul _ = Nothing
+
+    solveIntDivMod :: [SourceType] -> Maybe [TypeClassDict]
+    solveIntDivMod [arg0@(TypeLevelInt _ n), arg1@(TypeLevelInt _ d), _, _] =
+      if not $ 0 < d then
+        Nothing
+      else
+        let (q, r) = divMod n d
+            args' = [arg0, arg1, srcTypeLevelInt q, srcTypeLevelInt r]
+        in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntMul [] [] args' Nothing Nothing]
+    solveIntDivMod _ = Nothing
 
     solveUnion :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveUnion kinds [l, r, u] = do

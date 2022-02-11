@@ -109,6 +109,9 @@ pattern IntCompare = Qualified (Just PrimInt) (ProperName "Compare")
 pattern IntMul :: Qualified (ProperName 'ClassName)
 pattern IntMul = Qualified (Just PrimInt) (ProperName "Mul")
 
+pattern IntDivMod :: Qualified (ProperName 'ClassName)
+pattern IntDivMod = Qualified (Just PrimInt) (ProperName "DivMod")
+
 -- Prim.Symbol
 
 pattern PrimSymbol :: ModuleName

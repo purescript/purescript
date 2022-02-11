@@ -136,6 +136,7 @@ primIntDocsModule = Module
       [ intAdd
       , intCompare
       , intMul
+      , intDivMod
       ]
   , modReExports = []
   }
@@ -548,6 +549,11 @@ intCompare = primClassOf (P.primSubName "Int") "Compare" $ T.unlines
 intMul :: Declaration
 intMul = primClassOf (P.primSubName "Int") "Mul" $ T.unlines
   [ "Compiler solved type class for multiplying type-level `Int`s."
+  ]
+
+intDivMod :: Declaration
+intDivMod = primClassOf (P.primSubName "Int") "DivMod" $ T.unlines
+  [ "Compiler solved type class for division and modulo of type-level `Int`s."
   ]
 
 fail :: Declaration

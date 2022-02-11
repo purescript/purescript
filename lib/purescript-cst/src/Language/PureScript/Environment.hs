@@ -429,6 +429,7 @@ primIntTypes =
     [ primClass (primSubName C.moduleInt "Add")     (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
     , primClass (primSubName C.moduleInt "Compare") (\kind -> tyInt -:> tyInt -:> kindOrdering -:> kind)
     , primClass (primSubName C.moduleInt "Mul")     (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
+    , primClass (primSubName C.moduleInt "DivMod")  (\kind -> tyInt -:> tyInt -:> tyInt -:> tyInt -:> kind)
     ]
 
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
@@ -593,6 +594,24 @@ primIntClasses =
         , ("product", Just tyInt)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
+        ] True)
+
+    -- class DivMod (numerator :: Int) (denominator :: Int) (quotient :: Int) (remainder :: Int)
+    --   | numerator denominator -> quotient remainder
+    , (primSubName C.moduleInt "DivMod", makeTypeClassData
+        [ ("numerator", Just tyInt)
+        , ("denominator", Just tyInt)
+        , ("quotient", Just tyInt)
+        , ("remainder", Just tyInt)
+        ] []
+        [ srcConstraint (primSubName C.moduleInt "Compare")
+          []
+          [ srcTypeLevelInt 0
+          , tyVar "denominator"
+          , srcTypeConstructor C.orderingLT
+          ] Nothing
+        ]
+        [ FunctionalDependency [0, 1] [2, 3]
         ] True)
     ]
 
