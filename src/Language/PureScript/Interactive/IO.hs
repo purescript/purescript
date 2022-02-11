@@ -46,7 +46,7 @@ findNodeVersion node = do
 readNodeProcessWithExitCode :: Maybe FilePath -> [String] -> String -> IO (Either String (ExitCode, String, String))
 readNodeProcessWithExitCode nodePath nodeArgs stdin = runExceptT $ do
   process <- maybe (ExceptT findNodeProcess) pure nodePath
-  (_, minor, _) <- lift (findNodeVersion process) >>= \case
+  (major, _, _) <- lift (findNodeVersion process) >>= \case
     Nothing -> throwError "Could not find node.js version."
     Just version -> do
       let semver = do
@@ -56,9 +56,9 @@ readNodeProcessWithExitCode nodePath nodeArgs stdin = runExceptT $ do
       case parse (semver <?> "Could not parse node.js version.") "" version of
         Left err -> throwError $ show err
         Right (major, minor, patch)
-          | major < 12 -> throwError "Unsupported node.js version."
+          | major < 12 -> throwError $ "Unsupported node.js version " <> show major <> ". Required node.js version >=12."
           | otherwise -> pure (major, minor, patch)
-  let nodeArgs' = if minor < 7 then "--experimental-modules" : nodeArgs else nodeArgs
+  let nodeArgs' = if major < 13 then "--experimental-modules" : nodeArgs else nodeArgs
   lift (readProcessWithExitCode process nodeArgs' stdin) <&> \case
     (ExitSuccess, out, err) ->
       (ExitSuccess, out, censorExperimentalWarnings err)
