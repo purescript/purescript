@@ -5,16 +5,28 @@ import Prim.Int (class DivMod)
 
 data Proxy q r = Proxy
 
-a :: forall q r. DivMod 10 3 q r => Proxy q r
-a = Proxy
+odd :: forall q r. DivMod 10 3 q r => Proxy q r
+odd = Proxy
 
-a' :: Proxy 3 1
-a' = a
+odd' :: Proxy 3 1
+odd' = odd
 
-b :: forall q r. DivMod 10 2 q r => Proxy q r
-b = Proxy
+even :: forall q r. DivMod 10 2 q r => Proxy q r
+even = Proxy
 
-b' :: Proxy 5 0
-b' = Proxy
+even' :: Proxy 5 0
+even' = even
+
+oddNeg :: forall q r. DivMod 10 (-3) q r => Proxy q r
+oddNeg = Proxy
+
+oddNeg' :: Proxy (-4) (-2)
+oddNeg' = oddNeg
+
+evenNeg :: forall q r. DivMod 10 (-2) q r => Proxy q r
+evenNeg = Proxy
+
+evenNeg' :: Proxy (-5) 0
+evenNeg' = evenNeg
 
 main = log "Done"

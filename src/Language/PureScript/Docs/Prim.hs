@@ -137,6 +137,7 @@ primIntDocsModule = Module
       , intCompare
       , intMul
       , intDivMod
+      , intNonZero
       ]
   , modReExports = []
   }
@@ -554,6 +555,11 @@ intMul = primClassOf (P.primSubName "Int") "Mul" $ T.unlines
 intDivMod :: Declaration
 intDivMod = primClassOf (P.primSubName "Int") "DivMod" $ T.unlines
   [ "Compiler solved type class for division and modulo of type-level `Int`s."
+  ]
+
+intNonZero :: Declaration
+intNonZero = primClassOf (P.primSubName "Int") "NonZero" $ T.unlines
+  [ "Compiler solved type class that determines an integer is non-zero."
   ]
 
 fail :: Declaration
