@@ -29,4 +29,16 @@ evenNeg = Proxy
 evenNeg' :: Proxy (-5) 0
 evenNeg' = evenNeg
 
+oddNum :: forall n. DivMod n 3 3 1 => Proxy n n
+oddNum = Proxy
+
+oddNum' :: Proxy 10 10
+oddNum' = oddNum
+
+evenNum :: forall n. DivMod n 2 5 0 => Proxy n n
+evenNum = Proxy
+
+evenNum' :: Proxy 10 10
+evenNum' = evenNum
+
 main = log "Done"

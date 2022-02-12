@@ -554,6 +554,13 @@ entails SolverOptions{..} constraint context hints =
         in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntDivMod [] [] args' Nothing Nothing]
       else
         Nothing
+    solveIntDivMod [_, arg1@(TypeLevelInt _ d), arg2@(TypeLevelInt _ q), arg3@(TypeLevelInt _ r)] =
+      if d /= 0 then
+        let n = d * q + r
+            args' = [srcTypeLevelInt n, arg1, arg2, arg3]
+        in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntDivMod [] [] args' Nothing Nothing]
+      else
+        Nothing
     solveIntDivMod _ = Nothing
 
     solveIntNonZero :: [SourceType] -> Maybe [TypeClassDict]

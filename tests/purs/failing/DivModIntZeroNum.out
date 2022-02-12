@@ -1,0 +1,26 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/DivModIntZeroNum.purs:12:12 - 12:19 (line 12, column 12 - line 12, column 19)
+
+  No type class instance was found for
+  [33m                    [0m
+  [33m  Prim.Int.DivMod t3[0m
+  [33m                  0 [0m
+  [33m                  1 [0m
+  [33m                  0 [0m
+  [33m                    [0m
+
+while checking that type [33mforall (n :: Int). DivMod n 0 1 0 => Proxy @Int @Int n n[0m
+  is at least as general as type [33mProxy @t0 @t1 t2 t3[0m
+while checking that expression [33mfailing[0m
+  has type [33mProxy @t0 @t1 t2 t3[0m
+in value declaration [33mfailing'[0m
+
+where [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
+      [33mt2[0m is an unknown type
+      [33mt3[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

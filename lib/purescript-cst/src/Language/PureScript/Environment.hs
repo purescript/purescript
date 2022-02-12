@@ -609,6 +609,7 @@ primIntClasses =
           [] [ tyVar "denominator" ] Nothing
         ]
         [ FunctionalDependency [0, 1] [2, 3]
+        , FunctionalDependency [1, 2, 3] [0]
         ] True)
 
     -- class NonZero (integer :: Int)
