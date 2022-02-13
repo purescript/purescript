@@ -536,15 +536,14 @@ entails SolverOptions{..} constraint context hints =
           givens = flip mapMaybe compareDictsInScope $ \case
             dict | [a', b', c'] <- tcdInstanceTypes dict -> mkRelation a' b' c'
                  | otherwise -> Nothing
-      c' <- case (a, b) of
-        (_, TypeLevelInt _ _) ->
-          let facts = mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
-          in solveRelation (givens <> facts) a b
-        (TypeLevelInt _ _, _) ->
-          let facts = mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
-          in solveRelation (givens <> facts) a b
-        _ ->
-          solveRelation givens a b
+          facts = case (a, b) of
+            (_, TypeLevelInt _ _) ->
+              mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
+            (TypeLevelInt _ _, _) ->
+              mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
+            _ ->
+              []
+      c' <- solveRelation (givens <> facts) a b
       pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, srcTypeConstructor c'] Nothing Nothing]
     solveIntCompare _ _ = Nothing
 
