@@ -151,6 +151,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@PureFunctor](https://github.com/PureFunctor) | Justin Garcia | [MIT license](http://opensource.org/licenses/MIT) |
 | [@xgrommx](https://github.com/xgrommx) | Denis Stoyanov | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sigma-andex](https://github.com/sigma-andex) | Jan Schulte | [MIT license](http://opensource.org/licenses/MIT) |
+| [@i-am-the-slime](https://github.com/i-am-the-slime) | Mark Eibes | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 
