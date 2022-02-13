@@ -84,3 +84,19 @@ mkRelation lhs rhs rel = case rel of
     | ordering == P.orderingGT -> pure $ LessThan rhs lhs
   _ ->
     Nothing
+
+mkFacts :: [[P.Type a]] -> [Relation (P.Type a)]
+mkFacts = mkRels [] . sort . findFacts
+  where
+  mkRels a [] = concat a
+  mkRels a (x : xs) = mkRels (map (LessThan x) xs : a) xs
+
+  findFacts = mapMaybe $ \case
+    [P.TypeLevelInt _ _, P.TypeLevelInt _ _, _] ->
+      Nothing
+    [i@(P.TypeLevelInt _ _), _, _] ->
+      Just i
+    [_, i@(P.TypeLevelInt _ _), _] ->
+      Just i
+    _ ->
+      Nothing

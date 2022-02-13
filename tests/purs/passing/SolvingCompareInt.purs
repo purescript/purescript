@@ -91,4 +91,13 @@ infer _ _ = assertIsGT (Proxy :: _ o)
 inferSolved :: forall m n p. Compare m n GT => Compare n p GT => Proxy m -> Proxy n -> Proxy p -> Boolean
 inferSolved m _ p = infer m p
 
+litTransLT :: forall a. Compare a 10 LT => Proxy ( left :: a, right :: 20 )
+litTransLT = assertLesser
+
+litTransGT :: forall a. Compare a 10 GT => Proxy ( left :: a, right :: 0 )
+litTransGT = assertGreater
+
+litTransRange :: forall a o. Compare a 10 LT => Compare 0 a LT => Proxy ( left :: a, right :: 20 )
+litTransRange = assertLesser
+
 main = log "Done"
