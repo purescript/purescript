@@ -144,6 +144,7 @@ flattenExpr = \case
     flattenWrapped (foldMap (flattenSeparated (flattenRecordLabeled flattenExpr))) a
   ExprParens _ a -> flattenWrapped flattenExpr a
   ExprTyped _ a b c -> flattenExpr a <> pure b <> flattenType c
+  ExprVisibleTypeApp _ a b c -> flattenExpr a <> pure b <> flattenType c
   ExprInfix _ a b c -> flattenExpr a <> flattenWrapped flattenExpr b <> flattenExpr c
   ExprOp _ a b c -> flattenExpr a <> flattenQualifiedName b <> flattenExpr c
   ExprOpName _ a -> flattenQualifiedName a

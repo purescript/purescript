@@ -286,6 +286,7 @@ exprRange = \case
   ExprRecord _ a -> wrappedRange a
   ExprParens _ a -> wrappedRange a
   ExprTyped _ a _ b -> (fst $ exprRange a, snd $ typeRange b)
+  ExprVisibleTypeApp _ a _ b -> (fst $ exprRange a, snd $ typeRange b)
   ExprInfix _ a _ b -> (fst $ exprRange a, snd $ exprRange b)
   ExprOp _ a _ b -> (fst $ exprRange a, snd $ exprRange b)
   ExprOpName _ a -> qualRange a

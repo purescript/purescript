@@ -331,6 +331,7 @@ data Expr a
   | ExprRecord a (Delimited (RecordLabeled (Expr a)))
   | ExprParens a (Wrapped (Expr a))
   | ExprTyped a (Expr a) SourceToken (Type a)
+  | ExprVisibleTypeApp a (Expr a) SourceToken (Type a)
   | ExprInfix a (Expr a) (Wrapped (Expr a)) (Expr a)
   | ExprOp a (Expr a) (QualifiedName (N.OpName 'N.ValueOpName)) (Expr a)
   | ExprOpName a (QualifiedName (N.OpName 'N.ValueOpName))
