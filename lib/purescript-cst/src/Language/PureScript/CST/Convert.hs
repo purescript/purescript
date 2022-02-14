@@ -132,12 +132,13 @@ convertType fileName = go
       T.TypeApp ann (Env.tyRecord $> annRec) $ goRow row b
     TypeForall _ kw bindings _ ty -> do
       let
-        mkForAll a b t = do
+        mkForAll a b v t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
-          T.ForAll ann' (getIdent $ nameValue a) b t Nothing
-        -- TODO: Conversion for the AST.
-        k (TypeVarKinded _ (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b))
-        k (TypeVarName _ a) = mkForAll a Nothing
+          T.ForAll ann' (getIdent $ nameValue a) b t Nothing v
+        k (TypeVarKinded (Just _) (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b)) T.IsVtaForAll
+        k (TypeVarKinded _ (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b)) T.NotVtaForAll
+        k (TypeVarName (Just _) a) = mkForAll a Nothing T.IsVtaForAll
+        k (TypeVarName _ a) = mkForAll a Nothing T.NotVtaForAll
         ty' = foldr k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
       T.setAnnForType ann ty'
