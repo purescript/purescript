@@ -320,7 +320,7 @@ instantiatePolyTypeWithUnknowns
   => Expr
   -> SourceType
   -> m (Expr, SourceType)
-instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _) = do
+instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _ _) = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   instantiatePolyTypeWithUnknowns val $ replaceTypeVars ident u ty
 instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
@@ -656,7 +656,7 @@ check'
   => Expr
   -> SourceType
   -> m TypedValue'
-check' val (ForAll ann ident mbK ty _) = do
+check' val (ForAll ann ident mbK ty _ vta) = do
   env <- getEnv
   mn <- gets checkCurrentModule
   scope <- newSkolemScope
@@ -674,7 +674,7 @@ check' val (ForAll ann ident mbK ty _) = do
             skolemizeTypesInValue ss ident mbK sko scope val
         | otherwise = val
   val' <- tvToExpr <$> check skVal sk
-  return $ TypedValue' True val' (ForAll ann ident mbK ty (Just scope))
+  return $ TypedValue' True val' (ForAll ann ident mbK ty (Just scope) vta)
 check' val t@(ConstrainedType _ con@(Constraint _ cls@(Qualified _ (ProperName className)) _ _ _) ty) = do
   TypeClassData{ typeClassIsEmpty } <- lookupTypeClass cls
   -- An empty class dictionary is never used; see code in `TypeChecker.Entailment`
@@ -874,7 +874,7 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   unifyTypes tyFunction' tyFunction
   arg' <- tvToExpr <$> check arg argTy
   return (retTy, App fn arg')
-checkFunctionApplication' fn (ForAll _ ident mbK ty _) arg = do
+checkFunctionApplication' fn (ForAll _ ident mbK ty _ _) arg = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   let replaced = replaceTypeVars ident u ty
   checkFunctionApplication fn replaced arg

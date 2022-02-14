@@ -74,11 +74,11 @@ subsumes'
   -> SourceType
   -> SourceType
   -> m (Coercion mode)
-subsumes' mode (ForAll _ ident mbK ty1 _) ty2 = do
+subsumes' mode (ForAll _ ident mbK ty1 _ _) ty2 = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   let replaced = replaceTypeVars ident u ty1
   subsumes' mode replaced ty2
-subsumes' mode ty1 (ForAll _ ident mbK ty2 sco) =
+subsumes' mode ty1 (ForAll _ ident mbK ty2 sco _) =
   case sco of
     Just sco' -> do
       sko <- newSkolemConstant

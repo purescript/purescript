@@ -213,7 +213,7 @@ inferKind = \tyToInfer ->
     KindApp ann t1 t2 -> do
       (t1', kind) <- bitraverse pure apply =<< go t1
       case kind of
-        ForAll _ arg (Just argKind) resKind _ -> do
+        ForAll _ arg (Just argKind) resKind _ _ -> do
           t2' <- checkKind t2 argKind
           pure (KindApp ann t1' t2', replaceTypeVars arg t2' resKind)
         _ ->
@@ -223,7 +223,7 @@ inferKind = \tyToInfer ->
       t1' <- checkKind t1 t2'
       t2'' <- apply t2'
       pure (t1', t2'')
-    ForAll ann arg mbKind ty sc -> do
+    ForAll ann arg mbKind ty sc _ -> do
       moduleName <- unsafeCheckCurrentModule
       kind <- case mbKind of
         Just k -> replaceAllTypeSynonyms =<< checkKind k E.kindType
@@ -233,7 +233,7 @@ inferKind = \tyToInfer ->
         unks <- unknownsWithKinds . IS.toList $ unknowns ty'
         pure (ty', unks)
       for_ unks . uncurry $ addUnsolved Nothing
-      pure (ForAll ann arg (Just kind) ty' sc, E.kindType $> ann)
+      pure (ForAll ann arg (Just kind) ty' sc NotVtaForAll, E.kindType $> ann)
     ParensInType _ ty ->
       go ty
     ty ->
@@ -258,7 +258,7 @@ inferAppKind ann (fn, fnKind) arg = case fnKind of
     solve u $ (TUnknown ann u1 E.-:> TUnknown ann u2) $> ann
     arg' <- checkKind arg $ TUnknown ann u1
     pure (TypeApp ann fn arg', TUnknown ann u2)
-  ForAll _ a (Just k) ty _ -> do
+  ForAll _ a (Just k) ty _ _ -> do
     u <- freshUnknown
     addUnsolved Nothing u k
     inferAppKind ann (KindApp ann fn (TUnknown ann u), replaceTypeVars a (TUnknown ann u) ty) arg
@@ -305,7 +305,7 @@ instantiateKind
   -> SourceType
   -> m SourceType
 instantiateKind (ty, kind1) kind2 = case kind1 of
-  ForAll _ a (Just k) t _ | shouldInstantiate kind2 -> do
+  ForAll _ a (Just k) t _ _ | shouldInstantiate kind2 -> do
     let ann = getAnnForType ty
     u <- freshKindWithKind (fst ann) k
     instantiateKind (KindApp ann ty u, replaceTypeVars a u t) kind2
@@ -314,7 +314,7 @@ instantiateKind (ty, kind1) kind2 = case kind1 of
     pure ty
   where
   shouldInstantiate = not . \case
-    ForAll _ _ _ _ _ -> True
+    ForAll _ _ _ _ _ _ -> True
     _ -> False
 
 subsumesKind
@@ -330,11 +330,11 @@ subsumesKind = go
       , eqType arr2 E.tyFunction -> do
           go b1 a1
           join $ go <$> apply a2 <*> apply b2
-    (a, ForAll ann var mbKind b mbScope) -> do
+    (a, ForAll ann var mbKind b mbScope _) -> do
       scope <- maybe newSkolemScope pure mbScope
       skolc <- newSkolemConstant
       go a $ skolemize ann var mbKind skolc scope b
-    (ForAll ann var (Just kind) a _, b) -> do
+    (ForAll ann var (Just kind) a _ _, b) -> do
       a' <- freshKindWithKind (fst ann) kind
       go (replaceTypeVars var a' a) b
     (TUnknown ann u, b@(TypeApp _ (TypeApp _ arr _) _))
@@ -525,11 +525,11 @@ elaborateKind = \case
   KindApp ann t1 t2 -> do
     k1 <- elaborateKind t1
     case k1 of
-      ForAll _ a _ n _ -> do
+      ForAll _ a _ n _ _ -> do
         flip (replaceTypeVars a) n . ($> ann) <$> apply t2
       _ ->
         cannotApplyKindToType t1 t2
-  ForAll ann _ _ _ _ -> do
+  ForAll ann _ _ _ _ _ -> do
     pure $ E.kindType $> ann
   ConstrainedType ann _ _ ->
     pure $ E.kindType $> ann
@@ -733,7 +733,7 @@ checkTypeQuantification =
 
   unknownsInKinds False _ = (False, [])
   unknownsInKinds _ ty = case ty of
-    ForAll sa _ _ _ _ | unks <- unknowns ty, not (IS.null unks) ->
+    ForAll sa _ _ _ _ _ | unks <- unknowns ty, not (IS.null unks) ->
       (False, [(fst sa, unks, ty)])
     KindApp sa _ _ | unks <- unknowns ty, not (IS.null unks) ->
       (False, [(fst sa, unks, ty)])
@@ -882,15 +882,15 @@ checkKindDeclaration _ ty = do
   -- be referenced (easily).
   freshVar arg = (arg <>) . T.pack . show <$> fresh
   freshenForAlls = curry $ \case
-    (ForAll _ v1 _ ty1 _, ForAll a2 v2 k2 ty2 sc2) | v1 == v2 -> do
+    (ForAll _ v1 _ ty1 _ _, ForAll a2 v2 k2 ty2 sc2 vta) | v1 == v2 -> do
       ty2' <- freshenForAlls ty1 ty2
-      pure $ ForAll a2 v2 k2 ty2' sc2
+      pure $ ForAll a2 v2 k2 ty2' sc2 vta
     (_, ty2) -> go ty2 where
       go = \case
-        ForAll a' v' k' ty' sc' -> do
+        ForAll a' v' k' ty' sc' vta -> do
           v'' <- freshVar v'
           ty'' <- go (replaceTypeVars v' (TypeVar a' v'') ty')
-          pure $ ForAll a' v'' k' ty'' sc'
+          pure $ ForAll a' v'' k' ty'' sc' vta
         other -> pure other
 
   checkValidKind = everywhereOnTypesM $ \case

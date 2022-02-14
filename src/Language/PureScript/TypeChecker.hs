@@ -580,7 +580,7 @@ typeCheckAll moduleName _ = traverse go
   --
   withKinds :: [(Text, Maybe SourceType)] -> SourceType -> [(Text, Maybe SourceType)]
   withKinds [] _ = []
-  withKinds ss (ForAll _ _ _ k _) = withKinds ss k
+  withKinds ss (ForAll _ _ _ k _ _) = withKinds ss k
   withKinds (s@(_, Just _):ss) (TypeApp _ (TypeApp _ tyFn _) k2) | eqType tyFn tyFunction = s : withKinds ss k2
   withKinds ((s, Nothing):ss) (TypeApp _ (TypeApp _ tyFn k1) k2) | eqType tyFn tyFunction = (s, Just k1) : withKinds ss k2
   withKinds _ _ = internalError "Invalid arguments to withKinds"

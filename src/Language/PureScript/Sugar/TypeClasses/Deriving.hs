@@ -689,7 +689,7 @@ deriveFunctor ss mn syns kinds ds tyConNm = do
                 return (lam ss arg (ObjectUpdate argVar (mkAssignment <$> updates)))
 
           -- quantifiers
-          goType (ForAll _ scopedVar _ t _) | scopedVar /= iTyName = goType t
+          goType (ForAll _ scopedVar _ t _ _) | scopedVar /= iTyName = goType t
 
           -- constraints
           goType (ConstrainedType _ _ t) = goType t
