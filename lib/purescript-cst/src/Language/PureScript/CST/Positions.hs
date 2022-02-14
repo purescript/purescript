@@ -9,6 +9,7 @@ import Prelude
 
 import Data.Foldable (foldl')
 import qualified Data.List.NonEmpty as NE
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Void (Void)
 import qualified Data.Text as Text
@@ -268,8 +269,8 @@ constraintRange = \case
 
 typeVarBindingRange :: TypeVarBinding a -> TokenRange
 typeVarBindingRange = \case
-  TypeVarKinded a -> wrappedRange a
-  TypeVarName a -> nameRange a
+  TypeVarKinded _ a -> wrappedRange a
+  TypeVarName atSign a -> (fromMaybe (nameTok a) atSign, nameTok a)
 
 exprRange :: Expr a -> TokenRange
 exprRange = \case

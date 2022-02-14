@@ -135,8 +135,9 @@ convertType fileName = go
         mkForAll a b t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
           T.ForAll ann' (getIdent $ nameValue a) b t Nothing
-        k (TypeVarKinded (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b))
-        k (TypeVarName a) = mkForAll a Nothing
+        -- TODO: Conversion for the AST.
+        k (TypeVarKinded _ (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b))
+        k (TypeVarName _ a) = mkForAll a Nothing
         ty' = foldr k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
       T.setAnnForType ann ty'
@@ -451,8 +452,8 @@ convertDeclaration fileName decl = case decl of
     pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
-      goTyVar (TypeVarKinded (Wrapped _ (Labeled a _ _) _)) = nameValue a
-      goTyVar (TypeVarName a) = nameValue a
+      goTyVar (TypeVarKinded _ (Wrapped _ (Labeled a _ _) _)) = nameValue a
+      goTyVar (TypeVarName _ a) = nameValue a
       vars' = zip (toList $ goTyVar <$> vars) [0..]
       goName = fromJust . flip lookup vars' . nameValue
       goFundep (FundepDetermined _ bs) = Env.FunctionalDependency [] (goName <$> NE.toList bs)
@@ -586,8 +587,8 @@ convertDeclaration fileName decl = case decl of
         TypeUnaryRow{} -> "Row"
 
   goTypeVar = \case
-    TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
-    TypeVarName x -> (getIdent $ nameValue x, Nothing)
+    TypeVarKinded _ (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
+    TypeVarName _ x -> (getIdent $ nameValue x, Nothing)
 
   goInstanceBinding = \case
     InstanceBindingSignature _ lbl ->
