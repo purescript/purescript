@@ -152,8 +152,8 @@ data Type a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data TypeVarBinding a
-  = TypeVarKinded (Wrapped (Labeled (Name Ident) (Type a)))
-  | TypeVarName (Name Ident)
+  = TypeVarKinded (Maybe SourceToken) (Wrapped (Labeled (Name Ident) (Type a)))
+  | TypeVarName (Maybe SourceToken) (Name Ident)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data Constraint a

@@ -298,6 +298,14 @@ type1 :: { Type () }
   : type2 { $1 }
   | forall many(typeVarBinding) '.' type1 { TypeForall () $1 $2 $3 $4 }
 
+typeVta :: { Type () }
+  : type1Vta %shift { $1 }
+  | type1Vta '::' type { TypeKinded () $1 $2 $3 }
+
+type1Vta :: { Type () }
+  : type2 { $1 }
+  | forall many(typeVarBindingVta) '.' type1 { TypeForall () $1 $2 $3 $4 }
+
 type2 :: { Type () }
   : type3 %shift { $1 }
   | type3 '->' type1 { TypeArr () $1 $2 $3 }
@@ -351,8 +359,12 @@ rowLabel :: { Labeled Label (Type ()) }
   : label '::' type { Labeled $1 $2 $3 }
 
 typeVarBinding :: { TypeVarBinding () }
-  : ident { TypeVarName $1 }
-  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded (Wrapped $1 (Labeled $2 $3 $4) $5)) }
+  : ident { TypeVarName Nothing $1 }
+  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded Nothing (Wrapped $1 (Labeled $2 $3 $4) $5)) }
+
+typeVarBindingVta :: { TypeVarBinding () }
+  : '@' ident { TypeVarName (Just $1) $2 }
+  | '(' '@' ident '::' type ')' {% checkNoWildcards $5 *> pure (TypeVarKinded (Just $2) (Wrapped $1 (Labeled $3 $4 $5) $6)) }
 
 forall :: { SourceToken }
   : 'forall' { $1 }
@@ -673,7 +685,7 @@ decl :: { Declaration () }
   | 'type' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled (getProperName $2) $3 $4)) }
   | 'derive' instHead { DeclDerive () $1 Nothing $2 }
   | 'derive' 'newtype' instHead { DeclDerive () $1 (Just $2) $3 }
-  | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
+  | ident '::' typeVta { DeclSignature () (Labeled $1 $2 $3) }
   | ident manyOrEmpty(binderAtom) guardedDecl { DeclValue () (ValueBindingFields $1 $2 $3) }
   | fixity { DeclFixity () $1 }
   | 'foreign' 'import' ident '::' type {% when (isConstrained $5) (addWarning ([$1, $2, nameTok $3, $4] <> toList (flattenType $5)) WarnDeprecatedConstraintInForeignImportSyntax) *> pure (DeclForeign () $1 $2 (ForeignValue (Labeled $3 $4 $5))) }
