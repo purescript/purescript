@@ -221,6 +221,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
       mconcat $ map go vs ++ map f alts
 
     go (TypedValue _ v1 _) = go v1
+    go (VisibleTypeApp v1 _) = go v1
     go (Do _ es) = doElts es Nothing
     go (Ado _ es v1) = doElts es (Just v1)
 

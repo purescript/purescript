@@ -88,6 +88,7 @@ prettyPrintValue d (Ado m els yield) =
 prettyPrintValue d (TypeClassDictionary (Constraint _ name _ tys _) _ _) = foldl1 beforeWithSpace $ text ("#dict " ++ T.unpack (runProperName (disqualify name))) : map (typeAtomAsBox d) tys
 prettyPrintValue _ (DeferredDictionary name _) = text $ "#dict " ++ T.unpack (runProperName (disqualify name))
 prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
+prettyPrintValue d (VisibleTypeApp val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val
 prettyPrintValue d (Literal _ l) = prettyPrintLiteralValue d l
 prettyPrintValue _ (Hole name) = text "?" <> textT name

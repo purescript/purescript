@@ -699,6 +699,10 @@ data Expr
   --
   | TypedValue Bool Expr SourceType
   -- |
+  -- A value with a visible type application
+  --
+  | VisibleTypeApp Expr SourceType
+  -- |
   -- A let binding
   --
   | Let WhereProvenance [Declaration] Expr

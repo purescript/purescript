@@ -297,6 +297,12 @@ convertExpr fileName = go
         b' = convertType fileName b
         ann = (sourceSpan fileName . toSourceRange $ exprRange expr, [])
       positioned ann $ AST.TypedValue True a' b'
+    expr@(ExprVisibleTypeApp _ a _ b) -> do
+      let
+        a' = go a
+        b' = convertType fileName b
+        ann = (sourceSpan fileName . toSourceRange $ exprRange expr, [])
+      positioned ann $ AST.VisibleTypeApp a' b'
     expr@(ExprInfix _ a (Wrapped _ b _) c) -> do
       let ann = (sourceSpan fileName . toSourceRange $ exprRange expr, [])
       positioned ann $ AST.BinaryNoParens (go b) (go a) (go c)
