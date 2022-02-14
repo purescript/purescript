@@ -194,7 +194,6 @@ library
     Language.PureScript.Constants.Prelude
     Language.PureScript.Constants.Data.Generic.Rep
     Language.PureScript.Constants.Data.Newtype
-    Language.PureScript.Constants.Effect.Unsafe
     Language.PureScript.CoreFn
     Language.PureScript.CoreFn.Ann
     Language.PureScript.CoreFn.Binders
