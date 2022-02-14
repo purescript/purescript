@@ -63,6 +63,8 @@ import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
 
+import Language.PureScript.Pretty
+
 data BindingGroupType
   = RecursiveBindingGroup
   | NonRecursiveBindingGroup
@@ -451,6 +453,14 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy
   tv <- if checkType then withScopedTypeVars moduleName args (check val ty') else return (TypedValue' False val ty)
   return $ TypedValue' True (tvToExpr tv) ty'
+infer' (VisibleTypeApp val tyAbsArg) = do
+  TypedValue' _ val' valTy <- infer' val
+  case valTy of
+    ForAll _ tyAbsVar _ tyAbsBody _ IsVtaForAll -> do
+      let valTy' = replaceTypeVars tyAbsVar tyAbsArg tyAbsBody
+      return $ TypedValue' True val' valTy'
+    t ->
+      internalError $ prettyPrintType 1000 t
 infer' (Hole name) = do
   ty <- freshTypeWithKind kindType
   ctx <- getLocalContext
