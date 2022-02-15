@@ -478,7 +478,8 @@ infer' (VisibleTypeApp val tyAbsArg) = do
   case hoistVtaTypeVars valTy of
     ForAll _ tyAbsVar _ tyAbsBody _ IsVtaForAll -> do
       let valTy' = replaceTypeVars tyAbsVar tyAbsArg'' tyAbsBody
-      return $ TypedValue' True val' valTy'
+      (val'', valTy'') <- instantiatePolyTypeWithUnknowns val' valTy'
+      return $ TypedValue' True val'' valTy''
     t ->
       internalError $ prettyPrintType 1000 t
 infer' (Hole name) = do
