@@ -50,9 +50,9 @@ data Package a = Package
   { pkgMeta                 :: PackageMeta
   , pkgVersion              :: Version
   , pkgVersionTag           :: Text
-  -- All packages published via Git repositories can have a published time, but
-  -- not all packages are necessarily published that way, and so there is not a
-  -- guarantee we can always know when a version was published.
+  -- TODO: When this field was introduced, it was given the Maybe type for the
+  -- sake of backwards compatibility, as older JSON blobs will not include the
+  -- field. It should eventually be changed to just UTCTime.
   , pkgTagTime              :: Maybe UTCTime
   , pkgModules              :: [Module]
   , pkgModuleMap            :: Map P.ModuleName PackageName
