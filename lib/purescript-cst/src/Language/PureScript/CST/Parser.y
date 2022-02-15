@@ -748,7 +748,7 @@ fundep :: { ClassFundep }
   | many(ident) '->' many(ident) { FundepDetermines $1 $2 $3 }
 
 classMember :: { Labeled (Name Ident) (Type ()) }
-  : ident '::' type {% checkNoWildcards $3 *> pure (Labeled $1 $2 $3) }
+  : ident '::' typeVta {% checkNoWildcards $3 *> pure (Labeled $1 $2 $3) }
 
 instHead :: { InstanceHead () }
   : 'instance' constraints '=>' qualProperName manyOrEmpty(typeAtom)
