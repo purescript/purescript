@@ -17,7 +17,7 @@ import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Foldable (for_, traverse_, toList)
-import Data.List (nub, nubBy, (\\), sort, group, intersect)
+import Data.List (nub, nubBy, (\\), sort, group, intersect, elemIndices)
 import Data.Maybe
 import Data.Either (partitionEithers)
 import Data.Text (Text)
@@ -189,6 +189,11 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
     toPair (TypeDeclaration (TypeDeclarationData _ ident ty)) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
+    findVtaTypeVars = everythingOnTypes (<>) go
+      where
+      go (ForAll _ i _ _ _ IsVtaForAll) = elemIndices i $ map fst args
+      go _ = []
+
     -- Currently we are only checking usability based on the type class currently
     -- being defined.  If the mentioned arguments don't include a covering set,
     -- then we won't be able to find a instance.
@@ -196,7 +201,8 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
     checkMemberIsUsable newClass syns kinds (ident, memberTy) = do
       memberTy' <- T.replaceAllTypeSynonymsM syns kinds memberTy
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
-      let leftovers = map (`S.difference` mentionedArgIndexes) (coveringSets newClass)
+      let vtaTypeVars = S.fromList $ findVtaTypeVars memberTy
+      let leftovers = map ((`S.difference` vtaTypeVars) . (`S.difference` mentionedArgIndexes)) (coveringSets newClass)
 
       unless (any null leftovers) . throwError . errorMessage $
         let
