@@ -36,7 +36,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Bifunctor (bimap)
 import Data.Either (partitionEithers)
 import Data.Functor (($>))
-import Data.List (transpose, (\\), partition, delete)
+import Data.List (transpose, (\\), partition, delete, foldl')
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Traversable (for)
@@ -331,6 +331,21 @@ instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
   instantiatePolyTypeWithUnknowns (App val (TypeClassDictionary con dicts hints)) ty
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
+-- | "Hoist" up ForAlls tagged with IsVtaForAll, making sure that they go first no matter
+-- the order they're defined in source. This routine is primarily used when inferring the
+-- type of a visible type application.
+hoistVtaTypeVars :: SourceType -> SourceType
+hoistVtaTypeVars = go [] []
+  where
+  go y n (ForAll a i k t s v) =
+    case v of
+      IsVtaForAll -> go ((a, i, k, s, v) : y) n t
+      NotVtaForAll -> go y ((a, i, k, s, v) : n) t
+  go y n t =
+    foldl' mkForAll' (foldl' mkForAll' t n) y
+
+  mkForAll' t (a, i, k, s, v) = ForAll a i k t s v
+
 -- | Infer a type for a value, rethrowing any error to provide a more useful error message
 infer
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -456,11 +471,11 @@ infer' (TypedValue checkType val ty) = do
 infer' (VisibleTypeApp val tyAbsArg) = do
   TypedValue' _ val' valTy <- infer' val
   -- The call to `kindOf` here is important because the `inferKind` routine
-  -- in the type checker eliminates `ParensInType` from `tyAbsArg`. I'm not
+  -- in the kind checker eliminates `ParensInType` from `tyAbsArg`. I'm not
   -- sure why it isn't unwrapped by the type checker though. - PureFunctor
   (tyAbsArg', _) <- kindOf tyAbsArg
   tyAbsArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ tyAbsArg'
-  case valTy of
+  case hoistVtaTypeVars valTy of
     ForAll _ tyAbsVar _ tyAbsBody _ IsVtaForAll -> do
       let valTy' = replaceTypeVars tyAbsVar tyAbsArg'' tyAbsBody
       return $ TypedValue' True val' valTy'
