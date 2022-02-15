@@ -223,7 +223,7 @@ inferKind = \tyToInfer ->
       t1' <- checkKind t1 t2'
       t2'' <- apply t2'
       pure (t1', t2'')
-    ForAll ann arg mbKind ty sc _ -> do
+    ForAll ann arg mbKind ty sc vta -> do
       moduleName <- unsafeCheckCurrentModule
       kind <- case mbKind of
         Just k -> replaceAllTypeSynonyms =<< checkKind k E.kindType
@@ -233,7 +233,7 @@ inferKind = \tyToInfer ->
         unks <- unknownsWithKinds . IS.toList $ unknowns ty'
         pure (ty', unks)
       for_ unks . uncurry $ addUnsolved Nothing
-      pure (ForAll ann arg (Just kind) ty' sc NotVtaForAll, E.kindType $> ann)
+      pure (ForAll ann arg (Just kind) ty' sc vta, E.kindType $> ann)
     ParensInType _ ty ->
       go ty
     ty ->
