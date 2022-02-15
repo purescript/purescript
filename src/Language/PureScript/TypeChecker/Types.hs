@@ -455,9 +455,14 @@ infer' (TypedValue checkType val ty) = do
   return $ TypedValue' True (tvToExpr tv) ty'
 infer' (VisibleTypeApp val tyAbsArg) = do
   TypedValue' _ val' valTy <- infer' val
+  -- The call to `kindOf` here is important because the `inferKind` routine
+  -- in the type checker eliminates `ParensInType` from `tyAbsArg`. I'm not
+  -- sure why it isn't unwrapped by the type checker though. - PureFunctor
+  (tyAbsArg', _) <- kindOf tyAbsArg
+  tyAbsArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ tyAbsArg'
   case valTy of
     ForAll _ tyAbsVar _ tyAbsBody _ IsVtaForAll -> do
-      let valTy' = replaceTypeVars tyAbsVar tyAbsArg tyAbsBody
+      let valTy' = replaceTypeVars tyAbsVar tyAbsArg'' tyAbsBody
       return $ TypedValue' True val' valTy'
     t ->
       internalError $ prettyPrintType 1000 t
