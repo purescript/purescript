@@ -234,10 +234,11 @@ typeToJSON annToJSON ty =
       variant "TypeApp" a (go b, go c)
     KindApp a b c ->
       variant "KindApp" a (go b, go c)
-    ForAll a b c d e f ->
+    ForAll a b c d e _ ->
       case c of
-        Nothing -> variant "ForAll" a (b, go d, e, f)
-        Just k -> variant "ForAll" a (b, go k, go d, e, f)
+        -- TODO: Restore these in the future
+        Nothing -> variant "ForAll" a (b, go d, e)
+        Just k -> variant "ForAll" a (b, go k, go d, e)
     ConstrainedType a b c ->
       variant "ConstrainedType" a (constraintToJSON annToJSON b, go c)
     Skolem a b c d e ->
@@ -334,12 +335,13 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
       KindApp a <$> go b <*> go c
     "ForAll" -> do
       let
+        -- TODO: Restore these in the future
         withoutMbKind = do
-          (b, c, d, e) <- contents
-          ForAll a b Nothing <$> go c <*> pure d <*> pure e
+          (b, c, d) <- contents
+          ForAll a b Nothing <$> go c <*> pure d <*> pure NotVtaForAll
         withMbKind = do
-          (b, c, d, e, f) <- contents
-          ForAll a b <$> (Just <$> go c) <*> go d <*> pure e <*> pure f
+          (b, c, d, e) <- contents
+          ForAll a b <$> (Just <$> go c) <*> go d <*> pure e <*> pure NotVtaForAll
       withMbKind <|> withoutMbKind
     "ConstrainedType" -> do
       (b, c) <- contents
