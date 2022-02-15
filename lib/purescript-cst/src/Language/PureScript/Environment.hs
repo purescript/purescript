@@ -322,9 +322,6 @@ tyVar = TypeVar nullSourceAnn
 tyForall :: Text -> SourceType -> SourceType -> SourceType
 tyForall var k ty = ForAll nullSourceAnn var (Just k) ty Nothing NotVtaForAll
 
-tyForAllVta :: Text -> SourceType -> SourceType -> SourceType
-tyForAllVta var k ty = ForAll nullSourceAnn var (Just k) ty Nothing IsVtaForAll
-
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
 function = TypeApp nullSourceAnn . TypeApp nullSourceAnn tyFunction
