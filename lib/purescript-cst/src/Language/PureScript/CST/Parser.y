@@ -375,12 +375,8 @@ exprWhere :: { Where () }
   | expr 'where' '\{' manySep(letBinding, '\;') '\}' { Where $1 (Just ($2, $4)) }
 
 expr :: { Expr () }
-  : exprVta %shift { $1 }
-  | exprVta '::' type { ExprTyped () $1 $2 $3 }
-
-exprVta :: { Expr () }
   : expr1 %shift { $1 }
-  | expr1 '@' type { ExprVisibleTypeApp () $1 $2 $3 }
+  | expr1 '::' type { ExprTyped () $1 $2 $3 }
 
 expr1 :: { Expr () }
   : expr2 %shift { $1 }
@@ -408,6 +404,7 @@ expr4 :: { Expr () }
             ExprApp () (ExprApp () $1 lhs) rhs
           _ -> ExprApp () $1 $2
       }
+  | expr4 '@' type { ExprVisibleTypeApp () $1 $2 $3 }
 
 expr5 :: { Expr () }
   : expr6 { $1 }
