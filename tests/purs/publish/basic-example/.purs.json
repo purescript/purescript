@@ -2,7 +2,7 @@
   "name": "basic-example",
   "version": "1.0.0",
   "license": "MIT",
-  "repository": {
+  "location": {
     "githubOwner": "purescript",
     "githubRepo": "test"
   },

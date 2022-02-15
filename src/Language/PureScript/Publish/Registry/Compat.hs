@@ -25,8 +25,8 @@ toBowerPackage PursJson{..} = do
     bowerIgnore = []
     bowerKeywords = []
     bowerAuthors = []
-    bowerHomepage = Just pursJsonRepository
-    bowerRepository = Just $ Bower.Repository { repositoryUrl = pursJsonRepository, repositoryType = "git" }
+    bowerHomepage = Just pursJsonLocation
+    bowerRepository = Just $ Bower.Repository { repositoryUrl = pursJsonLocation, repositoryType = "git" }
     bowerDevDependencies = []
     bowerResolutions = []
     bowerPrivate = False
@@ -51,7 +51,7 @@ data PursJson = PursJson
     -- | The SPDX identifier representing the package license
   , pursJsonLicense :: Text
     -- | The GitHub repository hosting the package
-  , pursJsonRepository :: Text
+  , pursJsonLocation :: Text
     -- | An optional description of the package
   , pursJsonDescription :: Maybe Text
     -- | The registry-compliant version of the package, which is SemVer minus
@@ -76,10 +76,14 @@ asPursJson = do
   -- we fully support .purs.json manifests in the compiler and on Pursuit.
   --
   -- For the time being, we only parse manifests that include a GitHub owner
-  -- and repo pair, or which specify a Git url.
-  pursJsonRepository <- key "repository" (catchError asOwnerRepo (\_ -> key "url" asText))
+  -- and repo pair, or which specify a Git URL, which we use to try and get
+  -- the package from GitHub.
+  pursJsonLocation <- key "location" (catchError asOwnerRepo (const asGitUrl))
   pure $ PursJson{..}
   where
+  asGitUrl =
+    key "gitUrl" asText
+
   asOwnerRepo = do
     githubOwner <- key "githubOwner" asText
     githubRepo <- key "githubRepo" asText
