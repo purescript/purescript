@@ -56,7 +56,7 @@ data Evidence
   -- | Computed instances
   | WarnInstance SourceType -- ^ Warn type class with a user-defined warning message
   | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
-  | IsReflectableInstance Reflectable -- ^ The IsReflectable type class for a reflectable kind
+  | ReflectableInstance Reflectable -- ^ The Reflectable type class for a reflectable kind
   | EmptyClassInstance        -- ^ For any solved type class with no members
   deriving (Show, Eq)
 
@@ -64,13 +64,20 @@ data Evidence
 data Reflectable
   = ReflectableInt Integer -- ^ For type-level numbers
   | ReflectableString PSString -- ^ For type-level strings
+  | ReflectableBoolean Bool -- ^ For type-level booleans
+  | ReflectableOrdering Ordering -- ^ For type-level orderings
   deriving (Show, Eq)
 
--- | Convert a reflectable kind into a term-level literal
-asLiteral :: Reflectable -> Literal a
-asLiteral ref = case ref of
-  ReflectableInt n -> NumericLiteral $ Left n
-  ReflectableString s -> StringLiteral s
+-- | Reflect a reflectable type into an expression
+asExpression :: Reflectable -> Expr
+asExpression = \case
+  ReflectableInt n -> Literal NullSourceSpan $ NumericLiteral $ Left n
+  ReflectableString s -> Literal NullSourceSpan $ StringLiteral s
+  ReflectableBoolean b -> Literal NullSourceSpan $ BooleanLiteral b
+  ReflectableOrdering o -> Constructor NullSourceSpan $ case o of
+    LT -> C.LT
+    EQ -> C.EQ
+    GT -> C.GT
 
 -- | Extract the identifier of a named instance
 namedInstanceIdentifier :: Evidence -> Maybe (Qualified Ident)
@@ -199,7 +206,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.IntMul _ args | Just dicts <- solveIntMul args = dicts
     forClassName _ _ C.IntDivMod _ args | Just dicts <- solveIntDivMod args = dicts
     forClassName _ _ C.IntNonZero _ args | Just dicts <- solveIntNonZero args = dicts
-    forClassName _ _ C.IsReflectable _ args | Just dicts <- solveIsReflectable args = dicts
+    forClassName _ _ C.Reflectable _ args | Just dicts <- solveReflectable args = dicts
     forClassName _ _ C.RowUnion kinds args | Just dicts <- solveUnion kinds args = dicts
     forClassName _ _ C.RowNub kinds args | Just dicts <- solveNub kinds args = dicts
     forClassName _ _ C.RowLacks kinds args | Just dicts <- solveLacks kinds args = dicts
@@ -407,9 +414,9 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
               return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsSymbol)) (Literal nullSourceSpan (ObjectLiteral fields))
-            mkDictionary (IsReflectableInstance ref) _ =
-              let fields = [ ("reflectType", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (asLiteral ref))) ] in
-              pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsReflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
+            mkDictionary (ReflectableInstance ref) _ =
+              let fields = [ ("reflectType", Abs (VarBinder nullSourceSpan UnusedIdent) (asExpression ref)) ] in
+              pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
             unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
             unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)
@@ -498,14 +505,20 @@ entails SolverOptions{..} constraint context hints =
       pure (arg1, arg2, srcTypeLevelString (mkString $ h' <> t'))
     consSymbol _ _ _ = Nothing
 
-    solveIsReflectable :: [SourceType] -> Maybe [TypeClassDict]
-    solveIsReflectable [typeLevel, _] = do
+    solveReflectable :: [SourceType] -> Maybe [TypeClassDict]
+    solveReflectable [typeLevel, _] = do
       (ref, typ) <- case typeLevel of
         TypeLevelInt _ i -> pure (ReflectableInt i, tyInt)
         TypeLevelString _ s -> pure (ReflectableString s, tyString)
+        TypeConstructor _ n
+          | n == C.booleanTrue -> pure (ReflectableBoolean True, tyBoolean)
+          | n == C.booleanFalse -> pure (ReflectableBoolean False, tyBoolean)
+          | n == C.orderingLT -> pure (ReflectableOrdering LT, srcTypeConstructor C.Ordering)
+          | n == C.orderingEQ -> pure (ReflectableOrdering EQ, srcTypeConstructor C.Ordering)
+          | n == C.orderingGT -> pure (ReflectableOrdering GT, srcTypeConstructor C.Ordering)
         _ -> Nothing
-      pure [TypeClassDictionaryInScope Nothing 0 (IsReflectableInstance ref) [] C.IsReflectable [] [] [typeLevel, typ] Nothing Nothing]
-    solveIsReflectable _ = Nothing
+      pure [TypeClassDictionaryInScope Nothing 0 (ReflectableInstance ref) [] C.Reflectable [] [] [typeLevel, typ] Nothing Nothing]
+    solveReflectable _ = Nothing
 
     solveIntAdd :: [SourceType] -> Maybe [TypeClassDict]
     solveIntAdd [arg0, arg1, arg2] = do

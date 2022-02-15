@@ -276,8 +276,23 @@ pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 pattern DataReflectable :: ModuleName
 pattern DataReflectable = ModuleName "Data.Reflectable"
 
-pattern IsReflectable :: Qualified (ProperName 'ClassName)
-pattern IsReflectable = Qualified (Just DataReflectable) (ProperName "IsReflectable")
+pattern Reflectable :: Qualified (ProperName 'ClassName)
+pattern Reflectable = Qualified (Just DataReflectable) (ProperName "Reflectable")
+
+pattern DataOrdering :: ModuleName
+pattern DataOrdering = ModuleName "Data.Ordering"
+
+pattern Ordering :: Qualified (ProperName 'TypeName)
+pattern Ordering = Qualified (Just DataOrdering) (ProperName "Ordering")
+
+pattern LT :: Qualified (ProperName 'ConstructorName)
+pattern LT = Qualified (Just DataOrdering) (ProperName "LT")
+
+pattern EQ :: Qualified (ProperName 'ConstructorName)
+pattern EQ = Qualified (Just DataOrdering) (ProperName "EQ")
+
+pattern GT :: Qualified (ProperName 'ConstructorName)
+pattern GT = Qualified (Just DataOrdering) (ProperName "GT")
 
 dataArray :: forall a. (IsString a) => a
 dataArray = "Data_Array"

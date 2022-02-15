@@ -42,6 +42,12 @@ pattern Row = Qualified (Just Prim) (ProperName "Row")
 pattern PrimBoolean :: ModuleName
 pattern PrimBoolean = ModuleName "Prim.Boolean"
 
+booleanTrue :: Qualified (ProperName 'TypeName)
+booleanTrue = Qualified (Just PrimBoolean) (ProperName "True")
+
+booleanFalse :: Qualified (ProperName 'TypeName)
+booleanFalse = Qualified (Just PrimBoolean) (ProperName "False")
+
 -- Prim.Coerce
 
 pattern PrimCoerce :: ModuleName
