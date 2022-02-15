@@ -266,6 +266,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     ((ss, bound), ) <$> (Constructor ss <$> updateDataConstructorName name ss)
   updateValue s (TypedValue check val ty) =
     (s, ) <$> (TypedValue check val <$> updateTypesEverywhere ty)
+  updateValue s (VisibleTypeApp val ty) =
+    (s, ) <$> (VisibleTypeApp val <$> updateTypesEverywhere ty)
   updateValue s v = return (s, v)
 
   updateBinder
