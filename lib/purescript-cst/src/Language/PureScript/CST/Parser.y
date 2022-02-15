@@ -406,7 +406,7 @@ expr4 :: { Expr () }
             ExprApp () (ExprApp () $1 lhs) rhs
           _ -> ExprApp () $1 $2
       }
-  | expr4 '@' type { ExprVisibleTypeApp () $1 $2 $3 }
+  | expr4 '@' typeAtom { ExprVisibleTypeApp () $1 $2 $3 }
 
 expr5 :: { Expr () }
   : expr6 { $1 }
