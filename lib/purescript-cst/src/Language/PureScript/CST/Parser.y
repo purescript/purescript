@@ -363,7 +363,9 @@ typeVarBinding :: { TypeVarBinding () }
   | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded Nothing (Wrapped $1 (Labeled $2 $3 $4) $5)) }
 
 typeVarBindingVta :: { TypeVarBinding () }
-  : '@' ident { TypeVarName (Just $1) $2 }
+  : ident { TypeVarName Nothing $1 }
+  | '@' ident { TypeVarName (Just $1) $2 }
+  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded Nothing (Wrapped $1 (Labeled $2 $3 $4) $5)) }
   | '(' '@' ident '::' type ')' {% checkNoWildcards $5 *> pure (TypeVarKinded (Just $2) (Wrapped $1 (Labeled $3 $4 $5) $6)) }
 
 forall :: { SourceToken }
