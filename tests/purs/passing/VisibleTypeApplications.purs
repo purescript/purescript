@@ -4,10 +4,18 @@ import Effect.Console
 
 data Tuple a b = Tuple a b
 
-v2 :: forall @a @b. a -> b -> Tuple a b
-v2 = Tuple
+tuple :: forall @a @b. a -> b -> Tuple a b
+tuple = Tuple
 
-v2' :: Tuple Int Int
-v2' = v2 @Int @Int 21 42
+tuple' :: Tuple Int Int
+tuple' = tuple @Int @Int 21 42
+
+data Id a = Id a
+
+id :: forall @a. a -> Id a
+id = Id
+
+id' :: Id (forall a. a -> a)
+id' = id @(forall a. a -> a) (\x -> x)
 
 main = log "Done"
