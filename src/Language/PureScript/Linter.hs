@@ -42,7 +42,7 @@ lint modl@(Module _ _ mn ds _) = do
     (warningsInDecl, _, _, _, _) = everythingWithScope (\_ _ -> mempty) stepE stepB (\_ _ -> mempty) stepDo
 
     f :: Declaration -> MultipleErrors
-    f (TypeClassDeclaration _ name args _ _ decs) = addHint (ErrorInTypeClassDeclaration name) (foldMap (f' (S.fromList $ fst <$> args)) decs)
+    f (TypeClassDeclaration _ name args _ _ _ decs) = addHint (ErrorInTypeClassDeclaration name) (foldMap (f' (S.fromList $ fst <$> args)) decs)
     f dec = f' S.empty dec
 
     f' :: S.Set Text -> Declaration -> MultipleErrors

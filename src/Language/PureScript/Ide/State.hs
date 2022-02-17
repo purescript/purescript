@@ -317,7 +317,7 @@ resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) =
   extractDeclComments = \case
     P.DataDeclaration (_, cs) _ ctorName _ ctors ->
       (P.TyName ctorName, cs) : map dtorComments ctors
-    P.TypeClassDeclaration (_, cs) tyClassName _ _ _ members ->
+    P.TypeClassDeclaration (_, cs) tyClassName _ _ _ _ members ->
       (P.TyClassName tyClassName, cs) : concatMap extractDeclComments members
     decl ->
       maybe [] (\name' -> [(name', snd (P.declSourceAnn decl))]) (name decl)

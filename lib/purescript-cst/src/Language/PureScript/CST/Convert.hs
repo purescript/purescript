@@ -22,7 +22,7 @@ import Data.Char (toLower)
 import Data.Foldable (foldl', toList)
 import Data.Functor (($>))
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe (isJust, fromJust, mapMaybe)
+import Data.Maybe (isJust, fromJust, mapMaybe, fromMaybe)
 import qualified Data.Text as Text
 import qualified Language.PureScript.AST as AST
 import Language.PureScript.AST.Declarations.ChainId (mkChainId)
@@ -459,10 +459,11 @@ convertDeclaration fileName decl = case decl of
     pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
-      goTyVar (TypeVarKinded _ (Wrapped _ (Labeled a _ _) _)) = nameValue a
-      goTyVar (TypeVarName _ a) = nameValue a
-      vars' = zip (toList $ goTyVar <$> vars) [0..]
-      goName = fromJust . flip lookup vars' . nameValue
+      goTyVar (TypeVarKinded v (Wrapped _ (Labeled a _ _) _)) = (nameValue a, fromMaybe T.NotVtaForAll (v $> T.IsVtaForAll))
+      goTyVar (TypeVarName v a) = (nameValue a, fromMaybe T.NotVtaForAll (v $> T.IsVtaForAll))
+      (vars', vtas) = unzip (goTyVar <$> vars)
+      vars'' = zip (toList vars') [0..]
+      goName = fromJust . flip lookup vars'' . nameValue
       goFundep (FundepDetermined _ bs) = Env.FunctionalDependency [] (goName <$> NE.toList bs)
       goFundep (FundepDetermines as _ bs) = Env.FunctionalDependency (goName <$> NE.toList as) (goName <$> NE.toList bs)
       goSig (Labeled n _ ty) = do
@@ -473,6 +474,7 @@ convertDeclaration fileName decl = case decl of
     pure $ AST.TypeClassDeclaration ann
       (nameValue name)
       (goTypeVar <$> vars)
+      vtas
       (convertConstraint fileName <$> maybe [] (toList . fst) sup)
       (goFundep <$> maybe [] (toList . snd) fdeps)
       (goSig <$> maybe [] (NE.toList . snd) bd)

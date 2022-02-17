@@ -66,8 +66,8 @@ desugarTypeClasses externs = flip evalStateT initialState . desugarModule
     :: ModuleName
     -> ExternsDeclaration
     -> Maybe ((ModuleName, ProperName 'ClassName), TypeClassData)
-  fromExternsDecl mn (EDClass name args members implies deps tcIsEmpty) = Just ((mn, name), typeClass) where
-    typeClass = makeTypeClassData args members implies deps tcIsEmpty
+  fromExternsDecl mn (EDClass name args vtas members implies deps tcIsEmpty) = Just ((mn, name), typeClass) where
+    typeClass = makeTypeClassData args vtas members implies deps tcIsEmpty
   fromExternsDecl _ _ = Nothing
 
 desugarModule
@@ -92,14 +92,14 @@ desugarModule (Module ss coms name decls (Just exps)) = do
     | otherwise = internalError "desugarClassDecl: empty CyclicSCC"
 
   superClassesNames :: Declaration -> [Qualified (ProperName 'ClassName)]
-  superClassesNames (TypeClassDeclaration _ _ _ implies _ _) = fmap constraintName implies
+  superClassesNames (TypeClassDeclaration _ _ _ _ implies _ _) = fmap constraintName implies
   superClassesNames _ = []
 
   constraintName :: SourceConstraint -> Qualified (ProperName 'ClassName)
   constraintName (Constraint _ cName _ _ _) = cName
 
   classDeclName :: Declaration -> Qualified (ProperName 'ClassName)
-  classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (Just name) pn
+  classDeclName (TypeClassDeclaration _ pn _ _ _ _ _) = Qualified (Just name) pn
   classDeclName _ = internalError "Expected TypeClassDeclaration"
 
 desugarModule _ = internalError "Exports should have been elaborated in name desugaring"
@@ -202,9 +202,9 @@ desugarDecl
   -> Desugar m (Maybe DeclarationRef, [Declaration])
 desugarDecl mn exps = go
   where
-  go d@(TypeClassDeclaration sa name args implies deps members) = do
-    modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
-    return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
+  go d@(TypeClassDeclaration sa name args vtas implies deps members) = do
+    modify (M.insert (mn, name) (makeTypeClassData args vtas (map memberToNameAndType members) implies deps False))
+    return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args vtas) members)
   go (TypeInstanceDeclaration _ _ _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
   go (TypeInstanceDeclaration sa chainId idx name deps className tys (ExplicitInstance members))
     | className == C.Coercible
@@ -287,9 +287,10 @@ typeClassMemberToDictionaryAccessor
   :: ModuleName
   -> ProperName 'ClassName
   -> [(Text, Maybe SourceType)]
+  -> [VtaForAll]
   -> Declaration
   -> Declaration
-typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa@(ss, _) ident ty)) =
+typeClassMemberToDictionaryAccessor mn name args vtas (TypeDeclaration (TypeDeclarationData sa@(ss, _) ident ty)) =
   let className = Qualified (Just mn) name
       dictIdent = Ident "dict"
       dictObjIdent = Ident "v"
@@ -298,9 +299,15 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarati
   in ValueDecl sa ident Private []
     [MkUnguarded (
      TypedValue False (Abs (VarBinder ss dictIdent) (Case [Var ss $ Qualified Nothing dictIdent] [CaseAlternative [ctor] [MkUnguarded acsr]])) $
-       moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty))
+       makeVta (moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty)))
     )]
-typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
+  where
+  vtaVars = S.fromList $ map fst $ filter ((== IsVtaForAll) . snd) $ zip (map fst args) vtas
+  makeVta = everywhereOnTypes go
+    where
+    go (ForAll a b c d e _) | b `S.member` vtaVars = ForAll a b c d e IsVtaForAll
+    go t = t
+typeClassMemberToDictionaryAccessor _ _ _ _ _ = internalError "Invalid declaration in type class definition"
 
 unit :: SourceType
 unit = srcTypeApp tyRecord srcREmpty

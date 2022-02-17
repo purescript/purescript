@@ -185,14 +185,14 @@ usedTypeNames moduleName = go
   usedConstraint _ = []
 
   usedNamesForTypeClassDeps :: Declaration -> [ProperName 'TypeName]
-  usedNamesForTypeClassDeps (TypeClassDeclaration _ _ _ deps _ _) = foldMap usedConstraint deps
+  usedNamesForTypeClassDeps (TypeClassDeclaration _ _ _ _ deps _ _) = foldMap usedConstraint deps
   usedNamesForTypeClassDeps _ = []
 
 declTypeName :: Declaration -> ProperName 'TypeName
 declTypeName (DataDeclaration _ _ pn _ _) = pn
 declTypeName (ExternDataDeclaration _ pn _) = pn
 declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
-declTypeName (TypeClassDeclaration _ pn _ _ _ _) = coerceProperName pn
+declTypeName (TypeClassDeclaration _ pn _ _ _ _ _) = coerceProperName pn
 declTypeName (KindDeclaration _ _ pn _) = pn
 declTypeName (RoleDeclaration (RoleDeclarationData _ pn _)) = pn
 declTypeName _ = internalError "Expected DataDeclaration"

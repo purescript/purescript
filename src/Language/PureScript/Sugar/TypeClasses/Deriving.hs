@@ -87,7 +87,7 @@ deriveInstances externs syns kinds (Module ss coms mn ds exts) =
           foldMap (\nm -> NewtypeDerivedInstances mempty (S.singleton (qualify mn' edInstanceClassName, nm))) (extractNewtypeName mn' edInstanceTypes)
         fromExternsDecl _ _ = mempty
 
-        fromLocalDecl (TypeClassDeclaration _ cl args cons deps _) =
+        fromLocalDecl (TypeClassDeclaration _ cl args _ cons deps _) =
           NewtypeDerivedInstances (M.singleton (mn, cl) (map fst args, cons, deps)) mempty
         fromLocalDecl (TypeInstanceDeclaration _ _ _ _ _ cl tys _) =
           foldMap (\nm -> NewtypeDerivedInstances mempty (S.singleton (qualify mn cl, nm))) (extractNewtypeName mn tys)

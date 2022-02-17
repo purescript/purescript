@@ -133,7 +133,7 @@ getDeclarationTitle (P.ExternDeclaration _ name _) = Just (P.showIdent name)
 getDeclarationTitle (P.DataDeclaration _ _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.ExternDataDeclaration _ name _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeSynonymDeclaration _ name _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _) = Just (P.runProperName name)
+getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ name _ _ _ _) = Just $ either (const "<anonymous>") P.showIdent name
 getDeclarationTitle (P.TypeFixityDeclaration _ _ _ op) = Just ("type " <> P.showOp op)
 getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (P.showOp op)
@@ -177,7 +177,7 @@ convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
   basicDeclaration sa title (ExternDataDeclaration (kind' $> ()) [])
 convertDeclaration (P.TypeSynonymDeclaration sa _ args ty) title =
   basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()))
-convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
+convertDeclaration (P.TypeClassDeclaration sa _ args _ implies fundeps ds) title =
   Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
   args' = fmap (fmap (fmap ($> ()))) args

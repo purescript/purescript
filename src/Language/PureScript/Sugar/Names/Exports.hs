@@ -39,7 +39,7 @@ findExportable (Module _ _ mn ds _) =
     }
 
   updateExports :: Exports -> Declaration -> m Exports
-  updateExports exps (TypeClassDeclaration (ss, _) tcn _ _ _ ds') = do
+  updateExports exps (TypeClassDeclaration (ss, _) tcn _ _ _ _ ds') = do
     exps' <- rethrowWithPosition ss $ exportTypeClass ss Internal exps tcn source
     foldM go exps' ds'
     where

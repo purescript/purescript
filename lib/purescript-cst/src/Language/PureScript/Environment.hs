@@ -52,6 +52,9 @@ data TypeClassData = TypeClassData
   { typeClassArguments :: [(Text, Maybe SourceType)]
   -- ^ A list of type argument names, and their kinds, where kind annotations
   -- were provided.
+  , typeClassVtaForAlls :: [VtaForAll]
+  -- ^ A list of VtaForAlls which determine whether an argument can be bound
+  -- using a visible type application.
   , typeClassMembers :: [(Ident, SourceType)]
   -- ^ A list of type class members and their types. Type arguments listed above
   -- are considered bound in these types.
@@ -122,12 +125,13 @@ initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPr
 -- in its SCC, and everything determining X is either before it in an SCC path, or in the same SCC.
 makeTypeClassData
   :: [(Text, Maybe SourceType)]
+  -> [VtaForAll]
   -> [(Ident, SourceType)]
   -> [SourceConstraint]
   -> [FunctionalDependency]
   -> Bool
   -> TypeClassData
-makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
+makeTypeClassData args vtas m s deps = TypeClassData args vtas m s deps determinedArgs coveringSets
   where
     argumentIndices = [0 .. length args - 1]
 
@@ -443,7 +447,7 @@ primTypeErrorTypes =
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
-    [ (primName "Partial", makeTypeClassData [] [] [] [] True)
+    [ (primName "Partial", makeTypeClassData [] [] [] [] [] True)
     ]
 
 -- | This contains all of the type classes from all Prim modules.
@@ -464,7 +468,7 @@ primCoerceClasses =
     [ (primSubName C.moduleCoerce "Coercible", makeTypeClassData
         [ ("a", Just (tyVar "k"))
         , ("b", Just (tyVar "k"))
-        ] [] [] [] True)
+        ] [] [] [] [] True)
     ]
 
 primRowClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
@@ -475,7 +479,7 @@ primRowClasses =
         [ ("left", Just (kindRow (tyVar "k")))
         , ("right", Just (kindRow (tyVar "k")))
         , ("union", Just (kindRow (tyVar "k")))
-        ] [] []
+        ] [] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [1, 2] [0]
         , FunctionalDependency [2, 0] [1]
@@ -485,7 +489,7 @@ primRowClasses =
     , (primSubName C.moduleRow "Nub", makeTypeClassData
         [ ("original", Just (kindRow (tyVar "k")))
         , ("nubbed", Just (kindRow (tyVar "k")))
-        ] [] []
+        ] [] [] []
         [ FunctionalDependency [0] [1]
         ] True)
 
@@ -493,7 +497,7 @@ primRowClasses =
     , (primSubName C.moduleRow "Lacks", makeTypeClassData
         [ ("label", Just kindSymbol)
         , ("row", Just (kindRow (tyVar "k")))
-        ] [] [] [] True)
+        ] [] [] [] [] True)
 
     -- class RowCons (label :: Symbol) (a :: k) (tail :: Row k) (row :: Row k) | label tail a -> row, label row -> tail a
     , (primSubName C.moduleRow "Cons", makeTypeClassData
@@ -501,7 +505,7 @@ primRowClasses =
         , ("a", Just (tyVar "k"))
         , ("tail", Just (kindRow (tyVar "k")))
         , ("row", Just (kindRow (tyVar "k")))
-        ] [] []
+        ] [] [] []
         [ FunctionalDependency [0, 1, 2] [3]
         , FunctionalDependency [0, 3] [1, 2]
         ] True)
@@ -514,7 +518,7 @@ primRowListClasses =
     [ (primSubName C.moduleRowList "RowToList", makeTypeClassData
         [ ("row", Just (kindRow (tyVar "k")))
         , ("list", Just (kindRowList (tyVar "k")))
-        ] [] []
+        ] [] [] []
         [ FunctionalDependency [0] [1]
         ] True)
     ]
@@ -527,7 +531,7 @@ primSymbolClasses =
         [ ("left", Just kindSymbol)
         , ("right", Just kindSymbol)
         , ("appended", Just kindSymbol)
-        ] [] []
+        ] [] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [1, 2] [0]
         , FunctionalDependency [2, 0] [1]
@@ -538,7 +542,7 @@ primSymbolClasses =
         [ ("left", Just kindSymbol)
         , ("right", Just kindSymbol)
         , ("ordering", Just kindOrdering)
-        ] [] []
+        ] [] [] []
         [ FunctionalDependency [0, 1] [2]
         ] True)
 
@@ -547,7 +551,7 @@ primSymbolClasses =
         [ ("head", Just kindSymbol)
         , ("tail", Just kindSymbol)
         , ("symbol", Just kindSymbol)
-        ] [] []
+        ] [] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [2] [0, 1]
         ] True)
@@ -558,11 +562,11 @@ primTypeErrorClasses =
   M.fromList
     -- class Fail (message :: Symbol)
     [ (primSubName C.typeError "Fail", makeTypeClassData
-        [("message", Just kindDoc)] [] [] [] True)
+        [("message", Just kindDoc)] [] [] [] [] True)
 
     -- class Warn (message :: Symbol)
     , (primSubName C.typeError "Warn", makeTypeClassData
-        [("message", Just kindDoc)] [] [] [] True)
+        [("message", Just kindDoc)] [] [] [] [] True)
     ]
 
 -- | Finds information about data constructors from the current environment.

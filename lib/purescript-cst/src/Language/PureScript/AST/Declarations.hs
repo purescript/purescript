@@ -421,7 +421,7 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceType)] [SourceConstraint] [FunctionalDependency] [Declaration]
+  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceType)] [VtaForAll] [SourceConstraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
@@ -486,7 +486,7 @@ declSourceAnn (ExternDeclaration sa _ _) = sa
 declSourceAnn (ExternDataDeclaration sa _ _) = sa
 declSourceAnn (FixityDeclaration sa _) = sa
 declSourceAnn (ImportDeclaration sa _ _ _) = sa
-declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
+declSourceAnn (TypeClassDeclaration sa _ _ _ _ _ _) = sa
 declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
@@ -503,7 +503,7 @@ declName (ExternDeclaration _ n _) = Just (IdentName n)
 declName (ExternDataDeclaration _ n _) = Just (TyName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
-declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
+declName (TypeClassDeclaration _ n _ _ _ _ _) = Just (TyClassName n)
 declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = IdentName <$> hush n
 declName (RoleDeclaration RoleDeclarationData{..}) = Just (TyName rdeclIdent)
 declName ImportDeclaration{} = Nothing

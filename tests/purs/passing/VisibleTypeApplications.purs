@@ -43,4 +43,13 @@ tc2 = Proxy
 tc2' :: Proxy ( a :: Int, b :: String )
 tc2' = tc2 @Int
 
+class TypeClass3 @f where
+  tc3 :: Proxy ( f :: f )
+
+instance TypeClass3 Id where
+  tc3 = Proxy
+
+tc3' :: Proxy ( f :: Id )
+tc3' = tc3 @Id
+
 main = log "Done"

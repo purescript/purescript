@@ -75,7 +75,7 @@ extractSpans d = case d of
     [(IdeNamespaced IdeNSValue (P.runIdent i), ss)]
   P.TypeSynonymDeclaration (ss, _) name _ _ ->
     [(IdeNamespaced IdeNSType (P.runProperName name), ss)]
-  P.TypeClassDeclaration (ss, _) name _ _ _ members ->
+  P.TypeClassDeclaration (ss, _) name _ _ _ _ members ->
     (IdeNamespaced IdeNSType (P.runProperName name), ss) : concatMap extractSpans' members
   P.DataDeclaration (ss, _) _ name _ ctors ->
     (IdeNamespaced IdeNSType (P.runProperName name), ss) : map dtorSpan ctors

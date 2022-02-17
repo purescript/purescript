@@ -150,12 +150,13 @@ addTypeClass
   => ModuleName
   -> Qualified (ProperName 'ClassName)
   -> [(Text, Maybe SourceType)]
+  -> [VtaForAll]
   -> [SourceConstraint]
   -> [FunctionalDependency]
   -> [Declaration]
   -> SourceType
   -> m ()
-addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
+addTypeClass _ qualifiedClassName args vtas implies dependencies ds kind = do
   env <- getEnv
   newClass <- mkNewClass
   let qualName = fmap coerceProperName qualifiedClassName
@@ -174,7 +175,7 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
       env <- getEnv
       implies' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms implies
       let ctIsEmpty = null classMembers && all (typeClassIsEmpty . findSuperClass env) implies'
-      pure $ makeTypeClassData args classMembers implies' dependencies ctIsEmpty
+      pure $ makeTypeClassData args vtas classMembers implies' dependencies ctIsEmpty
       where
       findSuperClass env c = case M.lookup (constraintClass c) (typeClasses env) of
         Just tcd -> tcd
@@ -303,11 +304,11 @@ typeCheckAll moduleName _ = traverse go
         dataDecls = mapMaybe toDataDecl tysList
         roleDecls = mapMaybe toRoleDecl tysList
         clss = mapMaybe toClassDecl tysList
-        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2) ++ fmap coerceProperName (clss^..traverse._2._2))
+        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2) ++ fmap coerceProperName (map fst clss^..traverse._2._2))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
       env <- getEnv
-      (syn_ks, data_ks, cls_ks) <- kindsOfAll moduleName syns (fmap snd dataDecls) (fmap snd clss)
+      (syn_ks, data_ks, cls_ks) <- kindsOfAll moduleName syns (fmap snd dataDecls) (fmap (snd . fst) clss)
       for_ (zip syns syn_ks) $ \((_, name, args, _), (elabTy, kind)) -> do
         checkDuplicateTypeArguments $ map fst args
         let args' = args `withKinds` kind
@@ -323,11 +324,11 @@ typeCheckAll moduleName _ = traverse go
         let args'' = args' `withRoles` inferRoles' name args'
         addDataType moduleName dtype name args'' dataCtors ctorKind
       for_ roleDecls $ checkRoleDeclaration moduleName
-      for_ (zip clss cls_ks) $ \((deps, (sa, pn, _, _, _)), (args', implies', tys', kind)) -> do
+      for_ (zip clss cls_ks) $ \(((deps, (sa, pn, _, _, _)), vtas), (args', implies', tys', kind)) -> do
         let qualifiedClassName = Qualified (Just moduleName) pn
         guardWith (errorMessage (DuplicateTypeClass pn (fst sa))) $
           not (M.member qualifiedClassName (typeClasses env))
-        addTypeClass moduleName qualifiedClassName (fmap Just <$> args') implies' deps tys' kind
+        addTypeClass moduleName qualifiedClassName (fmap Just <$> args') vtas implies' deps tys' kind
     return d
     where
     toTypeSynonym (TypeSynonymDeclaration sa nm args ty) = Just (sa, nm, args, ty)
@@ -336,7 +337,7 @@ typeCheckAll moduleName _ = traverse go
     toDataDecl _ = Nothing
     toRoleDecl (RoleDeclaration rdd) = Just rdd
     toRoleDecl _ = Nothing
-    toClassDecl (TypeClassDeclaration sa nm args implies deps decls) = Just (deps, (sa, nm, args, implies, decls))
+    toClassDecl (TypeClassDeclaration sa nm args vtas implies deps decls) = Just ((deps, (sa, nm, args, implies, decls)), vtas)
     toClassDecl _ = Nothing
   go (TypeSynonymDeclaration sa@(ss, _) name args ty) = do
     warnAndRethrow (addHint (ErrorInTypeSynonym name) . addHint (positionedError ss) ) $ do
@@ -404,14 +405,14 @@ typeCheckAll moduleName _ = traverse go
     return d
   go d@FixityDeclaration{} = return d
   go d@ImportDeclaration{} = return d
-  go d@(TypeClassDeclaration sa@(ss, _) pn args implies deps tys) = do
+  go d@(TypeClassDeclaration sa@(ss, _) pn args vtas implies deps tys) = do
     warnAndRethrow (addHint (ErrorInTypeClassDeclaration pn) . addHint (positionedError ss)) $ do
       env <- getEnv
       let qualifiedClassName = Qualified (Just moduleName) pn
       guardWith (errorMessage (DuplicateTypeClass pn ss)) $
         not (M.member qualifiedClassName (typeClasses env))
       (args', implies', tys', kind) <- kindOfClass moduleName (sa, pn, args, implies, tys)
-      addTypeClass moduleName qualifiedClassName (fmap Just <$> args') implies' deps tys' kind
+      addTypeClass moduleName qualifiedClassName (fmap Just <$> args') vtas implies' deps tys' kind
       return d
   go (TypeInstanceDeclaration _ _ _ (Left _) _ _ _ _) = internalError "typeCheckAll: type class instance generated name should have been desugared"
   go d@(TypeInstanceDeclaration sa@(ss, _) ch idx (Right dictName) deps className tys body) =
@@ -790,7 +791,7 @@ typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
     unless (null missingMembers) . throwError . errorMessage' ss' $ TransitiveExportError dr missingMembers
     where
     findClassMembers :: Declaration -> Maybe [Ident]
-    findClassMembers (TypeClassDeclaration _ name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds
+    findClassMembers (TypeClassDeclaration _ name' _ _ _ _ ds) | name == name' = Just $ map extractMemberName ds
     findClassMembers (DataBindingGroupDeclaration decls') = headMay . mapMaybe findClassMembers $ NEL.toList decls'
     findClassMembers _ = Nothing
     extractMemberName :: Declaration -> Ident

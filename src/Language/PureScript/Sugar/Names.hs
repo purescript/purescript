@@ -195,10 +195,11 @@ renameInModule imports (Module modSS coms mn decls exps) =
       TypeSynonymDeclaration sa name
         <$> updateTypeArguments ps
         <*> updateTypesEverywhere ty
-  updateDecl bound (TypeClassDeclaration sa@(ss, _) className args implies deps ds) =
+  updateDecl bound (TypeClassDeclaration sa@(ss, _) className args vtas implies deps ds) =
     fmap (bound,) $
       TypeClassDeclaration sa className
         <$> updateTypeArguments args
+        <*> pure vtas
         <*> updateConstraints ss implies
         <*> pure deps
         <*> pure ds

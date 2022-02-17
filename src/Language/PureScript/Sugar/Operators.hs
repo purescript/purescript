@@ -320,10 +320,10 @@ updateTypes goType = (goDecl, goExpr, goBinder)
       <*> traverse (traverseDataCtorFields (traverse (sndM (goType' ss)))) dctors
   goDecl (ExternDeclaration sa@(ss, _) name ty) =
     ExternDeclaration sa name <$> goType' ss ty
-  goDecl (TypeClassDeclaration sa@(ss, _) name args implies deps decls) = do
+  goDecl (TypeClassDeclaration sa@(ss, _) name args vtas implies deps decls) = do
     implies' <- traverse (overConstraintArgs (traverse (goType' ss))) implies
     args' <- traverse (traverse (traverse (goType' ss))) args
-    return $ TypeClassDeclaration sa name args' implies' deps decls
+    return $ TypeClassDeclaration sa name args' vtas implies' deps decls
   goDecl (TypeInstanceDeclaration sa@(ss, _) ch idx name cs className tys impls) = do
     cs' <- traverse (overConstraintArgs (traverse (goType' ss))) cs
     tys' <- traverse (goType' ss) tys
