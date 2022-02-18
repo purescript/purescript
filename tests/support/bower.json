@@ -34,5 +34,22 @@
     "purescript-typelevel-prelude": "6.0.0",
     "purescript-unfoldable": "https://github.com/working-group-purescript-es/purescript-unfoldable.git#es-modules",
     "purescript-unsafe-coerce": "https://github.com/working-group-purescript-es/purescript-unsafe-coerce.git#es-modules"
+  },
+  "resolutions": {
+    "purescript-console": "es-modules",
+    "purescript-effect": "es-modules",
+    "purescript-control": "es-modules",
+    "purescript-foldable-traversable": "es-modules",
+    "purescript-functions": "es-modules",
+    "purescript-lazy": "es-modules",
+    "purescript-math": "es-modules",
+    "purescript-arrays": "es-modules",
+    "purescript-integers": "es-modules",
+    "purescript-partial": "es-modules",
+    "purescript-refs": "es-modules",
+    "purescript-st": "es-modules",
+    "purescript-unfoldable": "es-modules",
+    "purescript-prelude": "es-modules",
+    "purescript-unsafe-coerce": "es-modules"
   }
 }
