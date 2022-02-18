@@ -72,7 +72,7 @@ Bugfixes:
 
 * Optimize newtype applications with the ($) operator (#4205 by @PureFunctor)
 
-# Properly deserialize unused identifiers in the CoreFn (#4221 by @sjpgarcia)
+* Properly deserialize unused identifiers in the CoreFn (#4221 by @sjpgarcia)
 
   This mostly affects downstream consumers of the CoreFn as discussed in
   #4201. This makes it so CoreFn deserialization properly reads `$__unused`
@@ -2588,14 +2588,14 @@ The way names are resolved has now been updated in a way that may result in some
 
 Some examples:
 
-| Import statement | Exposed members |
-| --- | --- |
-| `import X` | `A`, `f` |
-| `import X as Y` | `Y.A` `Y.f` |
-| `import X (A)` | `A` |
-| `import X (A) as Y` | `Y.A` |
-| `import X hiding (f)` | `A` |
-| `import Y hiding (f) as Y` | `Y.A` |
+| Import statement           | Exposed members |
+| -------------------------- | --------------- |
+| `import X`                 | `A`, `f`        |
+| `import X as Y`            | `Y.A` `Y.f`     |
+| `import X (A)`             | `A`             |
+| `import X (A) as Y`        | `Y.A`           |
+| `import X hiding (f)`      | `A`             |
+| `import Y hiding (f) as Y` | `Y.A`           |
 
 Qualified references like `Control.Monad.Eff.Console.log` will no longer resolve unless there is a corresponding `import Control.Monad.Eff.Console as Control.Monad.Eff.Console`. Importing a module unqualified does not allow you to reference it with qualification, so `import X` does not allow references to `X.A` unless there is also an `import X as X`.
 
