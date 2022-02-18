@@ -104,9 +104,9 @@ Internal:
 * Prevent hangs on internal errors (#4126 by @rhendric)
 
 * The explicit disabling of Nix has been removed from `stack.yaml`.   (#4198 by @cdepillabout)
-  
-  For developers on NixOS, this means that you should be able to build 
-  PureScript by running `stack build` instead of `stack build --nix`.  
+
+  For developers on NixOS, this means that you should be able to build
+  PureScript by running `stack build` instead of `stack build --nix`.
   For other developers, this shouldn't affect you.
 
 * Build the entire latest package set in CI (#4217 by @rhendric)
