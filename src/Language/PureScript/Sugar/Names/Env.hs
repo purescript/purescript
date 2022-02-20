@@ -29,6 +29,7 @@ import Data.Foldable (find)
 import Data.List (groupBy, sortOn, delete)
 import Data.Maybe (fromJust, mapMaybe)
 import Safe (headMay)
+import GHC.Generics (Generic)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -109,7 +110,7 @@ data Imports = Imports
   -- Local names for kinds within a module mapped to their qualified names
   --
   , importedKinds :: ImportMap (ProperName 'TypeName)
-  } deriving (Show)
+  } deriving (Show, Generic)
 
 nullImports :: Imports
 nullImports = Imports M.empty M.empty M.empty M.empty M.empty M.empty S.empty S.empty M.empty
@@ -141,7 +142,7 @@ data Exports = Exports
   -- from.
   --
   , exportedValueOps :: M.Map (OpName 'ValueOpName) ExportSource
-  } deriving (Show)
+  } deriving (Show, Generic)
 
 -- |
 -- An empty 'Exports' value.
