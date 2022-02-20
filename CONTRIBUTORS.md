@@ -151,6 +151,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@PureFunctor](https://github.com/PureFunctor), [@sjpgarcia](https://github.com/sjpgarcia) | Justin Garcia | [MIT license](http://opensource.org/licenses/MIT) |
 | [@xgrommx](https://github.com/xgrommx) | Denis Stoyanov | [MIT license](http://opensource.org/licenses/MIT) |
 | [@MonoidMusician](https://github.com/MonoidMusician) | Verity Scheel | [MIT license](http://opensource.org/licenses/MIT) |
+| [@mikesol](https://github.com/mikesol) | Mike Solomon | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 
