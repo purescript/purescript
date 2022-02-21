@@ -720,7 +720,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent . paras $ map line idents
             ]
     renderSimpleErrorMessage (UnsupportedFFICommonJSImports mn mids) =
-      paras [ line $ "The following CommonJS imports are no supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "
+      paras [ line $ "The following CommonJS imports are not supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "
             , indent . paras $ map line mids
             ]
     renderSimpleErrorMessage InvalidDoBind =
