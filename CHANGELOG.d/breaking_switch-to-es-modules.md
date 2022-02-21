@@ -1,5 +1,5 @@
 * Switch from Common JS to ES modules
-  
+
   Previously, Purescript used Common JS for FFI declarations.
 
   Before, FFI was declared like this...
@@ -9,7 +9,7 @@
 
   exports.myvar = mymodule.myvar
   ```
-  
+
   ...and will be changed to this...
 
   ```javascript
