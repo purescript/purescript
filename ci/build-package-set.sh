@@ -26,7 +26,6 @@ spago upgrade-set
 # Override the `metadata` package's version to match `purs` version
 # so that `spago build` actually works
 sed -i'' "\$c in upstream with metadata.version = \"v$(purs --version | { read v z && echo $v; })\"" packages.dhall
-echo "    with metadata.repo = \"https://github.com/JordanMartinez/purescript-metadata.git\"" >>packages.dhall
 spago install $(spago ls packages | while read name z; do echo $name; done)
 echo ::endgroup::
 
