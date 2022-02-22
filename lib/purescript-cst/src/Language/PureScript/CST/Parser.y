@@ -90,7 +90,6 @@ import Language.PureScript.PSString (PSString)
   '\\'               { SourceToken _ TokBackslash }
   '-'                { SourceToken _ (TokOperator [] "-") }
   '@'                { SourceToken _ (TokOperator [] "@") }
-  '#'                { SourceToken _ (TokOperator [] "#") }
   'ado'              { SourceToken _ (TokLowerName _ "ado") }
   'as'               { SourceToken _ (TokLowerName [] "as") }
   'case'             { SourceToken _ (TokLowerName [] "case") }
@@ -213,14 +212,12 @@ qualOp :: { QualifiedOpName }
   | QUAL_OPERATOR {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
   | '<=' {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
   | '-' {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
-  | '#' {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
   | ':' {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
 
 op :: { OpName }
   : OPERATOR {% opName <\$> toName N.OpName $1 }
   | '<=' {% opName <\$> toName N.OpName $1 }
   | '-' {% opName <\$> toName N.OpName $1 }
-  | '#' {% opName <\$> toName N.OpName $1 }
   | ':' {% opName <\$> toName N.OpName $1 }
 
 qualSymbol :: { QualifiedOpName }
