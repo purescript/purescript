@@ -298,7 +298,7 @@ type2 :: { Type () }
 
 type3 :: { Type () }
   : type4 %shift { $1 }
-  | type3 qualOp type4 { TypeOp () $1 (getQualifiedOpName $2) $3 }
+  | type3 qualOp type4 %shift { TypeOp () $1 (getQualifiedOpName $2) $3 }
 
 type4 :: { Type () }
   : typeAtom { $1 }
