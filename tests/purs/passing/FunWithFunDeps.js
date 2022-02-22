@@ -9,22 +9,18 @@ exports.fcons = function (hd) {
   };
 };
 
-exports.fappend = function (dict) {
-  return function (left) {
-    return function (right) {
-      return left.concat(right);
-    };
+exports.fappendImpl = function (left) {
+  return function (right) {
+    return left.concat(right);
   };
 };
 
-exports.fflatten = function (dict) {
-  return function (v) {
-    var accRef = [];
-    for (var indexRef = 0; indexRef < v.length; indexRef += 1) {
-      accRef = accRef.concat(v[indexRef]);
-    }
-    return accRef;
-  };
+exports.fflattenImpl = function (v) {
+  var accRef = [];
+  for (var indexRef = 0; indexRef < v.length; indexRef += 1) {
+    accRef = accRef.concat(v[indexRef]);
+  }
+  return accRef;
 };
 
 exports.ftoArray = function (vect) {
