@@ -3,7 +3,7 @@ module Main where
 import Prelude
 import Effect.Console (log)
 import Prim.Symbol (class Compare)
-import Prim.Ordering (kind Ordering, LT, EQ, GT)
+import Prim.Ordering (Ordering, LT, EQ, GT)
 import Type.Proxy (Proxy(..))
 import Type.Data.Symbol (compare) as Symbol
 import Type.Data.Ordering (reflectOrdering)
