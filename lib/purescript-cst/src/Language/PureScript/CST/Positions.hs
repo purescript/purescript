@@ -133,7 +133,6 @@ exportRange = \case
     | otherwise -> nameRange a
   ExportTypeOp _ a b -> (a, nameTok b)
   ExportClass _ a b -> (a, nameTok b)
-  ExportKind _ a b -> (a, nameTok b)
   ExportModule _ a b -> (a, nameTok b)
 
 importDeclRange :: ImportDecl a -> TokenRange
@@ -151,7 +150,6 @@ importRange = \case
     | otherwise -> nameRange a
   ImportTypeOp _ a b -> (a, nameTok b)
   ImportClass _ a b -> (a, nameTok b)
-  ImportKind _ a b -> (a, nameTok b)
 
 dataMembersRange :: DataMembers a -> TokenRange
 dataMembersRange = \case

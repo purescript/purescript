@@ -110,7 +110,6 @@ import Language.PureScript.PSString (PSString)
   'infixl'           { SourceToken _ (TokLowerName [] "infixl") }
   'infixr'           { SourceToken _ (TokLowerName [] "infixr") }
   'instance'         { SourceToken _ (TokLowerName [] "instance") }
-  'kind'             { SourceToken _ (TokLowerName [] "kind") }
   'let'              { SourceToken _ (TokLowerName [] "let") }
   'module'           { SourceToken _ (TokLowerName [] "module") }
   'newtype'          { SourceToken _ (TokLowerName [] "newtype") }
@@ -191,7 +190,6 @@ qualIdent :: { QualifiedName Ident }
   | QUAL_LOWER {% toQualifiedName Ident $1 }
   | 'as' {% toQualifiedName Ident $1 }
   | 'hiding' {% toQualifiedName Ident $1 }
-  | 'kind' {% toQualifiedName Ident $1 }
   | 'role' {% toQualifiedName Ident $1 }
   | 'nominal' {% toQualifiedName Ident $1 }
   | 'representational' {% toQualifiedName Ident $1 }
@@ -201,7 +199,6 @@ ident :: { Name Ident }
   : LOWER {% toName Ident $1 }
   | 'as' {% toName Ident $1 }
   | 'hiding' {% toName Ident $1 }
-  | 'kind' {% toName Ident $1 }
   | 'role' {% toName Ident $1 }
   | 'nominal' {% toName Ident $1 }
   | 'representational' {% toName Ident $1 }
@@ -252,7 +249,6 @@ label :: { Label }
   | 'infixl' { toLabel $1 }
   | 'infixr' { toLabel $1 }
   | 'instance' { toLabel $1 }
-  | 'kind' { toLabel $1 }
   | 'let' { toLabel $1 }
   | 'module' { toLabel $1 }
   | 'newtype' { toLabel $1 }
@@ -626,7 +622,6 @@ export :: { Export () }
   | properName dataMembers { ExportType () (getProperName $1) (Just $2) }
   | 'type' symbol { ExportTypeOp () $1 (getOpName $2) }
   | 'class' properName { ExportClass () $1 (getProperName $2) }
-  | 'kind' properName {% addWarning [$1, nameTok (getProperName $2)] WarnDeprecatedKindExportSyntax *> pure (ExportKind () $1 (getProperName $2)) }
   | 'module' moduleName { ExportModule () $1 $2 }
 
 dataMembers :: { (DataMembers ()) }
@@ -650,7 +645,6 @@ import :: { Import () }
   | properName dataMembers { ImportType () (getProperName $1) (Just $2) }
   | 'type' symbol { ImportTypeOp () $1 (getOpName $2) }
   | 'class' properName { ImportClass () $1 (getProperName $2) }
-  | 'kind' properName {% addWarning [$1, nameTok (getProperName $2)] WarnDeprecatedKindImportSyntax *> pure (ImportKind () $1 (getProperName $2)) }
 
 decl :: { Declaration () }
   : dataHead { DeclData () $1 Nothing }
@@ -671,7 +665,6 @@ decl :: { Declaration () }
   | fixity { DeclFixity () $1 }
   | 'foreign' 'import' ident '::' type {% when (isConstrained $5) (addWarning ([$1, $2, nameTok $3, $4] <> toList (flattenType $5)) WarnDeprecatedConstraintInForeignImportSyntax) *> pure (DeclForeign () $1 $2 (ForeignValue (Labeled $3 $4 $5))) }
   | 'foreign' 'import' 'data' properName '::' type { DeclForeign () $1 $2 (ForeignData $3 (Labeled (getProperName $4) $5 $6)) }
-  | 'foreign' 'import' 'kind' properName {% addWarning [$1, $2, $3, nameTok (getProperName $4)] WarnDeprecatedForeignKindSyntax *> pure (DeclForeign () $1 $2 (ForeignKind $3 (getProperName $4))) }
   | 'type' 'role' properName many(role) { DeclRole () $1 $2 (getProperName $3) $4 }
 
 dataHead :: { DataHead () }
