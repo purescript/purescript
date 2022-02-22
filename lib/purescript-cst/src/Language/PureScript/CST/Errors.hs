@@ -53,6 +53,7 @@ data ParserErrorType
   | ErrQualifiedName
   | ErrEmptyDo
   | ErrLexeme (Maybe String) [String]
+  | ErrConstraintInForeignImportSyntax
   | ErrEof
   | ErrCustom String
   deriving (Show, Eq, Ord)
@@ -60,7 +61,6 @@ data ParserErrorType
 data ParserWarningType
   = WarnDeprecatedRowSyntax
   | WarnDeprecatedForeignKindSyntax
-  | WarnDeprecatedConstraintInForeignImportSyntax
   | WarnDeprecatedKindImportSyntax
   | WarnDeprecatedKindExportSyntax
   deriving (Show, Eq, Ord)
@@ -157,6 +157,8 @@ prettyPrintErrorMessage ParserErrorInfo {..} = case errType of
     "Expected do statement"
   ErrLexeme _ _ ->
     basicError
+  ErrConstraintInForeignImportSyntax ->
+    "Constraints are not allowed in foreign imports. Omit the constraint instead and update the foreign module accordingly."
   ErrToken
     | SourceToken _ (TokLeftArrow _) : _ <- errToks ->
         "Unexpected \"<-\" in expression, perhaps due to a missing 'do' or 'ado' keyword"
@@ -187,8 +189,6 @@ prettyPrintWarningMessage ParserErrorInfo {..} = case errType of
     "Unary '#' syntax for row kinds is deprecated and will be removed in a future release. Use the 'Row' kind instead."
   WarnDeprecatedForeignKindSyntax ->
     "Foreign kind imports are deprecated and will be removed in a future release. Use empty 'data' instead."
-  WarnDeprecatedConstraintInForeignImportSyntax ->
-    "Constraints are deprecated in foreign imports and will be removed in a future release. Omit the constraint instead and update the foreign module accordingly."
   WarnDeprecatedKindImportSyntax ->
     "Kind imports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."
   WarnDeprecatedKindExportSyntax ->

@@ -1,4 +1,4 @@
--- @shouldWarnWith WarningParsingModule
+-- @shouldFailWith ErrConstraintInForeignImportSyntax
 module Main where
 
 import Data.Show (class Show)
