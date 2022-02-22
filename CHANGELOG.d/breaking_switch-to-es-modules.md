@@ -23,6 +23,4 @@
   ```
 
 * FFI is annotated with `/* #__PURE__ */` so that bundlers can perform DCE
-* If CJS is detected a `Warning` is emitted
 * The current LTS Node.js version `12` is now the required minimum version
-* `purs bundle` has been rudimentarily updated but will be removed in a subsequent PR
