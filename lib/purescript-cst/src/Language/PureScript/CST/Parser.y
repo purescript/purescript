@@ -35,7 +35,7 @@ import qualified Language.PureScript.Roles as R
 import Language.PureScript.PSString (PSString)
 }
 
-%expect 19
+%expect 18
 
 %name parseType type
 %name parseExpr expr
