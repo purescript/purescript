@@ -308,12 +308,8 @@ type3 :: { Type () }
   | type3 qualOp type4 { TypeOp () $1 (getQualifiedOpName $2) $3 }
 
 type4 :: { Type () }
-  : type5 %shift { $1 }
-  | '#' type4 {% addWarning ($1 : toList (flattenType $2)) WarnDeprecatedRowSyntax *> pure (TypeUnaryRow () $1 $2) }
-
-type5 :: { Type () }
   : typeAtom { $1 }
-  | type5 typeAtom { TypeApp () $1 $2 }
+  | type4 typeAtom { TypeApp () $1 $2 }
 
 typeAtom :: { Type ()}
   : '_' { TypeWildcard () $1 }
