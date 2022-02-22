@@ -401,14 +401,6 @@ expr5 :: { Expr () }
   | '\\' many(binderAtom) '->' expr { ExprLambda () (Lambda $1 $2 $3 $4) }
   | 'let' '\{' manySep(letBinding, '\;') '\}' 'in' expr { ExprLet () (LetIn $1 $3 $5 $6) }
   | 'case' sep(expr, ',') 'of' '\{' manySep(caseBranch, '\;') '\}' { ExprCase () (CaseOf $1 $2 $3 $5) }
-  -- These special cases handle some idiosynchratic syntax that the current
-  -- parser allows. Technically the parser allows the rhs of a case branch to be
-  -- at any level, but this is ambiguous. We allow it in the case of a singleton
-  -- case, since this is used in the wild.
-  | 'case' sep(expr, ',') 'of' '\{' sep(binder1, ',') '->' '\}' exprWhere
-      { ExprCase () (CaseOf $1 $2 $3 (pure ($5, Unconditional $6 $8))) }
-  | 'case' sep(expr, ',') 'of' '\{' sep(binder1, ',') '\}' guardedCase
-      { ExprCase () (CaseOf $1 $2 $3 (pure ($5, $7))) }
 
 expr6 :: { Expr () }
   : expr7 %shift { $1 }
