@@ -214,7 +214,7 @@ compile checkForMainModule SupportModules{..} inputFiles = runTest $ do
   foreigns <- inferForeignModules ms
   let
     actions = makeActions supportModules (foreigns `M.union` supportForeigns)
-    hasMainModule = (==) 1 $ length $ filter (== T.pack "Main") $ fmap getPsModuleName ms
+    hasMainModule = (==) 1 $ length $ filter (== "Main") $ fmap getPsModuleName ms
   case ms of
     [singleModule] -> do
       when (checkForMainModule && not hasMainModule) $ do
