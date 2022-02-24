@@ -217,12 +217,12 @@ compile checkForMainModule SupportModules{..} inputFiles = runTest $ do
     hasMainModule = (==) 1 $ length $ filter (== T.pack "Main") $ fmap getPsModuleName ms
   case ms of
     [singleModule] -> do
-      unless (checkForMainModule && hasMainModule) $ do
+      when (checkForMainModule && not hasMainModule) $ do
         error $ "When testing a single PureScript file, the file's module's name must be 'Main' but got '"
           <> T.unpack (getPsModuleName singleModule) <> "'."
       pure <$> P.rebuildModule actions supportExterns (snd singleModule)
     _ -> do
-      unless (checkForMainModule && hasMainModule) $ do
+      when (checkForMainModule && not hasMainModule) $ do
         error "When testing a multiple PureScript files, the main file's module's name must be 'Main'."
       P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
 
