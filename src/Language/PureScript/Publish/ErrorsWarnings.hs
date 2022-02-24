@@ -244,16 +244,25 @@ displayRepositoryError err = case err of
   RepositoryFieldMissing giturl ->
     vcat
       [ para (concat
-         [ "The 'repository' field is not present in your package manifest file. "
+         [ "The 'repository' or 'location' field is not present in your package manifest file. "
          , "Without this information, Pursuit would not be able to generate "
          , "source links in your package's documentation. Please add one - like "
-         , "this, for example:"
+         , "this, if you are using the bower.json format:"
          ])
       , spacer
       , indented (vcat
           [ para "\"repository\": {"
           , indented (para "\"type\": \"git\",")
           , indented (para ("\"url\": \"" ++ T.unpack (fromMaybe "https://github.com/USER/REPO.git" giturl) ++ "\""))
+          , para "}"
+          ]
+        )
+      , para "or like this, if you are using the .purs.json format:"
+      , spacer
+      , indented (vcat
+          [ para "\"location\": {"
+          , indented (para "\"githubOwner\": \"USER\",")
+          , indented (para "\"githubRepo\": \"REPO\",")
           , para "}"
           ]
         )

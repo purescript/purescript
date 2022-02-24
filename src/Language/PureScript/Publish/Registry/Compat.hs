@@ -16,7 +16,7 @@ import Data.Aeson.BetterErrors (key, asText, keyMay, eachInObject, Parse)
 -- | Convert a valid .purs.json manifest into a bower.json manifest
 toBowerPackage :: PursJson -> Either Bower.BowerError Bower.PackageMeta
 toBowerPackage PursJson{..} = do
-  bowerName <- Bower.parsePackageName pursJsonName
+  bowerName <- Bower.parsePackageName ("purescript-" <> pursJsonName)
   let
     bowerDescription = pursJsonDescription
     bowerMain = []
@@ -33,7 +33,6 @@ toBowerPackage PursJson{..} = do
 
   let parseDependencies = traverse (bitraverse (Bower.parsePackageName . ("purescript-" <>)) (pure . Bower.VersionRange))
   bowerDependencies <- parseDependencies $ Map.toAscList pursJsonDependencies
-
   pure $ Bower.PackageMeta {..}
 
 -- | A partial representation of the .purs.json manifest format, including only
