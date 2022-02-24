@@ -6,9 +6,7 @@ import Effect.Console
 
 main :: Effect Unit
 main = do
-  log $ showFFI 4
-  log $ showFFI "string"
-  log $ showFFI { a: 1, b: true, c: 'd', e: 4.0 }
+  log "Done"
 
 showFFI :: forall a. Show a => a -> String
 showFFI = showImpl show
