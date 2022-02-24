@@ -121,7 +121,7 @@ displayUserError e = case e of
       [ para "The package manifest file was not found:"
       , indented (para path)
       , spacer
-      , para "Please create one."
+      , para "Please create either a bower.json or .purs.json manifest file."
       ]
   ResolutionsFileNotFound ->
     para "The resolutions file was not found."
