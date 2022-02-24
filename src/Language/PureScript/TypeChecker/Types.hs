@@ -473,10 +473,12 @@ infer' (VisibleTypeApp val tyAbsArg) = do
   -- The call to `kindOf` here is important because the `inferKind` routine
   -- in the kind checker eliminates `ParensInType` from `tyAbsArg`. I'm not
   -- sure why it isn't unwrapped by the type checker though. - PureFunctor
-  (tyAbsArg', _) <- kindOf tyAbsArg
+  (tyAbsArg', tyAbsKind) <- kindOf tyAbsArg
   tyAbsArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ tyAbsArg'
   case hoistVtaTypeVars valTy of
-    ForAll _ tyAbsVar _ tyAbsBody _ IsVtaForAll -> do
+    ForAll _ tyAbsVar (Just tyAbsVarKind) tyAbsBody _ IsVtaForAll -> do
+      -- TODO: Doesn't work
+      unifyKinds tyAbsKind tyAbsVarKind
       let valTy' = replaceTypeVars tyAbsVar tyAbsArg'' tyAbsBody
       (val'', valTy'') <- instantiatePolyTypeWithUnknowns val' valTy'
       return $ TypedValue' True val'' valTy''
