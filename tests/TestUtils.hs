@@ -223,7 +223,7 @@ compile checkForMainModule SupportModules{..} inputFiles = runTest $ do
       pure <$> P.rebuildModule actions supportExterns (snd singleModule)
     _ -> do
       when (checkForMainModule && not hasMainModule) $ do
-        error "When testing a multiple PureScript files, the main file's module's name must be 'Main'."
+        error "When testing multiple PureScript files, the main file's module's name must be 'Main'."
       P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
 
 getPsModuleName :: (a, AST.Module) -> T.Text
