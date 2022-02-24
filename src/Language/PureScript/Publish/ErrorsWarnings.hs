@@ -121,7 +121,7 @@ displayUserError e = case e of
       [ para "The package manifest file was not found:"
       , indented (para path)
       , spacer
-      , para "Please create either a bower.json or .purs.json manifest file."
+      , para "Please create either a bower.json or purs.json manifest file."
       ]
   ResolutionsFileNotFound ->
     para "The resolutions file was not found."
@@ -257,7 +257,7 @@ displayRepositoryError err = case err of
           , para "}"
           ]
         )
-      , para "or like this, if you are using the .purs.json format:"
+      , para "or like this, if you are using the purs.json format:"
       , spacer
       , indented (vcat
           [ para "\"location\": {"

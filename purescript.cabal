@@ -27,8 +27,6 @@ extra-source-files:
   tests/purs/**/*.purs
   tests/purs/**/*.json
   tests/purs/**/*.out
-  tests/purs/docs/.purs.json
-  tests/purs/publish/basic-example/.purs.json
   tests/json-compat/**/*.json
   tests/support/*.json
   tests/support/psci/**/*.purs

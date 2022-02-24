@@ -183,10 +183,10 @@ data TreeStatus = Clean | Dirty deriving (Show, Eq, Ord, Enum)
 getGitWorkingTreeStatus :: FilePath -> PrepareM TreeStatus
 getGitWorkingTreeStatus manifestFilePath = do
   output <- lines <$> readProcess' "git" ["status", "--porcelain"] ""
-  -- The PureScript registry generates .purs.json files when publishing legacy
+  -- The PureScript registry generates purs.json files when publishing legacy
   -- packages. To ensure these packages can also be published to Pursuit, we
   -- include an exemption to the working tree status check that will ignore
-  -- untracked .purs.json files. Note that _modified_ .purs.json files will
+  -- untracked purs.json files. Note that _modified_ purs.json files will
   -- still fail this check.
   let untrackedPursJson = "?? " <> manifestFilePath
   let filtered = filter (/= untrackedPursJson) output

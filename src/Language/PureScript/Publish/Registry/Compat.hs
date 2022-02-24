@@ -1,4 +1,4 @@
--- | A compatibility module that allows a restricted set of .purs.json manifest
+-- | A compatibility module that allows a restricted set of purs.json manifest
 -- | files to be used for publishing. The manifest must described a package
 -- | available on GitHub, and it must be convertable to a Bower manifest.
 -- |
@@ -13,7 +13,7 @@ import qualified Web.Bower.PackageMeta as Bower
 import Data.Bitraversable (Bitraversable(..))
 import Data.Aeson.BetterErrors (key, asText, keyMay, eachInObject, Parse)
 
--- | Convert a valid .purs.json manifest into a bower.json manifest
+-- | Convert a valid purs.json manifest into a bower.json manifest
 toBowerPackage :: PursJson -> Either Bower.BowerError Bower.PackageMeta
 toBowerPackage PursJson{..} = do
   bowerName <- Bower.parsePackageName ("purescript-" <> pursJsonName)
@@ -35,14 +35,14 @@ toBowerPackage PursJson{..} = do
   bowerDependencies <- parseDependencies $ Map.toAscList pursJsonDependencies
   pure $ Bower.PackageMeta {..}
 
--- | A partial representation of the .purs.json manifest format, including only
+-- | A partial representation of the purs.json manifest format, including only
 -- | the fields required for publishing.
 -- |
 -- | https://github.com/purescript/registry/blob/master/v1/Manifest.dhall
 --
 -- This type is intended for compatibility with the Bower publishing pipeline,
--- and does not accurately reflect all possible .purs.json manifests. However,
--- supporting .purs.json manifests properly introduces breaking changes to the
+-- and does not accurately reflect all possible purs.json manifests. However,
+-- supporting purs.json manifests properly introduces breaking changes to the
 -- compiler and to Pursuit.
 data PursJson = PursJson
   { -- | The name of the package
@@ -72,7 +72,7 @@ asPursJson = do
   -- Packages are required to come from GitHub in PureScript 0.14.x, but the
   -- PureScript registry does not require this, nor does it require that
   -- packages are Git repositories. This restriction should be lifted when
-  -- we fully support .purs.json manifests in the compiler and on Pursuit.
+  -- we fully support purs.json manifests in the compiler and on Pursuit.
   --
   -- For the time being, we only parse manifests that include a GitHub owner
   -- and repo pair, or which specify a Git URL, which we use to try and get

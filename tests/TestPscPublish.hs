@@ -38,10 +38,10 @@ spec = do
         "bower.json"
         "resolutions.json"
 
-    it "basic example (.purs.json)" $ do
+    it "basic example (purs.json)" $ do
       testPackage
         "tests/purs/publish/basic-example"
-        ".purs.json"
+        "purs.json"
         "resolutions.json"
 
   context "json compatibility" $ do
