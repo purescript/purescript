@@ -46,7 +46,8 @@ import Language.PureScript.Publish.Utils
 import qualified Language.PureScript as P (version, ModuleName)
 import qualified Language.PureScript.CoreFn.FromJSON as P
 import qualified Language.PureScript.Docs as D
-import Data.Aeson.BetterErrors (Parse, withString, eachInObjectWithKey, asString, key, keyMay, parse)
+import Data.Aeson.BetterErrors (Parse, withString, eachInObjectWithKey, asString, key, keyMay, parse, mapError)
+import Language.PureScript.Docs.Types (ManifestError(BowerManifest, PursManifest))
 
 data PublishOptions = PublishOptions
   { -- | How to obtain the version tag and version that the data being
@@ -142,10 +143,10 @@ preparePackage' opts = do
       -- files to have specific names.
       let isPursJson = "purs.json" `T.isInfixOf` T.pack manifestPath
       if isPursJson then do
-        pursJson <- catchLeft (parse asPursJson found) (userError . CouldntDecodePackageManifest)
+        pursJson <- catchLeft (parse (mapError PursManifest asPursJson) found) (userError . CouldntDecodePackageManifest)
         catchLeft (toBowerPackage pursJson) (userError . CouldntConvertPackageManifest)
       else
-        catchLeft (parse Bower.asPackageMeta found) (userError . CouldntDecodePackageManifest)
+        catchLeft (parse (mapError BowerManifest Bower.asPackageMeta) found) (userError . CouldntDecodePackageManifest)
 
   checkLicense pkgMeta
 
@@ -348,7 +349,7 @@ asVersion =
   withString (note D.InvalidVersion . P.parseVersion')
 
 parsePackageName :: Text -> Either D.PackageError PackageName
-parsePackageName = first D.ErrorInPackageMeta . Bower.parsePackageName
+parsePackageName = first D.ErrorInPackageMeta . D.mapLeft BowerManifest . Bower.parsePackageName
 
 handleDeps
   :: [PackageName]

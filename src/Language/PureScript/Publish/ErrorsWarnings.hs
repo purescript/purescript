@@ -31,6 +31,8 @@ import qualified Language.PureScript as P
 import Language.PureScript.Publish.BoxesHelpers
 
 import Web.Bower.PackageMeta (PackageName, runPackageName, showBowerError)
+import qualified Web.Bower.PackageMeta as Bower
+import Language.PureScript.Docs.Types (showManifestError)
 
 -- | An error which meant that it was not possible to retrieve metadata for a
 -- package.
@@ -50,7 +52,7 @@ data PackageWarning
 data UserError
   = PackageManifestNotFound FilePath
   | ResolutionsFileNotFound
-  | CouldntConvertPackageManifest D.ManifestError
+  | CouldntConvertPackageManifest Bower.BowerError
   | CouldntDecodePackageManifest (ParseError D.ManifestError)
   | TagMustBeCheckedOut
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
@@ -135,7 +137,7 @@ displayUserError e = case e of
   CouldntDecodePackageManifest err ->
     vcat
       [ para "There was a problem with your package manifest file:"
-      , indented (vcat (map (para . T.unpack) (displayError showBowerError err)))
+      , indented (vcat (map (para . T.unpack) (displayError showManifestError err)))
       , spacer
       , para "Please ensure that your package manifest file is valid."
       ]

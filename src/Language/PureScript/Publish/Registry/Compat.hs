@@ -11,7 +11,7 @@ import Protolude
 import qualified Data.Map as Map
 import qualified Web.Bower.PackageMeta as Bower
 import Data.Bitraversable (Bitraversable(..))
-import Data.Aeson.BetterErrors (key, asText, keyMay, eachInObject, Parse)
+import Data.Aeson.BetterErrors (key, asText, keyMay, eachInObject, Parse, throwCustomError)
 
 -- | Convert a valid purs.json manifest into a bower.json manifest
 toBowerPackage :: PursJson -> Either Bower.BowerError Bower.PackageMeta
@@ -53,21 +53,27 @@ data PursJson = PursJson
   , pursJsonLocation :: Text
     -- | An optional description of the package
   , pursJsonDescription :: Maybe Text
-    -- | The registry-compliant version of the package, which is SemVer minus
-    -- | build metadata and prerelease identifiers. This version can be used
-    -- | to associate this manifest with its metadata.
-  , pursJsonVersion :: Text
     -- | A map of dependencies, where keys are package names and values are
     -- | dependency ranges of the form '>=X.Y.Z <X.Y.Z'
   , pursJsonDependencies :: Map Text Text
   }
 
-asPursJson :: Parse Bower.BowerError PursJson
+data PursJsonError
+  = MalformedLocationField
+  deriving (Eq, Show, Ord, Generic)
+
+instance NFData PursJsonError
+
+showPursJsonError :: PursJsonError -> Text
+showPursJsonError = \case
+  MalformedLocationField ->
+    "The 'location' field must be either '{ \"githubOwner\": OWNER, \"githubRepo\": REPO }' or '{ \"gitUrl\": URL }'."
+
+asPursJson :: Parse PursJsonError PursJson
 asPursJson = do
   pursJsonName <- key "name" asText
   pursJsonDescription <- keyMay "description" asText
   pursJsonLicense <- key "license" asText
-  pursJsonVersion <- key "version" asText
   pursJsonDependencies <- key "dependencies" (Map.fromAscList <$> eachInObject asText)
   -- Packages are required to come from GitHub in PureScript 0.14.x, but the
   -- PureScript registry does not require this, nor does it require that
@@ -77,9 +83,12 @@ asPursJson = do
   -- For the time being, we only parse manifests that include a GitHub owner
   -- and repo pair, or which specify a Git URL, which we use to try and get
   -- the package from GitHub.
-  pursJsonLocation <- key "location" (catchError asOwnerRepo (const asGitUrl))
+  pursJsonLocation <- key "location" asOwnerRepoOrGitUrl
   pure $ PursJson{..}
   where
+  asOwnerRepoOrGitUrl =
+    catchError asOwnerRepo (\_ -> catchError asGitUrl (\_ -> throwCustomError MalformedLocationField))
+
   asGitUrl =
     key "gitUrl" asText
 
