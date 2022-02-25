@@ -64,6 +64,20 @@ New features:
   empty type classes, such as `Partial`, but is otherwise not expected to
   have user-visible consequences.
 
+- Add support for publishing via the `purs.json` manifest format (#4233 by @thomashoneyman)
+
+  This feature expands compiler support for publishing packages with different
+  manifest formats. Previously, packages had to have a `bower.json` manifest;
+  now, packages can choose to have a `purs.json` manifest instead.
+
+  This feature provides only partial support for packages published to the
+  PureScript registry using the `purs.json` manifest format. Registry packages
+  are allowed to be hosted anywhere (not just GitHub), and do not need to be
+  Git repositories at all. However, `purs publish` and its primary consumer,
+  Pursuit, both require packages to be available on GitHub and for their version
+  to be a SemVer-compliant Git tag. Therefore, this feature only supports
+  registry packages that are compatible with these restrictions.
+
 Bugfixes:
 
 * Add missing source spans to data constructors when generating docs (#4202 by @PureFunctor)
@@ -2588,14 +2602,14 @@ The way names are resolved has now been updated in a way that may result in some
 
 Some examples:
 
-| Import statement | Exposed members |
-| --- | --- |
-| `import X` | `A`, `f` |
-| `import X as Y` | `Y.A` `Y.f` |
-| `import X (A)` | `A` |
-| `import X (A) as Y` | `Y.A` |
-| `import X hiding (f)` | `A` |
-| `import Y hiding (f) as Y` | `Y.A` |
+| Import statement           | Exposed members |
+| -------------------------- | --------------- |
+| `import X`                 | `A`, `f`        |
+| `import X as Y`            | `Y.A` `Y.f`     |
+| `import X (A)`             | `A`             |
+| `import X (A) as Y`        | `Y.A`           |
+| `import X hiding (f)`      | `A`             |
+| `import Y hiding (f) as Y` | `Y.A`           |
 
 Qualified references like `Control.Monad.Eff.Console.log` will no longer resolve unless there is a corresponding `import Control.Monad.Eff.Console as Control.Monad.Eff.Console`. Importing a module unqualified does not allow you to reference it with qualification, so `import X` does not allow references to `X.A` unless there is also an `import X as X`.
 
