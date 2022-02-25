@@ -2606,14 +2606,14 @@ The way names are resolved has now been updated in a way that may result in some
 
 Some examples:
 
-| Import statement           | Exposed members |
-| -------------------------- | --------------- |
-| `import X`                 | `A`, `f`        |
-| `import X as Y`            | `Y.A` `Y.f`     |
-| `import X (A)`             | `A`             |
-| `import X (A) as Y`        | `Y.A`           |
-| `import X hiding (f)`      | `A`             |
-| `import Y hiding (f) as Y` | `Y.A`           |
+| Import statement | Exposed members |
+| --- | --- |
+| `import X` | `A`, `f` |
+| `import X as Y` | `Y.A` `Y.f` |
+| `import X (A)` | `A` |
+| `import X (A) as Y` | `Y.A` |
+| `import X hiding (f)` | `A` |
+| `import Y hiding (f) as Y` | `Y.A` |
 
 Qualified references like `Control.Monad.Eff.Console.log` will no longer resolve unless there is a corresponding `import Control.Monad.Eff.Console as Control.Monad.Eff.Console`. Importing a module unqualified does not allow you to reference it with qualification, so `import X` does not allow references to `X.A` unless there is also an `import X as X`.
 
