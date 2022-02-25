@@ -9,6 +9,7 @@ module Language.PureScript.CodeGen.JS
 import Prelude.Compat
 import Protolude (ordNub)
 
+import Control.Applicative (liftA2)
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
@@ -58,8 +59,9 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     let mnLookup = renameImports usedNames imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
-    optimized <- traverse (traverse (fmap annotatePure . optimize)) jsDecls
     let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
+    let moduleObjectNames = "$foreign" `S.insert` M.keysSet mnReverseLookup
+    optimized <- traverse (traverse (fmap (annotatePure moduleObjectNames) . optimize)) jsDecls
     let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
           `S.union` M.keysSet reExps
     let jsImports
@@ -85,22 +87,50 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   -- The semantics here derive from treating top-level module evaluation as pure, which lets
   -- us remove any unreferenced top-level declarations. To achieve this, we wrap any non-trivial
   -- top-level values in an IIFE marked with a pure annotation.
-  annotatePure :: AST -> AST
-  annotatePure js@(AST.App _ (AST.Function _ _ _ _) _) = AST.Comment AST.PureAnnotation js
-  annotatePure js@(AST.App _ _ _) = pureIife js
-  annotatePure js@(AST.Unary _ _ _) = pureIife js
-  annotatePure js@(AST.Binary _ _ _ _) = pureIife js
-  annotatePure js@(AST.Indexer _ _ _) = pureIife js
-  annotatePure js@(AST.ObjectLiteral _ []) = js
-  annotatePure js@(AST.ObjectLiteral _ _) = pureIife js
-  annotatePure js@(AST.ArrayLiteral _ []) = js
-  annotatePure js@(AST.ArrayLiteral _ _) = pureIife js
-  annotatePure (AST.VariableIntroduction ss name (Just js)) = AST.VariableIntroduction ss name (Just (annotatePure js))
-  annotatePure (AST.Comment c js) = AST.Comment c (annotatePure js)
-  annotatePure js = js
+  annotatePure :: S.Set Text -> AST -> AST
+  annotatePure moduleObjectNames = annotateOrWrap
+    where
+    annotateOrWrap = liftA2 fromMaybe pureIife maybePure
 
-  pureIife :: AST -> AST
-  pureIife val = AST.Comment AST.PureAnnotation $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing [AST.Return Nothing val])) []
+    -- | If the JS is potentially effectful (in the eyes of a bundler that
+    -- doesn't know about PureScript), return Nothing. Otherwise, return Just
+    -- the JS with any needed pure annotations added, and, in the case of a
+    -- variable declaration, an IIFE to be annotated.
+    maybePure :: AST -> Maybe AST
+    maybePure = maybePureGen False
+
+    -- | Like maybePure, but doesn't add a pure annotation to App. This exists
+    -- to prevent from doubling up on annotation comments on curried
+    -- applications; from experimentation, it turns out that a comment on the
+    -- outermost App is sufficient for the entire curried chain to be
+    -- considered effect-free.
+    maybePure' :: AST -> Maybe AST
+    maybePure' = maybePureGen True
+
+    maybePureGen alreadyAnnotated = \case
+      AST.VariableIntroduction ss name j -> Just (AST.VariableIntroduction ss name (annotateOrWrap <$> j))
+      AST.App ss f args -> (if alreadyAnnotated then AST.App else pureApp) ss <$> maybePure' f <*> traverse maybePure args
+      -- In general, indexers can be effectful, but not when indexing into an
+      -- ES module object.
+      AST.Indexer ss idx v@(AST.Var _ name)
+        | name `S.member` moduleObjectNames -> (\idx' -> AST.Indexer ss idx' v) <$> maybePure idx
+      AST.ArrayLiteral ss jss -> AST.ArrayLiteral ss <$> traverse maybePure jss
+      AST.ObjectLiteral ss props -> AST.ObjectLiteral ss <$> traverse (traverse maybePure) props
+      AST.Comment c js -> AST.Comment c <$> maybePure js
+
+      js@AST.NumericLiteral{} -> Just js
+      js@AST.StringLiteral{}  -> Just js
+      js@AST.BooleanLiteral{} -> Just js
+      js@AST.Function{}       -> Just js
+      js@AST.Var{}            -> Just js
+
+      _ -> Nothing
+
+    pureIife :: AST -> AST
+    pureIife val = pureApp Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing [AST.Return Nothing val])) []
+
+    pureApp :: Maybe SourceSpan -> AST -> [AST] -> AST
+    pureApp ss f = AST.Comment AST.PureAnnotation . AST.App ss f
 
   -- | Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]
