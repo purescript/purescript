@@ -66,7 +66,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
       . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
-    let header = if comments && not (null coms) then AST.Comment Nothing coms else id
+    let header = if comments && not (null coms) then AST.Comment (AST.SourceComments coms) else id
     let foreign' = maybe [] (pure . AST.Import Nothing "$foreign") $ if null foreigns then Nothing else foreignInclude
     let moduleBody = (maybe [] (uncurry (:) . first header) . uncons) $ foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
@@ -83,7 +83,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   -- us remove any unreferenced top-level declarations. To achieve this, we wrap any non-trivial
   -- top-level values in an IIFE marked with a pure annotation.
   annotatePure :: AST -> AST
-  annotatePure js@(AST.App _ (AST.Function _ _ _ _) _) = AST.Pure Nothing js
+  annotatePure js@(AST.App _ (AST.Function _ _ _ _) _) = AST.Comment AST.PureAnnotation js
   annotatePure js@(AST.App _ _ _) = pureIife js
   annotatePure js@(AST.Unary _ _ _) = pureIife js
   annotatePure js@(AST.Binary _ _ _ _) = pureIife js
@@ -93,11 +93,11 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   annotatePure js@(AST.ArrayLiteral _ []) = js
   annotatePure js@(AST.ArrayLiteral _ _) = pureIife js
   annotatePure (AST.VariableIntroduction ss name (Just js)) = AST.VariableIntroduction ss name (Just (annotatePure js))
-  annotatePure (AST.Comment a b js) = AST.Comment a b (annotatePure js)
+  annotatePure (AST.Comment c js) = AST.Comment c (annotatePure js)
   annotatePure js = js
 
   pureIife :: AST -> AST
-  pureIife val = AST.Pure Nothing $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing [AST.Return Nothing val])) []
+  pureIife val = AST.Comment AST.PureAnnotation $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing [AST.Return Nothing val])) []
 
   -- | Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]
@@ -193,7 +193,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     withoutComment <- asks optionsNoComments
     if withoutComment
        then nonRecToJS a i (modifyAnn removeComments e)
-       else AST.Comment Nothing com <$> nonRecToJS a i (modifyAnn removeComments e)
+       else AST.Comment (AST.SourceComments com) <$> nonRecToJS a i (modifyAnn removeComments e)
   nonRecToJS (ss, _, _, _) ident val = do
     js <- valueToJs val
     withPos ss $ AST.VariableIntroduction Nothing (identToJs ident) (Just js)

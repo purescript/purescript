@@ -115,13 +115,13 @@ literals = mkPattern' match'
     [ return $ emit "throw "
     , prettyPrintJS' value
     ]
-  match (Comment _ com js) = mconcat <$> sequence
+  match (Comment (SourceComments com) js) = mconcat <$> sequence
     [ return $ emit "\n"
     , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
-  match (Pure _ js) = mconcat <$> sequence 
-    [ return $ emit  "/* #__PURE__ */ "
+  match (Comment PureAnnotation js) = mconcat <$> sequence 
+    [ return $ emit "/* #__PURE__ */ "
     , prettyPrintJS' js 
     ]
   match (Import _ ident from) = return . emit $
