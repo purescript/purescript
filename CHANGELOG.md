@@ -2603,7 +2603,7 @@ The way names are resolved has now been updated in a way that may result in some
 Some examples:
 
 | Import statement | Exposed members |
-| -------------------------- | --------------- |
+| --- | --- |
 | `import X` | `A`, `f` |
 | `import X as Y` | `Y.A` `Y.f` |
 | `import X (A)` | `A` |
