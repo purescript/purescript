@@ -20,8 +20,8 @@ which spago || npm install spago
 echo ::endgroup::
 
 echo ::group::Create dummy project
-echo 'let upstream = https://github.com/purescript/package-sets/releases/download/XXX/packages.dhall in upstream' >packages.dhall
-echo '{ name = "my-project", dependencies = [] : List Text, packages = ./packages.dhall, sources = [] : List Text }' >spago.dhall
+echo 'let upstream = https://github.com/purescript/package-sets/releases/download/XXX/packages.dhall in upstream' > packages.dhall
+echo '{ name = "my-project", dependencies = [] : List Text, packages = ./packages.dhall, sources = [] : List Text }' > spago.dhall
 spago upgrade-set
 # Override the `metadata` package's version to match `purs` version
 # so that `spago build` actually works
