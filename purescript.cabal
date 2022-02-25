@@ -207,6 +207,7 @@ library
     Language.PureScript.CoreFn.Traversals
     Language.PureScript.CoreImp
     Language.PureScript.CoreImp.AST
+    Language.PureScript.CoreImp.Module
     Language.PureScript.CoreImp.Optimizer
     Language.PureScript.CoreImp.Optimizer.Blocks
     Language.PureScript.CoreImp.Optimizer.Common

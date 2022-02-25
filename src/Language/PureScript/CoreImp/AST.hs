@@ -6,7 +6,6 @@ import Prelude.Compat
 import Control.Monad ((>=>))
 import Control.Monad.Identity (Identity(..), runIdentity)
 import Data.Text (Text)
-import qualified Data.List.NonEmpty as NEL (NonEmpty)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments
@@ -100,10 +99,6 @@ data AST
   -- ^ instanceof check
   | Comment CIComments AST
   -- ^ Commented JavaScript
-  | Import (Maybe SourceSpan) Text PSString
-  -- ^ Imported identifier and path to its module
-  | Export (Maybe SourceSpan) (NEL.NonEmpty Text) (Maybe PSString)
-  -- ^ Exported identifiers and optional path to their module (for re-exports)
   deriving (Show, Eq)
 
 withSourceSpan :: SourceSpan -> AST -> AST
@@ -135,8 +130,6 @@ withSourceSpan withSpan = go where
   go (Throw _ js) = Throw ss js
   go (InstanceOf _ j1 j2) = InstanceOf ss j1 j2
   go c@Comment{} = c
-  go (Import _ ident from) = Import ss ident from
-  go (Export _ idents from) = Export ss idents from
 
 getSourceSpan :: AST -> Maybe SourceSpan
 getSourceSpan = go where
@@ -164,8 +157,6 @@ getSourceSpan = go where
   go (Throw ss _) = ss
   go (InstanceOf ss _ _) = ss
   go (Comment _ _) = Nothing
-  go (Import ss _ _) = ss
-  go (Export ss _ _) = ss
 
 everywhere :: (AST -> AST) -> AST -> AST
 everywhere f = go where

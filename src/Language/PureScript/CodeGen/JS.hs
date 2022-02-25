@@ -15,7 +15,7 @@ import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
 import Data.Bifunctor (first)
-import Data.List ((\\), intersect, uncons)
+import Data.List ((\\), intersect)
 import qualified Data.List.NonEmpty as NEL (nonEmpty)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
@@ -29,6 +29,7 @@ import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.Common as Common
 import Language.PureScript.CoreImp.AST (AST, everywhereTopDownM, withSourceSpan)
 import qualified Language.PureScript.CoreImp.AST as AST
+import qualified Language.PureScript.CoreImp.Module as AST
 import Language.PureScript.CoreImp.Optimizer
 import Language.PureScript.CoreFn
 import Language.PureScript.Crash
@@ -50,7 +51,7 @@ moduleToJs
    . (Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
   => Module Ann
   -> Maybe PSString
-  -> m [AST]
+  -> m AST.Module
 moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
@@ -61,21 +62,23 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
     let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
           `S.union` M.keysSet reExps
-    jsImports <- traverse (importToJs mnLookup)
-      . filter (flip S.member usedModuleNames)
-      . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
+    let jsImports
+          = map (importToJs mnLookup)
+          . filter (flip S.member usedModuleNames)
+          . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
-    let header = if comments && not (null coms) then AST.Comment (AST.SourceComments coms) else id
-    let foreign' = maybe [] (pure . AST.Import Nothing "$foreign") $ if null foreigns then Nothing else foreignInclude
-    let moduleBody = (maybe [] (uncurry (:) . first header) . uncons) $ foreign' ++ jsImports ++ concat optimized
+    let header = if comments then coms else []
+    let foreign' = maybe [] (pure . AST.Import "$foreign") $ if null foreigns then Nothing else foreignInclude
+    let moduleBody = concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
     let reExps' = M.toList (M.withoutKeys reExps (S.fromList C.primModules))
-    return $ moduleBody
-      ++ (maybeToList . exportsToJs foreignInclude $ foreignExps)
-      ++ (maybeToList . exportsToJs Nothing $ standardExps)
-      ++  mapMaybe reExportsToJs reExps'
+    let jsExports
+          =  (maybeToList . exportsToJs foreignInclude $ foreignExps)
+          ++ (maybeToList . exportsToJs Nothing $ standardExps)
+          ++  mapMaybe reExportsToJs reExps'
+    return $ AST.Module header (foreign' ++ jsImports) moduleBody jsExports
 
   where
   -- | Adds purity annotations to top-level values for bundlers.
@@ -127,19 +130,19 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
 
   -- | Generates JavaScript code for a module import, binding the required module
   -- to the alternative
-  importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m AST
-  importToJs mnLookup mn' = do
-    let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
-    withPos ss $ AST.Import Nothing (moduleNameToJs mnSafe) (moduleImportPath mn')
+  importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> AST.Import
+  importToJs mnLookup mn' =
+    let (_, mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
+    in AST.Import (moduleNameToJs mnSafe) (moduleImportPath mn')
 
   -- | Generates JavaScript code for exporting at least one identifier,
   -- eventually from another module.
-  exportsToJs :: Maybe PSString -> [Ident] -> Maybe AST
-  exportsToJs from = fmap (flip (AST.Export Nothing) from) . NEL.nonEmpty . fmap runIdent
+  exportsToJs :: Maybe PSString -> [Ident] -> Maybe AST.Export
+  exportsToJs from = fmap (flip AST.Export from) . NEL.nonEmpty . fmap runIdent
 
   -- | Generates JavaScript code for re-exporting at least one identifier from
   -- from another module.
-  reExportsToJs :: (ModuleName, [Ident]) -> Maybe AST
+  reExportsToJs :: (ModuleName, [Ident]) -> Maybe AST.Export
   reExportsToJs = uncurry exportsToJs . first (Just . moduleImportPath)
 
   moduleImportPath :: ModuleName -> PSString
