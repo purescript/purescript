@@ -2,7 +2,7 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.14.6
+## 0.14.7
 
 New features:
 
@@ -132,6 +132,10 @@ Internal:
   This adds machinery for testing code generation for optimizations.
 
   Partially extracted from #3915 to add tests for #4205.
+
+## 0.14.6
+
+Do not use this release. `purescript-cst`'s version wasn't bumped when this release was made. So, tools like `trypurescript` cannot depend on it. See [0.14.7](#0147) for the same thing.
 
 ## 0.14.5
 
@@ -2602,14 +2606,14 @@ The way names are resolved has now been updated in a way that may result in some
 
 Some examples:
 
-| Import statement | Exposed members |
-| --- | --- |
-| `import X` | `A`, `f` |
-| `import X as Y` | `Y.A` `Y.f` |
-| `import X (A)` | `A` |
-| `import X (A) as Y` | `Y.A` |
-| `import X hiding (f)` | `A` |
-| `import Y hiding (f) as Y` | `Y.A` |
+| Import statement           | Exposed members |
+| -------------------------- | --------------- |
+| `import X`                 | `A`, `f`        |
+| `import X as Y`            | `Y.A` `Y.f`     |
+| `import X (A)`             | `A`             |
+| `import X (A) as Y`        | `Y.A`           |
+| `import X hiding (f)`      | `A`             |
+| `import Y hiding (f) as Y` | `Y.A`           |
 
 Qualified references like `Control.Monad.Eff.Console.log` will no longer resolve unless there is a corresponding `import Control.Monad.Eff.Console as Control.Monad.Eff.Console`. Importing a module unqualified does not allow you to reference it with qualification, so `import X` does not allow references to `X.A` unless there is also an `import X as X`.
 
