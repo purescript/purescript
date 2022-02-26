@@ -330,7 +330,7 @@ instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- | Attempt to uncons a type variable binding from a type.
-unconsVtaTypeVar :: SourceType -> Maybe ((Text, SourceType), SourceType)
+unconsVtaTypeVar :: SourceType -> Maybe (Text, SourceType)
 unconsVtaTypeVar = go Nothing []
   where
   go y n (ForAll a i k t s v) =
@@ -341,7 +341,7 @@ unconsVtaTypeVar = go Nothing []
     typeVar <- getTypeVar <$> y
     pure (typeVar, foldl' mkForAll' t n)
 
-  getTypeVar (_, i, k, _, _) = (i, fromMaybe (internalError "unelaborated forall") k)
+  getTypeVar (_, i, _, _, _) = i
 
   mkForAll' t (a, i, k, s, v) = ForAll a i k t s v
 
@@ -479,16 +479,13 @@ infer' (VisibleTypeApp val typeArg) = do
   --
   -- This allows typeArg's kind to unify with the unknown k.
   (val'', valTy') <- instantiatePolyTypeWithUnknowns val' valTy
-  -- `kindOf` here does two things:
-  -- 1. It infers the kind of typeArg
-  -- 2. It eliminates ParensInType in typeArg
-  (typeArg', typeArgKind) <- kindOf typeArg
+  -- `kindOf` here eliminates ParensInType in typeArg
+  (typeArg', _) <- kindOf typeArg
   typeArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ typeArg'
   case unconsVtaTypeVar valTy' of
-    Just ((typeVar, typeVarKind), tyAbsBody) -> do
-      unifyKinds typeArgKind typeVarKind
-      let valTy'' = replaceTypeVars typeVar typeArg'' tyAbsBody
-      pure $ TypedValue' True val'' valTy''
+    Just (typeVar, valTyTail) -> do
+      let valTy'' = replaceTypeVars typeVar typeArg'' valTyTail
+      TypedValue' True val'' <$> checkKind valTy'' kindType
     _ ->
       throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy typeArg
 infer' (Hole name) = do
