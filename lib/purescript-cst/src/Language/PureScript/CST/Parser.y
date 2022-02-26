@@ -378,7 +378,7 @@ exprWhere :: { Where () }
 
 expr :: { Expr () }
   : expr1 %shift { $1 }
-  | expr1 '::' type { ExprTyped () $1 $2 $3 }
+  | expr1 '::' typeVta { ExprTyped () $1 $2 $3 }
 
 expr1 :: { Expr () }
   : expr2 %shift { $1 }

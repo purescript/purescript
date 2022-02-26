@@ -58,4 +58,10 @@ kinded = Proxy
 kinded' :: Proxy ( a :: Proxy "Int", b :: Proxy "Int", j :: Proxy Symbol, k :: Proxy Symbol )
 kinded' = kinded @Symbol @"Int" @"Int"
 
+changeId :: forall a. a -> a
+changeId x = x
+
+changeId' :: Int -> Int
+changeId' = (changeId :: forall @a. a -> a) @Int
+
 main = log "Done"
