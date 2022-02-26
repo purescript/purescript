@@ -339,7 +339,7 @@ unconsVtaTypeVar = go Nothing []
       _ -> go y ((a, i, k, s, v) : n) t
   go y n t = do
     typeVar <- getTypeVar <$> y
-    pure $ (typeVar, foldl' mkForAll' t n)
+    pure (typeVar, foldl' mkForAll' t n)
 
   getTypeVar (_, i, k, _, _) = (i, fromMaybe (internalError "unelaborated forall") k)
 
