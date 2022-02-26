@@ -36,7 +36,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Bifunctor (bimap)
 import Data.Either (partitionEithers)
 import Data.Functor (($>))
-import Data.List (transpose, (\\), partition, delete, foldl')
+import Data.List (transpose, (\\), partition, delete, foldl', uncons)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Traversable (for)
@@ -331,18 +331,19 @@ instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
   instantiatePolyTypeWithUnknowns (App val (TypeClassDictionary con dicts hints)) ty
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
--- | "Hoist" up ForAlls tagged with IsVtaForAll, making sure that they go first no matter
--- the order they're defined in source. This routine is primarily used when inferring the
--- type of a visible type application.
-hoistVtaTypeVars :: SourceType -> SourceType
-hoistVtaTypeVars = go [] []
+-- | Attempt to uncons a type variable binding from a type.
+unconsVtaTypeVar :: SourceType -> Maybe ((Text, SourceType), SourceType)
+unconsVtaTypeVar = go [] []
   where
   go y n (ForAll a i k t s v) =
     case v of
       IsVtaForAll -> go ((a, i, k, s, v) : y) n t
       NotVtaForAll -> go y ((a, i, k, s, v) : n) t
-  go y n t =
-    foldl' mkForAll' (foldl' mkForAll' t n) y
+  go y n t = do
+    (yh, yt) <- uncons $ reverse y
+    pure $ (getVar yh, foldl' mkForAll' (foldl' mkForAll' t n) yt)
+
+  getVar (_, i, k, _, _) = (i, fromMaybe (internalError "unelaborated forall") k)
 
   mkForAll' t (a, i, k, s, v) = ForAll a i k t s v
 
@@ -468,22 +469,30 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy
   tv <- if checkType then withScopedTypeVars moduleName args (check val ty') else return (TypedValue' False val ty)
   return $ TypedValue' True (tvToExpr tv) ty'
-infer' (VisibleTypeApp val tyAbsArg) = do
+infer' (VisibleTypeApp val typeArg) = do
   TypedValue' _ val' valTy <- infer' val
-  -- The call to `kindOf` here is important because the `inferKind` routine
-  -- in the kind checker eliminates `ParensInType` from `tyAbsArg`. I'm not
-  -- sure why it isn't unwrapped by the type checker though. - PureFunctor
-  (tyAbsArg', tyAbsKind) <- kindOf tyAbsArg
-  tyAbsArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ tyAbsArg'
-  case hoistVtaTypeVars valTy of
-    ForAll _ tyAbsVar (Just tyAbsVarKind) tyAbsBody _ IsVtaForAll -> do
-      -- TODO: Doesn't work
-      unifyKinds tyAbsKind tyAbsVarKind
-      let valTy' = replaceTypeVars tyAbsVar tyAbsArg'' tyAbsBody
-      (val'', valTy'') <- instantiatePolyTypeWithUnknowns val' valTy'
-      return $ TypedValue' True val'' valTy''
-    t ->
-      internalError $ prettyPrintType 1000 t
+  -- We instantiate early such that polykinded type variables:
+  --
+  -- forall (k :: Type) (@t :: k). Proxy t
+  --
+  -- are turned into:
+  --
+  -- forall (@t :: k?). Proxy t
+  --
+  -- This allows typeArg's kind to unify with the unknown k.
+  (val'', valTy') <- instantiatePolyTypeWithUnknowns val' valTy
+  -- `kindOf` here does two things:
+  -- 1. It infers the kind of typeArg
+  -- 2. It eliminates ParensInType in typeArg
+  (typeArg', typeArgKind) <- kindOf typeArg
+  typeArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ typeArg'
+  case unconsVtaTypeVar valTy' of
+    Just ((typeVar, typeVarKind), tyAbsBody) -> do
+      unifyKinds typeArgKind typeVarKind
+      let valTy'' = replaceTypeVars typeVar typeArg'' tyAbsBody
+      pure $ TypedValue' True val'' valTy''
+    _ ->
+      internalError $ prettyPrintType 1000 valTy'
 infer' (Hole name) = do
   ty <- freshTypeWithKind kindType
   ctx <- getLocalContext
