@@ -490,7 +490,7 @@ infer' (VisibleTypeApp val typeArg) = do
       let valTy'' = replaceTypeVars typeVar typeArg'' tyAbsBody
       pure $ TypedValue' True val'' valTy''
     _ ->
-      throwError . errorMessage $ CannotApplyTypeOnExpressionOfType typeArg valTy
+      throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy typeArg
 infer' (Hole name) = do
   ty <- freshTypeWithKind kindType
   ctx <- getLocalContext

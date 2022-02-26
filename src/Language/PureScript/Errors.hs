@@ -190,7 +190,7 @@ data SimpleErrorMessage
   | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
-  | CannotApplyTypeOnExpressionOfType SourceType SourceType
+  | CannotApplyExpressionOfTypeOnType SourceType SourceType
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -355,7 +355,7 @@ errorCode em = case unwrapErrorMessage em of
   UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
-  CannotApplyTypeOnExpressionOfType {} -> "CannotApplyTypeOnExpressionOfType"
+  CannotApplyExpressionOfTypeOnType {} -> "CannotApplyExpressionOfTypeOnType"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1352,12 +1352,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
       line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
 
-    renderSimpleErrorMessage (CannotApplyTypeOnExpressionOfType targ tabs) =
+    renderSimpleErrorMessage (CannotApplyExpressionOfTypeOnType tabs targ) =
       paras
-        [ "The type:"
-        , markCodeBox $ indent $ prettyType targ
-        , "cannot be applied to an expression of type:"
+        [ "An expression of type:"
         , markCodeBox $ indent $ prettyType tabs
+        , "cannot be applied to the type:"
+        , markCodeBox $ indent $ prettyType targ
         ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box

@@ -1,4 +1,4 @@
--- @shouldFailWith CannotApplyTypeOnExpressionOfType
+-- @shouldFailWith CannotApplyExpressionOfTypeOnType
 module Main where
 
 id :: forall a. a -> a
