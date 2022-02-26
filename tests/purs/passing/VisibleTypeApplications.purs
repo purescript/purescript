@@ -52,4 +52,10 @@ instance TypeClass3 Id where
 tc3' :: Proxy ( f :: Id )
 tc3' = tc3 @Id
 
+kinded :: forall @k (@a :: k) j (@b :: j). Proxy (a :: Proxy a, k :: Proxy k, b :: Proxy b, j :: Proxy j)
+kinded = Proxy
+
+kinded' :: Proxy ( a :: Proxy "Int", b :: Proxy "Int", j :: Proxy Symbol, k :: Proxy Symbol )
+kinded' = kinded @Symbol @"Int" @"Int"
+
 main = log "Done"
