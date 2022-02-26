@@ -189,7 +189,7 @@ usedTypeNames moduleName = go
   usedNamesForTypeClassDeps _ = []
 
 declTypeName :: Declaration -> ProperName 'TypeName
-declTypeName (DataDeclaration _ _ pn _ _) = pn
+declTypeName (DataDeclaration _ _ pn _ _ _) = pn
 declTypeName (ExternDataDeclaration _ pn _) = pn
 declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
 declTypeName (TypeClassDeclaration _ pn _ _ _ _ _) = coerceProperName pn

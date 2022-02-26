@@ -61,14 +61,14 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
 
   -- | Desugars member declarations from AST to CoreFn representation.
   declToCoreFn :: A.Declaration -> [Bind Ann]
-  declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [ctor]) =
+  declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ _ [ctor]) =
     [NonRec (ss, [], Nothing, declMeta) (properToIdent $ A.dataCtorName ctor) $
       Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var (ssAnn ss) $ Qualified Nothing (Ident "x"))]
     where
     declMeta = isDictTypeName (A.dataCtorName ctor) `orEmpty` IsTypeClassConstructor
-  declToCoreFn d@(A.DataDeclaration _ Newtype _ _ _) =
+  declToCoreFn d@(A.DataDeclaration _ Newtype _ _ _ _) =
     error $ "Found newtype with multiple constructors: " ++ show d
-  declToCoreFn (A.DataDeclaration (ss, com) Data tyName _ ctors) =
+  declToCoreFn (A.DataDeclaration (ss, com) Data tyName _ _ ctors) =
     flip fmap ctors $ \ctorDecl ->
       let
         ctor = A.dataCtorName ctorDecl

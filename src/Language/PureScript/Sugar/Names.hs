@@ -185,10 +185,11 @@ renameInModule imports (Module modSS coms mn decls exps) =
     :: [Ident]
     -> Declaration
     -> m ([Ident], Declaration)
-  updateDecl bound (DataDeclaration sa dtype name args dctors) =
+  updateDecl bound (DataDeclaration sa dtype name args vtvs dctors) =
     fmap (bound,) $
       DataDeclaration sa dtype name
         <$> updateTypeArguments args
+        <*> pure vtvs
         <*> traverse (traverseDataCtorFields (traverse (sndM updateTypesEverywhere))) dctors
   updateDecl bound (TypeSynonymDeclaration sa name ps ty) =
     fmap (bound,) $

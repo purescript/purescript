@@ -315,7 +315,7 @@ resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) =
   where
   extractDeclComments :: P.Declaration -> [(P.Name, [P.Comment])]
   extractDeclComments = \case
-    P.DataDeclaration (_, cs) _ ctorName _ ctors ->
+    P.DataDeclaration (_, cs) _ ctorName _ _ ctors ->
       (P.TyName ctorName, cs) : map dtorComments ctors
     P.TypeClassDeclaration (_, cs) tyClassName _ _ _ _ members ->
       (P.TyClassName tyClassName, cs) : concatMap extractDeclComments members

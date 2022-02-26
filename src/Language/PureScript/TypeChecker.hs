@@ -287,7 +287,7 @@ typeCheckAll
 typeCheckAll moduleName _ = traverse go
   where
   go :: Declaration -> m Declaration
-  go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
+  go (DataDeclaration sa@(ss, _) dtype name args vtvs dctors) = do
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
       when (dtype == Newtype) $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
@@ -297,23 +297,23 @@ typeCheckAll moduleName _ = traverse go
       dctors' <- traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
       let args'' = args' `withRoles` inferRoles env moduleName name args' dctors'
       addDataType moduleName dtype name args'' dataCtors ctorKind
-    return $ DataDeclaration sa dtype name args dctors
+    return $ DataDeclaration sa dtype name args vtvs dctors
   go d@(DataBindingGroupDeclaration tys) = do
     let tysList = NEL.toList tys
         syns = mapMaybe toTypeSynonym tysList
         dataDecls = mapMaybe toDataDecl tysList
         roleDecls = mapMaybe toRoleDecl tysList
         clss = mapMaybe toClassDecl tysList
-        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2) ++ fmap coerceProperName (map fst clss^..traverse._2._2))
+        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (map fst dataDecls^..traverse._2._2) ++ fmap coerceProperName (map fst clss^..traverse._2._2))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
       env <- getEnv
-      (syn_ks, data_ks, cls_ks) <- kindsOfAll moduleName syns (fmap snd dataDecls) (fmap (snd . fst) clss)
+      (syn_ks, data_ks, cls_ks) <- kindsOfAll moduleName syns (fmap (snd . fst) dataDecls) (fmap (snd . fst) clss)
       for_ (zip syns syn_ks) $ \((_, name, args, _), (elabTy, kind)) -> do
         checkDuplicateTypeArguments $ map fst args
         let args' = args `withKinds` kind
         addTypeSynonym moduleName name args' elabTy kind
-      let dataDeclsWithKinds = zipWith (\(dtype, (_, name, args, _)) (dataCtors, ctorKind) ->
+      let dataDeclsWithKinds = zipWith (\((dtype, (_, name, args, _)), _) (dataCtors, ctorKind) ->
             (dtype, name, args `withKinds` ctorKind, dataCtors, ctorKind)) dataDecls data_ks
       inferRoles' <- fmap (inferDataBindingGroupRoles env moduleName roleDecls) .
         forM dataDeclsWithKinds $ \(_, name, args, dataCtors, _) ->
@@ -333,7 +333,7 @@ typeCheckAll moduleName _ = traverse go
     where
     toTypeSynonym (TypeSynonymDeclaration sa nm args ty) = Just (sa, nm, args, ty)
     toTypeSynonym _ = Nothing
-    toDataDecl (DataDeclaration sa dtype nm args dctors) = Just (dtype, (sa, nm, args, dctors))
+    toDataDecl (DataDeclaration sa dtype nm args vtvs dctors) = Just ((dtype, (sa, nm, args, dctors)), vtvs)
     toDataDecl _ = Nothing
     toRoleDecl (RoleDeclaration rdd) = Just rdd
     toRoleDecl _ = Nothing

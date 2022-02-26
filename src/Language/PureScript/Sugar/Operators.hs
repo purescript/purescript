@@ -314,9 +314,10 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goType' = everywhereOnTypesTopDownM . goType
 
   goDecl :: Declaration -> m Declaration
-  goDecl (DataDeclaration sa@(ss, _) ddt name args dctors) =
+  goDecl (DataDeclaration sa@(ss, _) ddt name args vtvs dctors) =
     DataDeclaration sa ddt name
       <$> traverse (traverse (traverse (goType' ss))) args
+      <*> pure vtvs
       <*> traverse (traverseDataCtorFields (traverse (sndM (goType' ss)))) dctors
   goDecl (ExternDeclaration sa@(ss, _) name ty) =
     ExternDeclaration sa name <$> goType' ss ty

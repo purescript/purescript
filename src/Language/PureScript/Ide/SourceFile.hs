@@ -77,7 +77,7 @@ extractSpans d = case d of
     [(IdeNamespaced IdeNSType (P.runProperName name), ss)]
   P.TypeClassDeclaration (ss, _) name _ _ _ _ members ->
     (IdeNamespaced IdeNSType (P.runProperName name), ss) : concatMap extractSpans' members
-  P.DataDeclaration (ss, _) _ name _ ctors ->
+  P.DataDeclaration (ss, _) _ name _ _ ctors ->
     (IdeNamespaced IdeNSType (P.runProperName name), ss) : map dtorSpan ctors
   P.FixityDeclaration (ss, _) (Left (P.ValueFixity _ _ opName)) ->
     [(IdeNamespaced IdeNSValue (P.runOpName opName), ss)]

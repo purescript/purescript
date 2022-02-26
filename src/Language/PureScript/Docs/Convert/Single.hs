@@ -130,7 +130,7 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
 getDeclarationTitle :: P.Declaration -> Maybe Text
 getDeclarationTitle (P.ValueDeclaration vd) = Just (P.showIdent (P.valdeclIdent vd))
 getDeclarationTitle (P.ExternDeclaration _ name _) = Just (P.showIdent name)
-getDeclarationTitle (P.DataDeclaration _ _ name _ _) = Just (P.runProperName name)
+getDeclarationTitle (P.DataDeclaration _ _ name _ _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.ExternDataDeclaration _ name _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeSynonymDeclaration _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _ _) = Just (P.runProperName name)
@@ -164,7 +164,7 @@ convertDeclaration (P.ValueDecl sa _ _ _ _) title =
   basicDeclaration sa title (ValueDeclaration (P.TypeWildcard () Nothing))
 convertDeclaration (P.ExternDeclaration sa _ ty) title =
   basicDeclaration sa title (ValueDeclaration (ty $> ()))
-convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
+convertDeclaration (P.DataDeclaration sa dtype _ args _ ctors) title =
   Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
   info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args) []

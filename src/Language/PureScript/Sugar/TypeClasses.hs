@@ -281,7 +281,7 @@ typeClassDictionaryDeclaration sa name args implies members =
       toRowListItem (l, t) = srcRowListItem (Label $ mkString l) t
       ctor = DataConstructorDeclaration sa (coerceProperName $ dictTypeName name)
         [(Ident "dict", srcTypeApp tyRecord $ rowFromList (map toRowListItem mtys, srcREmpty))]
-  in DataDeclaration sa Newtype (coerceProperName $ dictTypeName name) args [ctor]
+  in DataDeclaration sa Newtype (coerceProperName $ dictTypeName name) args [] [ctor]
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName

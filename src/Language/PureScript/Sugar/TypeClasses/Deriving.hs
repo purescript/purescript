@@ -196,7 +196,7 @@ deriveNewtypeInstance ss mn syns kinds ndis className ds tys tyConNm dargs = do
     tyCon <- findTypeDecl ss tyConNm ds
     go tyCon
   where
-    go (DataDeclaration _ Newtype _ tyArgNames [DataConstructorDeclaration _ _ [(_, wrapped)]]) = do
+    go (DataDeclaration _ Newtype _ tyArgNames _ [DataConstructorDeclaration _ _ [(_, wrapped)]]) = do
       -- The newtype might not be applied to all type arguments.
       -- This is okay as long as the newtype wraps something which ends with
       -- sufficiently many type applications to variables.
@@ -279,7 +279,7 @@ deriveGenericRep ss mn syns kinds ds tyConNm tyConArgs repTy = do
     go =<< findTypeDecl ss tyConNm ds
   where
     go :: Declaration -> m ([Declaration], SourceType)
-    go (DataDeclaration (ss', _) _ _ args dctors) = do
+    go (DataDeclaration (ss', _) _ _ args _ dctors) = do
       x <- freshIdent "x"
       (reps, to, from) <- unzip3 <$> traverse makeInst dctors
       let rep = toRepTy reps
@@ -398,7 +398,7 @@ deriveEq ss mn syns kinds ds tyConNm = do
   return [ ValueDecl (ss, []) (Ident Prelude.eq) Public [] (unguarded eqFun) ]
   where
     mkEqFunction :: Declaration -> m Expr
-    mkEqFunction (DataDeclaration (ss', _) _ _ _ args) = do
+    mkEqFunction (DataDeclaration (ss', _) _ _ _ _ args) = do
       x <- freshIdent "x"
       y <- freshIdent "y"
       lamCase2 ss' x y <$> (addCatch <$> mapM mkCtorClause args)
@@ -467,7 +467,7 @@ deriveOrd ss mn syns kinds ds tyConNm = do
   return [ ValueDecl (ss, []) (Ident Prelude.compare) Public [] (unguarded compareFun) ]
   where
     mkCompareFunction :: Declaration -> m Expr
-    mkCompareFunction (DataDeclaration (ss', _) _ _ _ args) = do
+    mkCompareFunction (DataDeclaration (ss', _) _ _ _ _ args) = do
       x <- freshIdent "x"
       y <- freshIdent "y"
       lamCase2 ss' x y <$> (addCatch . concat <$> mapM mkCtorClauses (splitLast args))
@@ -569,9 +569,9 @@ deriveNewtype ss syns kinds ds tyConNm tyConArgs unwrappedTy = do
     go =<< findTypeDecl ss tyConNm ds
   where
     go :: Declaration -> m SourceType
-    go (DataDeclaration (ss', _) Data name _ _) =
+    go (DataDeclaration (ss', _) Data name _ _ _) =
       throwError . errorMessage' ss' $ CannotDeriveNewtypeForData name
-    go (DataDeclaration _ Newtype name args dctors) = do
+    go (DataDeclaration _ Newtype name args _ dctors) = do
       checkNewtype name dctors
       let (DataConstructorDeclaration _ _ [(_, ty)]) = head dctors
       ty' <- replaceAllTypeSynonymsM syns kinds ty
@@ -588,7 +588,7 @@ findTypeDecl
 findTypeDecl ss tyConNm = maybe (throwError . errorMessage' ss $ CannotFindDerivingType tyConNm) return . find isTypeDecl
   where
   isTypeDecl :: Declaration -> Bool
-  isTypeDecl (DataDeclaration _ _ nm _ _) | nm == tyConNm = True
+  isTypeDecl (DataDeclaration _ _ nm _ _ _) | nm == tyConNm = True
   isTypeDecl _ = False
 
 lam :: SourceSpan -> Ident -> Expr -> Expr
@@ -641,7 +641,7 @@ deriveFunctor ss mn syns kinds ds tyConNm = do
   return [ ValueDecl (ss, []) (Ident Prelude.map) Public [] (unguarded mapFun) ]
   where
     mkMapFunction :: Declaration -> m Expr
-    mkMapFunction (DataDeclaration (ss', _) _ _ tys ctors) = case reverse tys of
+    mkMapFunction (DataDeclaration (ss', _) _ _ tys _ ctors) = case reverse tys of
       [] -> throwError . errorMessage' ss' $ KindsDoNotUnify (kindType -:> kindType) kindType
       ((iTy, _) : _) -> do
         f <- freshIdent "f"
