@@ -298,13 +298,13 @@ type1 :: { Type () }
   : type2 { $1 }
   | forall many(typeVarBinding) '.' type1 { TypeForall () $1 $2 $3 $4 }
 
-typeVta :: { Type () }
-  : type1Vta %shift { $1 }
-  | type1Vta '::' type { TypeKinded () $1 $2 $3 }
+typeWithVta :: { Type () }
+  : type1WithVta %shift { $1 }
+  | type1WithVta '::' type { TypeKinded () $1 $2 $3 }
 
-type1Vta :: { Type () }
+type1WithVta :: { Type () }
   : type2 { $1 }
-  | forall many(typeVarBindingVta) '.' type1 { TypeForall () $1 $2 $3 $4 }
+  | forall many(typeVarBindingWithVta) '.' type1 { TypeForall () $1 $2 $3 $4 }
 
 type2 :: { Type () }
   : type3 %shift { $1 }
@@ -362,7 +362,7 @@ typeVarBinding :: { TypeVarBinding () }
   : ident { TypeVarName Nothing $1 }
   | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded Nothing (Wrapped $1 (Labeled $2 $3 $4) $5)) }
 
-typeVarBindingVta :: { TypeVarBinding () }
+typeVarBindingWithVta :: { TypeVarBinding () }
   : ident { TypeVarName Nothing $1 }
   | '@' ident { TypeVarName (Just $1) $2 }
   | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded Nothing (Wrapped $1 (Labeled $2 $3 $4) $5)) }
@@ -378,7 +378,7 @@ exprWhere :: { Where () }
 
 expr :: { Expr () }
   : expr1 %shift { $1 }
-  | expr1 '::' typeVta { ExprTyped () $1 $2 $3 }
+  | expr1 '::' typeWithVta { ExprTyped () $1 $2 $3 }
 
 expr1 :: { Expr () }
   : expr2 %shift { $1 }
@@ -688,7 +688,7 @@ decl :: { Declaration () }
   | 'type' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled (getProperName $2) $3 $4)) }
   | 'derive' instHead { DeclDerive () $1 Nothing $2 }
   | 'derive' 'newtype' instHead { DeclDerive () $1 (Just $2) $3 }
-  | ident '::' typeVta { DeclSignature () (Labeled $1 $2 $3) }
+  | ident '::' typeWithVta { DeclSignature () (Labeled $1 $2 $3) }
   | ident manyOrEmpty(binderAtom) guardedDecl { DeclValue () (ValueBindingFields $1 $2 $3) }
   | fixity { DeclFixity () $1 }
   | 'foreign' 'import' ident '::' type {% when (isConstrained $5) (addWarning ([$1, $2, nameTok $3, $4] <> toList (flattenType $5)) WarnDeprecatedConstraintInForeignImportSyntax) *> pure (DeclForeign () $1 $2 (ForeignValue (Labeled $3 $4 $5))) }
@@ -737,7 +737,7 @@ classSuper :: { (OneOrDelimited (Constraint ()), SourceToken) }
   : constraints '<=' {%^ revert $ pure ($1, $2) }
 
 classNameAndFundeps :: { (Name (N.ProperName 'N.ClassName), [TypeVarBinding ()], Maybe (SourceToken, Separated ClassFundep)) }
-  : properName manyOrEmpty(typeVarBindingVta) fundeps {%^ revert $ pure (getProperName $1, $2, $3) }
+  : properName manyOrEmpty(typeVarBindingWithVta) fundeps {%^ revert $ pure (getProperName $1, $2, $3) }
 
 fundeps :: { Maybe (SourceToken, Separated ClassFundep) }
   : {- empty -} { Nothing }
@@ -748,7 +748,7 @@ fundep :: { ClassFundep }
   | many(ident) '->' many(ident) { FundepDetermines $1 $2 $3 }
 
 classMember :: { Labeled (Name Ident) (Type ()) }
-  : ident '::' typeVta {% checkNoWildcards $3 *> pure (Labeled $1 $2 $3) }
+  : ident '::' typeWithVta {% checkNoWildcards $3 *> pure (Labeled $1 $2 $3) }
 
 instHead :: { InstanceHead () }
   : 'instance' constraints '=>' qualProperName manyOrEmpty(typeAtom)
