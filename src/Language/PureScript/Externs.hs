@@ -137,7 +137,7 @@ data ExternsDeclaration =
   | EDClass
       { edClassName               :: ProperName 'ClassName
       , edClassTypeArguments      :: [(Text, Maybe SourceType)]
-      , edClassVtaForAlls         :: [VtaForAll]
+      , edClassVtaTypeVars         :: [VtaTypeVar]
       , edClassMembers            :: [(Ident, SourceType)]
       , edClassConstraints        :: [SourceConstraint]
       , edFunctionalDependencies  :: [FunctionalDependency]
@@ -255,7 +255,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsF
     = [ EDType (coerceProperName className) kind tk
       , EDType dictName dictKind dictData
       , EDDataConstructor dctor dty dictName ty args
-      , EDClass className typeClassArguments typeClassVtaForAlls typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
+      , EDClass className typeClassArguments typeClassVtaTypeVars typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef ss' ident ns)
     = [ EDInstance tcdClassName (lookupRenamedIdent ident) tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex ns ss'

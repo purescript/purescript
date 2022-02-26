@@ -147,7 +147,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
-forall_ :: Pattern () PrettyPrintType ([((Text, Maybe PrettyPrintType), VtaForAll)], PrettyPrintType)
+forall_ :: Pattern () PrettyPrintType ([((Text, Maybe PrettyPrintType), VtaTypeVar)], PrettyPrintType)
 forall_ = mkPattern match
   where
   match (PPForAll mbKindedIdents ty) = Just (mbKindedIdents, ty)
@@ -233,16 +233,16 @@ renderType'
   = fromMaybe (internalError "Incomplete pattern")
   . PA.pattern matchType ()
 
-renderTypeVars :: [((Text, Maybe PrettyPrintType), VtaForAll)] -> RenderedCode
+renderTypeVars :: [((Text, Maybe PrettyPrintType), VtaTypeVar)] -> RenderedCode
 renderTypeVars tyVars = mintersperse sp (map renderTypeVar tyVars)
 
-renderTypeVar :: ((Text, Maybe PrettyPrintType), VtaForAll) -> RenderedCode
+renderTypeVar :: ((Text, Maybe PrettyPrintType), VtaTypeVar) -> RenderedCode
 renderTypeVar ((v, mbK), vta) = case mbK of
-  Nothing -> renderVtaForAll vta <> typeVar v
-  Just k -> mintersperse sp [ mconcat [syntax "(", renderVtaForAll vta, typeVar v], syntax "::", mconcat [renderType' k, syntax ")"] ]
+  Nothing -> renderVtaTypeVar vta <> typeVar v
+  Just k -> mintersperse sp [ mconcat [syntax "(", renderVtaTypeVar vta, typeVar v], syntax "::", mconcat [renderType' k, syntax ")"] ]
   where
-  renderVtaForAll IsVtaForAll = syntax "@"
-  renderVtaForAll NotVtaForAll = syntax ""
+  renderVtaTypeVar IsVtaTypeVar = syntax "@"
+  renderVtaTypeVar NotVtaTypeVar = syntax ""
 
 -- |
 -- Render code representing a Type, as it should appear inside parentheses

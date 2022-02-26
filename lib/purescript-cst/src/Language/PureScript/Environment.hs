@@ -52,8 +52,8 @@ data TypeClassData = TypeClassData
   { typeClassArguments :: [(Text, Maybe SourceType)]
   -- ^ A list of type argument names, and their kinds, where kind annotations
   -- were provided.
-  , typeClassVtaForAlls :: [VtaForAll]
-  -- ^ A list of VtaForAlls which determine whether an argument can be bound
+  , typeClassVtaTypeVars :: [VtaTypeVar]
+  -- ^ A list of VtaTypeVars which determine whether an argument can be bound
   -- using a visible type application.
   , typeClassMembers :: [(Ident, SourceType)]
   -- ^ A list of type class members and their types. Type arguments listed above
@@ -125,7 +125,7 @@ initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPr
 -- in its SCC, and everything determining X is either before it in an SCC path, or in the same SCC.
 makeTypeClassData
   :: [(Text, Maybe SourceType)]
-  -> [VtaForAll]
+  -> [VtaTypeVar]
   -> [(Ident, SourceType)]
   -> [SourceConstraint]
   -> [FunctionalDependency]
@@ -324,7 +324,7 @@ tyVar :: Text -> SourceType
 tyVar = TypeVar nullSourceAnn
 
 tyForall :: Text -> SourceType -> SourceType -> SourceType
-tyForall var k ty = ForAll nullSourceAnn var (Just k) ty Nothing NotVtaForAll
+tyForall var k ty = ForAll nullSourceAnn var (Just k) ty Nothing NotVtaTypeVar
 
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType

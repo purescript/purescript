@@ -135,10 +135,10 @@ convertType fileName = go
         mkForAll a b v t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
           T.ForAll ann' (getIdent $ nameValue a) b t Nothing v
-        k (TypeVarKinded (Just _) (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b)) T.IsVtaForAll
-        k (TypeVarKinded _ (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b)) T.NotVtaForAll
-        k (TypeVarName (Just _) a) = mkForAll a Nothing T.IsVtaForAll
-        k (TypeVarName _ a) = mkForAll a Nothing T.NotVtaForAll
+        k (TypeVarKinded (Just _) (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b)) T.IsVtaTypeVar
+        k (TypeVarKinded _ (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b)) T.NotVtaTypeVar
+        k (TypeVarName (Just _) a) = mkForAll a Nothing T.IsVtaTypeVar
+        k (TypeVarName _ a) = mkForAll a Nothing T.NotVtaTypeVar
         ty' = foldr k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
       T.setAnnForType ann ty'
@@ -459,8 +459,8 @@ convertDeclaration fileName decl = case decl of
     pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
-      goTyVar (TypeVarKinded v (Wrapped _ (Labeled a _ _) _)) = (nameValue a, fromMaybe T.NotVtaForAll (v $> T.IsVtaForAll))
-      goTyVar (TypeVarName v a) = (nameValue a, fromMaybe T.NotVtaForAll (v $> T.IsVtaForAll))
+      goTyVar (TypeVarKinded v (Wrapped _ (Labeled a _ _) _)) = (nameValue a, fromMaybe T.NotVtaTypeVar (v $> T.IsVtaTypeVar))
+      goTyVar (TypeVarName v a) = (nameValue a, fromMaybe T.NotVtaTypeVar (v $> T.IsVtaTypeVar))
       (vars', vtas) = unzip (goTyVar <$> vars)
       vars'' = zip (toList vars') [0..]
       goName = fromJust . flip lookup vars'' . nameValue

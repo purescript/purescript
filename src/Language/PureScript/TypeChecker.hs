@@ -150,7 +150,7 @@ addTypeClass
   => ModuleName
   -> Qualified (ProperName 'ClassName)
   -> [(Text, Maybe SourceType)]
-  -> [VtaForAll]
+  -> [VtaTypeVar]
   -> [SourceConstraint]
   -> [FunctionalDependency]
   -> [Declaration]
@@ -192,7 +192,7 @@ addTypeClass _ qualifiedClassName args vtas implies dependencies ds kind = do
 
     findVtaTypeVars = everythingOnTypes (<>) go
       where
-      go (ForAll _ i _ _ _ IsVtaForAll) = elemIndices i $ map fst args
+      go (ForAll _ i _ _ _ IsVtaTypeVar) = elemIndices i $ map fst args
       go _ = []
 
     -- Currently we are only checking usability based on the type class currently

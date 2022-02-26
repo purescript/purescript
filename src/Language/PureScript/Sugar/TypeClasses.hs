@@ -287,7 +287,7 @@ typeClassMemberToDictionaryAccessor
   :: ModuleName
   -> ProperName 'ClassName
   -> [(Text, Maybe SourceType)]
-  -> [VtaForAll]
+  -> [VtaTypeVar]
   -> Declaration
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args vtas (TypeDeclaration (TypeDeclarationData sa@(ss, _) ident ty)) =
@@ -302,10 +302,10 @@ typeClassMemberToDictionaryAccessor mn name args vtas (TypeDeclaration (TypeDecl
        makeVta (moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty)))
     )]
   where
-  vtaVars = S.fromList $ map fst $ filter ((== IsVtaForAll) . snd) $ zip (map fst args) vtas
+  vtaVars = S.fromList $ map fst $ filter ((== IsVtaTypeVar) . snd) $ zip (map fst args) vtas
   makeVta = everywhereOnTypes go
     where
-    go (ForAll a b c d e _) | b `S.member` vtaVars = ForAll a b c d e IsVtaForAll
+    go (ForAll a b c d e _) | b `S.member` vtaVars = ForAll a b c d e IsVtaTypeVar
     go t = t
 typeClassMemberToDictionaryAccessor _ _ _ _ _ = internalError "Invalid declaration in type class definition"
 

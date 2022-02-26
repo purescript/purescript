@@ -42,13 +42,17 @@ newtype SkolemScope = SkolemScope { runSkolemScope :: Int }
 instance NFData SkolemScope
 instance Serialise SkolemScope
 
-data VtaForAll
-  = IsVtaForAll
-  | NotVtaForAll
+-- |
+-- Metadata for determining whether or not a type variable is used for
+-- visible type applications.
+--
+data VtaTypeVar
+  = IsVtaTypeVar
+  | NotVtaTypeVar
   deriving (Show, Eq, Ord, Generic)
 
-instance NFData VtaForAll
-instance Serialise VtaForAll
+instance NFData VtaTypeVar
+instance Serialise VtaTypeVar
 
 -- |
 -- The type of types
@@ -72,7 +76,7 @@ data Type a
   -- | Explicit kind application
   | KindApp a (Type a) (Type a)
   -- | Forall quantifier
-  | ForAll a Text (Maybe (Type a)) (Type a) (Maybe SkolemScope) VtaForAll
+  | ForAll a Text (Maybe (Type a)) (Type a) (Maybe SkolemScope) VtaTypeVar
   -- | A type with a set of type class constraints
   | ConstrainedType a (Constraint a) (Type a)
   -- | A skolem constant
@@ -118,7 +122,7 @@ srcTypeApp = TypeApp NullSourceAnn
 srcKindApp :: SourceType -> SourceType -> SourceType
 srcKindApp = KindApp NullSourceAnn
 
-srcForAll :: Text -> Maybe SourceType -> SourceType -> Maybe SkolemScope -> VtaForAll -> SourceType
+srcForAll :: Text -> Maybe SourceType -> SourceType -> Maybe SkolemScope -> VtaTypeVar -> SourceType
 srcForAll = ForAll NullSourceAnn
 
 srcConstrainedType :: SourceConstraint -> SourceType -> SourceType
@@ -211,9 +215,9 @@ constraintToJSON annToJSON Constraint {..} =
     , "constraintData"  .= fmap constraintDataToJSON constraintData
     ]
 
-vtaForAllToJSON :: VtaForAll -> A.Value
-vtaForAllToJSON IsVtaForAll = A.toJSON ("IsVtaForAll" :: String)
-vtaForAllToJSON NotVtaForAll = A.toJSON ("NotVtaForAll" :: String)
+vtaForAllToJSON :: VtaTypeVar -> A.Value
+vtaForAllToJSON IsVtaTypeVar = A.toJSON ("IsVtaTypeVar" :: String)
+vtaForAllToJSON NotVtaTypeVar = A.toJSON ("NotVtaTypeVar" :: String)
 
 typeToJSON :: forall a. (a -> A.Value) -> Type a -> A.Value
 typeToJSON annToJSON ty =
@@ -281,7 +285,7 @@ instance A.ToJSON a => A.ToJSON (Constraint a) where
 instance A.ToJSON ConstraintData where
   toJSON = constraintDataToJSON
 
-instance A.ToJSON VtaForAll where
+instance A.ToJSON VtaTypeVar where
   toJSON = vtaForAllToJSON
 
 constraintDataFromJSON :: A.Value -> A.Parser ConstraintData
@@ -298,13 +302,13 @@ constraintFromJSON defaultAnn annFromJSON = A.withObject "Constraint" $ \o -> do
   constraintData  <- o .: "constraintData" >>= traverse constraintDataFromJSON
   pure $ Constraint {..}
 
-vtaForAllFromJSON :: A.Value -> A.Parser VtaForAll
+vtaForAllFromJSON :: A.Value -> A.Parser VtaTypeVar
 vtaForAllFromJSON v = do
   v' <- A.parseJSON v
   case v' of
-    "IsVtaForAll" -> pure IsVtaForAll
-    "NotVtaForAll" -> pure NotVtaForAll
-    _ -> fail $ "Unrecognized VtaForAll: " <> v'
+    "IsVtaTypeVar" -> pure IsVtaTypeVar
+    "NotVtaTypeVar" -> pure NotVtaTypeVar
+    _ -> fail $ "Unrecognized VtaTypeVar: " <> v'
 
 typeFromJSON :: forall a. A.Parser a -> (A.Value -> A.Parser a) -> A.Value -> A.Parser (Type a)
 typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
@@ -338,10 +342,10 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
         -- TODO: Restore these in the future
         withoutMbKind = do
           (b, c, d) <- contents
-          ForAll a b Nothing <$> go c <*> pure d <*> pure NotVtaForAll
+          ForAll a b Nothing <$> go c <*> pure d <*> pure NotVtaTypeVar
         withMbKind = do
           (b, c, d, e) <- contents
-          ForAll a b <$> (Just <$> go c) <*> go d <*> pure e <*> pure NotVtaForAll
+          ForAll a b <$> (Just <$> go c) <*> go d <*> pure e <*> pure NotVtaTypeVar
       withMbKind <|> withoutMbKind
     "ConstrainedType" -> do
       (b, c) <- contents
@@ -403,7 +407,7 @@ instance {-# OVERLAPPING #-} A.FromJSON a => A.FromJSON (Constraint a) where
 instance A.FromJSON ConstraintData where
   parseJSON = constraintDataFromJSON
 
-instance A.FromJSON VtaForAll where
+instance A.FromJSON VtaTypeVar where
   parseJSON = vtaForAllFromJSON
 
 data RowListItem a = RowListItem
@@ -462,7 +466,7 @@ isMonoType _        = True
 
 -- | Universally quantify a type
 mkForAll :: [(a, (Text, Maybe (Type a)))] -> Type a -> Type a
-mkForAll args ty = foldr (\(ann, (arg, mbK)) t -> ForAll ann arg mbK t Nothing NotVtaForAll) ty args
+mkForAll args ty = foldr (\(ann, (arg, mbK)) t -> ForAll ann arg mbK t Nothing NotVtaTypeVar) ty args
 
 -- | Replace a type variable, taking into account variable shadowing
 replaceTypeVars :: Text -> Type a -> Type a -> Type a
@@ -531,7 +535,7 @@ completeBinderList = go []
 
 -- | Universally quantify over all type variables appearing free in a type
 quantify :: Type a -> Type a
-quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) arg Nothing t Nothing NotVtaForAll) ty $ freeTypeVariables ty
+quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) arg Nothing t Nothing NotVtaTypeVar) ty $ freeTypeVariables ty
 
 -- | Move all universal quantifiers to the front of a type
 moveQuantifiersToFront :: Type a -> Type a
@@ -606,7 +610,7 @@ srcInstanceType
   -> SourceType
 srcInstanceType ss vars className tys
   = setAnnForType (ss, [])
-  . flip (foldr $ \(tv, k) ty -> srcForAll tv (Just k) ty Nothing NotVtaForAll) vars
+  . flip (foldr $ \(tv, k) ty -> srcForAll tv (Just k) ty Nothing NotVtaTypeVar) vars
   . flip (foldl' srcTypeApp) tys
   $ srcTypeConstructor $ coerceProperName <$> className
 

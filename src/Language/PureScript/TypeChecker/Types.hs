@@ -320,7 +320,7 @@ instantiatePolyTypeWithUnknowns
   => Expr
   -> SourceType
   -> m (Expr, SourceType)
-instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _ NotVtaForAll) = do
+instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _ NotVtaTypeVar) = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   instantiatePolyTypeWithUnknowns val $ replaceTypeVars ident u ty
 instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
@@ -335,7 +335,7 @@ unconsVtaTypeVar = go Nothing []
   where
   go y n (ForAll a i k t s v) =
     case (y, v) of
-      (Nothing, IsVtaForAll) -> go (Just (a, i, k, s, v)) n t
+      (Nothing, IsVtaTypeVar) -> go (Just (a, i, k, s, v)) n t
       _ -> go y ((a, i, k, s, v) : n) t
   go y n t = do
     typeVar <- getTypeVar <$> y
