@@ -697,7 +697,7 @@ decl :: { Declaration () }
   | 'type' 'role' properName many(role) { DeclRole () $1 $2 (getProperName $3) $4 }
 
 dataHead :: { DataHead () }
-  : 'data' properName manyOrEmpty(typeVarBinding) { DataHead $1 (getProperName $2) $3 }
+  : 'data' properName manyOrEmpty(typeVarBindingWithVta) { DataHead $1 (getProperName $2) $3 }
 
 typeHead :: { DataHead () }
   : 'type' properName manyOrEmpty(typeVarBinding) { DataHead $1 (getProperName $2) $3 }

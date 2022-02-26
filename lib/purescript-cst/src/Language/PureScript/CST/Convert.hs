@@ -448,7 +448,13 @@ convertDeclaration fileName decl = case decl of
             [] -> []
             (st', ctor) : tl' -> ctrs st' ctor tl'
           )
-    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) [] (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
+
+      findVtv = \case
+        TypeVarKinded (Just _) _ -> T.IsVtaTypeVar
+        TypeVarName (Just _) _ -> T.IsVtaTypeVar
+        _ -> T.NotVtaTypeVar
+
+    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (findVtv <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
