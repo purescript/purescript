@@ -63,8 +63,6 @@ import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
 
-import Language.PureScript.Pretty
-
 data BindingGroupType
   = RecursiveBindingGroup
   | NonRecursiveBindingGroup
@@ -492,7 +490,7 @@ infer' (VisibleTypeApp val typeArg) = do
       let valTy'' = replaceTypeVars typeVar typeArg'' tyAbsBody
       pure $ TypedValue' True val'' valTy''
     _ ->
-      internalError $ prettyPrintType 1000 valTy'
+      throwError . errorMessage $ CannotApplyTypeOnExpressionOfType typeArg valTy
 infer' (Hole name) = do
   ty <- freshTypeWithKind kindType
   ctx <- getLocalContext
