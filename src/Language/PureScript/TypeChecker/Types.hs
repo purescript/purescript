@@ -36,7 +36,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Bifunctor (bimap)
 import Data.Either (partitionEithers)
 import Data.Functor (($>))
-import Data.List (transpose, (\\), partition, delete, foldl', uncons)
+import Data.List (transpose, (\\), partition, delete, foldl')
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Traversable (for)
@@ -333,17 +333,17 @@ instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- | Attempt to uncons a type variable binding from a type.
 unconsVtaTypeVar :: SourceType -> Maybe ((Text, SourceType), SourceType)
-unconsVtaTypeVar = go [] []
+unconsVtaTypeVar = go Nothing []
   where
   go y n (ForAll a i k t s v) =
-    case v of
-      IsVtaForAll -> go ((a, i, k, s, v) : y) n t
-      NotVtaForAll -> go y ((a, i, k, s, v) : n) t
+    case (y, v) of
+      (Nothing, IsVtaForAll) -> go (Just (a, i, k, s, v)) n t
+      _ -> go y ((a, i, k, s, v) : n) t
   go y n t = do
-    (yh, yt) <- uncons $ reverse y
-    pure $ (getVar yh, foldl' mkForAll' (foldl' mkForAll' t n) yt)
+    typeVar <- getTypeVar <$> y
+    pure $ (typeVar, foldl' mkForAll' t n)
 
-  getVar (_, i, k, _, _) = (i, fromMaybe (internalError "unelaborated forall") k)
+  getTypeVar (_, i, k, _, _) = (i, fromMaybe (internalError "unelaborated forall") k)
 
   mkForAll' t (a, i, k, s, v) = ForAll a i k t s v
 
