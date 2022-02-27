@@ -1,9 +1,0 @@
-Warning found:
-at tests/purs/warning/DeprecatedRowKindSyntax.purs:4:15 - 4:21 (line 4, column 15 - line 4, column 21)
-
-  Unary '#' syntax for row kinds is deprecated and will be removed in a future release. Use the 'Row' kind instead.
-
-
-See https://github.com/purescript/documentation/blob/master/errors/WarningParsingModule.md for more information,
-or to contribute content related to this warning.
-

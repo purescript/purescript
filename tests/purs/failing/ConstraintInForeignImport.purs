@@ -1,4 +1,4 @@
--- @shouldWarnWith WarningParsingModule
+-- @shouldFailWith ErrorParsingModule
 module Main where
 
 import Data.Show (class Show)
