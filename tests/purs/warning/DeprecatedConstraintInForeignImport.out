@@ -1,9 +1,0 @@
-Warning found:
-at tests/purs/warning/DeprecatedConstraintInForeignImport.purs:6:1 - 6:50 (line 6, column 1 - line 6, column 50)
-
-  Constraints are deprecated in foreign imports and will be removed in a future release. Omit the constraint instead and update the foreign module accordingly.
-
-
-See https://github.com/purescript/documentation/blob/master/errors/WarningParsingModule.md for more information,
-or to contribute content related to this warning.
-
