@@ -18,11 +18,18 @@ id' = id @Int
 Note that for a polytyped expression to be applied to a type, at least
 one of its type variable bindings must be prefixed with a `@`, denoting
 that a type variable can be bound using visible type application syntax.
+For example, the following snippet will fail to compile:
+```hs
+idFail :: forall a. a -> a
+idFail a = a
+
+idFail' = idFail @Int
+```
 
 ```hs
 Error found:
 in module Main
-at Main.purs:6:7 - 6:14 (line 6, column 7 - line 6, column 14)
+at Main.purs:6:11 - 6:22 (line 6, column 11 - line 6, column 22)
 
   An expression of type:
 
@@ -33,8 +40,8 @@ at Main.purs:6:7 - 6:14 (line 6, column 7 - line 6, column 14)
     Int
 
 
-while inferring the type of id
-in value declaration id'
+while inferring the type of idFail
+in value declaration idFail'
 
 See https://github.com/purescript/documentation/blob/master/errors/CannotApplyExpressionOfTypeOnType.md for more information,
 or to contribute content related to this error.
@@ -53,6 +60,18 @@ right = Right @Int @String "0"
 class Functor @f where
   map :: forall a b. (a -> b) -> (f a -> f b)
 
+-- map :: forall @f a b. Functor f => (a -> b) -> (f a -> f b)
+
 map' :: (a -> b) -> (Array a -> Array b)
 map' = map @Array
 ```
+
+Finally, type wildcards `_` can be used to "skip" a binding:
+```hs
+-- Either Int String
+leftSkip = Left @_ @String 0
+
+-- Either String Int
+rightSkip = Right @String @_ 0
+```
+
