@@ -121,7 +121,7 @@ tco = flip evalState 0 . everywhereTopDownM convert where
       | otherwise = empty
     allInTailPosition (Assignment _ _ js1)
       = guard (countSelfReferences js1 == 0) $> S.empty
-    allInTailPosition (Comment _ _ js1)
+    allInTailPosition (Comment _ js1)
       = allInTailPosition js1
     allInTailPosition _
       = empty

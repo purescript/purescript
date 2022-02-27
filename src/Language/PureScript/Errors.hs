@@ -65,6 +65,9 @@ data SimpleErrorMessage
   | UnusedFFIImplementations ModuleName [Ident]
   | InvalidFFIIdentifier ModuleName Text
   | DeprecatedFFIPrime ModuleName Text
+  | DeprecatedFFICommonJSModule ModuleName FilePath
+  | UnsupportedFFICommonJSExports ModuleName [Text]
+  | UnsupportedFFICommonJSImports ModuleName [Text]
   | FileIOError Text IOError -- ^ A description of what we were trying to do, and the error which occurred
   | InfiniteType SourceType
   | InfiniteKind SourceType
@@ -239,6 +242,9 @@ errorCode em = case unwrapErrorMessage em of
   UnusedFFIImplementations{} -> "UnusedFFIImplementations"
   InvalidFFIIdentifier{} -> "InvalidFFIIdentifier"
   DeprecatedFFIPrime{} -> "DeprecatedFFIPrime"
+  DeprecatedFFICommonJSModule {} -> "DeprecatedFFICommonJSModule"
+  UnsupportedFFICommonJSExports {} -> "UnsupportedFFICommonJSExports"
+  UnsupportedFFICommonJSImports {} -> "UnsupportedFFICommonJSImports"
   FileIOError{} -> "FileIOError"
   InfiniteType{} -> "InfiniteType"
   InfiniteKind{} -> "InfiniteKind"
@@ -701,8 +707,21 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "In the FFI module for " <> markCode (runModuleName mn) <> ":"
             , indent . paras $
                 [ line $ "The identifier " <> markCode ident <> " contains a prime (" <> markCode "'" <> ")."
-                , line "Primes in identifiers exported from FFI modules are deprecated and won’t be supported in the future."
+                , line "Primes are not allowed in identifiers exported from FFI modules."
                 ]
+            ]
+    renderSimpleErrorMessage (DeprecatedFFICommonJSModule mn path) =
+      paras [ line $ "A CommonJS foreign module implementation was provided for module " <> markCode (runModuleName mn) <> ": "
+            , indent . lineS $ path
+            , line "CommonJS foreign modules are deprecated and won't be supported in the future."
+            ]
+    renderSimpleErrorMessage (UnsupportedFFICommonJSExports mn idents) =
+      paras [ line $ "The following CommonJS exports are not supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "
+            , indent . paras $ map line idents
+            ]
+    renderSimpleErrorMessage (UnsupportedFFICommonJSImports mn mids) =
+      paras [ line $ "The following CommonJS imports are not supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "
+            , indent . paras $ map line mids
             ]
     renderSimpleErrorMessage InvalidDoBind =
       line "The last statement in a 'do' block must be an expression, but this block ends with a binder."

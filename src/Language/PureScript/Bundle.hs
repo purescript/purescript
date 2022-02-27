@@ -13,7 +13,10 @@ module Language.PureScript.Bundle
   , ModuleType(..)
   , ErrorMessage(..)
   , printErrorMessage
+  , ForeignModuleExports(..)
   , getExportedIdentifiers
+  , ForeignModuleImports(..)
+  , getImportedModules
   , Module
   ) where
 
@@ -31,16 +34,19 @@ import Data.Foldable (fold)
 import Data.Generics (GenericM, everything, everythingWithContext, everywhere, gmapMo, mkMp, mkQ, mkT)
 import Data.Graph
 import Data.List (stripPrefix, (\\))
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybeToList)
 import Data.Version (showVersion)
 import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Data.Text.Lazy as T
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as LT
 
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Process.Minify
+import Language.PureScript.Names (ModuleName(..))
+import Language.PureScript.CodeGen.JS.Common (moduleNameToJs)
 
 import qualified Paths_purescript as Paths
 
@@ -54,6 +60,7 @@ data ErrorMessage
   = UnsupportedModulePath String
   | InvalidTopLevel
   | UnableToParseModule String
+  | UnsupportedImport
   | UnsupportedExport
   | ErrorInModule ModuleIdentifier ErrorMessage
   | MissingEntryPoint String
@@ -89,6 +96,7 @@ guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory f
   where
     guessModuleType "index.js" = pure Regular
     guessModuleType "foreign.js" = pure Foreign
+    guessModuleType "foreign.cjs" = pure Foreign
     guessModuleType name = throwError $ UnsupportedModulePath name
 
 data Visibility
@@ -111,7 +119,7 @@ data ExportType
 
 -- | There are four types of module element we are interested in:
 --
--- 1) Require statements
+-- 1) Import declarations and require statements
 -- 2) Member declarations
 -- 3) Export lists
 -- 4) Everything else
@@ -119,22 +127,22 @@ data ExportType
 -- Each is labelled with the original AST node which generated it, so that we can dump it back
 -- into the output during codegen.
 data ModuleElement
-  = Require JSStatement String (Either String ModuleIdentifier)
+  = Import JSModuleItem String (Either String ModuleIdentifier)
   | Member JSStatement Visibility String JSExpression [Key]
   | ExportsList [(ExportType, String, JSExpression, [Key])]
   | Other JSStatement
-  | Skip JSStatement
+  | Skip JSModuleItem
   deriving (Show)
 
 instance A.ToJSON ModuleElement where
   toJSON = \case
-    (Require _ name (Right target)) ->
-      A.object [ "type"   .= A.String "Require"
+    (Import _ name (Right target)) ->
+      A.object [ "type"   .= A.String "Import"
                , "name"   .= name
                , "target" .= target
                ]
-    (Require _ name (Left targetPath)) ->
-      A.object [ "type"       .= A.String "Require"
+    (Import _ name (Left targetPath)) ->
+      A.object [ "type"       .= A.String "Import"
                , "name"       .= name
                , "targetPath" .= targetPath
                ]
@@ -150,11 +158,11 @@ instance A.ToJSON ModuleElement where
                ]
     (Other stmt) ->
       A.object [ "type" .= A.String "Other"
-               , "js"   .= getFragment stmt
+               , "js"   .= getFragment (JSAstStatement stmt JSNoAnnot)
                ]
-    (Skip stmt) ->
+    (Skip item) ->
       A.object [ "type" .= A.String "Skip"
-               , "js"   .= getFragment stmt
+               , "js"   .= getFragment (JSAstModule [item] JSNoAnnot)
                ]
 
     where
@@ -177,9 +185,9 @@ instance A.ToJSON ModuleElement where
                , "dependsOn" .= map keyToJSON dependsOn
                ]
 
-    getFragment = ellipsize . renderToText . minifyJS . flip JSAstStatement JSNoAnnot
+    getFragment = ellipsize . renderToText . minifyJS
       where
-      ellipsize text = if T.compareLength text 20 == GT then T.take 19 text `T.snoc` ellipsis else text
+      ellipsize text = if LT.compareLength text 20 == GT then LT.take 19 text `LT.snoc` ellipsis else text
       ellipsis = '\x2026'
 
 -- | A module is just a list of elements of the types listed above.
@@ -195,10 +203,11 @@ instance A.ToJSON Module where
 -- | Prepare an error message for consumption by humans.
 printErrorMessage :: ErrorMessage -> [String]
 printErrorMessage (UnsupportedModulePath s) =
-  [ "A CommonJS module has an unsupported name (" ++ show s ++ ")."
+  [ "An ES or CommonJS module has an unsupported name (" ++ show s ++ ")."
   , "The following file names are supported:"
   , "  1) index.js (PureScript native modules)"
-  , "  2) foreign.js (PureScript foreign modules)"
+  , "  2) foreign.js (PureScript ES foreign modules)"
+  , "  3) foreign.cjs (PureScript CommonJS foreign modules)"
   ]
 printErrorMessage InvalidTopLevel =
   [ "Expected a list of source elements at the top level." ]
@@ -206,10 +215,24 @@ printErrorMessage (UnableToParseModule err) =
   [ "The module could not be parsed:"
   , err
   ]
+printErrorMessage UnsupportedImport =
+  [ "An import was unsupported."
+  , "Modules can be imported with ES namespace imports declarations:"
+  , "  import * as module from \"Module.Name\""
+  , "Alternatively, they can be also be imported with the CommonJS require function:"
+  , "  var module = require(\"Module.Name\")"
+  ]
 printErrorMessage UnsupportedExport =
-  [ "An export was unsupported. Exports can be defined in one of two ways: "
-  , "  1) exports.name = ..."
-  , "  2) exports = { ... }"
+  [ "An export was unsupported."
+  , "Declarations can be exported as ES named exports:"
+  , "  export var decl"
+  , "Existing identifiers can be exported as well:"
+  , "  export { name }"
+  , "They can also be renamed on export:"
+  , "  export { name as alias }"
+  , "Alternatively, CommonJS exports can be defined in one of two ways:"
+  , "  1) exports.name = value"
+  , "  2) exports = { name: value }"
   ]
 printErrorMessage (ErrorInModule mid e) =
   ("Error in module " ++ displayIdentifier mid ++ ":")
@@ -219,13 +242,13 @@ printErrorMessage (ErrorInModule mid e) =
     displayIdentifier (ModuleIdentifier name ty) =
       name ++ " (" ++ showModuleType ty ++ ")"
 printErrorMessage (MissingEntryPoint mName) =
-  [ "Couldn't find a CommonJS module for the specified entry point: " ++ mName
+  [ "Could not find an ES module or CommonJS module for the specified entry point: " ++ mName
   ]
 printErrorMessage (MissingMainModule mName) =
-  [ "Couldn't find a CommonJS module for the specified main module: " ++ mName
+  [ "Could not find an ES module or CommonJS module for the specified main module: " ++ mName
   ]
 
--- | Calculate the ModuleIdentifier which a require(...) statement imports.
+-- | Calculate the ModuleIdentifier imported by an import declaration or a require(...) statement.
 checkImportPath :: String -> ModuleIdentifier -> S.Set String -> Either String ModuleIdentifier
 checkImportPath "./foreign.js" m _ =
   Right (ModuleIdentifier (moduleName m) Foreign)
@@ -247,9 +270,13 @@ stripSuffix suffix xs =
 --
 -- 1) module.name or member["name"]
 --
---    where module was imported using
+--    where module was imported using require
 --
 --    var module = require("Module.Name");
+--
+--    or an import declaration
+--
+--    import * as module from "Module.Name";
 --
 -- 2) name
 --
@@ -262,7 +289,7 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
   imports = mapMaybe toImport es
     where
     toImport :: ModuleElement -> Maybe (String, ModuleIdentifier)
-    toImport (Require _ nm (Right mid)) = Just (nm, mid)
+    toImport (Import _ nm (Right mid)) = Just (nm, mid)
     toImport _ = Nothing
 
   -- | Collects all member names in scope, so that we can identify dependencies of the second type.
@@ -369,52 +396,159 @@ trailingCommaList :: JSCommaTrailingList a -> [a]
 trailingCommaList (JSCTLComma l _) = commaList l
 trailingCommaList (JSCTLNone l) = commaList l
 
+identName :: JSIdent -> Maybe String
+identName (JSIdentName _ ident) = Just ident
+identName _ = Nothing
+
+exportStatementIdentifiers :: JSStatement -> [String]
+exportStatementIdentifiers (JSVariable _ jsExpressions _) =
+  varNames jsExpressions
+exportStatementIdentifiers (JSConstant _ jsExpressions _) =
+  varNames jsExpressions
+exportStatementIdentifiers (JSLet _ jsExpressions _) =
+  varNames jsExpressions
+exportStatementIdentifiers (JSClass _ jsIdent _ _ _ _ _) =
+  maybeToList . identName $ jsIdent
+exportStatementIdentifiers (JSFunction _ jsIdent _ _ _ _ _) =
+  maybeToList . identName $ jsIdent
+exportStatementIdentifiers (JSGenerator _ _ jsIdent _ _ _ _ _) =
+  maybeToList . identName $ jsIdent
+exportStatementIdentifiers _ = []
+
+varNames :: JSCommaList JSExpression -> [String]
+varNames = mapMaybe varName . commaList
+  where
+  varName (JSVarInitExpression (JSIdentifier _ ident) _) = Just ident
+  varName _ = Nothing
+
+sp :: JSAnnot
+sp = JSAnnot tokenPosnEmpty [ WhiteSpace tokenPosnEmpty " " ]
+
+stringLiteral :: String -> JSExpression
+stringLiteral s = JSStringLiteral JSNoAnnot $ "\"" ++ s ++ "\""
+
 -- | Attempt to create a Module from a JavaScript AST.
 --
 -- Each type of module element is matched using pattern guards, and everything else is bundled into the
 -- Other constructor.
 toModule :: forall m. (MonadError ErrorMessage m) => S.Set String -> ModuleIdentifier -> Maybe FilePath -> JSAST -> m Module
 toModule mids mid filename top
-  | JSAstProgram smts _ <- top = Module mid filename <$> traverse toModuleElement smts
+  | JSAstModule jsModuleItems _ <- top
+  , JSModuleImportDeclaration _ jsImportDeclaration : _ <- jsModuleItems
+  , JSImportDeclaration JSImportClauseDefault{} jsFromClause _ <- jsImportDeclaration
+  , JSFromClause _ _ importPath <- jsFromClause
+  , "./foreign.cjs" <- strValue importPath
+  = pure $ Module mid filename []
+  | JSAstModule jsModuleItems _ <- top = Module mid filename . mconcat <$> traverse toModuleElements jsModuleItems
   | otherwise = err InvalidTopLevel
   where
   err :: ErrorMessage -> m a
   err = throwError . ErrorInModule mid
 
-  toModuleElement :: JSStatement -> m ModuleElement
-  toModuleElement stmt
-    | Just (importName, importPath) <- matchRequire mids mid stmt
-    = pure (Require stmt importName importPath)
-  toModuleElement stmt
-    | Just (visibility, name, decl) <- matchMember stmt
-    = pure (Member stmt visibility name decl [])
-  toModuleElement stmt
-    | Just props <- matchExportsAssignment stmt
-    = ExportsList <$> traverse toExport (trailingCommaList props)
-    where
-      toExport :: JSObjectProperty -> m (ExportType, String, JSExpression, [Key])
-      toExport (JSPropertyNameandValue name _ [val]) =
-        (,,val,[]) <$> exportType val
-                   <*> extractLabel' name
-      toExport _ = err UnsupportedExport
+  toModuleElements :: JSModuleItem -> m [ModuleElement]
+  toModuleElements item@(JSModuleImportDeclaration _ jsImportDeclaration)
+    | JSImportDeclaration jsImportClause jsFromClause _ <- jsImportDeclaration
+    , JSImportClauseNameSpace jsImportNameSpace <- jsImportClause
+    , JSImportNameSpace _ _ jsIdent <- jsImportNameSpace
+    , JSFromClause _ _ importPath <- jsFromClause
+    , importPath' <- checkImportPath (strValue importPath) mid mids
+    = maybe (err UnsupportedImport) pure (identName jsIdent) >>= \name ->
+        pure [Import item name importPath']
+  toModuleElements (JSModuleImportDeclaration _ _)
+    = err UnsupportedImport
 
-      exportType :: JSExpression -> m ExportType
-      exportType (JSMemberDot f _ _)
+  toModuleElements (JSModuleExportDeclaration _ jsExportDeclaration)
+    | JSExportFrom jsExportClause jsFromClause _ <- jsExportDeclaration
+    , JSFromClause _ _ from <- jsFromClause
+    , JSExportClause _ jsExportSpecifiers _ <- jsExportClause
+    = pure . ExportsList <$> exportSpecifiersList (Just (strValue from)) jsExportSpecifiers
+  toModuleElements (JSModuleExportDeclaration _ jsExportDeclaration)
+    | JSExportLocals jsExportClause _ <- jsExportDeclaration
+    , JSExportClause _ jsExportSpecifiers _ <- jsExportClause
+    = pure . ExportsList <$> exportSpecifiersList Nothing jsExportSpecifiers
+  toModuleElements (JSModuleExportDeclaration _ jsExportDeclaration)
+    | JSExport jsStatement _ <- jsExportDeclaration
+    , Just (name, decl) <- matchInternalMember jsStatement
+    = pure [ Member jsStatement Internal name decl []
+           , ExportsList [toRegularExport' name]
+           ]
+  toModuleElements (JSModuleExportDeclaration _ JSExport{})
+    = err UnsupportedExport
+
+  toModuleElements item@(JSModuleStatementListItem jsStatement)
+    | Just (importName, importPath) <- matchRequire jsStatement
+    = pure [Import item importName $ checkImportPath importPath mid mids]
+  toModuleElements (JSModuleStatementListItem jsStatement)
+    | Just (visibility, name, decl) <- matchMember jsStatement
+    = pure [Member jsStatement visibility name decl []]
+  toModuleElements (JSModuleStatementListItem jsStatement)
+    | Just props <- matchExportsAssignment jsStatement
+    = pure . ExportsList <$> traverse objectPropertyToExport (trailingCommaList props)
+    where
+      objectPropertyToExport :: JSObjectProperty -> m (ExportType, String, JSExpression, [Key])
+      objectPropertyToExport (JSPropertyNameandValue name _ [val]) =
+        (,,val,[]) <$> expressionExportType val
+                   <*> extractLabel' name
+      objectPropertyToExport _ = err UnsupportedExport
+
+      expressionExportType :: JSExpression -> m ExportType
+      expressionExportType (JSMemberDot f _ _)
         | JSIdentifier _ "$foreign" <- f
         = pure ForeignReexport
         | JSIdentifier _ ident <- f
         = pure (RegularExport ident)
-      exportType (JSMemberSquare f _ _ _)
+      expressionExportType (JSMemberSquare f _ _ _)
         | JSIdentifier _ "$foreign" <- f
         = pure ForeignReexport
         | JSIdentifier _ ident <- f
         = pure (RegularExport ident)
-      exportType (JSIdentifier _ s) = pure (RegularExport s)
-      exportType _ = err UnsupportedExport
+      expressionExportType (JSIdentifier _ s) = pure (RegularExport s)
+      expressionExportType _ = err UnsupportedExport
 
       extractLabel' = maybe (err UnsupportedExport) pure . extractLabel
 
-  toModuleElement other = pure (Other other)
+  toModuleElements (JSModuleStatementListItem other) = pure [Other other]
+
+  exportSpecifiersList from =
+    fmap catMaybes . traverse (exportSpecifier from) . commaList
+
+  exportSpecifier from (JSExportSpecifier jsIdent)
+    = traverse (toExport' from) $ identName jsIdent
+  exportSpecifier from (JSExportSpecifierAs jsIdent _ jsIdentAs)
+    = sequence $ toExport from <$> identName jsIdent <*> identName jsIdentAs
+
+  toExport :: Maybe String -> String -> String -> m (ExportType, String, JSExpression, [Key])
+  toExport (Just from) name as
+    | from == "./foreign.js" =
+        pure . (ForeignReexport, as,, []) $
+                JSMemberSquare (JSIdentifier sp "$foreign") JSNoAnnot
+                  (stringLiteral name) JSNoAnnot
+    | Just from' <- stripSuffix "/index.js" =<< stripPrefix "../" from =
+        pure . (RegularExport name, as,, []) $
+                JSMemberSquare (JSIdentifier sp (T.unpack . moduleNameToJs . ModuleName $ T.pack from')) JSNoAnnot
+                  (stringLiteral name) JSNoAnnot
+    | otherwise = err UnsupportedExport
+  toExport Nothing name as =
+    pure $ toRegularExport name as
+
+  toExport' from name = toExport from name name
+
+  toRegularExport name as =
+    (RegularExport name, as, JSIdentifier sp name, [])
+
+  toRegularExport' name = toRegularExport name name
+
+data ForeignModuleExports =
+  ForeignModuleExports
+    { cjsExports :: [String]
+    , esExports :: [String]
+    } deriving (Show)
+
+instance Semigroup ForeignModuleExports where
+  (ForeignModuleExports cjsExports esExports) <> (ForeignModuleExports cjsExports' esExports') =
+    ForeignModuleExports (cjsExports <> cjsExports') (esExports <> esExports')
+instance Monoid ForeignModuleExports where
+  mempty = ForeignModuleExports [] []
 
 -- Get a list of all the exported identifiers from a foreign module.
 --
@@ -423,21 +557,25 @@ toModule mids mid filename top
 getExportedIdentifiers :: forall m. (MonadError ErrorMessage m)
                           => String
                           -> JSAST
-                          -> m [String]
+                          -> m ForeignModuleExports
 getExportedIdentifiers mname top
-  | JSAstProgram stmts _ <- top = concat <$> traverse go stmts
+  | JSAstModule jsModuleItems _ <- top = fold <$> traverse go jsModuleItems
   | otherwise = err InvalidTopLevel
   where
   err :: ErrorMessage -> m a
   err = throwError . ErrorInModule (ModuleIdentifier mname Foreign)
 
-  go stmt
-    | Just props <- matchExportsAssignment stmt
-    = traverse toIdent (trailingCommaList props)
-    | Just (Public, name, _) <- matchMember stmt
-    = pure [name]
+  go (JSModuleStatementListItem jsStatement)
+    | Just props <- matchExportsAssignment jsStatement
+    = do cjsExports <- traverse toIdent (trailingCommaList props)
+         pure ForeignModuleExports{ cjsExports, esExports = [] }
+    | Just (Public, name, _) <- matchMember jsStatement
+    = pure ForeignModuleExports{ cjsExports = [name], esExports = [] }
     | otherwise
-    = pure []
+    = pure mempty
+  go (JSModuleExportDeclaration _ jsExportDeclaration) =
+    pure ForeignModuleExports{ cjsExports = [], esExports = exportDeclarationIdentifiers jsExportDeclaration }
+  go _ = pure mempty
 
   toIdent (JSPropertyNameandValue name _ [_]) =
     extractLabel' name
@@ -446,13 +584,57 @@ getExportedIdentifiers mname top
 
   extractLabel' = maybe (err UnsupportedExport) pure . extractLabel
 
+  exportDeclarationIdentifiers (JSExportFrom jsExportClause _ _) =
+    exportClauseIdentifiers jsExportClause
+  exportDeclarationIdentifiers (JSExportLocals jsExportClause _) =
+    exportClauseIdentifiers jsExportClause
+  exportDeclarationIdentifiers (JSExport jsStatement _) =
+    exportStatementIdentifiers jsStatement
+
+  exportClauseIdentifiers (JSExportClause _ jsExportsSpecifiers _) =
+    mapMaybe exportSpecifierName $ commaList jsExportsSpecifiers
+
+  exportSpecifierName (JSExportSpecifier jsIdent) = identName jsIdent
+  exportSpecifierName (JSExportSpecifierAs _ _ jsIdentAs) = identName jsIdentAs
+
+data ForeignModuleImports =
+  ForeignModuleImports
+    { cjsImports :: [String]
+    , esImports :: [String]
+    } deriving (Show)
+
+instance Semigroup ForeignModuleImports where
+  (ForeignModuleImports cjsImports esImports) <> (ForeignModuleImports cjsImports' esImports') =
+    ForeignModuleImports (cjsImports <> cjsImports') (esImports <> esImports')
+instance Monoid ForeignModuleImports where
+  mempty = ForeignModuleImports [] []
+
+-- Get a list of all the imported module identifiers from a foreign module.
+getImportedModules :: forall m. (MonadError ErrorMessage m)
+                          => String
+                          -> JSAST
+                          -> m ForeignModuleImports
+getImportedModules mname top
+  | JSAstModule jsModuleItems _ <- top = pure $ foldMap go jsModuleItems
+  | otherwise = err InvalidTopLevel
+  where
+  err :: ErrorMessage -> m a
+  err = throwError . ErrorInModule (ModuleIdentifier mname Foreign)
+
+  go (JSModuleStatementListItem jsStatement)
+    | Just (_, mid) <- matchRequire jsStatement
+    = ForeignModuleImports{ cjsImports = [mid], esImports = [] }
+  go (JSModuleImportDeclaration _ jsImportDeclaration) =
+    ForeignModuleImports{ cjsImports = [], esImports = [importDeclarationModuleId jsImportDeclaration] }
+  go _ = mempty
+
+  importDeclarationModuleId (JSImportDeclaration _ (JSFromClause _ _ mid) _) = mid
+  importDeclarationModuleId (JSImportDeclarationBare _ mid _) = mid
+
 -- Matches JS statements like this:
 -- var ModuleName = require("file");
-matchRequire :: S.Set String
-                -> ModuleIdentifier
-                -> JSStatement
-                -> Maybe (String, Either String ModuleIdentifier)
-matchRequire mids mid stmt
+matchRequire :: JSStatement -> Maybe (String, String)
+matchRequire stmt
   | JSVariable _ jsInit _ <- stmt
   , [JSVarInitExpression var varInit] <- commaList jsInit
   , JSIdentifier _ importName <- var
@@ -460,28 +642,34 @@ matchRequire mids mid stmt
   , JSMemberExpression req _ argsE _ <- jsInitEx
   , JSIdentifier _ "require" <- req
   , [ Just importPath ] <- map fromStringLiteral (commaList argsE)
-  , importPath' <- checkImportPath importPath mid mids
-  = Just (importName, importPath')
+  = Just (importName, importPath)
   | otherwise
   = Nothing
 
 -- Matches JS member declarations.
 matchMember :: JSStatement -> Maybe (Visibility, String, JSExpression)
 matchMember stmt
+  | Just (name, decl) <- matchInternalMember stmt
+  = pure (Internal, name, decl)
+  -- exports.foo = expr; exports["foo"] = expr;
+  | JSAssignStatement e (JSAssign _) decl _ <- stmt
+  , Just name <- exportsAccessor e
+  = Just (Public, name, decl)
+  | otherwise
+  = Nothing
+
+matchInternalMember :: JSStatement -> Maybe (String, JSExpression)
+matchInternalMember stmt
   -- var foo = expr;
   | JSVariable _ jsInit _ <- stmt
   , [JSVarInitExpression var varInit] <- commaList jsInit
   , JSIdentifier _ name <- var
   , JSVarInit _ decl <- varInit
-  = Just (Internal, name, decl)
+  = pure (name, decl)
   -- function foo(...args) { body }
   | JSFunction a0 jsIdent a1 args a2 body _ <- stmt
   , JSIdentName _ name <- jsIdent
-  = pure (Internal, name, JSFunctionExpression a0 jsIdent a1 args a2 body)
-  -- exports.foo = expr; exports["foo"] = expr;
-  | JSAssignStatement e (JSAssign _) decl _ <- stmt
-  , Just name <- exportsAccessor e
-  = Just (Public, name, decl)
+  = pure (name, JSFunctionExpression a0 jsIdent a1 args a2 body)
   | otherwise
   = Nothing
 
@@ -530,8 +718,8 @@ compile modules entryPoints = filteredModules
     where
     -- | Create a set of vertices for a module element.
     --
-    -- Require statements don't contribute towards dependencies, since they effectively get
-    -- inlined wherever they are used inside other module elements.
+    -- Imports declarations and require statements don't contribute towards dependencies,
+    -- since they effectively get inlined wherever they are used inside other module elements.
     toVertices :: ModuleIdentifier -> ModuleElement -> [(ModuleElement, Key, [Key])]
     toVertices p m@(Member _ visibility nm _ deps) = [(m, (p, nm, visibility), deps)]
     toVertices p m@(ExportsList exps) = map toVertex exps
@@ -571,11 +759,11 @@ compile modules entryPoints = filteredModules
         | otherwise = d : go rest
 
       skipDecl :: ModuleElement -> ModuleElement
-      skipDecl (Require s _ _) = Skip s
-      skipDecl (Member s _ _ _ _) = Skip s
-      skipDecl (ExportsList _) = Skip (JSEmptyStatement JSNoAnnot)
-      skipDecl (Other s) = Skip s
-      skipDecl (Skip s) = Skip s
+      skipDecl (Import item _ _) = Skip item
+      skipDecl (Member stmt _ _ _ _) = Skip $ JSModuleStatementListItem stmt
+      skipDecl (ExportsList _) = Skip . JSModuleStatementListItem $ JSEmptyStatement JSNoAnnot
+      skipDecl (Other stmt) = Skip $ JSModuleStatementListItem stmt
+      skipDecl (Skip item) = Skip item
 
       -- | Filter out the exports for members which aren't used.
       filterExports :: ModuleElement -> ModuleElement
@@ -584,7 +772,7 @@ compile modules entryPoints = filteredModules
 
       isDeclUsed :: ModuleElement -> Bool
       isDeclUsed (Member _ visibility nm _ _) = isKeyUsed (mid, nm, visibility)
-      isDeclUsed (Require _ _ (Right midRef)) = midRef `S.member` modulesReferenced
+      isDeclUsed (Import _ _ (Right midRef)) = midRef `S.member` modulesReferenced
       isDeclUsed _ = True
 
       isKeyUsed :: Key -> Bool
@@ -605,7 +793,7 @@ sortModules modules = map (\v -> case nodeFor v of (n, _, _) -> n) (reverse (top
     return (m, mid, mapMaybe getKey els)
 
   getKey :: ModuleElement -> Maybe ModuleIdentifier
-  getKey (Require _ _ (Right mi)) = Just mi
+  getKey (Import _ _ (Right mi)) = Just mi
   getKey _ = Nothing
 
 -- | A module is empty if it contains no exported members (in other words,
@@ -618,7 +806,7 @@ isModuleEmpty (Module _ _ els) = all isElementEmpty els
   where
   isElementEmpty :: ModuleElement -> Bool
   isElementEmpty (ExportsList exps) = null exps
-  isElementEmpty Require{} = True
+  isElementEmpty Import{} = True
   isElementEmpty (Other _) = True
   isElementEmpty (Skip _) = True
   isElementEmpty _ = False
@@ -659,7 +847,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
               })
             (offsets (0,0) (Right 1 : positions)))
           moduleFns
-          (scanl (+) (3 + moduleLength [prelude]) (map (3+) moduleLengths)) -- 3 lines between each module & at top
+          (scanl (+) (3 + moduleLength [JSModuleStatementListItem prelude]) (map (3+) moduleLengths)) -- 3 lines between each module & at top
           (map snd modulesJS)
     }
     where
@@ -669,7 +857,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
       offsets (m, n) (Right d:rest) = map ((m+) &&& (n+)) [0 .. d - 1] ++ offsets (m+d, n+d) rest
       offsets _ _ = []
 
-  moduleLength :: [JSStatement] -> Int
+  moduleLength :: [JSModuleItem] -> Int
   moduleLength = everything (+) (mkQ 0 countw)
     where
       countw :: CommentAnnotation -> Int
@@ -688,13 +876,13 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
     (jsDecls, lengths) = unzip $ map declToJS ds
 
     withLength :: [JSStatement] -> ([JSStatement], Either Int Int)
-    withLength n = (n, Right $ moduleLength n)
+    withLength n = (n, Right . moduleLength $ JSModuleStatementListItem <$> n)
 
     declToJS :: ModuleElement -> ([JSStatement], Either Int Int)
     declToJS (Member n _ _ _ _) = withLength [n]
     declToJS (Other n) = withLength [n]
     declToJS (Skip n) = ([], Left $ moduleLength [n])
-    declToJS (Require _ nm req) = withLength
+    declToJS (Import _ nm req) = withLength
       [
         JSVariable lfsp
           (cList [
@@ -702,15 +890,15 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
               (JSVarInit sp $ either require (innerModuleReference sp . moduleName) req )
           ]) (JSSemi JSNoAnnot)
       ]
-    declToJS (ExportsList exps) = withLength $ map toExport exps
+    declToJS (ExportsList exps) = withLength $ map toCommonJSExport exps
 
       where
 
-      toExport :: (ExportType, String, JSExpression, [Key]) -> JSStatement
-      toExport (_, nm, val, _) =
+      toCommonJSExport :: (ExportType, String, JSExpression, [Key]) -> JSStatement
+      toCommonJSExport (_, nm, val, _) =
         JSAssignStatement
           (JSMemberSquare (JSIdentifier lfsp "exports") JSNoAnnot
-            (str nm) JSNoAnnot)
+            (stringLiteral nm) JSNoAnnot)
           (JSAssign sp)
           val
           (JSSemi JSNoAnnot)
@@ -748,22 +936,18 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
 
   require :: String -> JSExpression
   require mn =
-    JSMemberExpression (JSIdentifier JSNoAnnot "require") JSNoAnnot (cList [ str mn ]) JSNoAnnot
+    JSMemberExpression (JSIdentifier JSNoAnnot "require") JSNoAnnot
+      (cList [ stringLiteral mn ]) JSNoAnnot
 
   moduleReference :: JSAnnot -> String -> JSExpression
   moduleReference a mn =
     JSMemberSquare (JSIdentifier a optionsNamespace) JSNoAnnot
-      (str mn) JSNoAnnot
+      (stringLiteral mn) JSNoAnnot
 
   innerModuleReference :: JSAnnot -> String -> JSExpression
   innerModuleReference a mn =
     JSMemberSquare (JSIdentifier a "$PS") JSNoAnnot
-      (str mn) JSNoAnnot
-
-
-  str :: String -> JSExpression
-  str s = JSStringLiteral JSNoAnnot $ "\"" ++ s ++ "\""
-
+      (stringLiteral mn) JSNoAnnot
 
   emptyObj :: JSAnnot -> JSExpression
   emptyObj a = JSObjectLiteral a (JSCTLNone JSLNil) JSNoAnnot
@@ -831,9 +1015,6 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
   lfsp :: JSAnnot
   lfsp = JSAnnot tokenPosnEmpty [ WhiteSpace tokenPosnEmpty "\n  " ]
 
-  sp :: JSAnnot
-  sp = JSAnnot tokenPosnEmpty [ WhiteSpace tokenPosnEmpty " " ]
-
 -- | The bundling function.
 -- This function performs dead code elimination, filters empty modules
 -- and generates and prints the final JavaScript bundle.
@@ -852,7 +1033,7 @@ bundleSM inputStrs entryPoints mainModule namespace outFilename reportRawModules
   forM_ entryPoints $ \mIdent ->
     when (mIdent `notElem` map mid inputStrs) (throwError (MissingEntryPoint (moduleName mIdent)))
   input <- forM inputStrs $ \(ident, filename, js) -> do
-                ast <- either (throwError . ErrorInModule ident . UnableToParseModule) pure $ parse js (moduleName ident)
+                ast <- either (throwError . ErrorInModule ident . UnableToParseModule) pure $ parseModule js (moduleName ident)
                 return (ident, filename, ast)
 
   let mids = S.fromList (map (moduleName . mid) input)

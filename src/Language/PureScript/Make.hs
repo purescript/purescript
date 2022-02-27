@@ -167,6 +167,8 @@ make ma@MakeActions{..} ms = do
   -- Write the updated build cache database to disk
   writeCacheDb $ Cache.removeModules (M.keysSet failures) newCacheDb
 
+  writePackageJson
+
   -- If generating docs, also generate them for the Prim modules
   outputPrimDocs
 
