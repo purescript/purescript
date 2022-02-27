@@ -523,6 +523,7 @@ errorSuggestion err =
           CST.WarnDeprecatedConstraintInForeignImportSyntax -> Nothing
           CST.WarnDeprecatedKindImportSyntax -> suggest $ CST.printTokens $ drop 1 toks
           CST.WarnDeprecatedKindExportSyntax -> suggest $ CST.printTokens $ drop 1 toks
+          CST.WarnDeprecatedCaseOfOffsideSyntax -> suggest $ CST.printTokens toks
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
