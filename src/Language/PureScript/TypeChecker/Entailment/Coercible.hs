@@ -527,7 +527,7 @@ insoluble
   -> SourceType
   -> MultipleErrors
 insoluble k a b =
-  errorMessage $ NoInstanceFound (srcConstraint Prim.Coercible [k] [a, b] Nothing) (any containsUnknowns [a, b])
+  errorMessage $ NoInstanceFound (srcConstraint Prim.Coercible [k] [a, b] Nothing) [] (any containsUnknowns [a, b])
 
 -- | Constraints of the form @Coercible a b@ can be solved if the two arguments
 -- are the same. Since we currently don't support higher-rank arguments in

@@ -39,6 +39,7 @@ import Language.PureScript.Docs.RenderedCode as ReExports
    ContainingModule(..), asContainingModule,
    RenderedCodeElement(..),
    Namespace(..), FixityAlias)
+import Language.PureScript.Publish.Registry.Compat (PursJsonError, showPursJsonError)
 
 type Type' = P.Type ()
 type Constraint' = P.Constraint ()
@@ -75,7 +76,17 @@ instance NFData NotYetKnown
 type UploadedPackage = Package NotYetKnown
 type VerifiedPackage = Package GithubUser
 
-type ManifestError = BowerError
+data ManifestError
+  = BowerManifest BowerError
+  | PursManifest PursJsonError
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData ManifestError
+
+showManifestError :: ManifestError -> Text
+showManifestError = \case
+  BowerManifest err -> showBowerError err
+  PursManifest err -> showPursJsonError err
 
 verifyPackage :: GithubUser -> UploadedPackage -> VerifiedPackage
 verifyPackage verifiedUser Package{..} =
@@ -481,7 +492,7 @@ asPackage minimumVersion uploader = do
   when (compilerVersion < minimumVersion)
     (throwCustomError $ CompilerTooOld minimumVersion compilerVersion)
 
-  Package <$> key "packageMeta" asPackageMeta .! ErrorInPackageMeta
+  Package <$> key "packageMeta" asPackageMeta .! (ErrorInPackageMeta . BowerManifest)
           <*> key "version" asVersion
           <*> key "versionTag" asText
           <*> keyMay "tagTime" (withString parseTimeEither)
@@ -516,7 +527,7 @@ displayPackageError e = case e of
     <> " of the compiler, but it appears that " <> T.pack (showVersion usedV)
     <> " was used."
   ErrorInPackageMeta err ->
-    "Error in package metadata: " <> showBowerError err
+    "Error in package metadata: " <> showManifestError err
   InvalidVersion ->
     "Invalid version"
   InvalidDeclarationType str ->
@@ -584,7 +595,7 @@ p `pOr` q = catchError p (const q)
 
 asInPackage :: Parse ManifestError a -> Parse ManifestError (InPackage a)
 asInPackage inner =
-  build <$> key "package" (perhaps (withText parsePackageName))
+  build <$> key "package" (perhaps (withText (mapLeft BowerManifest . parsePackageName)))
         <*> key "item" inner
   where
   build Nothing = Local
@@ -740,7 +751,7 @@ asResolvedDependencies =
 
 parsePackageName' :: Text -> Either PackageError PackageName
 parsePackageName' =
-  mapLeft ErrorInPackageMeta . parsePackageName
+  mapLeft ErrorInPackageMeta . (mapLeft BowerManifest . parsePackageName)
 
 mapLeft :: (a -> a') -> Either a b -> Either a' b
 mapLeft f (Left x) = Left (f x)

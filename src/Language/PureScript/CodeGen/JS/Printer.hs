@@ -15,10 +15,12 @@ import qualified Control.Arrow as A
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.List.NonEmpty as NEL (toList)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.CoreImp.AST
+import Language.PureScript.CoreImp.Module
 import Language.PureScript.Comments
 import Language.PureScript.Crash
 import Language.PureScript.Pretty.Common
@@ -114,40 +116,70 @@ literals = mkPattern' match'
     [ return $ emit "throw "
     , prettyPrintJS' value
     ]
-  match (Comment _ com js) = mconcat <$> sequence
+  match (Comment (SourceComments com) js) = mconcat <$> sequence
     [ return $ emit "\n"
     , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
+  match (Comment PureAnnotation js) = mconcat <$> sequence 
+    [ return $ emit "/* #__PURE__ */ "
+    , prettyPrintJS' js 
+    ]
   match _ = mzero
 
-  comment :: (Emit gen) => Comment -> StateT PrinterState Maybe gen
-  comment (LineComment com) = mconcat <$> sequence
-    [ currentIndent
-    , return $ emit "//" <> emit com <> emit "\n"
-    ]
-  comment (BlockComment com) = fmap mconcat $ sequence $
-    [ currentIndent
-    , return $ emit "/**\n"
-    ] ++
-    map asLine (T.lines com) ++
-    [ currentIndent
-    , return $ emit " */\n"
-    , currentIndent
-    ]
-    where
-    asLine :: (Emit gen) => Text -> StateT PrinterState Maybe gen
-    asLine s = do
-      i <- currentIndent
-      return $ i <> emit " * " <> (emit . removeComments) s <> emit "\n"
+comment :: (Emit gen) => Comment -> StateT PrinterState Maybe gen
+comment (LineComment com) = mconcat <$> sequence
+  [ currentIndent
+  , return $ emit "//" <> emit com <> emit "\n"
+  ]
+comment (BlockComment com) = fmap mconcat $ sequence $
+  [ currentIndent
+  , return $ emit "/**\n"
+  ] ++
+  map asLine (T.lines com) ++
+  [ currentIndent
+  , return $ emit " */\n"
+  , currentIndent
+  ]
+  where
+  asLine :: (Emit gen) => Text -> StateT PrinterState Maybe gen
+  asLine s = do
+    i <- currentIndent
+    return $ i <> emit " * " <> (emit . removeComments) s <> emit "\n"
 
-    removeComments :: Text -> Text
-    removeComments t =
-      case T.stripPrefix "*/" t of
-        Just rest -> removeComments rest
-        Nothing -> case T.uncons t of
-          Just (x, xs) -> x `T.cons` removeComments xs
-          Nothing -> ""
+  removeComments :: Text -> Text
+  removeComments t =
+    case T.stripPrefix "*/" t of
+      Just rest -> removeComments rest
+      Nothing -> case T.uncons t of
+        Just (x, xs) -> x `T.cons` removeComments xs
+        Nothing -> ""
+
+prettyImport :: (Emit gen) => Import -> StateT PrinterState Maybe gen
+prettyImport (Import ident from) =
+  return . emit $
+    "import * as " <> ident <> " from " <> prettyPrintStringJS from <> ";"
+
+prettyExport :: (Emit gen) => Export -> StateT PrinterState Maybe gen
+prettyExport (Export idents from) =
+  mconcat <$> sequence
+    [ return $ emit "export {\n"
+    , withIndent $ do
+        let exportsStrings = emit . exportedIdentToString from <$> idents
+        indentString <- currentIndent
+        return . intercalate (emit ",\n") . NEL.toList $ (indentString <>) <$> exportsStrings
+    , return $ emit "\n"
+    , currentIndent
+    , return . emit $ "}" <> maybe "" ((" from " <>) . prettyPrintStringJS) from <> ";"
+    ]
+  where
+  exportedIdentToString Nothing ident
+    | nameIsJsReserved ident || nameIsJsBuiltIn ident
+    = "$$" <> ident <> " as " <> ident
+  exportedIdentToString _ "$main"
+    = T.concatMap identCharToText "$main" <> " as $main"
+  exportedIdentToString _ ident
+    = T.concatMap identCharToText ident
 
 accessor :: Pattern PrinterState AST (Text, AST)
 accessor = mkPattern match
@@ -217,14 +249,22 @@ prettyStatements sts = do
   indentString <- currentIndent
   return $ intercalate (emit "\n") $ map ((<> emit ";") . (indentString <>)) jss
 
+prettyModule :: (Emit gen) => Module -> StateT PrinterState Maybe gen
+prettyModule Module{..} = do
+  header <- mconcat <$> traverse comment modHeader
+  imps <- traverse prettyImport modImports
+  body <- prettyStatements modBody
+  exps <- traverse prettyExport modExports
+  pure $ header <> intercalate (emit "\n") (imps ++ body : exps)
+
 -- | Generate a pretty-printed string representing a collection of JavaScript expressions at the same indentation level
-prettyPrintJSWithSourceMaps :: [AST] -> (Text, [SMap])
+prettyPrintJSWithSourceMaps :: Module -> (Text, [SMap])
 prettyPrintJSWithSourceMaps js =
-  let StrPos (_, s, mp) = (fromMaybe (internalError "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyStatements) js
+  let StrPos (_, s, mp) = (fromMaybe (internalError "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyModule) js
   in (s, mp)
 
-prettyPrintJS :: [AST] -> Text
-prettyPrintJS = maybe (internalError "Incomplete pattern") runPlainString . flip evalStateT (PrinterState 0) . prettyStatements
+prettyPrintJS :: Module -> Text
+prettyPrintJS = maybe (internalError "Incomplete pattern") runPlainString . flip evalStateT (PrinterState 0) . prettyModule
 
 -- | Generate an indented, pretty-printed string representing a JavaScript expression
 prettyPrintJS' :: (Emit gen) => AST -> StateT PrinterState Maybe gen

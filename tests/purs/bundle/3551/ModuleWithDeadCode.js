@@ -1,10 +1,8 @@
-"use strict";
-
-var fs = require('fs');
+import * as fs from 'fs';
 
 var source = fs.readFileSync(__filename, 'utf-8');
 
-exports.results = {
+export var results = {
     fooIsNotEliminated: /^ *var foo =/m.test(source),
     barIsExported: /^ *exports\["bar"\] =/m.test(source),
     barIsNotEliminated: /^ *var bar =/m.test(source),
