@@ -1,15 +1,13 @@
-"use strict";
+export var foo = 1;
 
-var foo = 1;
-
-exports.bar = { foo };
+export var bar = { foo };
 
 var baz = 2;
 
-exports.quux = function(baz) {
+export var quux = function(baz) {
   return { baz };
 };
 
-var fs = require('fs');
+import * as fs from 'fs';
 var source = fs.readFileSync(__filename, 'utf-8');
-exports.bazIsEliminated = !/^ *var baz =/m.test(source);
+export var bazIsEliminated = !/^ *var baz =/m.test(source);

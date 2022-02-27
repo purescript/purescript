@@ -1,15 +1,15 @@
 
 //: forall e. FVect Z e
-exports.fnil = [];
+export var fnil = [];
 
 //: forall n e. e -> FVect n e -> FVect (S n) e
-exports.fcons = function (hd) {
+export var fcons = function (hd) {
   return function (tl) {
     return [hd].concat(tl);
   };
 };
 
-exports.fappend = function (dict) {
+export var fappend = function (dict) {
   return function (left) {
     return function (right) {
       return left.concat(right);
@@ -17,7 +17,7 @@ exports.fappend = function (dict) {
   };
 };
 
-exports.fflatten = function (dict) {
+export var fflatten = function (dict) {
   return function (v) {
     var accRef = [];
     for (var indexRef = 0; indexRef < v.length; indexRef += 1) {
@@ -27,6 +27,6 @@ exports.fflatten = function (dict) {
   };
 };
 
-exports.ftoArray = function (vect) {
+export var ftoArray = function (vect) {
   return vect;
 };

@@ -18,11 +18,12 @@ import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
+import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (findIndices, minimumBy, groupBy, nubBy, sortOn, delete)
-import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
+import Data.List (delete, findIndices, groupBy, minimumBy, nubBy, sortOn, tails)
+import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (for)
@@ -230,22 +231,23 @@ entails SolverOptions{..} constraint context hints =
 
             dicts <- lift . lift $ forClassNameM env (combineContexts context inferred) className' kinds'' tys''
 
-            let instances = do
+            let (catMaybes -> ambiguous, instances) = partitionEithers $ do
                   chain <- groupBy ((==) `on` tcdChain) $
                            sortOn (tcdChain &&& tcdIndex)
                            dicts
                   -- process instances in a chain in index order
-                  let found = for chain $ \tcd ->
+                  let found = for (init $ tails chain) $ \(tcd:tl) ->
                                 -- Make sure the type unifies with the type in the type instance definition
                                 case matches typeClassDependencies tcd tys'' of
-                                  Apart        -> Right ()                  -- keep searching
-                                  Match substs -> Left (Just (substs, tcd)) -- found a match
-                                  Unknown      -> Left Nothing              -- can't continue with this chain yet, need proof of apartness
-                  case found of
-                    Right _               -> []          -- all apart
-                    Left Nothing          -> []          -- last unknown
-                    Left (Just substsTcd) -> [substsTcd] -- found a match
-            solution <- lift . lift $ unique kinds'' tys'' instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
+                                  Apart        -> Right ()                   -- keep searching
+                                  Match substs -> Left (Right (substs, tcd)) -- found a match
+                                  Unknown ->
+                                    if null (tcdChain tcd) || null tl
+                                    then Right ()                                   -- need proof of apartness but this is either not in a chain or at the end
+                                    else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
+
+                  lefts [found]
+            solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
@@ -323,16 +325,16 @@ entails SolverOptions{..} constraint context hints =
                       (substituteType currentSubst . replaceAllTypeVars (M.toList subst) $ instKind)
                       (substituteType currentSubst tyKind)
 
-            unique :: [SourceType] -> [SourceType] -> [(a, TypeClassDict)] -> Bool -> m (EntailsResult a)
-            unique kindArgs tyArgs [] unks
+            unique :: [SourceType] -> [SourceType] -> [Qualified (Either SourceType Ident)] -> [(a, TypeClassDict)] -> Bool -> m (EntailsResult a)
+            unique kindArgs tyArgs ambiguous [] unks
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
               | solverShouldGeneralize && ((null kindArgs && null tyArgs) || any canBeGeneralized kindArgs || any canBeGeneralized tyArgs) =
                   return (Unsolved (srcConstraint className' kindArgs tyArgs conInfo))
-              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' kindArgs tyArgs conInfo) unks
-            unique _ _ [(a, dict)] _ = return $ Solved a dict
-            unique _ tyArgs tcds _
+              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' kindArgs tyArgs conInfo) ambiguous unks
+            unique _ _ _ [(a, dict)] _ = return $ Solved a dict
+            unique _ tyArgs _ tcds _
               | pairwiseAny overlapping (map snd tcds) =
                   throwError . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . tcdToInstanceDescription . snd))
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
@@ -663,6 +665,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
         go (sd, r)                 ([], TypeVar _ v)                   = (Match (), M.singleton v [rowFromList (sd, r)])
         go _ _                                                         = (Apart, M.empty)
     typeHeadsAreEqual (TUnknown _ _) _ = (Unknown, M.empty)
+    typeHeadsAreEqual Skolem{} _       = (Unknown, M.empty)
     typeHeadsAreEqual _ _ = (Apart, M.empty)
 
     both :: (Matched (), Matching [Type a]) -> (Matched (), Matching [Type a]) -> (Matched (), Matching [Type a])
@@ -680,9 +683,11 @@ matches deps TypeClassDictionaryInScope{..} tys =
       typesAreEqual (KindedType _ t1 _)    t2                     = typesAreEqual t1 t2
       typesAreEqual t1                     (KindedType _ t2 _)    = typesAreEqual t1 t2
       typesAreEqual (TUnknown _ u1)        (TUnknown _ u2)        | u1 == u2 = Match ()
-      typesAreEqual (Skolem _ _ _ s1 _)      (Skolem _ _ _ s2 _)      | s1 == s2 = Match ()
-      typesAreEqual (Skolem _ _ _ _ _)       _                      = Unknown
-      typesAreEqual _                      (Skolem _ _ _ _ _)       = Unknown
+      typesAreEqual (TUnknown _ u1)        t2                     = if t2 `containsUnknown` u1 then Apart else Unknown
+      typesAreEqual t1                     (TUnknown _ u2)        = if t1 `containsUnknown` u2 then Apart else Unknown
+      typesAreEqual (Skolem _ _ _ s1 _)    (Skolem _ _ _ s2 _)    | s1 == s2 = Match ()
+      typesAreEqual (Skolem _ _ _ s1 _)    t2                     = if t2 `containsSkolem` s1 then Apart else Unknown
+      typesAreEqual t1                     (Skolem _ _ _ s2 _)    = if t1 `containsSkolem` s2 then Apart else Unknown
       typesAreEqual (TypeVar _ v1)         (TypeVar _ v2)         | v1 == v2 = Match ()
       typesAreEqual (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = Match ()
       typesAreEqual (TypeConstructor _ c1) (TypeConstructor _ c2) | c1 == c2 = Match ()
@@ -698,6 +703,8 @@ matches deps TypeClassDictionaryInScope{..} tys =
           go (l, t1)                (r, KindedType _ t2 _)            = go (l, t1) (r, t2)
           go ([], KindApp _ t1 k1)  ([], KindApp _ t2 k2)             = typesAreEqual t1 t2 <> typesAreEqual k1 k2
           go ([], TUnknown _ u1)    ([], TUnknown _ u2)    | u1 == u2 = Match ()
+          go ([], TUnknown _ _)     ([], _)                           = Unknown
+          go ([], _)                ([], TUnknown _ _)                = Unknown
           go ([], Skolem _ _ _ s1 _)  ([], Skolem _ _ _ s2 _)  | s1 == s2 = Match ()
           go ([], Skolem _ _ _ _ _)   _                               = Unknown
           go _                      ([], Skolem _ _ _ _ _)            = Unknown
@@ -709,6 +716,12 @@ matches deps TypeClassDictionaryInScope{..} tys =
       isRCons :: Type a -> Bool
       isRCons RCons{}    = True
       isRCons _          = False
+
+      containsSkolem :: Type a -> Int -> Bool
+      containsSkolem t s = everythingOnTypes (||) (\case Skolem _ _ _ s' _ -> s == s'; _ -> False) t
+
+      containsUnknown :: Type a -> Int -> Bool
+      containsUnknown t u = everythingOnTypes (||) (\case TUnknown _ u' -> u == u'; _ -> False) t
 
 -- | Add a dictionary for the constraint to the scope, and dictionaries
 -- for all implied superclass instances.

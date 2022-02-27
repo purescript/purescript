@@ -5,6 +5,9 @@ import Prelude.Compat
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
+import qualified Language.PureScript.AST as AST
+import qualified Language.PureScript.Names as N
+import Language.PureScript.Interactive.IO (findNodeProcess)
 
 import Control.Arrow ((***), (>>>))
 import Control.Monad
@@ -34,11 +37,6 @@ import System.Process hiding (cwd)
 import qualified System.FilePath.Glob as Glob
 import System.IO
 import Test.Hspec
-
-findNodeProcess :: IO (Maybe String)
-findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-  where
-  names = ["nodejs", "node"]
 
 -- |
 -- Fetches code necessary to run the tests with. The resulting support code
@@ -75,15 +73,15 @@ updateSupportCode = withCurrentDirectory "tests/support" $ do
     heading "Updating support code"
     callCommand "npm install"
     -- bower uses shebang "/usr/bin/env node", but we might have nodejs
-    node <- maybe cannotFindNode pure =<< findNodeProcess
+    node <- either cannotFindNode pure =<< findNodeProcess
     -- Sometimes we run as a root (e.g. in simple docker containers)
     -- And we are non-interactive: https://github.com/bower/bower/issues/1162
     callProcess node ["node_modules/bower/bin/bower", "--allow-root", "install", "--config.interactive=false"]
     writeFile lastUpdatedFile ""
   where
-  cannotFindNode :: IO a
-  cannotFindNode = do
-    hPutStrLn stderr "Cannot find node (or nodejs) executable"
+  cannotFindNode :: String -> IO a
+  cannotFindNode message = do
+    hPutStrLn stderr message
     exitFailure
 
   getModificationTimeMaybe :: FilePath -> IO (Maybe UTCTime)
@@ -199,20 +197,34 @@ getTestFiles testDir = do
        else dir
 
 compile
-  :: SupportModules
+  :: Bool
+  -> SupportModules
   -> [FilePath]
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile SupportModules{..} inputFiles = runTest $ do
+compile checkForMainModule SupportModules{..} inputFiles = runTest $ do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
   fs <- liftIO $ readInput (sort inputFiles)
   msWithWarnings <- CST.parseFromFiles id fs
   tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
   let ms = fmap snd <$> msWithWarnings
   foreigns <- inferForeignModules ms
-  let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
+  let
+    actions = makeActions supportModules (foreigns `M.union` supportForeigns)
+    hasMainModule = (==) 1 $ length $ filter (== "Main") $ fmap getPsModuleName ms
   case ms of
-    [singleModule] -> pure <$> P.rebuildModule actions supportExterns (snd singleModule)
-    _ -> P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
+    [singleModule] -> do
+      when (checkForMainModule && not hasMainModule) $ do
+        error $ "When testing a single PureScript file, the file's module's name must be 'Main' but got '"
+          <> T.unpack (getPsModuleName singleModule) <> "'."
+      pure <$> P.rebuildModule actions supportExterns (snd singleModule)
+    _ -> do
+      when (checkForMainModule && not hasMainModule) $ do
+        error "When testing multiple PureScript files, the main file's module's name must be 'Main'."
+      P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
+
+getPsModuleName :: (a, AST.Module) -> T.Text
+getPsModuleName psModule = case snd psModule of
+  AST.Module _ _ (N.ModuleName t) _ _ -> t
 
 makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
 makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
@@ -251,7 +263,7 @@ trim :: String -> String
 trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
 
 modulesDir :: FilePath
-modulesDir = ".test_modules" </> "node_modules"
+modulesDir = ".test_modules"
 
 logpath :: FilePath
 logpath = "purescript-output"
