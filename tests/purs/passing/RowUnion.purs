@@ -69,7 +69,7 @@ withDefaultsClosed p = merge p { y: 1, z: 1 }
 test4 = withDefaults { x: 1, y: 2 }
 
 -- r is a subrow of s if Union r t s for some t.
-class Subrow (r :: # Type) (s :: # Type)
+class Subrow (r :: Row Type) (s :: Row Type)
 instance subrow :: Union r t s => Subrow r s
 
 main :: Effect Unit

@@ -1,8 +1,8 @@
-module ForeignKinds.Lib (kind Nat, Kinded, Zero, Succ, N0, N1, N2, N3, NatProxy(..), class AddNat, addNat, proxy1, proxy2) where
+module ForeignKinds.Lib (Nat, Kinded, Zero, Succ, N0, N1, N2, N3, NatProxy(..), class AddNat, addNat, proxy1, proxy2) where
 
 -- declaration
 
-foreign import kind Nat
+data Nat
 
 -- use in foreign data
 

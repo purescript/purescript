@@ -183,7 +183,6 @@ data Export a
   | ExportType a (Name (N.ProperName 'N.TypeName)) (Maybe (DataMembers a))
   | ExportTypeOp a SourceToken (Name (N.OpName 'N.TypeOpName))
   | ExportClass a SourceToken (Name (N.ProperName 'N.ClassName))
-  | ExportKind a SourceToken (Name (N.ProperName 'N.TypeName))
   | ExportModule a SourceToken (Name N.ModuleName)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
@@ -231,7 +230,6 @@ data Import a
   | ImportType a (Name (N.ProperName 'N.TypeName)) (Maybe (DataMembers a))
   | ImportTypeOp a SourceToken (Name (N.OpName 'N.TypeOpName))
   | ImportClass a SourceToken (Name (N.ProperName 'N.ClassName))
-  | ImportKind a SourceToken (Name (N.ProperName 'N.TypeName))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data DataHead a = DataHead
