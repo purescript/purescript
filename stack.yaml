@@ -1,4 +1,4 @@
-resolver: lts-17.6
+resolver: lts-18.15
 pvp-bounds: both
 packages:
 - '.'
@@ -7,15 +7,17 @@ ghc-options:
   # Build with advanced optimizations enabled by default
   "$locals": -O2 -Werror
 extra-deps:
+# As of 2021-11-08, the latest release of `language-javascript` is 0.7.1.0,
+# but it has a problem with parsing the `async` keyword.  It doesn't allow
+# `async` to be used as an object key:
+# https://github.com/erikd/language-javascript/issues/131
 - language-javascript-0.7.0.0
-- git: https://github.com/hspec/hspec.git
-  commit: 8f628c861d01ec8fc0a94ffdfe31e4399bd049d1
-  subdirs:
-    - .
-    - hspec-core
-    - hspec-discover
+# The ./.hspec file uses the --times flag, which was added in hspec-2.8.0.
+# LTS-18 has only hspec-2.7.
+- hspec-2.8.3
+- hspec-core-2.8.3
+- hspec-discover-2.8.3
 nix:
-  enable: false
   packages:
   - zlib
   # Test dependencies

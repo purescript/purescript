@@ -4,6 +4,7 @@ at tests/purs/failing/RoleDeclarationArityMismatch.purs:5:1 - 5:20 (line 5, colu
 
   The type [33mA[0m expects 0 arguments but its role declaration lists 1 role.
 
+in role declaration for [33mA[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/RoleDeclarationArityMismatch.md for more information,
 or to contribute content related to this error.

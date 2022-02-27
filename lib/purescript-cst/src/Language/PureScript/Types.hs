@@ -18,7 +18,6 @@ import Data.Foldable (fold, foldl')
 import qualified Data.IntSet as IS
 import Data.List (sort, sortOn)
 import Data.Maybe (fromMaybe, isJust)
-import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics (Generic)
@@ -105,9 +104,6 @@ srcTypeWildcard = TypeWildcard NullSourceAnn Nothing
 srcTypeConstructor :: Qualified (ProperName 'TypeName) -> SourceType
 srcTypeConstructor = TypeConstructor NullSourceAnn
 
-srcTypeOp :: Qualified (OpName 'TypeOpName) -> SourceType
-srcTypeOp = TypeOp NullSourceAnn
-
 srcTypeApp :: SourceType -> SourceType -> SourceType
 srcTypeApp = TypeApp NullSourceAnn
 
@@ -128,12 +124,6 @@ srcRCons = RCons NullSourceAnn
 
 srcKindedType :: SourceType -> SourceType -> SourceType
 srcKindedType = KindedType NullSourceAnn
-
-srcBinaryNoParensType :: SourceType -> SourceType -> SourceType -> SourceType
-srcBinaryNoParensType = BinaryNoParensType NullSourceAnn
-
-srcParensInType :: SourceType -> SourceType
-srcParensInType = ParensInType NullSourceAnn
 
 pattern REmptyKinded :: forall a. a -> Maybe (Type a) -> Type a
 pattern REmptyKinded ann mbK <- (toREmptyKinded -> Just (ann, mbK))
@@ -184,12 +174,6 @@ mapConstraintArgs f c = c { constraintArgs = f (constraintArgs c) }
 
 overConstraintArgs :: Functor f => ([Type a] -> f [Type a]) -> Constraint a -> f (Constraint a)
 overConstraintArgs f c = (\args -> c { constraintArgs = args }) <$> f (constraintArgs c)
-
-mapConstraintKindArgs :: ([Type a] -> [Type a]) -> Constraint a -> Constraint a
-mapConstraintKindArgs f c = c { constraintKindArgs = f (constraintKindArgs c) }
-
-overConstraintKindArgs :: Functor f => ([Type a] -> f [Type a]) -> Constraint a -> f (Constraint a)
-overConstraintKindArgs f c = (\args -> c { constraintKindArgs = args }) <$> f (constraintKindArgs c)
 
 mapConstraintArgsAll :: ([Type a] -> [Type a]) -> Constraint a -> Constraint a
 mapConstraintArgsAll f c =
@@ -528,13 +512,6 @@ moveQuantifiersToFront = go [] [] where
   go qs cs (ConstrainedType ann c ty) = go qs ((ann, c) : cs) ty
   go qs cs ty = foldl (\ty' (ann, q, sco, mbK) -> ForAll ann q mbK ty' sco) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
 
--- | Check if a type contains wildcards
-containsWildcards :: Type a -> Bool
-containsWildcards = everythingOnTypes (||) go where
-  go :: Type a -> Bool
-  go TypeWildcard{} = True
-  go _ = False
-
 -- | Check if a type contains `forall`
 containsForAll :: Type a -> Bool
 containsForAll = everythingOnTypes (||) go where
@@ -616,18 +593,6 @@ everywhereOnTypes f = go where
   go (ParensInType ann t) = f (ParensInType ann (go t))
   go other = f other
 
-everywhereOnTypesTopDown :: (Type a -> Type a) -> Type a -> Type a
-everywhereOnTypesTopDown f = go . f where
-  go (TypeApp ann t1 t2) = TypeApp ann (go (f t1)) (go (f t2))
-  go (KindApp ann t1 t2) = KindApp ann (go (f t1)) (go (f t2))
-  go (ForAll ann arg mbK ty sco) = ForAll ann arg (go . f <$> mbK) (go (f ty)) sco
-  go (ConstrainedType ann c ty) = ConstrainedType ann (mapConstraintArgsAll (map (go . f)) c) (go (f ty))
-  go (RCons ann name ty rest) = RCons ann name (go (f ty)) (go (f rest))
-  go (KindedType ann ty k) = KindedType ann (go (f ty)) (go (f k))
-  go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann (go (f t1)) (go (f t2)) (go (f t3))
-  go (ParensInType ann t) = ParensInType ann (go (f t))
-  go other = f other
-
 everywhereOnTypesM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesM f = go where
   go (TypeApp ann t1 t2) = (TypeApp ann <$> go t1 <*> go t2) >>= f
@@ -639,18 +604,6 @@ everywhereOnTypesM f = go where
   go (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go t1 <*> go t2 <*> go t3) >>= f
   go (ParensInType ann t) = (ParensInType ann <$> go t) >>= f
   go other = f other
-
-everywhereWithScopeOnTypesM :: Monad m => S.Set Text -> (S.Set Text -> Type a -> m (Type a)) -> Type a -> m (Type a)
-everywhereWithScopeOnTypesM s0 f = go s0 where
-  go s (TypeApp ann t1 t2) = (TypeApp ann <$> go s t1 <*> go s t2) >>= f s
-  go s (KindApp ann t1 t2) = (KindApp ann <$> go s t1 <*> go s t2) >>= f s
-  go s (ForAll ann arg mbK ty sco) = (ForAll ann arg <$> traverse (go s) mbK <*> go (S.insert arg s) ty <*> pure sco) >>= f s
-  go s (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgsAll (traverse (go s)) c <*> go s ty) >>= f s
-  go s (RCons ann name ty rest) = (RCons ann name <$> go s ty <*> go s rest) >>= f s
-  go s (KindedType ann ty k) = (KindedType ann <$> go s ty <*> go s k) >>= f s
-  go s (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go s t1 <*> go s t2 <*> go s t3) >>= f s
-  go s (ParensInType ann t) = (ParensInType ann <$> go s t) >>= f s
-  go s other = f s other
 
 everywhereOnTypesTopDownM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesTopDownM f = go <=< f where

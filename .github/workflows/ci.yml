@@ -20,6 +20,7 @@ jobs:
     strategy:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
+        # If upgrading Ubuntu, also upgrade it in the lint job below
         os: [ "ubuntu-18.04", "macOS-10.15", "windows-2016" ]
 
     runs-on: "${{ matrix.os }}"
@@ -29,13 +30,14 @@ jobs:
 
       - uses: "actions/setup-node@v1"
         with:
-          node-version: "10"
+          node-version: "12"
 
       - id: "haskell"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
-          stack-version: "2.5.1"
+          # If upgrading Stack, also upgrade it in the lint job below
+          stack-version: "2.7.1"
           stack-no-global: true
 
       - uses: "actions/cache@v2"
@@ -53,11 +55,19 @@ jobs:
           mkdir -p "$STACK_ROOT"
           echo "local-programs-path: $STACK_ROOT/programs" > $STACK_ROOT/config.yaml
 
-      - run: "ci/run-hlint.sh --git"
-        env:
-          VERSION: "2.2.11"
-
       - run: "ci/build.sh"
+
+      - name: "(Linux only) Build the entire package set"
+        if: "${{ runner.os == 'Linux' }}"
+        # We build in this directory in build.sh, so this is where we need to
+        # launch `stack exec`. The actual package-set building happens in a
+        # temporary directory.
+        working-directory: "sdist-test"
+        # The presence or absence of the --haddock flag changes the location
+        # into which stack places all build artifacts. Since we use --haddock
+        # in our CI builds, in order to actually get stack to find the purs
+        # binary it created, we need to use the flag here as well.
+        run: "stack --haddock exec ../ci/build-package-set.sh"
 
       - name: "(Release only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
@@ -88,3 +98,57 @@ jobs:
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           files: "sdist-test/bundle/*.{tar.gz,sha}"
+
+  lint:
+    runs-on: "ubuntu-18.04"
+
+    steps:
+      - uses: "actions/checkout@v2"
+
+      - id: "haskell"
+        uses: "haskell/actions/setup@v1"
+        with:
+          enable-stack: true
+          stack-version: "2.7.1"
+          stack-no-global: true
+
+      - uses: "actions/cache@v2"
+        with:
+          path: |
+            ${{ steps.haskell.outputs.stack-root }}
+          key: "${{ runner.os }}-lint-${{ hashFiles('stack.yaml') }}"
+
+      - run: "ci/run-hlint.sh --git"
+        env:
+          VERSION: "2.2.11"
+
+      # Note: the weeder version will need to be updated when we next update our version
+      # of GHC.
+      #
+      # weeder-2.2.0 has somewhat strange version deps. It doesn't appear to
+      # support the exact versions of dhall and generic-lens in LTS-18.
+      # However, forcing it to use the versions of dhall and generic-lens in
+      # LTS-18 doesn't cause any problems when building, so the following
+      # commands build weeder while ignoring version constraints.
+      - name: Install weeder
+        run: |
+          # The `stack.yaml` file is copied to a separate file so that
+          # adding `allow-newer: true` doesn't affect any subsequant
+          # calls to `stack`.
+          cp stack.yaml stack-weeder.yaml
+          # `allow-newer: true` is needed so that weeder-2.2.0 can be
+          # installed with the dependencies present in LTS-18.
+          echo 'allow-newer: true' >> stack-weeder.yaml
+          stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.2.0
+
+      - run: "stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
+
+      - run: "stack exec weeder"
+
+      # Now do it again, with the test suite included. We don't want a
+      # reference from our test suite to count in the above check; the fact
+      # that a function is tested is not evidence that it's needed. But we also
+      # don't want to leave weeds lying around in our test suite either.
+      - run: "stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
+
+      - run: "stack exec weeder"

@@ -1,0 +1,14 @@
+{
+  "name": "basic-example",
+  "version": "1.0.0",
+  "license": "MIT",
+  "location": {
+    "githubOwner": "purescript",
+    "githubRepo": "test"
+  },
+  "dependencies": {
+    "console": ">=1.0.0 <2.0.0",
+    "prelude": ">=1.0.0 <2.0.0",
+    "effect": ">=1.0.0 <2.0.0"
+  }
+}

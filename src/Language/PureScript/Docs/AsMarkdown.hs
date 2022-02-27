@@ -1,7 +1,6 @@
 module Language.PureScript.Docs.AsMarkdown
   ( Docs
   , runDocs
-  , modulesAsMarkdown
   , moduleAsMarkdown
   , codeToString
   ) where
@@ -20,9 +19,6 @@ import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs.Render as Render
-
-modulesAsMarkdown :: [Module] -> Docs
-modulesAsMarkdown = mapM_ moduleAsMarkdown
 
 moduleAsMarkdown :: Module -> Docs
 moduleAsMarkdown Module{..} = do
@@ -66,6 +62,9 @@ codeToString = outputWith elemAsMarkdown
   elemAsMarkdown (Keyword x)    = x
   elemAsMarkdown Space          = " "
   elemAsMarkdown (Symbol _ x _) = x
+
+  -- roles aren't rendered in markdown
+  elemAsMarkdown (Role _) = ""
 
 -- fixityAsMarkdown :: P.Fixity -> Docs
 -- fixityAsMarkdown (P.Fixity associativity precedence) =

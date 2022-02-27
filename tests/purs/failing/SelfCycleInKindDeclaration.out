@@ -1,0 +1,9 @@
+Error found:
+at tests/purs/failing/SelfCycleInKindDeclaration.purs:4:1 - 4:24 (line 4, column 1 - line 4, column 24)
+
+  A kind declaration '[33mFoo[0m' may not refer to itself in its own signature.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CycleInKindDeclaration.md for more information,
+or to contribute content related to this error.
+

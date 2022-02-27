@@ -99,7 +99,9 @@ literalFromJSON t = withObject "Literal" literalFromObj
     ObjectLiteral <$> recordFromJSON t val
 
 identFromJSON :: Value -> Parser Ident
-identFromJSON = withText "Ident" (return . Ident)
+identFromJSON = withText "Ident" $ \case
+  ident | ident == unusedIdent -> pure UnusedIdent 
+        | otherwise -> pure $ Ident ident 
 
 properNameFromJSON :: Value -> Parser (ProperName a)
 properNameFromJSON = fmap ProperName . parseJSON

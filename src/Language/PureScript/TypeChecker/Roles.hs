@@ -6,11 +6,15 @@
 module Language.PureScript.TypeChecker.Roles
   ( lookupRoles
   , checkRoles
-  , checkDataBindingGroupRoles
+  , checkRoleDeclarationArity
+  , inferRoles
+  , inferDataBindingGroupRoles
   ) where
 
 import Prelude.Compat
 
+import Control.Arrow ((&&&))
+import Control.Monad (unless, when, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State (MonadState(..), runState, state)
 import Data.Coerce (coerce)
@@ -80,18 +84,42 @@ lookupRoles
 lookupRoles env tyName =
   fromMaybe [] $ M.lookup tyName (types env) >>= typeKindRoles . snd
 
--- | This function does the following:
---
--- * Infers roles for the given data type declaration
---
--- * Compares the inferred roles to the explicitly declared roles (if any) and
---   ensures that the explicitly declared roles are not more permissive than
---   the inferred ones
+-- |
+-- Compares the inferred roles to the explicitly declared roles and ensures
+-- that the explicitly declared roles are not more permissive than the
+-- inferred ones.
 --
 checkRoles
   :: forall m
    . (MonadError MultipleErrors m)
-  => Environment
+  => [(Text, Maybe SourceType, Role)]
+    -- ^ type parameters for the data type whose roles we are checking
+  -> [Role]
+    -- ^ roles declared for the data type
+  -> m ()
+checkRoles tyArgs declaredRoles = do
+  let k (var, _, inf) dec =
+        when (inf < dec) . throwError . errorMessage $ RoleMismatch var inf dec
+  zipWithM_ k tyArgs declaredRoles
+
+checkRoleDeclarationArity
+  :: forall m
+   . (MonadError MultipleErrors m)
+  => ProperName 'TypeName
+  -> [Role]
+  -> Int
+  -> m ()
+checkRoleDeclarationArity tyName roles expected = do
+  let actual = length roles
+  unless (expected == actual) $
+    throwError . errorMessage $
+      RoleDeclarationArityMismatch tyName expected actual
+
+-- |
+-- Infers roles for the given data type declaration.
+--
+inferRoles
+  :: Environment
   -> ModuleName
   -> ProperName 'TypeName
     -- ^ The name of the data type whose roles we are checking
@@ -99,9 +127,27 @@ checkRoles
     -- ^ type parameters for the data type whose roles we are checking
   -> [DataConstructorDeclaration]
     -- ^ constructors of the data type whose roles we are checking
-  -> m [Role]
-checkRoles env moduleName tyName tyArgs ctors =
-  checkDataBindingGroupRoles env moduleName [(tyName, tyArgs, ctors)] tyName tyArgs
+  -> [Role]
+inferRoles env moduleName tyName tyArgs ctors =
+  inferDataBindingGroupRoles env moduleName [] [(tyName, tyArgs, ctors)] tyName tyArgs
+
+inferDataBindingGroupRoles
+  :: Environment
+  -> ModuleName
+  -> [RoleDeclarationData]
+  -> [DataDeclaration]
+  -> ProperName 'TypeName
+  -> [(Text, Maybe SourceType)]
+  -> [Role]
+inferDataBindingGroupRoles env moduleName roleDeclarations group =
+  let declaredRoleEnv = M.fromList $ map (Qualified (Just moduleName) . rdeclIdent &&& rdeclRoles) roleDeclarations
+      inferredRoleEnv = getRoleEnv env
+      initialRoleEnv = declaredRoleEnv `M.union` inferredRoleEnv
+      inferredRoleEnv' = inferDataBindingGroupRoles' moduleName group initialRoleEnv
+  in \tyName tyArgs ->
+        let qualTyName = Qualified (Just moduleName) tyName
+            inferredRoles = M.lookup qualTyName inferredRoleEnv'
+        in fromMaybe (Phantom <$ tyArgs) inferredRoles
 
 type DataDeclaration =
   ( ProperName 'TypeName
@@ -109,43 +155,16 @@ type DataDeclaration =
   , [DataConstructorDeclaration]
   )
 
-checkDataBindingGroupRoles
-  :: forall m
-   . (MonadError MultipleErrors m)
-  => Environment
-  -> ModuleName
-  -> [DataDeclaration]
-  -> ProperName 'TypeName
-  -> [(Text, Maybe SourceType)]
-  -> m [Role]
-checkDataBindingGroupRoles env moduleName group =
-  let initialRoleEnv = M.union (roleDeclarations env) (getRoleEnv env)
-      inferredRoleEnv = inferDataBindingGroupRoles moduleName group initialRoleEnv
-  in \tyName tyArgs -> do
-    let qualTyName = Qualified (Just moduleName) tyName
-        inferredRoles = M.lookup qualTyName inferredRoleEnv
-    rethrow (addHint (ErrorInRoleDeclaration tyName)) $ do
-      case M.lookup qualTyName (roleDeclarations env) of
-        Just declaredRoles -> do
-          let
-            k (var, _) inf dec =
-              if inf < dec
-                then throwError . errorMessage $ RoleMismatch var inf dec
-                else pure dec
-          sequence $ zipWith3 k tyArgs (fromMaybe (repeat Phantom) inferredRoles) declaredRoles
-        Nothing ->
-          pure $ fromMaybe (Phantom <$ tyArgs) inferredRoles
-
-inferDataBindingGroupRoles
+inferDataBindingGroupRoles'
   :: ModuleName
   -> [DataDeclaration]
   -> RoleEnv
   -> RoleEnv
-inferDataBindingGroupRoles moduleName group roleEnv =
+inferDataBindingGroupRoles' moduleName group roleEnv =
   let (Any didRolesChange, roleEnv') = flip runState roleEnv $
         mconcat <$> traverse (state . inferDataDeclarationRoles moduleName) group
   in if didRolesChange
-     then inferDataBindingGroupRoles moduleName group roleEnv'
+     then inferDataBindingGroupRoles' moduleName group roleEnv'
      else roleEnv'
 
 -- |

@@ -2,6 +2,201 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.14.7
+
+New features:
+
+* Make `Prim.TypeError`'s `Quote` work on all kinds, not just kind `Type`. (#4142 by @xgrommx)
+
+* Display role annotations in HTML docs (#4121 by @JordanMartinez)
+
+  Previously, the HTML docs would not indicate which types could be safely
+  coerced and which could not:
+
+  ```purescript
+  -- cannot be coerced
+  data Foo1 a = Foo1 a
+  type role Foo1 nominal
+
+  -- can be coerced
+  data Foo2 a = Foo2
+  type role Foo2 phantom
+
+  -- can be coerced in some contexts
+  data Foo3 a = Foo3 a
+  type role Foo3 representational
+  ```
+
+  The HTML docs now display the role annotations either explicitly
+  declared by the developer or those inferred by the compiler.
+
+  Since role annotations are an advanced feature and since most type
+  parameters' roles are the `representational` role, the `phantom` and
+  `nominal` role annotations are displayed in documentation whereas the
+  `representational` role is not, similar to "uninteresting" kind signatures.
+
+  Lastly, FFI declarations like below...
+
+  ```purescript
+  foreign import data Foo :: (Type -> Type) -> Type
+  type role Foo nominal
+  ```
+
+  ...will be rendered as though they are data declarations:
+
+  ```purescript
+  data Foo :: (Type -> Type) -> Type
+  data Foo t0
+  type role Foo nominal
+  ```
+
+  One can distinguish FFI declarations with roles separately from normal `data`
+  declarations that have roles based on the name of the type parameters. Since FFI declarations' type parameters are implicit and thus unnamed, the compiler will generate their name: `t0`, `t1`, ..., `tN` where `N` is a zero-based
+  index of the type parameter.
+
+  Note: the resulting documentation will display the roles, but the roles
+  will not be selectable when selecting the type in case one wants to
+  copy-paste the type into source code.
+
+* Rewrite `Partial` optimization to be cleaner (#4208 by @rhendric)
+
+  This feature shrinks the generated JS code for declarations that use
+  empty type classes, such as `Partial`, but is otherwise not expected to
+  have user-visible consequences.
+
+- Add support for publishing via the `purs.json` manifest format (#4233 by @thomashoneyman)
+
+  This feature expands compiler support for publishing packages with different
+  manifest formats. Previously, packages had to have a `bower.json` manifest;
+  now, packages can choose to have a `purs.json` manifest instead.
+
+  This feature provides only partial support for packages published to the
+  PureScript registry using the `purs.json` manifest format. Registry packages
+  are allowed to be hosted anywhere (not just GitHub), and do not need to be
+  Git repositories at all. However, `purs publish` and its primary consumer,
+  Pursuit, both require packages to be available on GitHub and for their version
+  to be a SemVer-compliant Git tag. Therefore, this feature only supports
+  registry packages that are compatible with these restrictions.
+
+Bugfixes:
+
+* Add missing source spans to data constructors when generating docs (#4202 by @PureFunctor)
+
+* Check role declarations arity during type checking (#4157 by @kl0tl)
+
+* Optimize newtype applications with the ($) operator (#4205 by @PureFunctor)
+
+* Properly deserialize unused identifiers in the CoreFn (#4221 by @sjpgarcia)
+
+  This mostly affects downstream consumers of the CoreFn as discussed in
+  #4201. This makes it so CoreFn deserialization properly reads `$__unused`
+  into `UnusedIdent` instead of an `Ident`. This is particularly useful for
+  downstream consumers of the CoreFn such as alternative backends that don't
+  allow arguments to be omitted from functions.
+
+* Fix type operators in declaration param kinds (#4220 by @rhendric)
+
+  This fixes an internal error triggered by using a type operator in the
+  kind of a type parameter of a data declaration, type synonym
+  declaration, or class declaration.
+
+* Scope type vars when type checking typed values (#4216 by @rhendric)
+
+  When the compiler is checking an expression that is annotated with a
+  type against another expected type, and the annotation introduces a type
+  variable, the compiler needs to introduce that type variable to the
+  scope of any types used inside the expression.
+
+  One noteworthy case of this pattern is member signatures inside
+  instances. This fix allows type variables introduced in member
+  signatures to be used in the member declaration itself.
+
+Internal:
+
+* Bump PureScript to building with GHC-8.10.7, as well as from LTS-17 to LTS-18. (#4199 by @cdepillabout)
+
+* Prevent hangs on internal errors (#4126 by @rhendric)
+
+* The explicit disabling of Nix has been removed from `stack.yaml`.   (#4198 by @cdepillabout)
+
+  For developers on NixOS, this means that you should be able to build
+  PureScript by running `stack build` instead of `stack build --nix`.
+  For other developers, this shouldn't affect you.
+
+* Build the entire latest package set in CI (#4217 by @rhendric)
+
+  See [#4128](https://github.com/purescript/purescript/pull/4128).
+
+* Create test machinery for optimizations (#4205 by @PureFunctor)
+
+  This adds machinery for testing code generation for optimizations.
+
+  Partially extracted from #3915 to add tests for #4205.
+
+## 0.14.6
+
+Do not use this release. `purescript-cst`'s version wasn't bumped when this release was made. So, tools like `trypurescript` cannot depend on it. See [0.14.7](#0147) for the same thing.
+
+## 0.14.5
+
+Bugfixes:
+
+* Fix a case where kind inference inferred the wrong kind for type synonyms (#4184 by @jy14898)
+
+* Properly rename module imports in case of conflicts with declarations (#4188 by @PureFunctor)
+
+Internal:
+
+* Fix command and clarify a few other requirements in release guide (#4177 by @JordanMartinez)
+
+* Add `Functor` instance for `Language.PureScript.CoreFn.Module`. (#4186 by @cdepillabout)
+
+## v0.14.4
+
+Bugfixes:
+
+* Solve `Prim.Row.Union left right all` constraint for `left` when `all` and `right` are already closed rows, (#3720 by @MonoidMusician)
+  reflecting the existing functional dependency `all right -> left`
+
+* Account for redundant parens when excluding uninteresting kind sigs from docs (#4137 by @JordanMartinez)
+
+* Add a hint for errors in foreign data type declarations (#4161 by @kl0tl)
+
+* Do not remove bindings referenced in function declarations when bundling (#4044 by @kl0tl)
+
+* Improve row type error messages (#4159 by @rhendric)
+  * Remove a redundant hint that repeats the types in the error
+  * Correctly diff rows containing duplicate items
+  * Erase kind applications from rows in errors (by default)
+
+* Fix bad interaction between superclasses and type synonyms (#4164 by @rhendric)
+
+  See #4101.
+
+* Fix regression in row unification (#4168 by @rhendric)
+
+* Fix backtick operator rule (#4172 by @JordanMartinez)
+
+Other improvements:
+
+* Add developer guide to readme (#3900 by @milesfrain)
+
+Internal:
+
+* Move unreleased changelog entries to CHANGELOG.d (#4132 by @rhendric)
+
+  See CHANGELOG.d/README.md for details.
+
+* Clarify in RELEASE_GUIDE what to do when broken releases are made (#4147 by @JordanMartinez)
+
+* Miscellaneous updates/clarifications to the release guide (#4131 by @JordanMartinez)
+
+* Run Weeder in CI and make it happy (#4148 by @rhendric)
+
+* Add golden tests for self cycles in type class declarations, kind declarations and foreign data type declarations (#4162 by @kl0tl)
+
+* Represent class dictionaries as newtypes (#4125 by @rhendric)
+
 ## v0.14.3
 
 New features:
@@ -65,22 +260,8 @@ New features:
   instance Foo Int String
   ```
 
-  and the compiler will generate a unique name for the instance
-  (e.g. `$dollar_FooIntString_4` where `4` is a randomly-generated number
-  that can change across compiler runs). This version of the instance name
-  is not intended for use in FFI.
-
-  Note: if one wrote
-
-  ```purescript
-  instance ReallyLongClassName Int String
-  ```
-
-  the generated name would be something like
-  `$dollar_ReallyLongClassNameIntStr_87` rather than
-  `$dollar_ReallyLongClassNameIntString_87` as the generated part
-  of the name will be truncated to 25 characters (long enough to be readable
-  without being too verbose).
+  Note that generated instance names can change without warning as a result of changes
+  elsewhere in your code, so do not rely upon these names in any FFI code.
 
 Bugfixes:
 

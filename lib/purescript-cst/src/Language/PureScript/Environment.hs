@@ -35,11 +35,6 @@ data Environment = Environment
   , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
   -- ^ Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
-  , roleDeclarations :: M.Map (Qualified (ProperName 'TypeName)) [Role]
-  -- ^ Explicit role declarations currently in scope. Note that this field is
-  -- only used to store declared roles temporarily until they can be checked;
-  -- to find a type's real checked and/or inferred roles, refer to the TypeKind
-  -- in the `types` field.
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceType)], SourceType)
   -- ^ Type synonyms currently in scope
   , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
@@ -103,7 +98,7 @@ instance A.ToJSON FunctionalDependency where
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
-initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty M.empty allPrimClasses
+initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPrimClasses
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
@@ -267,18 +262,11 @@ kindType = primKind C.typ
 kindConstraint :: SourceType
 kindConstraint = primKind C.constraint
 
-isKindType :: Type a -> Bool
-isKindType (TypeConstructor _ n) = n == primName C.typ
-isKindType _ = False
-
 kindSymbol :: SourceType
 kindSymbol = primKind C.symbol
 
 kindDoc :: SourceType
 kindDoc = primSubKind C.typeError C.doc
-
-kindBoolean :: SourceType
-kindBoolean = primSubKind C.moduleBoolean C.kindBoolean
 
 kindOrdering :: SourceType
 kindOrdering = primSubKind C.moduleOrdering C.kindOrdering
@@ -334,18 +322,6 @@ tyVar = TypeVar nullSourceAnn
 tyForall :: Text -> SourceType -> SourceType -> SourceType
 tyForall var k ty = ForAll nullSourceAnn var (Just k) ty Nothing
 
--- | Check whether a type is a record
-isObject :: Type a -> Bool
-isObject = isTypeOrApplied tyRecord
-
--- | Check whether a type is a function
-isFunction :: Type a -> Bool
-isFunction = isTypeOrApplied tyFunction
-
-isTypeOrApplied :: Type a -> Type b -> Bool
-isTypeOrApplied t1 (TypeApp _ t2 _) = eqType t1 t2
-isTypeOrApplied t1 t2 = eqType t1 t2
-
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
 function = TypeApp nullSourceAnn . TypeApp nullSourceAnn tyFunction
@@ -360,7 +336,7 @@ primClass name mkKind =
   [ let k = mkKind kindConstraint
     in (name, (k, ExternData (nominalRolesForKind k)))
   , let k = mkKind kindType
-    in (dictSynonymName <$> name, (k, TypeSynonym))
+    in (dictTypeName <$> name, (k, TypeSynonym))
   ]
 
 -- | The primitive types in the external environment with their
@@ -453,7 +429,7 @@ primTypeErrorTypes =
     , (primSubName C.typeError "Fail", (kindDoc -:> kindConstraint, ExternData [Nominal]))
     , (primSubName C.typeError "Warn", (kindDoc -:> kindConstraint, ExternData [Nominal]))
     , (primSubName C.typeError "Text", (kindSymbol -:> kindDoc, ExternData [Phantom]))
-    , (primSubName C.typeError "Quote", (kindType -:> kindDoc, ExternData [Phantom]))
+    , (primSubName C.typeError "Quote", (tyForall "k" kindType $ tyVar "k" -:> kindDoc, ExternData [Phantom]))
     , (primSubName C.typeError "QuoteLabel", (kindSymbol -:> kindDoc, ExternData [Phantom]))
     , (primSubName C.typeError "Beside", (kindDoc -:> kindDoc -:> kindDoc, ExternData [Phantom, Phantom]))
     , (primSubName C.typeError "Above", (kindDoc -:> kindDoc -:> kindDoc, ExternData [Phantom, Phantom]))
@@ -594,24 +570,18 @@ lookupConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> (
 lookupConstructor env ctor =
   fromMaybe (internalError "Data constructor not found") $ ctor `M.lookup` dataConstructors env
 
--- | Checks whether a data constructor is for a newtype.
-isNewtypeConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> Bool
-isNewtypeConstructor e ctor = case lookupConstructor e ctor of
-  (Newtype, _, _, _) -> True
-  (Data, _, _, _) -> False
-
 -- | Finds information about values from the current environment.
 lookupValue :: Environment -> Qualified Ident -> Maybe (SourceType, NameKind, NameVisibility)
 lookupValue env ident = ident `M.lookup` names env
 
-dictSynonymName' :: Text -> Text
-dictSynonymName' = (<> "$Dict")
+dictTypeName' :: Text -> Text
+dictTypeName' = (<> "$Dict")
 
-dictSynonymName :: ProperName a -> ProperName a
-dictSynonymName = ProperName . dictSynonymName' . runProperName
+dictTypeName :: ProperName a -> ProperName a
+dictTypeName = ProperName . dictTypeName' . runProperName
 
-isDictSynonym :: ProperName a -> Bool
-isDictSynonym = T.isSuffixOf "$Dict" . runProperName
+isDictTypeName :: ProperName a -> Bool
+isDictTypeName = T.isSuffixOf "$Dict" . runProperName
 
 -- |
 -- Given the kind of a type, generate a list @Nominal@ roles. This is used for

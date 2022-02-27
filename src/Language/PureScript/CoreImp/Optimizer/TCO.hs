@@ -9,7 +9,6 @@ import Control.Monad.State (State, evalState, get, modify)
 import Data.Functor (($>), (<&>))
 import qualified Data.Set as S
 import Data.Text (Text, pack)
-import qualified Language.PureScript.Constants.Prim as C
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.AST.SourcePos (SourceSpan)
 import Safe (headDef, tailSafe)
@@ -122,7 +121,7 @@ tco = flip evalState 0 . everywhereTopDownM convert where
       | otherwise = empty
     allInTailPosition (Assignment _ _ js1)
       = guard (countSelfReferences js1 == 0) $> S.empty
-    allInTailPosition (Comment _ _ js1)
+    allInTailPosition (Comment _ js1)
       = allInTailPosition js1
     allInTailPosition _
       = empty
@@ -175,9 +174,6 @@ tco = flip evalState 0 . everywhereTopDownM convert where
     rootSS = Nothing
 
     collectArgs :: [[AST]] -> AST -> [[AST]]
-    collectArgs acc (App _ fn []) =
-      -- count 0-argument applications as single-argument so we get the correct number of args
-      collectArgs ([Var Nothing C.undefined] : acc) fn
     collectArgs acc (App _ fn args') = collectArgs (args' : acc) fn
     collectArgs acc _ = acc
 

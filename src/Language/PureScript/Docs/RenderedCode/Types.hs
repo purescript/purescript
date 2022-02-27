@@ -3,39 +3,31 @@
 
 module Language.PureScript.Docs.RenderedCode.Types
  ( RenderedCodeElement(..)
- , asRenderedCodeElement
  , ContainingModule(..)
  , asContainingModule
- , containingModuleToMaybe
  , maybeToContainingModule
- , fromContainingModule
  , fromQualified
  , Namespace(..)
  , Link(..)
  , FixityAlias
  , RenderedCode
- , asRenderedCode
  , outputWith
  , sp
- , parens
  , syntax
  , keyword
  , keywordForall
  , keywordData
- , keywordNewtype
  , keywordType
  , keywordClass
- , keywordInstance
  , keywordWhere
  , keywordFixity
- , keywordKind
  , keywordAs
- , kindSignatureFor
  , ident
  , dataCtor
  , typeCtor
  , typeOp
  , typeVar
+ , roleAnn
  , alias
  , aliasName
  ) where
@@ -46,7 +38,7 @@ import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Data.Aeson.BetterErrors (Parse, nth, withText, withValue, toAesonParser, perhaps, asText, eachInArray)
+import Data.Aeson.BetterErrors (Parse, nth, withText, withValue, toAesonParser, perhaps, asText)
 import qualified Data.Aeson as A
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -55,7 +47,6 @@ import qualified Data.Text.Encoding as TE
 
 import Language.PureScript.Names
 import Language.PureScript.AST (Associativity(..))
-import qualified Language.PureScript.AST.Declarations as P
 
 -- | Given a list of actions, attempt them all, returning the first success.
 -- If all the actions fail, 'tryAll' returns the first argument.
@@ -125,21 +116,6 @@ maybeToContainingModule :: Maybe ModuleName -> ContainingModule
 maybeToContainingModule Nothing = ThisModule
 maybeToContainingModule (Just mn) = OtherModule mn
 
--- |
--- Convert a 'ContainingModule' to a 'Maybe' 'ModuleName', using the obvious
--- isomorphism.
---
-containingModuleToMaybe :: ContainingModule -> Maybe ModuleName
-containingModuleToMaybe ThisModule = Nothing
-containingModuleToMaybe (OtherModule mn) = Just mn
-
--- |
--- A version of 'fromMaybe' for 'ContainingModule' values.
---
-fromContainingModule :: ModuleName -> ContainingModule -> ModuleName
-fromContainingModule def ThisModule = def
-fromContainingModule _ (OtherModule mn) = mn
-
 fromQualified :: Qualified a -> (ContainingModule, a)
 fromQualified (Qualified mn x) =
   (maybeToContainingModule mn, x)
@@ -198,6 +174,7 @@ data RenderedCodeElement
   -- namespace (value, type, or kind). Note that this is not related to the
   -- kind called Symbol for type-level strings.
   | Symbol Namespace Text Link
+  | Role Text
   deriving (Show, Eq, Ord)
 
 instance A.ToJSON RenderedCodeElement where
@@ -209,30 +186,8 @@ instance A.ToJSON RenderedCodeElement where
     A.toJSON ["space" :: Text]
   toJSON (Symbol ns str link) =
     A.toJSON ["symbol", A.toJSON ns, A.toJSON str, A.toJSON link]
-
-asRenderedCodeElement :: Parse Text RenderedCodeElement
-asRenderedCodeElement =
-  tryParse "RenderedCodeElement" $
-    [ a Syntax "syntax"
-    , a Keyword "keyword"
-    , asSpace
-    , asSymbol
-    ] ++ backwardsCompat
-  where
-  a ctor' ctorStr = firstEq ctorStr (ctor' <$> nth 1 asText)
-  asSymbol = firstEq "symbol" (Symbol <$> nth 1 asNamespace <*> nth 2 asText <*> nth 3 asLink)
-  asSpace = firstEq "space" (pure Space)
-
-  -- These will make some mistakes e.g. treating data constructors as types,
-  -- because the old code did not save information which is necessary to
-  -- distinguish these cases. This is the best we can do.
-  backwardsCompat =
-    [ oldAsIdent
-    , oldAsCtor
-    ]
-
-  oldAsIdent = firstEq "ident" (Symbol ValueLevel <$> nth 1 asText <*> nth 2 (Link <$> asContainingModule))
-  oldAsCtor = firstEq "ctor" (Symbol TypeLevel <$> nth 1 asText <*> nth 2 (Link <$> asContainingModule))
+  toJSON (Role role) =
+    A.toJSON ["role", role]
 
 -- |
 -- A type representing a highly simplified version of PureScript code, intended
@@ -244,9 +199,6 @@ newtype RenderedCode
 
 instance A.ToJSON RenderedCode where
   toJSON (RC elems) = A.toJSON elems
-
-asRenderedCode :: Parse Text RenderedCode
-asRenderedCode = RC <$> eachInArray asRenderedCodeElement
 
 -- |
 -- This function allows conversion of a 'RenderedCode' value into a value of
@@ -263,11 +215,6 @@ outputWith f = foldMap f . unRC
 sp :: RenderedCode
 sp = RC [Space]
 
--- |
--- Wrap a RenderedCode value in parens.
-parens :: RenderedCode -> RenderedCode
-parens x = syntax "(" <> x <> syntax ")"
-
 -- possible TODO: instead of this function, export RenderedCode values for
 -- each syntax element, eg syntaxArr (== syntax "->"), syntaxLBrace,
 -- syntaxRBrace, etc.
@@ -283,17 +230,11 @@ keywordForall = keyword "forall"
 keywordData :: RenderedCode
 keywordData = keyword "data"
 
-keywordNewtype :: RenderedCode
-keywordNewtype = keyword "newtype"
-
 keywordType :: RenderedCode
 keywordType = keyword "type"
 
 keywordClass :: RenderedCode
 keywordClass = keyword "class"
-
-keywordInstance :: RenderedCode
-keywordInstance = keyword "instance"
 
 keywordWhere :: RenderedCode
 keywordWhere = keyword "where"
@@ -303,18 +244,8 @@ keywordFixity Infixl = keyword "infixl"
 keywordFixity Infixr = keyword "infixr"
 keywordFixity Infix = keyword "infix"
 
-keywordKind :: RenderedCode
-keywordKind = keyword "kind"
-
 keywordAs :: RenderedCode
 keywordAs = keyword "as"
-
-kindSignatureFor :: P.KindSignatureFor -> RenderedCode
-kindSignatureFor = \case
-  P.DataSig -> keywordData
-  P.NewtypeSig -> keywordNewtype
-  P.TypeSynonymSig -> keywordType
-  P.ClassSig -> keywordClass
 
 ident :: Qualified Ident -> RenderedCode
 ident (fromQualified -> (mn, name)) =
@@ -334,6 +265,14 @@ typeOp (fromQualified -> (mn, name)) =
 
 typeVar :: Text -> RenderedCode
 typeVar x = RC [Symbol TypeLevel x NoLink]
+
+roleAnn :: Maybe Text -> RenderedCode
+roleAnn = RC . maybe [] renderRole
+  where
+  renderRole = \case
+    "nominal" -> [Role "nominal"]
+    "phantom" -> [Role "phantom"]
+    _ -> []
 
 type FixityAlias = Qualified (Either (ProperName 'TypeName) (Either Ident (ProperName 'ConstructorName)))
 

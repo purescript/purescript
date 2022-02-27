@@ -57,10 +57,6 @@ getClassName :: Name -> Maybe (ProperName 'ClassName)
 getClassName (TyClassName name) = Just name
 getClassName _ = Nothing
 
-getModName :: Name -> Maybe ModuleName
-getModName (ModName name) = Just name
-getModName _ = Nothing
-
 -- |
 -- Names for value identifiers
 --
@@ -82,11 +78,14 @@ data Ident
 instance NFData Ident
 instance Serialise Ident
 
+unusedIdent :: Text
+unusedIdent = "$__unused"
+
 runIdent :: Ident -> Text
 runIdent (Ident i) = i
 runIdent (GenIdent Nothing n) = "$" <> T.pack (show n)
 runIdent (GenIdent (Just name) n) = "$" <> name <> T.pack (show n)
-runIdent UnusedIdent = "$__unused"
+runIdent UnusedIdent = unusedIdent
 
 showIdent :: Ident -> Text
 showIdent = runIdent

@@ -31,13 +31,11 @@ import Test.Hspec
 utcMidnightOnDate :: Integer -> Int -> Int -> UTCTime
 utcMidnightOnDate year month day = UTCTime (fromGregorian year month day) (secondsToDiffTime 0)
 
-timestampA, timestampB, timestampC, timestampD, timestampE, timestampF :: UTCTime
+timestampA, timestampB, timestampC, timestampD :: UTCTime
 timestampA = utcMidnightOnDate 2019 1 1
 timestampB = utcMidnightOnDate 2019 1 2
 timestampC = utcMidnightOnDate 2019 1 3
 timestampD = utcMidnightOnDate 2019 1 4
-timestampE = utcMidnightOnDate 2019 1 5
-timestampF = utcMidnightOnDate 2019 1 6
 
 spec :: Spec
 spec = do
@@ -88,7 +86,7 @@ spec = do
       writeFileWithTimestamp modulePath timestampA moduleContent
       compile [modulePath] `shouldReturn` moduleNames ["Module"]
 
-      writeFileWithTimestamp moduleFFIPath timestampB "exports.bar = 1;\n"
+      writeFileWithTimestamp moduleFFIPath timestampB "export var bar = 1;\n"
       compile [modulePath] `shouldReturn` moduleNames ["Module"]
 
     it "recompiles if an FFI file was removed" $ do
@@ -98,7 +96,7 @@ spec = do
           moduleContent = "module Module where\nfoo = 0\n"
 
       writeFileWithTimestamp modulePath timestampA moduleContent
-      writeFileWithTimestamp moduleFFIPath timestampB "exports.bar = 1;\n"
+      writeFileWithTimestamp moduleFFIPath timestampB "export var bar = 1;\n"
       compile [modulePath] `shouldReturn` moduleNames ["Module"]
 
       removeFile moduleFFIPath

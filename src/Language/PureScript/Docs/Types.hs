@@ -11,7 +11,7 @@ import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
 import Data.Aeson.BetterErrors
-  (Parse, ParseError, parse, keyOrDefault, throwCustomError, key, asText,
+  (Parse, keyOrDefault, throwCustomError, key, asText,
    keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser',
    fromAesonParser, perhaps, withText, asIntegral, nth, eachInObjectWithKey,
    asString)
@@ -28,16 +28,18 @@ import qualified Language.PureScript.CoreFn.FromJSON as P
 import qualified Language.PureScript.Crash as P
 import qualified Language.PureScript.Environment as P
 import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Roles as P
 import qualified Language.PureScript.Types as P
 import qualified Paths_purescript as Paths
 
 import Web.Bower.PackageMeta hiding (Version, displayError)
 
 import Language.PureScript.Docs.RenderedCode as ReExports
-  (RenderedCode, asRenderedCode,
+  (RenderedCode,
    ContainingModule(..), asContainingModule,
-   RenderedCodeElement(..), asRenderedCodeElement,
+   RenderedCodeElement(..),
    Namespace(..), FixityAlias)
+import Language.PureScript.Publish.Registry.Compat (PursJsonError, showPursJsonError)
 
 type Type' = P.Type ()
 type Constraint' = P.Constraint ()
@@ -74,7 +76,17 @@ instance NFData NotYetKnown
 type UploadedPackage = Package NotYetKnown
 type VerifiedPackage = Package GithubUser
 
-type ManifestError = BowerError
+data ManifestError
+  = BowerManifest BowerError
+  | PursManifest PursJsonError
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData ManifestError
+
+showManifestError :: ManifestError -> Text
+showManifestError = \case
+  BowerManifest err -> showBowerError err
+  PursManifest err -> showPursJsonError err
 
 verifyPackage :: GithubUser -> UploadedPackage -> VerifiedPackage
 verifyPackage verifiedUser Package{..} =
@@ -158,12 +170,12 @@ data DeclarationInfo
   -- newtype) and its type arguments. Constructors are represented as child
   -- declarations.
   --
-  | DataDeclaration P.DataDeclType [(Text, Maybe Type')]
+  | DataDeclaration P.DataDeclType [(Text, Maybe Type')] [P.Role]
 
   -- |
   -- A data type foreign import, with its kind.
   --
-  | ExternDataDeclaration Type'
+  | ExternDataDeclaration Type' [P.Role]
 
   -- |
   -- A type synonym, with its type arguments and its type.
@@ -216,8 +228,8 @@ convertFundepsToStrings args fundeps =
 
 declInfoToString :: DeclarationInfo -> Text
 declInfoToString (ValueDeclaration _) = "value"
-declInfoToString (DataDeclaration _ _) = "data"
-declInfoToString (ExternDataDeclaration _) = "externData"
+declInfoToString (DataDeclaration _ _ _) = "data"
+declInfoToString (ExternDataDeclaration _ _) = "externData"
 declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _ _) = "typeClass"
 declInfoToString (AliasDeclaration _ _) = "alias"
@@ -361,6 +373,7 @@ data PackageError
   | InvalidDataDeclType Text
   | InvalidKindSignatureFor Text
   | InvalidTime
+  | InvalidRole Text
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData PackageError
@@ -375,13 +388,6 @@ instance NFData a => NFData (InPackage a)
 instance Functor InPackage where
   fmap f (Local x) = Local (f x)
   fmap f (FromDep pkgName x) = FromDep pkgName (f x)
-
-takeLocal :: InPackage a -> Maybe a
-takeLocal (Local a) = Just a
-takeLocal _ = Nothing
-
-takeLocals :: [InPackage a] -> [a]
-takeLocals = mapMaybe takeLocal
 
 ignorePackage :: InPackage a -> a
 ignorePackage (Local x) = x
@@ -477,12 +483,6 @@ getLinksContext Package{..} =
 ----------------------
 -- Parsing
 
-parseUploadedPackage :: Version -> LByteString -> Either (ParseError PackageError) UploadedPackage
-parseUploadedPackage minVersion = parse $ asUploadedPackage minVersion
-
-parseVerifiedPackage :: Version -> LByteString -> Either (ParseError PackageError) VerifiedPackage
-parseVerifiedPackage minVersion = parse $ asVerifiedPackage minVersion
-
 asPackage :: Version -> (forall e. Parse e a) -> Parse PackageError (Package a)
 asPackage minimumVersion uploader = do
   -- If the compilerVersion key is missing, we can be sure that it was produced
@@ -492,7 +492,7 @@ asPackage minimumVersion uploader = do
   when (compilerVersion < minimumVersion)
     (throwCustomError $ CompilerTooOld minimumVersion compilerVersion)
 
-  Package <$> key "packageMeta" asPackageMeta .! ErrorInPackageMeta
+  Package <$> key "packageMeta" asPackageMeta .! (ErrorInPackageMeta . BowerManifest)
           <*> key "version" asVersion
           <*> key "versionTag" asText
           <*> keyMay "tagTime" (withString parseTimeEither)
@@ -520,9 +520,6 @@ asNotYetKnown = NotYetKnown <$ asNull
 instance A.FromJSON NotYetKnown where
   parseJSON = toAesonParser' asNotYetKnown
 
-asVerifiedPackage :: Version -> Parse PackageError VerifiedPackage
-asVerifiedPackage minVersion = asPackage minVersion asGithubUser
-
 displayPackageError :: PackageError -> Text
 displayPackageError e = case e of
   CompilerTooOld minV usedV ->
@@ -530,7 +527,7 @@ displayPackageError e = case e of
     <> " of the compiler, but it appears that " <> T.pack (showVersion usedV)
     <> " was used."
   ErrorInPackageMeta err ->
-    "Error in package metadata: " <> showBowerError err
+    "Error in package metadata: " <> showManifestError err
   InvalidVersion ->
     "Invalid version"
   InvalidDeclarationType str ->
@@ -547,6 +544,8 @@ displayPackageError e = case e of
     "Invalid kind signature keyword: \"" <> str <> "\""
   InvalidTime ->
     "Invalid time"
+  InvalidRole str ->
+    "Invalid role keyword: \"" <> str <> "\""
 
 instance A.FromJSON a => A.FromJSON (Package a) where
   parseJSON = toAesonParser displayPackageError
@@ -596,7 +595,7 @@ p `pOr` q = catchError p (const q)
 
 asInPackage :: Parse ManifestError a -> Parse ManifestError (InPackage a)
 asInPackage inner =
-  build <$> key "package" (perhaps (withText parsePackageName))
+  build <$> key "package" (perhaps (withText (mapLeft BowerManifest . parsePackageName)))
         <*> key "item" inner
   where
   build Nothing = Local
@@ -629,8 +628,10 @@ asDeclarationInfo = do
     "data" ->
       DataDeclaration <$> key "dataDeclType" asDataDeclType
                       <*> key "typeArguments" asTypeArguments
+                      <*> keyOrDefault "roles" [] (eachInArray asRole)
     "externData" ->
       ExternDataDeclaration <$> key "kind" asType
+                            <*> keyOrDefault "roles" [] (eachInArray asRole)
     "typeSynonym" ->
       TypeSynonymDeclaration <$> key "arguments" asTypeArguments
                              <*> key "type" asType
@@ -643,7 +644,7 @@ asDeclarationInfo = do
                        <*> key "alias" asFixityAlias
     -- Backwards compat: kinds are extern data
     "kind" ->
-      pure $ ExternDataDeclaration (P.kindType $> ())
+      pure $ ExternDataDeclaration (P.kindType $> ()) []
     other ->
       throwCustomError (InvalidDeclarationType other)
 
@@ -665,6 +666,14 @@ asTypeArguments :: Parse PackageError [(Text, Maybe Type')]
 asTypeArguments = eachInArray asTypeArgument
   where
   asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asType)
+
+asRole :: Parse PackageError P.Role
+asRole =
+  withText $ \case
+    "Representational" -> Right P.Representational
+    "Nominal" -> Right P.Nominal
+    "Phantom" -> Right P.Phantom
+    other -> Left (InvalidRole other)
 
 asType :: Parse e Type'
 asType = fromAesonParser
@@ -715,12 +724,6 @@ asConstraint = P.Constraint () <$> key "constraintClass" asQualifiedProperName
 asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
 asQualifiedProperName = fromAesonParser
 
-asQualifiedIdent :: Parse e (P.Qualified P.Ident)
-asQualifiedIdent = fromAesonParser
-
-asSourceAnn :: Parse e P.SourceAnn
-asSourceAnn = fromAesonParser
-
 asModuleMap :: Parse PackageError (Map P.ModuleName PackageName)
 asModuleMap =
   Map.fromList <$>
@@ -748,7 +751,7 @@ asResolvedDependencies =
 
 parsePackageName' :: Text -> Either PackageError PackageName
 parsePackageName' =
-  mapLeft ErrorInPackageMeta . parsePackageName
+  mapLeft ErrorInPackageMeta . (mapLeft BowerManifest . parsePackageName)
 
 mapLeft :: (a -> a') -> Either a b -> Either a' b
 mapLeft f (Left x) = Left (f x)
@@ -836,8 +839,8 @@ instance A.ToJSON DeclarationInfo where
     where
     props = case info of
       ValueDeclaration ty -> ["type" .= ty]
-      DataDeclaration ty args -> ["dataDeclType" .= ty, "typeArguments" .= args]
-      ExternDataDeclaration kind -> ["kind" .= kind]
+      DataDeclaration ty args roles -> ["dataDeclType" .= ty, "typeArguments" .= args, "roles" .= roles]
+      ExternDataDeclaration kind roles -> ["kind" .= kind, "roles" .= roles]
       TypeSynonymDeclaration args ty -> ["arguments" .= args, "type" .= ty]
       TypeClassDeclaration args super fundeps -> ["arguments" .= args, "superclasses" .= super, "fundeps" .= fundeps]
       AliasDeclaration fixity alias -> ["fixity" .= fixity, "alias" .= alias]

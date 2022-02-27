@@ -2,7 +2,6 @@ module Language.PureScript.Make.BuildPlan
   ( BuildPlan(bpEnv)
   , BuildJobResult(..)
   , buildJobSuccess
-  , buildJobFailure
   , construct
   , getResult
   , collectResults
@@ -64,10 +63,6 @@ data BuildJobResult
 buildJobSuccess :: BuildJobResult -> Maybe (MultipleErrors, ExternsFile)
 buildJobSuccess (BuildJobSucceeded warnings externs) = Just (warnings, externs)
 buildJobSuccess _ = Nothing
-
-buildJobFailure :: BuildJobResult -> Maybe MultipleErrors
-buildJobFailure (BuildJobFailed errors) = Just errors
-buildJobFailure _ = Nothing
 
 -- | Information obtained about a particular module while constructing a build
 -- plan; used to decide whether a module needs rebuilding.
