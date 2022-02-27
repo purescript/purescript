@@ -1,7 +1,8 @@
-* Remove ad-hoc non-single-line case expression syntax
+* Warn on ad-hoc non-single-line case expression syntax
 
-  The following code will no longer compile. These were originally
-  supported to ease the migration to the new CST parser.
+  The following code will now produce a compiler warning.
+  These were originally supported to ease the migration
+  to the new CST parser.
 
   ```purescript
   -- before: `arg` isn't indented "past" the `Foo arg` binder
