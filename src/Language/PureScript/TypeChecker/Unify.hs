@@ -11,6 +11,7 @@ module Language.PureScript.TypeChecker.Unify
   , unifyRows
   , alignRowsWith
   , replaceTypeWildcards
+  , replaceTypeWildcards'
   , varIfUnknown
   ) where
 
@@ -181,13 +182,19 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
 -- Replace type wildcards with unknowns
 --
 replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => SourceType -> m SourceType
-replaceTypeWildcards = everywhereOnTypesM replace
+replaceTypeWildcards = replaceTypeWildcards' True
+
+-- |
+-- Replace type wildcards with unknowns and choose whether to emit a warning
+--
+replaceTypeWildcards' :: (MonadWriter MultipleErrors m, MonadState CheckState m) => Bool -> SourceType -> m SourceType
+replaceTypeWildcards' shouldWarn = everywhereOnTypesM replace
   where
   replace (TypeWildcard ann name) = do
     t <- freshType
     ctx <- getLocalContext
     let err = maybe (WildcardInferredType t ctx) (\n -> HoleInferredType n t ctx Nothing) name
-    warnWithPosition (fst ann) $ tell $ errorMessage err
+    when shouldWarn $ warnWithPosition (fst ann) $ tell $ errorMessage err
     return t
   replace other = return other
 

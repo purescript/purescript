@@ -72,4 +72,10 @@ left = Left @Int @String 0
 right :: Either Int String
 right = Right @Int @String "0"
 
+leftSkip :: Either Int String
+leftSkip = Left @_ @String 0
+
+rightSkip :: Either Int String
+rightSkip = Right @Int @_ "0"
+
 main = log "Done"

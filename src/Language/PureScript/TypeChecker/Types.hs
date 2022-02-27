@@ -481,7 +481,7 @@ infer' (VisibleTypeApp val typeArg) = do
   (val'', valTy') <- instantiatePolyTypeWithUnknowns val' valTy
   -- `kindOf` here eliminates ParensInType in typeArg
   (typeArg', _) <- kindOf typeArg
-  typeArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ typeArg'
+  typeArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards' False $ typeArg'
   case unconsVtaTypeVar valTy' of
     Just (typeVar, valTyTail) -> do
       let valTy'' = replaceTypeVars typeVar typeArg'' valTyTail
