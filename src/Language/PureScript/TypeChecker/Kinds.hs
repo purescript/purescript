@@ -41,7 +41,8 @@ import Data.Functor (($>))
 import qualified Data.IntSet as IS
 import Data.List (nubBy, sortOn, (\\))
 import qualified Data.Map as M
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromJust, fromMaybe, mapMaybe)
+import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
@@ -583,6 +584,7 @@ type DataDeclarationArgs =
   ( SourceAnn
   , ProperName 'TypeName
   , [(Text, Maybe SourceType)]
+  , [VtaTypeVar]
   , [DataConstructorDeclaration]
   )
 
@@ -606,7 +608,7 @@ inferDataDeclaration
   => ModuleName
   -> DataDeclarationArgs
   -> m [(DataConstructorDeclaration, SourceType)]
-inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
+inferDataDeclaration moduleName (ann, tyName, tyArgs, vtvs, ctors) = do
   tyKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
@@ -616,9 +618,15 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
           tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . fst) tyCtor tyArgs'
+          vtvs' = S.fromList $ mapMaybe findVtv $ zip tyArgs vtvs where
+            findVtv ((i, _), IsVtaTypeVar) = Just i
+            findVtv _ = Nothing
+          makeVta = everywhereOnTypes go where
+            go (ForAll a b c d e _) | b `S.member` vtvs' = ForAll a b c d e IsVtaTypeVar
+            go t = t
           ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (nullSourceAnn,) tyArgs'
       for ctors $
-        fmap (fmap (mkForAll ctorBinders)) . inferDataConstructor tyCtor'
+        fmap (fmap (makeVta . mkForAll ctorBinders)) . inferDataConstructor tyCtor'
 
 inferDataConstructor
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
@@ -919,7 +927,7 @@ kindsOfAll
   -> m ([TypeDeclarationResult], [DataDeclarationResult], [ClassDeclarationResult])
 kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
   synDict <- for syns $ \(sa, synName, _, _) -> (synName,) <$> existingSignatureOrFreshKind moduleName (fst sa) synName
-  datDict <- for dats $ \(sa, datName, _, _) -> (datName,) <$> existingSignatureOrFreshKind moduleName (fst sa) datName
+  datDict <- for dats $ \(sa, datName, _, _, _) -> (datName,) <$> existingSignatureOrFreshKind moduleName (fst sa) datName
   clsDict <- for clss $ \(sa, clsName, _, _, _) -> fmap (coerceProperName clsName,) $ existingSignatureOrFreshKind moduleName (fst sa) $ coerceProperName clsName
   let bindingGroup = synDict <> datDict <> clsDict
   bindLocalTypeVariables moduleName bindingGroup $ do

@@ -291,7 +291,7 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
       when (dtype == Newtype) $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
-      (dataCtors, ctorKind) <- kindOfData moduleName (sa, name, args, dctors)
+      (dataCtors, ctorKind) <- kindOfData moduleName (sa, name, args, vtvs, dctors)
       let args' = args `withKinds` ctorKind
       env <- getEnv
       dctors' <- traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
@@ -304,21 +304,21 @@ typeCheckAll moduleName _ = traverse go
         dataDecls = mapMaybe toDataDecl tysList
         roleDecls = mapMaybe toRoleDecl tysList
         clss = mapMaybe toClassDecl tysList
-        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (map fst dataDecls^..traverse._2._2) ++ fmap coerceProperName (map fst clss^..traverse._2._2))
+        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2) ++ fmap coerceProperName (map fst clss^..traverse._2._2))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
       env <- getEnv
-      (syn_ks, data_ks, cls_ks) <- kindsOfAll moduleName syns (fmap (snd . fst) dataDecls) (fmap (snd . fst) clss)
+      (syn_ks, data_ks, cls_ks) <- kindsOfAll moduleName syns (fmap snd dataDecls) (fmap (snd . fst) clss)
       for_ (zip syns syn_ks) $ \((_, name, args, _), (elabTy, kind)) -> do
         checkDuplicateTypeArguments $ map fst args
         let args' = args `withKinds` kind
         addTypeSynonym moduleName name args' elabTy kind
-      let dataDeclsWithKinds = zipWith (\((dtype, (_, name, args, _)), _) (dataCtors, ctorKind) ->
-            (dtype, name, args `withKinds` ctorKind, dataCtors, ctorKind)) dataDecls data_ks
+      let dataDeclsWithKinds = zipWith (\(dtype, (_, name, args, vtvs, _)) (dataCtors, ctorKind) ->
+            (dtype, name, args `withKinds` ctorKind, vtvs, dataCtors, ctorKind)) dataDecls data_ks
       inferRoles' <- fmap (inferDataBindingGroupRoles env moduleName roleDecls) .
-        forM dataDeclsWithKinds $ \(_, name, args, dataCtors, _) ->
+        forM dataDeclsWithKinds $ \(_, name, args, _, dataCtors, _) ->
           (name, args,) <$> traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
-      for_ dataDeclsWithKinds $ \(dtype, name, args', dataCtors, ctorKind) -> do
+      for_ dataDeclsWithKinds $ \(dtype, name, args', _, dataCtors, ctorKind) -> do
         when (dtype == Newtype) $ checkNewtype name (map fst dataCtors)
         checkDuplicateTypeArguments $ map fst args'
         let args'' = args' `withRoles` inferRoles' name args'
@@ -333,7 +333,7 @@ typeCheckAll moduleName _ = traverse go
     where
     toTypeSynonym (TypeSynonymDeclaration sa nm args ty) = Just (sa, nm, args, ty)
     toTypeSynonym _ = Nothing
-    toDataDecl (DataDeclaration sa dtype nm args vtvs dctors) = Just ((dtype, (sa, nm, args, dctors)), vtvs)
+    toDataDecl (DataDeclaration sa dtype nm args vtvs dctors) = Just (dtype, (sa, nm, args, vtvs, dctors))
     toDataDecl _ = Nothing
     toRoleDecl (RoleDeclaration rdd) = Just rdd
     toRoleDecl _ = Nothing
