@@ -64,4 +64,12 @@ changeId x = x
 changeId' :: Int -> Int
 changeId' = (changeId :: forall @a. a -> a) @Int
 
+data Either @a @b = Left a | Right b
+
+left :: Either Int String
+left = Left @Int @String 0
+
+right :: Either Int String
+right = Right @Int @String "0"
+
 main = log "Done"
