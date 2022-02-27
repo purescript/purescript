@@ -7,6 +7,7 @@ import Prelude.Compat
 
 import qualified Language.PureScript as P
 import Language.PureScript.Bundle
+import Language.PureScript.Interactive.IO (readNodeProcessWithExitCode)
 
 import Data.Function (on)
 import Data.List (minimumBy)
@@ -16,7 +17,6 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except
 
 import System.Exit
-import System.Process
 import System.FilePath
 import System.IO
 import System.IO.UTF8
@@ -47,13 +47,12 @@ assertBundles
   -> Handle
   -> Expectation
 assertBundles support inputFiles outputFile = do
-  (result, _) <- compile support inputFiles
+  (result, _) <- compile True support inputFiles
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
     Right _ -> do
-      process <- findNodeProcess
-      jsFiles <- Glob.globDir1 (Glob.compile "**/*.js") modulesDir
-      let entryPoint = modulesDir </> "index.js"
+      jsFiles <- concat <$> Glob.globDir [Glob.compile "*/*.js", Glob.compile "*/foreign.cjs"] modulesDir
+      let entryPoint = modulesDir </> "index.cjs"
       let entryModule = map (`ModuleIdentifier` Regular) ["Main"]
       bundled <- runExceptT $ do
         input <- forM jsFiles $ \filename -> do
@@ -64,15 +63,15 @@ assertBundles support inputFiles outputFile = do
       case bundled of
           Right (_, js) -> do
             writeUTF8File entryPoint js
-            nodeResult <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
+            nodeResult <- readNodeProcessWithExitCode Nothing [entryPoint] ""
             hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) <> ":"
             case nodeResult of
-              Just (ExitSuccess, out, err)
+              Right (ExitSuccess, out, err)
                | not (null err) -> expectationFailure $ "Test wrote to stderr:\n\n" <> err
                | not (null out) && trim (last (lines out)) == "Done" -> hPutStr outputFile out
                | otherwise -> expectationFailure $ "Test did not finish with 'Done':\n\n" <> out
-              Just (ExitFailure _, _, err) -> expectationFailure err
-              Nothing -> expectationFailure "Couldn't find node.js executable"
+              Right (ExitFailure _, _, err) -> expectationFailure err
+              Left err -> expectationFailure err
           Left err -> expectationFailure $ "Could not bundle: " ++ show err
 
 logfile :: FilePath

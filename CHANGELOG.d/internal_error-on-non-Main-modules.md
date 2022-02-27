@@ -1,0 +1,1 @@
+* Fail test if PureScript file(s) don't have a `Main` module

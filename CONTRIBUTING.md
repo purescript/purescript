@@ -41,6 +41,8 @@ stack test --fast --test-arguments="--match 1110.purs"
 
 This will run whatever test uses the example file `1110.purs`.
 
+The golden files (e.g. `*.out` files) are generated automatically when missing, and can be updated by setting the "HSPEC_ACCEPT" environment variable, e.g. by running `HSPEC_ACCEPT=true stack test`.
+
 ### Adding Dependencies
 
 Because the PureScript compiler is distributed in binary form, we include the licenses of all dependencies, including transitive ones, in the LICENSE file. Therefore, whenever the dependencies change, the LICENSE file should be updated.

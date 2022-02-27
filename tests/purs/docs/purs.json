@@ -1,0 +1,11 @@
+{
+  "name": "docs-test-package",
+  "license": "MIT",
+  "version": "1.0.0",
+  "location": {
+    "gitUrl": "https://github.com/not-real/not-a-real-repo.git"
+  },
+  "dependencies": {
+    "prelude": ">=1.0.0 <2.0.0"
+  }
+}

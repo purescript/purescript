@@ -26,6 +26,7 @@ import Prelude ()
 import Prelude.Compat
 
 import qualified Language.PureScript as P
+import Language.PureScript.Interactive.IO (readNodeProcessWithExitCode)
 
 import Control.Arrow ((>>>))
 import qualified Data.ByteString as BS
@@ -39,7 +40,6 @@ import qualified Data.Text.Encoding as T
 import Control.Monad
 
 import System.Exit
-import System.Process
 import System.FilePath
 import System.IO
 import System.IO.UTF8 (readUTF8File)
@@ -135,22 +135,21 @@ assertCompiles
   -> Handle
   -> Expectation
 assertCompiles support inputFiles outputFile = do
-  (result, _) <- compile support inputFiles
+  (result, _) <- compile True support inputFiles
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
     Right _ -> do
-      process <- findNodeProcess
       let entryPoint = modulesDir </> "index.js"
-      writeFile entryPoint "require('Main').main()"
-      nodeResult <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
+      writeFile entryPoint "import('./Main/index.js').then(({ main }) => main());"
+      nodeResult <- readNodeProcessWithExitCode Nothing [entryPoint] ""
       hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) <> ":"
       case nodeResult of
-        Just (ExitSuccess, out, err)
+        Right (ExitSuccess, out, err)
           | not (null err) -> expectationFailure $ "Test wrote to stderr:\n\n" <> err
           | not (null out) && trim (last (lines out)) == "Done" -> hPutStr outputFile out
           | otherwise -> expectationFailure $ "Test did not finish with 'Done':\n\n" <> out
-        Just (ExitFailure _, _, err) -> expectationFailure err
-        Nothing -> expectationFailure "Couldn't find node.js executable"
+        Right (ExitFailure _, _, err) -> expectationFailure err
+        Left err -> expectationFailure err
 
 assertCompilesWithWarnings
   :: SupportModules
@@ -158,7 +157,7 @@ assertCompilesWithWarnings
   -> [String]
   -> Expectation
 assertCompilesWithWarnings support inputFiles shouldWarnWith = do
-  result'@(result, warnings) <- compile support inputFiles
+  result'@(result, warnings) <- compile False support inputFiles
   case result of
     Left errs ->
       expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
@@ -174,7 +173,7 @@ assertDoesNotCompile
   -> [String]
   -> Expectation
 assertDoesNotCompile support inputFiles shouldFailWith = do
-  result <- compile support inputFiles
+  result <- compile False support inputFiles
   case fst result of
     Left errs -> do
       when (null shouldFailWith)
@@ -194,7 +193,7 @@ assertCompilesToExpectedOutput
   -> [FilePath]
   -> Expectation
 assertCompilesToExpectedOutput support inputFiles = do
-  (result, _) <- compile support inputFiles
+  (result, _) <- compile False support inputFiles
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
     Right _ ->

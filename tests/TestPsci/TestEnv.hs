@@ -17,7 +17,6 @@ import           System.Directory (getCurrentDirectory, doesPathExist, removeFil
 import           System.Exit
 import           System.FilePath ((</>), pathSeparator)
 import qualified System.FilePath.Glob as Glob
-import           System.Process (readProcessWithExitCode)
 import           Test.Hspec (shouldBe, Expectation)
 
 -- | A monad transformer for handle PSCi actions in tests
@@ -55,13 +54,12 @@ execTestPSCi i = do
 -- command evaluation.
 jsEval :: TestPSCi String
 jsEval = liftIO $ do
-  writeFile indexFile "require('$PSCI')['$main']();"
-  process <- findNodeProcess
-  result <- traverse (\node -> readProcessWithExitCode node [indexFile] "") process
+  writeFile indexFile "import('./$PSCI/index.js').then(({ $main }) => $main());"
+  result <- readNodeProcessWithExitCode Nothing [indexFile] ""
   case result of
-    Just (ExitSuccess, out, _)   -> return out
-    Just (ExitFailure _, _, err) -> putStrLn err >> exitFailure
-    Nothing                      -> putStrLn "Couldn't find node.js" >> exitFailure
+    Right (ExitSuccess, out, _)   -> return out
+    Right (ExitFailure _, _, err) -> putStrLn err >> exitFailure
+    Left err                      -> putStrLn err >> exitFailure
 
 -- | Run a PSCi command and evaluate its outputs:
 -- * jsOutputEval is used to evaluate compiled JS output by PSCi
