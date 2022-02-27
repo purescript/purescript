@@ -44,6 +44,13 @@ data BinaryOperator
   | ZeroFillShiftRight
   deriving (Show, Eq)
 
+-- | Data type for CoreImp comments, which can come from either the PureScript
+-- source or internal transformations.
+data CIComments
+  = SourceComments [Comment]
+  | PureAnnotation
+  deriving (Show, Eq)
+
 -- | Data type for simplified JavaScript expressions
 data AST
   = NumericLiteral (Maybe SourceSpan) (Either Integer Double)
@@ -90,7 +97,7 @@ data AST
   -- ^ Throw statement
   | InstanceOf (Maybe SourceSpan) AST AST
   -- ^ instanceof check
-  | Comment (Maybe SourceSpan) [Comment] AST
+  | Comment CIComments AST
   -- ^ Commented JavaScript
   deriving (Show, Eq)
 
@@ -122,7 +129,7 @@ withSourceSpan withSpan = go where
   go (ReturnNoResult _) = ReturnNoResult ss
   go (Throw _ js) = Throw ss js
   go (InstanceOf _ j1 j2) = InstanceOf ss j1 j2
-  go (Comment _ com j) = Comment ss com j
+  go c@Comment{} = c
 
 getSourceSpan :: AST -> Maybe SourceSpan
 getSourceSpan = go where
@@ -149,7 +156,7 @@ getSourceSpan = go where
   go (ReturnNoResult ss) = ss
   go (Throw ss _) = ss
   go (InstanceOf ss _ _) = ss
-  go (Comment ss _ _) = ss
+  go (Comment _ _) = Nothing
 
 everywhere :: (AST -> AST) -> AST -> AST
 everywhere f = go where
@@ -171,7 +178,7 @@ everywhere f = go where
   go (Return ss js) = f (Return ss (go js))
   go (Throw ss js) = f (Throw ss (go js))
   go (InstanceOf ss j1 j2) = f (InstanceOf ss (go j1) (go j2))
-  go (Comment ss com j) = f (Comment ss com (go j))
+  go (Comment com j) = f (Comment com (go j))
   go other = f other
 
 everywhereTopDown :: (AST -> AST) -> AST -> AST
@@ -197,7 +204,7 @@ everywhereTopDownM f = f >=> go where
   go (Return ss j) = Return ss <$> f' j
   go (Throw ss j) = Throw ss <$> f' j
   go (InstanceOf ss j1 j2) = InstanceOf ss <$> f' j1 <*> f' j2
-  go (Comment ss com j) = Comment ss com <$> f' j
+  go (Comment com j) = Comment com <$> f' j
   go other = f other
 
 everything :: (r -> r -> r) -> (AST -> r) -> AST -> r
@@ -220,5 +227,5 @@ everything (<>.) f = go where
   go j@(Return _ j1) = f j <>. go j1
   go j@(Throw _ j1) = f j <>. go j1
   go j@(InstanceOf _ j1 j2) = f j <>. go j1 <>. go j2
-  go j@(Comment _ _ j1) = f j <>. go j1
+  go j@(Comment _ j1) = f j <>. go j1
   go other = f other

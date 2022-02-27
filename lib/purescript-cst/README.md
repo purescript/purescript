@@ -12,6 +12,8 @@ We provide a table to make it a bit easier to map between versions of `purescrip
 | 0.14.3 | 0.3.0.0 |
 | 0.14.4 | 0.4.0.0 |
 | 0.14.5 | 0.4.0.0 |
+| 0.14.6 | 0.4.0.0 |
+| 0.14.7 | 0.5.0.0 |
 
 Before v0.14.2, there was a third package, `purescript-ast`. In v0.14.2, `purescript-ast` was merged into `purescript-cst`.
 

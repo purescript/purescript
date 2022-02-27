@@ -1,2 +1,2 @@
-exports.yes = true;
-exports.no = false;
+export var yes = true;
+export var no = false;

@@ -16,13 +16,24 @@ var evaluate = function evaluate(js) {
         // which will be returned to PSCi.
         buffer.push(s);
     };
-    // Replace any require(...) statements with lookups on the PSCI object.
+    // Replace any require and import statements with lookups on the PSCI object
+    // and export statements with assignments to module.exports.
     var replaced = js.replace(/require\("[^"]*"\)/g, function(s) {
         return "PSCI['" + s.split('/')[1] + "']";
+    }).replace(/import \* as ([^\s]+) from "([^"]*)"/g, function (_, as, from) {
+        return "var " + as + " = PSCI['" + from.split('/')[1] + "']";
+    }).replace(/export \{([^}]+)\} from "\.\/foreign\.js";?/g, function (_, exports) {
+        return exports.replace(/^\s*([^,\s]+),?\s*$/gm, function (_, exported) {
+            return "module.exports." + exported + " = $foreign." + exported + ";";
+        });
+    }).replace(/export \{([^}]+)\};?/g, function (_, exports) {
+        return exports.replace(/^\s*([^,\s]+)(?: as ([^\s]+))?,?\s*$/gm, function (_, exported, as) {
+            return "module.exports." + (as || exported) + " = " + exported + ";";
+        });
     });
     // Wrap the module and evaluate it.
     var wrapped =
-      [ 'var module = {};'
+      [ 'var module = { exports: {} };'
       , '(function(module) {'
       , replaced
       , '})(module);'

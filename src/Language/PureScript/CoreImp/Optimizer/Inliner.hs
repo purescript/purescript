@@ -164,8 +164,6 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , binary' C.dataIntBits C.zshr ZeroFillShiftRight
   , unary'  C.dataIntBits C.complement BitwiseNot
 
-  , inlineNonClassFunction (isModFn (C.dataFunction, C.apply)) $ \f x -> App Nothing f [x]
-  , inlineNonClassFunction (isModFn (C.dataFunction, C.applyFlipped)) $ \x f -> App Nothing f [x]
   , inlineNonClassFunction (isModFnWithDict (C.dataArray, C.unsafeIndex)) $ flip (Indexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ] ++
@@ -247,11 +245,6 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
     convert :: AST -> AST
     convert (App _ (App _ op' [x]) [y]) | p op' = f x y
     convert other = other
-
-  isModFn :: (Text, PSString) -> AST -> Bool
-  isModFn (m, op) (Indexer _ (StringLiteral _ op') (Var _ m')) =
-    m == m' && op == op'
-  isModFn _ _ = False
 
   isModFnWithDict :: (Text, PSString) -> AST -> Bool
   isModFnWithDict (m, op) (App _ (Indexer _ (StringLiteral _ op') (Var _ m')) [Var _ _]) =

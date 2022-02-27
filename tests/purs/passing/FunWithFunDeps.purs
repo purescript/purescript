@@ -26,8 +26,12 @@ instance natMultS :: (NatMult m n r, NatPlus n r s) => NatMult (S m) n s
 foreign import data FVect :: Type -> Type -> Type
 foreign import fnil :: forall e. FVect Z e
 foreign import fcons :: forall n e. e -> FVect n e -> FVect (S n) e
-foreign import fappend :: forall l r o e. NatPlus l r o => FVect l e -> FVect r e -> FVect o e
-foreign import fflatten :: forall f s t o. NatMult f s o => FVect f (FVect s t) -> FVect o t
+fappend :: forall l r o e. NatPlus l r o => FVect l e -> FVect r e -> FVect o e
+fappend = fappendImpl
+foreign import fappendImpl :: forall l r o e. FVect l e -> FVect r e -> FVect o e
+fflatten :: forall f s t o. NatMult f s o => FVect f (FVect s t) -> FVect o t
+fflatten = fflattenImpl
+foreign import fflattenImpl :: forall f s t o. FVect f (FVect s t) -> FVect o t
 foreign import ftoArray :: forall n e. FVect n e -> Array e
 
 -- should be able to figure these out

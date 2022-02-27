@@ -1,0 +1,12 @@
+Error found:
+at tests/purs/failing/UnsupportedFFICommonJSImports1.purs:2:1 - 5:29 (line 2, column 1 - line 5, column 29)
+
+  The following CommonJS imports are not supported in the ES foreign module for module [33mMain[0m:
+
+    some CJS module
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnsupportedFFICommonJSImports.md for more information,
+or to contribute content related to this error.
+

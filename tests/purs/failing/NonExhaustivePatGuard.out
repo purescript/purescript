@@ -9,13 +9,10 @@ at tests/purs/failing/NonExhaustivePatGuard.purs:4:1 - 4:16 (line 4, column 1 - 
 
   Alternatively, add a Partial constraint to the type of the enclosing value.
 
-while applying a function [33m$__unused[0m
-  of type [33mPartial => t0 -> t0[0m
-  to argument [33mcase x of        [0m
-              [33m  x | 1 <- x -> x[0m
-while checking that expression [33m$__unused (case x of        [0m
-                               [33m             x | 1 <- x -> x[0m
-                               [33m          )                 [0m
+while checking that type [33mPartial => t0[0m
+  is at least as general as type [33mInt[0m
+while checking that expression [33mcase x of        [0m
+                               [33m  x | 1 <- x -> x[0m
   has type [33mInt[0m
 in value declaration [33mf[0m
 

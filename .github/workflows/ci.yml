@@ -30,7 +30,7 @@ jobs:
 
       - uses: "actions/setup-node@v1"
         with:
-          node-version: "10"
+          node-version: "12"
 
       - id: "haskell"
         uses: "haskell/actions/setup@v1"
@@ -56,6 +56,18 @@ jobs:
           echo "local-programs-path: $STACK_ROOT/programs" > $STACK_ROOT/config.yaml
 
       - run: "ci/build.sh"
+
+      - name: "(Linux only) Build the entire package set"
+        if: "${{ runner.os == 'Linux' }}"
+        # We build in this directory in build.sh, so this is where we need to
+        # launch `stack exec`. The actual package-set building happens in a
+        # temporary directory.
+        working-directory: "sdist-test"
+        # The presence or absence of the --haddock flag changes the location
+        # into which stack places all build artifacts. Since we use --haddock
+        # in our CI builds, in order to actually get stack to find the purs
+        # binary it created, we need to use the flag here as well.
+        run: "stack --haddock exec ../ci/build-package-set.sh"
 
       - name: "(Release only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"

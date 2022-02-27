@@ -1,0 +1,1 @@
+* Removes deprecated syntax for rows (i.e. `#`) and kinds (i.e. `kind`-keyword)
