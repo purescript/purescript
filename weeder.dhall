@@ -2,6 +2,9 @@
   [ "^Main\\.main$"
   , "^PscIdeSpec\\.main$"
 
+  -- Temporary fix until #4241 gets merged
+  , "^Language\\.PureScript\\.CST\\.Monad\\.addWarning"
+
   -- These declarations are used in Pursuit. (The Types declarations are
   -- reexported in the L.P.Docs module, and referenced from there, but Weeder
   -- isn't that smart.)
