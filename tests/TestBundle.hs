@@ -47,7 +47,7 @@ assertBundles
   -> Handle
   -> Expectation
 assertBundles support inputFiles outputFile = do
-  (result, _) <- compile support inputFiles
+  (result, _) <- compile True support inputFiles
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
     Right _ -> do
