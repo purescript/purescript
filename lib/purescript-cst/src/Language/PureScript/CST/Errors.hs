@@ -195,4 +195,4 @@ prettyPrintWarningMessage ParserErrorInfo {..} = case errType of
   WarnDeprecatedKindExportSyntax ->
     "Kind exports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."
   WarnDeprecatedCaseOfOffsideSyntax ->
-    "An expression that is not indented past its `case ... of` branch's binder is deprecated and will be removed in a future release. Indent the expression beyond its binder, similar to how let bindings work."
+    "Dedented expressions in case branches are deprecated and will be removed in a future release. Indent the branch's expression past it's binder instead."
