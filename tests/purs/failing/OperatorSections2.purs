@@ -3,5 +3,4 @@ module Main where
 
 import Prelude
 
-test :: Int -> Int
-test = 1 + _
+test = ( _ * 4 + 1 ) 50
