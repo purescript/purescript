@@ -5,7 +5,7 @@ at tests/purs/failing/DeprecatedFFICommonJSModule.purs:2:1 - 5:29 (line 2, colum
 
     tests/purs/failing/DeprecatedFFICommonJSModule.js
 
-  CommonJS foreign modules are no longer supported.
+  CommonJS foreign modules are no longer supported. Use native JavaScript/ECMAScript module syntax instead.
 
 
 See https://github.com/purescript/documentation/blob/master/errors/DeprecatedFFICommonJSModule.md for more information,
