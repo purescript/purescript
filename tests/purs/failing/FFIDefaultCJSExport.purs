@@ -1,3 +1,4 @@
+-- @shouldFailWith DeprecatedFFICommonJSModule
 module Main where
 
 import Effect.Console (log)

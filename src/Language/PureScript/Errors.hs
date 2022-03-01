@@ -713,7 +713,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DeprecatedFFICommonJSModule mn path) =
       paras [ line $ "A CommonJS foreign module implementation was provided for module " <> markCode (runModuleName mn) <> ": "
             , indent . lineS $ path
-            , line "CommonJS foreign modules are deprecated and won't be supported in the future."
+            , line "CommonJS foreign modules are no longer supported. Use native JavaScript/ECMAScript module syntax instead."
             ]
     renderSimpleErrorMessage (UnsupportedFFICommonJSExports mn idents) =
       paras [ line $ "The following CommonJS exports are not supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "

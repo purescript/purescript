@@ -1,4 +1,4 @@
-export var foo = 1;
+var foo = 1;
 
 export var bar = { foo };
 
