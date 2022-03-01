@@ -522,6 +522,7 @@ errorSuggestion err =
           CST.WarnDeprecatedForeignKindSyntax -> suggest $ "data " <> CST.printTokens (drop 3 toks)
           CST.WarnDeprecatedKindImportSyntax -> suggest $ CST.printTokens $ drop 1 toks
           CST.WarnDeprecatedKindExportSyntax -> suggest $ CST.printTokens $ drop 1 toks
+          CST.WarnDeprecatedCaseOfOffsideSyntax -> Nothing
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""

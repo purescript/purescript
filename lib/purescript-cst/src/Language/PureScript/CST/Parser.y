@@ -395,9 +395,9 @@ expr5 :: { Expr () }
   -- at any level, but this is ambiguous. We allow it in the case of a singleton
   -- case, since this is used in the wild.
   | 'case' sep(expr, ',') 'of' '\{' sep(binder1, ',') '->' '\}' exprWhere
-      { ExprCase () (CaseOf $1 $2 $3 (pure ($5, Unconditional $6 $8))) }
+      {% addWarning (let (a,b) = whereRange $8 in [a, b]) WarnDeprecatedCaseOfOffsideSyntax *> pure (ExprCase () (CaseOf $1 $2 $3 (pure ($5, Unconditional $6 $8)))) }
   | 'case' sep(expr, ',') 'of' '\{' sep(binder1, ',') '\}' guardedCase
-      { ExprCase () (CaseOf $1 $2 $3 (pure ($5, $7))) }
+      {% addWarning (let (a,b) = guardedRange $7 in [a, b]) WarnDeprecatedCaseOfOffsideSyntax *> pure (ExprCase () (CaseOf $1 $2 $3 (pure ($5, $7)))) }
 
 expr6 :: { Expr () }
   : expr7 %shift { $1 }

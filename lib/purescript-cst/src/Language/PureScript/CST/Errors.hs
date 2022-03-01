@@ -63,6 +63,7 @@ data ParserWarningType
   | WarnDeprecatedForeignKindSyntax
   | WarnDeprecatedKindImportSyntax
   | WarnDeprecatedKindExportSyntax
+  | WarnDeprecatedCaseOfOffsideSyntax
   deriving (Show, Eq, Ord)
 
 data ParserErrorInfo a = ParserErrorInfo
@@ -193,3 +194,5 @@ prettyPrintWarningMessage ParserErrorInfo {..} = case errType of
     "Kind imports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."
   WarnDeprecatedKindExportSyntax ->
     "Kind exports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."
+  WarnDeprecatedCaseOfOffsideSyntax ->
+    "Dedented expressions in case branches are deprecated and will be removed in a future release. Indent the branch's expression past it's binder instead."

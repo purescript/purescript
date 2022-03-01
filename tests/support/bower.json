@@ -17,7 +17,7 @@
     "purescript-integers": "https://github.com/working-group-purescript-es/purescript-integers.git#es-modules",
     "purescript-invariant": "5.0.0",
     "purescript-lazy": "https://github.com/working-group-purescript-es/purescript-lazy.git#es-modules",
-    "purescript-lists": "6.0.0",
+    "purescript-lists": "6.1.0",
     "purescript-math": "https://github.com/working-group-purescript-es/purescript-math.git#es-modules",
     "purescript-maybe": "5.0.0",
     "purescript-newtype": "4.0.0",
