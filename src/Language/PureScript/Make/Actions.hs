@@ -334,7 +334,7 @@ checkForeignDecls m path = do
   let
     parseResult :: Either MultipleErrors JS.JSAST
     parseResult = first (errorParsingModule . Bundle.UnableToParseModule) $ JS.parseModule jsStr path
-  either (pure . Left) (fmap Right . checkFFI) parseResult
+  traverse checkFFI parseResult
 
   where
   mname = CF.moduleName m
