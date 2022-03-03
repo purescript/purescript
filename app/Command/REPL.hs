@@ -1,6 +1,5 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Command.REPL (command) where
 
