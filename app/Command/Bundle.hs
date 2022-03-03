@@ -41,26 +41,28 @@ data Options = Options
 -- This function parses the input files, performs dead code elimination, filters empty modules
 -- and generates and prints the final Javascript bundle.
 app :: (MonadError ErrorMessage m, MonadIO m) => Options -> m (Maybe SourceMapping, String)
-app Options{..} = do
-  inputFiles <- concat <$> mapM (liftIO . glob) optionsInputFiles
-  when (null inputFiles) . liftIO $ do
-    hPutStrLn stderr "purs bundle: No input files."
-    exitFailure
-  when (isNothing optionsOutputFile && optionsSourceMaps) . liftIO $ do
-    hPutStrLn stderr "purs bundle: Source maps only supported when output file specified."
-    exitFailure
+app Options{} = liftIO $ do
+  hPutStrLn stderr "'purs bundle' was removed in the v0.15.0 release. Use 'esbuild' or another bundler."
+  exitFailure
+  -- inputFiles <- concat <$> mapM (liftIO . glob) optionsInputFiles
+  -- when (null inputFiles) . liftIO $ do
+  --   hPutStrLn stderr "purs bundle: No input files."
+  --   exitFailure
+  -- when (isNothing optionsOutputFile && optionsSourceMaps) . liftIO $ do
+  --   hPutStrLn stderr "purs bundle: Source maps only supported when output file specified."
+  --   exitFailure
 
-  input <- for inputFiles $ \filename -> do
-    js <- liftIO (readUTF8File filename)
-    mid <- guessModuleIdentifier filename
-    length js `seq` return (mid, Just filename, js)                                            -- evaluate readFile till EOF before returning, not to exhaust file handles
+  -- input <- for inputFiles $ \filename -> do
+  --   js <- liftIO (readUTF8File filename)
+  --   mid <- guessModuleIdentifier filename
+  --   length js `seq` return (mid, Just filename, js)                                            -- evaluate readFile till EOF before returning, not to exhaust file handles
 
-  let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
+  -- let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
 
-  currentDir <- liftIO getCurrentDirectory
-  let outFile = if optionsSourceMaps then fmap (currentDir </>) optionsOutputFile else Nothing
-  let withRawModules = if optionsDebug then Just bundleDebug else Nothing
-  bundleSM input entryIds optionsMainModule optionsNamespace outFile withRawModules
+  -- currentDir <- liftIO getCurrentDirectory
+  -- let outFile = if optionsSourceMaps then fmap (currentDir </>) optionsOutputFile else Nothing
+  -- let withRawModules = if optionsDebug then Just bundleDebug else Nothing
+  -- bundleSM input entryIds optionsMainModule optionsNamespace outFile withRawModules
 
 -- | Print a JSON representation of a list of modules to stderr.
 bundleDebug :: (MonadIO m) => [Module] -> m ()
