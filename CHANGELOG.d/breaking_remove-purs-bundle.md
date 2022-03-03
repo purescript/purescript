@@ -1,0 +1,1 @@
+* Remove `purs bundle`; use another bundler like `esbuild`
