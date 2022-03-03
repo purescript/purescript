@@ -330,7 +330,7 @@ instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- | Attempt to uncons a type variable binding from a type.
-unconsVtaTypeVar :: SourceType -> Maybe (Text, SourceType)
+unconsVtaTypeVar :: SourceType -> Maybe ((Text, SourceType), SourceType)
 unconsVtaTypeVar = go Nothing []
   where
   go y n (ForAll a i k t s v) =
@@ -341,7 +341,7 @@ unconsVtaTypeVar = go Nothing []
     typeVar <- getTypeVar <$> y
     pure (typeVar, foldl' mkForAll' t n)
 
-  getTypeVar (_, i, _, _, _) = i
+  getTypeVar (_, i, k, _, _) = (i, fromMaybe (internalError "unelaborated forall") k)
 
   mkForAll' t (a, i, k, s, v) = ForAll a i k t s v
 
@@ -483,9 +483,10 @@ infer' (VisibleTypeApp val typeArg) = do
   (typeArg', _) <- kindOf typeArg
   typeArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards' False $ typeArg'
   case unconsVtaTypeVar valTy' of
-    Just (typeVar, valTyTail) -> do
-      let valTy'' = replaceTypeVars typeVar typeArg'' valTyTail
-      TypedValue' True val'' <$> checkKind valTy'' kindType
+    Just ((typeVar, typeVarKind), tyAbsBody) -> do
+      typeVarUnk <- freshTypeWithKind typeVarKind
+      unifyTypes typeArg'' typeVarUnk
+      pure $ TypedValue' True val'' (replaceTypeVars typeVar typeVarUnk tyAbsBody)
     _ ->
       throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy typeArg
 infer' (Hole name) = do
