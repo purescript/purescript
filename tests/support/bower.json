@@ -24,7 +24,7 @@
     "purescript-nonempty": "6.0.0",
     "purescript-numbers": "https://github.com/working-group-purescript-es/purescript-numbers.git#es-modules",
     "purescript-partial": "https://github.com/working-group-purescript-es/purescript-partial.git#es-modules",
-    "purescript-prelude": "https://github.com/working-group-purescript-es/purescript-prelude.git#es-modules",
+    "purescript-prelude": "https://github.com/working-group-purescript-es/purescript-prelude.git#fix-es-modules",
     "purescript-psci-support": "5.0.0",
     "purescript-refs": "https://github.com/working-group-purescript-es/purescript-refs.git#es-modules",
     "purescript-safe-coerce": "1.0.0",
@@ -51,7 +51,7 @@
     "purescript-refs": "es-modules",
     "purescript-partial": "es-modules",
     "purescript-numbers": "es-modules",
-    "purescript-prelude": "es-modules",
+    "purescript-prelude": "fix-es-modules",
     "purescript-unfoldable": "es-modules",
     "purescript-unsafe-coerce": "es-modules",
     "purescript-st": "es-modules"
