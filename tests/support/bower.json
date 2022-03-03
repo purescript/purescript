@@ -39,22 +39,21 @@
   },
   "resolutions": {
     "purescript-console": "es-modules",
-    "purescript-assert": "es-modules",
     "purescript-effect": "es-modules",
-    "purescript-enums": "es-modules",
     "purescript-control": "es-modules",
-    "purescript-foldable-traversable": "es-modules",
-    "purescript-functions": "es-modules",
-    "purescript-lazy": "es-modules",
-    "purescript-math": "es-modules",
     "purescript-arrays": "es-modules",
+    "purescript-enums": "es-modules",
+    "purescript-lazy": "es-modules",
+    "purescript-functions": "es-modules",
     "purescript-integers": "es-modules",
-    "purescript-numbers": "es-modules",
-    "purescript-partial": "es-modules",
+    "purescript-foldable-traversable": "es-modules",
+    "purescript-math": "es-modules",
     "purescript-refs": "es-modules",
-    "purescript-st": "es-modules",
-    "purescript-unfoldable": "es-modules",
+    "purescript-partial": "es-modules",
+    "purescript-numbers": "es-modules",
     "purescript-prelude": "es-modules",
-    "purescript-unsafe-coerce": "es-modules"
+    "purescript-unfoldable": "es-modules",
+    "purescript-unsafe-coerce": "es-modules",
+    "purescript-st": "es-modules"
   }
 }
