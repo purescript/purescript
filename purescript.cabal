@@ -388,7 +388,6 @@ test-suite tests
     Language.PureScript.Ide.Test
     Language.PureScript.Ide.UsageSpec
     PscIdeSpec
-    TestBundle
     TestCompiler
     TestCoreFn
     TestCst
