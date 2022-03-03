@@ -100,4 +100,7 @@ litTransGT = assertGreater
 litTransRange :: forall a o. Compare a 10 LT => Compare 0 a LT => Proxy ( left :: a, right :: 20 )
 litTransRange = assertLesser
 
+withFacts :: forall l r o. Compare l 10 LT => Compare r 20 GT => Proxy ( left :: l, right :: r )
+withFacts = assertLesser
+
 main = log "Done"
