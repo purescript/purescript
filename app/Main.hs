@@ -60,7 +60,7 @@ main = do
       (Opts.subparser . fold)
         [ Opts.command "bundle"
             (Opts.info Bundle.command
-              (Opts.progDesc "Bundle compiled PureScript modules for the browser"))
+              (Opts.progDesc "REMOVED. This command was removed in v0.15.0; use 'esbuild' or another bundler now"))
         , Opts.command "compile"
             (Opts.info Compile.command
               (Opts.progDesc "Compile PureScript source files"))
