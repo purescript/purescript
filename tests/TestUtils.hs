@@ -37,6 +37,8 @@ import System.Process hiding (cwd)
 import qualified System.FilePath.Glob as Glob
 import System.IO
 import Test.Hspec
+import Data.Foldable (traverse_)
+import qualified Data.Text.IO as T
 
 -- |
 -- Fetches code necessary to run the tests with. The resulting support code
@@ -78,7 +80,15 @@ updateSupportCode = withCurrentDirectory "tests/support" $ do
     -- And we are non-interactive: https://github.com/bower/bower/issues/1162
     callProcess node ["node_modules/bower/bin/bower", "--allow-root", "install", "--config.interactive=false"]
     writeFile lastUpdatedFile ""
+  files <- readInput ["bower_components/purescript-prelude/src/Data/HeytingAlgebra.js"]
+  traverse_ showFFI files
   where
+  showFFI :: (FilePath, T.Text) -> IO ()
+  showFFI (filePath, content) = do
+    putStrLn $ "File path: " <> filePath
+    putStrLn "====="
+    T.putStrLn content
+    putStrLn "====="
   cannotFindNode :: String -> IO a
   cannotFindNode message = do
     hPutStrLn stderr message
