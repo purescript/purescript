@@ -26,6 +26,7 @@ primModules =
   , primRowDocsModule
   , primRowListDocsModule
   , primSymbolDocsModule
+  , primIntDocsModule
   , primTypeErrorDocsModule
   ]
 
@@ -127,6 +128,18 @@ primSymbolDocsModule = Module
   , modReExports = []
   }
 
+primIntDocsModule :: Module
+primIntDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.Int"
+  , modComments = Just "The Prim.Int module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with type-level intural numbers."
+  , modDeclarations =
+      [ intAdd
+      , intCompare
+      , intMul
+      ]
+  , modReExports = []
+  }
+
 primTypeErrorDocsModule :: Module
 primTypeErrorDocsModule = Module
   { modName = P.moduleNameFromString "Prim.TypeError"
@@ -195,6 +208,7 @@ lookupPrimClassOf g = unsafeLookupOf g
     P.primRowClasses <>
     P.primRowListClasses <>
     P.primSymbolClasses <>
+    P.primIntClasses <>
     P.primTypeErrorClasses
   ) "Docs.Prim: No such Prim class: "
 
@@ -518,6 +532,22 @@ symbolCons = primClassOf (P.primSubName "Symbol") "Cons" $ T.unlines
   , "head and tail or for combining a head and tail into a new symbol."
   , "Requires the head to be a single character and the combined string"
   , "cannot be empty."
+  ]
+
+intAdd :: Declaration
+intAdd = primClassOf (P.primSubName "Int") "Add" $ T.unlines
+  [ "Compiler solved type class for adding type-level `Int`s."
+  ]
+
+intCompare :: Declaration
+intCompare = primClassOf (P.primSubName "Int") "Compare" $ T.unlines
+  [ "Compiler solved type class for comparing two type-level `Int`s."
+  , "Produces an `Ordering`."
+  ]
+
+intMul :: Declaration
+intMul = primClassOf (P.primSubName "Int") "Mul" $ T.unlines
+  [ "Compiler solved type class for multiplying type-level `Int`s."
   ]
 
 fail :: Declaration

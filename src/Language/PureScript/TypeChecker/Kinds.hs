@@ -185,6 +185,8 @@ inferKind = \tyToInfer ->
       pure (ConstrainedType ann' con'' ty', E.kindType $> ann')
     ty@(TypeLevelString ann _) ->
       pure (ty, E.kindSymbol $> ann)
+    ty@(TypeLevelInt ann _) ->
+      pure (ty, E.tyInt $> ann)
     ty@(TypeVar ann v) -> do
       moduleName <- unsafeCheckCurrentModule
       kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
@@ -486,6 +488,8 @@ elaborateKind
 elaborateKind = \case
   TypeLevelString ann _ ->
     pure $ E.kindSymbol $> ann
+  TypeLevelInt ann _ ->
+    pure $ E.tyInt $> ann
   TypeConstructor ann v -> do
     env <- getEnv
     case M.lookup v (E.types env) of

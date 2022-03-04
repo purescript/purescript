@@ -238,6 +238,7 @@ checkTypeClassInstance cls i = check where
   check = \case
     TypeVar _ _ -> return ()
     TypeLevelString _ _ -> return ()
+    TypeLevelInt _ _ -> return ()
     TypeConstructor _ _ -> return ()
     TypeApp _ t1 t2 -> check t1 >> check t2
     KindApp _ t k -> check t >> check k
@@ -471,6 +472,7 @@ typeCheckAll moduleName _ = traverse go
     typeModule :: SourceType -> Maybe ModuleName
     typeModule (TypeVar _ _) = Nothing
     typeModule (TypeLevelString _ _) = Nothing
+    typeModule (TypeLevelInt _ _) = Nothing
     typeModule (TypeConstructor _ (Qualified (Just mn'') _)) = Just mn''
     typeModule (TypeConstructor _ (Qualified Nothing _)) = internalError "Unqualified type name in findNonOrphanModules"
     typeModule (TypeApp _ t1 _) = typeModule t1

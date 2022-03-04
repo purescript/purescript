@@ -37,6 +37,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Entailment.Coercible
+import Language.PureScript.TypeChecker.Entailment.IntCompare
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
@@ -56,8 +57,28 @@ data Evidence
   -- | Computed instances
   | WarnInstance SourceType -- ^ Warn type class with a user-defined warning message
   | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
+  | ReflectableInstance Reflectable -- ^ The Reflectable type class for a reflectable kind
   | EmptyClassInstance        -- ^ For any solved type class with no members
   deriving (Show, Eq)
+
+-- | Describes kinds that are reflectable to the term-level
+data Reflectable
+  = ReflectableInt Integer -- ^ For type-level numbers
+  | ReflectableString PSString -- ^ For type-level strings
+  | ReflectableBoolean Bool -- ^ For type-level booleans
+  | ReflectableOrdering Ordering -- ^ For type-level orderings
+  deriving (Show, Eq)
+
+-- | Reflect a reflectable type into an expression
+asExpression :: Reflectable -> Expr
+asExpression = \case
+  ReflectableInt n -> Literal NullSourceSpan $ NumericLiteral $ Left n
+  ReflectableString s -> Literal NullSourceSpan $ StringLiteral s
+  ReflectableBoolean b -> Literal NullSourceSpan $ BooleanLiteral b
+  ReflectableOrdering o -> Constructor NullSourceSpan $ case o of
+    LT -> C.LT
+    EQ -> C.EQ
+    GT -> C.GT
 
 -- | Extract the identifier of a named instance
 namedInstanceIdentifier :: Evidence -> Maybe (Qualified Ident)
@@ -181,6 +202,10 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.SymbolCompare _ args | Just dicts <- solveSymbolCompare args = dicts
     forClassName _ _ C.SymbolAppend _ args | Just dicts <- solveSymbolAppend args = dicts
     forClassName _ _ C.SymbolCons _ args | Just dicts <- solveSymbolCons args = dicts
+    forClassName _ _ C.IntAdd _ args | Just dicts <- solveIntAdd args = dicts
+    forClassName _ ctx C.IntCompare _ args | Just dicts <- solveIntCompare ctx args = dicts
+    forClassName _ _ C.IntMul _ args | Just dicts <- solveIntMul args = dicts
+    forClassName _ _ C.Reflectable _ args | Just dicts <- solveReflectable args = dicts
     forClassName _ _ C.RowUnion kinds args | Just dicts <- solveUnion kinds args = dicts
     forClassName _ _ C.RowNub kinds args | Just dicts <- solveNub kinds args = dicts
     forClassName _ _ C.RowLacks kinds args | Just dicts <- solveLacks kinds args = dicts
@@ -389,6 +414,9 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
               return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsSymbol)) (Literal nullSourceSpan (ObjectLiteral fields))
+            mkDictionary (ReflectableInstance ref) _ =
+              let fields = [ ("reflectType", Abs (VarBinder nullSourceSpan UnusedIdent) (asExpression ref)) ] in
+              pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
             unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
             unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)
@@ -476,6 +504,61 @@ entails SolverOptions{..} constraint context hints =
       guard (T.length h' == 1)
       pure (arg1, arg2, srcTypeLevelString (mkString $ h' <> t'))
     consSymbol _ _ _ = Nothing
+
+    solveReflectable :: [SourceType] -> Maybe [TypeClassDict]
+    solveReflectable [typeLevel, _] = do
+      (ref, typ) <- case typeLevel of
+        TypeLevelInt _ i -> pure (ReflectableInt i, tyInt)
+        TypeLevelString _ s -> pure (ReflectableString s, tyString)
+        TypeConstructor _ n
+          | n == C.booleanTrue -> pure (ReflectableBoolean True, tyBoolean)
+          | n == C.booleanFalse -> pure (ReflectableBoolean False, tyBoolean)
+          | n == C.orderingLT -> pure (ReflectableOrdering LT, srcTypeConstructor C.Ordering)
+          | n == C.orderingEQ -> pure (ReflectableOrdering EQ, srcTypeConstructor C.Ordering)
+          | n == C.orderingGT -> pure (ReflectableOrdering GT, srcTypeConstructor C.Ordering)
+        _ -> Nothing
+      pure [TypeClassDictionaryInScope Nothing 0 (ReflectableInstance ref) [] C.Reflectable [] [] [typeLevel, typ] Nothing Nothing]
+    solveReflectable _ = Nothing
+
+    solveIntAdd :: [SourceType] -> Maybe [TypeClassDict]
+    solveIntAdd [arg0, arg1, arg2] = do
+      (arg0', arg1', arg2') <- addInts arg0 arg1 arg2
+      let args' = [arg0', arg1', arg2']
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntAdd [] [] args' Nothing Nothing]
+    solveIntAdd _ = Nothing
+
+    addInts :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
+    -- | l r -> o, l + r = o
+    addInts arg0@(TypeLevelInt _ l) arg1@(TypeLevelInt _ r) _ = pure (arg0, arg1, srcTypeLevelInt (l + r))
+    -- | l o -> r, o - l = r
+    addInts arg0@(TypeLevelInt _ l) _ arg2@(TypeLevelInt _ o) = pure (arg0, srcTypeLevelInt (o - l), arg2)
+    -- | r o -> l, o - r = l
+    addInts _ arg1@(TypeLevelInt _ r) arg2@(TypeLevelInt _ o) = pure (srcTypeLevelInt (o - r), arg1, arg2)
+    addInts _ _ _                                             = Nothing
+
+    solveIntCompare :: InstanceContext -> [SourceType] -> Maybe [TypeClassDict]
+    solveIntCompare _ [arg0@(TypeLevelInt _ a), arg1@(TypeLevelInt _ b), _] =
+      let ordering = case compare a b of
+            EQ -> C.orderingEQ
+            LT -> C.orderingLT
+            GT -> C.orderingGT
+          args' = [arg0, arg1, srcTypeConstructor ordering]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] args' Nothing Nothing]
+    solveIntCompare ctx args@[a, b, _] = do
+      let compareDictsInScope = findDicts ctx C.IntCompare Nothing
+          givens = flip mapMaybe compareDictsInScope $ \case
+            dict | [a', b', c'] <- tcdInstanceTypes dict -> mkRelation a' b' c'
+                 | otherwise -> Nothing
+          facts = mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
+      c' <- solveRelation (givens <> facts) a b
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, srcTypeConstructor c'] Nothing Nothing]
+    solveIntCompare _ _ = Nothing
+
+    solveIntMul :: [SourceType] -> Maybe [TypeClassDict]
+    solveIntMul [arg0@(TypeLevelInt _ l), arg1@(TypeLevelInt _ r), _] =
+      let args' = [arg0, arg1, srcTypeLevelInt (l * r)]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntMul [] [] args' Nothing Nothing]
+    solveIntMul _ = Nothing
 
     solveUnion :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveUnion kinds [l, r, u] = do
@@ -643,6 +726,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
     typeHeadsAreEqual t                      (TypeVar _ v)                     = (Match (), M.singleton v [t])
     typeHeadsAreEqual (TypeConstructor _ c1) (TypeConstructor _ c2) | c1 == c2 = (Match (), M.empty)
     typeHeadsAreEqual (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = (Match (), M.empty)
+    typeHeadsAreEqual (TypeLevelInt _ n1)    (TypeLevelInt _ n2)    | n1 == n2 = (Match (), M.empty)
     typeHeadsAreEqual (TypeApp _ h1 t1)      (TypeApp _ h2 t2)                 =
       both (typeHeadsAreEqual h1 h2) (typeHeadsAreEqual t1 t2)
     typeHeadsAreEqual (KindApp _ h1 t1)      (KindApp _ h2 t2)                 =
@@ -690,6 +774,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
       typesAreEqual t1                     (Skolem _ _ _ s2 _)    = if t1 `containsSkolem` s2 then Apart else Unknown
       typesAreEqual (TypeVar _ v1)         (TypeVar _ v2)         | v1 == v2 = Match ()
       typesAreEqual (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = Match ()
+      typesAreEqual (TypeLevelInt _ n1)    (TypeLevelInt _ n2)    | n1 == n2 = Match ()
       typesAreEqual (TypeConstructor _ c1) (TypeConstructor _ c2) | c1 == c2 = Match ()
       typesAreEqual (TypeApp _ h1 t1)      (TypeApp _ h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2
       typesAreEqual (KindApp _ h1 t1)      (KindApp _ h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2

@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/IntAsRecordLabel.purs:4:27 - 4:29 (line 4, column 27 - line 4, column 29)
+
+  Unable to parse module:
+  Unexpected token '42'
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

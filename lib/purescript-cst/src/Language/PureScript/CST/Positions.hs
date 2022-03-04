@@ -9,6 +9,7 @@ import Prelude
 
 import Data.Foldable (foldl')
 import qualified Data.List.NonEmpty as NE
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Void (Void)
 import qualified Data.Text as Text
@@ -244,6 +245,7 @@ typeRange = \case
   TypeWildcard _ a -> (a, a)
   TypeHole _ a -> nameRange a
   TypeString _ a _ -> (a, a)
+  TypeInt _ a b _ -> (fromMaybe b a, b)
   TypeRow _ a -> wrappedRange a
   TypeRecord _ a -> wrappedRange a
   TypeForall _ a _ _ b -> (a, snd $ typeRange b)

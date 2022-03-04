@@ -137,6 +137,7 @@ data Type a
   | TypeWildcard a SourceToken
   | TypeHole a (Name Ident)
   | TypeString a SourceToken PSString
+  | TypeInt a (Maybe SourceToken) SourceToken Integer
   | TypeRow a (Wrapped (Row a))
   | TypeRecord a (Wrapped (Row a))
   | TypeForall a SourceToken (NonEmpty (TypeVarBinding a)) SourceToken (Type a)
