@@ -78,4 +78,16 @@ leftSkip = Left @_ @String 0
 rightSkip :: Either Int String
 rightSkip = Right @Int @_ "0"
 
+hrk :: forall (@f :: forall k. k -> Type). Proxy f
+hrk = Proxy
+
+hrk' :: Proxy Proxy
+hrk' = hrk @Proxy
+
+kindCheck :: forall @k (@t :: k). Proxy t
+kindCheck = Proxy
+
+kindCheck' :: Proxy "Type"
+kindCheck' = kindCheck @Symbol @"Type"
+
 main = log "Done"
