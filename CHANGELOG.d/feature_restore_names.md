@@ -11,23 +11,15 @@ addNumberSuffix a _ _ _ = a
 addNumberSuffix' = addNumberSuffix 0
 ```
 
-This now generalizes with the original names suffixed with a number
-instead of just being replaced by a `t`.
+Previously, inferring top-level declarations without type signatures
+would use `t` suffixed with an integer for type variables.
 
 ```hs
-Warning found:
-in module Main
-at Main.purs:6:1 - 6:37 (line 6, column 1 - line 6, column 37)
+forall t6 t7 t8. t6 -> t7 -> t8 -> Int
+```
 
-  No type declaration was provided for the top-level declaration of addNumberSuffix'.
-  It is good practice to provide type declarations as a form of documentation.
-  The inferred type of addNumberSuffix' was:
+Now, the inferred type would refer back to their original names.
 
-    forall b6 c7 d8. b6 -> c7 -> d8 -> Int
-
-
-in value declaration addNumberSuffix'
-
-See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
-or to contribute content related to this warning.
+```hs
+forall b6 c7 d8. b6 -> c7 -> d8 -> Int
 ```
