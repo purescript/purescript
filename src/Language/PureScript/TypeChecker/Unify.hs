@@ -195,13 +195,31 @@ replaceTypeWildcards = everywhereOnTypesM replace
 -- |
 -- Replace outermost unsolved unification variables with named type variables
 --
-varIfUnknown :: [(Unknown, SourceType)] -> SourceType -> SourceType
-varIfUnknown unks ty =
-  mkForAll (toBinding <$> unks) $ go ty
+varIfUnknown :: forall m. (MonadState CheckState m) => [(Unknown, SourceType)] -> SourceType -> m SourceType
+varIfUnknown unks ty = do
+  bn' <- traverse toBinding unks
+  ty' <- go ty
+  pure $ mkForAll bn' ty'
   where
-  toName = T.cons 't' . T.pack .  show
-  toBinding (a, k) = (getAnnForType ty, (toName a, Just $ go k))
-  go = everywhereOnTypes $ \case
-    (TUnknown ann u)
-      | Just _ <- lookup u unks -> TypeVar ann (toName u)
-    t -> t
+  toName = T.cons 't' . T.pack . show
+
+  toBinding :: (Unknown, SourceType) -> m (SourceAnn, (T.Text, Maybe SourceType))
+  toBinding (a, k) = do
+    mn <- lookupUnkName a
+    k' <- go k
+    case mn of
+      Just n ->
+        pure (getAnnForType ty, (n <> T.pack (show a), Just k'))
+      Nothing ->
+        pure (getAnnForType ty, (toName a, Just k'))
+
+  go :: SourceType -> m SourceType
+  go = everywhereOnTypesM $ \case
+    (TUnknown ann u) -> do
+      mn <- lookupUnkName u
+      case mn of
+        Just n ->
+          pure $ TypeVar ann (n <> T.pack (show u))
+        Nothing ->
+          pure $ TypeVar ann $ toName u
+    t -> pure t

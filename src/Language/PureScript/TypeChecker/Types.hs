@@ -105,7 +105,8 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           ty'' = constrain unsolved ty'
       unsolvedTypeVarsWithKinds <- unknownsWithKinds . IS.toList . unknowns $ constrain unsolved ty''
       let unsolvedTypeVars = IS.toList $ unknowns ty'
-          generalized = varIfUnknown unsolvedTypeVarsWithKinds ty''
+
+      generalized <- varIfUnknown unsolvedTypeVarsWithKinds ty''
 
       when shouldGeneralize $ do
         -- Show the inferred type in a warning
@@ -322,6 +323,11 @@ instantiatePolyTypeWithUnknowns
   -> m (Expr, SourceType)
 instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _) = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
+  case u of
+    TUnknown _ i ->
+      insertUnkName i ident
+    _ ->
+      internalError "freshTypeWithKind didn't produce TUnknown"
   instantiatePolyTypeWithUnknowns val $ replaceTypeVars ident u ty
 instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
   dicts <- getTypeClassDictionaries
@@ -876,6 +882,11 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   return (retTy, App fn arg')
 checkFunctionApplication' fn (ForAll _ ident mbK ty _) arg = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
+  case u of
+    TUnknown _ i ->
+      insertUnkName i ident
+    _ ->
+      internalError "freshTypeWithKind didn't produce TUnknown"
   let replaced = replaceTypeVars ident u ty
   checkFunctionApplication fn replaced arg
 checkFunctionApplication' fn (KindedType _ ty _) arg =
