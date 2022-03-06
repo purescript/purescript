@@ -163,11 +163,15 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         let constraintTypeVars = fold (conData >>= snd)
         let solved = solveFrom determinedFromType
         let unsolvedVars = S.difference constraintTypeVars solved
+        let lookupUnkName' i = do
+              mn <- lookupUnkName i
+              pure $ (fromMaybe "t" mn, i)
+        unsolvedVarNames <- traverse lookupUnkName' (S.toList unsolvedVars)
         unless (S.null unsolvedVars) .
           throwError
             . onErrorMessages (replaceTypes currentSubst)
             . errorMessage' ss
-            $ AmbiguousTypeVariables generalized (S.toList unsolvedVars)
+            $ AmbiguousTypeVariables generalized unsolvedVarNames
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
