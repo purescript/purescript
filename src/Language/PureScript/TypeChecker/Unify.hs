@@ -22,6 +22,7 @@ import Control.Monad.State.Class (MonadState(..), gets, modify, state)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Foldable (traverse_)
+import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Text as T
 
@@ -201,25 +202,17 @@ varIfUnknown unks ty = do
   ty' <- go ty
   pure $ mkForAll bn' ty'
   where
-  toName = T.cons 't' . T.pack . show
+  toName :: Unknown -> m T.Text
+  toName u = (<> T.pack (show u)) . fromMaybe "t" <$> lookupUnkName u
 
   toBinding :: (Unknown, SourceType) -> m (SourceAnn, (T.Text, Maybe SourceType))
-  toBinding (a, k) = do
-    mn <- lookupUnkName a
+  toBinding (u, k) = do
+    u' <- toName u
     k' <- go k
-    case mn of
-      Just n ->
-        pure (getAnnForType ty, (n <> T.pack (show a), Just k'))
-      Nothing ->
-        pure (getAnnForType ty, (toName a, Just k'))
+    pure (getAnnForType ty, (u', Just k'))
 
   go :: SourceType -> m SourceType
   go = everywhereOnTypesM $ \case
-    (TUnknown ann u) -> do
-      mn <- lookupUnkName u
-      case mn of
-        Just n ->
-          pure $ TypeVar ann (n <> T.pack (show u))
-        Nothing ->
-          pure $ TypeVar ann $ toName u
+    (TUnknown ann u) ->
+      TypeVar ann <$> toName u
     t -> pure t
