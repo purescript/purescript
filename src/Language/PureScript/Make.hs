@@ -146,17 +146,17 @@ make ma@MakeActions{..} ms = do
 
   (sorted, graph) <- sortModules Transitive (moduleSignature . CST.resPartial) ms
 
-  let sortedWithIndex :: [(CST.PartialResult Module, Int)]
-      sortedWithIndex = zip sorted [1..]
-  -- let totalBuildLength = length sorted
+  let totalBuildLength = length sorted
+  let sortedWithIndex :: [(CST.PartialResult Module, (Int, Int))]
+      sortedWithIndex = zip sorted [(x, totalBuildLength) | x <- [1..]]
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial . fst) sortedWithIndex
-  for_ toBeRebuilt $ \(m, _) -> fork $ do
+  for_ toBeRebuilt $ \(m, moduleIndex) -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-    buildModule buildPlan moduleName
+    buildModule buildPlan moduleName moduleIndex
       (spanName . getModuleSourceSpan . CST.resPartial $ m)
       (fst $ CST.resFull m)
       (fmap importPrim . snd $ CST.resFull m)
@@ -230,8 +230,8 @@ make ma@MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: BuildPlan -> ModuleName -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
-  buildModule buildPlan moduleName fp pwarnings mres deps = do
+  buildModule :: BuildPlan -> ModuleName -> (Int, Int) -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
+  buildModule buildPlan moduleName moduleIndex fp pwarnings mres deps = do
     result <- flip catchError (return . BuildJobFailed) $ do
       let pwarnings' = CST.toMultipleWarnings fp pwarnings
       tell pwarnings'
@@ -253,7 +253,7 @@ make ma@MakeActions{..} ms = do
                 _ -> return e
             foldM go env deps
           env <- C.readMVar (bpEnv buildPlan)
-          (exts, warnings) <- listen $ rebuildModule' ma env externs m
+          (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just moduleIndex)
           return $ BuildJobSucceeded (pwarnings' <> warnings) exts
         Nothing -> return BuildJobSkipped
 

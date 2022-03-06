@@ -72,7 +72,18 @@ data ProgressMessage
 
 -- | Render a progress message
 renderProgressMessage :: ProgressMessage -> T.Text
-renderProgressMessage (CompilingModule mn _) = T.append "Compiling " (runModuleName mn)
+renderProgressMessage (CompilingModule mn mi) =
+  T.concat
+    [ renderProgressIndex mi
+    , "Compiling "
+    , runModuleName mn
+    ]
+  where
+  renderProgressIndex = maybe "" $ \(start, end) ->
+    let start' = T.pack (show start)
+        end' = T.pack (show end)
+        preSpace = T.replicate (T.length end' - T.length start') " "
+    in "[" <> preSpace <> start' <> " of " <> end' <> "] "
 
 -- | Actions that require implementations when running in "make" mode.
 --

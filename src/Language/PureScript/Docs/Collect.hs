@@ -103,8 +103,18 @@ compileForDocs outputDir inputFiles = do
 
   where
   renderProgressMessage :: P.ProgressMessage -> String
-  renderProgressMessage (P.CompilingModule mn _) =
-    "Compiling documentation for " ++ T.unpack (P.runModuleName mn)
+  renderProgressMessage (P.CompilingModule mn mi) =
+    concat
+      [ renderProgressIndex mi
+      , "Compiling documentation for "
+      , T.unpack (P.runModuleName mn)
+      ]
+    where
+    renderProgressIndex = maybe "" $ \(start, end) ->
+      let start' = show start
+          end' = show end
+          preSpace = replicate (length end' - length start') ' '
+      in "[" <> preSpace <> start' <> " of " <> end' <> "] "
 
   testOptions :: P.Options
   testOptions = P.defaultOptions { P.optionsCodegenTargets = Set.singleton P.Docs }
