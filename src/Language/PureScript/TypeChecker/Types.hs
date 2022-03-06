@@ -165,7 +165,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         let unsolvedVars = S.difference constraintTypeVars solved
         let lookupUnkName' i = do
               mn <- lookupUnkName i
-              pure $ (fromMaybe "t" mn, i)
+              pure (fromMaybe "t" mn, i)
         unsolvedVarNames <- traverse lookupUnkName' (S.toList unsolvedVars)
         unless (S.null unsolvedVars) .
           throwError
