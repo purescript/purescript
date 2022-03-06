@@ -73,8 +73,19 @@ rebuildModule'
   -> [ExternsFile]
   -> Module
   -> m ExternsFile
-rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
-  progress $ CompilingModule moduleName
+rebuildModule' act env ext mdl = rebuildModuleWithIndex act env ext mdl Nothing
+
+rebuildModuleWithIndex
+  :: forall m
+   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => MakeActions m
+  -> Env
+  -> [ExternsFile]
+  -> Module
+  -> Maybe (Int, Int)
+  -> m ExternsFile
+rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) moduleIndex = do
+  progress $ CompilingModule moduleName moduleIndex
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
       withPrim = importPrim m
   lint withPrim
@@ -135,10 +146,14 @@ make ma@MakeActions{..} ms = do
 
   (sorted, graph) <- sortModules Transitive (moduleSignature . CST.resPartial) ms
 
+  let sortedWithIndex :: [(CST.PartialResult Module, Int)]
+      sortedWithIndex = zip sorted [1..]
+  -- let totalBuildLength = length sorted
+
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
-  let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
-  for_ toBeRebuilt $ \m -> fork $ do
+  let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial . fst) sortedWithIndex
+  for_ toBeRebuilt $ \(m, _) -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
     buildModule buildPlan moduleName

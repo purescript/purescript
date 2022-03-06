@@ -103,7 +103,7 @@ compileForDocs outputDir inputFiles = do
 
   where
   renderProgressMessage :: P.ProgressMessage -> String
-  renderProgressMessage (P.CompilingModule mn) =
+  renderProgressMessage (P.CompilingModule mn _) =
     "Compiling documentation for " ++ T.unpack (P.runModuleName mn)
 
   testOptions :: P.Options
