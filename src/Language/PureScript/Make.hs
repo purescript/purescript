@@ -251,8 +251,8 @@ make ma@MakeActions{..} ms = do
             foldM go env deps
           env <- C.readMVar (bpEnv buildPlan)
           idx <- C.takeMVar (bpIndex buildPlan)
-          (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
           C.putMVar (bpIndex buildPlan) (idx + 1)
+          (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
           return $ BuildJobSucceeded (pwarnings' <> warnings) exts
         Nothing -> return BuildJobSkipped
 
