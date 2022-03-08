@@ -69,6 +69,16 @@ jobs:
         # binary it created, we need to use the flag here as well.
         run: "stack --haddock exec ../ci/build-package-set.sh"
 
+      - name: Verify that 'libtinfo' isn't in binary
+        if: runner.os == 'Linux'
+        working-directory: "sdist-test"
+        run: |
+          if [ $(ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
+            echo "libtinfo detected"
+            $(ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo'
+            exit 1
+          fi
+
       - name: "(Release only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
         run: |
