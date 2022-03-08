@@ -75,7 +75,7 @@ jobs:
         run: |
           if [ $(ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
             echo "libtinfo detected"
-            $(ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo'
+            ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo'
             exit 1
           fi
 
