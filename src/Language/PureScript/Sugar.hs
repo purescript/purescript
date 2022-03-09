@@ -31,6 +31,7 @@ import Language.PureScript.Sugar.Operators as S
 import Language.PureScript.Sugar.TypeClasses as S
 import Language.PureScript.Sugar.TypeClasses.Deriving as S
 import Language.PureScript.Sugar.TypeDeclarations as S
+import Language.PureScript.Types (eraseKindApps)
 import Language.PureScript.TypeChecker.Synonyms (SynonymMap)
 
 -- |
@@ -93,7 +94,8 @@ findTypeSynonyms externs mn decls =
     M.fromList $ (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
               ++ mapMaybe fromLocalDecl decls
   where
-    fromExternsDecl mn' (EDTypeSynonym name args ty) = Just (Qualified (Just mn') name, (args, ty))
+    fromExternsDecl mn' (EDTypeSynonym name args ty) = do
+      Just (Qualified (Just mn') name, (args, eraseKindApps ty))
     fromExternsDecl _ _ = Nothing
 
     fromLocalDecl (TypeSynonymDeclaration _ name args ty) =
