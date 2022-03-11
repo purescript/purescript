@@ -103,15 +103,6 @@ browserBackend _ = Backend setup mempty mempty mempty
       hPutStrLn stderr "The browser REPL backend was removed in v0.15.0. Use TryPureScript instead: https://try.purescript.org"
       exitFailure
 
-    reload :: () -> IO ()
-    reload _ = pure ()
-
-    shutdown :: () -> IO ()
-    shutdown _ = pure ()
-
-    evaluate :: () -> String -> IO ()
-    evaluate _ _ = liftIO $ pure ()
-
 nodeBackend :: Maybe FilePath -> [String] -> Backend
 nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
   where
