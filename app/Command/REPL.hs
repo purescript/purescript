@@ -56,7 +56,7 @@ port :: Opts.Parser Int
 port = Opts.option Opts.auto $
      Opts.long "port"
   <> Opts.short 'p'
-  <> Opts.help "The browser REPL backend was REMOVED in v0.15.0. Use https://try.purescript.org instead."
+  <> Opts.help "The browser REPL backend was removed in v0.15.0. Use https://try.purescript.org instead."
 
 backend :: Opts.Parser Backend
 backend =
@@ -96,7 +96,7 @@ data Backend = forall state. Backend
   }
 
 browserBackend :: Int -> Backend
-browserBackend _ = Backend setup evaluate reload shutdown
+browserBackend _ = Backend setup mempty mempty mempty
   where
     setup :: IO ()
     setup = do
