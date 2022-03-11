@@ -113,6 +113,7 @@ lint modl@(Module _ _ mn ds _) = do
       go unused (BinaryNoParensType _ t1 t2 t3) = go unused t1 `combine` go unused t2 `combine` go unused t3
       go unused TUnknown{} = (unused, mempty)
       go unused TypeLevelString{} = (unused, mempty)
+      go unused TypeLevelInt{} = (unused, mempty)
       go unused TypeWildcard{} = (unused, mempty)
       go unused TypeConstructor{} = (unused, mempty)
       go unused TypeOp{} = (unused, mempty)

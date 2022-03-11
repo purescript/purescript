@@ -2,6 +2,7 @@ module Language.PureScript.Make.Actions
   ( MakeActions(..)
   , RebuildPolicy(..)
   , ProgressMessage(..)
+  , renderProgressMessage
   , buildMakeActions
   , checkForeignDecls
   , cacheDbFile
@@ -66,13 +67,25 @@ data RebuildPolicy
 
 -- | Progress messages from the make process
 data ProgressMessage
-  = CompilingModule ModuleName
+  = CompilingModule ModuleName (Maybe (Int, Int))
   -- ^ Compilation started for the specified module
   deriving (Show, Eq, Ord)
 
 -- | Render a progress message
-renderProgressMessage :: ProgressMessage -> T.Text
-renderProgressMessage (CompilingModule mn) = T.append "Compiling " (runModuleName mn)
+renderProgressMessage :: T.Text -> ProgressMessage -> T.Text
+renderProgressMessage infx (CompilingModule mn mi) =
+  T.concat
+    [ renderProgressIndex mi
+    , infx
+    , runModuleName mn
+    ]
+  where
+  renderProgressIndex :: Maybe (Int, Int) -> T.Text
+  renderProgressIndex = maybe "" $ \(start, end) ->
+    let start' = T.pack (show start)
+        end' = T.pack (show end)
+        preSpace = T.replicate (T.length end' - T.length start') " "
+    in "[" <> preSpace <> start' <> " of " <> end' <> "] "
 
 -- | Actions that require implementations when running in "make" mode.
 --
@@ -312,7 +325,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   requiresForeign = not . null . CF.moduleForeign
 
   progress :: ProgressMessage -> Make ()
-  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage
+  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage "Compiling "
 
   readCacheDb :: Make CacheDb
   readCacheDb = readCacheDb' outputDir

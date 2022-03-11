@@ -370,6 +370,7 @@ allPrimTypes = M.unions
   , primRowTypes
   , primRowListTypes
   , primSymbolTypes
+  , primIntTypes
   , primTypeErrorTypes
   ]
 
@@ -422,6 +423,14 @@ primSymbolTypes =
     , primClass (primSubName C.moduleSymbol "Cons")    (\kind -> kindSymbol -:> kindSymbol -:> kindSymbol -:> kind)
     ]
 
+primIntTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
+primIntTypes =
+  M.fromList $ mconcat
+    [ primClass (primSubName C.moduleInt "Add")     (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
+    , primClass (primSubName C.moduleInt "Compare") (\kind -> tyInt -:> tyInt -:> kindOrdering -:> kind)
+    , primClass (primSubName C.moduleInt "Mul")     (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
+    ]
+
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primTypeErrorTypes =
   M.fromList $
@@ -454,6 +463,7 @@ allPrimClasses = M.unions
   , primRowClasses
   , primRowListClasses
   , primSymbolClasses
+  , primIntClasses
   , primTypeErrorClasses
   ]
 
@@ -550,6 +560,39 @@ primSymbolClasses =
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [2] [0, 1]
+        ] True)
+    ]
+
+primIntClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primIntClasses =
+  M.fromList
+    -- class Add (left :: Int) (right :: Int) (sum :: Int) | left right -> sum, left sum -> right, right sum -> left
+    [ (primSubName C.moduleInt "Add", makeTypeClassData
+        [ ("left", Just tyInt)
+        , ("right", Just tyInt)
+        , ("sum", Just tyInt)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        , FunctionalDependency [0, 2] [1]
+        , FunctionalDependency [1, 2] [0]
+        ] True)
+
+    -- class Compare (left :: Int) (right :: Int) (ordering :: Ordering) | left right -> ordering
+    , (primSubName C.moduleInt "Compare", makeTypeClassData
+        [ ("left", Just tyInt)
+        , ("right", Just kindSymbol)
+        , ("ordering", Just kindSymbol)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        ] True)
+
+    -- class Mul (left :: Int) (right :: Int) (product :: Int) | left right -> product
+    , (primSubName C.moduleInt "Mul", makeTypeClassData
+        [ ("left", Just tyInt)
+        , ("right", Just tyInt)
+        , ("product", Just tyInt)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
         ] True)
     ]
 
