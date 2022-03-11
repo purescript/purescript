@@ -35,7 +35,6 @@ main = do
     describe "ide" TestIde.spec
     beforeAll TestUtils.setupSupportModules $ do
       describe "compiler" TestCompiler.spec
-      -- describe "bundle" TestBundle.spec
     describe "make" TestMake.spec
     describe "psci" TestPsci.spec
     describe "corefn" TestCoreFn.spec
