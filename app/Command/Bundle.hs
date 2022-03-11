@@ -11,8 +11,8 @@ app :: IO ()
 app = do
   hPutStrLn stderr $ unlines
     [ "'purs bundle' was removed in the v0.15.0 release."
-    , "Use 'esbuild' or another bundler. For info on migrating to a bundler, see"
-    , "https://github.com/purescript/documentation/blob/master/migration-guides/0.15-Migration-Guide.md#how-can-i-bundle-my-library-or-application"
+    , "See https://www.github.com/purescript/documentation/migration-guides/0.15-Migration-Guide.md "
+    , "for more information and bundler alternatives."
     ]
   exitFailure
 
