@@ -17,9 +17,7 @@ license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
-  app/static/*.html
   app/static/*.css
-  app/static/*.js
   app/static/*.less
   bundle/build.sh
   bundle/README
