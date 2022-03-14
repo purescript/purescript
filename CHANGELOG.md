@@ -2,6 +2,11 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.14.8
+
+Bugfixes:
+- Drops `libtinfo` again to avoid compatibility issues on Linux (#4266 by @JordanMartinez)
+
 ## 0.14.7
 
 New features:
