@@ -391,7 +391,8 @@ typeCheckAll moduleName _ = traverse go
       env <- getEnv
       (elabTy, kind) <- withFreshSubstitution $ do
         ((unks, ty'), kind) <- kindOfWithUnknowns ty
-        pure (varIfUnknown unks ty', kind)
+        ty'' <- varIfUnknown unks ty'
+        pure (ty'', kind)
       checkTypeKind elabTy kind
       case M.lookup (Qualified (Just moduleName) name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name

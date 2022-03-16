@@ -110,7 +110,7 @@ data SimpleErrorMessage
       SourceConstraint -- ^ constraint that could not be solved
       [Qualified (Either SourceType Ident)] -- ^ a list of instances that stopped further progress in instance chains due to ambiguity
       Bool -- ^ whether eliminating unknowns with annotations might help
-  | AmbiguousTypeVariables SourceType [Int]
+  | AmbiguousTypeVariables SourceType [(Text, Int)]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | PossiblyInfiniteCoercibleInstance
@@ -461,7 +461,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con ambig unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure ambig <*> pure unks
-  gSimple (AmbiguousTypeVariables t us) = AmbiguousTypeVariables <$> f t <*> pure us
+  gSimple (AmbiguousTypeVariables t uis) = AmbiguousTypeVariables <$> f t <*> pure uis
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> traverse (traverse $ bitraverse f pure) insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
@@ -920,14 +920,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                     | unks
                     ]
             ]
-    renderSimpleErrorMessage (AmbiguousTypeVariables t us) =
+    renderSimpleErrorMessage (AmbiguousTypeVariables t uis) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ prettyType t
             , line "has type variables which are not determined by those mentioned in the body of the type:"
             , indent $ Box.hsep 1 Box.left
               [ Box.vcat Box.left
-                [ line $ markCode ("t" <> T.pack (show u)) <> " could not be determined"
-                | u <- us ]
+                [ line $ markCode (u <> T.pack (show i)) <> " could not be determined"
+                | (u, i) <- uis ]
               ]
             , line "Consider adding a type annotation."
             ]
