@@ -23,4 +23,13 @@ negToString = testToString (Proxy :: Proxy (-1))
 zeroToString :: Proxy "0"
 zeroToString = testToString (Proxy :: Proxy 0)
 
+posToStringTA :: Proxy "1"
+posToStringTA = testToString (Proxy :: Proxy One)
+
+negToStringTA :: Proxy "-1"
+negToStringTA = testToString (Proxy :: Proxy NegOne)
+
+zeroToStringTA :: Proxy "0"
+zeroToStringTA = testToString (Proxy :: Proxy Zero)
+
 main = log "Done"
