@@ -184,11 +184,14 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
 replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => SourceType -> m SourceType
 replaceTypeWildcards = everywhereOnTypesM replace
   where
-  replace (TypeWildcard ann name) = do
+  replace (TypeWildcard ann wdata) = do
     t <- freshType
     ctx <- getLocalContext
-    let err = maybe (WildcardInferredType t ctx) (\n -> HoleInferredType n t ctx Nothing) name
-    warnWithPosition (fst ann) $ tell $ errorMessage err
+    let err = case wdata of
+          HoleWildcard n -> Just $ HoleInferredType n t ctx Nothing
+          UnnamedWildcard -> Just $ WildcardInferredType t ctx
+          IgnoredWildcard -> Nothing
+    forM_ err $ warnWithPosition (fst ann) . tell . errorMessage
     return t
   replace other = return other
 

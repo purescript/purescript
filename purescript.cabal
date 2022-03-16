@@ -266,6 +266,7 @@ library
     Language.PureScript.Linter
     Language.PureScript.Linter.Exhaustive
     Language.PureScript.Linter.Imports
+    Language.PureScript.Linter.Wildcards
     Language.PureScript.Make
     Language.PureScript.Make.Actions
     Language.PureScript.Make.BuildPlan
