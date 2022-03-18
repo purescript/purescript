@@ -143,4 +143,8 @@ instance Super2 String where
 testClassRelationship :: String
 testClassRelationship = super1 "foo" "bar" <> super2 "foo" "bar"
 
+-- an abstracted type variable is usable
+class Usable @a where
+  usable :: String
+
 main = log "Done"
