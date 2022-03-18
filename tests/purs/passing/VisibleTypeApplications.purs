@@ -90,4 +90,57 @@ kindCheck = Proxy
 kindCheck' :: Proxy "Type"
 kindCheck' = kindCheck @Symbol @"Type"
 
+newtype Id' @a = Id' a
+
+_IdInt :: Int -> Id' Int
+_IdInt = Id' @Int
+
+whereTest :: forall a b. a -> b -> String
+whereTest a b = foo' @a a <> bar' @b b
+  where
+  foo' :: forall @a. a -> String
+  foo' _ = "foo"
+
+  bar' :: forall @b. b -> String
+  bar' _ = "bar"
+
+type Foo = forall @a. { foo :: a }
+type Foo2 = { foo :: forall @a. a -> String }
+
+testRank2 :: (forall @b. b -> String) -> String
+testRank2 f = f 1 <> f true
+
+testRank2' :: String
+testRank2' = testRank2 (\_ -> "rank2")
+
+-- whether `BaseNoVta` or `BaseVta`
+-- have visible type application type variable
+-- for `a` or not`, a super class still works
+class BaseNoVta a where
+  baseNoVta :: a -> String
+
+class BaseNoVta a <= Super1 @a where
+  super1 :: a -> a -> String
+
+class BaseVta @a where
+  baseVta :: a -> String
+
+class BaseVta a <= Super2 @a where
+  super2 :: a -> a -> String
+
+instance BaseNoVta String where
+  baseNoVta x = x
+
+instance Super1 String where
+  super1 = (<>)
+
+instance BaseVta String where
+  baseVta x = x
+
+instance Super2 String where
+  super2 = (<>)
+
+testClassRelationship :: String
+testClassRelationship = super1 "foo" "bar" <> super2 "foo" "bar"
+
 main = log "Done"

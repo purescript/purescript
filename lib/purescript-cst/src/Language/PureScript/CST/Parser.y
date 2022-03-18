@@ -292,14 +292,6 @@ type1 :: { Type () }
   : type2 { $1 }
   | forall many(typeVarBinding) '.' type1 { TypeForall () $1 $2 $3 $4 }
 
-typeWithVta :: { Type () }
-  : type1WithVta %shift { $1 }
-  | type1WithVta '::' type { TypeKinded () $1 $2 $3 }
-
-type1WithVta :: { Type () }
-  : type2 { $1 }
-  | forall many(typeVarBindingWithVta) '.' type1 { TypeForall () $1 $2 $3 $4 }
-
 type2 :: { Type () }
   : type3 %shift { $1 }
   | type3 '->' type1 { TypeArr () $1 $2 $3 }
@@ -356,13 +348,13 @@ rowLabel :: { Labeled Label (Type ()) }
 
 typeVarBinding :: { TypeVarBinding () }
   : ident { TypeVarName Nothing $1 }
-  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded Nothing (Wrapped $1 (Labeled $2 $3 $4) $5)) }
-
-typeVarBindingWithVta :: { TypeVarBinding () }
-  : ident { TypeVarName Nothing $1 }
   | '@' ident { TypeVarName (Just $1) $2 }
   | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded Nothing (Wrapped $1 (Labeled $2 $3 $4) $5)) }
   | '(' '@' ident '::' type ')' {% checkNoWildcards $5 *> pure (TypeVarKinded (Just $2) (Wrapped $1 (Labeled $3 $4 $5) $6)) }
+
+typeVarBindingPlain :: { TypeVarBinding () }
+  : ident { TypeVarName Nothing $1 }
+  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded Nothing (Wrapped $1 (Labeled $2 $3 $4) $5)) }
 
 forall :: { SourceToken }
   : 'forall' { $1 }
@@ -374,7 +366,7 @@ exprWhere :: { Where () }
 
 expr :: { Expr () }
   : expr1 %shift { $1 }
-  | expr1 '::' typeWithVta { ExprTyped () $1 $2 $3 }
+  | expr1 '::' type { ExprTyped () $1 $2 $3 }
 
 expr1 :: { Expr () }
   : expr2 %shift { $1 }
@@ -682,7 +674,7 @@ decl :: { Declaration () }
   | 'type' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled (getProperName $2) $3 $4)) }
   | 'derive' instHead { DeclDerive () $1 Nothing $2 }
   | 'derive' 'newtype' instHead { DeclDerive () $1 (Just $2) $3 }
-  | ident '::' typeWithVta { DeclSignature () (Labeled $1 $2 $3) }
+  | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
   | ident manyOrEmpty(binderAtom) guardedDecl { DeclValue () (ValueBindingFields $1 $2 $3) }
   | fixity { DeclFixity () $1 }
   | 'foreign' 'import' ident '::' type {% when (isConstrained $5) (addFailure ([$1, $2, nameTok $3, $4] <> toList (flattenType $5)) ErrConstraintInForeignImportSyntax) *> pure (DeclForeign () $1 $2 (ForeignValue (Labeled $3 $4 $5))) }
@@ -690,10 +682,10 @@ decl :: { Declaration () }
   | 'type' 'role' properName many(role) { DeclRole () $1 $2 (getProperName $3) $4 }
 
 dataHead :: { DataHead () }
-  : 'data' properName manyOrEmpty(typeVarBindingWithVta) { DataHead $1 (getProperName $2) $3 }
+  : 'data' properName manyOrEmpty(typeVarBinding) { DataHead $1 (getProperName $2) $3 }
 
 typeHead :: { DataHead () }
-  : 'type' properName manyOrEmpty(typeVarBinding) { DataHead $1 (getProperName $2) $3 }
+  : 'type' properName manyOrEmpty(typeVarBindingPlain) { DataHead $1 (getProperName $2) $3 }
 
 newtypeHead :: { DataHead () }
   : 'newtype' properName manyOrEmpty(typeVarBinding) { DataHead $1 (getProperName $2) $3 }
@@ -730,7 +722,7 @@ classSuper :: { (OneOrDelimited (Constraint ()), SourceToken) }
   : constraints '<=' {%^ revert $ pure ($1, $2) }
 
 classNameAndFundeps :: { (Name (N.ProperName 'N.ClassName), [TypeVarBinding ()], Maybe (SourceToken, Separated ClassFundep)) }
-  : properName manyOrEmpty(typeVarBindingWithVta) fundeps {%^ revert $ pure (getProperName $1, $2, $3) }
+  : properName manyOrEmpty(typeVarBinding) fundeps {%^ revert $ pure (getProperName $1, $2, $3) }
 
 fundeps :: { Maybe (SourceToken, Separated ClassFundep) }
   : {- empty -} { Nothing }
@@ -741,7 +733,7 @@ fundep :: { ClassFundep }
   | many(ident) '->' many(ident) { FundepDetermines $1 $2 $3 }
 
 classMember :: { Labeled (Name Ident) (Type ()) }
-  : ident '::' typeWithVta {% checkNoWildcards $3 *> pure (Labeled $1 $2 $3) }
+  : ident '::' type {% checkNoWildcards $3 *> pure (Labeled $1 $2 $3) }
 
 instHead :: { InstanceHead () }
   : 'instance' constraints '=>' qualProperName manyOrEmpty(typeAtom)

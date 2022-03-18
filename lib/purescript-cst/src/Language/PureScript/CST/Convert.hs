@@ -450,12 +450,6 @@ convertDeclaration fileName decl = case decl of
             [] -> []
             (st', ctor) : tl' -> ctrs st' ctor tl'
           )
-
-      findVtv = \case
-        TypeVarKinded (Just _) _ -> T.IsVtaTypeVar
-        TypeVarName (Just _) _ -> T.IsVtaTypeVar
-        _ -> T.NotVtaTypeVar
-
     pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (findVtv <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
@@ -464,7 +458,7 @@ convertDeclaration fileName decl = case decl of
       (convertType fileName bd)
   DeclNewtype _ (DataHead _ a vars) st x ys -> do
     let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(head ctrFields, convertType fileName ys)]]
-    pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) [] ctrs
+    pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) (findVtv <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
       goTyVar (TypeVarKinded v (Wrapped _ (Labeled a _ _) _)) = (nameValue a, fromMaybe T.NotVtaTypeVar (v $> T.IsVtaTypeVar))
@@ -614,6 +608,11 @@ convertDeclaration fileName decl = case decl of
     binding@(InstanceBindingName _ fields) -> do
       let ann' = uncurry (sourceAnnCommented fileName) $ instanceBindingRange binding
       convertValueBindingFields fileName ann' fields
+
+  findVtv = \case
+    TypeVarKinded (Just _) _ -> T.IsVtaTypeVar
+    TypeVarName (Just _) _ -> T.IsVtaTypeVar
+    _ -> T.NotVtaTypeVar
 
 convertSignature :: String -> Labeled (Name Ident) (Type a) -> AST.Declaration
 convertSignature fileName (Labeled a _ b) = do
