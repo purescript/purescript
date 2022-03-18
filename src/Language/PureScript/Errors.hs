@@ -1353,12 +1353,29 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
 
     renderSimpleErrorMessage (CannotApplyExpressionOfTypeOnType tabs targ) =
-      paras
+      paras $
         [ "An expression of type:"
         , markCodeBox $ indent $ prettyType tabs
         , "cannot be applied to the type:"
         , markCodeBox $ indent $ prettyType targ
-        ]
+        ] <> comments
+      where
+      comments =
+        case tabs of
+          ForAll a i k t s _
+            | not $ hasVta tabs
+            , isMonoType t ->
+                [ "Try adding a visible type abstraction:"
+                , markCodeBox $ indent $ prettyType (ForAll a i k t s IsVtaTypeVar)
+                ]
+          _ -> [ "as it has no visible type abstraction."
+               ]
+
+      hasVta (ForAll _ _ _ t _ NotVtaTypeVar) = hasVta t
+      hasVta (ForAll _ _ _ _ _ IsVtaTypeVar) = True
+      hasVta (ParensInType _ t) = hasVta t
+      hasVta (KindedType _ t _) = hasVta t
+      hasVta _ = False
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =

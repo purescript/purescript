@@ -10,6 +10,7 @@ at tests/purs/failing/VisibleTypeApplications1.purs:7:8 - 7:15 (line 7, column 8
   [33m     [0m
   [33m  Int[0m
   [33m     [0m
+  as it has no visible type abstraction.
 
 while inferring the type of [33mId[0m
 in value declaration [33mfail[0m
