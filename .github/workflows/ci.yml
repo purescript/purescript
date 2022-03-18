@@ -52,7 +52,6 @@ jobs:
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
-          # If upgrading Stack, also upgrade it in the lint job below
           stack-version: "${{ env.STACK_VERSION }}"
           stack-no-global: true
 
