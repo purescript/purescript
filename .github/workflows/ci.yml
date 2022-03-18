@@ -32,6 +32,14 @@ jobs:
     container: "${{ matrix.image }}"
 
     steps:
+      - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
+        # if the Git version is less than 2.18.
+        name: "(Linux only) Install a newer version of Git"
+        if: "${{ runner.os == 'Linux' }}"
+        run: |
+          . /etc/os-release
+          echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
+          apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
 
       - uses: "actions/setup-node@v1"
@@ -48,12 +56,10 @@ jobs:
           stack-version: "${{ env.STACK_VERSION }}"
           stack-no-global: true
 
-      - name: "(Linux only) Check Stack version and ensure a (dummy) accessible local repository"
+      - name: "(Linux only) Check Stack version"
         if: "${{ runner.os == 'Linux' }}"
         run: |
           [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
-          echo 'allow-different-user: true' >>/root/.stack/config.yaml
-          git -C .. init
 
       - uses: "actions/cache@v2"
         with:
@@ -120,12 +126,14 @@ jobs:
     container: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
 
     steps:
-      - uses: "actions/checkout@v2"
-
-      - name: "Ensure a (dummy) accessible local repository"
+      - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
+        # if the Git version is less than 2.18.
+        name: "Install a newer version of Git"
         run: |
-          echo 'allow-different-user: true' >>/root/.stack/config.yaml
-          git -C .. init
+          . /etc/os-release
+          echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
+          apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
+      - uses: "actions/checkout@v2"
 
       - uses: "actions/cache@v2"
         with:
