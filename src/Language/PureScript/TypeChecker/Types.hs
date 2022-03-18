@@ -330,7 +330,9 @@ instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- | Attempt to uncons a type variable binding from a type.
-unconsVtaTypeVar :: SourceType -> Maybe ((Text, SourceType), SourceType)
+unconsVtaTypeVar
+  :: SourceType
+  -> Maybe ((SourceAnn, Text, Maybe SourceType, Maybe SkolemScope, VtaTypeVar), SourceType)
 unconsVtaTypeVar = go Nothing []
   where
   go y n (ForAll a i k t s v) =
@@ -338,10 +340,7 @@ unconsVtaTypeVar = go Nothing []
       (Nothing, IsVtaTypeVar) -> go (Just (a, i, k, s, v)) n t
       _ -> go y ((a, i, k, s, v) : n) t
   go y n t = do
-    typeVar <- getTypeVar <$> y
-    pure (typeVar, foldl' mkForAll' t n)
-
-  getTypeVar (_, i, k, _, _) = (i, fromMaybe (internalError "unelaborated forall") k)
+    (, foldl' mkForAll' t n) <$> y
 
   mkForAll' t (a, i, k, s, v) = ForAll a i k t s v
 
@@ -467,6 +466,14 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy
   tv <- if checkType then withScopedTypeVars moduleName args (check val ty') else return (TypedValue' False val ty)
   return $ TypedValue' True (tvToExpr tv) ty'
+infer' (VisibleTypeApp val typeArg@(TypeWildcard _ _)) = do
+  TypedValue' _ val' valTy <- infer' val
+  (val'', valTy') <- instantiatePolyTypeWithUnknowns val' valTy
+  case unconsVtaTypeVar valTy' of
+    Just ((a, i, k, s, _), t) ->
+      pure $ TypedValue' True val'' $ ForAll a i k t s NotVtaTypeVar
+    Nothing ->
+      throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy typeArg
 infer' (VisibleTypeApp val typeArg) = do
   TypedValue' _ val' valTy <- infer' val
   -- We instantiate early such that polykinded type variables:
@@ -481,10 +488,10 @@ infer' (VisibleTypeApp val typeArg) = do
   (val'', valTy') <- instantiatePolyTypeWithUnknowns val' valTy
   -- `kindOf` here eliminates ParensInType in typeArg
   (typeArg', _) <- kindOf typeArg
-  typeArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards' False $ typeArg'
+  typeArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ typeArg'
   case unconsVtaTypeVar valTy' of
-    Just ((typeVar, typeVarKind), tyAbsBody) -> do
-      typeVarUnk <- freshTypeWithKind typeVarKind
+    Just ((_, typeVar, mTypeVarUnk, _, _), tyAbsBody) -> do
+      typeVarUnk <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mTypeVarUnk
       unifyTypes typeArg'' typeVarUnk
       pure $ TypedValue' True val'' (replaceTypeVars typeVar typeVarUnk tyAbsBody)
     _ ->

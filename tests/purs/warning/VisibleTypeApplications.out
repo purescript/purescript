@@ -1,0 +1,34 @@
+Warning 1 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/VisibleTypeApplications.purs:27:1 - 27:37 (line 27, column 1 - line 27, column 37)
+
+    No type declaration was provided for the top-level declaration of [33mtestFooGeneralize[0m.
+    It is good practice to provide type declarations as a form of documentation.
+    The inferred type of [33mtestFooGeneralize[0m was:
+    [33m                                                    [0m
+    [33m  forall t64. MultiKind t64 => t64 Int Int -> String[0m
+    [33m                                                    [0m
+
+  in value declaration [33mtestFooGeneralize[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
+  or to contribute content related to this warning.
+
+Warning 2 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/VisibleTypeApplications.purs:10:1 - 10:18 (line 10, column 1 - line 10, column 18)
+
+    No type declaration was provided for the top-level declaration of [33mconst'[0m.
+    It is good practice to provide type declarations as a form of documentation.
+    The inferred type of [33mconst'[0m was:
+    [33m                          [0m
+    [33m  forall a @b. a -> b -> a[0m
+    [33m                          [0m
+
+  in value declaration [33mconst'[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
+  or to contribute content related to this warning.
+
