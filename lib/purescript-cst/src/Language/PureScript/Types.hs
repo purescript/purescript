@@ -43,6 +43,18 @@ instance NFData SkolemScope
 instance Serialise SkolemScope
 
 -- |
+-- Describes how a TypeWildcard should be presented to the user during
+-- type checking: holes (?foo) are always emitted as errors, whereas unnamed
+-- wildcards (_) default to warnings, but are ignored entirely if they are
+-- contained by a binding with a complete (wildcard-free) type signature.
+--
+data WildcardData = HoleWildcard Text | UnnamedWildcard | IgnoredWildcard
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData WildcardData
+instance Serialise WildcardData
+
+-- |
 -- The type of types
 --
 data Type a
@@ -55,7 +67,7 @@ data Type a
   -- | A type-level natural
   | TypeLevelInt a Integer
   -- | A type wildcard, as would appear in a partial type synonym
-  | TypeWildcard a (Maybe Text)
+  | TypeWildcard a WildcardData
   -- | A type constructor
   | TypeConstructor a (Qualified (ProperName 'TypeName))
   -- | A type operator. This will be desugared into a type constructor during the
@@ -104,7 +116,7 @@ srcTypeLevelInt :: Integer -> SourceType
 srcTypeLevelInt = TypeLevelInt NullSourceAnn
 
 srcTypeWildcard :: SourceType
-srcTypeWildcard = TypeWildcard NullSourceAnn Nothing
+srcTypeWildcard = TypeWildcard NullSourceAnn UnnamedWildcard
 
 srcTypeConstructor :: Qualified (ProperName 'TypeName) -> SourceType
 srcTypeConstructor = TypeConstructor NullSourceAnn
@@ -266,6 +278,12 @@ typeToJSON annToJSON ty =
       , "annotation" .= annToJSON ann
       ]
 
+instance A.ToJSON WildcardData where
+  toJSON = \case
+    HoleWildcard name -> A.String name
+    UnnamedWildcard -> A.Null
+    IgnoredWildcard -> A.object [ "ignored" .= True ]
+
 instance A.ToJSON a => A.ToJSON (Type a) where
   toJSON = typeToJSON A.toJSON
 
@@ -306,7 +324,7 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
     "TypeLevelInt" ->
       TypeLevelInt a <$> contents
     "TypeWildcard" -> do
-      b <- contents <|> pure Nothing
+      b <- contents <|> pure UnnamedWildcard
       pure $ TypeWildcard a b
     "TypeConstructor" ->
       TypeConstructor a <$> contents
@@ -386,6 +404,13 @@ instance {-# OVERLAPPING #-} A.FromJSON a => A.FromJSON (Constraint a) where
 
 instance A.FromJSON ConstraintData where
   parseJSON = constraintDataFromJSON
+
+instance A.FromJSON WildcardData where
+  parseJSON = \case
+    A.String name -> pure $ HoleWildcard name
+    A.Object _ -> pure IgnoredWildcard
+    A.Null -> pure UnnamedWildcard
+    _ -> fail "Unrecognized WildcardData"
 
 data RowListItem a = RowListItem
   { rowListAnn :: a

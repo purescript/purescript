@@ -8,6 +8,7 @@ import Prelude.Compat
 import Control.Monad
 
 import Data.Foldable (fold)
+import Data.Functor.Identity (runIdentity)
 import Data.List (mapAccumL)
 import Data.Maybe (mapMaybe)
 import qualified Data.List.NonEmpty as NEL
@@ -414,6 +415,25 @@ everythingWithContextOnValues s0 r0 (<>.) f g h i j = (f'' s0, g'' s0, h'' s0, i
   k' :: s -> Guard -> r
   k' s (ConditionGuard e) = g'' s e
   k' s (PatternGuard b e) = h'' s b <>. g'' s e
+
+everywhereWithContextOnValues
+  :: forall s
+   . s
+  -> (s -> Declaration       -> (s, Declaration))
+  -> (s -> Expr              -> (s, Expr))
+  -> (s -> Binder            -> (s, Binder))
+  -> (s -> CaseAlternative   -> (s, CaseAlternative))
+  -> (s -> DoNotationElement -> (s, DoNotationElement))
+  -> ( Declaration       -> Declaration
+     , Expr              -> Expr
+     , Binder            -> Binder
+     , CaseAlternative   -> CaseAlternative
+     , DoNotationElement -> DoNotationElement
+     )
+everywhereWithContextOnValues s f g h i j = (runIdentity . f', runIdentity . g', runIdentity . h', runIdentity . i', runIdentity . j')
+  where
+  (f', g', h', i', j') = everywhereWithContextOnValuesM s (wrap f) (wrap g) (wrap h) (wrap i) (wrap j)
+  wrap = ((pure .) .)
 
 everywhereWithContextOnValuesM
   :: forall m s

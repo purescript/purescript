@@ -1931,9 +1931,6 @@ withoutPosition (ErrorMessage hints se) = ErrorMessage (filter go hints) se
 positionedError :: SourceSpan -> ErrorMessageHint
 positionedError = PositionedError . pure
 
-filterErrors :: (ErrorMessage -> Bool) -> MultipleErrors -> MultipleErrors
-filterErrors f = MultipleErrors . filter f . runMultipleErrors
-
 -- | Runs a computation listening for warnings and then escalating any warnings
 -- that match the predicate to error status.
 escalateWarningWhen
