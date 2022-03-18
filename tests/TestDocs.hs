@@ -26,7 +26,7 @@ import TestPscPublish (preparePackage)
 import Test.Hspec
 
 spec :: Spec
-spec = beforeAll (handleDocPrepFailure <$> preparePackage "tests/purs/docs" "resolutions.json") $
+spec = beforeAll (handleDocPrepFailure <$> preparePackage "tests/purs/docs" "purs.json" "resolutions.json") $
   context "Language.PureScript.Docs" $ do
     context "Doc generation tests:" $
       mkSpec testCases displayAssertion $ \a pkg mdl ->

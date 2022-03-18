@@ -5,7 +5,7 @@ at tests/purs/failing/Generalization2.purs:6:1 - 7:45 (line 6, column 1 - line 7
   Unable to generalize the type of the recursive function [33mtest[0m.
   The inferred type of [33mtest[0m was:
   [33m                                            [0m
-  [33m  forall t7. Semigroup t7 => Int -> t7 -> t7[0m
+  [33m  forall a7. Semigroup a7 => Int -> a7 -> a7[0m
   [33m                                            [0m
   Try adding a type signature.
 

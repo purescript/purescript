@@ -14,6 +14,7 @@ everythingOnTypes op k = goTy
     TypeWildcard _ _ -> k ty
     TypeHole _ _ -> k ty
     TypeString _ _ _ -> k ty
+    TypeInt _ _ _ _ -> k ty
     TypeRow _ (Wrapped _ row _) -> goRow ty row
     TypeRecord _ (Wrapped _ row _) -> goRow ty row
     TypeForall _ _ _ _ ty2 -> k ty `op` goTy ty2

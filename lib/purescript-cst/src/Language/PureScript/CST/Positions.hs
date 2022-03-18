@@ -134,7 +134,6 @@ exportRange = \case
     | otherwise -> nameRange a
   ExportTypeOp _ a b -> (a, nameTok b)
   ExportClass _ a b -> (a, nameTok b)
-  ExportKind _ a b -> (a, nameTok b)
   ExportModule _ a b -> (a, nameTok b)
 
 importDeclRange :: ImportDecl a -> TokenRange
@@ -152,7 +151,6 @@ importRange = \case
     | otherwise -> nameRange a
   ImportTypeOp _ a b -> (a, nameTok b)
   ImportClass _ a b -> (a, nameTok b)
-  ImportKind _ a b -> (a, nameTok b)
 
 dataMembersRange :: DataMembers a -> TokenRange
 dataMembersRange = \case
@@ -247,6 +245,7 @@ typeRange = \case
   TypeWildcard _ a -> (a, a)
   TypeHole _ a -> nameRange a
   TypeString _ a _ -> (a, a)
+  TypeInt _ a b _ -> (fromMaybe b a, b)
   TypeRow _ a -> wrappedRange a
   TypeRecord _ a -> wrappedRange a
   TypeForall _ a _ _ b -> (a, snd $ typeRange b)

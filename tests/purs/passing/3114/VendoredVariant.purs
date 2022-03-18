@@ -7,9 +7,9 @@ import Prim.Row as Row
 import Unsafe.Coerce (unsafeCoerce)
 import Partial.Unsafe (unsafeCrashWith)
 import Data.Symbol
+import Type.Proxy (Proxy(..))
 
-data FProxy (k :: Type -> Type) = FProxy
-data VariantF (f :: # Type) a
+data VariantF (f :: Row Type) a
 
 newtype VariantFRep f a = VariantFRep
   { type :: String
@@ -23,9 +23,9 @@ case_ r = unsafeCrashWith case unsafeCoerce r of
 
 on
   :: forall sym f a b r1 r2
-  . Row.Cons sym (FProxy f) r1 r2
+  . Row.Cons sym (Proxy f) r1 r2
   => IsSymbol sym
-  => SProxy sym
+  => Proxy sym
   -> (f a -> b)
   -> (VariantF r1 a -> b)
   -> VariantF r2 a

@@ -7,7 +7,7 @@ Warning 1 of 2:
     It is good practice to provide type declarations as a form of documentation.
     The inferred type of [33mtestFooGeneralize[0m was:
     [33m                                                    [0m
-    [33m  forall t64. MultiKind t64 => t64 Int Int -> String[0m
+    [33m  forall f64. MultiKind f64 => f64 Int Int -> String[0m
     [33m                                                    [0m
 
   in value declaration [33mtestFooGeneralize[0m

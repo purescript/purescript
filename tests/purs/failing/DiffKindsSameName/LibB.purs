@@ -1,6 +1,6 @@
 module DiffKindsSameName.LibB where
 
-foreign import kind DemoKind
+data DemoKind
 
 foreign import data DemoData :: DemoKind
 

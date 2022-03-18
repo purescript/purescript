@@ -1,5 +1,5 @@
 module Language.PureScript.Make.BuildPlan
-  ( BuildPlan(bpEnv)
+  ( BuildPlan(bpEnv, bpIndex)
   , BuildJobResult(..)
   , buildJobSuccess
   , construct
@@ -38,6 +38,7 @@ data BuildPlan = BuildPlan
   { bpPrebuilt :: M.Map ModuleName Prebuilt
   , bpBuildJobs :: M.Map ModuleName BuildJob
   , bpEnv :: C.MVar Env
+  , bpIndex :: C.MVar Int
   }
 
 data Prebuilt = Prebuilt
@@ -140,8 +141,9 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
   let toBeRebuilt = filter (not . flip M.member prebuilt) sortedModuleNames
   buildJobs <- foldM makeBuildJob M.empty toBeRebuilt
   env <- C.newMVar primEnv
+  idx <- C.newMVar 1
   pure
-    ( BuildPlan prebuilt buildJobs env
+    ( BuildPlan prebuilt buildJobs env idx
     , let
         update = flip $ \s ->
           M.alter (const (statusNewCacheInfo s)) (statusModuleName s)

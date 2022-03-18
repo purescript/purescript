@@ -58,6 +58,7 @@ desugarTypeClasses externs = flip evalStateT initialState . desugarModule
       , M.mapKeys (qualify C.PrimRow) primRowClasses
       , M.mapKeys (qualify C.PrimRowList) primRowListClasses
       , M.mapKeys (qualify C.PrimSymbol) primSymbolClasses
+      , M.mapKeys (qualify C.PrimInt) primIntClasses
       , M.mapKeys (qualify C.PrimTypeError) primTypeErrorClasses
       , M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
       ]

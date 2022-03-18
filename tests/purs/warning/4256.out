@@ -1,0 +1,34 @@
+Warning 1 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/4256.purs:16:1 - 16:58 (line 16, column 1 - line 16, column 58)
+
+    No type declaration was provided for the top-level declaration of [33mbaz[0m.
+    It is good practice to provide type declarations as a form of documentation.
+    The inferred type of [33mbaz[0m was:
+    [33m                                                         [0m
+    [33m  forall c14 d15 b25 d27. d27 -> c14 -> b25 -> d15 -> d27[0m
+    [33m                                                         [0m
+
+  in value declaration [33mbaz[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
+  or to contribute content related to this warning.
+
+Warning 2 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/4256.purs:8:1 - 8:37 (line 8, column 1 - line 8, column 37)
+
+    No type declaration was provided for the top-level declaration of [33maddNumberSuffix'[0m.
+    It is good practice to provide type declarations as a form of documentation.
+    The inferred type of [33maddNumberSuffix'[0m was:
+    [33m                                              [0m
+    [33m  forall b34 c35 d36. b34 -> c35 -> d36 -> Int[0m
+    [33m                                              [0m
+
+  in value declaration [33maddNumberSuffix'[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
+  or to contribute content related to this warning.
+

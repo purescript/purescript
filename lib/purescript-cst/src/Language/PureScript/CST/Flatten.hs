@@ -238,7 +238,6 @@ flattenExport = \case
   ExportType _ n dms -> flattenName n <> foldMap flattenDataMembers dms
   ExportTypeOp _ t n -> pure t <> flattenName n
   ExportClass _ t n -> pure t <> flattenName n
-  ExportKind _ t n -> pure t <> flattenName n
   ExportModule _ t n -> pure t <> flattenName n
 
 flattenDataMembers :: DataMembers a -> DList SourceToken
@@ -261,7 +260,6 @@ flattenImport = \case
   ImportType _ n dms -> flattenName n <> foldMap flattenDataMembers dms
   ImportTypeOp _ t n -> pure t <> flattenName n
   ImportClass _ t n -> pure t <> flattenName n
-  ImportKind _ t n -> pure t <> flattenName n
 
 flattenWrapped :: (a -> DList SourceToken) -> Wrapped a -> DList SourceToken
 flattenWrapped k (Wrapped a b c) = pure a <> k b <> pure c
@@ -285,6 +283,7 @@ flattenType = \case
   TypeWildcard _ a -> pure a
   TypeHole _ a -> pure $ nameTok a
   TypeString _ a _ -> pure a
+  TypeInt _ a b _ -> maybe mempty pure a <> pure b
   TypeRow _ a -> flattenWrapped flattenRow a
   TypeRecord _ a -> flattenWrapped flattenRow a
   TypeForall _ a b c d -> pure a <> foldMap flattenTypeVarBinding b <> pure c <> flattenType d

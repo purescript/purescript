@@ -123,6 +123,8 @@ convertType fileName = go
       T.TypeWildcard (sourceName fileName a) . Just . getIdent $ nameValue a
     TypeString _ a b ->
       T.TypeLevelString (sourceAnnCommented fileName a a) b
+    TypeInt _ _ a b ->
+      T.TypeLevelInt (sourceAnnCommented fileName a a) b
     TypeRow _ (Wrapped _ row b) ->
       goRow row b
     TypeRecord _ (Wrapped a row b) -> do
@@ -582,6 +584,7 @@ convertDeclaration fileName decl = case decl of
         TypeConstructor _ qn -> N.runProperName $ qualName qn
         TypeOpName _ qn -> N.runOpName $ qualName qn
         TypeString _ _ ps -> prettyPrintStringJS ps
+        TypeInt _ _ _ nt -> Text.pack $ show nt
 
         -- Typed holes are disallowed in instance heads
         TypeHole{} -> ""
@@ -661,8 +664,6 @@ convertImport fileName imp = case imp of
     AST.TypeOpRef ann $ nameValue a
   ImportClass _ _ a ->
     AST.TypeClassRef ann $ nameValue a
-  ImportKind _ _ a ->
-    AST.TypeRef ann (nameValue a) (Just [])
   where
   ann = sourceSpan fileName . toSourceRange $ importRange imp
 
@@ -685,8 +686,6 @@ convertExport fileName export = case export of
     AST.TypeOpRef ann $ nameValue a
   ExportClass _ _ a ->
     AST.TypeClassRef ann $ nameValue a
-  ExportKind _ _ a ->
-    AST.TypeRef ann (nameValue a) Nothing
   ExportModule _ _ a ->
     AST.ModuleRef ann (nameValue a)
   where
