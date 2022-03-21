@@ -11,7 +11,7 @@ import Data.List (elemIndices, intersperse)
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
+import Language.PureScript.AST (SourcePos(..), SourceSpan(..), nullSourceSpan)
 import Language.PureScript.CST.Lexer (isUnquotedKey)
 
 import Text.PrettyPrint.Boxes hiding ((<>))
@@ -74,7 +74,7 @@ instance Emit StrPos where
   -- |
   -- Add a new mapping entry for given source position with initially zero generated position
   --
-  addMapping SourceSpan { spanName = file, spanStart = startPos } = StrPos (zeroPos, mempty, [mapping])
+  addMapping ss@SourceSpan { spanName = file, spanStart = startPos } = StrPos (zeroPos, mempty, [mapping | ss /= nullSourceSpan])
     where
       mapping = SMap (T.pack file) startPos zeroPos
       zeroPos = SourcePos 0 0

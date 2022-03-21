@@ -121,9 +121,9 @@ literals = mkPattern' match'
     , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
-  match (Comment PureAnnotation js) = mconcat <$> sequence 
+  match (Comment PureAnnotation js) = mconcat <$> sequence
     [ return $ emit "/* #__PURE__ */ "
-    , prettyPrintJS' js 
+    , prettyPrintJS' js
     ]
   match _ = mzero
 
@@ -156,8 +156,8 @@ comment (BlockComment com) = fmap mconcat $ sequence $
         Nothing -> ""
 
 prettyImport :: (Emit gen) => Import -> StateT PrinterState Maybe gen
-prettyImport (Import ident from) =
-  return . emit $
+prettyImport (Import ss ident from) =
+  return . (addMapping' ss <>) . emit $
     "import * as " <> ident <> " from " <> prettyPrintStringJS from <> ";"
 
 prettyExport :: (Emit gen) => Export -> StateT PrinterState Maybe gen

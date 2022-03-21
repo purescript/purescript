@@ -386,6 +386,7 @@ test-suite tests
     PscIdeSpec
     TestCompiler
     TestCoreFn
+    TestSourceMaps
     TestCst
     TestDocs
     TestGraph

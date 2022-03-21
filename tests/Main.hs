@@ -9,6 +9,7 @@ import Test.Hspec
 
 import qualified TestCompiler
 import qualified TestCoreFn
+import qualified TestSourceMaps
 import qualified TestCst
 import qualified TestDocs
 import qualified TestHierarchy
@@ -35,6 +36,7 @@ main = do
     describe "ide" TestIde.spec
     beforeAll TestUtils.setupSupportModules $ do
       describe "compiler" TestCompiler.spec
+      describe "sourcemaps" TestSourceMaps.spec
     describe "make" TestMake.spec
     describe "psci" TestPsci.spec
     describe "corefn" TestCoreFn.spec

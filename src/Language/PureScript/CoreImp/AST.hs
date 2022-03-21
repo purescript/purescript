@@ -131,6 +131,10 @@ withSourceSpan withSpan = go where
   go (InstanceOf _ j1 j2) = InstanceOf ss j1 j2
   go c@Comment{} = c
 
+withVarSourceSpan :: Maybe SourceSpan -> AST -> AST
+withVarSourceSpan ss (Var _ v) = Var ss v
+withVarSourceSpan _ v = v 
+
 getSourceSpan :: AST -> Maybe SourceSpan
 getSourceSpan = go where
   go :: AST -> Maybe SourceSpan

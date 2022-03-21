@@ -17,13 +17,13 @@ applyAll = foldl' (.) id
 replaceIdent :: Text -> AST -> AST -> AST
 replaceIdent var1 js = everywhere replace
   where
-  replace (Var _ var2) | var1 == var2 = js
+  replace (Var ss var2) | var1 == var2 = withVarSourceSpan ss js
   replace other = other
 
 replaceIdents :: [(Text, AST)] -> AST -> AST
 replaceIdents vars = everywhere replace
   where
-  replace v@(Var _ var) = fromMaybe v $ lookup var vars
+  replace v@(Var ss var) = withVarSourceSpan ss . fromMaybe v $ lookup var vars
   replace other = other
 
 isReassigned :: Text -> AST -> Bool

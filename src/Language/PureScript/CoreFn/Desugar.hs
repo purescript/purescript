@@ -32,7 +32,7 @@ moduleToCoreFn :: Environment -> A.Module -> Module Ann
 moduleToCoreFn _ (A.Module _ _ _ _ Nothing) =
   internalError "Module exports were not elaborated before moduleToCoreFn"
 moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
-  let imports = mapMaybe importToCoreFn decls ++ fmap (ssAnn modSS,) (findQualModules decls)
+  let imports = fmap (ssAnn modSS,) (findQualModules decls) ++ mapMaybe importToCoreFn decls
       imports' = dedupeImports imports
       exps' = ordNub $ concatMap exportToCoreFn exps
       reExps = M.map ordNub $ M.unionsWith (++) (mapMaybe (fmap reExportsToCoreFn . toReExportRef) exps)
@@ -56,9 +56,6 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   dedupeImports :: [(Ann, ModuleName)] -> [(Ann, ModuleName)]
   dedupeImports = fmap swap . M.toList . M.fromListWith const . fmap swap
 
-  ssA :: SourceSpan -> Ann
-  ssA ss = (ss, [], Nothing, Nothing)
-
   -- | Desugars member declarations from AST to CoreFn representation.
   declToCoreFn :: A.Declaration -> [Bind Ann]
   declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [ctor]) =
@@ -73,13 +70,13 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       let
         ctor = A.dataCtorName ctorDecl
         (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
-      in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
+      in NonRec (ssAnn ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration ds) =
     concatMap declToCoreFn ds
   declToCoreFn (A.ValueDecl (ss, com) name _ _ [A.MkUnguarded e]) =
-    [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
+    [NonRec (ssAnn ss) name (exprToCoreFn ss com Nothing e)]
   declToCoreFn (A.BindingGroupDeclaration ds) =
-    [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]
+    [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssAnn ss, name), exprToCoreFn ss com Nothing e)) ds]
   declToCoreFn _ = []
 
   -- | Desugars expressions from AST to CoreFn representation.
