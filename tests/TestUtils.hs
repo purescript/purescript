@@ -186,7 +186,15 @@ compile
   -> SupportModules
   -> [FilePath]
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile checkForMainModule SupportModules{..} inputFiles = runTest $ do
+compile = compile' P.defaultOptions
+
+compile'
+  :: P.Options
+  -> Bool
+  -> SupportModules
+  -> [FilePath]
+  -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
+compile' options checkForMainModule SupportModules{..} inputFiles = P.runMake options $ do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
   fs <- liftIO $ readInput (sort inputFiles)
   msWithWarnings <- CST.parseFromFiles id fs
