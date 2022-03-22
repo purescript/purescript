@@ -32,11 +32,3 @@ data Binder a
   -- A binder which binds its input to an identifier
   --
   | NamedBinder a Ident (Binder a) deriving (Eq, Show, Functor)
-
-
-extractBinderAnn :: Binder a -> a
-extractBinderAnn (NullBinder a) = a
-extractBinderAnn (LiteralBinder a _) = a
-extractBinderAnn (VarBinder a _) = a
-extractBinderAnn (ConstructorBinder a _ _ _) = a
-extractBinderAnn (NamedBinder a _ _) = a
