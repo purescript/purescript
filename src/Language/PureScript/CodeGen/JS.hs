@@ -360,7 +360,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable that may have a qualified name.
   qualifiedToJS :: SourceSpan -> (a -> Ident) -> Qualified a -> AST
-  qualifiedToJS ss f (Qualified (Just C.Prim) a) = AST.Var (Just ss) . runIdent $ f a
+  qualifiedToJS _ f (Qualified (Just C.Prim) a) = AST.Var Nothing . runIdent $ f a
   qualifiedToJS ss f (Qualified (Just mn') a) | mn /= mn' = moduleAccessor (f a) (AST.Var (Just ss) (moduleNameToJs mn'))
   qualifiedToJS ss f (Qualified _ a) = AST.Var (Just ss) $ identToJs (f a)
 
