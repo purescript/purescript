@@ -1,4 +1,4 @@
-module Main where
+module SourceMaps.Bug3581 where
 
 import Prelude
 

@@ -35,7 +35,14 @@ assertCompilesToExpectedOutput support inputFiles = do
   (result, _) <- compile' compilationOptions False support inputFiles
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
-    Right _ ->
+    Right _ -> do
+      let
+        modulePath = getTestMain inputFiles
+        strLength = length :: String -> Int
+        dirPrefix = strLength "tests/purs/sourcemaps/"
+        moduleSuffix = do
+          let modulePlusExt = drop dirPrefix modulePath
+          take (strLength modulePlusExt - strLength ".purs") modulePlusExt
       goldenVsString
-        (replaceExtension (getTestMain inputFiles) ".out.js.map")
-        (BS.readFile $ modulesDir </> "Main/index.js.map")
+        (replaceExtension modulePath ".out.js.map")
+        (BS.readFile $ modulesDir </> "SourceMaps." <> moduleSuffix <> "/index.js.map")

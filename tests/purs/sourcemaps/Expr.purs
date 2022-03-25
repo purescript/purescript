@@ -1,4 +1,4 @@
-module Main where
+module SourceMaps.Expr where
 
 import Prelude
 import Effect (Effect)

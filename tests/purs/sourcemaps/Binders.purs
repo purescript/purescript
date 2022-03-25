@@ -1,4 +1,4 @@
-module Main where
+module SourceMaps.Binders where
 
 import Prelude
 import Effect (Effect)
