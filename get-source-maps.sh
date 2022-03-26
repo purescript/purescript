@@ -4,7 +4,7 @@ TEST_MODULES_DIR=.test_modules
 OUTPUT_DIR=.source-maps
 
 if [ ! -d "$TEST_MODULES_DIR" ]; then
-  echo "'$TEST_MODULES_DIR' dir does not exist. You need to run 'stack test --fast --ta \"match sourcemaps\"' first"
+  echo "'$TEST_MODULES_DIR' dir does not exist. You need to run 'stack test --fast --ta \"--match sourcemaps\"' first"
   exit 1
 fi
 
