@@ -4,13 +4,12 @@ import Prelude
 
 import Control.Monad (forM_)
 import Test.Hspec
-import System.FilePath (replaceExtension, (</>), takeFileName, dropExtensions)
+import System.FilePath (replaceExtension, takeFileName)
 import qualified Language.PureScript as P
 import qualified Data.ByteString as BS
-import TestUtils (goldenVsString, modulesDir, getTestFiles, SupportModules (..), compile')
+import TestUtils (goldenVsString, getTestFiles, SupportModules (..), compile', ExpectedModuleName (IsSourceMap))
 import qualified Data.Set as Set
 import TestCompiler (getTestMain)
-import System.Directory (doesFileExist)
 
 spec :: SpecWith SupportModules
 spec =
@@ -40,14 +39,11 @@ assertCompilesToExpectedOutput support inputFiles = do
 
   let
     modulePath = getTestMain inputFiles
-    moduleName = "SourceMaps." <> (dropExtensions . takeFileName $ modulePath)
-    compiledModulePath = modulesDir </> moduleName </> "index.js.map"
 
-  (result, _) <- compile' compilationOptions False support inputFiles
+  (result, _) <- compile' compilationOptions (Just (IsSourceMap modulePath)) support inputFiles
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
-    Right _ -> do
-      assertFileNameIsModuleName moduleName compiledModulePath
+    Right compiledModulePath ->
       goldenVsString
         (replaceExtension modulePath ".out.js.map")
         (BS.readFile compiledModulePath)
@@ -55,14 +51,3 @@ assertCompilesToExpectedOutput support inputFiles = do
   where
     compilationOptions :: P.Options
     compilationOptions = P.defaultOptions { P.optionsCodegenTargets = Set.fromList [P.JS, P.JSSourceMap] }
-
-    assertFileNameIsModuleName
-      :: String
-      -> FilePath
-      -> Expectation
-    assertFileNameIsModuleName moduleName compiledModulePath =
-      doesFileExist compiledModulePath
-      >>= \case
-        True -> pure ()
-        False -> expectationFailure $
-          "Module '" ++ moduleName ++ "' does not exist at '" <> compiledModulePath <> "'."
