@@ -102,7 +102,7 @@ jobs:
           fi
 
       - name: "(Release only) Create bundle"
-        if: "${{ env.CI_RELEASE == 'true' }}"
+        # if: "${{ env.CI_RELEASE == 'true' }}"
         run: |
           os_name="${{ runner.os }}"
           case "$os_name" in
