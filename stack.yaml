@@ -1,3 +1,5 @@
+# Please update Haskell image versions under .github/workflows/ci.yml together to use the same GHC version
+# (or the CI build will fail)
 resolver: lts-18.15
 pvp-bounds: both
 packages:

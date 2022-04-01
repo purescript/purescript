@@ -154,6 +154,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@thomashoneyman](https://github.com/thomashoneyman) | Thomas Honeyman | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sigma-andex](https://github.com/sigma-andex) | Jan Schulte | [MIT license](http://opensource.org/licenses/MIT) |
 | [@i-am-the-slime](https://github.com/i-am-the-slime) | Mark Eibes | [MIT license](http://opensource.org/licenses/MIT) |
+| [@sd-yip](https://github.com/sd-yip) | Nicholas Yip | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 
