@@ -55,10 +55,11 @@ jobs:
           stack-version: "${{ env.STACK_VERSION }}"
           stack-no-global: true
 
-      - name: "(Linux only) Check Stack version"
+      - name: "(Linux only) Check Stack version and fix working directory ownership"
         if: "${{ runner.os == 'Linux' }}"
         run: |
           [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
+          chown root:root .
 
       - uses: "actions/cache@v2"
         with:
@@ -133,6 +134,10 @@ jobs:
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
+
+      - name: "Fix working directory ownership"
+        run: |
+          chown root:root .
 
       - uses: "actions/cache@v2"
         with:
