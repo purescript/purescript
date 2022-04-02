@@ -117,7 +117,7 @@ jobs:
               exit 1;;
           esac
           cd sdist-test
-          ci/fix-home bundle/build.sh "$bundle_os"
+          ../ci/fix-home bundle/build.sh "$bundle_os"
 
       - name: "(Release only) Publish bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
