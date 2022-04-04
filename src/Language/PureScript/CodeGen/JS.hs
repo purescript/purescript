@@ -14,6 +14,7 @@ import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
+import Control.Monad.Writer (MonadWriter, runWriterT, writer)
 
 import Data.Bifunctor (first)
 import Data.List ((\\), intersect)
@@ -22,17 +23,19 @@ import qualified Data.Foldable as F
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
+import Data.Monoid (Any(..))
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.Common as Common
-import Language.PureScript.CoreImp.AST (AST, everywhereTopDownM, withSourceSpan)
+import Language.PureScript.CoreImp.AST (AST, everywhere, everywhereTopDownM, withSourceSpan)
 import qualified Language.PureScript.CoreImp.AST as AST
 import qualified Language.PureScript.CoreImp.Module as AST
 import Language.PureScript.CoreImp.Optimizer
 import Language.PureScript.CoreFn
+import Language.PureScript.CoreFn.Laziness (applyLazinessTransform)
 import Language.PureScript.Crash
 import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
                                    MultipleErrors(..), rethrow, errorMessage,
@@ -58,10 +61,10 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
     let decls' = renameModules mnLookup decls
-    jsDecls <- mapM bindToJs decls'
+    (jsDecls, Any needRuntimeLazy) <- runWriterT $ mapM (moduleBindToJs mn) decls'
     let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
     let moduleObjectNames = "$foreign" `S.insert` M.keysSet mnReverseLookup
-    optimized <- traverse (traverse (fmap (annotatePure moduleObjectNames) . optimize)) jsDecls
+    optimized <- traverse (traverse (fmap (annotatePure moduleObjectNames) . optimize)) (if needRuntimeLazy then [runtimeLazy] : jsDecls else jsDecls)
     let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
           `S.union` M.keysSet reExps
     let jsImports
@@ -206,6 +209,57 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     go (AST.Var _ name) = foldMap S.singleton $ M.lookup name mnReverseLookup
     go _ = mempty
 
+  -- Check that all integers fall within the valid int range for JavaScript.
+  checkIntegers :: AST -> m ()
+  checkIntegers = void . everywhereTopDownM go
+    where
+    go :: AST -> m AST
+    go (AST.Unary _ AST.Negate (AST.NumericLiteral ss (Left i))) =
+      -- Move the negation inside the literal; since this is a top-down
+      -- traversal doing this replacement will stop the next case from raising
+      -- the error when attempting to use -2147483648, as if left unrewritten
+      -- the value is `Unary Negate (NumericLiteral (Left 2147483648))`, and
+      -- 2147483648 is larger than the maximum allowed int.
+      return $ AST.NumericLiteral ss (Left (-i))
+    go js@(AST.NumericLiteral ss (Left i)) =
+      let minInt = -2147483648
+          maxInt = 2147483647
+      in if i < minInt || i > maxInt
+         then throwError . maybe errorMessage errorMessage' ss $ IntOutOfRange i "JavaScript" minInt maxInt
+         else return js
+    go other = return other
+
+  runtimeLazy :: AST
+  runtimeLazy =
+    AST.VariableIntroduction Nothing "$runtime_lazy" . Just . AST.Function Nothing Nothing ["name", "moduleName", "init"] . AST.Block Nothing $
+      [ AST.VariableIntroduction Nothing "state" . Just . AST.NumericLiteral Nothing $ Left 0
+      , AST.VariableIntroduction Nothing "val" Nothing
+      , AST.Return Nothing . AST.Function Nothing Nothing ["lineNumber"] . AST.Block Nothing $
+        [ AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing "state") (AST.NumericLiteral Nothing (Left 2))) (AST.Return Nothing $ AST.Var Nothing "val") Nothing
+        , AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing "state") (AST.NumericLiteral Nothing (Left 1))) (AST.Throw Nothing $ AST.Unary Nothing AST.New (AST.App Nothing (AST.Var Nothing "ReferenceError") [foldl1 (AST.Binary Nothing AST.Add)
+          [ AST.Var Nothing "name"
+          , AST.StringLiteral Nothing " was needed before it finished initializing (module "
+          , AST.Var Nothing "moduleName"
+          , AST.StringLiteral Nothing ", line "
+          , AST.Var Nothing "lineNumber"
+          , AST.StringLiteral Nothing ")"
+          ], AST.Var Nothing "moduleName", AST.Var Nothing "lineNumber"])) Nothing
+        , AST.Assignment Nothing (AST.Var Nothing "state") . AST.NumericLiteral Nothing $ Left 1
+        , AST.Assignment Nothing (AST.Var Nothing "val") $ AST.App Nothing (AST.Var Nothing "init") []
+        , AST.Assignment Nothing (AST.Var Nothing "state") . AST.NumericLiteral Nothing $ Left 2
+        , AST.Return Nothing $ AST.Var Nothing "val"
+        ]
+      ]
+
+
+moduleBindToJs
+  :: forall m
+   . (Monad m, MonadReader Options m, MonadSupply m, MonadWriter Any m, MonadError MultipleErrors m)
+  => ModuleName
+  -> Bind Ann
+  -> m [AST]
+moduleBindToJs mn = bindToJs
+  where
   -- |
   -- Generate code in the simplified JavaScript intermediate representation for a declaration
   --
@@ -215,7 +269,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     -- ever applied; it's not possible to use them as values. So it's safe to
     -- erase them.
   bindToJs (NonRec ann ident val) = return <$> nonRecToJS ann ident val
-  bindToJs (Rec vals) = forM vals (uncurry . uncurry $ nonRecToJS)
+  bindToJs (Rec vals) = writer (applyLazinessTransform mn vals) >>= traverse (uncurry . uncurry $ nonRecToJS)
 
   -- | Generate code in the simplified JavaScript intermediate representation for a single non-recursive
   -- declaration.
@@ -250,6 +304,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   moduleAccessor (Ident prop) = moduleAccessorString prop
   moduleAccessor (GenIdent _ _) = internalError "GenIdent in moduleAccessor"
   moduleAccessor UnusedIdent = internalError "UnusedIdent in moduleAccessor"
+  moduleAccessor InternalIdent{} = internalError "InternalIdent in moduleAccessor"
 
   moduleAccessorString :: Text -> AST -> AST
   moduleAccessorString = accessorString . mkString . T.replace "'" "$prime"
@@ -486,23 +541,3 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
       done'' <- go done' (index + 1) bs'
       js <- binderToJs elVar done'' binder
       return (AST.VariableIntroduction Nothing elVar (Just (AST.Indexer Nothing (AST.NumericLiteral Nothing (Left index)) (AST.Var Nothing varName))) : js)
-
-  -- Check that all integers fall within the valid int range for JavaScript.
-  checkIntegers :: AST -> m ()
-  checkIntegers = void . everywhereTopDownM go
-    where
-    go :: AST -> m AST
-    go (AST.Unary _ AST.Negate (AST.NumericLiteral ss (Left i))) =
-      -- Move the negation inside the literal; since this is a top-down
-      -- traversal doing this replacement will stop the next case from raising
-      -- the error when attempting to use -2147483648, as if left unrewritten
-      -- the value is `Unary Negate (NumericLiteral (Left 2147483648))`, and
-      -- 2147483648 is larger than the maximum allowed int.
-      return $ AST.NumericLiteral ss (Left (-i))
-    go js@(AST.NumericLiteral ss (Left i)) =
-      let minInt = -2147483648
-          maxInt = 2147483647
-      in if i < minInt || i > maxInt
-         then throwError . maybe errorMessage errorMessage' ss $ IntOutOfRange i "JavaScript" minInt maxInt
-         else return js
-    go other = return other
