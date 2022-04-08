@@ -137,10 +137,10 @@ convertType fileName = go
         mkForAll a b v t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
           T.ForAll ann' (getIdent $ nameValue a) b t Nothing v
-        k (TypeVarKinded (Just _) (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b)) T.IsVtaTypeVar
-        k (TypeVarKinded _ (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b)) T.NotVtaTypeVar
-        k (TypeVarName (Just _) a) = mkForAll a Nothing T.IsVtaTypeVar
-        k (TypeVarName _ a) = mkForAll a Nothing T.NotVtaTypeVar
+        k (TypeVarKinded (Wrapped _ (Labeled (Just _, a) _ b) _)) = mkForAll a (Just (go b)) T.IsVtaTypeVar
+        k (TypeVarKinded (Wrapped _ (Labeled (_, a) _ b) _)) = mkForAll a (Just (go b)) T.NotVtaTypeVar
+        k (TypeVarName (Just _, a)) = mkForAll a Nothing T.IsVtaTypeVar
+        k (TypeVarName (_, a)) = mkForAll a Nothing T.NotVtaTypeVar
         ty' = foldr k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
       T.setAnnForType ann ty'
@@ -461,8 +461,8 @@ convertDeclaration fileName decl = case decl of
     pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) (findVtv <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
-      goTyVar (TypeVarKinded v (Wrapped _ (Labeled a _ _) _)) = (nameValue a, fromMaybe T.NotVtaTypeVar (v $> T.IsVtaTypeVar))
-      goTyVar (TypeVarName v a) = (nameValue a, fromMaybe T.NotVtaTypeVar (v $> T.IsVtaTypeVar))
+      goTyVar (TypeVarKinded (Wrapped _ (Labeled (v, a) _ _) _)) = (nameValue a, fromMaybe T.NotVtaTypeVar (v $> T.IsVtaTypeVar))
+      goTyVar (TypeVarName (v, a)) = (nameValue a, fromMaybe T.NotVtaTypeVar (v $> T.IsVtaTypeVar))
       (vars', vtas) = unzip (goTyVar <$> vars)
       vars'' = zip (toList vars') [0..]
       goName = fromJust . flip lookup vars'' . nameValue
@@ -599,8 +599,8 @@ convertDeclaration fileName decl = case decl of
         TypeUnaryRow{} -> "Row"
 
   goTypeVar = \case
-    TypeVarKinded _ (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
-    TypeVarName _ x -> (getIdent $ nameValue x, Nothing)
+    TypeVarKinded (Wrapped _ (Labeled (_, x) _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
+    TypeVarName (_, x) -> (getIdent $ nameValue x, Nothing)
 
   goInstanceBinding = \case
     InstanceBindingSignature _ lbl ->
@@ -610,8 +610,8 @@ convertDeclaration fileName decl = case decl of
       convertValueBindingFields fileName ann' fields
 
   findVtv = \case
-    TypeVarKinded (Just _) _ -> T.IsVtaTypeVar
-    TypeVarName (Just _) _ -> T.IsVtaTypeVar
+    TypeVarKinded (Wrapped _ (Labeled (_, _) _ _) _) -> T.IsVtaTypeVar
+    TypeVarName (Just _, _) -> T.IsVtaTypeVar
     _ -> T.NotVtaTypeVar
 
 convertSignature :: String -> Labeled (Name Ident) (Type a) -> AST.Declaration

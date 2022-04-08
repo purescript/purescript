@@ -245,8 +245,8 @@ checkFundeps :: ClassHead a -> Parser ()
 checkFundeps (ClassHead _ _ _ _ Nothing) = pure ()
 checkFundeps (ClassHead _ _ _ vars (Just (_, fundeps))) = do
   let
-    k (TypeVarKinded _ (Wrapped _ (Labeled a _ _) _)) = getIdent $ nameValue a
-    k (TypeVarName _ a) = getIdent $ nameValue a
+    k (TypeVarKinded (Wrapped _ (Labeled (_, a) _ _) _)) = getIdent $ nameValue a
+    k (TypeVarName (_, a)) = getIdent $ nameValue a
     names = k <$> vars
     check a
       | getIdent (nameValue a) `elem` names = pure ()

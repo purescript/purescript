@@ -268,8 +268,8 @@ constraintRange = \case
 
 typeVarBindingRange :: TypeVarBinding a -> TokenRange
 typeVarBindingRange = \case
-  TypeVarKinded _ a -> wrappedRange a
-  TypeVarName atSign a -> (fromMaybe (nameTok a) atSign, nameTok a)
+  TypeVarKinded a -> wrappedRange a
+  TypeVarName (atSign, a) -> (fromMaybe (nameTok a) atSign, nameTok a)
 
 exprRange :: Expr a -> TokenRange
 exprRange = \case

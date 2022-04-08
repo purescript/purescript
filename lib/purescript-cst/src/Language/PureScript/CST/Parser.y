@@ -347,14 +347,14 @@ rowLabel :: { Labeled Label (Type ()) }
   : label '::' type { Labeled $1 $2 $3 }
 
 typeVarBinding :: { TypeVarBinding () }
-  : ident { TypeVarName Nothing $1 }
-  | '@' ident { TypeVarName (Just $1) $2 }
-  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded Nothing (Wrapped $1 (Labeled $2 $3 $4) $5)) }
-  | '(' '@' ident '::' type ')' {% checkNoWildcards $5 *> pure (TypeVarKinded (Just $2) (Wrapped $1 (Labeled $3 $4 $5) $6)) }
+  : ident { TypeVarName (Nothing, $1) }
+  | '@' ident { TypeVarName (Just $1, $2) }
+  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded (Wrapped $1 (Labeled (Nothing, $2) $3 $4) $5)) }
+  | '(' '@' ident '::' type ')' {% checkNoWildcards $5 *> pure (TypeVarKinded (Wrapped $1 (Labeled (Just $2, $3) $4 $5) $6)) }
 
 typeVarBindingPlain :: { TypeVarBinding () }
-  : ident { TypeVarName Nothing $1 }
-  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded Nothing (Wrapped $1 (Labeled $2 $3 $4) $5)) }
+  : ident { TypeVarName (Nothing, $1) }
+  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded (Wrapped $1 (Labeled (Nothing, $2) $3 $4) $5)) }
 
 forall :: { SourceToken }
   : 'forall' { $1 }
