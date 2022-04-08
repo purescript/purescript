@@ -753,7 +753,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
-      line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
+      line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode "bind" <> " and " <> markCode "discard" <> " functions. Please import " <> markCode i <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i == C.negate =
       line $ "Unknown " <> printName name <> ". You're probably using numeric negation (the unary " <> markCode "-" <> " operator), which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name) =
@@ -1953,9 +1953,6 @@ withoutPosition (ErrorMessage hints se) = ErrorMessage (filter go hints) se
 
 positionedError :: SourceSpan -> ErrorMessageHint
 positionedError = PositionedError . pure
-
-filterErrors :: (ErrorMessage -> Bool) -> MultipleErrors -> MultipleErrors
-filterErrors f = MultipleErrors . filter f . runMultipleErrors
 
 -- | Runs a computation listening for warnings and then escalating any warnings
 -- that match the predicate to error status.

@@ -7,6 +7,7 @@
 --
 module Language.PureScript.Sugar.Operators
   ( desugarSignedLiterals
+  , RebracketCaller(..)
   , rebracket
   , rebracketFiltered
   , checkFixityExports
@@ -74,7 +75,7 @@ rebracket
   -> Module
   -> m Module
 rebracket =
-  rebracketFiltered (const True)
+  rebracketFiltered CalledByCompile (const True)
 
 -- |
 -- A version of `rebracket` which allows you to choose which declarations
@@ -87,11 +88,12 @@ rebracketFiltered
   :: forall m
    . MonadError MultipleErrors m
   => MonadSupply m
-  => (Declaration -> Bool)
+  => RebracketCaller
+  -> (Declaration -> Bool)
   -> [ExternsFile]
   -> Module
   -> m Module
-rebracketFiltered pred_ externs m = do
+rebracketFiltered !caller pred_ externs m = do
   let (valueFixities, typeFixities) =
         partitionEithers
           $ concatMap externsFixities externs
@@ -105,7 +107,7 @@ rebracketFiltered pred_ externs m = do
   let typeOpTable = customOperatorTable' typeFixities
   let typeAliased = M.fromList (map makeLookupEntry typeFixities)
 
-  rebracketModule pred_ valueOpTable typeOpTable m >>=
+  rebracketModule caller pred_ valueOpTable typeOpTable m >>=
     renameAliasedOperators valueAliased typeAliased
 
   where
@@ -179,22 +181,50 @@ rebracketFiltered pred_ externs m = do
           throwError . errorMessage' pos $ UnknownName $ fmap TyOpName op
     goType _ other = return other
 
+-- | Indicates whether the `rebracketModule`
+-- is being called with the full desugar pass
+-- run via `purs compile` or whether
+-- only the partial desguar pass is run
+-- via `purs docs`.
+-- This indication is needed to prevent
+-- a `purs docs` error when using
+-- `case _ of` syntax in a type class instance.
+data RebracketCaller
+  = CalledByCompile
+  | CalledByDocs
+  deriving (Eq, Show)
+
 rebracketModule
   :: forall m
    . (MonadError MultipleErrors m)
   => MonadSupply m
-  => (Declaration -> Bool)
+  => RebracketCaller
+  -> (Declaration -> Bool)
   -> [[(Qualified (OpName 'ValueOpName), Associativity)]]
   -> [[(Qualified (OpName 'TypeOpName), Associativity)]]
   -> Module
   -> m Module
-rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
+rebracketModule !caller pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
   Module ss coms mn <$> f' ds <*> pure exts
   where
   f' :: [Declaration] -> m [Declaration]
   f' =
     fmap (map (\d -> if pred_ d then removeParens d else d)) .
-    flip parU (usingPredicate pred_ (g <=< f))
+    flip parU (usingPredicate pred_ h)
+
+  -- | The AST will run through all the desugar passes when compiling
+  -- and only some of the desugar passes when generating docs.
+  -- When generating docs, `case _ of` syntax used in an instance declaration
+  -- can trigger the `IncorrectAnonymousArgument` error because it does not
+  -- run the same passes that the compile desguaring does. Since `purs docs`
+  -- will only succeed once `purs compile` succeeds, we can ignore this check
+  -- when running `purs docs`.
+  -- See https://github.com/purescript/purescript/issues/4274#issuecomment-1087730651=
+  -- for more info.
+  h :: Declaration -> m Declaration
+  h = case caller of
+    CalledByDocs -> f
+    CalledByCompile -> g <=< f
 
   (f, _, _, _, _) =
       everywhereWithContextOnValuesM

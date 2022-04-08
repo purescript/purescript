@@ -118,9 +118,9 @@ convertType fileName = go
     TypeConstructor _ a ->
       T.TypeConstructor (sourceQualName fileName a) $ qualified a
     TypeWildcard _ a ->
-      T.TypeWildcard (sourceAnnCommented fileName a a) Nothing
+      T.TypeWildcard (sourceAnnCommented fileName a a) T.UnnamedWildcard
     TypeHole _ a ->
-      T.TypeWildcard (sourceName fileName a) . Just . getIdent $ nameValue a
+      T.TypeWildcard (sourceName fileName a) . T.HoleWildcard . getIdent $ nameValue a
     TypeString _ a b ->
       T.TypeLevelString (sourceAnnCommented fileName a a) b
     TypeInt _ _ a b ->

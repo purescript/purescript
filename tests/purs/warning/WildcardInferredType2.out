@@ -1,14 +1,83 @@
-Warning found:
-in module [33mMain[0m
-at tests/purs/warning/WildcardInferredType2.purs:4:6 - 4:7 (line 4, column 6 - line 4, column 7)
+Warning 1 of 5:
 
-  Wildcard type definition has the inferred type
-  [33m     [0m
-  [33m  Int[0m
-  [33m     [0m
+  in module [33mMain[0m
+  at tests/purs/warning/WildcardInferredType2.purs:10:6 - 10:7 (line 10, column 6 - line 10, column 7)
 
-in value declaration [33mx[0m
+    Wildcard type definition has the inferred type
+    [33m     [0m
+    [33m  Int[0m
+    [33m     [0m
 
-See https://github.com/purescript/documentation/blob/master/errors/WildcardInferredType.md for more information,
-or to contribute content related to this warning.
+  in value declaration [33mx[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/WildcardInferredType.md for more information,
+  or to contribute content related to this warning.
+
+Warning 2 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/warning/WildcardInferredType2.purs:51:9 - 51:10 (line 51, column 9 - line 51, column 10)
+
+    Wildcard type definition has the inferred type
+    [33m     [0m
+    [33m  Int[0m
+    [33m     [0m
+
+  in binding group foxtrot, echo
+
+  See https://github.com/purescript/documentation/blob/master/errors/WildcardInferredType.md for more information,
+  or to contribute content related to this warning.
+
+Warning 3 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/warning/WildcardInferredType2.purs:54:8 - 54:9 (line 54, column 8 - line 54, column 9)
+
+    Wildcard type definition has the inferred type
+    [33m     [0m
+    [33m  Int[0m
+    [33m     [0m
+    in the following context:
+
+      m :: [33mInt[0m
+
+
+  in binding group foxtrot, echo
+
+  See https://github.com/purescript/documentation/blob/master/errors/WildcardInferredType.md for more information,
+  or to contribute content related to this warning.
+
+Warning 4 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/warning/WildcardInferredType2.purs:47:1 - 49:8 (line 47, column 1 - line 49, column 8)
+
+    No type declaration was provided for the top-level declaration of [33mdelta[0m.
+    It is good practice to provide type declarations as a form of documentation.
+    The inferred type of [33mdelta[0m was:
+    [33m            [0m
+    [33m  Int -> Int[0m
+    [33m            [0m
+
+  in binding group delta, charlie
+
+  See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
+  or to contribute content related to this warning.
+
+Warning 5 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/warning/WildcardInferredType2.purs:25:1 - 31:14 (line 25, column 1 - line 31, column 14)
+
+    No type declaration was provided for the top-level declaration of [33malpha[0m.
+    It is good practice to provide type declarations as a form of documentation.
+    The inferred type of [33malpha[0m was:
+    [33m     [0m
+    [33m  Int[0m
+    [33m     [0m
+
+  in value declaration [33malpha[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
+  or to contribute content related to this warning.
 

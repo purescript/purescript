@@ -378,7 +378,7 @@ deriveGenericRep ss mn syns kinds ds tyConNm tyConArgs repTy = do
     toRepTy ctors = foldr1 (\f -> srcTypeApp (srcTypeApp (srcTypeConstructor DataGenericRep.Sum) f)) ctors
 
 checkIsWildcard :: MonadError MultipleErrors m => SourceSpan -> ProperName 'TypeName -> SourceType -> m ()
-checkIsWildcard _ _ (TypeWildcard _ Nothing) = return ()
+checkIsWildcard _ _ (TypeWildcard _ UnnamedWildcard) = return ()
 checkIsWildcard ss tyConNm _ =
   throwError . errorMessage' ss $ ExpectedWildcard tyConNm
 
