@@ -51,7 +51,7 @@ type RoleEnv = M.Map (Qualified (ProperName 'TypeName)) [Role]
 typeKindRoles :: TypeKind -> Maybe [Role]
 typeKindRoles = \case
   DataType _ args _ ->
-    Just $ map (\(_, _, role) -> role) args
+    Just $ map (\(_, _, role, _) -> role) args
   ExternData roles ->
     Just roles
   _ ->
@@ -92,13 +92,13 @@ lookupRoles env tyName =
 checkRoles
   :: forall m
    . (MonadError MultipleErrors m)
-  => [(Text, Maybe SourceType, Role)]
+  => [(Text, Maybe SourceType, Role, VtaTypeVar)]
     -- ^ type parameters for the data type whose roles we are checking
   -> [Role]
     -- ^ roles declared for the data type
   -> m ()
 checkRoles tyArgs declaredRoles = do
-  let k (var, _, inf) dec =
+  let k (var, _, inf, _) dec =
         when (inf < dec) . throwError . errorMessage $ RoleMismatch var inf dec
   zipWithM_ k tyArgs declaredRoles
 

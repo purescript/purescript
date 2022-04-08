@@ -224,7 +224,7 @@ primClassOf gen title comments = Declaration
   , declInfo =
       let
         tcd = lookupPrimClassOf gen title
-        args = fmap (fmap ($> ())) <$> P.typeClassArguments tcd
+        args = (\(a, b, _) -> (a, fmap ($> ()) b)) <$> P.typeClassArguments tcd
         superclasses = ($> ()) <$> P.typeClassSuperclasses tcd
         fundeps = convertFundepsToStrings args (P.typeClassDependencies tcd)
       in

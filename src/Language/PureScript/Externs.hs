@@ -136,8 +136,7 @@ data ExternsDeclaration =
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
-      , edClassTypeArguments      :: [(Text, Maybe SourceType)]
-      , edClassVtaTypeVars         :: [VtaTypeVar]
+      , edClassTypeArguments      :: [(Text, Maybe SourceType, VtaTypeVar)]
       , edClassMembers            :: [(Ident, SourceType)]
       , edClassConstraints        :: [SourceConstraint]
       , edFunctionalDependencies  :: [FunctionalDependency]
@@ -175,7 +174,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDTypeSynonym pn args ty) = env { typeSynonyms = M.insert (qual pn) (args, ty) (typeSynonyms env) }
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
-  applyDecl env (EDClass pn args vtas members cs deps tcIsEmpty) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args vtas members cs deps tcIsEmpty) (typeClasses env) }
+  applyDecl env (EDClass pn args members cs deps tcIsEmpty) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps tcIsEmpty) (typeClasses env) }
   applyDecl env (EDInstance className ident vars kinds tys cs ch idx ns ss) =
     env { typeClassDictionaries =
             updateMap
@@ -255,7 +254,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsF
     = [ EDType (coerceProperName className) kind tk
       , EDType dictName dictKind dictData
       , EDDataConstructor dctor dty dictName ty args
-      , EDClass className typeClassArguments typeClassVtaTypeVars typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
+      , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef ss' ident ns)
     = [ EDInstance tcdClassName (lookupRenamedIdent ident) tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex ns ss'

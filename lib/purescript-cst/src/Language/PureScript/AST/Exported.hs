@@ -48,8 +48,8 @@ exportedDeclarations (Module _ _ mn decls exps) = go decls
 -- it unchanged.
 --
 filterDataConstructors :: Maybe [DeclarationRef] -> Declaration -> Declaration
-filterDataConstructors exps (DataDeclaration sa dType tyName tyArgs vtvs dctors) =
-  DataDeclaration sa dType tyName tyArgs vtvs $
+filterDataConstructors exps (DataDeclaration sa dType tyName tyArgs dctors) =
+  DataDeclaration sa dType tyName tyArgs $
     filter (isDctorExported tyName exps . dataCtorName) dctors
 filterDataConstructors _ other = other
 

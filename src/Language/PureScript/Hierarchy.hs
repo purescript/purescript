@@ -79,7 +79,7 @@ typeClassEpilogue :: T.Text
 typeClassEpilogue = "\n}"
 
 superClasses :: P.Declaration -> [SuperMap]
-superClasses (P.TypeClassDeclaration _ sub _ _ supers@(_:_) _ _) =
+superClasses (P.TypeClassDeclaration _ sub _ supers@(_:_) _ _) =
   fmap (\(P.Constraint _ (P.Qualified _ super) _ _ _) -> SuperMap (Right (super, sub))) supers
-superClasses (P.TypeClassDeclaration _ sub _ _ _ _ _) = [SuperMap (Left sub)]
+superClasses (P.TypeClassDeclaration _ sub _ _ _ _) = [SuperMap (Left sub)]
 superClasses _ = []

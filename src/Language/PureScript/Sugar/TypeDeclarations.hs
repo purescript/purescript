@@ -63,10 +63,10 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
     checkKindDeclarations rest
     where
     matchesDeclaration :: Declaration -> Bool
-    matchesDeclaration (DataDeclaration _ Data name'' _ _ _) = kindFor == DataSig && name' == name''
-    matchesDeclaration (DataDeclaration _ Newtype name'' _ _ _) = kindFor == NewtypeSig && name' == name''
+    matchesDeclaration (DataDeclaration _ Data name'' _ _) = kindFor == DataSig && name' == name''
+    matchesDeclaration (DataDeclaration _ Newtype name'' _ _) = kindFor == NewtypeSig && name' == name''
     matchesDeclaration (TypeSynonymDeclaration _ name'' _ _) = kindFor == TypeSynonymSig && name' == name''
-    matchesDeclaration (TypeClassDeclaration _ name'' _ _ _ _ _) = kindFor == ClassSig && name' == coerceProperName name''
+    matchesDeclaration (TypeClassDeclaration _ name'' _ _ _ _) = kindFor == ClassSig && name' == coerceProperName name''
     matchesDeclaration _ = False
   checkKindDeclarations (KindDeclaration sa _ name' _ : _) = do
     throwError . errorMessage' (fst sa) $ OrphanKindDeclaration name'
@@ -88,10 +88,10 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
     isSupported ExternDataDeclaration{} = True
     isSupported _ = False
     matchesDeclaration :: Declaration -> Bool
-    matchesDeclaration (DataDeclaration _ _ name' _ _ _) = rdeclIdent == name'
+    matchesDeclaration (DataDeclaration _ _ name' _ _) = rdeclIdent == name'
     matchesDeclaration (ExternDataDeclaration _ name' _) = rdeclIdent == name'
     matchesDeclaration (TypeSynonymDeclaration _ name' _ _) = rdeclIdent == name'
-    matchesDeclaration (TypeClassDeclaration _ name' _ _ _ _ _) = rdeclIdent == coerceProperName name'
+    matchesDeclaration (TypeClassDeclaration _ name' _ _ _ _) = rdeclIdent == coerceProperName name'
     matchesDeclaration _ = False
   checkRoleDeclarations _ (d : rest) = checkRoleDeclarations (Just d) rest
   checkRoleDeclarations _ [] = return ()

@@ -31,6 +31,7 @@ import Control.Monad.Supply.Class (MonadSupply)
 
 import Data.Either (partitionEithers)
 import Data.Foldable (for_, traverse_)
+import Data.Traversable (for)
 import Data.Function (on)
 import Data.Functor (($>))
 import Data.Functor.Identity (Identity(..), runIdentity)
@@ -338,17 +339,21 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goType' = everywhereOnTypesTopDownM . goType
 
   goDecl :: Declaration -> m Declaration
-  goDecl (DataDeclaration sa@(ss, _) ddt name args vtvs dctors) =
+  goDecl (DataDeclaration sa@(ss, _) ddt name args dctors) =
     DataDeclaration sa ddt name
-      <$> traverse (traverse (traverse (goType' ss))) args
-      <*> pure vtvs
+      <$> ( for args $ \(n, mbK, v) -> do
+              mbK' <- traverse (goType' ss) mbK
+              pure (n, mbK', v)
+          )
       <*> traverse (traverseDataCtorFields (traverse (sndM (goType' ss)))) dctors
   goDecl (ExternDeclaration sa@(ss, _) name ty) =
     ExternDeclaration sa name <$> goType' ss ty
-  goDecl (TypeClassDeclaration sa@(ss, _) name args vtas implies deps decls) = do
+  goDecl (TypeClassDeclaration sa@(ss, _) name args implies deps decls) = do
     implies' <- traverse (overConstraintArgs (traverse (goType' ss))) implies
-    args' <- traverse (traverse (traverse (goType' ss))) args
-    return $ TypeClassDeclaration sa name args' vtas implies' deps decls
+    args' <- for args $ \(n, mbK, v) -> do
+      mbK' <- traverse (goType' ss) mbK
+      pure (n, mbK', v)
+    return $ TypeClassDeclaration sa name args' implies' deps decls
   goDecl (TypeInstanceDeclaration sa@(ss, _) ch idx name cs className tys impls) = do
     cs' <- traverse (overConstraintArgs (traverse (goType' ss))) cs
     tys' <- traverse (goType' ss) tys

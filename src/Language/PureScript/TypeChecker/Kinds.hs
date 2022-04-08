@@ -587,8 +587,7 @@ kindOfWithScopedVars ty = do
 type DataDeclarationArgs =
   ( SourceAnn
   , ProperName 'TypeName
-  , [(Text, Maybe SourceType)]
-  , [VtaTypeVar]
+  , [(Text, Maybe SourceType, VtaTypeVar)]
   , [DataConstructorDeclaration]
   )
 
@@ -612,23 +611,26 @@ inferDataDeclaration
   => ModuleName
   -> DataDeclarationArgs
   -> m [(DataConstructorDeclaration, SourceType)]
-inferDataDeclaration moduleName (ann, tyName, tyArgs, vtvs, ctors) = do
+inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
   tyKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
-    subsumesKind (foldr ((E.-:>) . snd) E.kindType tyArgs') tyKind'
-    bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
+    tyArgs' <- for tyArgs $ \(n, mbK, v) -> do
+      k_ <- maybe (freshKind (fst ann)) pure mbK
+      k <- replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType $ k_
+      pure (n, k, v)
+    subsumesKind (foldr ((E.-:>) . \(_, b, _) -> b) E.kindType tyArgs') tyKind'
+    bindLocalTypeVariables moduleName ((\(a, b, _) -> (ProperName a, b)) <$> tyArgs') $ do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
-          tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . fst) tyCtor tyArgs'
-          vtvs' = S.fromList $ mapMaybe findVtv $ zip tyArgs vtvs where
-            findVtv ((i, _), IsVtaTypeVar) = Just i
-            findVtv _ = Nothing
+          tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . \(a, _, _) -> a) tyCtor tyArgs'
+          vtvs = S.fromList $ mapMaybe go tyArgs where
+            go (i, _, IsVtaTypeVar) = Just i
+            go _ = Nothing
           makeVta = everywhereOnTypes go where
-            go (ForAll a b c d e _) | b `S.member` vtvs' = ForAll a b c d e IsVtaTypeVar
+            go (ForAll a b c d e _) | b `S.member` vtvs = ForAll a b c d e IsVtaTypeVar
             go t = t
-          ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (nullSourceAnn,) tyArgs'
+          ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (\(a, b, _) -> (nullSourceAnn, (a, b))) tyArgs'
       for ctors $
         fmap (fmap (makeVta . mkForAll ctorBinders)) . inferDataConstructor tyCtor'
 
@@ -757,13 +759,13 @@ checkTypeQuantification =
 type ClassDeclarationArgs =
   ( SourceAnn
   , ProperName 'ClassName
-  , [(Text, Maybe SourceType)]
+  , [(Text, Maybe SourceType, VtaTypeVar)]
   , [SourceConstraint]
   , [Declaration]
   )
 
 type ClassDeclarationResult =
-  ( [(Text, SourceType)]
+  ( [(Text, SourceType, VtaTypeVar)]
   -- The kind annotated class arguments
   , [SourceConstraint]
   -- The kind annotated superclass constraints
@@ -785,14 +787,17 @@ inferClassDeclaration
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
   -> ClassDeclarationArgs
-  -> m ([(Text, SourceType)], [SourceConstraint], [Declaration])
+  -> m ([(Text, SourceType, VtaTypeVar)], [SourceConstraint], [Declaration])
 inferClassDeclaration moduleName (ann, clsName, clsArgs, superClasses, decls) = do
   clsKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ coerceProperName clsName)
   let (sigBinders, clsKind') = fromJust . completeBinderList $ clsKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    clsArgs' <- for clsArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
-    unifyKinds clsKind' $ foldr ((E.-:>) . snd) E.kindConstraint clsArgs'
-    bindLocalTypeVariables moduleName (first ProperName <$> clsArgs') $ do
+    clsArgs' <- for clsArgs $ \(n, mbK, v) -> do
+      k_ <- maybe (freshKind (fst ann)) pure mbK
+      k <- replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType $ k_
+      pure (n, k, v)
+    unifyKinds clsKind' $ foldr ((E.-:>) . \(_, b, _) -> b) E.kindConstraint $ clsArgs'
+    bindLocalTypeVariables moduleName ((\(a, b, _) -> (ProperName a, b)) <$> clsArgs') $ do
       (clsArgs',,)
         <$> for superClasses checkConstraint
         <*> for decls checkClassMemberDeclaration
@@ -931,7 +936,7 @@ kindsOfAll
   -> m ([TypeDeclarationResult], [DataDeclarationResult], [ClassDeclarationResult])
 kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
   synDict <- for syns $ \(sa, synName, _, _) -> (synName,) <$> existingSignatureOrFreshKind moduleName (fst sa) synName
-  datDict <- for dats $ \(sa, datName, _, _, _) -> (datName,) <$> existingSignatureOrFreshKind moduleName (fst sa) datName
+  datDict <- for dats $ \(sa, datName, _, _) -> (datName,) <$> existingSignatureOrFreshKind moduleName (fst sa) datName
   clsDict <- for clss $ \(sa, clsName, _, _, _) -> fmap (coerceProperName clsName,) $ existingSignatureOrFreshKind moduleName (fst sa) $ coerceProperName clsName
   let bindingGroup = synDict <> datDict <> clsDict
   bindLocalTypeVariables moduleName bindingGroup $ do
@@ -948,7 +953,9 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
       pure (((datName, datKind'), ctors'), unknowns datKind')
     clsResultsWithUnks <- for (zip clsDict clsResults) $ \((clsName, clsKind), (args, supers, decls)) -> do
       clsKind' <- apply clsKind
-      args' <- traverse (traverse apply) args
+      args' <- for args $ \(a, b, c) -> do
+        b' <- apply b
+        pure (a, b', c)
       supers' <- traverse applyConstraint supers
       decls' <- traverse applyClassMemberDeclaration decls
       pure (((clsName, clsKind'), (args', supers', decls')), unknowns clsKind')
@@ -971,11 +978,12 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
           let tyUnks = snd . fromJust $ lookup (mkQualified clsName moduleName) tySubs
               (usedTypeVariablesInDecls, _, _, _, _) = accumTypes usedTypeVariables
               usedVars = usedTypeVariables clsKind
-                      <> foldMap (usedTypeVariables . snd) args
+                      <> foldMap (usedTypeVariables . \(_, b, _) -> b) args
                       <> foldMap (foldMap usedTypeVariables . (\c -> constraintKindArgs c <> constraintArgs c)) supers
                       <> foldMap usedTypeVariablesInDecls decls
               unkBinders = unknownVarNames usedVars tyUnks
-              args' = fmap (replaceUnknownsWithVars unkBinders . replaceTypeCtors) <$> args
+              args' = go <$> args where
+                go (a, b, c) = (a, replaceUnknownsWithVars unkBinders $ replaceTypeCtors b, c)
               supers' = mapConstraintArgsAll (fmap (replaceUnknownsWithVars unkBinders . replaceTypeCtors)) <$> supers
               decls' = mapTypeDeclaration (replaceUnknownsWithVars unkBinders . replaceTypeCtors) <$> decls
           (args', supers', decls', generalizeUnknownsWithVars unkBinders clsKind)

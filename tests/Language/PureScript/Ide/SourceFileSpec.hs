@@ -21,10 +21,10 @@ typeAnnotation1, value1, synonym1, class1, class2, data1, data2, valueFixity, ty
 typeAnnotation1 = P.TypeDeclaration (P.TypeDeclarationData ann1 (P.Ident "value1") P.srcREmpty)
 value1 = P.ValueDecl ann1 (P.Ident "value1") P.Public [] []
 synonym1 = P.TypeSynonymDeclaration ann1 (P.ProperName "Synonym1") [] P.srcREmpty
-class1 = P.TypeClassDeclaration ann1 (P.ProperName "Class1") [] [] [] [] []
-class2 = P.TypeClassDeclaration ann1 (P.ProperName "Class2") [] [] [] [] [member1]
-data1 = P.DataDeclaration ann1 P.Newtype (P.ProperName "Data1") [] [] []
-data2 = P.DataDeclaration ann1 P.Data (P.ProperName "Data2") [] [] [P.DataConstructorDeclaration ann2 (P.ProperName "Cons1") []]
+class1 = P.TypeClassDeclaration ann1 (P.ProperName "Class1") [] [] [] []
+class2 = P.TypeClassDeclaration ann1 (P.ProperName "Class2") [] [] [] [member1]
+data1 = P.DataDeclaration ann1 P.Newtype (P.ProperName "Data1") [] []
+data2 = P.DataDeclaration ann1 P.Data (P.ProperName "Data2") [] [P.DataConstructorDeclaration ann2 (P.ProperName "Cons1") []]
 valueFixity =
   P.ValueFixityDeclaration
     ann1

@@ -67,7 +67,7 @@ printModuleSignatures moduleName P.Environment{..} =
                          Box.<> Box.text ") <= "
                 className =
                     textT (P.runProperName name)
-                    Box.<> textT (foldMap ((" " <>) . fst) typeClassArguments)
+                    Box.<> textT (foldMap ((" " <>) . \(a, _, _) -> a) typeClassArguments)
                 classBody =
                     Box.vcat Box.top (map (\(i, t) -> textT (P.showIdent i <> " ::") Box.<+> P.typeAsBox maxBound t) typeClassMembers)
 
@@ -113,7 +113,7 @@ printModuleSignatures moduleName P.Environment{..} =
                       _ -> "data"
 
               in
-                Just $ textT (prefix <> " " <> P.runProperName name <> foldMap ((" " <>) . (\(v, _, _) -> v)) typevars) Box.// printCons pt
+                Just $ textT (prefix <> " " <> P.runProperName name <> foldMap ((" " <>) . (\(v, _, _, _) -> v)) typevars) Box.// printCons pt
 
             _ ->
               Nothing

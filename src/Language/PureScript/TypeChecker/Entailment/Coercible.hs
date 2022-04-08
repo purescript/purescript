@@ -664,7 +664,7 @@ lookupNewtypeConstructor env qualifiedNewtypeName ks = do
   (newtyk, DataType Newtype tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
   let (kvs, _) = fromMaybe (internalError "lookupNewtypeConstructor: unkinded forall binder") $ completeBinderList newtyk
       instantiatedKinds = zipWith (\(_, (kv, _)) k -> (kv, k)) kvs ks
-  pure (map (\(name, _, _) -> name) tvs, ctorName, replaceAllTypeVars instantiatedKinds wrappedTy)
+  pure (map (\(name, _, _, _) -> name) tvs, ctorName, replaceAllTypeVars instantiatedKinds wrappedTy)
 
 -- | Behaves like 'lookupNewtypeConstructor' but also returns whether the
 -- newtype constructor is in scope and the module from which it is imported, or

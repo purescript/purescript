@@ -87,7 +87,7 @@ insertValueTypesAndAdjustKinds env m =
       case Map.lookup key (P.types env) of
         Just (_, tyKind) -> case tyKind of
           P.DataType _ tySourceTyRole _ ->
-            map (\(_,_,r) -> r) tySourceTyRole
+            map (\(_,_,r,_) -> r) tySourceTyRole
           P.ExternData rs ->
             rs
           _ ->

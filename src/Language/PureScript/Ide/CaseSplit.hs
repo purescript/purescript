@@ -77,7 +77,7 @@ findTypeDeclaration'
 findTypeDeclaration' t ExternsFile{..} =
   First $ head $ mapMaybe (\case
             EDType tn _ (P.DataType _ typeVars ctors)
-              | tn == t -> Just (typeVars, ctors)
+              | tn == t -> Just ((\(a, b, c, _) -> (a, b, c)) <$> typeVars, ctors)
             _ -> Nothing) efDeclarations
 
 splitTypeConstructor :: (MonadError IdeError m) =>

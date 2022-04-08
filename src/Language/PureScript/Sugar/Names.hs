@@ -185,22 +185,20 @@ renameInModule imports (Module modSS coms mn decls exps) =
     :: [Ident]
     -> Declaration
     -> m ([Ident], Declaration)
-  updateDecl bound (DataDeclaration sa dtype name args vtvs dctors) =
+  updateDecl bound (DataDeclaration sa dtype name args dctors) =
     fmap (bound,) $
       DataDeclaration sa dtype name
-        <$> updateTypeArguments args
-        <*> pure vtvs
+        <$> updateTypeArguments' args
         <*> traverse (traverseDataCtorFields (traverse (sndM updateTypesEverywhere))) dctors
   updateDecl bound (TypeSynonymDeclaration sa name ps ty) =
     fmap (bound,) $
       TypeSynonymDeclaration sa name
         <$> updateTypeArguments ps
         <*> updateTypesEverywhere ty
-  updateDecl bound (TypeClassDeclaration sa@(ss, _) className args vtas implies deps ds) =
+  updateDecl bound (TypeClassDeclaration sa@(ss, _) className args implies deps ds) =
     fmap (bound,) $
       TypeClassDeclaration sa className
-        <$> updateTypeArguments args
-        <*> pure vtas
+        <$> updateTypeArguments' args
         <*> updateConstraints ss implies
         <*> pure deps
         <*> pure ds
@@ -310,6 +308,13 @@ renameInModule imports (Module modSS coms mn decls exps) =
     :: (Traversable f, Traversable g)
     => f (a, g SourceType) -> m (f (a, g SourceType))
   updateTypeArguments = traverse (sndM (traverse updateTypesEverywhere))
+
+  updateTypeArguments'
+    :: (Traversable f, Traversable g)
+    => f (a, g SourceType, VtaTypeVar) -> m (f (a, g SourceType, VtaTypeVar))
+  updateTypeArguments' = traverse $ \(a, b, c) -> do
+    b' <- traverse updateTypesEverywhere b
+    pure (a, b', c)
 
   updateTypesEverywhere :: SourceType -> m SourceType
   updateTypesEverywhere = everywhereOnTypesM updateType

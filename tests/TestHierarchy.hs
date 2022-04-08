@@ -47,11 +47,9 @@ spec = describe "hierarchy" $ do
                  []
                  []
                  []
-                 []
               , P.TypeClassDeclaration
                  (P.internalModuleSourceSpan "<B>", [])
                  (P.ProperName "B")
-                 []
                  []
                  [P.srcConstraint (P.Qualified Nothing $ P.ProperName "A") [] [] Nothing]
                  []

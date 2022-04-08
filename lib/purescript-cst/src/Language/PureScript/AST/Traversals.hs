@@ -58,7 +58,7 @@ everywhereOnValues f g h = (f', g', h')
      f (ValueDecl sa name nameKind (fmap h' bs) (fmap (mapGuardedExpr handleGuard g') val))
   f' (BoundValueDeclaration sa b expr) = f (BoundValueDeclaration sa (h' b) (g' expr))
   f' (BindingGroupDeclaration ds) = f (BindingGroupDeclaration (fmap (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
-  f' (TypeClassDeclaration sa name args vtas implies deps ds) = f (TypeClassDeclaration sa name args vtas implies deps (fmap f' ds))
+  f' (TypeClassDeclaration sa name args implies deps ds) = f (TypeClassDeclaration sa name args implies deps (fmap f' ds))
   f' (TypeInstanceDeclaration sa ch idx name cs className args ds) = f (TypeInstanceDeclaration sa ch idx name cs className args (mapTypeInstanceBody (fmap f') ds))
   f' other = f other
 
@@ -132,7 +132,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   f' (ValueDecl sa name nameKind bs val) =
      ValueDecl sa name nameKind <$> traverse (h' <=< h) bs <*> traverse (guardedExprM handleGuard (g' <=< g)) val
   f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (name, nameKind, ) <$> (g val >>= g')) ds
-  f' (TypeClassDeclaration sa name args vtas implies deps ds) = TypeClassDeclaration sa name args vtas implies deps <$> traverse (f' <=< f) ds
+  f' (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f' <=< f) ds
   f' (TypeInstanceDeclaration sa ch idx name cs className args ds) = TypeInstanceDeclaration sa ch idx name cs className args <$> traverseTypeInstanceBody (traverse (f' <=< f)) ds
   f' (BoundValueDeclaration sa b expr) = BoundValueDeclaration sa <$> (h' <=< h) b <*> (g' <=< g) expr
   f' other = f other
@@ -203,7 +203,7 @@ everywhereOnValuesM f g h = (f', g', h')
     ValueDecl sa name nameKind <$> traverse h' bs <*> traverse (guardedExprM handleGuard g') val >>= f
   f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (name, nameKind, ) <$> g' val) ds) >>= f
   f' (BoundValueDeclaration sa b expr) = (BoundValueDeclaration sa <$> h' b <*> g' expr) >>= f
-  f' (TypeClassDeclaration sa name args vtas implies deps ds) = (TypeClassDeclaration sa name args vtas implies deps <$> traverse f' ds) >>= f
+  f' (TypeClassDeclaration sa name args implies deps ds) = (TypeClassDeclaration sa name args implies deps <$> traverse f' ds) >>= f
   f' (TypeInstanceDeclaration sa ch idx name cs className args ds) = (TypeInstanceDeclaration sa ch idx name cs className args <$> traverseTypeInstanceBody (traverse f') ds) >>= f
   f' other = f other
 
@@ -275,7 +275,7 @@ everythingOnValues (<>.) f g h i j = (f', g', h', i', j')
   f' d@(DataBindingGroupDeclaration ds) = foldl (<>.) (f d) (fmap f' ds)
   f' d@(ValueDeclaration vd) = foldl (<>.) (f d) (fmap h' (valdeclBinders vd) ++ concatMap (\(GuardedExpr grd v) -> fmap k' grd ++ [g' v]) (valdeclExpression vd))
   f' d@(BindingGroupDeclaration ds) = foldl (<>.) (f d) (fmap (\(_, _, val) -> g' val) ds)
-  f' d@(TypeClassDeclaration _ _ _ _ _ _ ds) = foldl (<>.) (f d) (fmap f' ds)
+  f' d@(TypeClassDeclaration _ _ _ _ _ ds) = foldl (<>.) (f d) (fmap f' ds)
   f' d@(TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance ds)) = foldl (<>.) (f d) (fmap f' ds)
   f' d@(BoundValueDeclaration _ b expr) = f d <>. h' b <>. g' expr
   f' d = f d
@@ -355,7 +355,7 @@ everythingWithContextOnValues s0 r0 (<>.) f g h i j = (f'' s0, g'' s0, h'' s0, i
   f' s (DataBindingGroupDeclaration ds) = foldl (<>.) r0 (fmap (f'' s) ds)
   f' s (ValueDeclaration vd) = foldl (<>.) r0 (fmap (h'' s) (valdeclBinders vd) ++ concatMap (\(GuardedExpr grd v) -> fmap (k' s) grd ++ [g'' s v]) (valdeclExpression vd))
   f' s (BindingGroupDeclaration ds) = foldl (<>.) r0 (fmap (\(_, _, val) -> g'' s val) ds)
-  f' s (TypeClassDeclaration _ _ _ _ _ _ ds) = foldl (<>.) r0 (fmap (f'' s) ds)
+  f' s (TypeClassDeclaration _ _ _ _ _ ds) = foldl (<>.) r0 (fmap (f'' s) ds)
   f' s (TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance ds)) = foldl (<>.) r0 (fmap (f'' s) ds)
   f' _ _ = r0
 
@@ -443,7 +443,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   f' s (ValueDecl sa name nameKind bs val) =
     ValueDecl sa name nameKind <$> traverse (h'' s) bs <*> traverse (guardedExprM (k' s) (g'' s)) val
   f' s (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (thirdM (g'' s)) ds
-  f' s (TypeClassDeclaration sa name args vtas implies deps ds) = TypeClassDeclaration sa name args vtas implies deps <$> traverse (f'' s) ds
+  f' s (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f'' s) ds
   f' s (TypeInstanceDeclaration sa ch idx name cs className args ds) = TypeInstanceDeclaration sa ch idx name cs className args <$> traverseTypeInstanceBody (traverse (f'' s)) ds
   f' _ other = return other
 
@@ -535,7 +535,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   f' s (BindingGroupDeclaration ds) =
     let s' = S.union s (S.fromList (NEL.toList (fmap (\((_, name), _, _) -> ToplevelIdent name) ds)))
     in foldMap (\(_, _, val) -> g'' s' val) ds
-  f' s (TypeClassDeclaration _ _ _ _ _ _ ds) = foldMap (f'' s) ds
+  f' s (TypeClassDeclaration _ _ _ _ _ ds) = foldMap (f'' s) ds
   f' s (TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance ds)) = foldMap (f'' s) ds
   f' _ _ = mempty
 
@@ -637,13 +637,13 @@ accumTypes
      )
 accumTypes f = everythingOnValues mappend forDecls forValues forBinders (const mempty) (const mempty)
   where
-  forDecls (DataDeclaration _ _ _ args _ dctors) =
-    foldMap (foldMap f . snd) args <>
+  forDecls (DataDeclaration _ _ _ args dctors) =
+    foldMap (foldMap f . \(_, b, _) -> b) args <>
     foldMap (foldMap (f . snd) . dataCtorFields) dctors
   forDecls (ExternDataDeclaration _ _ ty) = f ty
   forDecls (ExternDeclaration _ _ ty) = f ty
-  forDecls (TypeClassDeclaration _ _ args _ implies _ _) =
-    foldMap (foldMap (foldMap f)) args <>
+  forDecls (TypeClassDeclaration _ _ args implies _ _) =
+    foldMap (foldMap f . \(_, b, _) -> b) args <>
     foldMap (foldMap f . constraintArgs) implies
   forDecls (TypeInstanceDeclaration _ _ _ _ cs _ tys _) =
     foldMap (foldMap f . constraintArgs) cs <> foldMap f tys

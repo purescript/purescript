@@ -370,7 +370,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceType)] [VtaTypeVar] [DataConstructorDeclaration]
+  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceType, VtaTypeVar)] [DataConstructorDeclaration]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -421,7 +421,7 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceType)] [VtaTypeVar] [SourceConstraint] [FunctionalDependency] [Declaration]
+  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceType, VtaTypeVar)] [SourceConstraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
@@ -473,7 +473,7 @@ data KindSignatureFor
 instance NFData KindSignatureFor
 
 declSourceAnn :: Declaration -> SourceAnn
-declSourceAnn (DataDeclaration sa _ _ _ _ _) = sa
+declSourceAnn (DataDeclaration sa _ _ _ _) = sa
 declSourceAnn (DataBindingGroupDeclaration ds) = declSourceAnn (NEL.head ds)
 declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
 declSourceAnn (KindDeclaration sa _ _ _) = sa
@@ -486,7 +486,7 @@ declSourceAnn (ExternDeclaration sa _ _) = sa
 declSourceAnn (ExternDataDeclaration sa _ _) = sa
 declSourceAnn (FixityDeclaration sa _) = sa
 declSourceAnn (ImportDeclaration sa _ _ _) = sa
-declSourceAnn (TypeClassDeclaration sa _ _ _ _ _ _) = sa
+declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
 declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
@@ -496,14 +496,14 @@ declSourceSpan = fst . declSourceAnn
 -- or a `TypeName`. Use a helper function for handling `KindDeclaration`s
 -- specifically in the context in which it is needed.
 declName :: Declaration -> Maybe Name
-declName (DataDeclaration _ _ n _ _ _) = Just (TyName n)
+declName (DataDeclaration _ _ n _ _) = Just (TyName n)
 declName (TypeSynonymDeclaration _ n _ _) = Just (TyName n)
 declName (ValueDeclaration vd) = Just (IdentName (valdeclIdent vd))
 declName (ExternDeclaration _ n _) = Just (IdentName n)
 declName (ExternDataDeclaration _ n _) = Just (TyName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
-declName (TypeClassDeclaration _ n _ _ _ _ _) = Just (TyClassName n)
+declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
 declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = IdentName <$> hush n
 declName (RoleDeclaration RoleDeclarationData{..}) = Just (TyName rdeclIdent)
 declName ImportDeclaration{} = Nothing
