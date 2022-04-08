@@ -209,7 +209,7 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
         let
           solutions = map (map ((\(a, _, _) -> a) . (args !!)) . S.toList) leftovers
         in
-          UnusableDeclaration ident (nub $ solutions)
+          UnusableDeclaration ident (nub solutions)
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)

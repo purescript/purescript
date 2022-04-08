@@ -792,7 +792,7 @@ inferClassDeclaration moduleName (ann, clsName, clsArgs, superClasses, decls) = 
       k_ <- maybe (freshKind (fst ann)) pure mbK
       k <- replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType $ k_
       pure (n, k, v)
-    unifyKinds clsKind' $ foldr ((E.-:>) . \(_, b, _) -> b) E.kindConstraint $ clsArgs'
+    unifyKinds clsKind' $ foldr ((E.-:>) . \(_, b, _) -> b) E.kindConstraint clsArgs'
     bindLocalTypeVariables moduleName ((\(a, b, _) -> (ProperName a, b)) <$> clsArgs') $ do
       (clsArgs',,)
         <$> for superClasses checkConstraint

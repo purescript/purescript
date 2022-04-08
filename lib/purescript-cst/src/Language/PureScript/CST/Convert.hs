@@ -602,7 +602,7 @@ convertDeclaration fileName decl = case decl of
     TypeVarKinded (Wrapped _ (Labeled (v, x) _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y, vtv v)
     TypeVarName (v, x) -> (getIdent $ nameValue x, Nothing, vtv v)
     where
-    vtv = maybe T.NotVtaTypeVar (const $ T.IsVtaTypeVar)
+    vtv = maybe T.NotVtaTypeVar (const T.IsVtaTypeVar)
 
   goInstanceBinding = \case
     InstanceBindingSignature _ lbl ->
