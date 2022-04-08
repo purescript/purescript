@@ -1,13 +1,25 @@
-Warning 1 of 2:
+Warning 1 of 5:
 
   in module [33mMain[0m
-  at tests/purs/warning/VisibleTypeApplications.purs:27:1 - 27:37 (line 27, column 1 - line 27, column 37)
+  at tests/purs/warning/VisibleTypeApplications.purs:41:3 - 41:31 (line 41, column 3 - line 41, column 31)
+
+    Type variable [33ma[0m was shadowed.
+
+  in type declaration for [33mf[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/ShadowedTypeVar.md for more information,
+  or to contribute content related to this warning.
+
+Warning 2 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/warning/VisibleTypeApplications.purs:30:1 - 30:37 (line 30, column 1 - line 30, column 37)
 
     No type declaration was provided for the top-level declaration of [33mtestFooGeneralize[0m.
     It is good practice to provide type declarations as a form of documentation.
     The inferred type of [33mtestFooGeneralize[0m was:
     [33m                                                    [0m
-    [33m  forall f64. MultiKind f64 => f64 Int Int -> String[0m
+    [33m  forall f76. MultiKind f76 => f76 Int Int -> String[0m
     [33m                                                    [0m
 
   in value declaration [33mtestFooGeneralize[0m
@@ -15,10 +27,10 @@ Warning 1 of 2:
   See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
   or to contribute content related to this warning.
 
-Warning 2 of 2:
+Warning 3 of 5:
 
   in module [33mMain[0m
-  at tests/purs/warning/VisibleTypeApplications.purs:10:1 - 10:18 (line 10, column 1 - line 10, column 18)
+  at tests/purs/warning/VisibleTypeApplications.purs:13:1 - 13:18 (line 13, column 1 - line 13, column 18)
 
     No type declaration was provided for the top-level declaration of [33mconst'[0m.
     It is good practice to provide type declarations as a form of documentation.
@@ -28,6 +40,40 @@ Warning 2 of 2:
     [33m                          [0m
 
   in value declaration [33mconst'[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
+  or to contribute content related to this warning.
+
+Warning 4 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/warning/VisibleTypeApplications.purs:43:1 - 43:7 (line 43, column 1 - line 43, column 7)
+
+    No type declaration was provided for the top-level declaration of [33m_f[0m.
+    It is good practice to provide type declarations as a form of documentation.
+    The inferred type of [33m_f[0m was:
+    [33m                                           [0m
+    [33m  forall @a. F a => a -> (forall a. a -> a)[0m
+    [33m                                           [0m
+
+  in value declaration [33m_f[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
+  or to contribute content related to this warning.
+
+Warning 5 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/warning/VisibleTypeApplications.purs:37:1 - 37:7 (line 37, column 1 - line 37, column 7)
+
+    No type declaration was provided for the top-level declaration of [33m_A[0m.
+    It is good practice to provide type declarations as a form of documentation.
+    The inferred type of [33m_A[0m was:
+    [33m                                      [0m
+    [33m  forall @a. (forall a. a -> a) -> A a[0m
+    [33m                                      [0m
+
+  in value declaration [33m_A[0m
 
   See https://github.com/purescript/documentation/blob/master/errors/MissingTypeDeclaration.md for more information,
   or to contribute content related to this warning.

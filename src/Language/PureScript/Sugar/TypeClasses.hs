@@ -299,16 +299,12 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarati
   in ValueDecl sa ident Private []
     [MkUnguarded (
      TypedValue False (Abs (VarBinder ss dictIdent) (Case [Var ss $ Qualified Nothing dictIdent] [CaseAlternative [ctor] [MkUnguarded acsr]])) $
-       makeVta (moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . \(a, _, _) -> a) args) Nothing) ty)))
+       makeTopLevelVta vtas (moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . \(a, _, _) -> a) args) Nothing) ty)))
     )]
   where
-  vtvs = S.fromList $ mapMaybe go args where
+  vtas = mapMaybe go args where
     go (i, _, IsVtaTypeVar) = Just i
     go _ = Nothing
-  makeVta = everywhereOnTypes go
-    where
-    go (ForAll a b c d e _) | b `S.member` vtvs = ForAll a b c d e IsVtaTypeVar
-    go t = t
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 
 unit :: SourceType

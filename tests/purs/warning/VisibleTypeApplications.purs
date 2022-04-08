@@ -1,3 +1,6 @@
+-- @shouldWarnWith ShadowedTypeVar
+-- @shouldWarnWith MissingTypeDeclaration
+-- @shouldWarnWith MissingTypeDeclaration
 -- @shouldWarnWith MissingTypeDeclaration
 -- @shouldWarnWith MissingTypeDeclaration
 module Main where
@@ -25,3 +28,16 @@ instance MultiKind (Tuplet2 a) where
   foo _ = "Tuplet2"
 
 testFooGeneralize = foo @_ @Int @Int
+
+
+-- Only top-level foralls should be vta-ified
+data A :: Type -> Type
+data A @a = A (forall a. a -> a)
+
+_A = A
+
+class F :: Type -> Constraint
+class F @a where
+  f :: a -> (forall a. a -> a)
+
+_f = f
