@@ -7,6 +7,14 @@ module Language.PureScript.Ide.Psii where
 
 import Protolude
 
+import Data.String (String)
+import qualified Data.Text as T
+
+import Language.PureScript.AST
+import Language.PureScript.Names
+import Language.PureScript.Pretty
+import Language.PureScript.Types
+
 -- |
 -- The verbosity of IDE information.
 data PsiiVerbosity
@@ -21,8 +29,22 @@ data PsiiVerbosity
 -- |
 -- The information entry to be emitted.
 data PsiiInformation
-  -- | A declaration in a source file.
-  = PsiiDeclaration
-  -- | A reference to a declaration.
-  | PsiiReference
+  -- |
+  -- Value declarations.
+  = PsiiValueDecl PsiiValueDecl'
   deriving (Show, Eq, Ord)
+
+data PsiiValueDecl' = PsiiValueDecl'
+  { psiiValueDeclSpan :: SourceSpan
+  , psiiValueDeclIdent :: Qualified Ident
+  , psiiValueDeclType :: SourceType
+  }
+  deriving (Show, Eq, Ord)
+
+debugInformation :: PsiiInformation -> String
+debugInformation (PsiiValueDecl (PsiiValueDecl' {..})) =
+  let
+    ident' = runIdent $ disqualify psiiValueDeclIdent
+    type' = T.strip $ T.pack $ prettyPrintType maxBound psiiValueDeclType
+  in
+    T.unpack $ "(" <> ident' <> " :: " <> type' <> ")"

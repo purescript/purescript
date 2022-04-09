@@ -171,6 +171,10 @@ withErrorMessageHint hint action = do
   modify $ \st -> st { checkHints = checkHints orig }
   return a
 
+insertPsiiInformation :: MonadState CheckState m => PsiiInformation -> m ()
+insertPsiiInformation information =
+  modify $ \st -> st { checkPsiiInformation = S.insert information $ checkPsiiInformation st }
+
 -- | These hints are added at the front, so the most nested hint occurs
 -- at the front, but the simplifier assumes the reverse order.
 getHints :: MonadState CheckState m => m [ErrorMessageHint]

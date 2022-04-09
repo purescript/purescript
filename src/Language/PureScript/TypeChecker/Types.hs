@@ -49,6 +49,7 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Ide.Psii
 import Language.PureScript.Names
 import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Entailment
@@ -491,6 +492,7 @@ inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (Typed
     if checkType
       then withScopedTypeVars moduleName args (bindNames dict (check val ty'))
       else return (TypedValue' checkType val elabTy)
+  insertPsiiInformation $ PsiiValueDecl $ PsiiValueDecl' ss (Qualified Nothing ident) ty''
   bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined))
     $ inferLetBinding (seen ++ [ValueDecl sa ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
 inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded val] : rest) ret j = do
@@ -499,6 +501,7 @@ inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded val] :
     let dict = M.singleton (Qualified Nothing ident) (valTy, nameKind, Undefined)
     bindNames dict $ infer val
   warnAndRethrowWithPositionTC ss $ unifyTypes valTy valTy'
+  insertPsiiInformation $ PsiiValueDecl $ PsiiValueDecl' ss (Qualified Nothing ident) valTy'
   bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined))
     $ inferLetBinding (seen ++ [ValueDecl sa ident nameKind [] [MkUnguarded val']]) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do

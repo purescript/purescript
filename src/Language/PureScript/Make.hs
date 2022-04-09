@@ -29,6 +29,7 @@ import           Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import           Debug.Trace (traceM)
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST as CST
@@ -36,6 +37,7 @@ import qualified Language.PureScript.Docs.Convert as Docs
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs
+import           Language.PureScript.Ide.Psii
 import           Language.PureScript.Linter
 import           Language.PureScript.ModuleDependencies
 import           Language.PureScript.Names
@@ -100,6 +102,7 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
     -- known which newtype constructors are used to solve Coercible
     -- constraints in order to not report them as unused.
     censor (addHint (ErrorInModule moduleName)) $ lintImports checked exEnv' usedImports'
+    _ <- traverse (traceM . debugInformation) $ S.toList checkPsiiInformation
     return (checked, checkEnv)
 
   -- desugar case declarations *after* type- and exhaustiveness checking
