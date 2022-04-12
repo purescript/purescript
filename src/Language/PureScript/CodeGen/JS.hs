@@ -263,10 +263,10 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     return $ accessorString "create" $ qualifiedToJS ss id name
   valueToJs (Accessor _ prop val) =
     accessorString prop <$> valueToJs val
-  valueToJs (ObjectUpdate _ o ps) = do
+  valueToJs (ObjectUpdate (ss, _, _, _) o ps) = do
     obj <- valueToJs o
     sts <- mapM (sndM valueToJs) ps
-    extendObj obj sts
+    extendObj ss obj sts
   valueToJs (Abs _ arg val) = do
     ret <- valueToJs val
     let jsArg = case arg of
@@ -332,8 +332,8 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   literalToValueJS ss (ObjectLiteral ps) = AST.ObjectLiteral (Just ss) <$> mapM (sndM valueToJs) ps
 
   -- | Shallow copy an object.
-  extendObj :: AST -> [(PSString, AST)] -> m AST
-  extendObj obj sts = do
+  extendObj :: SourceSpan -> AST -> [(PSString, AST)] -> m AST
+  extendObj ss obj sts = do
     newObj <- freshName
     key <- freshName
     evaluatedObj <- freshName
@@ -343,7 +343,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
       jsEvaluatedObj = AST.Var Nothing evaluatedObj
       block = AST.Block Nothing (evaluate:objAssign:copy:extend ++ [AST.Return Nothing jsNewObj])
       evaluate = AST.VariableIntroduction Nothing evaluatedObj (Just obj)
-      objAssign = AST.VariableIntroduction Nothing newObj (Just $ AST.ObjectLiteral Nothing [])
+      objAssign = AST.VariableIntroduction (Just ss) newObj (Just $ AST.ObjectLiteral Nothing [])
       copy = AST.ForIn Nothing key jsEvaluatedObj $ AST.Block Nothing [AST.IfElse Nothing cond assign Nothing]
       cond = AST.App Nothing (accessorString "call" (accessorString "hasOwnProperty" (AST.ObjectLiteral Nothing []))) [jsEvaluatedObj, jsKey]
       assign = AST.Block Nothing [AST.Assignment Nothing (AST.Indexer Nothing jsKey jsNewObj) (AST.Indexer Nothing jsKey jsEvaluatedObj)]
