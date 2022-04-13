@@ -443,15 +443,15 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
 
   literalToBinderJS :: SourceSpan -> Text -> [AST] -> Literal (Binder Ann) -> m [AST]
   literalToBinderJS ss varName done (NumericLiteral num) =
-    return [AST.IfElse (Just ss) (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.NumericLiteral Nothing num)) (AST.Block Nothing done) Nothing]
+    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.NumericLiteral (Just ss) num)) (AST.Block Nothing done) Nothing]
   literalToBinderJS ss varName done (CharLiteral c) =
-    return [AST.IfElse (Just ss) (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.StringLiteral Nothing (fromString [c]))) (AST.Block Nothing done) Nothing]
+    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.StringLiteral (Just ss) (fromString [c]))) (AST.Block Nothing done) Nothing]
   literalToBinderJS ss varName done (StringLiteral str) =
-    return [AST.IfElse (Just ss) (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.StringLiteral Nothing str)) (AST.Block Nothing done) Nothing]
-  literalToBinderJS _ varName done (BooleanLiteral True) =
-    return [AST.IfElse Nothing (AST.Var Nothing varName) (AST.Block Nothing done) Nothing]
+    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.StringLiteral (Just ss) str)) (AST.Block Nothing done) Nothing]
+  literalToBinderJS ss varName done (BooleanLiteral True) =
+    return [AST.IfElse Nothing (AST.Var (Just ss) varName) (AST.Block Nothing done) Nothing]
   literalToBinderJS ss varName done (BooleanLiteral False) =
-    return [AST.IfElse (Just ss) (AST.Unary Nothing AST.Not (AST.Var Nothing varName)) (AST.Block Nothing done) Nothing]
+    return [AST.IfElse Nothing (AST.Unary Nothing AST.Not (AST.Var (Just ss) varName)) (AST.Block Nothing done) Nothing]
   literalToBinderJS _ varName done (ObjectLiteral bs) = go done bs
     where
     go :: [AST] -> [(PSString, Binder Ann)] -> m [AST]
