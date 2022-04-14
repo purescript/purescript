@@ -1,8 +1,10 @@
 # purescript-cst
 
-The parser for the PureScript programming language.
+The parser for the PureScript programming language was temporarily released as a separate package for the `0.14.x` series. In `0.15.x`, it was merged back into the main `purescript` package. This table only exists for documentary purposes.
 
 ## Compiler compatibility
+
+In `v0.15.0`, the `purescript-cst` package was merged back into the `purescript` package.
 
 We provide a table to make it a bit easier to map between versions of `purescript` and `purescript-cst`.
 
