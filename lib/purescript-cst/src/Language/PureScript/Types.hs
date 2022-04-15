@@ -231,9 +231,9 @@ constraintToJSON annToJSON Constraint {..} =
     , "constraintData"  .= fmap constraintDataToJSON constraintData
     ]
 
-vtaForAllToJSON :: VtaTypeVar -> A.Value
-vtaForAllToJSON IsVtaTypeVar = A.toJSON ("IsVtaTypeVar" :: String)
-vtaForAllToJSON NotVtaTypeVar = A.toJSON ("NotVtaTypeVar" :: String)
+vtaTypeVarToJSON :: VtaTypeVar -> A.Value
+vtaTypeVarToJSON IsVtaTypeVar = A.toJSON ("IsVtaTypeVar" :: String)
+vtaTypeVarToJSON NotVtaTypeVar = A.toJSON ("NotVtaTypeVar" :: String)
 
 typeToJSON :: forall a. (a -> A.Value) -> Type a -> A.Value
 typeToJSON annToJSON ty =
@@ -256,11 +256,10 @@ typeToJSON annToJSON ty =
       variant "TypeApp" a (go b, go c)
     KindApp a b c ->
       variant "KindApp" a (go b, go c)
-    ForAll a b c d e _ ->
+    ForAll a b c d e f ->
       case c of
-        -- TODO: Restore these in the future
-        Nothing -> variant "ForAll" a (b, go d, e)
-        Just k -> variant "ForAll" a (b, go k, go d, e)
+        Nothing -> variant "ForAll" a (b, go d, e, f)
+        Just k -> variant "ForAll" a (b, go k, go d, e, f)
     ConstrainedType a b c ->
       variant "ConstrainedType" a (constraintToJSON annToJSON b, go c)
     Skolem a b c d e ->
@@ -310,7 +309,7 @@ instance A.ToJSON ConstraintData where
   toJSON = constraintDataToJSON
 
 instance A.ToJSON VtaTypeVar where
-  toJSON = vtaForAllToJSON
+  toJSON = vtaTypeVarToJSON
 
 constraintDataFromJSON :: A.Value -> A.Parser ConstraintData
 constraintDataFromJSON = A.withObject "PartialConstraintData" $ \o -> do
@@ -326,8 +325,8 @@ constraintFromJSON defaultAnn annFromJSON = A.withObject "Constraint" $ \o -> do
   constraintData  <- o .: "constraintData" >>= traverse constraintDataFromJSON
   pure $ Constraint {..}
 
-vtaForAllFromJSON :: A.Value -> A.Parser VtaTypeVar
-vtaForAllFromJSON v = do
+vtaTypeVarFromJSON :: A.Value -> A.Parser VtaTypeVar
+vtaTypeVarFromJSON v = do
   v' <- A.parseJSON v
   case v' of
     "IsVtaTypeVar" -> pure IsVtaTypeVar
@@ -365,14 +364,19 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
       KindApp a <$> go b <*> go c
     "ForAll" -> do
       let
-        -- TODO: Restore these in the future
         withoutMbKind = do
           (b, c, d) <- contents
           ForAll a b Nothing <$> go c <*> pure d <*> pure NotVtaTypeVar
+        withoutMbKind' = do
+          (b, c, d, e) <- contents
+          ForAll a b Nothing <$> go c <*> pure d <*> vtaTypeVarFromJSON e
         withMbKind = do
           (b, c, d, e) <- contents
           ForAll a b <$> (Just <$> go c) <*> go d <*> pure e <*> pure NotVtaTypeVar
-      withMbKind <|> withoutMbKind
+        withMbKind' = do
+          (b, c, d, e, f) <- contents
+          ForAll a b <$> (Just <$> go c) <*> go d <*> pure e <*> vtaTypeVarFromJSON f
+      withMbKind' <|> withMbKind <|> withoutMbKind' <|> withoutMbKind
     "ConstrainedType" -> do
       (b, c) <- contents
       ConstrainedType a <$> constraintFromJSON defaultAnn annFromJSON b <*> go c
@@ -434,7 +438,7 @@ instance A.FromJSON ConstraintData where
   parseJSON = constraintDataFromJSON
 
 instance A.FromJSON VtaTypeVar where
-  parseJSON = vtaForAllFromJSON
+  parseJSON = vtaTypeVarFromJSON
 
 instance A.FromJSON WildcardData where
   parseJSON = \case
