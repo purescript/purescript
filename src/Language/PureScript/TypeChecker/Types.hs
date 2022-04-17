@@ -265,7 +265,7 @@ typeDictionaryForBindingGroup moduleName vals = do
       return ((sai, ty), (sai, (expr, ty)))
     -- Create the dictionary of all name/type pairs, which will be added to the
     -- environment during type checking
-    let dict = M.fromList [ (Qualified (fromMaybe (BySourceSpan ss) (ByModuleName <$> moduleName)) ident, (ty, Private, Undefined))
+    let dict = M.fromList [ (Qualified (maybe (BySourceSpan ss) ByModuleName moduleName) ident, (ty, Private, Undefined))
                           | (((ss, _), ident), ty) <- typedDict <> untypedDict
                           ]
     return (SplitBindingGroup untyped' typed' dict)

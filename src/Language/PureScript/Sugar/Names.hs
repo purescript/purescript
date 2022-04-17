@@ -412,13 +412,11 @@ renameInModule imports (Module modSS coms mn decls exps) =
 desugarLocals :: Monad m => Module -> m Module
 desugarLocals (Module ms cm mn dc ex) = pure $ Module ms cm mn dc' ex
   where
-  dc' = (flip evalState (M.empty, []) . go) <$> dc
+  dc' = flip evalState (M.empty, []) . go <$> dc
 
-  insertOne k v = modify' $ \(e, b) ->
-    (M.insert k v e, b)
+  insertOne k v = modify' $ first $ M.insert k v
 
-  insertMany e' = modify' $ \(e, b) ->
-    (M.union e' e, b)
+  insertMany e' = modify' $ first $ M.union e'
 
   lookupIdent k = gets (M.lookup k . fst)
 
