@@ -150,7 +150,7 @@ spec = context "CoreFnFromJson" $ do
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse UnusedIdent in Abs" $ do
-      let i = NonRec ann (Ident "f") (Abs ann UnusedIdent (Var ann (Qualified (BySourceSpan nullSourceSpan { spanName = mp }) (Ident "x"))))
+      let i = NonRec ann (Ident "f") (Abs ann UnusedIdent (Var ann (Qualified ByNullSourceSpan (Ident "x"))))
       let r = parseMod $ Module ss [] mn mp [] [] M.empty [] [i]
       r `shouldSatisfy` isSuccess
       case r of
