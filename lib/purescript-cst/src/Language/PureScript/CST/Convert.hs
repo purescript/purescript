@@ -90,7 +90,11 @@ moduleName = \case
   go ns = Just $ N.ModuleName $ Text.intercalate "." ns
 
 qualified :: QualifiedName a -> N.Qualified a
-qualified q = N.Qualified (qualModule q) (qualName q)
+qualified q = N.Qualified qb (qualName q)
+  where
+  qb = case qualModule q of
+    Just mn -> N.ByModuleName mn
+    Nothing -> N.ByNullSourceSpan
 
 ident :: Ident -> N.Ident
 ident = N.Ident . getIdent

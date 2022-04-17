@@ -67,7 +67,7 @@ directDependants declaration modules mn = Map.mapMaybe (nonEmpty . go) modules
     go = foldMap isImporting . P.getModuleDeclarations
 
     isImporting d = case d of
-      P.ImportDeclaration _ mn' it qual | mn == mn' -> P.Qualified qual <$> case it of
+      P.ImportDeclaration _ mn' it qual | mn == mn' -> P.Qualified (P.byMaybeModuleName qual) <$> case it of
         P.Implicit -> pure declaration
         P.Explicit refs
           | any (declaration `matchesRef`) refs -> pure declaration
@@ -120,7 +120,7 @@ eligibleModules
   -> ModuleMap (NonEmpty Search)
 eligibleModules query@(moduleName, declaration) decls modules =
   let
-    searchDefiningModule = P.Qualified Nothing declaration :| []
+    searchDefiningModule = P.Qualified P.ByNullSourceSpan declaration :| []
   in
     Map.insert moduleName searchDefiningModule $
       foldMap (directDependants declaration modules) (moduleName :| findReexportingModules query decls)

@@ -128,7 +128,7 @@ onVarsWithDelayAndForce f = snd . go 0 $ Just 0
       Var a i -> f delay force a i
       Abs a i e -> Abs a i <$> snd (if force == Just 0 then go (succ delay) force else go delay $ fmap pred force) e
       -- A clumsy hack to preserve TCO in a particular idiom of unsafePartial once seen in Data.Map.Internal, possibly still used elsewhere.
-      App a1 e1@(Var _ (Qualified (Just C.PartialUnsafe) (Ident up))) (Abs a2 i e2) | up == C.unsafePartial
+      App a1 e1@(Var _ (Qualified (ByModuleName C.PartialUnsafe) (Ident up))) (Abs a2 i e2) | up == C.unsafePartial
         -> App a1 e1 . Abs a2 i <$> handleExpr' e2
       App a e1 e2 ->
         -- `handleApp` is just to handle the constructor application exception
@@ -433,7 +433,7 @@ applyLazinessTransform mn rawItems = let
   --                A           B (keys)           C (keys)           D
   findReferences :: Expr Ann -> IM.MonoidalIntMap (IM.MonoidalIntMap (Ap Maybe (Max Int)))
   findReferences = (getConst .) . onVarsWithDelayAndForce $ \delay force _ -> \case
-    Qualified mn' ident | all (== mn) mn', Just i <- ident `S.lookupIndex` names
+    Qualified qb ident | all (== mn) (toMaybeModuleName qb), Just i <- ident `S.lookupIndex` names
       -> Const . IM.singleton delay . IM.singleton i $ coerceForce force
     _ -> Const IM.empty
 
@@ -517,7 +517,7 @@ applyLazinessTransform mn rawItems = let
     Nothing -> pair
     Just m -> let
       rewriteExpr = (runIdentity .) . onVarsWithDelayAndForce $ \delay _ ann -> pure . \case
-        Qualified mn' ident' | all (== mn) mn', any (all (>= Max delay) . getAp) $ ident' `M.lookup` m
+        Qualified qb ident' | all (== mn) (toMaybeModuleName qb), any (all (>= Max delay) . getAp) $ ident' `M.lookup` m
           -> makeForceCall ann ident'
         q -> Var ann q
       in (ident, rewriteExpr <$> item)
@@ -532,8 +532,8 @@ applyLazinessTransform mn rawItems = let
   where
 
   nullAnn = ssAnn nullSourceSpan
-  runtimeLazy = Var nullAnn . Qualified Nothing $ InternalIdent RuntimeLazyFactory
-  runFn3 = Var nullAnn . Qualified (Just C.DataFunctionUncurried) . Ident $ C.runFn <> "3"
+  runtimeLazy = Var nullAnn . Qualified ByNullSourceSpan $ InternalIdent RuntimeLazyFactory
+  runFn3 = Var nullAnn . Qualified (ByModuleName C.DataFunctionUncurried) . Ident $ C.runFn <> "3"
   strLit = Literal nullAnn . StringLiteral . mkString
 
   lazifyIdent = \case
@@ -546,7 +546,7 @@ applyLazinessTransform mn rawItems = let
     -- argument: the line number on which this reference is made. The runtime
     -- code uses this number to generate a message that identifies where the
     -- evaluation looped.
-    = App nullAnn (Var nullAnn . Qualified Nothing $ lazifyIdent ident)
+    = App nullAnn (Var nullAnn . Qualified ByNullSourceSpan $ lazifyIdent ident)
     . Literal nullAnn . NumericLiteral . Left . toInteger . sourcePosLine
     $ spanStart ss
 

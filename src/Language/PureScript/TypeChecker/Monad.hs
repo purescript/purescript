@@ -149,9 +149,9 @@ withScopedTypeVars
 withScopedTypeVars mn ks ma = do
   orig <- get
   forM_ ks $ \(name, _) ->
-    when (Qualified (Just mn) (ProperName name) `M.member` types (checkEnv orig)) $
+    when (Qualified (ByModuleName mn) (ProperName name) `M.member` types (checkEnv orig)) $
       tell . errorMessage $ ShadowedTypeVar name
-  bindTypes (M.fromList (map (\(name, k) -> (Qualified (Just mn) (ProperName name), (k, ScopedTypeVar))) ks)) ma
+  bindTypes (M.fromList (map (\(name, k) -> (Qualified (ByModuleName mn) (ProperName name), (k, ScopedTypeVar))) ks)) ma
 
 withErrorMessageHint
   :: (MonadState CheckState m, MonadError MultipleErrors m)
@@ -196,8 +196,8 @@ withTypeClassDictionaries entries action = do
 
   let mentries =
         M.fromListWith (M.unionWith (M.unionWith (<>)))
-          [ (mn, M.singleton className (M.singleton (tcdValue entry) (pure entry)))
-          | entry@TypeClassDictionaryInScope{ tcdValue = Qualified mn _, tcdClassName = className }
+          [ (getQual tcdValue, M.singleton className (M.singleton tcdValue (pure entry)))
+          | entry@TypeClassDictionaryInScope{ tcdValue, tcdClassName = className }
               <- entries
           ]
 
@@ -234,7 +234,7 @@ bindLocalVariables
   -> m a
   -> m a
 bindLocalVariables bindings =
-  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> (Qualified Nothing name, (ty, Private, visibility)))
+  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> (Qualified ByNullSourceSpan name, (ty, Private, visibility)))
 
 -- | Temporarily bind a collection of names to local type variables
 bindLocalTypeVariables
@@ -244,7 +244,7 @@ bindLocalTypeVariables
   -> m a
   -> m a
 bindLocalTypeVariables moduleName bindings =
-  bindTypes (M.fromList $ flip map bindings $ \(pn, kind) -> (Qualified (Just moduleName) pn, (kind, LocalTypeVariable)))
+  bindTypes (M.fromList $ flip map bindings $ \(pn, kind) -> (Qualified (ByModuleName moduleName) pn, (kind, LocalTypeVariable)))
 
 -- | Update the visibility of all names to Defined
 makeBindingGroupVisible :: (MonadState CheckState m) => m ()
@@ -301,11 +301,15 @@ lookupTypeVariable
   => ModuleName
   -> Qualified (ProperName 'TypeName)
   -> m SourceType
-lookupTypeVariable currentModule (Qualified moduleName name) = do
+lookupTypeVariable currentModule (Qualified qb name) = do
   env <- getEnv
-  case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of
+  case M.lookup (Qualified qb' name) (types env) of
     Nothing -> throwError . errorMessage $ UndefinedTypeVariable name
     Just (k, _) -> return k
+  where
+  qb' = ByModuleName $ case qb of
+    ByModuleName m -> m
+    BySourceSpan _ -> currentModule
 
 -- | Get the current @Environment@
 getEnv :: (MonadState CheckState m) => m Environment
@@ -315,7 +319,7 @@ getEnv = gets checkEnv
 getLocalContext :: MonadState CheckState m => m Context
 getLocalContext = do
   env <- getEnv
-  return [ (ident, ty') | (Qualified Nothing ident@Ident{}, (ty', _, Defined)) <- M.toList (names env) ]
+  return [ (ident, ty') | (Qualified (BySourceSpan _) ident@Ident{}, (ty', _, Defined)) <- M.toList (names env) ]
 
 -- | Update the @Environment@
 putEnv :: (MonadState CheckState m) => Environment -> m ()

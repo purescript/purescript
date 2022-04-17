@@ -130,13 +130,15 @@ getModuleDeclarations (Module _ _ _ declarations _) = declarations
 addDefaultImport :: Qualified ModuleName -> Module -> Module
 addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps) =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit toImportAs : decls) exps
+  else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit toImportAs' : decls) exps
   where
+  toImportAs' = toMaybeModuleName toImportAs
+
   isExistingImport (ImportDeclaration _ mn' _ as')
     | mn' == toImport =
-        case toImportAs of
+        case toImportAs' of
           Nothing -> True
-          _ -> as' == toImportAs
+          _ -> as' == toImportAs'
   isExistingImport _ = False
 
 -- | Adds import declarations to a module for an implicit Prim import and Prim
@@ -146,8 +148,8 @@ importPrim =
   let
     primModName = C.Prim
   in
-    addDefaultImport (Qualified (Just primModName) primModName)
-      . addDefaultImport (Qualified Nothing primModName)
+    addDefaultImport (Qualified (ByModuleName primModName) primModName)
+      . addDefaultImport (Qualified ByNullSourceSpan primModName)
 
 data NameSource = UserNamed | CompilerNamed
   deriving (Show, Generic, NFData, Serialise)
@@ -828,8 +830,8 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSo
 
 isTrueExpr :: Expr -> Bool
 isTrueExpr (Literal _ (BooleanLiteral True)) = True
-isTrueExpr (Var _ (Qualified (Just (ModuleName "Prelude")) (Ident "otherwise"))) = True
-isTrueExpr (Var _ (Qualified (Just (ModuleName "Data.Boolean")) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (ByModuleName (ModuleName "Prelude")) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (ByModuleName (ModuleName "Data.Boolean")) (Ident "otherwise"))) = True
 isTrueExpr (TypedValue _ e _) = isTrueExpr e
 isTrueExpr (PositionedValue _ _ e) = isTrueExpr e
 isTrueExpr _ = False

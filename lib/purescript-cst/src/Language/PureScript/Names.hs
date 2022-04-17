@@ -8,6 +8,7 @@ module Language.PureScript.Names where
 import Prelude.Compat
 
 import Codec.Serialise (Serialise)
+import Control.Applicative ((<|>))
 import Control.Monad.Supply.Class
 import Control.DeepSeq (NFData)
 import Data.Functor.Contravariant (contramap)
@@ -18,6 +19,8 @@ import Data.Aeson
 import Data.Aeson.TH
 import Data.Text (Text)
 import qualified Data.Text as T
+
+import Language.PureScript.AST.SourcePos (SourceSpan, pattern NullSourceSpan)
 
 -- | A sum of the possible name types, useful for error and lint messages.
 data Name
@@ -199,34 +202,58 @@ moduleNameFromString = ModuleName
 isBuiltinModuleName :: ModuleName -> Bool
 isBuiltinModuleName (ModuleName mn) = mn == "Prim" || "Prim." `T.isPrefixOf` mn
 
+data QualifiedBy
+  = BySourceSpan SourceSpan
+  | ByModuleName ModuleName
+  deriving (Show, Eq, Ord, Generic)
+
+pattern ByNullSourceSpan :: QualifiedBy
+pattern ByNullSourceSpan = BySourceSpan NullSourceSpan
+
+instance NFData QualifiedBy
+instance Serialise QualifiedBy
+
+isBySourceSpan :: QualifiedBy -> Bool
+isBySourceSpan (BySourceSpan _) = True
+isBySourceSpan _ = False
+
+byMaybeModuleName :: Maybe ModuleName -> QualifiedBy
+byMaybeModuleName (Just mn) = ByModuleName mn
+byMaybeModuleName Nothing = ByNullSourceSpan
+
+toMaybeModuleName :: QualifiedBy -> Maybe ModuleName
+toMaybeModuleName (ByModuleName mn) = Just mn
+toMaybeModuleName (BySourceSpan _) = Nothing
+
 -- |
 -- A qualified name, i.e. a name with an optional module name
 --
-data Qualified a = Qualified (Maybe ModuleName) a
+data Qualified a = Qualified QualifiedBy a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 instance NFData a => NFData (Qualified a)
 instance Serialise a => Serialise (Qualified a)
 
 showQualified :: (a -> Text) -> Qualified a -> Text
-showQualified f (Qualified Nothing a) = f a
-showQualified f (Qualified (Just name) a) = runModuleName name <> "." <> f a
+showQualified f (Qualified (BySourceSpan  _) a) = f a
+showQualified f (Qualified (ByModuleName name) a) = runModuleName name <> "." <> f a
 
 getQual :: Qualified a -> Maybe ModuleName
-getQual (Qualified mn _) = mn
+getQual (Qualified (ByModuleName mn) _) = Just mn
+getQual _ = Nothing
 
 -- |
 -- Provide a default module name, if a name is unqualified
 --
 qualify :: ModuleName -> Qualified a -> (ModuleName, a)
-qualify m (Qualified Nothing a) = (m, a)
-qualify _ (Qualified (Just m) a) = (m, a)
+qualify m (Qualified (BySourceSpan _) a) = (m, a)
+qualify _ (Qualified (ByModuleName m) a) = (m, a)
 
 -- |
 -- Makes a qualified value from a name and module name.
 --
 mkQualified :: a -> ModuleName -> Qualified a
-mkQualified name mn = Qualified (Just mn) name
+mkQualified name mn = Qualified (ByModuleName mn) name
 
 -- | Remove the module name from a qualified name
 disqualify :: Qualified a -> a
@@ -237,14 +264,15 @@ disqualify (Qualified _ a) = a
 -- module name.
 --
 disqualifyFor :: Maybe ModuleName -> Qualified a -> Maybe a
-disqualifyFor mn (Qualified mn' a) | mn == mn' = Just a
+disqualifyFor (Just mn) (Qualified (ByModuleName mn') a) | mn == mn' = Just a
+disqualifyFor Nothing (Qualified _ a) = Just a
 disqualifyFor _ _ = Nothing
 
 -- |
 -- Checks whether a qualified value is actually qualified with a module reference
 --
 isQualified :: Qualified a -> Bool
-isQualified (Qualified Nothing _) = False
+isQualified (Qualified (BySourceSpan  _) _) = False
 isQualified _ = True
 
 -- |
@@ -257,10 +285,24 @@ isUnqualified = not . isQualified
 -- Checks whether a qualified value is qualified with a particular module
 --
 isQualifiedWith :: ModuleName -> Qualified a -> Bool
-isQualifiedWith mn (Qualified (Just mn') _) = mn == mn'
+isQualifiedWith mn (Qualified (ByModuleName mn') _) = mn == mn'
 isQualifiedWith _ _ = False
 
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Qualified)
+instance ToJSON a => ToJSON (Qualified a) where
+  toJSON (Qualified qb a) = case qb of
+    ByModuleName mn -> toJSON (mn, a)
+    BySourceSpan ss -> toJSON (ss, a)
+
+instance FromJSON a => FromJSON (Qualified a) where
+  parseJSON v = byModule <|> bySourceSpan
+    where
+    byModule = do
+      (mn, a) <- parseJSON v
+      pure $ Qualified (ByModuleName mn) a
+    bySourceSpan = do
+      (ss, a) <- parseJSON v
+      pure $ Qualified (BySourceSpan ss) a
+
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''InternalIdentData)
 

@@ -360,7 +360,7 @@ resolveInstances externs declarations =
   where
     extractInstances mn P.EDInstance{..} =
       case edInstanceClassName of
-          P.Qualified (Just classModule) className ->
+          P.Qualified (P.ByModuleName classModule) className ->
             Just (IdeInstance mn
                   edInstanceName
                   edInstanceTypes
@@ -405,14 +405,14 @@ resolveOperatorsForModule modules = map (idaDeclaration %~ resolveOperator)
       & map discardAnn
 
     resolveOperator (IdeDeclValueOperator op)
-      | (P.Qualified (Just mn) (Left ident)) <- op ^. ideValueOpAlias =
+      | (P.Qualified (P.ByModuleName mn) (Left ident)) <- op ^. ideValueOpAlias =
           let t = getDeclarations mn
                   & mapMaybe (preview _IdeDeclValue)
                   & filter (anyOf ideValueIdent (== ident))
                   & map (view ideValueType)
                   & listToMaybe
           in IdeDeclValueOperator (op & ideValueOpType .~ t)
-      | (P.Qualified (Just mn) (Right dtor)) <- op ^. ideValueOpAlias =
+      | (P.Qualified (P.ByModuleName mn) (Right dtor)) <- op ^. ideValueOpAlias =
           let t = getDeclarations mn
                   & mapMaybe (preview _IdeDeclDataConstructor)
                   & filter (anyOf ideDtorName (== dtor))
@@ -420,7 +420,7 @@ resolveOperatorsForModule modules = map (idaDeclaration %~ resolveOperator)
                   & listToMaybe
           in IdeDeclValueOperator (op & ideValueOpType .~ t)
     resolveOperator (IdeDeclTypeOperator op)
-      | P.Qualified (Just mn) properName <- op ^. ideTypeOpAlias =
+      | P.Qualified (P.ByModuleName mn) properName <- op ^. ideTypeOpAlias =
           let k = getDeclarations mn
                   & mapMaybe (preview _IdeDeclType)
                   & filter (anyOf ideTypeName (== properName))

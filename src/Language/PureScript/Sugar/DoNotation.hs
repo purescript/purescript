@@ -30,10 +30,10 @@ desugarDo d =
   in rethrowWithPosition ss $ f d
   where
   bind :: SourceSpan -> Maybe ModuleName -> Expr
-  bind ss m = Var ss (Qualified m (Ident C.bind))
+  bind ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.bind))
 
   discard :: SourceSpan -> Maybe ModuleName -> Expr
-  discard ss m = Var ss (Qualified m (Ident C.discard))
+  discard ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.discard))
 
   replace :: SourceSpan -> Expr -> m Expr
   replace pos (Do m els) = go pos m els
@@ -70,7 +70,7 @@ desugarDo d =
         return $ App (App (bind pos m) val) (Abs (VarBinder ss ident) rest')
       _ -> do
         ident <- freshIdent'
-        return $ App (App (bind pos m) val) (Abs (VarBinder pos ident) (Case [Var pos (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
+        return $ App (App (bind pos m) val) (Abs (VarBinder pos ident) (Case [Var pos (Qualified ByNullSourceSpan ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
   go _ _ [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go pos m (DoNotationLet ds : rest) = do
     let checkBind :: Declaration -> m ()

@@ -18,7 +18,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 
 import           Language.PureScript.AST.Literals
-import           Language.PureScript.AST.SourcePos (SourceSpan(SourceSpan))
+import           Language.PureScript.AST.SourcePos (SourceSpan(..))
 import           Language.PureScript.CoreFn
 import           Language.PureScript.Names
 import           Language.PureScript.PSString (PSString)
@@ -94,10 +94,18 @@ properNameToJSON :: ProperName a -> Value
 properNameToJSON = toJSON . runProperName
 
 qualifiedToJSON :: (a -> Text) -> Qualified a -> Value
-qualifiedToJSON f (Qualified mn a) = object
-  [ T.pack "moduleName"   .= maybe Null moduleNameToJSON mn
-  , T.pack "identifier"   .= toJSON (f a)
-  ]
+qualifiedToJSON f (Qualified qb a) =
+  case qb of
+    ByModuleName mn -> object
+      [ T.pack "moduleName" .= moduleNameToJSON mn
+      , T.pack "identifier" .= toJSON (f a)
+      ]
+    BySourceSpan ss -> object
+      -- TODO: Should `sourceSpanXJSON` encode this information as well?
+      [ T.pack "spanName"   .= toJSON (spanName ss)
+      , T.pack "sourceSpan" .= sourceSpanToJSON ss
+      , T.pack "identifier" .= toJSON (f a)
+      ]
 
 moduleNameToJSON :: ModuleName -> Value
 moduleNameToJSON (ModuleName name) = toJSON (T.splitOn (T.pack ".") name)

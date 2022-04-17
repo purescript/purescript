@@ -211,12 +211,12 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.RowLacks kinds args | Just dicts <- solveLacks kinds args = dicts
     forClassName _ _ C.RowCons kinds args | Just dicts <- solveRowCons kinds args = dicts
     forClassName _ _ C.RowToList kinds args | Just dicts <- solveRowToList kinds args = dicts
-    forClassName _ ctx cn@(Qualified (Just mn) _) _ tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
+    forClassName _ ctx cn@(Qualified (ByModuleName mn) _) _ tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ _ _ = internalError "forClassName: expected qualified class name"
 
     ctorModules :: SourceType -> Maybe ModuleName
-    ctorModules (TypeConstructor _ (Qualified (Just mn) _)) = Just mn
-    ctorModules (TypeConstructor _ (Qualified Nothing _)) = internalError "ctorModules: unqualified type name"
+    ctorModules (TypeConstructor _ (Qualified (ByModuleName mn) _)) = Just mn
+    ctorModules (TypeConstructor _ (Qualified (BySourceSpan _) _)) = internalError "ctorModules: unqualified type name"
     ctorModules (TypeApp _ ty _) = ctorModules ty
     ctorModules (KindApp _ ty _) = ctorModules ty
     ctorModules (KindedType _ ty _) = ctorModules ty
@@ -226,7 +226,7 @@ entails SolverOptions{..} constraint context hints =
     findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (>>= M.lookup cn) . flip M.lookup ctx
 
     valUndefined :: Expr
-    valUndefined = Var nullSourceSpan (Qualified (Just C.Prim) (Ident C.undefined))
+    valUndefined = Var nullSourceSpan (Qualified (ByModuleName C.Prim) (Ident C.undefined))
 
     solve :: SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
     solve = go 0 hints
@@ -303,7 +303,7 @@ entails SolverOptions{..} constraint context hints =
               Unsolved unsolved -> do
                 -- Generate a fresh name for the unsolved constraint's new dictionary
                 ident <- freshIdent ("dict" <> runProperName (disqualify (constraintClass unsolved)))
-                let qident = Qualified Nothing ident
+                let qident = Qualified ByNullSourceSpan ident
                 -- Store the new dictionary in the InstanceContext so that we can solve this goal in
                 -- future.
                 newDicts <- lift . lift $ newDictionaries [] qident unsolved
@@ -368,7 +368,7 @@ entails SolverOptions{..} constraint context hints =
             tcdToInstanceDescription TypeClassDictionaryInScope{ tcdDescription, tcdValue } =
               let nii = namedInstanceIdentifier tcdValue
               in case tcdDescription of
-                Just ty -> flip Qualified (Left ty) <$> fmap getQual nii
+                Just ty -> flip Qualified (Left ty) <$> fmap (byMaybeModuleName . getQual) nii
                 Nothing -> fmap Right <$> nii
 
             canBeGeneralized :: Type a -> Bool

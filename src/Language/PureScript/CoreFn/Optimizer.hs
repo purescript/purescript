@@ -10,7 +10,7 @@ import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.CoreFn.Traversals
-import Language.PureScript.Names (Ident(..), ModuleName(..), Qualified(..))
+import Language.PureScript.Names (Ident(..), ModuleName(..), QualifiedBy(..), Qualified(..))
 import Language.PureScript.Label
 import Language.PureScript.Types
 import qualified Language.PureScript.Constants.Prelude as C
@@ -53,7 +53,7 @@ closedRecordFields _ = Nothing
 
 optimizeDataFunctionApply :: Expr a -> Expr a
 optimizeDataFunctionApply e = case e of
-  (App a (App _ (Var _ (Qualified (Just (ModuleName mn)) (Ident fn))) x) y)
+  (App a (App _ (Var _ (Qualified (ByModuleName (ModuleName mn)) (Ident fn))) x) y)
     | mn == dataFunction && fn == C.apply -> App a x y
     | mn == dataFunction && fn == C.applyFlipped -> App a y x
   _ -> e

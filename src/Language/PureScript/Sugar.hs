@@ -93,9 +93,9 @@ findTypeSynonyms externs mn decls =
     M.fromList $ (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
               ++ mapMaybe fromLocalDecl decls
   where
-    fromExternsDecl mn' (EDTypeSynonym name args ty) = Just (Qualified (Just mn') name, (args, ty))
+    fromExternsDecl mn' (EDTypeSynonym name args ty) = Just (Qualified (ByModuleName mn') name, (args, ty))
     fromExternsDecl _ _ = Nothing
 
     fromLocalDecl (TypeSynonymDeclaration _ name args ty) =
-      Just (Qualified (Just mn) name, (args, ty))
+      Just (Qualified (ByModuleName mn) name, (args, ty))
     fromLocalDecl _ = Nothing

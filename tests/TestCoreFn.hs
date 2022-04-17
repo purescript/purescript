@@ -136,7 +136,7 @@ spec = context "CoreFnFromJson" $ do
     specify "should parse Abs" $ do
       let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "abs")
-                    $ Abs ann (Ident "x") (Var ann (Qualified (Just mn) (Ident "x")))
+                    $ Abs ann (Ident "x") (Var ann (Qualified (ByModuleName mn) (Ident "x")))
                 ]
       parseMod m `shouldSatisfy` isSuccess
 
@@ -144,13 +144,13 @@ spec = context "CoreFnFromJson" $ do
       let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "app")
                     $ App ann
-                        (Abs ann (Ident "x") (Var ann (Qualified Nothing (Ident "x"))))
+                        (Abs ann (Ident "x") (Var ann (Qualified ByNullSourceSpan (Ident "x"))))
                         (Literal ann (CharLiteral 'c'))
                 ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse UnusedIdent in Abs" $ do
-      let i = NonRec ann (Ident "f") (Abs ann UnusedIdent (Var ann (Qualified Nothing (Ident "x"))))
+      let i = NonRec ann (Ident "f") (Abs ann UnusedIdent (Var ann (Qualified (BySourceSpan nullSourceSpan { spanName = mp }) (Ident "x"))))
       let r = parseMod $ Module ss [] mn mp [] [] M.empty [] [i]
       r `shouldSatisfy` isSuccess
       case r of
@@ -161,7 +161,7 @@ spec = context "CoreFnFromJson" $ do
     specify "should parse Case" $ do
       let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
-                    Case ann [Var ann (Qualified Nothing (Ident "x"))]
+                    Case ann [Var ann (Qualified ByNullSourceSpan (Ident "x"))]
                       [ CaseAlternative
                         [ NullBinder ann ]
                         (Right (Literal ann (CharLiteral 'a')))
@@ -172,7 +172,7 @@ spec = context "CoreFnFromJson" $ do
     specify "should parse Case with guards" $ do
       let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
-                    Case ann [Var ann (Qualified Nothing (Ident "x"))]
+                    Case ann [Var ann (Qualified ByNullSourceSpan (Ident "x"))]
                       [ CaseAlternative
                         [ NullBinder ann ]
                         (Left [(Literal ann (BooleanLiteral True), Literal ann (CharLiteral 'a'))])
@@ -184,7 +184,7 @@ spec = context "CoreFnFromJson" $ do
       let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
                     Let ann
-                      [ Rec [((ann, Ident "a"), Var ann (Qualified Nothing (Ident "x")))] ]
+                      [ Rec [((ann, Ident "a"), Var ann (Qualified ByNullSourceSpan (Ident "x")))] ]
                       (Literal ann (BooleanLiteral True))
                 ]
       parseMod m `shouldSatisfy` isSuccess
@@ -222,7 +222,7 @@ spec = context "CoreFnFromJson" $ do
     specify "should parse LiteralBinder" $ do
       let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
-                    Case ann [Var ann (Qualified Nothing (Ident "x"))]
+                    Case ann [Var ann (Qualified ByNullSourceSpan (Ident "x"))]
                       [ CaseAlternative
                         [ LiteralBinder ann (BooleanLiteral True) ]
                         (Right (Literal ann (CharLiteral 'a')))
@@ -233,12 +233,12 @@ spec = context "CoreFnFromJson" $ do
     specify "should parse VarBinder" $ do
       let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
-                    Case ann [Var ann (Qualified Nothing (Ident "x"))]
+                    Case ann [Var ann (Qualified ByNullSourceSpan (Ident "x"))]
                       [ CaseAlternative
                         [ ConstructorBinder
                             ann
-                            (Qualified (Just (ModuleName "Data.Either")) (ProperName "Either"))
-                            (Qualified Nothing (ProperName "Left"))
+                            (Qualified (ByModuleName (ModuleName "Data.Either")) (ProperName "Either"))
+                            (Qualified ByNullSourceSpan (ProperName "Left"))
                             [VarBinder ann (Ident "z")]
                         ]
                         (Right (Literal ann (CharLiteral 'a')))
@@ -249,7 +249,7 @@ spec = context "CoreFnFromJson" $ do
     specify "should parse NamedBinder" $ do
       let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "case") $
-                    Case ann [Var ann (Qualified Nothing (Ident "x"))]
+                    Case ann [Var ann (Qualified ByNullSourceSpan (Ident "x"))]
                       [ CaseAlternative
                         [ NamedBinder ann (Ident "w") (NamedBinder ann (Ident "w'") (VarBinder ann (Ident "w''"))) ]
                         (Right (Literal ann (CharLiteral 'a')))

@@ -242,12 +242,12 @@ instance A.FromJSON DataDeclType where
 
 -- | Construct a ProperName in the Prim module
 primName :: Text -> Qualified (ProperName a)
-primName = Qualified (Just C.Prim) . ProperName
+primName = Qualified (ByModuleName C.Prim) . ProperName
 
 -- | Construct a 'ProperName' in the @Prim.NAME@ module.
 primSubName :: Text -> Text -> Qualified (ProperName a)
 primSubName sub =
-  Qualified (Just $ ModuleName $ C.prim <> "." <> sub) . ProperName
+  Qualified (ByModuleName $ ModuleName $ C.prim <> "." <> sub) . ProperName
 
 primKind :: Text -> SourceType
 primKind = primTy

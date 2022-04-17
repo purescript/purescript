@@ -9,6 +9,8 @@ module Language.PureScript.CoreFn.FromJSON
 
 import Prelude.Compat
 
+import           Control.Applicative ((<|>))
+
 import           Data.Aeson
 import           Data.Aeson.Types (Parser, listParser)
 import qualified Data.Map.Strict as M
@@ -17,7 +19,7 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 import           Data.Version (Version, parseVersion)
 
-import           Language.PureScript.AST.SourcePos (SourceSpan(SourceSpan))
+import           Language.PureScript.AST.SourcePos (SourceSpan(..))
 import           Language.PureScript.AST.Literals
 import           Language.PureScript.CoreFn.Ann
 import           Language.PureScript.CoreFn
@@ -109,10 +111,18 @@ properNameFromJSON = fmap ProperName . parseJSON
 qualifiedFromJSON :: (Text -> a) -> Value -> Parser (Qualified a)
 qualifiedFromJSON f = withObject "Qualified" qualifiedFromObj
   where
-  qualifiedFromObj o = do
-    mn <- o .:? "moduleName" >>= traverse moduleNameFromJSON
+  qualifiedFromObj o =
+    qualifiedByModuleFromObj o <|> qualifiedBySourceSpanFromObj o
+  qualifiedByModuleFromObj o = do
+    mn <- o .: "moduleName" >>= moduleNameFromJSON
     i  <- o .: "identifier" >>= withText "Ident" (return . f)
-    return $ Qualified mn i
+    pure $ Qualified (ByModuleName mn) i
+  qualifiedBySourceSpanFromObj o = do
+    -- TODO: Should `sourceSpanXJSON` encode this information as well?
+    sn <- o .: "spanName" >>= withText "SpanName" (pure . T.unpack)
+    ss <- o .: "sourceSpan" >>= sourceSpanFromJSON sn
+    i  <- o .: "identifier" >>= withText "Ident" (return . f)
+    pure $ Qualified (BySourceSpan ss { spanName = sn }) i
 
 moduleNameFromJSON :: Value -> Parser ModuleName
 moduleNameFromJSON v = ModuleName . T.intercalate "." <$> listParser parseJSON v

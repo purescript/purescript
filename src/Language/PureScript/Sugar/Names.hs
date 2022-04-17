@@ -256,9 +256,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let w ds val')
-  updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound =
+  updateValue (_, bound) (Var ss name'@(Qualified (BySourceSpan _) ident)) | ident `notElem` bound =
     ((ss, bound), ) <$> (Var ss <$> updateValueName name' ss)
-  updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) =
+  updateValue (_, bound) (Var ss name'@(Qualified (ByModuleName _) _)) =
     ((ss, bound), ) <$> (Var ss <$> updateValueName name' ss)
   updateValue (_, bound) (Op ss op) =
     ((ss, bound), ) <$> (Op ss <$> updateValueOpName op ss)
@@ -382,16 +382,16 @@ renameInModule imports (Module modSS coms mn decls exps) =
         (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
         modify $ \usedImports ->
           M.insertWith (++) mnNew [fmap toName qname] usedImports
-        return $ Qualified (Just mnOrig) name
+        return $ Qualified (ByModuleName mnOrig) name
 
       -- If the name wasn't found in our imports but was qualified then we need
       -- to check whether it's a failed import from a "pseudo" module (created
       -- by qualified importing). If that's not the case, then we just need to
       -- check it refers to a symbol in another module.
-      (Nothing, Just mn'') ->
+      (Nothing, ByModuleName mn'') ->
         if mn'' `S.member` importedQualModules imports || mn'' `S.member` importedModules imports
         then throwUnknown
-        else throwError . errorMessage . UnknownName . Qualified Nothing $ ModName mn''
+        else throwError . errorMessage . UnknownName . Qualified ByNullSourceSpan $ ModName mn''
 
       -- If neither of the above cases are true then it's an undefined or
       -- unimported symbol.

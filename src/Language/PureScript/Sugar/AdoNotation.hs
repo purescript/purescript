@@ -28,13 +28,13 @@ desugarAdo d =
   in rethrowWithPosition ss $ f d
   where
   pure' :: SourceSpan -> Maybe ModuleName -> Expr
-  pure' ss m = Var ss (Qualified m (Ident C.pure'))
+  pure' ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.pure'))
 
   map' :: SourceSpan -> Maybe ModuleName -> Expr
-  map' ss m = Var ss (Qualified m (Ident C.map))
+  map' ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.map))
 
   apply :: SourceSpan -> Maybe ModuleName -> Expr
-  apply ss m = Var ss (Qualified m (Ident C.apply))
+  apply ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.apply))
 
   replace :: SourceSpan -> Expr -> m Expr
   replace pos (Ado m els yield) = do
@@ -53,7 +53,7 @@ desugarAdo d =
   go ss (yield, args) (DoNotationBind binder val) = do
     ident <- freshIdent'
     let abs = Abs (VarBinder ss ident)
-                  (Case [Var ss (Qualified Nothing ident)]
+                  (Case [Var ss (Qualified ByNullSourceSpan ident)]
                         [CaseAlternative [binder] [MkUnguarded yield]])
     return (abs, val : args)
   go _ (yield, args) (DoNotationLet ds) = do

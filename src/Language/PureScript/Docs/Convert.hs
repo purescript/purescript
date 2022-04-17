@@ -84,7 +84,7 @@ insertValueTypesAndAdjustKinds env m =
     where
     inferredRoles :: [P.Role]
     inferredRoles = do
-      let key = P.Qualified (Just (modName m)) (P.ProperName (declTitle d))
+      let key = P.Qualified (P.ByModuleName (modName m)) (P.ProperName (declTitle d))
       case Map.lookup key (P.types env) of
         Just (_, tyKind) -> case tyKind of
           P.DataType _ tySourceTyRole _ ->
@@ -164,7 +164,7 @@ insertValueTypesAndAdjustKinds env m =
     either (err . ("failed to parse Ident: " ++)) identity . runParser CST.parseIdent
 
   lookupName name =
-    let key = P.Qualified (Just (modName m)) name
+    let key = P.Qualified (P.ByModuleName (modName m)) name
     in case Map.lookup key (P.names env) of
       Just (ty, _, _) ->
         ty
@@ -217,7 +217,7 @@ insertValueTypesAndAdjustKinds env m =
   insertInferredKind :: Declaration -> Text -> P.KindSignatureFor -> Declaration
   insertInferredKind d name keyword =
     let
-      key = P.Qualified (Just (modName m)) (P.ProperName name)
+      key = P.Qualified (P.ByModuleName (modName m)) (P.ProperName name)
     in case Map.lookup key (P.types env) of
       Just (inferredKind, _) ->
         if isUninteresting keyword inferredKind'

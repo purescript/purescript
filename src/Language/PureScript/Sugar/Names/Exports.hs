@@ -170,7 +170,7 @@ resolveExports env ss mn imps exps refs =
     go
       :: Qualified (ProperName 'TypeName)
       -> ((ProperName 'TypeName, [ProperName 'ConstructorName]), ExportSource)
-    go (Qualified (Just mn'') name) =
+    go (Qualified (ByModuleName mn'') name) =
       fromMaybe (internalError "Missing value in resolveTypeExports") $ do
         exps' <- envModuleExports <$> mn'' `M.lookup` env
         (dctors', src) <- name `M.lookup` exportedTypes exps'
@@ -179,7 +179,7 @@ resolveExports env ss mn imps exps refs =
           ( (name, relevantDctors `intersect` dctors')
           , src { exportSourceImportedFrom = Just mn'' }
           )
-    go (Qualified Nothing _) = internalError "Unqualified value in resolveTypeExports"
+    go (Qualified _ _) = internalError "Unqualified value in resolveTypeExports"
 
   -- Looks up an imported type operator and re-qualifies it with the original
   -- module it came from.
@@ -214,7 +214,7 @@ resolveExports env ss mn imps exps refs =
     => (Exports -> M.Map a ExportSource)
     -> Qualified a
     -> Maybe (a, ExportSource)
-  resolve f (Qualified (Just mn'') a) = do
+  resolve f (Qualified (ByModuleName mn'') a) = do
     exps' <- envModuleExports <$> mn'' `M.lookup` env
     src <- a `M.lookup` f exps'
     return (a, src { exportSourceImportedFrom = Just mn'' })

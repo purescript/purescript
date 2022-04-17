@@ -195,9 +195,9 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     goBinder (ConstructorBinder ann q1 q2 bs) = ConstructorBinder ann (renameQual q1) (renameQual q2) bs
     goBinder b = b
     renameQual :: Qualified a -> Qualified a
-    renameQual (Qualified (Just mn') a) =
+    renameQual (Qualified (ByModuleName mn') a) =
       let (_,mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
-      in Qualified (Just mnSafe) a
+      in Qualified (ByModuleName mnSafe) a
     renameQual q = q
 
   -- |
@@ -349,7 +349,7 @@ moduleBindToJs mn = bindToJs
     unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
     unApp (App _ val arg) args = unApp val (arg : args)
     unApp other args = (other, args)
-  valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
+  valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (ByModuleName mn') ident)) =
     return $ if mn' == mn
              then foreignIdent ident
              else varToJs qi
@@ -418,14 +418,14 @@ moduleBindToJs mn = bindToJs
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable.
   varToJs :: Qualified Ident -> AST
-  varToJs (Qualified Nothing ident) = var ident
+  varToJs (Qualified (BySourceSpan _) ident) = var ident
   varToJs qual = qualifiedToJS id qual
 
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable that may have a qualified name.
   qualifiedToJS :: (a -> Ident) -> Qualified a -> AST
-  qualifiedToJS f (Qualified (Just C.Prim) a) = AST.Var Nothing . runIdent $ f a
-  qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = moduleAccessor (f a) (AST.Var Nothing (moduleNameToJs mn'))
+  qualifiedToJS f (Qualified (ByModuleName C.Prim) a) = AST.Var Nothing . runIdent $ f a
+  qualifiedToJS f (Qualified (ByModuleName mn') a) | mn /= mn' = moduleAccessor (f a) (AST.Var Nothing (moduleNameToJs mn'))
   qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToJs (f a)
 
   foreignIdent :: Ident -> AST

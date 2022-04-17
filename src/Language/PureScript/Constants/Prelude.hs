@@ -1,8 +1,6 @@
 -- | Various constants which refer to things in the Prelude
 module Language.PureScript.Constants.Prelude where
 
-import Prelude.Compat
-
 import Data.String (IsString)
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Names
@@ -25,7 +23,7 @@ discard :: forall a. (IsString a) => a
 discard = "discard"
 
 pattern Discard :: Qualified (ProperName 'ClassName)
-pattern Discard = Qualified (Just ControlBind) (ProperName "Discard")
+pattern Discard = Qualified (ByModuleName ControlBind) (ProperName "Discard")
 
 add :: forall a. (IsString a) => a
 add = "add"
@@ -271,13 +269,13 @@ pattern DataSymbol :: ModuleName
 pattern DataSymbol = ModuleName "Data.Symbol"
 
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
-pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
+pattern IsSymbol = Qualified (ByModuleName DataSymbol) (ProperName "IsSymbol")
 
 pattern DataReflectable :: ModuleName
 pattern DataReflectable = ModuleName "Data.Reflectable"
 
 pattern Reflectable :: Qualified (ProperName 'ClassName)
-pattern Reflectable = Qualified (Just DataReflectable) (ProperName "Reflectable")
+pattern Reflectable = Qualified (ByModuleName DataReflectable) (ProperName "Reflectable")
 
 pattern DataOrdering :: ModuleName
 pattern DataOrdering = ModuleName "Data.Ordering"
@@ -289,16 +287,16 @@ pattern PartialUnsafe :: ModuleName
 pattern PartialUnsafe = ModuleName "Partial.Unsafe"
 
 pattern Ordering :: Qualified (ProperName 'TypeName)
-pattern Ordering = Qualified (Just DataOrdering) (ProperName "Ordering")
+pattern Ordering = Qualified (ByModuleName DataOrdering) (ProperName "Ordering")
 
 pattern LT :: Qualified (ProperName 'ConstructorName)
-pattern LT = Qualified (Just DataOrdering) (ProperName "LT")
+pattern LT = Qualified (ByModuleName DataOrdering) (ProperName "LT")
 
 pattern EQ :: Qualified (ProperName 'ConstructorName)
-pattern EQ = Qualified (Just DataOrdering) (ProperName "EQ")
+pattern EQ = Qualified (ByModuleName DataOrdering) (ProperName "EQ")
 
 pattern GT :: Qualified (ProperName 'ConstructorName)
-pattern GT = Qualified (Just DataOrdering) (ProperName "GT")
+pattern GT = Qualified (ByModuleName DataOrdering) (ProperName "GT")
 
 dataArray :: forall a. (IsString a) => a
 dataArray = "Data_Array"

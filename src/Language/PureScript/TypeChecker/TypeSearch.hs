@@ -59,7 +59,7 @@ checkSubsume unsolved env st userT envT = checkInEnvironment env st $ do
   userT' <- initializeSkolems userT
   envT' <- initializeSkolems envT
 
-  let dummyExpression = P.Var nullSourceSpan (P.Qualified Nothing (P.Ident "x"))
+  let dummyExpression = P.Var nullSourceSpan (P.Qualified P.ByNullSourceSpan (P.Ident "x"))
 
   elab <- subsumes envT' userT'
   subst <- gets TC.checkSubstitution
@@ -127,7 +127,7 @@ typeSearch unsolved env st type' =
     runPlainIdent (Qualified m (Ident k), v) = Just (Qualified m k, v)
     runPlainIdent _ = Nothing
   in
-    ( (first (P.Qualified Nothing . ("_." <>) . P.prettyPrintLabel) <$> matchingLabels)
+    ( (first (P.Qualified P.ByNullSourceSpan . ("_." <>) . P.prettyPrintLabel) <$> matchingLabels)
       <> mapMaybe runPlainIdent (Map.toList matchingNames)
       <> (first (map P.runProperName) <$> Map.toList matchingConstructors)
     , if null allLabels then Nothing else Just allLabels)

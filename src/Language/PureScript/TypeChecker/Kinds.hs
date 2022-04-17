@@ -189,7 +189,7 @@ inferKind = \tyToInfer ->
       pure (ty, E.tyInt $> ann)
     ty@(TypeVar ann v) -> do
       moduleName <- unsafeCheckCurrentModule
-      kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
+      kind <- apply =<< lookupTypeVariable moduleName (Qualified ByNullSourceSpan $ ProperName v)
       pure (ty, kind $> ann)
     ty@(Skolem ann _ mbK _ _) -> do
       kind <- apply $ fromMaybe (internalError "Skolem has no kind") mbK
@@ -499,7 +499,7 @@ elaborateKind = \case
         ($> ann) <$> apply kind
   TypeVar ann a -> do
     moduleName <- unsafeCheckCurrentModule
-    kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName a)
+    kind <- apply =<< lookupTypeVariable moduleName (Qualified ByNullSourceSpan $ ProperName a)
     pure (kind $> ann)
   (Skolem ann _ mbK _ _) -> do
     kind <- apply $ fromMaybe (internalError "Skolem has no kind") mbK
@@ -611,7 +611,7 @@ inferDataDeclaration
   -> DataDeclarationArgs
   -> m [(DataConstructorDeclaration, SourceType)]
 inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
-  tyKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing tyName)
+  tyKind <- apply =<< lookupTypeVariable moduleName (Qualified ByNullSourceSpan tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
     tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
@@ -662,7 +662,7 @@ inferTypeSynonym
   -> TypeDeclarationArgs
   -> m SourceType
 inferTypeSynonym moduleName (ann, tyName, tyArgs, tyBody) = do
-  tyKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing tyName)
+  tyKind <- apply =<< lookupTypeVariable moduleName (Qualified ByNullSourceSpan tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
     kindRes <- freshKind (fst ann)
@@ -779,7 +779,7 @@ inferClassDeclaration
   -> ClassDeclarationArgs
   -> m ([(Text, SourceType)], [SourceConstraint], [Declaration])
 inferClassDeclaration moduleName (ann, clsName, clsArgs, superClasses, decls) = do
-  clsKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ coerceProperName clsName)
+  clsKind <- apply =<< lookupTypeVariable moduleName (Qualified ByNullSourceSpan $ coerceProperName clsName)
   let (sigBinders, clsKind') = fromJust . completeBinderList $ clsKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
     clsArgs' <- for clsArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
@@ -910,7 +910,7 @@ existingSignatureOrFreshKind
   -> m SourceType
 existingSignatureOrFreshKind moduleName ss name = do
   env <- getEnv
-  case M.lookup (Qualified (Just moduleName) name) (E.types env) of
+  case M.lookup (Qualified (ByModuleName moduleName) name) (E.types env) of
     Nothing -> freshKind ss
     Just (kind, _) -> pure kind
 
