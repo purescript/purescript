@@ -265,8 +265,8 @@ typeDictionaryForBindingGroup moduleName vals = do
       return ((sai, ty), (sai, (expr, ty)))
     -- Create the dictionary of all name/type pairs, which will be added to the
     -- environment during type checking
-    let dict = M.fromList [ (Qualified (byMaybeModuleName moduleName) ident, (ty, Private, Undefined))
-                          | ((_, ident), ty) <- typedDict <> untypedDict
+    let dict = M.fromList [ (Qualified (fromMaybe (BySourceSpan ss) (ByModuleName <$> moduleName)) ident, (ty, Private, Undefined))
+                          | (((ss, _), ident), ty) <- typedDict <> untypedDict
                           ]
     return (SplitBindingGroup untyped' typed' dict)
   where
@@ -408,7 +408,7 @@ infer' (Accessor prop val) = withErrorMessageHint (ErrorCheckingAccessor val pro
 infer' (Abs binder ret)
   | VarBinder ss arg <- binder = do
       ty <- freshTypeWithKind kindType
-      withBindingGroupVisible $ bindLocalVariables [(arg, ty, Defined)] $ do
+      withBindingGroupVisible $ bindLocalVariables [(ss, arg, ty, Defined)] $ do
         body@(TypedValue' _ _ bodyTy) <- infer' ret
         (body', bodyTy') <- instantiatePolyTypeWithUnknowns (tvToExpr body) bodyTy
         return $ TypedValue' True (Abs (VarBinder ss arg) body') (function ty bodyTy')
@@ -486,20 +486,20 @@ inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (Typed
   TypedValue' _ val' ty'' <- warnAndRethrowWithPositionTC ss $ do
     ((args, elabTy), kind) <- kindOfWithScopedVars ty
     checkTypeKind ty kind
-    let dict = M.singleton (Qualified ByNullSourceSpan ident) (elabTy, nameKind, Undefined)
+    let dict = M.singleton (Qualified (BySourceSpan ss) ident) (elabTy, nameKind, Undefined)
     ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy
     if checkType
       then withScopedTypeVars moduleName args (bindNames dict (check val ty'))
       else return (TypedValue' checkType val elabTy)
-  bindNames (M.singleton (Qualified ByNullSourceSpan ident) (ty'', nameKind, Defined))
+  bindNames (M.singleton (Qualified (BySourceSpan ss) ident) (ty'', nameKind, Defined))
     $ inferLetBinding (seen ++ [ValueDecl sa ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
 inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded val] : rest) ret j = do
   valTy <- freshTypeWithKind kindType
   TypedValue' _ val' valTy' <- warnAndRethrowWithPositionTC ss $ do
-    let dict = M.singleton (Qualified ByNullSourceSpan ident) (valTy, nameKind, Undefined)
+    let dict = M.singleton (Qualified (BySourceSpan ss) ident) (valTy, nameKind, Undefined)
     bindNames dict $ infer val
   warnAndRethrowWithPositionTC ss $ unifyTypes valTy valTy'
-  bindNames (M.singleton (Qualified ByNullSourceSpan ident) (valTy', nameKind, Defined))
+  bindNames (M.singleton (Qualified (BySourceSpan ss) ident) (valTy', nameKind, Defined))
     $ inferLetBinding (seen ++ [ValueDecl sa ident nameKind [] [MkUnguarded val']]) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   moduleName <- unsafeCheckCurrentModule
@@ -518,14 +518,14 @@ inferBinder
    . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => SourceType
   -> Binder
-  -> m (M.Map Ident SourceType)
+  -> m (M.Map Ident (SourceSpan, SourceType))
 inferBinder _ NullBinder = return M.empty
 inferBinder val (LiteralBinder _ (StringLiteral _)) = unifyTypes val tyString >> return M.empty
 inferBinder val (LiteralBinder _ (CharLiteral _)) = unifyTypes val tyChar >> return M.empty
 inferBinder val (LiteralBinder _ (NumericLiteral (Left _))) = unifyTypes val tyInt >> return M.empty
 inferBinder val (LiteralBinder _ (NumericLiteral (Right _))) = unifyTypes val tyNumber >> return M.empty
 inferBinder val (LiteralBinder _ (BooleanLiteral _)) = unifyTypes val tyBoolean >> return M.empty
-inferBinder val (VarBinder _ name) = return $ M.singleton name val
+inferBinder val (VarBinder ss name) = return $ M.singleton name (ss, val)
 inferBinder val (ConstructorBinder ss ctor binders) = do
   env <- getEnv
   case M.lookup ctor (dataConstructors env) of
@@ -552,7 +552,7 @@ inferBinder val (LiteralBinder _ (ObjectLiteral props)) = do
   unifyTypes val (srcTypeApp tyRecord row)
   return m1
   where
-  inferRowProperties :: SourceType -> SourceType -> [(PSString, Binder)] -> m (M.Map Ident SourceType)
+  inferRowProperties :: SourceType -> SourceType -> [(PSString, Binder)] -> m (M.Map Ident (SourceSpan, SourceType))
   inferRowProperties nrow row [] = unifyTypes nrow row >> return M.empty
   inferRowProperties nrow row ((name, binder):binders) = do
     propTy <- freshTypeWithKind kindType
@@ -567,7 +567,7 @@ inferBinder val (LiteralBinder _ (ArrayLiteral binders)) = do
 inferBinder val (NamedBinder ss name binder) =
   warnAndRethrowWithPositionTC ss $ do
     m <- inferBinder val binder
-    return $ M.insert name val m
+    return $ M.insert name (ss, val) m
 inferBinder val (PositionedBinder pos _ binder) =
   warnAndRethrowWithPositionTC pos $ inferBinder val binder
 inferBinder val (TypedBinder ty binder) = do
@@ -622,7 +622,7 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
   guardWith (errorMessage $ OverlappingArgNames Nothing) $
     let ns = concatMap binderNames binders in length (ordNub ns) == length ns
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
-  r <- bindLocalVariables [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $
+  r <- bindLocalVariables [ (ss, name, ty, Defined) | (name, (ss, ty)) <- M.toList m1 ] $
        CaseAlternative binders <$> forM result (\ge -> checkGuardedRhs ge ret)
   rs <- checkBinders nvals ret bs
   return $ r : rs
@@ -642,8 +642,8 @@ checkGuardedRhs (GuardedExpr (ConditionGuard cond : guards) rhs) ret = do
 checkGuardedRhs (GuardedExpr (PatternGuard binder expr : guards) rhs) ret = do
   tv@(TypedValue' _ _ ty) <- infer expr
   variables <- inferBinder ty binder
-  GuardedExpr guards' rhs' <- bindLocalVariables [ (name, bty, Defined)
-                                                 | (name, bty) <- M.toList variables
+  GuardedExpr guards' rhs' <- bindLocalVariables [ (ss, name, bty, Defined)
+                                                 | (name, (ss, bty)) <- M.toList variables
                                                  ] $
     checkGuardedRhs (GuardedExpr guards rhs) ret
   return $ GuardedExpr (PatternGuard binder (tvToExpr tv) : guards') rhs'
@@ -717,7 +717,7 @@ check' (Literal ss (ArrayLiteral vals)) t@(TypeApp _ a ty) = do
 check' (Abs binder ret) ty@(TypeApp _ (TypeApp _ t argTy) retTy)
   | VarBinder ss arg <- binder = do
       unifyTypes t tyFunction
-      ret' <- withBindingGroupVisible $ bindLocalVariables [(arg, argTy, Defined)] $ check ret retTy
+      ret' <- withBindingGroupVisible $ bindLocalVariables [(ss, arg, argTy, Defined)] $ check ret retTy
       return $ TypedValue' True (Abs (VarBinder ss arg) (tvToExpr ret')) ty
   | otherwise = internalError "Binder was not desugared"
 check' (App f arg) ret = do

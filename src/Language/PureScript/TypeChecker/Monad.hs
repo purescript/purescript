@@ -230,11 +230,11 @@ lookupTypeClassDictionariesForClass mn cn = fromMaybe M.empty . M.lookup cn <$> 
 -- | Temporarily bind a collection of names to local variables
 bindLocalVariables
   :: (MonadState CheckState m)
-  => [(Ident, SourceType, NameVisibility)]
+  => [(SourceSpan, Ident, SourceType, NameVisibility)]
   -> m a
   -> m a
 bindLocalVariables bindings =
-  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> (Qualified ByNullSourceSpan name, (ty, Private, visibility)))
+  bindNames (M.fromList $ flip map bindings $ \(ss, name, ty, visibility) -> (Qualified (BySourceSpan ss) name, (ty, Private, visibility)))
 
 -- | Temporarily bind a collection of names to local type variables
 bindLocalTypeVariables
