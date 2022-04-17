@@ -1,5 +1,6 @@
 module Language.PureScript.Sugar.Names
   ( desugarImports
+  , desugarLocals
   , Env
   , externsEnv
   , primEnv
@@ -19,6 +20,7 @@ import Control.Monad.State.Lazy
 import Control.Monad.Writer (MonadWriter(..))
 
 import Data.Maybe (fromMaybe, mapMaybe)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -399,3 +401,48 @@ renameInModule imports (Module modSS coms mn decls exps) =
 
     where
     throwUnknown = throwError . errorMessage . UnknownName . fmap toName $ qname
+
+-- |
+-- Qualifies locally-bound names such that they're indexed by the `SourceSpan`
+-- of the definition they're referencing. Names that are already qualified by
+-- a module name aren't affected at all.
+--
+-- Note: Unlike @desugarImports@, this function requires that binding groups are
+-- created first, hence the reason why this is a separate desugaring step.
+desugarLocals :: Monad m => Module -> m Module
+desugarLocals (Module ms cm mn dc ex) = pure $ Module ms cm mn dc' ex
+  where
+  dc' :: [Declaration]
+  dc' = (flip evalState M.empty . go) <$> dc
+
+  go :: Declaration -> State (M.Map Ident SourceSpan) Declaration
+  (go, _, _) = everywhereOnValuesTopDownM goDeclaration goExpr goBinder
+    where
+    goDeclaration declaration = case declaration of
+      ValueDeclaration ValueDeclarationData{..} -> do
+        modify $ M.insert valdeclIdent $ fst valdeclSourceAnn
+        pure declaration
+      BindingGroupDeclaration declarations -> do
+        let findSsI (((ss, _), i), _, _) = (i, ss)
+        modify $ M.union $ M.fromList $ NEL.toList $ findSsI <$> declarations
+        pure declaration
+      _ ->
+        pure declaration
+
+    goExpr expression = case expression of
+      Var ss (Qualified (BySourceSpan _) i@(Ident _)) -> do
+        bound <- get
+        pure $ case M.lookup i bound of
+          Just ss' ->
+            Var ss (Qualified (BySourceSpan ss') i)
+          Nothing ->
+            expression
+      _ ->
+        pure expression
+
+    goBinder binder = case binder of
+      VarBinder s i -> do
+        modify $ M.insert i s
+        pure binder
+      _ ->
+        pure binder

@@ -87,6 +87,7 @@ desugar externs =
        in deriveInstances externs syns kinds m)
     >=> desugarTypeClasses externs
     >=> createBindingGroupsModule
+    >=> desugarLocals
 
 findTypeSynonyms :: [ExternsFile] -> ModuleName -> [Declaration] -> SynonymMap
 findTypeSynonyms externs mn decls =
