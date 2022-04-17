@@ -412,27 +412,49 @@ renameInModule imports (Module modSS coms mn decls exps) =
 desugarLocals :: Monad m => Module -> m Module
 desugarLocals (Module ms cm mn dc ex) = pure $ Module ms cm mn dc' ex
   where
-  dc' :: [Declaration]
-  dc' = (flip evalState M.empty . go) <$> dc
+  dc' = (flip evalState (M.empty, []) . go) <$> dc
 
-  go :: Declaration -> State (M.Map Ident SourceSpan) Declaration
-  (go, _, _) = everywhereOnValuesTopDownM goDeclaration goExpr goBinder
+  insertOne k v = modify' $ \(e, b) ->
+    (M.insert k v e, b)
+
+  insertMany e' = modify' $ \(e, b) ->
+    (M.union e' e, b)
+
+  lookupIdent k = gets (M.lookup k . fst)
+
+  pushScope = modify' $ \(e, b) ->
+    (e, e : b)
+
+  popScope = modify' $ \(e, b) -> case b of
+    [] -> (e, [])
+    (e' : b') -> (e', b')
+
+  (go, _, _) = everywhereOnValuesTopDownThenM goDecl goExpr goBinder pure thenExpr pure
     where
-    goDeclaration declaration = case declaration of
+    goDecl declaration = case declaration of
       ValueDeclaration ValueDeclarationData{..} -> do
-        modify $ M.insert valdeclIdent $ fst valdeclSourceAnn
+        insertOne valdeclIdent $ fst valdeclSourceAnn
         pure declaration
       BindingGroupDeclaration declarations -> do
         let findSsI (((ss, _), i), _, _) = (i, ss)
-        modify $ M.union $ M.fromList $ NEL.toList $ findSsI <$> declarations
+        insertMany $ M.fromList $ NEL.toList $ findSsI <$> declarations
         pure declaration
       _ ->
         pure declaration
 
     goExpr expression = case expression of
-      Var ss (Qualified (BySourceSpan _) i@(Ident _)) -> do
-        bound <- get
-        pure $ case M.lookup i bound of
+      Abs _ _ -> do
+        pushScope
+        pure expression
+      Let _ _ _ -> do
+        pushScope
+        pure expression
+      Case _ _ -> do
+        pushScope
+        pure expression
+      Var ss (Qualified (BySourceSpan _) i) -> do
+        result <- lookupIdent i
+        pure $ case result of
           Just ss' ->
             Var ss (Qualified (BySourceSpan ss') i)
           Nothing ->
@@ -440,9 +462,25 @@ desugarLocals (Module ms cm mn dc ex) = pure $ Module ms cm mn dc' ex
       _ ->
         pure expression
 
+    thenExpr expression = case expression of
+      Abs _ _ -> do
+        popScope
+        pure expression
+      Let _ _ _ -> do
+        popScope
+        pure expression
+      Case _ _ -> do
+        popScope
+        pure expression
+      _ ->
+        pure expression
+
     goBinder binder = case binder of
       VarBinder s i -> do
-        modify $ M.insert i s
+        insertOne i s
+        pure binder
+      NamedBinder s i _ -> do
+        insertOne i s
         pure binder
       _ ->
         pure binder
