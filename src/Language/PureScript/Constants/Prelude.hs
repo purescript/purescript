@@ -282,6 +282,12 @@ pattern Reflectable = Qualified (Just DataReflectable) (ProperName "Reflectable"
 pattern DataOrdering :: ModuleName
 pattern DataOrdering = ModuleName "Data.Ordering"
 
+pattern DataFunctionUncurried :: ModuleName
+pattern DataFunctionUncurried = ModuleName "Data.Function.Uncurried"
+
+pattern PartialUnsafe :: ModuleName
+pattern PartialUnsafe = ModuleName "Partial.Unsafe"
+
 pattern Ordering :: Qualified (ProperName 'TypeName)
 pattern Ordering = Qualified (Just DataOrdering) (ProperName "Ordering")
 
