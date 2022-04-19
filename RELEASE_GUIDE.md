@@ -106,7 +106,7 @@ considering what effects this may have:
   completes. (If the CI build fails, binaries can also be built locally and
   manually uploaded to the release on GitHub)
 
-- Publish to Hackage:
+- If making a normal release, publish to Hackage:
 
   - change to the `lib/purescript-cst` directory and run `stack upload .`
 
@@ -117,9 +117,15 @@ considering what effects this may have:
   point.
 
 - After all of the prebuilt binaries are present on the GitHub releases page,
-  publish to npm: change to the `npm-package` directory and run `npm publish`.
-  It's a good idea to check that the package can be installed from npm at this
-  point.
+  publish to npm: change to the `npm-package` directory and do the following:
+    - if making a pre-release (e.g. `v0.15.0-alpha-05`)
+        - run `npm publish --tag next`
+        - verify that the prerelease can be installed via `npm i purescript@next`
+    - if making a normal release (e.g. `v0.15.0`)
+        - run `npm publish --tag next`
+        - run `npm publish`
+        - verify that the release can be installed via `npm i purescript@next`
+        - verify that the release can be installed via `npm i purescript`
 
 Note: if a release does not go as planned (e.g. [`v0.14.3`](https://github.com/purescript/purescript/pull/4139)), we should not delete the broken GitHub release or its Git tag. Rather, we should make a new release and update the GitHub release notes and the corresponding section in the CHANGELOG.md file for the broken release to
 1. say that it's not a real release, and
