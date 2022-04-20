@@ -559,8 +559,10 @@ unknowns = everythingOnTypes (<>) go where
   go (TUnknown _ u) = IS.singleton u
   go _ = mempty
 
+-- | Check if a type contains unknowns in a position that is relevant to
+-- constraint solving. (Kinds are not.)
 containsUnknowns :: Type a -> Bool
-containsUnknowns = everythingOnTypes (||) go where
+containsUnknowns = everythingOnTypes (||) go . eraseKindApps where
   go :: Type a -> Bool
   go TUnknown{} = True
   go _ = False
@@ -570,6 +572,8 @@ eraseKindApps = everywhereOnTypes $ \case
   KindApp _ ty _ -> ty
   ConstrainedType ann con ty ->
     ConstrainedType ann (con { constraintKindArgs = [] }) ty
+  Skolem ann name _ i sc ->
+    Skolem ann name Nothing i sc
   other -> other
 
 eraseForAllKindAnnotations :: Type a -> Type a
@@ -621,6 +625,7 @@ everywhereOnTypes f = go where
   go (KindApp ann t1 t2) = f (KindApp ann (go t1) (go t2))
   go (ForAll ann arg mbK ty sco) = f (ForAll ann arg (go <$> mbK) (go ty) sco)
   go (ConstrainedType ann c ty) = f (ConstrainedType ann (mapConstraintArgsAll (map go) c) (go ty))
+  go (Skolem ann name mbK i sc) = f (Skolem ann name (go <$> mbK) i sc)
   go (RCons ann name ty rest) = f (RCons ann name (go ty) (go rest))
   go (KindedType ann ty k) = f (KindedType ann (go ty) (go k))
   go (BinaryNoParensType ann t1 t2 t3) = f (BinaryNoParensType ann (go t1) (go t2) (go t3))
@@ -633,6 +638,7 @@ everywhereOnTypesM f = go where
   go (KindApp ann t1 t2) = (KindApp ann <$> go t1 <*> go t2) >>= f
   go (ForAll ann arg mbK ty sco) = (ForAll ann arg <$> traverse go mbK <*> go ty <*> pure sco) >>= f
   go (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgsAll (mapM go) c <*> go ty) >>= f
+  go (Skolem ann name mbK i sc) = (Skolem ann name <$> traverse go mbK <*> pure i <*> pure sc) >>= f
   go (RCons ann name ty rest) = (RCons ann name <$> go ty <*> go rest) >>= f
   go (KindedType ann ty k) = (KindedType ann <$> go ty <*> go k) >>= f
   go (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go t1 <*> go t2 <*> go t3) >>= f
@@ -645,11 +651,12 @@ everywhereOnTypesTopDownM f = go <=< f where
   go (KindApp ann t1 t2) = KindApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (ForAll ann arg mbK ty sco) = ForAll ann arg <$> traverse (f >=> go) mbK <*> (f ty >>= go) <*> pure sco
   go (ConstrainedType ann c ty) = ConstrainedType ann <$> overConstraintArgsAll (mapM (go <=< f)) c <*> (f ty >>= go)
+  go (Skolem ann name mbK i sc) = Skolem ann name <$> traverse (f >=> go) mbK <*> pure i <*> pure sc
   go (RCons ann name ty rest) = RCons ann name <$> (f ty >>= go) <*> (f rest >>= go)
   go (KindedType ann ty k) = KindedType ann <$> (f ty >>= go) <*> (f k >>= go)
   go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann <$> (f t1 >>= go) <*> (f t2 >>= go) <*> (f t3 >>= go)
   go (ParensInType ann t) = ParensInType ann <$> (f t >>= go)
-  go other = f other
+  go other = pure other
 
 everythingOnTypes :: (r -> r -> r) -> (Type a -> r) -> Type a -> r
 everythingOnTypes (<+>) f = go where
@@ -658,6 +665,7 @@ everythingOnTypes (<+>) f = go where
   go t@(ForAll _ _ (Just k) ty _) = f t <+> go k <+> go ty
   go t@(ForAll _ _ _ ty _) = f t <+> go ty
   go t@(ConstrainedType _ c ty) = foldl (<+>) (f t) (map go (constraintKindArgs c) ++ map go (constraintArgs c)) <+> go ty
+  go t@(Skolem _ _ (Just k) _ _) = f t <+> go k
   go t@(RCons _ _ ty rest) = f t <+> go ty <+> go rest
   go t@(KindedType _ ty k) = f t <+> go ty <+> go k
   go t@(BinaryNoParensType _ t1 t2 t3) = f t <+> go t1 <+> go t2 <+> go t3
@@ -672,6 +680,7 @@ everythingWithContextOnTypes s0 r0 (<+>) f = go' s0 where
   go s (ForAll _ _ (Just k) ty _) = go' s k <+> go' s ty
   go s (ForAll _ _ _ ty _) = go' s ty
   go s (ConstrainedType _ c ty) = foldl (<+>) r0 (map (go' s) (constraintKindArgs c) ++ map (go' s) (constraintArgs c)) <+> go' s ty
+  go s (Skolem _ _ (Just k) _ _) = go' s k
   go s (RCons _ _ ty rest) = go' s ty <+> go' s rest
   go s (KindedType _ ty k) = go' s ty <+> go' s k
   go s (BinaryNoParensType _ t1 t2 t3) = go' s t1 <+> go' s t2 <+> go' s t3

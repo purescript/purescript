@@ -7,6 +7,7 @@ import Prelude.Compat
 
 import Test.Hspec
 
+import qualified TestAst
 import qualified TestCompiler
 import qualified TestCoreFn
 import qualified TestCst
@@ -32,6 +33,7 @@ main = do
 
   hspec $ do
     describe "cst" TestCst.spec
+    describe "ast" TestAst.spec
     describe "ide" TestIde.spec
     beforeAll TestUtils.setupSupportModules $ do
       describe "compiler" TestCompiler.spec
