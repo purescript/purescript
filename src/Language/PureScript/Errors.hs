@@ -110,7 +110,7 @@ data SimpleErrorMessage
       SourceConstraint -- ^ constraint that could not be solved
       [Qualified (Either SourceType Ident)] -- ^ a list of instances that stopped further progress in instance chains due to ambiguity
       Bool -- ^ whether eliminating unknowns with annotations might help
-  | AmbiguousTypeVariables SourceType [Int]
+  | AmbiguousTypeVariables SourceType [(Text, Int)]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | PossiblyInfiniteCoercibleInstance
@@ -461,7 +461,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con ambig unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure ambig <*> pure unks
-  gSimple (AmbiguousTypeVariables t us) = AmbiguousTypeVariables <$> f t <*> pure us
+  gSimple (AmbiguousTypeVariables t uis) = AmbiguousTypeVariables <$> f t <*> pure uis
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> traverse (traverse $ bitraverse f pure) insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
@@ -751,7 +751,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
-      line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
+      line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode "bind" <> " and " <> markCode "discard" <> " functions. Please import " <> markCode i <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i == C.negate =
       line $ "Unknown " <> printName name <> ". You're probably using numeric negation (the unary " <> markCode "-" <> " operator), which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name) =
@@ -920,14 +920,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                     | unks
                     ]
             ]
-    renderSimpleErrorMessage (AmbiguousTypeVariables t us) =
+    renderSimpleErrorMessage (AmbiguousTypeVariables t uis) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ prettyType t
             , line "has type variables which are not determined by those mentioned in the body of the type:"
             , indent $ Box.hsep 1 Box.left
               [ Box.vcat Box.left
-                [ line $ markCode ("t" <> T.pack (show u)) <> " could not be determined"
-                | u <- us ]
+                [ line $ markCode (u <> T.pack (show i)) <> " could not be determined"
+                | (u, i) <- uis ]
               ]
             , line "Consider adding a type annotation."
             ]
@@ -1930,9 +1930,6 @@ withoutPosition (ErrorMessage hints se) = ErrorMessage (filter go hints) se
 
 positionedError :: SourceSpan -> ErrorMessageHint
 positionedError = PositionedError . pure
-
-filterErrors :: (ErrorMessage -> Bool) -> MultipleErrors -> MultipleErrors
-filterErrors f = MultipleErrors . filter f . runMultipleErrors
 
 -- | Runs a computation listening for warnings and then escalating any warnings
 -- that match the predicate to error status.

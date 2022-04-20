@@ -1,0 +1,34 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/TypedHole3.purs:4:10 - 4:15 (line 4, column 10 - line 4, column 15)
+
+  Hole '[33mhelp[0m' has the inferred type
+  [33m    [0m
+  [33m  t0[0m
+  [33m    [0m
+  You could substitute the hole with one of these values:
+  [33m                                                                                                        [0m
+  [33m  Control.Alt.alt               :: forall f a. Alt f => f a -> f a -> f a                               [0m
+  [33m  Control.Alternative.guard     :: forall m. Alternative m => Boolean -> m Unit                         [0m
+  [33m  Control.Applicative.liftA1    :: forall f a b. Applicative f => (a -> b) -> f a -> f b                [0m
+  [33m  Control.Applicative.pure      :: forall f a. Applicative f => a -> f a                                [0m
+  [33m  Control.Applicative.unless    :: forall m. Applicative m => Boolean -> m Unit -> m Unit               [0m
+  [33m  Control.Applicative.when      :: forall m. Applicative m => Boolean -> m Unit -> m Unit               [0m
+  [33m  Control.Apply.apply           :: forall f a b. Apply f => f (a -> b) -> f a -> f b                    [0m
+  [33m  Control.Apply.applyFirst      :: forall a b f. Apply f => f a -> f b -> f a                           [0m
+  [33m  Control.Apply.applySecond     :: forall a b f. Apply f => f a -> f b -> f b                           [0m
+  [33m  Control.Apply.lift2           :: forall a b c f. Apply f => (a -> b -> c) -> f a -> ... -> ...        [0m
+  [33m  Control.Apply.lift3           :: forall a b c d f. Apply f => (a -> b -> ...) -> f a -> ... -> ...    [0m
+  [33m  Control.Apply.lift4           :: forall a b c d e f. Apply f => (a -> b -> ...) -> f a -> ... -> ...  [0m
+  [33m  Control.Apply.lift5           :: forall a b c d e f g. Apply f => (a -> b -> ...) -> f a -> ... -> ...[0m
+  [33m  Control.Biapplicative.bipure  :: forall w a b. Biapplicative w => a -> b -> w a b                     [0m
+  [33m  Control.Biapply.biapply       :: forall w a b c d. Biapply w => w (a -> b) (c -> d) -> w a c -> w b d [0m
+  [33m                                                                                                        [0m
+
+in value declaration [33mfn[0m
+
+where [33mt0[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/HoleInferredType.md for more information,
+or to contribute content related to this error.
+

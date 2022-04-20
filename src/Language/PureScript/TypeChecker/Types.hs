@@ -105,7 +105,8 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           ty'' = constrain unsolved ty'
       unsolvedTypeVarsWithKinds <- unknownsWithKinds . IS.toList . unknowns $ constrain unsolved ty''
       let unsolvedTypeVars = IS.toList $ unknowns ty'
-          generalized = varIfUnknown unsolvedTypeVarsWithKinds ty''
+
+      generalized <- varIfUnknown unsolvedTypeVarsWithKinds ty''
 
       when shouldGeneralize $ do
         -- Show the inferred type in a warning
@@ -162,11 +163,15 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         let constraintTypeVars = fold (conData >>= snd)
         let solved = solveFrom determinedFromType
         let unsolvedVars = S.difference constraintTypeVars solved
+        let lookupUnkName' i = do
+              mn <- lookupUnkName i
+              pure (fromMaybe "t" mn, i)
+        unsolvedVarNames <- traverse lookupUnkName' (S.toList unsolvedVars)
         unless (S.null unsolvedVars) .
           throwError
             . onErrorMessages (replaceTypes currentSubst)
             . errorMessage' ss
-            $ AmbiguousTypeVariables generalized (S.toList unsolvedVars)
+            $ AmbiguousTypeVariables generalized unsolvedVarNames
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -322,12 +327,18 @@ instantiatePolyTypeWithUnknowns
   -> m (Expr, SourceType)
 instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _) = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
+  insertUnkName' u ident
   instantiatePolyTypeWithUnknowns val $ replaceTypeVars ident u ty
 instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
   instantiatePolyTypeWithUnknowns (App val (TypeClassDictionary con dicts hints)) ty
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
+
+-- | Match against TUnknown and call insertUnkName, failing otherwise.
+insertUnkName' :: (MonadState CheckState m, MonadError MultipleErrors m) => SourceType -> Text -> m ()
+insertUnkName' (TUnknown _ i) n = insertUnkName i n
+insertUnkName' _ _ = internalCompilerError "type is not TUnknown"
 
 -- | Infer a type for a value, rethrowing any error to provide a more useful error message
 infer
@@ -876,6 +887,7 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   return (retTy, App fn arg')
 checkFunctionApplication' fn (ForAll _ ident mbK ty _) arg = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
+  insertUnkName' u ident
   let replaced = replaceTypeVars ident u ty
   checkFunctionApplication fn replaced arg
 checkFunctionApplication' fn (KindedType _ ty _) arg =

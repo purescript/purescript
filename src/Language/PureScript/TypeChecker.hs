@@ -14,10 +14,10 @@ import Control.Monad (when, unless, void, forM, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
-import Control.Monad.Writer.Class (MonadWriter(..), censor)
+import Control.Monad.Writer.Class (MonadWriter, tell)
 
 import Data.Foldable (for_, traverse_, toList)
-import Data.List (nub, nubBy, (\\), sort, group, intersect)
+import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import Data.Either (partitionEithers)
 import Data.Text (Text)
@@ -34,6 +34,7 @@ import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Linter
+import Language.PureScript.Linter.Wildcards
 import Language.PureScript.Names
 import Language.PureScript.Roles
 import Language.PureScript.Sugar.Names.Env (Exports(..))
@@ -275,10 +276,9 @@ typeCheckAll
   :: forall m
    . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> [DeclarationRef]
   -> [Declaration]
   -> m [Declaration]
-typeCheckAll moduleName _ = traverse go
+typeCheckAll moduleName = traverse go
   where
   go :: Declaration -> m Declaration
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
@@ -353,7 +353,7 @@ typeCheckAll moduleName _ = traverse go
     internalError "Type declarations should have been removed before typeCheckAlld"
   go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
-    warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (positionedError ss)) . censorLocalUnnamedWildcards val $ do
+    warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (positionedError ss)) $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
       typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')] >>= \case
@@ -391,7 +391,8 @@ typeCheckAll moduleName _ = traverse go
       env <- getEnv
       (elabTy, kind) <- withFreshSubstitution $ do
         ((unks, ty'), kind) <- kindOfWithUnknowns ty
-        pure (varIfUnknown unks ty', kind)
+        ty'' <- varIfUnknown unks ty'
+        pure (ty'', kind)
       checkTypeKind elabTy kind
       case M.lookup (Qualified (Just moduleName) name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
@@ -561,21 +562,6 @@ typeCheckAll moduleName _ = traverse go
     | moduleName `S.member` nonOrphanModules = return ()
     | otherwise = throwError . errorMessage $ OrphanInstance dictName className nonOrphanModules tys'
 
-  censorLocalUnnamedWildcards :: Expr -> m a -> m a
-  censorLocalUnnamedWildcards (TypedValue _ _ ty) = censor (filterErrors (not . isLocalUnnamedWildcardError ty))
-  censorLocalUnnamedWildcards _ = id
-
-  isLocalUnnamedWildcardError :: SourceType -> ErrorMessage -> Bool
-  isLocalUnnamedWildcardError ty err@(ErrorMessage _ (WildcardInferredType _ _)) =
-    let
-      ssWildcard (TypeWildcard (ss', _) Nothing) = [ss']
-      ssWildcard _ = []
-      sssWildcards = everythingOnTypes (<>) ssWildcard ty
-      sss = maybe [] NEL.toList $ errorSpan err
-    in
-      null $ intersect sss sssWildcards
-  isLocalUnnamedWildcardError _ _ = False
-
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
@@ -623,7 +609,7 @@ typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
   warnAndRethrow (addHint (ErrorInModule mn)) $ do
     let (decls', imports) = partitionEithers $ fromImportDecl <$> decls
     modify (\s -> s { checkCurrentModule = Just mn, checkCurrentModuleImports = imports })
-    decls'' <- typeCheckAll mn exps decls'
+    decls'' <- typeCheckAll mn $ ignoreWildcardsUnderCompleteTypeSignatures <$> decls'
     checkSuperClassesAreExported <- getSuperClassExportCheck
     for_ exps $ \e -> do
       checkTypesAreExported e

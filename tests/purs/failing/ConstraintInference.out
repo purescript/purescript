@@ -4,11 +4,11 @@ at tests/purs/failing/ConstraintInference.purs:10:1 - 10:21 (line 10, column 1 -
 
   The inferred type
   [33m                                         [0m
-  [33m  forall t8 t11. Show t8 => t11 -> String[0m
+  [33m  forall c8 t11. Show c8 => t11 -> String[0m
   [33m                                         [0m
   has type variables which are not determined by those mentioned in the body of the type:
 
-    [33mt8[0m could not be determined
+    [33mc8[0m could not be determined
 
   Consider adding a type annotation.
 
