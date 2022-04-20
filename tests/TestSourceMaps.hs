@@ -15,13 +15,15 @@ spec :: SpecWith SupportModules
 spec =
   goldenFiles
 
--- Test module names must be prefixed with "SourceMaps." and reside under tests/purs/sourcemaps. 
---  eg. Module file tests/purs/sourcemaps/Test123.purs must be named SourceMaps.Test123  
--- Modules created for the purpose of testing specific github issues should be named SourceMaps.Bug<issue_number>. 
---  eg. File name tests/purs/sourcemaps/Bug123.purs, module name SourceMaps.Bug123
---
--- Test modules and compilation output can be conveniently copied to .source-maps/<module_name>/
---  by running the get-source-maps.sh script.
+-- See the CONTRIBUTING.md file for why the below requirements are needed.
+-- Test files and their module names must abide by the following requirements:
+-- - Test files must reside in the @tests/purs/sourcemaps/@ directory
+-- - Module names must be prefixed with "SourceMaps." with the remainder
+--   matching the file name. For example:
+--    - File Name:   @tests/purs/sourcemaps/Test123.purs@
+--    - Module Name: @SourceMaps.Test123@
+--    - File Name:   @tests/purs/sourcemaps/Bug1234.purs@
+--    - Module Name: @SourceMaps.Bug1234@
 goldenFiles :: SpecWith SupportModules
 goldenFiles = do
   sourceMapsFiles <- runIO $ getTestFiles "sourcemaps"
