@@ -43,6 +43,10 @@ This will run whatever test uses the example file `1110.purs`.
 
 The golden files (e.g. `*.out` files) are generated automatically when missing, and can be updated by setting the "HSPEC_ACCEPT" environment variable, e.g. by running `HSPEC_ACCEPT=true stack test`.
 
+The source map tests' output can be visualized using the [Source Map Visualization](https://sokra.github.io/source-map-visualization/) website. The site requires uploading three files in the following order: the `.js` file, the `.js.map` file, and the `.purs` file.
+
+To produce these files, run `stack test --fast --ta "--match sourcemaps" && ./get-source-maps.sh`. Each test's 3 files will be stored in `.source-maps/<test file name>/` folder. The `get-source-maps.sh` script only works if the test files abide by the requirements described in [TestSourceMaps.hs](.tests/TestSourceMaps.hs).
+
 ### Adding Dependencies
 
 Because the PureScript compiler is distributed in binary form, we include the licenses of all dependencies, including transitive ones, in the LICENSE file. Therefore, whenever the dependencies change, the LICENSE file should be updated.
