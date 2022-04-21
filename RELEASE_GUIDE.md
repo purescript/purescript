@@ -122,8 +122,8 @@ considering what effects this may have:
         - run `npm publish --tag next`
         - verify that the prerelease can be installed via `npm i purescript@next`
     - if making a normal release (e.g. `v0.15.0`)
-        - run `npm publish --tag next`
         - run `npm publish`
+        - run `npm dist-tag add purescript@VERSION next` where `VERSION` is `v0.15.0`.
         - verify that the release can be installed via `npm i purescript@next`
         - verify that the release can be installed via `npm i purescript`
 
