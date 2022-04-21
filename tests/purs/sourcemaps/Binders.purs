@@ -3,13 +3,33 @@ module SourceMaps.Binders where
 import Prelude
 import Effect (Effect)
 
-f1 :: Int -> String
-f1 = case _ of
+f1 :: String
+f1 = "literal"
 
-  -- Literal
-  42 -> "literal"
+  where
+  -- Literals
 
-  _ -> ""
+  intb = case _ of
+    42 -> "int"
+    _ -> ""
+  numb = case _ of
+    42.0 -> "number"
+    _ -> ""
+  strb = case _ of
+    "foo" -> "string"
+    _ -> ""
+  chrb = case _ of
+    'f' -> "char"
+    _ -> ""
+  boolb = case _ of
+    true -> "bool true"
+    false -> "bool false"
+  recb = case _ of
+    { a: 42 } -> "record"
+    _ -> ""
+  arrb = case _ of
+    [ 1, 2, _ ] -> "array"
+    _ -> ""
   
 f2 :: String -> Int -> String
 f2 a b = case a, b of
