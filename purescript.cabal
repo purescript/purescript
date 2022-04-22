@@ -95,7 +95,7 @@ common defaults
     -- update to a newer snapshot as follows:
     --
     -- 1. Remove all version constraints from this cabal file (apart from
-    --    language-javascript and purescript-cst).
+    --    language-javascript).
     -- 2. Update stack.yaml as required to select a new snapshot, and check
     --    everything builds correctly with stack.
     -- 3. Run `stack sdist`; this will produce a source distribution including
@@ -109,8 +109,8 @@ common defaults
     -- built with (almost) the same install plan for both cabal and stack
     -- users.
     --
-    -- We need to be especially careful with purescript-cst
-    -- and language-javascript, because they all form part of the compiler's
+    -- We need to be especially careful with
+    -- language-javascript, because it forms a part of the compiler's
     -- public API. In the case of language-javascript specifically, all FFI
     -- modules must be parseable by this library otherwise the compiler
     -- will reject them. It should therefore always be pinned to a single
@@ -158,7 +158,6 @@ common defaults
     pattern-arrows >=0.0.2 && <0.1,
     process ==1.6.13.1,
     protolude >=0.3.0 && <0.4,
-    purescript-cst ==0.5.0.0,
     regex-tdfa >=1.3.1.1 && <1.4,
     safe >=0.3.19 && <0.4,
     scientific >=0.3.7.0 && <0.4,
@@ -184,7 +183,18 @@ library
   hs-source-dirs: src
   exposed-modules:
     Control.Monad.Logger
+    Control.Monad.Supply
+    Control.Monad.Supply.Class
     Language.PureScript
+    Language.PureScript.AST
+    Language.PureScript.AST.Binders
+    Language.PureScript.AST.Declarations
+    Language.PureScript.AST.Declarations.ChainId
+    Language.PureScript.AST.Exported
+    Language.PureScript.AST.Literals
+    Language.PureScript.AST.Operators
+    Language.PureScript.AST.SourcePos
+    Language.PureScript.AST.Traversals
     Language.PureScript.Bundle
     Language.PureScript.CodeGen
     Language.PureScript.CodeGen.JS
@@ -216,6 +226,22 @@ library
     Language.PureScript.CoreImp.Optimizer.TCO
     Language.PureScript.CoreImp.Optimizer.Unused
     Language.PureScript.CST
+    Language.PureScript.CST.Convert
+    Language.PureScript.CST.Errors
+    Language.PureScript.CST.Flatten
+    Language.PureScript.CST.Layout
+    Language.PureScript.CST.Lexer
+    Language.PureScript.CST.Monad
+    Language.PureScript.CST.Parser
+    Language.PureScript.CST.Positions
+    Language.PureScript.CST.Print
+    Language.PureScript.CST.Traversals
+    Language.PureScript.CST.Traversals.Type
+    Language.PureScript.CST.Types
+    Language.PureScript.CST.Utils
+    Language.PureScript.Comments
+    Language.PureScript.Constants.Prim
+    Language.PureScript.Crash
     Language.PureScript.Docs
     Language.PureScript.Docs.AsHtml
     Language.PureScript.Docs.AsMarkdown
@@ -232,6 +258,7 @@ library
     Language.PureScript.Docs.Tags
     Language.PureScript.Docs.Types
     Language.PureScript.Docs.Utils.MonoidExtras
+    Language.PureScript.Environment
     Language.PureScript.Errors
     Language.PureScript.Errors.JSON
     Language.PureScript.Externs
@@ -265,6 +292,7 @@ library
     Language.PureScript.Interactive.Parser
     Language.PureScript.Interactive.Printer
     Language.PureScript.Interactive.Types
+    Language.PureScript.Label
     Language.PureScript.Linter
     Language.PureScript.Linter.Exhaustive
     Language.PureScript.Linter.Imports
@@ -275,17 +303,20 @@ library
     Language.PureScript.Make.Cache
     Language.PureScript.Make.Monad
     Language.PureScript.ModuleDependencies
+    Language.PureScript.Names
     Language.PureScript.Options
     Language.PureScript.Pretty
     Language.PureScript.Pretty.Common
     Language.PureScript.Pretty.Types
     Language.PureScript.Pretty.Values
+    Language.PureScript.PSString
     Language.PureScript.Publish
     Language.PureScript.Publish.BoxesHelpers
     Language.PureScript.Publish.ErrorsWarnings
     Language.PureScript.Publish.Registry.Compat
     Language.PureScript.Publish.Utils
     Language.PureScript.Renamer
+    Language.PureScript.Roles
     Language.PureScript.Sugar
     Language.PureScript.Sugar.AdoNotation
     Language.PureScript.Sugar.BindingGroups
@@ -306,6 +337,7 @@ library
     Language.PureScript.Sugar.TypeClasses
     Language.PureScript.Sugar.TypeClasses.Deriving
     Language.PureScript.Sugar.TypeDeclarations
+    Language.PureScript.Traversals
     Language.PureScript.TypeChecker
     Language.PureScript.TypeChecker.Entailment
     Language.PureScript.TypeChecker.Entailment.Coercible
@@ -319,8 +351,11 @@ library
     Language.PureScript.TypeChecker.Types
     Language.PureScript.TypeChecker.TypeSearch
     Language.PureScript.TypeChecker.Unify
+    Language.PureScript.TypeClassDictionaries
+    Language.PureScript.Types
     System.IO.UTF8
   other-modules:
+    Data.Text.PureScript
     Paths_purescript
   autogen-modules:
     Paths_purescript
