@@ -541,20 +541,14 @@ replaceAllTypeVars = go [] where
 
 -- | Add visible type abstractions to top-level foralls.
 makeTopLevelVta :: [Text] -> Type a -> Type a
-makeTopLevelVta v = go True where
-  go n (ForAll ann arg mbK ty sco vta)
-    | n && arg `elem` v =
-        ForAll ann arg (go False <$> mbK) (go n ty) sco IsVtaTypeVar
+makeTopLevelVta v = go where
+  go (ForAll ann arg mbK ty sco vta)
+    | arg `elem` v =
+        ForAll ann arg mbK (go ty) sco IsVtaTypeVar
     | otherwise =
-        ForAll ann arg (go False <$> mbK) (go False ty) sco vta
-  go _ (ConstrainedType ann c ty) = ConstrainedType ann (mapConstraintArgsAll (map $ go False) c) (go False ty)
-  go _ (TypeApp ann t1 t2) = TypeApp ann (go False t1) (go False t2)
-  go _ (KindApp ann t1 t2) = KindApp ann (go False t1) (go False t2)
-  go _ (RCons ann name ty rest) = RCons ann name (go False ty) (go False rest)
-  go _ (KindedType ann ty k) = KindedType ann (go False ty) (go False k)
-  go _ (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann (go False t1) (go False t2) (go False t3)
-  go n (ParensInType ann t) = ParensInType ann (go n t)
-  go _ ty = ty
+        ForAll ann arg mbK (go ty) sco vta
+  go (ParensInType ann ty) = ParensInType ann (go ty)
+  go ty = ty
 
 -- | Collect all type variables appearing in a type
 usedTypeVariables :: Type a -> [Text]
