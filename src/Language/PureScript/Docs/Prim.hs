@@ -136,6 +136,7 @@ primIntDocsModule = Module
       [ intAdd
       , intCompare
       , intMul
+      , intToString
       ]
   , modReExports = []
   }
@@ -548,6 +549,11 @@ intCompare = primClassOf (P.primSubName "Int") "Compare" $ T.unlines
 intMul :: Declaration
 intMul = primClassOf (P.primSubName "Int") "Mul" $ T.unlines
   [ "Compiler solved type class for multiplying type-level `Int`s."
+  ]
+
+intToString :: Declaration
+intToString = primClassOf (P.primSubName "Int") "ToString" $ T.unlines
+  [ "Compiler solved type class for converting a type-level `Int` into a type-level `String` (i.e. `Symbol`)."
   ]
 
 fail :: Declaration

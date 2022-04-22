@@ -44,8 +44,6 @@ $STACK build --only-snapshot $STACK_OPTS
 (echo "::endgroup::"; echo "::group::Build source distributions") 2>/dev/null
 
 # Test in a source distribution (see above)
-$STACK sdist lib/purescript-cst --tar-dir sdist-test/lib/purescript-cst
-tar -xzf sdist-test/lib/purescript-cst/purescript-cst-*.tar.gz -C sdist-test/lib/purescript-cst --strip-components=1
 $STACK sdist . --tar-dir sdist-test;
 tar -xzf sdist-test/purescript-*.tar.gz -C sdist-test --strip-components=1
 
