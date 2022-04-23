@@ -1404,7 +1404,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       hasNoVta _ = True
 
     renderSimpleErrorMessage (CannotSkipTypeApplication tvar ttyp) =
-      paras $
+      paras
         [ "A type variable:"
         , markCodeBox $ indent $ line tvar
         , "in the type:"
