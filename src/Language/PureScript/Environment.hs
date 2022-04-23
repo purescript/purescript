@@ -430,6 +430,7 @@ primIntTypes =
     [ primClass (primSubName C.moduleInt "Add")     (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
     , primClass (primSubName C.moduleInt "Compare") (\kind -> tyInt -:> tyInt -:> kindOrdering -:> kind)
     , primClass (primSubName C.moduleInt "Mul")     (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
+    , primClass (primSubName C.moduleInt "ToString") (\kind -> tyInt -:> kindSymbol -:> kind)
     ]
 
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
@@ -594,6 +595,14 @@ primIntClasses =
         , ("product", Just tyInt, NotVtaTypeVar)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
+        ] True)
+
+    -- class ToString (int :: Int) (string :: Symbol) | int -> string
+    , (primSubName C.moduleInt "ToString", makeTypeClassData
+        [ ("int", Just tyInt, NotVtaTypeVar)
+        , ("string", Just kindSymbol, NotVtaTypeVar)
+        ] [] []
+        [ FunctionalDependency [0] [1]
         ] True)
     ]
 

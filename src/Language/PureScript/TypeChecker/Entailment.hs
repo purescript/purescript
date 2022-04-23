@@ -205,6 +205,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.IntAdd _ args | Just dicts <- solveIntAdd args = dicts
     forClassName _ ctx C.IntCompare _ args | Just dicts <- solveIntCompare ctx args = dicts
     forClassName _ _ C.IntMul _ args | Just dicts <- solveIntMul args = dicts
+    forClassName _ _ C.IntToString _ args | Just dicts <- solveIntToString args = dicts
     forClassName _ _ C.Reflectable _ args | Just dicts <- solveReflectable args = dicts
     forClassName _ _ C.RowUnion kinds args | Just dicts <- solveUnion kinds args = dicts
     forClassName _ _ C.RowNub kinds args | Just dicts <- solveNub kinds args = dicts
@@ -504,6 +505,18 @@ entails SolverOptions{..} constraint context hints =
       guard (T.length h' == 1)
       pure (arg1, arg2, srcTypeLevelString (mkString $ h' <> t'))
     consSymbol _ _ _ = Nothing
+
+    solveIntToString :: [SourceType] -> Maybe [TypeClassDict]
+    solveIntToString [arg0, _] = do
+      (arg0', arg1') <- printIntToString arg0
+      let args' = [arg0', arg1']
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntToString [] [] args' Nothing Nothing]
+    solveIntToString _ = Nothing
+
+    printIntToString :: SourceType -> Maybe (SourceType, SourceType)
+    printIntToString arg0@(TypeLevelInt _ i) = do
+      pure (arg0, srcTypeLevelString $ mkString $ T.pack $ show i)
+    printIntToString _ = Nothing
 
     solveReflectable :: [SourceType] -> Maybe [TypeClassDict]
     solveReflectable [typeLevel, _] = do

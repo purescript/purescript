@@ -4,7 +4,6 @@ resolver: lts-18.15
 pvp-bounds: both
 packages:
 - '.'
-- lib/purescript-cst
 ghc-options:
   # Build with advanced optimizations enabled by default
   "$locals": -O2 -Werror
@@ -23,6 +22,8 @@ extra-deps:
 # See https://github.com/purescript/purescript/issues/4253
 - process-1.6.13.1
 - Cabal-3.2.1.0
+# Not included in Stackage until the lts-19 series
+- monoidal-containers-0.6.2.0
 nix:
   packages:
   - zlib

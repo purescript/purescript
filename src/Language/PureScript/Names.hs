@@ -58,6 +58,21 @@ getClassName (TyClassName name) = Just name
 getClassName _ = Nothing
 
 -- |
+-- This type is meant to be extended with any new uses for idents that come
+-- along. Adding constructors to this type is cheaper than adding them to
+-- `Ident` because functions that match on `Ident` can ignore all
+-- `InternalIdent`s with a single pattern, and thus don't have to change if
+-- a new `InternalIdentData` constructor is created.
+--
+data InternalIdentData
+  -- Used by CoreFn.Laziness
+  = RuntimeLazyFactory | Lazy !Text
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData InternalIdentData
+instance Serialise InternalIdentData
+
+-- |
 -- Names for value identifiers
 --
 data Ident
@@ -73,6 +88,10 @@ data Ident
   -- A generated name used only for type-checking
   --
   | UnusedIdent
+  -- |
+  -- A generated name used only for internal transformations
+  --
+  | InternalIdent !InternalIdentData
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData Ident
@@ -86,6 +105,7 @@ runIdent (Ident i) = i
 runIdent (GenIdent Nothing n) = "$" <> T.pack (show n)
 runIdent (GenIdent (Just name) n) = "$" <> name <> T.pack (show n)
 runIdent UnusedIdent = unusedIdent
+runIdent InternalIdent{} = error "unexpected InternalIdent"
 
 showIdent :: Ident -> Text
 showIdent = runIdent
@@ -242,6 +262,7 @@ isQualifiedWith _ _ = False
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Qualified)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''InternalIdentData)
 
 instance ToJSON ModuleName where
   toJSON (ModuleName name) = toJSON (T.splitOn "." name)
