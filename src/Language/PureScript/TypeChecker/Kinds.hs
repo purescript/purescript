@@ -41,7 +41,7 @@ import Data.Functor (($>))
 import qualified Data.IntSet as IS
 import Data.List (nubBy, sortOn, (\\))
 import qualified Data.Map as M
-import Data.Maybe (fromJust, fromMaybe, mapMaybe)
+import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
@@ -623,9 +623,7 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
           tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . \(a, _, _) -> a) tyCtor tyArgs'
-          vtas = mapMaybe go tyArgs where
-            go (i, _, IsVtaTypeVar) = Just i
-            go _ = Nothing
+          vtas = map (\(i, _, v) -> (i, v)) tyArgs
           ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (\(a, b, _) -> (nullSourceAnn, (a, b))) tyArgs'
       for ctors $
         fmap (fmap (makeTopLevelVta vtas . mkForAll ctorBinders)) . inferDataConstructor tyCtor'

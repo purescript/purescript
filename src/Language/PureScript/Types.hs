@@ -48,6 +48,7 @@ instance Serialise SkolemScope
 --
 data VtaTypeVar
   = IsVtaTypeVar
+  | IsVtaTypeVarRequired
   | NotVtaTypeVar
   deriving (Show, Eq, Ord, Generic)
 
@@ -233,6 +234,7 @@ constraintToJSON annToJSON Constraint {..} =
 
 vtaTypeVarToJSON :: VtaTypeVar -> A.Value
 vtaTypeVarToJSON IsVtaTypeVar = A.toJSON ("IsVtaTypeVar" :: String)
+vtaTypeVarToJSON IsVtaTypeVarRequired = A.toJSON ("IsVtaTypeVarRequired" :: String)
 vtaTypeVarToJSON NotVtaTypeVar = A.toJSON ("NotVtaTypeVar" :: String)
 
 typeToJSON :: forall a. (a -> A.Value) -> Type a -> A.Value
@@ -331,6 +333,7 @@ vtaTypeVarFromJSON v = do
   case v' of
     "IsVtaTypeVar" -> pure IsVtaTypeVar
     "NotVtaTypeVar" -> pure NotVtaTypeVar
+    "IsVtaTypeVarRequired" -> pure IsVtaTypeVarRequired
     _ -> fail $ "Unrecognized VtaTypeVar: " <> v'
 
 typeFromJSON :: forall a. A.Parser a -> (A.Value -> A.Parser a) -> A.Value -> A.Parser (Type a)
@@ -540,13 +543,13 @@ replaceAllTypeVars = go [] where
            | otherwise = orig <> T.pack (show n)
 
 -- | Add visible type abstractions to top-level foralls.
-makeTopLevelVta :: [Text] -> Type a -> Type a
+makeTopLevelVta :: [(Text, VtaTypeVar)] -> Type a -> Type a
 makeTopLevelVta v = go where
-  go (ForAll ann arg mbK ty sco vta)
-    | arg `elem` v =
-        ForAll ann arg mbK (go ty) sco IsVtaTypeVar
-    | otherwise =
-        ForAll ann arg mbK (go ty) sco vta
+  go (ForAll ann arg mbK ty sco vta) = case lookup arg v of
+    Just vtv ->
+      ForAll ann arg mbK (go ty) sco vtv
+    Nothing ->
+      ForAll ann arg mbK (go ty) sco vta
   go (ParensInType ann ty) = ParensInType ann (go ty)
   go ty = ty
 

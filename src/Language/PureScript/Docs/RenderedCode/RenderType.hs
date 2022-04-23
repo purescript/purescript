@@ -244,6 +244,7 @@ renderTypeVar (v, mbK, vta) = case mbK of
   Just k -> mintersperse sp [ mconcat [syntax "(", renderVtaTypeVar vta, typeVar v], syntax "::", mconcat [renderType' k, syntax ")"] ]
   where
   renderVtaTypeVar IsVtaTypeVar = syntax "@"
+  renderVtaTypeVar IsVtaTypeVarRequired = syntax "@"
   renderVtaTypeVar NotVtaTypeVar = syntax ""
 
 -- |

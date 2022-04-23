@@ -195,6 +195,7 @@ data SimpleErrorMessage
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
+  | CannotSkipTypeApplication Text SourceType
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -363,6 +364,7 @@ errorCode em = case unwrapErrorMessage em of
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
   CannotApplyExpressionOfTypeOnType {} -> "CannotApplyExpressionOfTypeOnType"
+  CannotSkipTypeApplication {} -> "CannotSkipTypeApplication"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1400,6 +1402,15 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       hasNoVta (ParensInType _ t) = hasNoVta t
       hasNoVta (KindedType _ t _) = hasNoVta t
       hasNoVta _ = True
+
+    renderSimpleErrorMessage (CannotSkipTypeApplication tvar ttyp) =
+      paras $
+        [ "A type variable:"
+        , markCodeBox $ indent $ line tvar
+        , "in the type:"
+        , markCodeBox $ indent $ prettyType ttyp
+        , "cannot be skipped during type application."
+        ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =

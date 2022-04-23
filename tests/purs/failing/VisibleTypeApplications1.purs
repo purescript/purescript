@@ -1,7 +1,10 @@
--- @shouldFailWith CannotApplyExpressionOfTypeOnType
+-- @shouldFailWith KindsDoNotUnify
 module Main where
 
-data Id :: forall k. k -> Type
-data Id a = Id
+data Proxy :: forall k. k -> Type
+data Proxy a = Proxy
 
-fail = Id @Int
+fail :: forall @k (@t :: k). Proxy t
+fail = Proxy
+
+fail' = fail @Type @"NotType"

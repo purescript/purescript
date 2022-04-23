@@ -1,10 +1,7 @@
--- @shouldFailWith KindsDoNotUnify
+-- @shouldFailWith CannotSkipTypeApplication
 module Main where
 
-data Proxy :: forall k. k -> Type
-data Proxy a = Proxy
+class Foo foo where
+  foo :: String
 
-fail :: forall @k (@t :: k). Proxy t
-fail = Proxy
-
-fail' = fail @Type @"NotType"
+foo' = foo @_

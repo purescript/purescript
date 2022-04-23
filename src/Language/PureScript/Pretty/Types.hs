@@ -225,6 +225,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   printMbKindedType (v, Just k, vta) = text ("(" ++ printVtaTypeVar vta ++ v ++ " " ++ doubleColon ++ " ") <> typeAsBox' k <> text ")"
 
   printVtaTypeVar IsVtaTypeVar = "@"
+  printVtaTypeVar IsVtaTypeVarRequired = "@"
   printVtaTypeVar NotVtaTypeVar = ""
 
   -- If both boxes span a single line, keep them on the same line, or else

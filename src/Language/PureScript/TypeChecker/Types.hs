@@ -349,6 +349,7 @@ unconsVtaTypeVar = go Nothing []
   go y n (ForAll a i k t s v) =
     case (y, v) of
       (Nothing, IsVtaTypeVar) -> go (Just (a, i, k, s, v)) n t
+      (Nothing, IsVtaTypeVarRequired) -> go (Just (a, i, k, s, v)) n t
       _ -> go y ((a, i, k, s, v) : n) t
   go y n t = do
     (, foldl' mkForAll' t n) <$> y
@@ -481,8 +482,11 @@ infer' (VisibleTypeApp val typeArg@(TypeWildcard _ _)) = do
   TypedValue' _ val' valTy <- infer' val
   (val'', valTy') <- instantiatePolyTypeWithUnknowns val' valTy
   case unconsVtaTypeVar valTy' of
-    Just ((a, i, k, s, _), t) ->
-      pure $ TypedValue' True val'' $ ForAll a i k t s NotVtaTypeVar
+    Just ((a, i, k, s, v), t) -> case v of
+      IsVtaTypeVarRequired ->
+        throwError . errorMessage $ CannotSkipTypeApplication i valTy
+      _ ->
+        pure $ TypedValue' True val'' $ ForAll a i k t s NotVtaTypeVar
     Nothing ->
       throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy typeArg
 infer' (VisibleTypeApp val typeArg) = do

@@ -450,7 +450,7 @@ convertDeclaration fileName decl = case decl of
             [] -> []
             (st', ctor) : tl' -> ctrs st' ctor tl'
           )
-    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goVtvTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
+    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goVtvTypeVarAlways <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
@@ -458,7 +458,7 @@ convertDeclaration fileName decl = case decl of
       (convertType fileName bd)
   DeclNewtype _ (DataHead _ a vars) st x ys -> do
     let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(head ctrFields, convertType fileName ys)]]
-    pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goVtvTypeVar <$> vars) ctrs
+    pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goVtvTypeVarAlways <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
       goTyVar (TypeVarKinded (Wrapped _ (Labeled (_, a) _ _) _)) = nameValue a
@@ -474,7 +474,7 @@ convertDeclaration fileName decl = case decl of
         AST.TypeDeclaration $ AST.TypeDeclarationData ann' (ident $ nameValue n) ty'
     pure $ AST.TypeClassDeclaration ann
       (nameValue name)
-      (goVtvTypeVar <$> vars)
+      (goVtvTypeVarRequired <$> vars)
       (convertConstraint fileName <$> maybe [] (toList . fst) sup)
       (goFundep <$> maybe [] (toList . snd) fdeps)
       (goSig <$> maybe [] (NE.toList . snd) bd)
@@ -596,13 +596,15 @@ convertDeclaration fileName decl = case decl of
         TypeConstrained{} -> ""
         TypeUnaryRow{} -> "Row"
 
-  goTypeVar = (\(a, b, _) -> (a, b)) . goVtvTypeVar
+  goVtvTypeVar_ atSign = \case
+    TypeVarKinded (Wrapped _ (Labeled (_, x) _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y, atSign)
+    TypeVarName (_, x) -> (getIdent $ nameValue x, Nothing, atSign)
 
-  goVtvTypeVar = \case
-    TypeVarKinded (Wrapped _ (Labeled (v, x) _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y, vtv v)
-    TypeVarName (v, x) -> (getIdent $ nameValue x, Nothing, vtv v)
-    where
-    vtv = maybe T.NotVtaTypeVar (const T.IsVtaTypeVar)
+  goTypeVar = (\(a, b, _) -> (a, b)) . goVtvTypeVar_ T.NotVtaTypeVar
+
+  goVtvTypeVarAlways = goVtvTypeVar_ T.IsVtaTypeVar
+
+  goVtvTypeVarRequired = goVtvTypeVar_ T.IsVtaTypeVarRequired
 
   goInstanceBinding = \case
     InstanceBindingSignature _ lbl ->
