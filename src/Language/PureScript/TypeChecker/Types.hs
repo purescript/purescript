@@ -579,7 +579,7 @@ inferBinder val (ConstructorBinder ss ctor binders) = do
   env <- getEnv
   case M.lookup ctor (dataConstructors env) of
     Just (_, _, ty, _) -> do
-      (_, fn) <- instantiatePolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") ty
+      (_, fn) <- instantiatePolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") $ removeVtaTypeVars ty
       fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
       let (args, ret) = peelArgs fn'
           expected = length args
@@ -594,6 +594,12 @@ inferBinder val (ConstructorBinder ss ctor binders) = do
     where
     go args (TypeApp _ (TypeApp _ fn arg) ret) | eqType fn tyFunction = go (arg : args) ret
     go args ret = (args, ret)
+
+  removeVtaTypeVars :: Type a -> Type a
+  removeVtaTypeVars = go where
+    go (ForAll a b c d e _) = ForAll a b c (go d) e NotVtaTypeVar
+    go (ParensInType a t) = ParensInType a (go t)
+    go t = t
 inferBinder val (LiteralBinder _ (ObjectLiteral props)) = do
   row <- freshTypeWithKind (kindRow kindType)
   rest <- freshTypeWithKind (kindRow kindType)
