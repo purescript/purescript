@@ -326,7 +326,17 @@ instantiatePolyTypeWithUnknowns
   => Expr
   -> SourceType
   -> m (Expr, SourceType)
-instantiatePolyTypeWithUnknowns = go []
+instantiatePolyTypeWithUnknowns = instantiatePolyTypeWithUnknownsAndSpecify False
+
+-- | Similar to instantiatePolyTypeWithUnknowns, but chooses whether to wrap the resulting
+-- type in Specified for visible type applications.
+instantiatePolyTypeWithUnknownsAndSpecify
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => Bool
+  -> Expr
+  -> SourceType
+  -> m (Expr, SourceType)
+instantiatePolyTypeWithUnknownsAndSpecify shouldSpecify = go []
   where
   go sp val (ForAll ann ident mbK ty _ vtv) = do
     u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
@@ -344,7 +354,7 @@ instantiatePolyTypeWithUnknowns = go []
     dicts <- getTypeClassDictionaries
     hints <- getHints
     go sp (App val (TypeClassDictionary con dicts hints)) ty
-  go sp val ty = return (val, foldl' mkSpecified ty sp) where
+  go sp val ty = return (val, if shouldSpecify then foldl' mkSpecified ty sp else ty) where
     mkSpecified t (a, i, r) = Specified a i r t
 
 -- | Match against TUnknown and call insertUnkName, failing otherwise.
@@ -451,7 +461,7 @@ infer' v@(Constructor _ c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
-    Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
+    Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknownsAndSpecify True v $ ty
                              return $ TypedValue' True v' ty'
 infer' (Case vals binders) = do
   (vals', ts) <- instantiateForBinders vals binders
@@ -485,7 +495,7 @@ infer' (TypedValue checkType val ty) = do
   return $ TypedValue' True (tvToExpr tv) ty'
 infer' (VisibleTypeApp val typeArg@(TypeWildcard _ _)) = do
   TypedValue' _ val' valTy <- infer' val
-  (val'', valTy') <- instantiatePolyTypeWithUnknowns val' valTy
+  (val'', valTy') <- instantiatePolyTypeWithUnknownsAndSpecify True val' valTy
   case unconsVtaTypeVar valTy' of
     Just (_, typeHead, typeRequired, typeTail) ->
       if typeRequired then do
@@ -497,7 +507,7 @@ infer' (VisibleTypeApp val typeArg@(TypeWildcard _ _)) = do
       throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy typeArg
 infer' (VisibleTypeApp val typeArg) = do
   TypedValue' _ val' valTy <- infer' val
-  (val'', valTy') <- instantiatePolyTypeWithUnknowns val' valTy
+  (val'', valTy') <- instantiatePolyTypeWithUnknownsAndSpecify True val' valTy
   (typeArg', _) <- kindOf typeArg
   typeArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ typeArg'
   case unconsVtaTypeVar valTy' of
