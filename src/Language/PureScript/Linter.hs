@@ -97,6 +97,7 @@ lint modl@(Module _ _ mn ds _) = do
       -- Recursively walk the type and prune used variables from `unused`
       go :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
       go unused (TypeVar _ v) = (S.delete v unused, mempty)
+      go unused (Specified _ _ _ t) = go unused t
       go unused (ForAll _ tv mbK t1 _ _) =
         let (nowUnused, errors)
               | Just k <- mbK = go unused k `combine` go (S.insert tv unused) t1

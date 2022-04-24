@@ -43,6 +43,7 @@ import Data.Traversable (for)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Text as T
 import qualified Data.IntSet as IS
 
 import Language.PureScript.AST
@@ -325,15 +326,26 @@ instantiatePolyTypeWithUnknowns
   => Expr
   -> SourceType
   -> m (Expr, SourceType)
-instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _ NotVtaTypeVar) = do
-  u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
-  insertUnkName' u ident
-  instantiatePolyTypeWithUnknowns val $ replaceTypeVars ident u ty
-instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
-  dicts <- getTypeClassDictionaries
-  hints <- getHints
-  instantiatePolyTypeWithUnknowns (App val (TypeClassDictionary con dicts hints)) ty
-instantiatePolyTypeWithUnknowns val ty = return (val, ty)
+instantiatePolyTypeWithUnknowns = go []
+  where
+  go sp val (ForAll ann ident mbK ty _ vtv) = do
+    u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
+    case u of
+      TUnknown _ i -> do
+        insertUnkName i ident
+        let sp' = case vtv of
+              NotVtaTypeVar -> sp
+              IsVtaTypeVar -> (ann, i, False) : sp
+              IsVtaTypeVarRequired -> (ann, i, True) : sp
+        go sp' val $ replaceTypeVars ident u ty
+      _ ->
+        internalError "type is not TUnknown"
+  go sp val (ConstrainedType _ con ty) = do
+    dicts <- getTypeClassDictionaries
+    hints <- getHints
+    go sp (App val (TypeClassDictionary con dicts hints)) ty
+  go sp val ty = return (val, foldl' mkSpecified ty sp) where
+    mkSpecified t (a, i, r) = Specified a i r t
 
 -- | Match against TUnknown and call insertUnkName, failing otherwise.
 insertUnkName' :: (MonadState CheckState m, MonadError MultipleErrors m) => SourceType -> Text -> m ()
@@ -343,18 +355,11 @@ insertUnkName' _ _ = internalCompilerError "type is not TUnknown"
 -- | Attempt to uncons a type variable binding from a type.
 unconsVtaTypeVar
   :: SourceType
-  -> Maybe ((SourceAnn, Text, Maybe SourceType, Maybe SkolemScope, VtaTypeVar), SourceType)
-unconsVtaTypeVar = go Nothing []
+  -> Maybe (SourceAnn, Int, Bool, SourceType)
+unconsVtaTypeVar = go
   where
-  go y n (ForAll a i k t s v) =
-    case (y, v) of
-      (Nothing, IsVtaTypeVar) -> go (Just (a, i, k, s, v)) n t
-      (Nothing, IsVtaTypeVarRequired) -> go (Just (a, i, k, s, v)) n t
-      _ -> go y ((a, i, k, s, v) : n) t
-  go y n t = do
-    (, foldl' mkForAll' t n) <$> y
-
-  mkForAll' t (a, i, k, s, v) = ForAll a i k t s v
+  go (Specified a i r t) = Just (a, i, r, t)
+  go _ = Nothing
 
 -- | Infer a type for a value, rethrowing any error to provide a more useful error message
 infer
@@ -482,33 +487,23 @@ infer' (VisibleTypeApp val typeArg@(TypeWildcard _ _)) = do
   TypedValue' _ val' valTy <- infer' val
   (val'', valTy') <- instantiatePolyTypeWithUnknowns val' valTy
   case unconsVtaTypeVar valTy' of
-    Just ((a, i, k, s, v), t) -> case v of
-      IsVtaTypeVarRequired ->
-        throwError . errorMessage $ CannotSkipTypeApplication i valTy
-      _ ->
-        pure $ TypedValue' True val'' $ ForAll a i k t s NotVtaTypeVar
-    Nothing ->
+    Just (_, typeHead, typeRequired, typeTail) ->
+      if typeRequired then do
+        typeHead' <- fromMaybe (T.pack $ "t" <> show typeHead) <$> lookupUnkName typeHead
+        throwError . errorMessage $ CannotSkipTypeApplication typeHead' valTy
+      else
+        pure $ TypedValue' True val'' typeTail
+    _ ->
       throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy typeArg
 infer' (VisibleTypeApp val typeArg) = do
   TypedValue' _ val' valTy <- infer' val
-  -- We instantiate early such that polykinded type variables:
-  --
-  -- forall (k :: Type) (@t :: k). Proxy t
-  --
-  -- are turned into:
-  --
-  -- forall (@t :: k?). Proxy t
-  --
-  -- This allows typeArg's kind to unify with the unknown k.
   (val'', valTy') <- instantiatePolyTypeWithUnknowns val' valTy
-  -- `kindOf` here eliminates ParensInType in typeArg
   (typeArg', _) <- kindOf typeArg
   typeArg'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ typeArg'
   case unconsVtaTypeVar valTy' of
-    Just ((_, typeVar, mTypeVarUnk, _, _), tyAbsBody) -> do
-      typeVarUnk <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mTypeVarUnk
-      unifyTypes typeArg'' typeVarUnk
-      pure $ TypedValue' True val'' (replaceTypeVars typeVar typeVarUnk tyAbsBody)
+    Just (typeAnn, typeHead, _, typeTail) -> do
+      unifyTypes (TUnknown typeAnn typeHead) typeArg''
+      pure $ TypedValue' True val'' typeTail
     _ ->
       throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy typeArg
 infer' (Hole name) = do
@@ -940,6 +935,7 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   unifyTypes tyFunction' tyFunction
   arg' <- tvToExpr <$> check arg argTy
   return (retTy, App fn arg')
+checkFunctionApplication' fn (Specified _ _ _ ty) arg = checkFunctionApplication' fn ty arg
 checkFunctionApplication' fn (ForAll _ ident mbK ty _ _) arg = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   insertUnkName' u ident

@@ -11,8 +11,8 @@ at tests/purs/failing/VisibleTypeApplications1.purs:10:9 - 10:30 (line 10, colum
   [33m  Type[0m
   [33m      [0m
 
-while trying to match type [33m"NotType"[0m
-  with type [33mt0[0m
+while trying to match type [33mt0[0m
+  with type [33m"NotType"[0m
 while inferring the type of [33mfail[0m
 in value declaration [33mfail'[0m
 
