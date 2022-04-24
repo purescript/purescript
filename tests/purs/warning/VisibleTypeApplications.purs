@@ -9,7 +9,7 @@ module Main where
 const :: forall @a @b. a -> b -> a
 const a _ = a
 
--- const' :: forall a @b. a -> b -> a
+-- const' :: forall a84 b85. a84 -> b85 -> a84
 const' = const @_
 
 
