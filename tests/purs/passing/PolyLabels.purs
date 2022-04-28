@@ -4,7 +4,7 @@ import Prelude
 import Prim.Row
 import Effect
 import Effect.Console
-import Data.Reflectable (class Reflectable, reflectType)
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Type.Proxy (Proxy(..))
 
 foreign import unsafeGet
@@ -22,27 +22,27 @@ foreign import unsafeSet
 
 get
   :: forall r r' l a
-   . Reflectable l String
+   . IsSymbol l
   => Cons l a r' r
   => Proxy l
   -> Record r
   -> a
-get l = unsafeGet (reflectType l)
+get l = unsafeGet (reflectSymbol l)
 
 set
   :: forall r1 r2 r l a b
-   . Reflectable l String
+   . IsSymbol l
   => Cons l a r r1
   => Cons l b r r2
   => Proxy l
   -> b
   -> Record r1
   -> Record r2
-set l = unsafeSet (reflectType l)
+set l = unsafeSet (reflectSymbol l)
 
 lens 
   :: forall l f r1 r2 r a b
-   . Reflectable l String
+   . IsSymbol l
   => Cons l a r r1
   => Cons l b r r2
   => Functor f
