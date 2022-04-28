@@ -94,7 +94,7 @@ jobs:
         # We upgrade npm to fix this
         run: |
           npm i -g npm@8.8.0
-          "../ci/fix-home stack --haddock exec ../ci/build-package-set.sh"
+          ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
 
       - name: Verify that 'libtinfo' isn't in binary
         if: runner.os == 'Linux'
