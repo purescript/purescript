@@ -25,8 +25,8 @@ jobs:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
             os: "ubuntu-latest"
             image: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
-          - os: "macOS-10.15"
-          - os: "windows-2019"
+          # - os: "macOS-10.15"
+          # - os: "windows-2019"
 
     runs-on: "${{ matrix.os }}"
     container: "${{ matrix.image }}"

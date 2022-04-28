@@ -27,7 +27,7 @@ set -ex
 # and these failures are very easy to miss otherwise.
 STACK="stack --no-terminal --haddock --jobs=2"
 
-STACK_OPTS="--test"
+STACK_OPTS=""
 if [ "$CI_RELEASE" = "true" ]
 then
   STACK_OPTS="$STACK_OPTS --flag=purescript:RELEASE"
