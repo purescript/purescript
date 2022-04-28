@@ -42,9 +42,9 @@ jobs:
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
 
-      - uses: "actions/setup-node@v1"
+      - uses: "actions/setup-node@v2"
         with:
-          node-version: "12"
+          node-version: "14"
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
