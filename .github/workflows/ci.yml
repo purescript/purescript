@@ -89,7 +89,12 @@ jobs:
         # into which stack places all build artifacts. Since we use --haddock
         # in our CI builds, in order to actually get stack to find the purs
         # binary it created, we need to use the flag here as well.
-        run: "../ci/fix-home stack --haddock exec ../ci/build-package-set.sh"
+        #
+        # Moreover, npm has a hook issue that will cause spago to fail to install
+        # We upgrade npm to fix this
+        run: |
+          npm i -g npm@8.8.0
+          "../ci/fix-home stack --haddock exec ../ci/build-package-set.sh"
 
       - name: Verify that 'libtinfo' isn't in binary
         if: runner.os == 'Linux'
