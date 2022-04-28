@@ -16,23 +16,32 @@ export PATH="$tmpdir/node_modules/.bin:$PATH"
 cd "$tmpdir"
 
 echo ::group::Ensure Spago is available
-which spago || npm install spago@0.20.8
+SPAGO="spago"
+if [ "${CI:-}" ] && [ ! -x "$(command -v spago 2>/dev/null)" ]; then
+  echo "Installing spago"
+  SPAGO_VERSION=0.20.8
+  curl -o spago.tar.gz -L "https://github.com/purescript/spago/releases/download/$SPAGO_VERSION/Linux.tar.gz"
+  tar -xvf spago.tar.gz
+  chmod +x spago
+  SPAGO="./spago"
+  "$SPAGO" --version
+fi
 echo ::endgroup::
 
 echo ::group::Create dummy project
 echo 'let upstream = https://github.com/purescript/package-sets/releases/download/XXX/packages.dhall in upstream' > packages.dhall
 echo '{ name = "my-project", dependencies = [] : List Text, packages = ./packages.dhall, sources = [] : List Text }' > spago.dhall
-spago upgrade-set
+"$SPAGO" upgrade-set
 # Override the `metadata` package's version to match `purs` version
 # so that `spago build` actually works
 sed -i'' "\$c in upstream with metadata.version = \"v$(purs --version | { read v z && echo $v; })\"" packages.dhall
-spago install $(spago ls packages | while read name z; do echo $name; done)
+"$SPAGO" install $("$SPAGO" ls packages | while read name z; do echo $name; done)
 echo ::endgroup::
 
 echo ::group::Compile package set
-spago build
+"$SPAGO" build
 echo ::endgroup::
 
 echo ::group::Document package set
-spago docs --no-search
+"$SPAGO" docs --no-search
 echo ::endgroup::
