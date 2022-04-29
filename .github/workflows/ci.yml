@@ -42,9 +42,9 @@ jobs:
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
 
-      - uses: "actions/setup-node@v1"
+      - uses: "actions/setup-node@v2"
         with:
-          node-version: "12"
+          node-version: "14"
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
@@ -89,7 +89,12 @@ jobs:
         # into which stack places all build artifacts. Since we use --haddock
         # in our CI builds, in order to actually get stack to find the purs
         # binary it created, we need to use the flag here as well.
-        run: "../ci/fix-home stack --haddock exec ../ci/build-package-set.sh"
+        #
+        # Moreover, npm has a hook issue that will cause spago to fail to install
+        # We upgrade npm to fix this
+        run: |
+          npm i -g npm@8.8.0
+          ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
 
       - name: Verify that 'libtinfo' isn't in binary
         if: runner.os == 'Linux'
