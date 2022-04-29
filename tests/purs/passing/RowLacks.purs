@@ -2,34 +2,32 @@ module Main where
 
 import Effect.Console (log)
 import Prim.Row (class Lacks)
-import Type.Row (RProxy(..))
-
-data SProxy (a :: Symbol) = SProxy
+import Type.Proxy (Proxy(..))
 
 lacksX
   :: forall r
    . Lacks "x" r
-  => RProxy r
-  -> RProxy ()
-lacksX _ = RProxy
+  => Proxy r
+  -> Proxy ()
+lacksX _ = Proxy
 
 lacksSym
   :: forall sym (to :: Row Type)
    . Lacks sym to
-  => SProxy sym
-  -> RProxy to
-lacksSym _ = RProxy
+  => Proxy sym
+  -> Proxy to
+lacksSym _ = Proxy
 
-test1 :: RProxy ()
-test1 = lacksX (RProxy :: RProxy (y :: Int, z :: String))
+test1 :: Proxy ()
+test1 = lacksX (Proxy :: Proxy (y :: Int, z :: String))
 
-test2 :: forall r. Lacks "x" r => RProxy r -> RProxy ()
-test2 _ = lacksX (RProxy :: RProxy (y :: Int, z :: String | r))
+test2 :: forall r. Lacks "x" r => Proxy r -> Proxy ()
+test2 _ = lacksX (Proxy :: Proxy (y :: Int, z :: String | r))
 
-test3 :: RProxy ()
-test3 = test2 (RProxy :: RProxy (a :: String))
+test3 :: Proxy ()
+test3 = test2 (Proxy :: Proxy (a :: String))
 
-test4 :: forall sym. SProxy sym -> RProxy ()
+test4 :: forall sym. Proxy sym -> Proxy ()
 test4 = lacksSym
 
 main = log "Done"

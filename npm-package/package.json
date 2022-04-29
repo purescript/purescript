@@ -1,6 +1,6 @@
 {
   "name": "purescript",
-  "version": "0.14.7",
+  "version": "0.15.0-alpha-07",
   "license": "ISC",
   "description": "PureScript wrapper that makes it available as a local dependency",
   "author": {
@@ -15,7 +15,7 @@
     "purs": "purs.bin"
   },
   "dependencies": {
-    "purescript-installer": "^0.2.0"
+    "purescript-installer": "^0.2.6"
   },
   "homepage": "https://github.com/purescript/purescript",
   "repository": {
@@ -43,7 +43,7 @@
   ],
   "scripts": {
     "prepublishOnly": "node -e \"require('fs').copyFileSync('purs.bin.placeholder', 'purs.bin');\"",
-    "postinstall": "install-purescript --purs-ver=0.14.7",
+    "postinstall": "install-purescript --purs-ver=0.15.0-alpha-07",
     "test": "echo 'Error: no test specified' && exit 1"
   }
 }
