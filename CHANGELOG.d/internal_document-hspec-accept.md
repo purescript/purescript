@@ -1,1 +1,0 @@
-* Document the `HSPEC_ACCEPT` flag for generating golden files
