@@ -123,8 +123,11 @@ typeSearch unsolved env st type' =
     matchingNames = runTypeSearch (Map.map (\(ty, _, _) -> ty) (P.names env))
     matchingConstructors = runTypeSearch (Map.map (\(_, _, ty, _) -> ty) (P.dataConstructors env))
     (allLabels, matchingLabels) = accessorSearch unsolved env st type'
+
+    runPlainIdent (Qualified m (Ident k), v) = Just (Qualified m k, v)
+    runPlainIdent _ = Nothing
   in
     ( (first (P.Qualified Nothing . ("_." <>) . P.prettyPrintLabel) <$> matchingLabels)
-      <> (first (map P.runIdent) <$> Map.toList matchingNames)
+      <> mapMaybe runPlainIdent (Map.toList matchingNames)
       <> (first (map P.runProperName) <$> Map.toList matchingConstructors)
     , if null allLabels then Nothing else Just allLabels)

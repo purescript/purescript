@@ -1,0 +1,9 @@
+Warning found:
+at tests/purs/warning/DeprecatedCaseOfOffsideSyntax2.purs:8:3 - 8:4 (line 8, column 3 - line 8, column 4)
+
+  Dedented expressions in case branches are deprecated and will be removed in a future release. Indent the branch's expression past it's binder instead.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/WarningParsingModule.md for more information,
+or to contribute content related to this warning.
+

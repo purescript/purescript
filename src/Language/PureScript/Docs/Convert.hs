@@ -13,6 +13,7 @@ import Control.Monad.Supply (evalSupplyT)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import Data.String (String)
+import qualified Data.Text as T
 
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
 import Language.PureScript.Docs.Types
@@ -23,9 +24,11 @@ import qualified Language.PureScript.Errors as P
 import qualified Language.PureScript.Externs as P
 import qualified Language.PureScript.Environment as P
 import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Roles as P
 import qualified Language.PureScript.Sugar as P
 import qualified Language.PureScript.Types as P
 import qualified Language.PureScript.Constants.Prim as Prim
+import Language.PureScript.Sugar (RebracketCaller(CalledByDocs))
 
 -- |
 -- Convert a single module to a Docs.Module, making use of a pre-existing
@@ -43,6 +46,12 @@ convertModule externs env checkEnv =
   fmap (insertValueTypesAndAdjustKinds checkEnv . convertSingleModule) . partiallyDesugar externs env
 
 -- |
+-- Convert FFI declarations into `DataDeclaration` so that the declaration's
+-- roles (if any) can annotate the generated type parameter names.
+--
+-- Inserts all data declarations inferred roles if none were specified
+-- explicitly.
+--
 -- Updates all the types of the ValueDeclarations inside the module based on
 -- their types inside the given Environment.
 --
@@ -55,8 +64,80 @@ convertModule externs env checkEnv =
 insertValueTypesAndAdjustKinds ::
   P.Environment -> Module -> Module
 insertValueTypesAndAdjustKinds env m =
-  m { modDeclarations = map go (modDeclarations m) }
+  m { modDeclarations = map (go . insertInferredRoles . convertFFIDecl) (modDeclarations m) }
   where
+  -- |
+  -- Convert FFI declarations into data declaration
+  -- by generating the type parameters' names based on its kind signature.
+  -- Note: `Prim` modules' docs don't go through this conversion process
+  -- so `ExternDataDeclaration` values will still exist beyond this point.
+  convertFFIDecl d@Declaration { declInfo = ExternDataDeclaration kind roles } =
+    d { declInfo = DataDeclaration P.Data (genTypeParams kind) roles
+      , declKind = Just (KindInfo P.DataSig kind)
+      }
+
+  convertFFIDecl other = other
+
+  insertInferredRoles d@Declaration { declInfo = DataDeclaration dataDeclType args [] } =
+    d { declInfo = DataDeclaration dataDeclType args inferredRoles }
+
+    where
+    inferredRoles :: [P.Role]
+    inferredRoles = do
+      let key = P.Qualified (Just (modName m)) (P.ProperName (declTitle d))
+      case Map.lookup key (P.types env) of
+        Just (_, tyKind) -> case tyKind of
+          P.DataType _ tySourceTyRole _ ->
+            map (\(_,_,r) -> r) tySourceTyRole
+          P.ExternData rs ->
+            rs
+          _ ->
+            []
+        Nothing ->
+          err $ "type not found: " <> show key
+
+  insertInferredRoles other =
+    other
+
+  -- |
+  -- Given an FFI declaration like this
+  -- ```
+  -- foreign import data Foo
+  --    :: forall a b c d
+  --     . MyKind a b
+  --    -> OtherKind c d
+  --    -> Symbol
+  --    -> (Type -> Type)
+  --    -> (Type) -- unneeded parens a developer typo
+  --    -> Type
+  -- ```
+  -- Return a list of values, one for each implicit type parameter
+  -- of `(tX, Nothing)` where `X` refers to the index of he parameter
+  -- in that list, matching the values expected by `Render.toTypeVar`
+  genTypeParams :: Type' -> [(Text, Maybe Type')]
+  genTypeParams kind = do
+    let n = countParams 0 kind
+    map (\(i :: Int) -> ("t" <> T.pack (show i), Nothing)) $ take n [0..]
+    where
+      countParams :: Int -> Type' -> Int
+      countParams acc = \case
+        P.ForAll _ _ _ rest _ ->
+          countParams acc rest
+
+        P.TypeApp _ f a | isFunctionApplication f ->
+          countParams (acc + 1) a
+
+        P.ParensInType _ ty ->
+          countParams acc ty
+
+        _ ->
+          acc
+
+      isFunctionApplication = \case
+        P.TypeApp _ (P.TypeConstructor () Prim.Function) _ -> True
+        P.ParensInType _ ty -> isFunctionApplication ty
+        _ -> False
+
   -- insert value types
   go d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} } =
     let
@@ -94,7 +175,7 @@ insertValueTypesAndAdjustKinds env m =
   -- Extracts the keyword for a declaration (if there is one)
   extractKeyword :: DeclarationInfo -> Maybe P.KindSignatureFor
   extractKeyword = \case
-    DataDeclaration dataDeclType _ -> Just $ case dataDeclType of
+    DataDeclaration dataDeclType _ _ -> Just $ case dataDeclType of
       P.Data -> P.DataSig
       P.Newtype -> P.NewtypeSig
     TypeSynonymDeclaration _ _ -> Just P.TypeSynonymSig
@@ -149,6 +230,9 @@ insertValueTypesAndAdjustKinds env m =
         where
           inferredKind' = inferredKind $> ()
 
+          -- Note: the below change to the final kind used is intentionally
+          -- NOT being done for explicit kind signatures:
+          --
           -- changes `forall (k :: Type). k -> ...`
           -- to      `forall k          . k -> ...`
           dropTypeSortAnnotation = \case
@@ -187,7 +271,7 @@ partiallyDesugar externs env = evalSupplyT 0 . desugar'
       >>> P.desugarCasesModule
       >=> P.desugarTypeDeclarationsModule
       >=> fmap fst . runWriterT . flip evalStateT (env, mempty) . P.desugarImports
-      >=> P.rebracketFiltered isInstanceDecl externs
+      >=> P.rebracketFiltered CalledByDocs isInstanceDecl externs
 
   isInstanceDecl P.TypeInstanceDeclaration {} = True
   isInstanceDecl _ = False

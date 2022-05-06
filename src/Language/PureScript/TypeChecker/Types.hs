@@ -75,6 +75,12 @@ data TypedValue' = TypedValue' Bool Expr SourceType
 tvToExpr :: TypedValue' -> Expr
 tvToExpr (TypedValue' c e t) = TypedValue c e t
 
+-- | Lookup data about a type class in the @Environment@
+lookupTypeClass :: MonadState CheckState m => Qualified (ProperName 'ClassName) -> m TypeClassData
+lookupTypeClass name =
+  let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup name
+   in gets (findClass . typeClasses . checkEnv)
+
 -- | Infer the types of multiple mutually-recursive values, and return elaborated values including
 -- type class dictionaries and type annotations.
 typesOf
@@ -99,7 +105,8 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           ty'' = constrain unsolved ty'
       unsolvedTypeVarsWithKinds <- unknownsWithKinds . IS.toList . unknowns $ constrain unsolved ty''
       let unsolvedTypeVars = IS.toList $ unknowns ty'
-          generalized = varIfUnknown unsolvedTypeVarsWithKinds ty''
+
+      generalized <- varIfUnknown unsolvedTypeVarsWithKinds ty''
 
       when shouldGeneralize $ do
         -- Show the inferred type in a warning
@@ -116,8 +123,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         -- ambiguous types to be inferred if they can be solved by some functional
         -- dependency.
         conData <- forM unsolved $ \(_, _, con) -> do
-          let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup (constraintClass con)
-          TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
+          TypeClassData{ typeClassDependencies } <- lookupTypeClass $ constraintClass con
           let
             -- The set of unknowns mentioned in each argument.
             unknownsForArg :: [S.Set Int]
@@ -157,11 +163,15 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         let constraintTypeVars = fold (conData >>= snd)
         let solved = solveFrom determinedFromType
         let unsolvedVars = S.difference constraintTypeVars solved
+        let lookupUnkName' i = do
+              mn <- lookupUnkName i
+              pure (fromMaybe "t" mn, i)
+        unsolvedVarNames <- traverse lookupUnkName' (S.toList unsolvedVars)
         unless (S.null unsolvedVars) .
           throwError
             . onErrorMessages (replaceTypes currentSubst)
             . errorMessage' ss
-            $ AmbiguousTypeVariables generalized (S.toList unsolvedVars)
+            $ AmbiguousTypeVariables generalized unsolvedVarNames
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -317,12 +327,18 @@ instantiatePolyTypeWithUnknowns
   -> m (Expr, SourceType)
 instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _) = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
+  insertUnkName' u ident
   instantiatePolyTypeWithUnknowns val $ replaceTypeVars ident u ty
 instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
   instantiatePolyTypeWithUnknowns (App val (TypeClassDictionary con dicts hints)) ty
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
+
+-- | Match against TUnknown and call insertUnkName, failing otherwise.
+insertUnkName' :: (MonadState CheckState m, MonadError MultipleErrors m) => SourceType -> Text -> m ()
+insertUnkName' (TUnknown _ i) n = insertUnkName i n
+insertUnkName' _ _ = internalCompilerError "type is not TUnknown"
 
 -- | Infer a type for a value, rethrowing any error to provide a more useful error message
 infer
@@ -670,8 +686,11 @@ check' val (ForAll ann ident mbK ty _) = do
         | otherwise = val
   val' <- tvToExpr <$> check skVal sk
   return $ TypedValue' True val' (ForAll ann ident mbK ty (Just scope))
-check' val t@(ConstrainedType _ con@(Constraint _ (Qualified _ (ProperName className)) _ _ _) ty) = do
-  dictName <- freshIdent ("dict" <> className)
+check' val t@(ConstrainedType _ con@(Constraint _ cls@(Qualified _ (ProperName className)) _ _ _) ty) = do
+  TypeClassData{ typeClassIsEmpty } <- lookupTypeClass cls
+  -- An empty class dictionary is never used; see code in `TypeChecker.Entailment`
+  -- that wraps empty dictionary solutions in `Unused`.
+  dictName <- if typeClassIsEmpty then pure UnusedIdent else freshIdent ("dict" <> className)
   dicts <- newDictionaries [] (Qualified Nothing dictName) con
   val' <- withBindingGroupVisible $ withTypeClassDictionaries dicts $ check val ty
   return $ TypedValue' True (Abs (VarBinder nullSourceSpan dictName) (tvToExpr val')) t
@@ -726,7 +745,8 @@ check' (DeferredDictionary className tys) ty = do
              (TypeClassDictionary con dicts hints)
              ty
 check' (TypedValue checkType val ty1) ty2 = do
-  (elabTy1, kind1) <- kindOf ty1
+  moduleName <- unsafeCheckCurrentModule
+  ((args, elabTy1), kind1) <- kindOfWithScopedVars ty1
   (elabTy2, kind2) <- kindOf ty2
   unifyKinds' kind1 kind2
   checkTypeKind ty1 kind1
@@ -734,7 +754,7 @@ check' (TypedValue checkType val ty1) ty2 = do
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy2
   elaborate <- subsumes ty1' ty2'
   val' <- if checkType
-            then tvToExpr <$> check val ty1'
+            then withScopedTypeVars moduleName args $ tvToExpr <$> check val ty1'
             else pure val
   return $ TypedValue' True (TypedValue checkType (elaborate val') ty1') ty2'
 check' (Case vals binders) ret = do
@@ -867,6 +887,7 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   return (retTy, App fn arg')
 checkFunctionApplication' fn (ForAll _ ident mbK ty _) arg = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
+  insertUnkName' u ident
   let replaced = replaceTypeVars ident u ty
   checkFunctionApplication fn replaced arg
 checkFunctionApplication' fn (KindedType _ ty _) arg =

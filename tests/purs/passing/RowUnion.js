@@ -1,8 +1,6 @@
-export var merge = function (dict) {
-  return function (l) {
-    return function (r) {
-      var o = {};
-      return Object.assign(o, r, l);
-    };
+export var mergeImpl = function (l) {
+  return function (r) {
+    var o = {};
+    return Object.assign(o, r, l);
   };
 };

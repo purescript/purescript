@@ -1,0 +1,18 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ProgrammablePolykindedTypeErrorsTypeString.purs:23:7 - 23:17 (line 23, column 7 - line 23, column 17)
+
+  A custom type error occurred while solving type class constraints:
+
+    Don't want to show Just @Type String because.
+
+
+while checking that type [33mFail (Beside (Beside (Text "Don\'t want to show ") (... ...)) (Text " because.")) => String[0m
+  is at least as general as type [33mString[0m
+while checking that expression [33msomeString[0m
+  has type [33mString[0m
+in value declaration [33mmain[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

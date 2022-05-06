@@ -85,16 +85,6 @@ considering what effects this may have:
 
   - The version to install in the `postinstall` script in `package.json`
 
-  - If `purescript-cst` has changed at all since the last release:
-
-      - The `version` field in `lib/purescript-cst/purescript-cst.cabal` (note
-        that the new version should be based on the [PVP](https://pvp.haskell.org/),
-        according to what changed since the previous release, and not on the actual compiler version)
-
-      - The versions table in `lib/purescript-cst/README.md`,
-
-      - The version bounds for `purescript-cst` in `purescript.cabal`
-
 - Run `stack update-changelog.hs`, which will move the entries in `CHANGELOG.d`
   to a new section in `CHANGELOG.md` labeled with the new version.
 
@@ -106,24 +96,25 @@ considering what effects this may have:
   completes. (If the CI build fails, binaries can also be built locally and
   manually uploaded to the release on GitHub)
 
-- Publish to Hackage:
+- If making a normal release, publish to Hackage by running `stack upload .` from the repo root directory.
 
-  - change to the `lib/purescript-cst` directory and run `stack upload .`
-
-  - Finally, run `stack upload .` from the repo root directory.
-
-  It's a good idea to check that the two packages (`purescript` and
-  `purescript-cst`) can be installed from Hackage at this
-  point.
+  It's a good idea to check that the package (`purescript`)
+  can be installed from Hackage at this point.
 
 - After all of the prebuilt binaries are present on the GitHub releases page,
-  publish to npm: change to the `npm-package` directory and run `npm publish`.
-  It's a good idea to check that the package can be installed from npm at this
-  point.
+  publish to npm: change to the `npm-package` directory and do the following:
+    - if making a pre-release (e.g. `v0.15.0-alpha-05`)
+        - run `npm publish --tag next`
+        - verify that the prerelease can be installed via `npm i purescript@next`
+    - if making a normal release (e.g. `v0.15.0`)
+        - run `npm publish`
+        - run `npm dist-tag add purescript@VERSION next` where `VERSION` is `v0.15.0`.
+        - verify that the release can be installed via `npm i purescript@next`
+        - verify that the release can be installed via `npm i purescript`
 
 Note: if a release does not go as planned (e.g. [`v0.14.3`](https://github.com/purescript/purescript/pull/4139)), we should not delete the broken GitHub release or its Git tag. Rather, we should make a new release and update the GitHub release notes and the corresponding section in the CHANGELOG.md file for the broken release to
 1. say that it's not a real release, and
-1. refer people to the newer release.
+2. refer people to the newer release.
 
 ## After making a release
 

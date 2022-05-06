@@ -29,11 +29,19 @@ spec = do
     it "purescript-prelude" $ do
       testPackage
         "tests/support/bower_components/purescript-prelude"
+        "bower.json"
         "../../prelude-resolutions.json"
 
-    it "basic example" $ do
+    it "basic example (bower.json)" $ do
       testPackage
         "tests/purs/publish/basic-example"
+        "bower.json"
+        "resolutions.json"
+
+    it "basic example (purs.json)" $ do
+      testPackage
+        "tests/purs/publish/basic-example"
+        "purs.json"
         "resolutions.json"
 
   context "json compatibility" $ do
@@ -68,9 +76,10 @@ roundTrip pkg =
            then Pass before'
            else Mismatch before' after'
 
-testRunOptions :: FilePath -> PublishOptions
-testRunOptions resolutionsFile = defaultPublishOptions
+testRunOptions :: FilePath -> FilePath -> PublishOptions
+testRunOptions manifestFile resolutionsFile = defaultPublishOptions
   { publishResolutionsFile = resolutionsFile
+  , publishManifestFile = manifestFile
   , publishGetVersion = return testVersion
   , publishGetTagTime = const (liftIO getCurrentTime)
   , publishWorkingTreeDirty = return ()
@@ -79,9 +88,9 @@ testRunOptions resolutionsFile = defaultPublishOptions
 
 -- | Given a directory which contains a package, produce JSON from it, and then
 -- | attempt to parse it again, and ensure that it doesn't change.
-testPackage :: FilePath -> FilePath -> Expectation
-testPackage packageDir resolutionsFile = do
-  res <- preparePackage packageDir resolutionsFile
+testPackage :: FilePath -> FilePath -> FilePath -> Expectation
+testPackage packageDir manifestFile resolutionsFile = do
+  res <- preparePackage packageDir manifestFile resolutionsFile
   case res of
     Left err ->
       expectationFailure $
@@ -100,11 +109,11 @@ testPackage packageDir resolutionsFile = do
 -- output directory each time to ensure that we are actually testing the docs
 -- code in the working tree as it is now (as opposed to how it was at some
 -- point in the past when the tests were previously successfully run).
-preparePackage :: FilePath -> FilePath -> IO (Either Publish.PackageError UploadedPackage)
-preparePackage packageDir resolutionsFile =
+preparePackage :: FilePath -> FilePath -> FilePath -> IO (Either Publish.PackageError UploadedPackage)
+preparePackage packageDir manifestFile resolutionsFile =
   pushd packageDir $ do
     removeDirectoryRecursiveIfPresent "output"
-    Publish.preparePackage (testRunOptions resolutionsFile)
+    Publish.preparePackage (testRunOptions manifestFile resolutionsFile)
 
 removeDirectoryRecursiveIfPresent :: FilePath -> IO ()
 removeDirectoryRecursiveIfPresent =
