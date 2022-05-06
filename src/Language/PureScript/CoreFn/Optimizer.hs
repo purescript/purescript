@@ -1,19 +1,22 @@
 module Language.PureScript.CoreFn.Optimizer (optimizeCoreFn) where
 
-import Protolude hiding (Type)
+import           Protolude                             hiding (Type)
 
-import Data.List (lookup)
-import Language.PureScript.AST.Literals
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.CoreFn.Ann
-import Language.PureScript.CoreFn.Expr as Expr
-import Language.PureScript.CoreFn.Module
-import Language.PureScript.CoreFn.Traversals
-import Language.PureScript.Names (Ident(UnusedIdent), Qualified(Qualified))
-import Language.PureScript.Label
-import Language.PureScript.Types
-import qualified Language.PureScript.Constants.Prim as C
+import           Data.List                             (lookup)
+import qualified Data.Text                             as T
+import           Language.PureScript.AST.Literals
+import           Language.PureScript.AST.SourcePos
 import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Prim    as C
+import           Language.PureScript.CoreFn.Ann
+import           Language.PureScript.CoreFn.Expr       as Expr
+import           Language.PureScript.CoreFn.Module
+import           Language.PureScript.CoreFn.Traversals
+import           Language.PureScript.Label
+import           Language.PureScript.Names             (Ident (..),
+                                                        ModuleName (..),
+                                                        Qualified (..))
+import           Language.PureScript.Types
 
 -- |
 -- CoreFn optimization pass.
@@ -25,7 +28,10 @@ optimizeModuleDecls :: [Bind Ann] -> [Bind Ann]
 optimizeModuleDecls = map transformBinds
   where
   (transformBinds, _, _) = everywhereOnValues identity transformExprs identity
-  transformExprs = optimizeUnusedPartialFn . optimizeClosedRecordUpdate . optimizeRecordGetField
+  transformExprs
+    = optimizeClosedRecordUpdate
+    . optimizeDataFunctionApply
+    . optimizeRecordGetField
 
 optimizeClosedRecordUpdate :: Expr Ann -> Expr Ann
 optimizeClosedRecordUpdate ou@(ObjectUpdate a@(_, _, Just t, _) r updatedFields) =
@@ -44,17 +50,9 @@ closedRecordFields (TypeApp _ (TypeConstructor _ C.Record) row) =
   where
     collect :: Type a -> Maybe [Label]
     collect (REmptyKinded _ _) = Just []
-    collect (RCons _ l _ r) = (l :) <$> collect r
-    collect _ = Nothing
+    collect (RCons _ l _ r)    = (l :) <$> collect r
+    collect _                  = Nothing
 closedRecordFields _ = Nothing
-
--- | See https://github.com/purescript/purescript/issues/3157
-optimizeUnusedPartialFn :: Expr a -> Expr a
-optimizeUnusedPartialFn (Let _
-  [NonRec _ UnusedIdent _]
-  (App _ (App _ (Var _ (Qualified _ UnusedIdent)) _) originalCoreFn)) =
-  originalCoreFn
-optimizeUnusedPartialFn e = e
 
 -- | Optimize
 -- `Data_Record.getField(Data_Record.hasFieldRecord(new Data_Symbol.IsSymbol(function() { return "f"; }))())(Data_Symbol.SProxy.value)(x)`
@@ -80,3 +78,13 @@ optimizeRecordGetField
     object) =
   Accessor ann label object
 optimizeRecordGetField e = e
+
+optimizeDataFunctionApply :: Expr a -> Expr a
+optimizeDataFunctionApply e = case e of
+  (App a (App _ (Var _ (Qualified (Just (ModuleName mn)) (Ident fn))) x) y)
+    | mn == dataFunction && fn == C.apply -> App a x y
+    | mn == dataFunction && fn == C.applyFlipped -> App a y x
+  _ -> e
+  where
+  dataFunction :: Text
+  dataFunction = T.replace "_" "." C.dataFunction

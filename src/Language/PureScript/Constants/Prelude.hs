@@ -1,11 +1,11 @@
 -- | Various constants which refer to things in the Prelude
 module Language.PureScript.Constants.Prelude where
 
-import Prelude.Compat
+import           Prelude.Compat
 
-import Data.String (IsString)
-import Language.PureScript.PSString (PSString)
-import Language.PureScript.Names
+import           Data.String                  (IsString)
+import           Language.PureScript.Names
+import           Language.PureScript.PSString (PSString)
 
 -- Operators
 
@@ -172,10 +172,10 @@ runEffectFn = "runEffectFn"
 
 data EffectDictionaries = EffectDictionaries
   { edApplicativeDict :: PSString
-  , edBindDict :: PSString
-  , edMonadDict :: PSString
-  , edWhile :: PSString
-  , edUntil :: PSString
+  , edBindDict        :: PSString
+  , edMonadDict       :: PSString
+  , edWhile           :: PSString
+  , edUntil           :: PSString
   }
 
 effDictionaries :: EffectDictionaries
@@ -288,6 +288,34 @@ pattern SProxy = Qualified (Just DataSymbol) (ProperName "SProxy")
 pattern SProxyIdent :: Qualified Ident
 pattern SProxyIdent = Qualified (Just DataSymbol) (Ident "SProxy")
 
+
+pattern DataReflectable :: ModuleName
+pattern DataReflectable = ModuleName "Data.Reflectable"
+
+pattern Reflectable :: Qualified (ProperName 'ClassName)
+pattern Reflectable = Qualified (Just DataReflectable) (ProperName "Reflectable")
+
+pattern DataOrdering :: ModuleName
+pattern DataOrdering = ModuleName "Data.Ordering"
+
+pattern DataFunctionUncurried :: ModuleName
+pattern DataFunctionUncurried = ModuleName "Data.Function.Uncurried"
+
+pattern PartialUnsafe :: ModuleName
+pattern PartialUnsafe = ModuleName "Partial.Unsafe"
+
+pattern Ordering :: Qualified (ProperName 'TypeName)
+pattern Ordering = Qualified (Just DataOrdering) (ProperName "Ordering")
+
+pattern LT :: Qualified (ProperName 'ConstructorName)
+pattern LT = Qualified (Just DataOrdering) (ProperName "LT")
+
+pattern EQ :: Qualified (ProperName 'ConstructorName)
+pattern EQ = Qualified (Just DataOrdering) (ProperName "EQ")
+
+pattern GT :: Qualified (ProperName 'ConstructorName)
+pattern GT = Qualified (Just DataOrdering) (ProperName "GT")
+
 -- Data.Record
 
 pattern DataRecord :: ModuleName
@@ -298,7 +326,6 @@ pattern GetField = Qualified (Just DataRecord) (Ident "getField")
 
 pattern HasFieldRecord :: Qualified Ident
 pattern HasFieldRecord = Qualified (Just DataRecord) (Ident "hasFieldRecord")
-
 
 dataArray :: forall a. (IsString a) => a
 dataArray = "Data_Array"

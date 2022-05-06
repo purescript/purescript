@@ -2,6 +2,426 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.0
+
+Breaking changes:
+
+* Switch from Common JS to ES modules (#4232 by @sigma-andex)
+
+  Previously, Purescript used Common JS for FFI declarations.
+
+  Before, FFI was declared like this...
+
+  ```javascript
+  const mymodule = require('mymodule')
+
+  exports.myvar = mymodule.myvar
+  ```
+
+  ...and will be changed to this...
+
+  ```javascript
+  import * as M from 'mymodule';
+  export const myvar = M.myvar
+  ```
+  ...or using the short version...
+
+  ```javascript
+  export { myvar } from 'mymodule';
+  ```
+
+* FFI is annotated with `/* #__PURE__ */` so that bundlers can perform DCE
+* The current LTS Node.js version `12` is now the required minimum version
+
+* Improve apartness checking (#4149 by @rhendric)
+
+  See details in https://github.com/purescript/documentation/blob/master/language/Type-Classes.md#instance-chains
+
+* Disable type class constraints in FFI (#4240 by @JordanMartinez)
+
+  Previously, one could write FFI like the following:
+  ```purescript
+  foreign import foo :: forall a. Show a => a -> String
+  ```
+
+  Type class dictionaries are "magically" handled by the compiler.
+  By including them in the above FFI, one can depend on their representation.
+  Since the representation can change without notice, this may silently break
+  code.
+
+  In `v0.14.x`, a warning was emitted if these were used. Now it will fail
+  to compile. Rather, one should write something like the following
+  where the members of the type class are passed explicitly to
+  the FFI function as arguments:
+
+  ```purescript
+  foo :: forall a. Show a => a -> String
+  foo val = fooImpl show val
+
+  foreign import fooImpl :: forall a. (a -> String) -> a -> String
+  ```
+
+* Removes deprecated syntax for rows (i.e. `#`) and kinds (i.e. `kind`-keyword) (#4239 by @JordanMartinez)
+
+* Apply precedence rules to operator sections (#4033 by @rhendric)
+
+  Previously, `(_ * 4 + 1)` would desugar to `\x -> x * (4 + 1)`, even
+  though `*` has higher precedence than `+`. Conversely, `(3 * 2 + _)`
+  would not compile, even though `*` has higher precedence than `+`. These
+  bugs have now been fixed; `(_ * 4 + 1)` is an error, and `(3 * 2 + _)`
+  desugars to `\x -> 3 * 2 + x`.
+
+  If you have code that relied on the old behavior, add an extra pair of
+  parentheses around the expression in the section.
+
+* If FFI parsing succeeds & CommonJS is detected, fail; otherwise, do not error or warn (#4250 by @sigma-andex)
+
+  Previously, the compiler would emit an error if it failed to parse the FFI JavaScript file.
+  Since the underlying JavaScript parser (i.e. `language-javascript`) fails to parse even
+  valid JavaScript files, we cannot consider every failed parse to mean invalid JS files.
+  Fixing the parser would require a lot of effort, so we are planning to remove it instead
+  in `v0.16.x`.
+
+  If the parse succeeds and a CommonJS module is detected, a compiler error is now emitted.
+  If the parse fails, we no longer emit a compiler error. While we could emit a warning,
+  such a warning will quickly become annoying for FFI files that trigger the buggy paths
+  of `language-javascript`. Moreover, we presume that all will be migrating their code to
+  ES modules now that CommonJS is being deprecated in the larger JavaScript ecosystem.
+
+* Warn on ad-hoc non-single-line case expression syntax (#4241 by @JordanMartinez)
+
+  The following code will now produce a compiler warning.
+  These were originally supported to ease the migration
+  to the new CST parser.
+
+  ```purescript
+  -- before: `arg` isn't indented "past" the `Foo arg` binder
+  case foo of Foo arg ->
+    arg
+  -- after
+  case foo of Foo arg ->
+                foo
+  ```
+
+  Dropping the above syntax make case expressions more similar to how `let` bindings work:
+  ```purescript
+  let ok = 1
+  let
+    ok = 1
+  let ok =
+        1
+  let notOk =
+    1
+  ```
+
+* Drop support for browser backend for repl (i.e. `purs repl --port 1234`) (#4255 by @JordanMartinez)
+
+  Running this command will print a link that directs users to use
+  Try PureScript instead.
+
+* Remove `purs bundle` (#4255 by @JordanMartinez)
+
+  Users of `purs bundle` should switch to a standalone bundler such as `esbuild`, `webpack` or `parcel`.
+
+* Lazy initialization for recursive bindings (#4283 by @rhendric)
+
+  This is unlikely to break a working program, but the upshot for users is
+  that it's now possible to get a run-time error when dereferencing an
+  identifier in a recursive binding group before it has been initialized,
+  instead of silently getting an `undefined` value and having that maybe
+  or maybe not lead to an error somewhere else.
+
+  This change can cause code that relies on tail-call optimization to no
+  longer compile with that optimization. If you find that code that
+  previously compiled to a TCO loop no longer does but does include `$lazy`
+  initializers, please report the issue.
+
+  **Alternate backend maintainers:** for you, this change represents a
+  clarification of a responsibility shared by all backends. The identifiers
+  bound in a recursive binding group need to behave as if those identifiers
+  have call-by-need semantics during the initialization of the entire binding
+  group. (Initializing the binding group entails ensuring every initializer
+  has been executed, so after the binding group is initialized, these
+  identifiers can be considered call-by-value again.)
+
+  If an identifier is needed during its own call-by-need initialization, the
+  backend must ensure that an explicit run-time error is raised appropriate for
+  your target platform. This error may be raised at compile time instead if the
+  backend can determine that such a cycle is inevitable. Returning your
+  target language's equivalent of JavaScript's `undefined`, as `purs` did in
+  earlier releases in some cases, is not permitted.
+
+  If your target language natively has call-by-need semantics, you probably
+  don't have to do anything. If your target language is call-by-value and you
+  are using PureScript as a library, you can use the function
+  `Language.PureScript.CoreFn.Laziness.applyLazinessTransform` to your CoreFn
+  input to satisfy this responsibility; if you do, you will need to do the
+  following:
+
+    * Translate `InternalIdent RuntimeLazyFactory` and `InternalIdent (Lazy _)`
+      identifiers to appropriate strings for your backend
+    * Ensure that any output file that needs it has a reference to a function
+      named `InternalIdent RuntimeLazyFactory`, with type `forall a. Fn3 String
+      String (Unit -> a) (Int -> a)`, and with the same semantics as the
+      following JavaScript (though you should customize the error raised to be
+      appropriate for your target language):
+
+      ```js
+      function (name, moduleName, init) {
+          var state = 0;
+          var val;
+          return function (lineNumber) {
+              if (state === 2) return val;
+              if (state === 1) throw new ReferenceError(name + " was needed before it finished initializing (module " + moduleName + ", line " + lineNumber + ")", moduleName, lineNumber);
+              state = 1;
+              val = init();
+              state = 2;
+              return val;
+          };
+      };
+      ```
+
+  If neither of the previous cases apply to you, you can meet this
+  responsibility most easily simply by ensuring that all recursive bindings are
+  lazy. You may instead choose to implement some light analysis to skip
+  generating lazy bindings in some cases, such as if every initializer in the
+  binding group is an `Abs`. You also may choose to reimplement
+  `applyLazinessTransform`, or even develop a more sophisticated laziness
+  transform for your backend. It is of course your responsibility to ensure
+  that the result of whatever analysis you do is equivalent to the expected
+  semantics.
+
+New features:
+
+* Implement the Reflectable type class (#4207 by @PureFunctor)
+
+  The `Reflectable` type class is a common interface for reflecting
+  type-level values down to the term-level. Its instances are
+  automatically solved by the compiler, and it allows `Symbol`, `Int`,
+  `Boolean`, and `Ordering` kinded types to be reflected to their
+  term-level representations.
+
+* Implement native type-level integers (#4207 and #4267 by @PureFunctor and @JordanMartinez)
+
+  Added support for type-level integers and compiler-solved operations
+  such as `Add`, `Mul`, `Compare`, and `ToString`. Type-level integers use the `Int`
+  type as their kind.
+
+* Print compilation progress on the command line (#4258 by @PureFunctor)
+
+  This feature makes it so `purs compile` and `purs docs` now show
+  compilation progress on the command line. Example output:
+
+  ```purs
+  [ 1 of 59] Compiling Type.Proxy
+  [ 2 of 59] Compiling Type.Data.RowList
+  ...
+  [58 of 59] Compiling Effect.Class.Console
+  [59 of 59] Compiling Test.Main
+  ```
+
+* Restore names of quantified variables during generalization (#4257 by @PureFunctor)
+
+  This makes the compiler aware of the names of quantified variables
+  instantiated into unification variables, such that when the latter
+  is generalized, semantic information is restored. For example:
+
+  ```purs
+  addNumberSuffix :: forall a b c d. a -> b -> c -> d -> a
+  addNumberSuffix a _ _ _ = a
+
+  addNumberSuffix' = addNumberSuffix 0
+  ```
+
+  Previously, inferring top-level declarations without type signatures
+  would use `t` suffixed with an integer for type variables.
+
+  ```purs
+  forall t6 t7 t8. t6 -> t7 -> t8 -> Int
+  ```
+
+  Now, the inferred type would refer back to their original names.
+
+  ```purs
+  forall b6 c7 d8. b6 -> c7 -> d8 -> Int
+  ```
+
+* Support Glibc versions >= `2.24` (#4228 by @sd-yip)
+
+  Previously, `purs` required a Glibc version greater than or equal to `2.27`.
+  This requirement is relaxed to support a Glibc version down to `2.24`.
+
+Bugfixes:
+
+* Fix warning suppression for wildcard types (#4269 by @rhendric)
+
+  This bug was triggered by defining recursive partial functions or
+  recursive bindings that contained wildcards in inner type annotations.
+  Recursive partial function declarations now no longer cause spurious
+  wildcard warnings to be emitted, and actual user-written wildcards now
+  accurately emit warnings if and only if they don't appear within a
+  binding (recursive or otherwise) with a complete (wildcard-free) type
+  signature.
+
+* Remove compiler-generated identifiers from type search results (#4260 by @PureFunctor)
+
+Other improvements:
+
+* Improve "Unknown value bind" and "Unknown value discard" errors (#4272 by @mhmdanas)
+
+  The previous error implies that do-notation compiles down to only `bind` or to
+  only `discard` (depending on whether the symbol not found was `bind` or
+  `discard` respectively), which is somewhat misleading, especially in the
+  latter case. Now, the error states correctly that do-notation compiles down to
+  both functions.
+
+Internal:
+
+* Document the `HSPEC_ACCEPT` flag for generating golden files (#4243 by @JordanMartinez)
+
+* Fail test if PureScript file(s) don't have a `Main` module (#4243 by @JordanMartinez)
+
+* Update CI to use `windows-2019` since `windows-2016` is deprecated (#4248 by @JordanMartinez)
+
+* Move `lib/purescript-cst` into `src/` (#4290 by @JordanMartinez)
+
+* Update tests and their bower deps to 0.15.0-compatible versions (#4300 by @JordanMartinez)
+
+## 0.14.7
+
+New features:
+
+* Make `Prim.TypeError`'s `Quote` work on all kinds, not just kind `Type`. (#4142 by @xgrommx)
+
+* Display role annotations in HTML docs (#4121 by @JordanMartinez)
+
+  Previously, the HTML docs would not indicate which types could be safely
+  coerced and which could not:
+
+  ```purescript
+  -- cannot be coerced
+  data Foo1 a = Foo1 a
+  type role Foo1 nominal
+
+  -- can be coerced
+  data Foo2 a = Foo2
+  type role Foo2 phantom
+
+  -- can be coerced in some contexts
+  data Foo3 a = Foo3 a
+  type role Foo3 representational
+  ```
+
+  The HTML docs now display the role annotations either explicitly
+  declared by the developer or those inferred by the compiler.
+
+  Since role annotations are an advanced feature and since most type
+  parameters' roles are the `representational` role, the `phantom` and
+  `nominal` role annotations are displayed in documentation whereas the
+  `representational` role is not, similar to "uninteresting" kind signatures.
+
+  Lastly, FFI declarations like below...
+
+  ```purescript
+  foreign import data Foo :: (Type -> Type) -> Type
+  type role Foo nominal
+  ```
+
+  ...will be rendered as though they are data declarations:
+
+  ```purescript
+  data Foo :: (Type -> Type) -> Type
+  data Foo t0
+  type role Foo nominal
+  ```
+
+  One can distinguish FFI declarations with roles separately from normal `data`
+  declarations that have roles based on the name of the type parameters. Since FFI declarations' type parameters are implicit and thus unnamed, the compiler will generate their name: `t0`, `t1`, ..., `tN` where `N` is a zero-based
+  index of the type parameter.
+
+  Note: the resulting documentation will display the roles, but the roles
+  will not be selectable when selecting the type in case one wants to
+  copy-paste the type into source code.
+
+* Rewrite `Partial` optimization to be cleaner (#4208 by @rhendric)
+
+  This feature shrinks the generated JS code for declarations that use
+  empty type classes, such as `Partial`, but is otherwise not expected to
+  have user-visible consequences.
+
+- Add support for publishing via the `purs.json` manifest format (#4233 by @thomashoneyman)
+
+  This feature expands compiler support for publishing packages with different
+  manifest formats. Previously, packages had to have a `bower.json` manifest;
+  now, packages can choose to have a `purs.json` manifest instead.
+
+  This feature provides only partial support for packages published to the
+  PureScript registry using the `purs.json` manifest format. Registry packages
+  are allowed to be hosted anywhere (not just GitHub), and do not need to be
+  Git repositories at all. However, `purs publish` and its primary consumer,
+  Pursuit, both require packages to be available on GitHub and for their version
+  to be a SemVer-compliant Git tag. Therefore, this feature only supports
+  registry packages that are compatible with these restrictions.
+
+Bugfixes:
+
+* Add missing source spans to data constructors when generating docs (#4202 by @PureFunctor)
+
+* Check role declarations arity during type checking (#4157 by @kl0tl)
+
+* Optimize newtype applications with the ($) operator (#4205 by @PureFunctor)
+
+* Properly deserialize unused identifiers in the CoreFn (#4221 by @sjpgarcia)
+
+  This mostly affects downstream consumers of the CoreFn as discussed in
+  #4201. This makes it so CoreFn deserialization properly reads `$__unused`
+  into `UnusedIdent` instead of an `Ident`. This is particularly useful for
+  downstream consumers of the CoreFn such as alternative backends that don't
+  allow arguments to be omitted from functions.
+
+* Fix type operators in declaration param kinds (#4220 by @rhendric)
+
+  This fixes an internal error triggered by using a type operator in the
+  kind of a type parameter of a data declaration, type synonym
+  declaration, or class declaration.
+
+* Scope type vars when type checking typed values (#4216 by @rhendric)
+
+  When the compiler is checking an expression that is annotated with a
+  type against another expected type, and the annotation introduces a type
+  variable, the compiler needs to introduce that type variable to the
+  scope of any types used inside the expression.
+
+  One noteworthy case of this pattern is member signatures inside
+  instances. This fix allows type variables introduced in member
+  signatures to be used in the member declaration itself.
+
+Internal:
+
+* Bump PureScript to building with GHC-8.10.7, as well as from LTS-17 to LTS-18. (#4199 by @cdepillabout)
+
+* Prevent hangs on internal errors (#4126 by @rhendric)
+
+* The explicit disabling of Nix has been removed from `stack.yaml`.   (#4198 by @cdepillabout)
+
+  For developers on NixOS, this means that you should be able to build
+  PureScript by running `stack build` instead of `stack build --nix`.
+  For other developers, this shouldn't affect you.
+
+* Build the entire latest package set in CI (#4217 by @rhendric)
+
+  See [#4128](https://github.com/purescript/purescript/pull/4128).
+
+* Create test machinery for optimizations (#4205 by @PureFunctor)
+
+  This adds machinery for testing code generation for optimizations.
+
+  Partially extracted from #3915 to add tests for #4205.
+
+## 0.14.6
+
+Do not use this release. `purescript-cst`'s version wasn't bumped when this release was made. So, tools like `trypurescript` cannot depend on it. See [0.14.7](#0147) for the same thing.
+
 ## 0.14.5
 
 Bugfixes:
@@ -125,22 +545,8 @@ New features:
   instance Foo Int String
   ```
 
-  and the compiler will generate a unique name for the instance
-  (e.g. `$dollar_FooIntString_4` where `4` is a randomly-generated number
-  that can change across compiler runs). This version of the instance name
-  is not intended for use in FFI.
-
-  Note: if one wrote
-
-  ```purescript
-  instance ReallyLongClassName Int String
-  ```
-
-  the generated name would be something like
-  `$dollar_ReallyLongClassNameIntStr_87` rather than
-  `$dollar_ReallyLongClassNameIntString_87` as the generated part
-  of the name will be truncated to 25 characters (long enough to be readable
-  without being too verbose).
+  Note that generated instance names can change without warning as a result of changes
+  elsewhere in your code, so do not rely upon these names in any FFI code.
 
 Bugfixes:
 

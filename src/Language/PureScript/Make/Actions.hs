@@ -2,6 +2,7 @@ module Language.PureScript.Make.Actions
   ( MakeActions(..)
   , RebuildPolicy(..)
   , ProgressMessage(..)
+  , renderProgressMessage
   , buildMakeActions
   , checkForeignDecls
   , cacheDbFile
@@ -11,51 +12,54 @@ module Language.PureScript.Make.Actions
 
 import           Prelude
 
-import           Control.Arrow ((&&&))
-import           Control.Monad hiding (sequence)
-import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad                          hiding (sequence)
+import           Control.Monad.Error.Class              (MonadError (..))
 import           Control.Monad.IO.Class
-import           Control.Monad.Reader (asks)
+import           Control.Monad.Reader                   (asks)
 import           Control.Monad.Supply
-import           Control.Monad.Trans.Class (MonadTrans(..))
-import           Control.Monad.Writer.Class (MonadWriter(..))
-import           Data.Aeson (Value(String), (.=), object)
-import           Data.Bifunctor (bimap)
-import           Data.Either (partitionEithers)
-import           Data.Foldable (for_)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Map as M
-import           Data.Maybe (fromMaybe, maybeToList)
-import qualified Data.Set as S
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-import qualified Data.Text.Encoding as TE
-import           Data.Time.Clock (UTCTime)
-import           Data.Version (showVersion)
-import qualified Language.JavaScript.Parser as JS
+import           Control.Monad.Trans.Class              (MonadTrans (..))
+import           Control.Monad.Writer.Class             (MonadWriter (..))
+import           Data.Aeson                             (Value (String), object,
+                                                         (.=))
+import           Data.Bifunctor                         (bimap, first)
+import           Data.Either                            (partitionEithers)
+import           Data.Foldable                          (for_)
+import qualified Data.List.NonEmpty                     as NEL
+import qualified Data.Map                               as M
+import           Data.Maybe                             (fromMaybe, maybeToList)
+import qualified Data.Set                               as S
+import qualified Data.Text                              as T
+import qualified Data.Text.Encoding                     as TE
+import qualified Data.Text.IO                           as TIO
+import           Data.Time.Clock                        (UTCTime)
+import           Data.Version                           (showVersion)
+import qualified Language.JavaScript.Parser             as JS
 import           Language.PureScript.AST
-import qualified Language.PureScript.Bundle as Bundle
-import qualified Language.PureScript.CodeGen.JS as J
+import qualified Language.PureScript.Bundle             as Bundle
+import qualified Language.PureScript.CST                as CST
+import qualified Language.PureScript.CodeGen.JS         as J
 import           Language.PureScript.CodeGen.JS.Printer
-import qualified Language.PureScript.CoreFn as CF
-import qualified Language.PureScript.CoreFn.ToJSON as CFJ
+import qualified Language.PureScript.CoreFn             as CF
+import qualified Language.PureScript.CoreFn.ToJSON      as CFJ
 import           Language.PureScript.Crash
-import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.Docs.Prim as Docs.Prim
-import qualified Language.PureScript.Docs.Types as Docs
+import qualified Language.PureScript.Docs.Prim          as Docs.Prim
+import qualified Language.PureScript.Docs.Types         as Docs
 import           Language.PureScript.Errors
-import           Language.PureScript.Externs (ExternsFile, externsFileName)
-import           Language.PureScript.Make.Monad
+import           Language.PureScript.Externs            (ExternsFile,
+                                                         externsFileName)
 import           Language.PureScript.Make.Cache
+import           Language.PureScript.Make.Monad
 import           Language.PureScript.Names
-import           Language.PureScript.Options hiding (codegenTargets)
-import           Language.PureScript.Pretty.Common (SMap(..))
-import qualified Paths_purescript as Paths
+import           Language.PureScript.Options            hiding (codegenTargets)
+import           Language.PureScript.Pretty.Common      (SMap (..))
+import qualified Paths_purescript                       as Paths
 import           SourceMap
 import           SourceMap.Types
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath ((</>), makeRelative, splitPath, normalise)
-import           System.IO (stderr)
+import           System.Directory                       (getCurrentDirectory)
+import           System.FilePath                        (makeRelative,
+                                                         normalise, splitPath,
+                                                         (</>))
+import           System.IO                              (stderr)
 
 -- | Determines when to rebuild a module
 data RebuildPolicy
@@ -67,13 +71,25 @@ data RebuildPolicy
 
 -- | Progress messages from the make process
 data ProgressMessage
-  = CompilingModule ModuleName
+  = CompilingModule ModuleName (Maybe (Int, Int))
   -- ^ Compilation started for the specified module
   deriving (Show, Eq, Ord)
 
 -- | Render a progress message
-renderProgressMessage :: ProgressMessage -> T.Text
-renderProgressMessage (CompilingModule mn) = T.append "Compiling " (runModuleName mn)
+renderProgressMessage :: T.Text -> ProgressMessage -> T.Text
+renderProgressMessage infx (CompilingModule mn mi) =
+  T.concat
+    [ renderProgressIndex mi
+    , infx
+    , runModuleName mn
+    ]
+  where
+  renderProgressIndex :: Maybe (Int, Int) -> T.Text
+  renderProgressIndex = maybe "" $ \(start, end) ->
+    let start' = T.pack (show start)
+        end' = T.pack (show end)
+        preSpace = T.replicate (T.length end' - T.length start') " "
+    in "[" <> preSpace <> start' <> " of " <> end' <> "] "
 
 -- | Actions that require implementations when running in "make" mode.
 --
@@ -187,10 +203,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   targetFilename :: ModuleName -> CodegenTarget -> FilePath
   targetFilename mn = \case
-    JS -> outputFilename mn "index.js"
+    JS          -> outputFilename mn "index.js"
     JSSourceMap -> outputFilename mn "index.js.map"
-    CoreFn -> outputFilename mn "corefn.json"
-    Docs -> outputFilename mn "docs.json"
+    CoreFn      -> outputFilename mn "corefn.json"
+    Docs        -> outputFilename mn "docs.json"
 
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
@@ -274,33 +290,16 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
           | not $ requiresForeign m ->
               tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
           | otherwise -> do
-              (foreignModuleType, foreignIdents) <- checkForeignDecls m path
-              case foreignModuleType of
-                ESModule -> copyFile path (outputFilename mn "foreign.js")
-                CJSModule -> do
-                  tell $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
-                  copyFile path (outputFilename mn "foreign.cjs")
-                  writeESForeignModuleWrapper mn foreignIdents
+              checkResult <- checkForeignDecls m path
+              case checkResult of
+                Left _ -> copyFile path (outputFilename mn "foreign.js")
+                Right (ESModule, _) -> copyFile path (outputFilename mn "foreign.js")
+                Right (CJSModule, _) -> do
+                  throwError $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
 
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return ()
 
-  writeESForeignModuleWrapper :: ModuleName -> S.Set Ident -> Make ()
-  writeESForeignModuleWrapper mn idents =
-    writeTextFile (outputFilename mn "foreign.js") wrapper
-    where
-    xs = (J.identToJs &&& runIdent) <$> S.toList idents
-    wrapper = TE.encodeUtf8 . T.intercalate "\n" $
-      "import $foreign from \"./foreign.cjs\";" :
-      fmap (uncurry toLocalDeclaration) xs ++
-      [ "export { " <> T.intercalate ", " (uncurry toNamedExport <$> xs) <> " };"
-      , ""
-      ]
-    toLocalDeclaration local exported =
-      "var " <> local <> " = $foreign." <> exported <> ";"
-    toNamedExport local exported
-      | local == exported = local
-      | otherwise = local <> " as " <> exported
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
@@ -330,7 +329,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   requiresForeign = not . null . CF.moduleForeign
 
   progress :: ProgressMessage -> Make ()
-  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage
+  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage "Compiling "
 
   readCacheDb :: Make CacheDb
   readCacheDb = readCacheDb' outputDir
@@ -345,55 +344,65 @@ data ForeignModuleType = ESModule | CJSModule deriving (Show)
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
-checkForeignDecls :: CF.Module ann -> FilePath -> Make (ForeignModuleType, S.Set Ident)
+checkForeignDecls :: CF.Module ann -> FilePath -> Make (Either MultipleErrors (ForeignModuleType, S.Set Ident))
+-- checkForeignDecls :: CF.Module ann -> FilePath -> Make (ForeignModuleType, S.Set Ident
 checkForeignDecls m path = do
   jsStr <- T.unpack <$> readTextFile path
-  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parseModule jsStr path
 
-  (foreignModuleType, foreignIdentsStrs) <-
-    case (,) <$> getForeignModuleExports js <*> getForeignModuleImports js of
-      Left reason -> errorParsingModule reason
-      Right (Bundle.ForeignModuleExports{..}, Bundle.ForeignModuleImports{..})
-        | not (null cjsExports && null cjsImports)
-        , null esExports
-        , null esImports -> do
-            let deprecatedFFI = filter (elem '\'') cjsExports
-            unless (null deprecatedFFI) $
-              errorDeprecatedForeignPrimes deprecatedFFI
 
-            pure (CJSModule, cjsExports)
-        | otherwise -> do
-            unless (null cjsImports) $
-              errorUnsupportedFFICommonJSImports cjsImports
+  let
+    parseResult :: Either MultipleErrors JS.JSAST
+    parseResult = first (errorParsingModule . Bundle.UnableToParseModule) $ JS.parseModule jsStr path
+  traverse checkFFI parseResult
 
-            unless (null cjsExports) $
-              errorUnsupportedFFICommonJSExports cjsExports
 
-            pure (ESModule, esExports)
-
-  foreignIdents <- either
-                     errorInvalidForeignIdentifiers
-                     (pure . S.fromList)
-                     (parseIdents foreignIdentsStrs)
-  let importedIdents = S.fromList (CF.moduleForeign m)
-
-  let unusedFFI = foreignIdents S.\\ importedIdents
-  unless (null unusedFFI) $
-    tell . errorMessage' modSS . UnusedFFIImplementations mname $
-      S.toList unusedFFI
-
-  let missingFFI = importedIdents S.\\ foreignIdents
-  unless (null missingFFI) $
-    throwError . errorMessage' modSS . MissingFFIImplementations mname $
-      S.toList missingFFI
-
-  pure (foreignModuleType, foreignIdents)
   where
   mname = CF.moduleName m
   modSS = CF.moduleSourceSpan m
 
-  errorParsingModule :: Bundle.ErrorMessage -> Make a
-  errorParsingModule = throwError . errorMessage' modSS . ErrorParsingFFIModule path . Just
+  checkFFI :: JS.JSAST -> Make (ForeignModuleType, S.Set Ident)
+  checkFFI js = do
+    (foreignModuleType, foreignIdentsStrs) <-
+        case (,) <$> getForeignModuleExports js <*> getForeignModuleImports js of
+          Left reason -> throwError $ errorParsingModule reason
+          Right (Bundle.ForeignModuleExports{..}, Bundle.ForeignModuleImports{..})
+            | not (null cjsExports && null cjsImports)
+            , null esExports
+            , null esImports -> do
+                let deprecatedFFI = filter (elem '\'') cjsExports
+                unless (null deprecatedFFI) $
+                  errorDeprecatedForeignPrimes deprecatedFFI
+
+                pure (CJSModule, cjsExports)
+            | otherwise -> do
+                unless (null cjsImports) $
+                  errorUnsupportedFFICommonJSImports cjsImports
+
+                unless (null cjsExports) $
+                  errorUnsupportedFFICommonJSExports cjsExports
+
+                pure (ESModule, esExports)
+
+    foreignIdents <- either
+                     errorInvalidForeignIdentifiers
+                     (pure . S.fromList)
+                     (parseIdents foreignIdentsStrs)
+    let importedIdents = S.fromList (CF.moduleForeign m)
+
+    let unusedFFI = foreignIdents S.\\ importedIdents
+    unless (null unusedFFI) $
+      tell . errorMessage' modSS . UnusedFFIImplementations mname $
+        S.toList unusedFFI
+
+    let missingFFI = importedIdents S.\\ foreignIdents
+    unless (null missingFFI) $
+      throwError . errorMessage' modSS . MissingFFIImplementations mname $
+        S.toList missingFFI
+
+    pure (foreignModuleType, foreignIdents)
+
+  errorParsingModule :: Bundle.ErrorMessage -> MultipleErrors
+  errorParsingModule = errorMessage' modSS . ErrorParsingFFIModule path . Just
 
   getForeignModuleExports :: JS.JSAST -> Either Bundle.ErrorMessage  Bundle.ForeignModuleExports
   getForeignModuleExports = Bundle.getExportedIdentifiers (T.unpack (runModuleName mname))

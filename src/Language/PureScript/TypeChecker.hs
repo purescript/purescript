@@ -14,10 +14,10 @@ import Control.Monad (when, unless, void, forM, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
-import Control.Monad.Writer.Class (MonadWriter(..), censor)
+import Control.Monad.Writer.Class (MonadWriter, tell)
 
 import Data.Foldable (for_, traverse_, toList)
-import Data.List (nub, nubBy, (\\), sort, group, intersect)
+import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import Data.Either (partitionEithers)
 import Data.Text (Text)
@@ -34,6 +34,7 @@ import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Linter
+import Language.PureScript.Linter.Wildcards
 import Language.PureScript.Names
 import Language.PureScript.Roles
 import Language.PureScript.Sugar.Names.Env (Exports(..))
@@ -84,19 +85,25 @@ addDataConstructor moduleName dtype name dctor dctorArgs polyType = do
   checkTypeSynonyms polyType
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
--- | Add an explicit role declaration to the Environment. The idea is that we
--- do this before encountering the data type which it refers to; we don't check
--- that the role declaration is valid until we encounter the data type's own
--- declaration.
-addExplicitRoleDeclaration
-  :: (MonadState CheckState m, MonadError MultipleErrors m)
+checkRoleDeclaration
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> ProperName 'TypeName
-  -> [Role]
+  -> RoleDeclarationData
   -> m ()
-addExplicitRoleDeclaration moduleName name roles = do
-  env <- getEnv
-  putEnv $ env { roleDeclarations = M.insert (Qualified (Just moduleName) name) roles (roleDeclarations env) }
+checkRoleDeclaration moduleName (RoleDeclarationData (ss, _) name declaredRoles) = do
+  warnAndRethrow (addHint (ErrorInRoleDeclaration name) . addHint (positionedError ss)) $ do
+    env <- getEnv
+    let qualName = Qualified (Just moduleName) name
+    case M.lookup qualName (types env) of
+      Just (kind, DataType dtype args dctors) -> do
+        checkRoleDeclarationArity name declaredRoles (length args)
+        checkRoles args declaredRoles
+        let args' = zipWith (\(v, k, _) r -> (v, k, r)) args declaredRoles
+        putEnv $ env { types = M.insert qualName (kind, DataType dtype args' dctors) (types env) }
+      Just (kind, ExternData _) -> do
+        checkRoleDeclarationArity name declaredRoles (kindArity kind)
+        putEnv $ env { types = M.insert qualName (kind, ExternData declaredRoles) (types env) }
+      _ -> internalError "Unsupported role declaration"
 
 addTypeSynonym
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -232,6 +239,7 @@ checkTypeClassInstance cls i = check where
   check = \case
     TypeVar _ _ -> return ()
     TypeLevelString _ _ -> return ()
+    TypeLevelInt _ _ -> return ()
     TypeConstructor _ _ -> return ()
     TypeApp _ t1 t2 -> check t1 >> check t2
     KindApp _ t k -> check t >> check k
@@ -268,10 +276,9 @@ typeCheckAll
   :: forall m
    . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> [DeclarationRef]
   -> [Declaration]
   -> m [Declaration]
-typeCheckAll moduleName _ = traverse go
+typeCheckAll moduleName = traverse go
   where
   go :: Declaration -> m Declaration
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
@@ -282,14 +289,14 @@ typeCheckAll moduleName _ = traverse go
       let args' = args `withKinds` ctorKind
       env <- getEnv
       dctors' <- traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
-      roles <- checkRoles env moduleName name args' dctors'
-      let args'' = args' `withRoles` roles
+      let args'' = args' `withRoles` inferRoles env moduleName name args' dctors'
       addDataType moduleName dtype name args'' dataCtors ctorKind
     return $ DataDeclaration sa dtype name args dctors
   go d@(DataBindingGroupDeclaration tys) = do
     let tysList = NEL.toList tys
         syns = mapMaybe toTypeSynonym tysList
         dataDecls = mapMaybe toDataDecl tysList
+        roleDecls = mapMaybe toRoleDecl tysList
         clss = mapMaybe toClassDecl tysList
         bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2) ++ fmap coerceProperName (clss^..traverse._2._2))
         sss = fmap declSourceSpan tys
@@ -302,15 +309,15 @@ typeCheckAll moduleName _ = traverse go
         addTypeSynonym moduleName name args' elabTy kind
       let dataDeclsWithKinds = zipWith (\(dtype, (_, name, args, _)) (dataCtors, ctorKind) ->
             (dtype, name, args `withKinds` ctorKind, dataCtors, ctorKind)) dataDecls data_ks
-      checkRoles' <- fmap (checkDataBindingGroupRoles env moduleName) .
+      inferRoles' <- fmap (inferDataBindingGroupRoles env moduleName roleDecls) .
         forM dataDeclsWithKinds $ \(_, name, args, dataCtors, _) ->
           (name, args,) <$> traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
       for_ dataDeclsWithKinds $ \(dtype, name, args', dataCtors, ctorKind) -> do
         when (dtype == Newtype) $ checkNewtype name (map fst dataCtors)
         checkDuplicateTypeArguments $ map fst args'
-        roles <- checkRoles' name args'
-        let args'' = args' `withRoles` roles
+        let args'' = args' `withRoles` inferRoles' name args'
         addDataType moduleName dtype name args'' dataCtors ctorKind
+      for_ roleDecls $ checkRoleDeclaration moduleName
       for_ (zip clss cls_ks) $ \((deps, (sa, pn, _, _, _)), (args', implies', tys', kind)) -> do
         let qualifiedClassName = Qualified (Just moduleName) pn
         guardWith (errorMessage (DuplicateTypeClass pn (fst sa))) $
@@ -322,6 +329,8 @@ typeCheckAll moduleName _ = traverse go
     toTypeSynonym _ = Nothing
     toDataDecl (DataDeclaration sa dtype nm args dctors) = Just (dtype, (sa, nm, args, dctors))
     toDataDecl _ = Nothing
+    toRoleDecl (RoleDeclaration rdd) = Just rdd
+    toRoleDecl _ = Nothing
     toClassDecl (TypeClassDeclaration sa nm args implies deps decls) = Just (deps, (sa, nm, args, implies, decls))
     toClassDecl _ = Nothing
   go (TypeSynonymDeclaration sa@(ss, _) name args ty) = do
@@ -337,14 +346,14 @@ typeCheckAll moduleName _ = traverse go
       env <- getEnv
       putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabTy, LocalTypeVariable) (types env) }
       return $ KindDeclaration sa kindFor name elabTy
-  go d@(RoleDeclaration (RoleDeclarationData _sa name roles)) = do
-    addExplicitRoleDeclaration moduleName name roles
+  go d@(RoleDeclaration rdd) = do
+    checkRoleDeclaration moduleName rdd
     return d
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
   go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
-    warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (positionedError ss)) . censorLocalUnnamedWildcards val $ do
+    warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (positionedError ss)) $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
       typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')] >>= \case
@@ -374,8 +383,7 @@ typeCheckAll moduleName _ = traverse go
       elabKind <- withFreshSubstitution $ checkKindDeclaration moduleName kind
       env <- getEnv
       let qualName = Qualified (Just moduleName) name
-      -- If there's an explicit role declaration, just trust it
-      let roles = fromMaybe (nominalRolesForKind elabKind) $ M.lookup qualName (roleDeclarations env)
+          roles = nominalRolesForKind elabKind
       putEnv $ env { types = M.insert qualName (elabKind, ExternData roles) (types env) }
       return d
   go d@(ExternDeclaration (ss, _) name ty) = do
@@ -383,7 +391,8 @@ typeCheckAll moduleName _ = traverse go
       env <- getEnv
       (elabTy, kind) <- withFreshSubstitution $ do
         ((unks, ty'), kind) <- kindOfWithUnknowns ty
-        pure (varIfUnknown unks ty', kind)
+        ty'' <- varIfUnknown unks ty'
+        pure (ty'', kind)
       checkTypeKind elabTy kind
       case M.lookup (Qualified (Just moduleName) name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
@@ -464,6 +473,7 @@ typeCheckAll moduleName _ = traverse go
     typeModule :: SourceType -> Maybe ModuleName
     typeModule (TypeVar _ _) = Nothing
     typeModule (TypeLevelString _ _) = Nothing
+    typeModule (TypeLevelInt _ _) = Nothing
     typeModule (TypeConstructor _ (Qualified (Just mn'') _)) = Just mn''
     typeModule (TypeConstructor _ (Qualified Nothing _)) = internalError "Unqualified type name in findNonOrphanModules"
     typeModule (TypeApp _ t1 _) = typeModule t1
@@ -552,21 +562,6 @@ typeCheckAll moduleName _ = traverse go
     | moduleName `S.member` nonOrphanModules = return ()
     | otherwise = throwError . errorMessage $ OrphanInstance dictName className nonOrphanModules tys'
 
-  censorLocalUnnamedWildcards :: Expr -> m a -> m a
-  censorLocalUnnamedWildcards (TypedValue _ _ ty) = censor (filterErrors (not . isLocalUnnamedWildcardError ty))
-  censorLocalUnnamedWildcards _ = id
-
-  isLocalUnnamedWildcardError :: SourceType -> ErrorMessage -> Bool
-  isLocalUnnamedWildcardError ty err@(ErrorMessage _ (WildcardInferredType _ _)) =
-    let
-      ssWildcard (TypeWildcard (ss', _) Nothing) = [ss']
-      ssWildcard _ = []
-      sssWildcards = everythingOnTypes (<>) ssWildcard ty
-      sss = maybe [] NEL.toList $ errorSpan err
-    in
-      null $ intersect sss sssWildcards
-  isLocalUnnamedWildcardError _ _ = False
-
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
@@ -614,7 +609,7 @@ typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
   warnAndRethrow (addHint (ErrorInModule mn)) $ do
     let (decls', imports) = partitionEithers $ fromImportDecl <$> decls
     modify (\s -> s { checkCurrentModule = Just mn, checkCurrentModuleImports = imports })
-    decls'' <- typeCheckAll mn exps decls'
+    decls'' <- typeCheckAll mn $ ignoreWildcardsUnderCompleteTypeSignatures <$> decls'
     checkSuperClassesAreExported <- getSuperClassExportCheck
     for_ exps $ \e -> do
       checkTypesAreExported e

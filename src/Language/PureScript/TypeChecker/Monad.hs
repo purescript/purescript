@@ -49,11 +49,26 @@ data Substitution = Substitution
   -- ^ Type substitution
   , substUnsolved :: M.Map Int (UnkLevel, SourceType)
   -- ^ Unsolved unification variables with their level (scope ordering) and kind
+  , substNames :: M.Map Int Text
+  -- ^ The original names of unknowns
   }
+
+insertUnkName :: (MonadState CheckState m) => Unknown -> Text -> m ()
+insertUnkName u t = do
+  modify (\s ->
+            s { checkSubstitution =
+                  (checkSubstitution s) { substNames =
+                                            M.insert u t $ substNames $ checkSubstitution s
+                                        }
+              }
+         )
+
+lookupUnkName :: (MonadState CheckState m) => Unknown -> m (Maybe Text)
+lookupUnkName u = gets $ M.lookup u . substNames . checkSubstitution
 
 -- | An empty substitution
 emptySubstitution :: Substitution
-emptySubstitution = Substitution M.empty M.empty
+emptySubstitution = Substitution M.empty M.empty M.empty
 
 -- | State required for type checking
 data CheckState = CheckState
@@ -445,8 +460,12 @@ debugValue :: Expr -> String
 debugValue = init . render . prettyPrintValue 100
 
 debugSubstitution :: Substitution -> [String]
-debugSubstitution (Substitution solved unsolved) =
-  fmap go1 (M.toList solved) <> fmap go2 (M.toList unsolved')
+debugSubstitution (Substitution solved unsolved names) =
+  concat
+    [ fmap go1 (M.toList solved)
+    , fmap go2 (M.toList unsolved')
+    , fmap go3 (M.toList names)
+    ]
   where
   unsolved' =
     M.filterWithKey (\k _ -> M.notMember k solved) unsolved
@@ -456,3 +475,6 @@ debugSubstitution (Substitution solved unsolved) =
 
   go2 (u, (_, k)) =
     "?" <> show u <> " :: " <> debugType k
+
+  go3 (u, t) =
+    unpack t <> show u

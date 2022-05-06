@@ -23,7 +23,9 @@ moduleNameToJs (ModuleName mn) =
 identToJs :: Ident -> Text
 identToJs (Ident name) = anyNameToJs name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
-identToJs UnusedIdent = "$__unused"
+identToJs UnusedIdent = unusedIdent
+identToJs (InternalIdent RuntimeLazyFactory) = "$runtime_lazy"
+identToJs (InternalIdent (Lazy name)) = "$lazy_" <> anyNameToJs name
 
 -- | Convert a 'ProperName' into a valid JavaScript identifier:
 --

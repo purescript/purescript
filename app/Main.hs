@@ -48,7 +48,7 @@ main = do
     -- | Displays full command help when invoked with no arguments.
     execParserPure :: Opts.ParserInfo a -> [String] -> Opts.ParserResult a
     execParserPure pinfo [] = Opts.Failure $
-      Opts.parserFailure Opts.defaultPrefs pinfo Opts.ShowHelpText mempty
+      Opts.parserFailure Opts.defaultPrefs pinfo (Opts.ShowHelpText Nothing) mempty
     execParserPure pinfo args = Opts.execParserPure Opts.defaultPrefs pinfo args
 
     versionInfo :: Opts.Parser (a -> a)
@@ -60,7 +60,7 @@ main = do
       (Opts.subparser . fold)
         [ Opts.command "bundle"
             (Opts.info Bundle.command
-              (Opts.progDesc "Bundle compiled PureScript modules for the browser"))
+              (Opts.progDesc "This command was removed in v0.15.0. Run this command for migration information."))
         , Opts.command "compile"
             (Opts.info Compile.command
               (Opts.progDesc "Compile PureScript source files"))

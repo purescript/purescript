@@ -14,37 +14,60 @@ defaults:
 
 env:
   CI_RELEASE: "${{ github.event_name == 'release' }}"
+  STACK_VERSION: "2.7.3"
 
 jobs:
   build:
     strategy:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
-        # If upgrading Ubuntu, also upgrade it in the lint job below
-        os: [ "ubuntu-18.04", "macOS-10.15", "windows-2016" ]
+        include:
+          - # If upgrading the Haskell image, also upgrade it in the lint job below
+            os: "ubuntu-latest"
+            image: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
+          - os: "macOS-10.15"
+          - os: "windows-2019"
 
     runs-on: "${{ matrix.os }}"
+    container: "${{ matrix.image }}"
 
     steps:
+      - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
+        # if the Git version is less than 2.18.
+        name: "(Linux only) Install a newer version of Git"
+        if: "${{ runner.os == 'Linux' }}"
+        run: |
+          . /etc/os-release
+          echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
+          apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
 
-      - uses: "actions/setup-node@v1"
+      - uses: "actions/setup-node@v2"
         with:
-          node-version: "12"
+          node-version: "14"
+
 
       - id: "haskell"
+        name: "(Non-Linux only) Install Haskell"
+        if: "${{ runner.os != 'Linux' }}"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
-          # If upgrading Stack, also upgrade it in the lint job below
-          stack-version: "2.7.1"
+          stack-version: "${{ env.STACK_VERSION }}"
           stack-no-global: true
+
+      - name: "(Linux only) Check Stack version and fix working directory ownership"
+        if: "${{ runner.os == 'Linux' }}"
+        run: |
+          [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
+          chown root:root .
 
       - uses: "actions/cache@v2"
         with:
           path: |
+            /root/.stack
             ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ runner.os }}-${{ hashFiles('stack.yaml') }}"
+          key: "${{ runner.os }}-MdyPsf-${{ hashFiles('stack.yaml') }}"
 
       - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
         # This ensures that the local GHC and MSYS binaries that Stack installs
@@ -55,7 +78,34 @@ jobs:
           mkdir -p "$STACK_ROOT"
           echo "local-programs-path: $STACK_ROOT/programs" > $STACK_ROOT/config.yaml
 
-      - run: "ci/build.sh"
+      - run: "ci/fix-home ci/build.sh"
+
+      - name: "(Linux only) Build the entire package set"
+        if: "${{ runner.os == 'Linux' }}"
+        # We build in this directory in build.sh, so this is where we need to
+        # launch `stack exec`. The actual package-set building happens in a
+        # temporary directory.
+        working-directory: "sdist-test"
+        # The presence or absence of the --haddock flag changes the location
+        # into which stack places all build artifacts. Since we use --haddock
+        # in our CI builds, in order to actually get stack to find the purs
+        # binary it created, we need to use the flag here as well.
+        #
+        # Moreover, npm has a hook issue that will cause spago to fail to install
+        # We upgrade npm to fix this
+        run: |
+          npm i -g npm@8.8.0
+          ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
+
+      - name: Verify that 'libtinfo' isn't in binary
+        if: runner.os == 'Linux'
+        working-directory: "sdist-test"
+        run: |
+          if [ $(ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
+            echo "libtinfo detected"
+            ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo'
+            exit 1
+          fi
 
       - name: "(Release only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
@@ -73,7 +123,7 @@ jobs:
               exit 1;;
           esac
           cd sdist-test
-          bundle/build.sh "$bundle_os"
+          ../ci/fix-home bundle/build.sh "$bundle_os"
 
       - name: "(Release only) Publish bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
@@ -88,40 +138,60 @@ jobs:
           files: "sdist-test/bundle/*.{tar.gz,sha}"
 
   lint:
-    runs-on: "ubuntu-18.04"
+    runs-on: "ubuntu-latest"
+    container: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
 
     steps:
+      - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
+        # if the Git version is less than 2.18.
+        name: "Install a newer version of Git"
+        run: |
+          . /etc/os-release
+          echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
+          apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
 
-      - id: "haskell"
-        uses: "haskell/actions/setup@v1"
-        with:
-          enable-stack: true
-          stack-version: "2.7.1"
-          stack-no-global: true
+      - name: "Fix working directory ownership"
+        run: |
+          chown root:root .
 
       - uses: "actions/cache@v2"
         with:
           path: |
-            ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ runner.os }}-lint-${{ hashFiles('stack.yaml') }}"
+            /root/.stack
+          key: "${{ runner.os }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
 
-      - run: "ci/run-hlint.sh --git"
+      - run: "ci/fix-home ci/run-hlint.sh --git"
         env:
           VERSION: "2.2.11"
 
       # Note: the weeder version will need to be updated when we next update our version
-      # of GHC
-      - run: "stack --no-terminal --jobs=2 build --copy-compiler-tool weeder-2.2.0"
+      # of GHC.
+      #
+      # weeder-2.2.0 has somewhat strange version deps. It doesn't appear to
+      # support the exact versions of dhall and generic-lens in LTS-18.
+      # However, forcing it to use the versions of dhall and generic-lens in
+      # LTS-18 doesn't cause any problems when building, so the following
+      # commands build weeder while ignoring version constraints.
+      - name: Install weeder
+        run: |
+          # The `stack.yaml` file is copied to a separate file so that
+          # adding `allow-newer: true` doesn't affect any subsequant
+          # calls to `stack`.
+          cp stack.yaml stack-weeder.yaml
+          # `allow-newer: true` is needed so that weeder-2.2.0 can be
+          # installed with the dependencies present in LTS-18.
+          echo 'allow-newer: true' >> stack-weeder.yaml
+          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.2.0
 
-      - run: "stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
+      - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
 
-      - run: "stack exec weeder"
+      - run: "ci/fix-home stack exec weeder"
 
       # Now do it again, with the test suite included. We don't want a
       # reference from our test suite to count in the above check; the fact
       # that a function is tested is not evidence that it's needed. But we also
       # don't want to leave weeds lying around in our test suite either.
-      - run: "stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
+      - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
 
-      - run: "stack exec weeder"
+      - run: "ci/fix-home stack exec weeder"

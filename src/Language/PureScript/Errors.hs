@@ -4,52 +4,55 @@ module Language.PureScript.Errors
   ) where
 
 import           Prelude.Compat
-import           Protolude (ordNub)
+import           Protolude                                (ordNub)
 
-import           Control.Arrow ((&&&))
-import           Control.Exception (displayException)
+import           Control.Arrow                            ((&&&))
+import           Control.Exception                        (displayException)
 import           Control.Monad
-import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.Error.Class                (MonadError (..))
 import           Control.Monad.Trans.State.Lazy
 import           Control.Monad.Writer
-import           Data.Bifunctor (first, second)
-import           Data.Bitraversable (bitraverse)
-import           Data.Char (isSpace)
-import           Data.Either (partitionEithers)
-import           Data.Foldable (fold)
-import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn)
-import qualified Data.List.NonEmpty as NEL
-import           Data.List.NonEmpty (NonEmpty((:|)))
-import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
-import qualified Data.Map as M
-import           Data.Ord (Down(..))
-import qualified Data.Set as S
-import qualified Data.Text as T
-import           Data.Text (Text)
+import           Data.Bifunctor                           (first, second)
+import           Data.Bitraversable                       (bitraverse)
+import           Data.Char                                (isSpace)
+import           Data.Either                              (partitionEithers)
+import           Data.Foldable                            (fold)
+import           Data.Functor.Identity                    (Identity (..))
+import           Data.List                                (dropWhileEnd, nubBy,
+                                                           partition, sortOn,
+                                                           transpose)
+import           Data.List.NonEmpty                       (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty                       as NEL
+import qualified Data.Map                                 as M
+import           Data.Maybe                               (fromMaybe, mapMaybe,
+                                                           maybeToList)
+import           Data.Ord                                 (Down (..))
+import qualified Data.Set                                 as S
+import           Data.Text                                (Text)
+import qualified Data.Text                                as T
 import qualified GHC.Stack
 import           Language.PureScript.AST
-import qualified Language.PureScript.Bundle as Bundle
-import qualified Language.PureScript.Constants.Prelude as C
-import qualified Language.PureScript.Constants.Prim as C
+import qualified Language.PureScript.Bundle               as Bundle
+import qualified Language.PureScript.CST.Errors           as CST
+import qualified Language.PureScript.CST.Print            as CST
+import qualified Language.PureScript.Constants.Prelude    as C
+import qualified Language.PureScript.Constants.Prim       as C
 import           Language.PureScript.Crash
-import qualified Language.PureScript.CST.Errors as CST
-import qualified Language.PureScript.CST.Print as CST
 import           Language.PureScript.Environment
-import           Language.PureScript.Label (Label(..))
+import           Language.PureScript.Label                (Label (..))
 import           Language.PureScript.Names
+import           Language.PureScript.PSString             (decodeStringWithReplacement)
 import           Language.PureScript.Pretty
-import           Language.PureScript.Pretty.Common (endWith)
-import           Language.PureScript.PSString (decodeStringWithReplacement)
+import           Language.PureScript.Pretty.Common        (endWith)
+import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
 import           Language.PureScript.Roles
 import           Language.PureScript.Traversals
 import           Language.PureScript.Types
-import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
-import qualified System.Console.ANSI as ANSI
-import qualified Text.Parsec as P
-import qualified Text.Parsec.Error as PE
-import           Text.Parsec.Error (Message(..))
-import qualified Text.PrettyPrint.Boxes as Box
+import qualified System.Console.ANSI                      as ANSI
+import qualified Text.Parsec                              as P
+import           Text.Parsec.Error                        (Message (..))
+import qualified Text.Parsec.Error                        as PE
+import qualified Text.PrettyPrint.Boxes                   as Box
 
 -- | A type of error messages
 data SimpleErrorMessage
@@ -108,8 +111,9 @@ data SimpleErrorMessage
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified (Either SourceType Ident)]
   | NoInstanceFound
       SourceConstraint -- ^ constraint that could not be solved
+      [Qualified (Either SourceType Ident)] -- ^ a list of instances that stopped further progress in instance chains due to ambiguity
       Bool -- ^ whether eliminating unknowns with annotations might help
-  | AmbiguousTypeVariables SourceType [Int]
+  | AmbiguousTypeVariables SourceType [(Text, Int)]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | PossiblyInfiniteCoercibleInstance
@@ -207,14 +211,14 @@ errorSpan :: ErrorMessage -> Maybe (NEL.NonEmpty SourceSpan)
 errorSpan = findHint matchSpan
   where
   matchSpan (PositionedError ss) = Just ss
-  matchSpan _ = Nothing
+  matchSpan _                    = Nothing
 
 -- | Get the module name for an error
 errorModule :: ErrorMessage -> Maybe ModuleName
 errorModule = findHint matchModule
   where
   matchModule (ErrorInModule mn) = Just mn
-  matchModule _ = Nothing
+  matchModule _                  = Nothing
 
 findHint :: (ErrorMessageHint -> Maybe a) -> ErrorMessage -> Maybe a
 findHint f (ErrorMessage hints _) = getLast . foldMap (Last . f) $ hints
@@ -223,9 +227,9 @@ findHint f (ErrorMessage hints _) = getLast . foldMap (Last . f) $ hints
 stripModuleAndSpan :: ErrorMessage -> ErrorMessage
 stripModuleAndSpan (ErrorMessage hints e) = ErrorMessage (filter (not . shouldStrip) hints) e
   where
-  shouldStrip (ErrorInModule _) = True
+  shouldStrip (ErrorInModule _)   = True
   shouldStrip (PositionedError _) = True
-  shouldStrip _ = False
+  shouldStrip _                   = False
 
 -- | Get the error code for a particular error type
 errorCode :: ErrorMessage -> Text
@@ -408,11 +412,11 @@ addHints hints = onErrorMessages $ \(ErrorMessage hints' se) -> ErrorMessage (hi
 
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
 data TypeMap = TypeMap
-  { umSkolemMap   :: M.Map Int (String, Int, Maybe SourceSpan)
+  { umSkolemMap  :: M.Map Int (String, Int, Maybe SourceSpan)
   -- ^ a map from skolems to their new names, including source and naming info
-  , umUnknownMap  :: M.Map Int Int
+  , umUnknownMap :: M.Map Int Int
   -- ^ a map from unification variables to their new names
-  , umNextIndex   :: Int
+  , umNextIndex  :: Int
   -- ^ unknowns and skolems share a source of names during renaming, to
   -- avoid overlaps in error messages. This is the next label for either case.
   } deriving Show
@@ -459,8 +463,8 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-  gSimple (NoInstanceFound con unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure unks
-  gSimple (AmbiguousTypeVariables t us) = AmbiguousTypeVariables <$> f t <*> pure us
+  gSimple (NoInstanceFound con ambig unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure ambig <*> pure unks
+  gSimple (AmbiguousTypeVariables t uis) = AmbiguousTypeVariables <$> f t <*> pure uis
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> traverse (traverse $ bitraverse f pure) insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
@@ -519,9 +523,9 @@ errorSuggestion err =
                      | otherwise = "Row " <> kind
             suggest sugg
           CST.WarnDeprecatedForeignKindSyntax -> suggest $ "data " <> CST.printTokens (drop 3 toks)
-          CST.WarnDeprecatedConstraintInForeignImportSyntax -> Nothing
           CST.WarnDeprecatedKindImportSyntax -> suggest $ CST.printTokens $ drop 1 toks
           CST.WarnDeprecatedKindExportSyntax -> suggest $ CST.printTokens $ drop 1 toks
+          CST.WarnDeprecatedCaseOfOffsideSyntax -> Nothing
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
@@ -533,7 +537,7 @@ errorSuggestion err =
 
     qstr :: Maybe ModuleName -> Text
     qstr (Just mn) = " as " <> runModuleName mn
-    qstr Nothing = ""
+    qstr Nothing   = ""
 
 suggestionSpan :: ErrorMessage -> Maybe SourceSpan
 suggestionSpan e =
@@ -548,12 +552,12 @@ suggestionSpan e =
       case simple of
         MissingTypeDeclaration{} -> startOnly ss
         MissingKindDeclaration{} -> startOnly ss
-        _ -> ss
+        _                        -> ss
 
 showSuggestion :: SimpleErrorMessage -> Text
 showSuggestion suggestion = case errorSuggestion suggestion of
   Just (ErrorSuggestion x) -> x
-  _ -> ""
+  _                        -> ""
 
 ansiColor :: (ANSI.ColorIntensity, ANSI.Color) -> String
 ansiColor (intensity, color) =
@@ -713,14 +717,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DeprecatedFFICommonJSModule mn path) =
       paras [ line $ "A CommonJS foreign module implementation was provided for module " <> markCode (runModuleName mn) <> ": "
             , indent . lineS $ path
-            , line "CommonJS foreign modules are deprecated and won't be supported in the future."
+            , line "CommonJS foreign modules are no longer supported. Use native JavaScript/ECMAScript module syntax instead."
             ]
     renderSimpleErrorMessage (UnsupportedFFICommonJSExports mn idents) =
       paras [ line $ "The following CommonJS exports are not supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "
             , indent . paras $ map line idents
             ]
     renderSimpleErrorMessage (UnsupportedFFICommonJSImports mn mids) =
-      paras [ line $ "The following CommonJS imports are no supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "
+      paras [ line $ "The following CommonJS imports are not supported in the ES foreign module for module " <> markCode (runModuleName mn) <> ": "
             , indent . paras $ map line mids
             ]
     renderSimpleErrorMessage InvalidDoBind =
@@ -750,7 +754,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
-      line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
+      line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode "bind" <> " and " <> markCode "discard" <> " functions. Please import " <> markCode i <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i == C.negate =
       line $ "Unknown " <> printName name <> ". You're probably using numeric negation (the unary " <> markCode "-" <> " operator), which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name) =
@@ -879,14 +883,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ line (showQualified runProperName nm)
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _) _) | Just box <- toTypelevelString ty =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _) _ _) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Partial
                                                           _
                                                           _
-                                                          (Just (PartialConstraintData bs b))) _) =
+                                                          (Just (PartialConstraintData bs b))) _ _) =
       paras [ line "A case expression could not be determined to cover all inputs."
             , line "The following additional cases are required to cover all inputs:"
             , indent $ paras $
@@ -895,30 +899,38 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _) _) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _) _ _) =
       paras [ line "A result of type"
             , markCodeBox $ indent $ prettyType ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _) unks) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _) ambiguous unks) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map prettyTypeAtom ts)
                 ]
+            , paras $ let useMessage msg =
+                            [ line msg
+                            , indent $ paras (map prettyInstanceName ambiguous)
+                            ]
+                      in case ambiguous of
+                        [] -> []
+                        [_] -> useMessage "The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:"
+                        _ -> useMessage "The following instances partially overlap the above constraint, which means the rest of their instance chains will not be considered:"
             , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
                     | unks
                     ]
             ]
-    renderSimpleErrorMessage (AmbiguousTypeVariables t us) =
+    renderSimpleErrorMessage (AmbiguousTypeVariables t uis) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ prettyType t
             , line "has type variables which are not determined by those mentioned in the body of the type:"
             , indent $ Box.hsep 1 Box.left
               [ Box.vcat Box.left
-                [ line $ markCode ("t" <> T.pack (show u)) <> " could not be determined"
-                | u <- us ]
+                [ line $ markCode (u <> T.pack (show i)) <> " could not be determined"
+                | (u, i) <- uis ]
               ]
             , line "Consider adding a type annotation."
             ]
@@ -1589,13 +1601,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     printName qn = nameType (disqualify qn) <> " " <> markCode (runName qn)
 
     nameType :: Name -> Text
-    nameType (IdentName _) = "value"
-    nameType (ValOpName _) = "operator"
-    nameType (TyName _) = "type"
-    nameType (TyOpName _) = "type operator"
-    nameType (DctorName _) = "data constructor"
+    nameType (IdentName _)   = "value"
+    nameType (ValOpName _)   = "operator"
+    nameType (TyName _)      = "type"
+    nameType (TyOpName _)    = "type operator"
+    nameType (DctorName _)   = "data constructor"
     nameType (TyClassName _) = "type class"
-    nameType (ModName _) = "module"
+    nameType (ModName _)     = "module"
 
     runName :: Qualified Name -> Text
     runName (Qualified mn (IdentName name)) =
@@ -1634,7 +1646,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
   levelText :: Text
   levelText = case level of
-    Error -> "error"
+    Error   -> "error"
     Warning -> "warning"
 
   paras :: [Box.Box] -> Box.Box
@@ -1654,26 +1666,26 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       case (hintCategory x, hintCategory y) of
         (OtherHint, _) -> False
         (_, OtherHint) -> False
-        (c1, c2) -> c1 == c2
+        (c1, c2)       -> c1 == c2
 
     -- | See https://github.com/purescript/purescript/issues/1802
     stripRedundantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
     stripRedundantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
       where
       isCheckHint ErrorCheckingType{} = True
-      isCheckHint _ = False
+      isCheckHint _                   = False
     stripRedundantHints TypesDoNotUnify{} = stripFirst isUnifyHint
       where
       isUnifyHint ErrorUnifyingTypes{} = True
-      isUnifyHint _ = False
-    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _) _) = filter (not . isSolverHint)
+      isUnifyHint _                    = False
+    stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _) _ _) = filter (not . isSolverHint)
       where
       isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
       isSolverHint _ = False
     stripRedundantHints NoInstanceFound{} = stripFirst isSolverHint
       where
       isSolverHint ErrorSolvingConstraint{} = True
-      isSolverHint _ = False
+      isSolverHint _                        = False
     stripRedundantHints _ = id
 
     stripFirst :: (ErrorMessageHint -> Bool) -> [ErrorMessageHint] -> [ErrorMessageHint]
@@ -1685,16 +1697,27 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     stripFirst _ [] = []
 
   hintCategory :: ErrorMessageHint -> HintCategory
-  hintCategory ErrorCheckingType{}                  = ExprHint
-  hintCategory ErrorInferringType{}                 = ExprHint
-  hintCategory ErrorInExpression{}                  = ExprHint
-  hintCategory ErrorUnifyingTypes{}                 = CheckHint
-  hintCategory ErrorInSubsumption{}                 = CheckHint
-  hintCategory ErrorInApplication{}                 = CheckHint
-  hintCategory ErrorCheckingKind{}                  = CheckHint
-  hintCategory ErrorSolvingConstraint{}             = SolverHint
-  hintCategory PositionedError{}                    = PositionHint
-  hintCategory _                                    = OtherHint
+  hintCategory ErrorCheckingType{}           = ExprHint
+  hintCategory ErrorInferringType{}          = ExprHint
+  hintCategory ErrorInExpression{}           = ExprHint
+  hintCategory ErrorUnifyingTypes{}          = CheckHint
+  hintCategory ErrorInSubsumption{}          = CheckHint
+  hintCategory ErrorInApplication{}          = CheckHint
+  hintCategory ErrorCheckingKind{}           = CheckHint
+  hintCategory ErrorSolvingConstraint{}      = SolverHint
+  hintCategory PositionedError{}             = PositionHint
+  hintCategory ErrorInDataConstructor{}      = DeclarationHint
+  hintCategory ErrorInTypeConstructor{}      = DeclarationHint
+  hintCategory ErrorInBindingGroup{}         = DeclarationHint
+  hintCategory ErrorInDataBindingGroup{}     = DeclarationHint
+  hintCategory ErrorInTypeSynonym{}          = DeclarationHint
+  hintCategory ErrorInValueDeclaration{}     = DeclarationHint
+  hintCategory ErrorInTypeDeclaration{}      = DeclarationHint
+  hintCategory ErrorInTypeClassDeclaration{} = DeclarationHint
+  hintCategory ErrorInKindDeclaration{}      = DeclarationHint
+  hintCategory ErrorInRoleDeclaration{}      = DeclarationHint
+  hintCategory ErrorInForeignImport{}        = DeclarationHint
+  hintCategory _                             = OtherHint
 
   prettyPrintPlainIdent :: Ident -> Text
   prettyPrintPlainIdent ident =
@@ -1758,10 +1781,10 @@ prettyPrintRef ReExportRef{} =
   Nothing
 
 prettyPrintKindSignatureFor :: KindSignatureFor -> Text
-prettyPrintKindSignatureFor DataSig = "data"
-prettyPrintKindSignatureFor NewtypeSig = "newtype"
+prettyPrintKindSignatureFor DataSig        = "data"
+prettyPrintKindSignatureFor NewtypeSig     = "newtype"
 prettyPrintKindSignatureFor TypeSynonymSig = "type"
-prettyPrintKindSignatureFor ClassSig = "class"
+prettyPrintKindSignatureFor ClassSig       = "class"
 
 prettyPrintSuggestedTypeSimplified :: Type a -> String
 prettyPrintSuggestedTypeSimplified = prettyPrintSuggestedType . eraseForAllKindAnnotations . eraseKindApps
@@ -1832,9 +1855,9 @@ prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEnd
                          ms | null pre  -> commasOr ms
                             | otherwise -> pre ++ " " ++ commasOr ms
 
-  commasOr []       = ""
-  commasOr [m]      = m
-  commasOr ms       = commaSep (init ms) ++ " " ++ msgOr ++ " " ++ last ms
+  commasOr []  = ""
+  commasOr [m] = m
+  commasOr ms  = commaSep (init ms) ++ " " ++ msgOr ++ " " ++ last ms
 
   commaSep          = separate ", " . clean
 
@@ -1869,7 +1892,7 @@ toTypelevelString (TypeLevelString _ s) =
   Just . Box.text $ decodeStringWithReplacement s
 toTypelevelString (TypeApp _ (TypeConstructor _ f) x)
   | f == primSubName C.typeError "Text" = toTypelevelString x
-toTypelevelString (TypeApp _ (TypeConstructor _ f) x)
+toTypelevelString (TypeApp _ (KindApp _ (TypeConstructor _ f) _) x)
   | f == primSubName C.typeError "Quote" = Just (typeAsBox maxBound x)
 toTypelevelString (TypeApp _ (TypeConstructor _ f) (TypeLevelString _ x))
   | f == primSubName C.typeError "QuoteLabel" = Just . line . prettyPrintLabel . Label $ x
@@ -1906,13 +1929,10 @@ withoutPosition :: ErrorMessage -> ErrorMessage
 withoutPosition (ErrorMessage hints se) = ErrorMessage (filter go hints) se
   where
   go (PositionedError _) = False
-  go _ = True
+  go _                   = True
 
 positionedError :: SourceSpan -> ErrorMessageHint
 positionedError = PositionedError . pure
-
-filterErrors :: (ErrorMessage -> Bool) -> MultipleErrors -> MultipleErrors
-filterErrors f = MultipleErrors . filter f . runMultipleErrors
 
 -- | Runs a computation listening for warnings and then escalating any warnings
 -- that match the predicate to error status.
@@ -1943,7 +1963,7 @@ parU xs f =
 
     collectErrors :: [Either MultipleErrors b] -> m [b]
     collectErrors es = case partitionEithers es of
-      ([], rs) -> return rs
+      ([], rs)  -> return rs
       (errs, _) -> throwError $ fold errs
 
 internalCompilerError

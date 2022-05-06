@@ -1,40 +1,44 @@
 module TestUtils where
 
-import Prelude ()
-import Prelude.Compat
+import           Prelude                            ()
+import           Prelude.Compat
 
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
-import Language.PureScript.Interactive.IO (findNodeProcess)
+import qualified Language.PureScript                as P
+import qualified Language.PureScript.AST            as AST
+import qualified Language.PureScript.CST            as CST
+import           Language.PureScript.Interactive.IO (findNodeProcess)
+import qualified Language.PureScript.Names          as N
 
-import Control.Arrow ((***), (>>>))
-import Control.Monad
-import Control.Monad.Reader
-import Control.Monad.Trans.Except
-import Control.Monad.Trans.Maybe
-import Control.Monad.Writer.Class (tell)
-import Control.Exception
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
-import Data.Char (isSpace)
-import Data.Function (on)
-import Data.List (sort, sortBy, stripPrefix, groupBy)
-import qualified Data.Map as M
-import Data.Maybe (isJust)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import Data.Time.Clock (UTCTime(), diffUTCTime, getCurrentTime, nominalDay)
-import Data.Tuple (swap)
-import System.Directory
-import System.Exit (exitFailure)
-import System.Environment (lookupEnv)
-import System.FilePath
-import System.IO.Error (isDoesNotExistError)
-import System.IO.UTF8 (readUTF8FileT)
-import System.Process hiding (cwd)
-import qualified System.FilePath.Glob as Glob
-import System.IO
-import Test.Hspec
+import           Control.Arrow                      ((***), (>>>))
+import           Control.Exception
+import           Control.Monad
+import           Control.Monad.Reader
+import           Control.Monad.Trans.Except
+import           Control.Monad.Trans.Maybe
+import           Control.Monad.Writer.Class         (tell)
+import           Data.ByteString                    (ByteString)
+import qualified Data.ByteString                    as BS
+import           Data.Char                          (isSpace)
+import           Data.Function                      (on)
+import           Data.List                          (groupBy, sort, sortBy,
+                                                     stripPrefix)
+import qualified Data.Map                           as M
+import           Data.Maybe                         (isJust)
+import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as T
+import           Data.Time.Clock                    (UTCTime, diffUTCTime,
+                                                     getCurrentTime, nominalDay)
+import           Data.Tuple                         (swap)
+import           System.Directory
+import           System.Environment                 (lookupEnv)
+import           System.Exit                        (exitFailure)
+import           System.FilePath
+import qualified System.FilePath.Glob               as Glob
+import           System.IO
+import           System.IO.Error                    (isDoesNotExistError)
+import           System.IO.UTF8                     (readUTF8FileT)
+import           System.Process                     hiding (cwd)
+import           Test.Hspec
 
 -- |
 -- Fetches code necessary to run the tests with. The resulting support code
@@ -113,7 +117,7 @@ getSupportModuleTuples = do
   fileContents <- readInput pursFiles
   modules <- runExceptT $ ExceptT . return $ CST.parseFromFiles id fileContents
   case modules of
-    Right ms -> return (fmap (fmap snd) ms)
+    Right ms  -> return (fmap (fmap snd) ms)
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
 
 getSupportModuleNames :: IO [T.Text]
@@ -135,8 +139,8 @@ createOutputFile logfileName = do
   openFile (tmp </> logpath </> logfileName) WriteMode
 
 data SupportModules = SupportModules
-  { supportModules :: [P.Module]
-  , supportExterns :: [P.ExternsFile]
+  { supportModules  :: [P.Module]
+  , supportExterns  :: [P.ExternsFile]
   , supportForeigns :: M.Map P.ModuleName FilePath
   }
 
@@ -154,23 +158,8 @@ setupSupportModules = do
 
 getTestFiles :: FilePath -> IO [[FilePath]]
 getTestFiles testDir = do
-  cwd <- getCurrentDirectory
   let dir = "tests" </> "purs" </> testDir
-  testsInPath <- getFiles dir <$> testGlob dir
-  let rerunPath = dir </> "RerunCompilerTests.txt"
-  hasRerunFile <- doesFileExist rerunPath
-  rerunTests <-
-    if hasRerunFile
-    then let compilerTestDir = cwd </> "tests" </> "purs" </> "passing"
-             textToTestFiles
-               = mapM (\path -> ((path ++ ".purs") :) <$> testGlob path)
-               . map ((compilerTestDir </>) . T.unpack)
-               . filter (not . T.null)
-               . map (T.strip . fst . T.breakOn "--")
-               . T.lines
-         in readUTF8FileT rerunPath >>= textToTestFiles
-    else return []
-  return $ testsInPath ++ rerunTests
+  getFiles dir <$> testGlob dir
   where
   -- A glob for all purs and js files within a test directory
   testGlob :: FilePath -> IO [FilePath]
@@ -195,20 +184,34 @@ getTestFiles testDir = do
        else dir
 
 compile
-  :: SupportModules
+  :: Bool
+  -> SupportModules
   -> [FilePath]
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile SupportModules{..} inputFiles = runTest $ do
+compile checkForMainModule SupportModules{..} inputFiles = runTest $ do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
   fs <- liftIO $ readInput (sort inputFiles)
   msWithWarnings <- CST.parseFromFiles id fs
   tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
   let ms = fmap snd <$> msWithWarnings
   foreigns <- inferForeignModules ms
-  let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
+  let
+    actions = makeActions supportModules (foreigns `M.union` supportForeigns)
+    hasMainModule = (==) 1 $ length $ filter (== "Main") $ fmap getPsModuleName ms
   case ms of
-    [singleModule] -> pure <$> P.rebuildModule actions supportExterns (snd singleModule)
-    _ -> P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
+    [singleModule] -> do
+      when (checkForMainModule && not hasMainModule) $ do
+        error $ "When testing a single PureScript file, the file's module's name must be 'Main' but got '"
+          <> T.unpack (getPsModuleName singleModule) <> "'."
+      pure <$> P.rebuildModule actions supportExterns (snd singleModule)
+    _ -> do
+      when (checkForMainModule && not hasMainModule) $ do
+        error "When testing multiple PureScript files, the main file's module's name must be 'Main'."
+      P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
+
+getPsModuleName :: (a, AST.Module) -> T.Text
+getPsModuleName psModule = case snd psModule of
+  AST.Module _ _ (N.ModuleName t) _ _ -> t
 
 makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
 makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
