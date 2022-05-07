@@ -307,7 +307,7 @@ moduleBindToJs mn = bindToJs
   moduleAccessor InternalIdent{} = internalError "InternalIdent in moduleAccessor"
 
   moduleAccessorString :: Text -> AST -> AST
-  moduleAccessorString = accessorString . mkString . T.replace "'" "$prime"
+  moduleAccessorString = accessorString . mkString . T.concatMap identCharToText
 
   accessorString :: PSString -> AST -> AST
   accessorString prop = AST.Indexer Nothing (AST.StringLiteral Nothing prop)
