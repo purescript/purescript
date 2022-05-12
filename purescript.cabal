@@ -37,6 +37,7 @@ extra-source-files:
   INSTALL.md
   CONTRIBUTORS.md
   CONTRIBUTING.md
+  VERSIONING_POLICY.md
   .hspec
 
 source-repository head
