@@ -1,7 +1,7 @@
 cabal-version:  2.4
 
 name:           purescript
--- note: When updating the prerelease identifier, update it in app/Version.hs too!
+-- Note: don't add prerelease identifiers here! Add them in app/Version.hs and npm-package/package.json instead.
 version:        0.15.0
 synopsis:       PureScript Programming Language Compiler
 description:    A small strongly, statically typed programming language with expressive types, inspired by Haskell and compiling to JavaScript.
