@@ -107,7 +107,7 @@ else # (current version does not contain a prerelease suffix)
   fi
 fi
 
-echo "::set-output name=version::v$build_version"
+echo "::set-output name=version::$build_version"
 
 if [ "$build_version" != "$package_version" ]
 then
