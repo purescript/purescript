@@ -267,7 +267,16 @@ kindSymbol = primType "Symbol" $ T.unlines
 kindRow :: Declaration
 kindRow = primType "Row" $ T.unlines
   [ "`Row` is the kind constructor of label-indexed types which map type-level strings to other types."
-  , "For example, the kind of `Record` is `Row Type -> Type`, mapping field names to values."
+  , "For example..."
+  , ""
+  , "     type ClosedRow = ( label :: TypeName, name :: String )"
+  , "     type OpenRow otherRows = ( label :: TypeName, name :: String | otherRows )"
+  , "     type FinalRow = OpenRows ( anotherLabel :: Int )"
+  , "     -- FinalRow = ( label :: TypeName, name :: String, anotherLabel :: Int )"
+  , ""
+  , "Rows can be 'open' or 'closed'. 'Closed' rows cannot be extended with additional label-type pairs."
+  , "'Open' rows can be extended."
+  , "`Row`s are often used in `Record`, whose kind signature is `Row Type -> Type`, mapping field names to values."
   ]
 
 function :: Declaration
