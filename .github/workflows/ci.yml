@@ -238,6 +238,7 @@ jobs:
       - uses: "actions/setup-node@v3"
         with:
           node-version: "16.x"
+          registry-url: "https://registry.npmjs.org"
       - name: "Publish npm package"
         working-directory: "npm-package"
         env:
