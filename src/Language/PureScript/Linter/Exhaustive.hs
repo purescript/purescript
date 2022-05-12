@@ -281,7 +281,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
   addPartialConstraint :: ([[Binder]], Bool) -> Expr -> Expr
   addPartialConstraint (bss, complete) e =
     TypedValue True e $
-      srcConstrainedType (srcConstraint C.Partial [] [] (Just constraintData)) srcTypeWildcard
+      srcConstrainedType (srcConstraint C.Partial [] [] (Just constraintData)) $ TypeWildcard NullSourceAnn IgnoredWildcard
     where
       constraintData :: ConstraintData
       constraintData =

@@ -31,16 +31,6 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
   (fn, _, _) = everywhereOnValuesTopDownM return desugarExpr return
 
   desugarExpr :: Expr -> m Expr
-  desugarExpr AnonymousArgument = throwError . errorMessage $ IncorrectAnonymousArgument
-  desugarExpr (Parens b)
-    | b' <- stripPositionInfo b
-    , BinaryNoParens op val u <- b'
-    , isAnonymousArgument u = do arg <- freshIdent'
-                                 return $ Abs (VarBinder nullSourceSpan arg) $ App (App op val) (Var nullSourceSpan (Qualified Nothing arg))
-    | b' <- stripPositionInfo b
-    , BinaryNoParens op u val <- b'
-    , isAnonymousArgument u = do arg <- freshIdent'
-                                 return $ Abs (VarBinder nullSourceSpan arg) $ App (App op (Var nullSourceSpan (Qualified Nothing arg))) val
   desugarExpr (Literal ss (ObjectLiteral ps)) = wrapLambdaAssoc (Literal ss . ObjectLiteral) ps
   desugarExpr (ObjectUpdateNested obj ps) = transformNestedUpdate obj ps
   desugarExpr (Accessor prop u)
@@ -96,20 +86,11 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
   wrapLambdaAssoc :: ([(PSString, Expr)] -> Expr) -> [(PSString, Expr)] -> m Expr
   wrapLambdaAssoc mkVal = wrapLambda (mkVal . runAssocList) . AssocList
 
-  stripPositionInfo :: Expr -> Expr
-  stripPositionInfo (PositionedValue _ _ e) = stripPositionInfo e
-  stripPositionInfo e = e
-
   peelAnonAccessorChain :: Expr -> Maybe [PSString]
   peelAnonAccessorChain (Accessor p e) = (p :) <$> peelAnonAccessorChain e
   peelAnonAccessorChain (PositionedValue _ _ e) = peelAnonAccessorChain e
   peelAnonAccessorChain AnonymousArgument = Just []
   peelAnonAccessorChain _ = Nothing
-
-  isAnonymousArgument :: Expr -> Bool
-  isAnonymousArgument AnonymousArgument = True
-  isAnonymousArgument (PositionedValue _ _ e) = isAnonymousArgument e
-  isAnonymousArgument _ = False
 
   freshIfAnon :: Expr -> m (Maybe Ident)
   freshIfAnon u

@@ -180,11 +180,13 @@ inferKind = \tyToInfer ->
           throwError . errorMessage' (fst ann) . UnknownName . fmap TyClassName $ v
         Just _ ->
           checkConstraint con
-      ty' <- checkKind ty E.kindType
+      ty' <- checkIsSaturatedType ty
       con'' <- applyConstraint con'
       pure (ConstrainedType ann' con'' ty', E.kindType $> ann')
     ty@(TypeLevelString ann _) ->
       pure (ty, E.kindSymbol $> ann)
+    ty@(TypeLevelInt ann _) ->
+      pure (ty, E.tyInt $> ann)
     ty@(TypeVar ann v) -> do
       moduleName <- unsafeCheckCurrentModule
       kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
@@ -226,10 +228,10 @@ inferKind = \tyToInfer ->
     ForAll ann arg mbKind ty sc -> do
       moduleName <- unsafeCheckCurrentModule
       kind <- case mbKind of
-        Just k -> replaceAllTypeSynonyms =<< checkKind k E.kindType
+        Just k -> replaceAllTypeSynonyms =<< checkIsSaturatedType k
         Nothing -> freshKind (fst ann)
       (ty', unks) <- bindLocalTypeVariables moduleName [(ProperName arg, kind)] $ do
-        ty' <- apply =<< checkKind ty E.kindType
+        ty' <- apply =<< checkIsSaturatedType ty
         unks <- unknownsWithKinds . IS.toList $ unknowns ty'
         pure (ty', unks)
       for_ unks . uncurry $ addUnsolved Nothing
@@ -247,7 +249,8 @@ inferAppKind
   -> m (SourceType, SourceType)
 inferAppKind ann (fn, fnKind) arg = case fnKind of
   TypeApp _ (TypeApp _ arrKind argKind) resKind | eqType arrKind E.tyFunction -> do
-    arg' <- checkKind arg argKind
+    expandSynonyms <- requiresSynonymsToExpand fn
+    arg' <- checkKind' expandSynonyms arg argKind
     (TypeApp ann fn arg',) <$> apply resKind
   TUnknown _ u -> do
     (lvl, _) <- lookupUnsolved u
@@ -264,6 +267,12 @@ inferAppKind ann (fn, fnKind) arg = case fnKind of
     inferAppKind ann (KindApp ann fn (TUnknown ann u), replaceTypeVars a (TUnknown ann u) ty) arg
   _ ->
     cannotApplyTypeToType fn arg
+  where
+  requiresSynonymsToExpand = \case
+    TypeConstructor _ v -> M.notMember v . E.typeSynonyms <$> getEnv
+    TypeApp _ l _ -> requiresSynonymsToExpand l
+    KindApp _ l _ -> requiresSynonymsToExpand l
+    _ -> pure True
 
 cannotApplyTypeToType
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -291,12 +300,34 @@ checkKind
   => SourceType
   -> SourceType
   -> m SourceType
-checkKind ty kind2 =
+checkKind = checkKind' False
+
+-- | `checkIsSaturatedType t` is identical to `checkKind t E.kindType` except
+-- that the former checks that the type synonyms in `t` expand completely. This
+-- is the appropriate function to use when expanding the types of type
+-- parameter kinds, arguments to data constructors, etc., in order for the
+-- PartiallyAppliedSynonym error to take precedence over the KindsDoNotUnify
+-- error.
+--
+checkIsSaturatedType
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceType
+  -> m SourceType
+checkIsSaturatedType ty = checkKind' True ty E.kindType
+
+checkKind'
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => Bool
+  -> SourceType
+  -> SourceType
+  -> m SourceType
+checkKind' requireSynonymsToExpand ty kind2 = do
   withErrorMessageHint (ErrorCheckingKind ty kind2)
     . rethrowWithPosition (fst $ getAnnForType ty) $ do
         (ty', kind1) <- inferKind ty
         kind1' <- apply kind1
         kind2' <- apply kind2
+        when requireSynonymsToExpand $ void $ replaceAllTypeSynonyms ty'
         instantiateKind (ty', kind1') kind2'
 
 instantiateKind
@@ -486,6 +517,8 @@ elaborateKind
 elaborateKind = \case
   TypeLevelString ann _ ->
     pure $ E.kindSymbol $> ann
+  TypeLevelInt ann _ ->
+    pure $ E.tyInt $> ann
   TypeConstructor ann v -> do
     env <- getEnv
     case M.lookup v (E.types env) of
@@ -610,7 +643,7 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
   tyKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
+    tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< checkIsSaturatedType
     subsumesKind (foldr ((E.-:>) . snd) E.kindType tyArgs') tyKind'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
@@ -626,7 +659,7 @@ inferDataConstructor
   -> DataConstructorDeclaration
   -> m (DataConstructorDeclaration, SourceType)
 inferDataConstructor tyCtor DataConstructorDeclaration{..} = do
-  dataCtorFields' <- traverse (traverse (flip checkKind E.kindType)) dataCtorFields
+  dataCtorFields' <- traverse (traverse checkIsSaturatedType) dataCtorFields
   dataCtor <- flip (foldr ((E.-:>) . snd)) dataCtorFields' <$> checkKind tyCtor E.kindType
   pure ( DataConstructorDeclaration { dataCtorFields = dataCtorFields', .. }, dataCtor )
 
@@ -662,7 +695,7 @@ inferTypeSynonym moduleName (ann, tyName, tyArgs, tyBody) = do
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
     kindRes <- freshKind (fst ann)
-    tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
+    tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< checkIsSaturatedType
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) kindRes tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       tyBodyAndKind <- traverse apply =<< inferKind tyBody
@@ -778,7 +811,7 @@ inferClassDeclaration moduleName (ann, clsName, clsArgs, superClasses, decls) = 
   clsKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ coerceProperName clsName)
   let (sigBinders, clsKind') = fromJust . completeBinderList $ clsKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    clsArgs' <- for clsArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
+    clsArgs' <- for clsArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< checkIsSaturatedType
     unifyKinds clsKind' $ foldr ((E.-:>) . snd) E.kindConstraint clsArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> clsArgs') $ do
       (clsArgs',,)

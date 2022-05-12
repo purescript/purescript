@@ -6,15 +6,16 @@ module Symbols where
 import Prelude
 import Effect.Console (log)
 import Prim.Symbol (class Append)
-import Type.Data.Symbol (SProxy(..), reflectSymbol)
+import Type.Data.Symbol (reflectSymbol)
 import Type.Data.Symbol (append) as Symbol
 import Test.Assert (assert')
+import Type.Proxy (Proxy(..))
 
-highS :: SProxy "\xd834"
-highS = SProxy
+highS :: Proxy "\xd834"
+highS = Proxy
 
-lowS :: SProxy "\xdf06"
-lowS = SProxy
+lowS :: Proxy "\xdf06"
+lowS = Proxy
 
 loneSurrogates :: Boolean
 loneSurrogates = reflectSymbol (Symbol.append highS lowS) == "\x1d306"

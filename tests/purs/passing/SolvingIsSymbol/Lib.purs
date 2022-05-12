@@ -1,10 +1,11 @@
 module SolvingIsSymbol.Lib where
 
 import Data.Symbol
+import Type.Proxy (Proxy(..))
 
-literalSymbol :: SProxy "literal"
-literalSymbol = SProxy
+literalSymbol :: Proxy "literal"
+literalSymbol = Proxy
 
-libReflectSymbol :: forall s. IsSymbol s => SProxy s -> String
+libReflectSymbol :: forall s. IsSymbol s => Proxy s -> String
 libReflectSymbol = reflectSymbol
 
