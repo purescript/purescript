@@ -342,10 +342,13 @@ number :: Declaration
 number = primType "Number" $ T.unlines
   [ "A double precision floating point number (IEEE 754)."
   , ""
-  , "Construct values of this type with literals:"
+  , "Construct values of this type with literals."
+  , "Negative literals must be wrapped in parenthesis if the negation sign could be mistaken"
+  , "for an infix operator (e.g. `negate`):"
   , ""
-  , "    y = 35.23 :: Number"
-  , "    z = 1.224e6 :: Number"
+  , "    x = 35.23 :: Number"
+  , "    y = 1.224e6 :: Number"
+  , "    z = (-1.0) :: Number"
   ]
 
 int :: Declaration
