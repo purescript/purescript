@@ -230,7 +230,7 @@ jobs:
       - uses: "actions/download-artifact@v3"
       - uses: "ncipollo/release-action@v1.10.0"
         with:
-          tag: "${{ needs.build.outputs.version }}"
+          tag: "v${{ needs.build.outputs.version }}"
           artifacts: "*-bundle/*"
           prerelease: true
           body: "This is an automated preview release. Get the latest stable release [here](https://github.com/purescript/purescript/releases/latest)."
