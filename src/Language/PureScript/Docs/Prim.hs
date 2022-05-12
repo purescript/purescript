@@ -408,15 +408,15 @@ string = primType "String" $ T.unlines
 
 char :: Declaration
 char = primType "Char" $ T.unlines
-   [ "A single character (UTF-16 code unit). The JavaScript representation is a"
-   , "normal `String`, which is guaranteed to contain one code unit. This means"
-   , "that astral plane characters (i.e. those with code point values greater"
-   , "than `0xFFFF`) cannot be represented as `Char` values."
-   , ""
-   , "Construct values of this type with literals, using single quotes `'`:"
-   , ""
-   , "    x = 'a' :: Char"
-   ]
+  [ "A single character (UTF-16 code unit). The JavaScript representation is a"
+  , "normal `String`, which is guaranteed to contain one code unit. This means"
+  , "that astral plane characters (i.e. those with code point values greater"
+  , "than `0xFFFF`) cannot be represented as `Char` values."
+  , ""
+  , "Construct values of this type with literals, using single quotes `'`:"
+  , ""
+  , "    x = 'a' :: Char"
+  ]
 
 boolean :: Declaration
 boolean = primType "Boolean" $ T.unlines
