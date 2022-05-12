@@ -258,6 +258,10 @@ kindSymbol = primType "Symbol" $ T.unlines
   , ""
   , "Construct types of this kind using the same literal syntax as documented"
   , "for strings."
+  , ""
+  , "    type Hello :: Symbol {- String -}"
+  , "    type Hello = \"Hello, world\""
+  , ""
   ]
 
 kindRow :: Declaration
@@ -330,12 +334,35 @@ number = primType "Number" $ T.unlines
 
 int :: Declaration
 int = primType "Int" $ T.unlines
-  [ "A 32-bit signed integer. See the purescript-integers package for details"
+  [ "A 32-bit signed integer. See the `purescript-integers` package for details"
   , "of how this is accomplished when compiling to JavaScript."
   , ""
-  , "Construct values of this type with literals:"
+  , "Construct values of this type with literals. Hexadecimal syntax is supported."
+  , "Negative literals must be wrapped in parenthesis if the negation sign could be mistaken"
+  , "for an infix operator (e.g. `negate`):"
   , ""
   , "    x = 23 :: Int"
+  , "    y = 0x17 :: Int"
+  , "    z = (-23) :: Int"
+  , ""
+  , "Integers used as types are considered to have kind `Int`."
+  , "Unlike value-level `Int`s, which must be representable as a 32-bit signed integer,"
+  , "type-level `Int`s are unbounded. Hexadecimal support is also supported at the type-level."
+  , ""
+  , "    type One :: Int"
+  , "    type One = 1"
+  , "    "
+  , "    type Beyond32BigSignedInt :: Int"
+  , "    type Beyond32BigSignedInt = 2147483648"
+  , "    "
+  , "    type HexInt :: Int"
+  , "    type HexInt = 0x17"
+  , ""
+  , "Negative integer literals at the type level must be"
+  , "wrapped in parentheses if the negation sign could be mistaken for an infix operator."
+  , ""
+  , "    type NegativeOne = -1"
+  , "    foo :: Proxy (-1) -> ..."
   ]
 
 string :: Declaration
@@ -348,7 +375,16 @@ string = primType "String" $ T.unlines
   , ""
   , "    x = \"hello, world\" :: String"
   , ""
-  , "Multi-line string literals are also supported with triple quotes (`\"\"\"`)."
+  , "Multi-line string literals are also supported with triple quotes (`\"\"\"`):"
+  , ""
+  , "    x = \"\"\"multi"
+  , "       line\"\"\""
+  , ""
+  , "At the type-level, string literals are kinded with the `Symbol` type."
+  , "They will be kinded with the `String` type in a future release:"
+  , ""
+  , "    type Hello :: Symbol {- String -}"
+  , "    type Hello = \"Hello, world\""
   ]
 
 char :: Declaration
@@ -368,6 +404,8 @@ boolean = primType "Boolean" $ T.unlines
   [ "A JavaScript Boolean value."
   , ""
   , "Construct values of this type with the literals `true` and `false`."
+  , ""
+  , "The `True` and `False` types defined in `Prim.Boolean` are kinded with this type."
   ]
 
 partial :: Declaration
