@@ -267,11 +267,13 @@ kindSymbol = primType "Symbol" $ T.unlines
 kindRow :: Declaration
 kindRow = primType "Row" $ T.unlines
   [ "`Row` is the kind constructor of label-indexed types which map type-level strings to other types."
-  , "For example..."
+  , "The most common use of `Row` is `Row Type`, a row mapping labels to basic (of kind `Type`) types:"
   , ""
-  , "     type ExampleRow = ( label :: TypeName, name :: String )"
+  , "    type ExampleRow :: Row Type"
+  , "    type ExampleRow = ( name :: String, values :: Array Int )"
   , ""
-  , "`Row`s are often used in `Record`, whose kind signature is `Row Type -> Type`, mapping field names to values."
+  , "This is the kind of `Row` expected by the `Record` type constructor."
+  , "More advanced row kinds like `Row (Type -> Type)` are used much less frequently."
   ]
 
 function :: Declaration
