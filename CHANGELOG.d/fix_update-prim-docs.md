@@ -1,0 +1,1 @@
+* Update `Prim` docs for Boolean, Int, String/Symbol, Number, Record, and Row
