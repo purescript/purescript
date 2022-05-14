@@ -300,77 +300,68 @@ pattern EQ = Qualified (Just DataOrdering) (ProperName "EQ")
 pattern GT :: Qualified (ProperName 'ConstructorName)
 pattern GT = Qualified (Just DataOrdering) (ProperName "GT")
 
-dataArray :: forall a. (IsString a) => a
-dataArray = "Data_Array"
+pattern DataArray :: ModuleName
+pattern DataArray = ModuleName "Data.Array"
 
-eff :: forall a. (IsString a) => a
-eff = "Control_Monad_Eff"
+pattern Eff :: ModuleName
+pattern Eff = ModuleName "Control.Monad.Eff"
 
-effect :: forall a. (IsString a) => a
-effect = "Effect"
+pattern Effect :: ModuleName
+pattern Effect = ModuleName "Effect"
 
-st :: forall a. (IsString a) => a
-st = "Control_Monad_ST_Internal"
+pattern ST :: ModuleName
+pattern ST = ModuleName "Control.Monad.ST.Internal"
 
-controlApplicative :: forall a. (IsString a) => a
-controlApplicative = "Control_Applicative"
+pattern ControlApplicative :: ModuleName
+pattern ControlApplicative = ModuleName "Control.Applicative"
 
-controlSemigroupoid :: forall a. (IsString a) => a
-controlSemigroupoid = "Control_Semigroupoid"
+pattern ControlSemigroupoid :: ModuleName
+pattern ControlSemigroupoid = ModuleName "Control.Semigroupoid"
 
 pattern ControlBind :: ModuleName
 pattern ControlBind = ModuleName "Control.Bind"
 
-controlBind :: forall a. (IsString a) => a
-controlBind = "Control_Bind"
+pattern ControlMonadEffUncurried :: ModuleName
+pattern ControlMonadEffUncurried = ModuleName "Control.Monad.Eff.Uncurried"
 
-controlMonadEffUncurried :: forall a. (IsString a) => a
-controlMonadEffUncurried = "Control_Monad_Eff_Uncurried"
+pattern EffectUncurried :: ModuleName
+pattern EffectUncurried = ModuleName "Effect.Uncurried"
 
-effectUncurried :: forall a. (IsString a) => a
-effectUncurried = "Effect_Uncurried"
+pattern DataBounded :: ModuleName
+pattern DataBounded = ModuleName "Data.Bounded"
 
-dataBounded :: forall a. (IsString a) => a
-dataBounded = "Data_Bounded"
+pattern DataSemigroup :: ModuleName
+pattern DataSemigroup = ModuleName "Data.Semigroup"
 
-dataSemigroup :: forall a. (IsString a) => a
-dataSemigroup = "Data_Semigroup"
+pattern DataHeytingAlgebra :: ModuleName
+pattern DataHeytingAlgebra = ModuleName "Data.HeytingAlgebra"
 
-dataHeytingAlgebra :: forall a. (IsString a) => a
-dataHeytingAlgebra = "Data_HeytingAlgebra"
+pattern DataEq :: ModuleName
+pattern DataEq = ModuleName "Data.Eq"
 
-dataEq :: forall a. (IsString a) => a
-dataEq = "Data_Eq"
+pattern DataOrd :: ModuleName
+pattern DataOrd = ModuleName "Data.Ord"
 
-dataOrd :: forall a. (IsString a) => a
-dataOrd = "Data_Ord"
+pattern DataSemiring :: ModuleName
+pattern DataSemiring = ModuleName "Data.Semiring"
 
-dataSemiring :: forall a. (IsString a) => a
-dataSemiring = "Data_Semiring"
+pattern DataRing :: ModuleName
+pattern DataRing = ModuleName "Data.Ring"
 
-dataRing :: forall a. (IsString a) => a
-dataRing = "Data_Ring"
+pattern DataEuclideanRing :: ModuleName
+pattern DataEuclideanRing = ModuleName "Data.EuclideanRing"
 
-dataEuclideanRing :: forall a. (IsString a) => a
-dataEuclideanRing = "Data_EuclideanRing"
+pattern DataFunction :: ModuleName
+pattern DataFunction = ModuleName "Data.Function"
 
-dataFunction :: forall a. (IsString a) => a
-dataFunction = "Data_Function"
-
-dataFunctionUncurried :: forall a. (IsString a) => a
-dataFunctionUncurried = "Data_Function_Uncurried"
-
-dataIntBits :: forall a. (IsString a) => a
-dataIntBits = "Data_Int_Bits"
-
-partialUnsafe :: forall a. (IsString a) => a
-partialUnsafe = "Partial_Unsafe"
+pattern DataIntBits :: ModuleName
+pattern DataIntBits = ModuleName "Data.Int.Bits"
 
 unsafePartial :: forall a. (IsString a) => a
 unsafePartial = "unsafePartial"
 
-unsafeCoerce :: forall a. (IsString a) => a
-unsafeCoerce = "Unsafe_Coerce"
+pattern UnsafeCoerce :: ModuleName
+pattern UnsafeCoerce = ModuleName "Unsafe.Coerce"
 
 unsafeCoerceFn :: forall a. (IsString a) => a
 unsafeCoerceFn = "unsafeCoerce"

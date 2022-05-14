@@ -6,10 +6,10 @@ import Prelude.Compat
 import Protolude (ordNub)
 
 import Data.Maybe (fromJust, isJust)
-import Data.Text (Text)
 
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common
+import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.Constants.Prelude as C
 
@@ -28,15 +28,15 @@ import qualified Language.PureScript.Constants.Prelude as C
 --    ...
 --  }
 magicDoEff :: AST -> AST
-magicDoEff = magicDo C.eff C.effDictionaries
+magicDoEff = magicDo C.Eff C.effDictionaries
 
 magicDoEffect :: AST -> AST
-magicDoEffect = magicDo C.effect C.effectDictionaries
+magicDoEffect = magicDo C.Effect C.effectDictionaries
 
 magicDoST :: AST -> AST
-magicDoST = magicDo C.st C.stDictionaries
+magicDoST = magicDo C.ST C.stDictionaries
 
-magicDo :: Text -> C.EffectDictionaries -> AST -> AST
+magicDo :: ModuleName -> C.EffectDictionaries -> AST -> AST
 magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   where
   -- The name of the function block which is added to denote a do block
@@ -72,7 +72,7 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   isBind _ = False
   -- Check if an expression represents a call to @discard@
   isDiscard (App _ (App _ fn [dict1]) [dict2])
-    | isDict (C.controlBind, C.discardUnitDictionary) dict1 &&
+    | isDict (C.ControlBind, C.discardUnitDictionary) dict1 &&
       isDict (effectModule, edBindDict) dict2 &&
       isDiscardPoly fn = True
   isDiscard _ = False
@@ -80,13 +80,13 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   isPure (App _ fn [dict]) | isDict (effectModule, edApplicativeDict) dict && isPurePoly fn = True
   isPure _ = False
   -- Check if an expression represents the polymorphic >>= function
-  isBindPoly = isDict (C.controlBind, C.bind)
+  isBindPoly = isDict (C.ControlBind, C.bind)
   -- Check if an expression represents the polymorphic pure function
-  isPurePoly = isDict (C.controlApplicative, C.pure')
+  isPurePoly = isDict (C.ControlApplicative, C.pure')
   -- Check if an expression represents the polymorphic discard function
-  isDiscardPoly = isDict (C.controlBind, C.discard)
+  isDiscardPoly = isDict (C.ControlBind, C.discard)
   -- Check if an expression represents a function in the Effect module
-  isEffFunc name (Indexer _ (StringLiteral _ name') (Var _ eff)) = eff == effectModule && name == name'
+  isEffFunc name (ModuleAccessor _ eff name') = eff == effectModule && name == name'
   isEffFunc _ _ = False
 
   applyReturns :: AST -> AST
@@ -125,7 +125,7 @@ inlineST = everywhere convertBlock
     if agg then Assignment s1 ref (App s1 func [ref]) else Assignment s1 (Indexer s1 (StringLiteral s1 C.stRefValue) ref) (App s1 func [Indexer s1 (StringLiteral s1 C.stRefValue) ref])
   convert _ other = other
   -- Check if an expression represents a function in the ST module
-  isSTFunc name (Indexer _ (StringLiteral _ name') (Var _ st)) = st == C.st && name == name'
+  isSTFunc name (ModuleAccessor _ C.ST name') = name == name'
   isSTFunc _ _ = False
   -- Find all ST Refs initialized in this block
   findSTRefsIn = everything (++) isSTRef

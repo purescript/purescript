@@ -9,6 +9,7 @@ import Data.Text (Text)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments
+import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Traversals
 
@@ -75,6 +76,8 @@ data AST
   -- ^ Function application
   | Var (Maybe SourceSpan) Text
   -- ^ Variable
+  | ModuleAccessor (Maybe SourceSpan) ModuleName PSString
+  -- ^ Value from another module
   | Block (Maybe SourceSpan) [AST]
   -- ^ A block of expressions in braces
   | VariableIntroduction (Maybe SourceSpan) Text (Maybe AST)
@@ -118,6 +121,7 @@ withSourceSpan withSpan = go where
   go (Function _ name args j) = Function ss name args j
   go (App _ j js) = App ss j js
   go (Var _ s) = Var ss s
+  go (ModuleAccessor _ s1 s2) = ModuleAccessor ss s1 s2
   go (Block _ js) = Block ss js
   go (VariableIntroduction _ name j) = VariableIntroduction ss name j
   go (Assignment _ j1 j2) = Assignment ss j1 j2
@@ -145,6 +149,7 @@ getSourceSpan = go where
   go (Function ss _ _ _) = ss
   go (App ss _ _) = ss
   go (Var ss _) = ss
+  go (ModuleAccessor ss _ _) = ss
   go (Block ss _) = ss
   go (VariableIntroduction ss _ _) = ss
   go (Assignment ss _ _) = ss

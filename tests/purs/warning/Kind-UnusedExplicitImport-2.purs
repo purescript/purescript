@@ -3,9 +3,10 @@ module Main where
 
 import Prelude (Unit, unit, pure)
 import Effect (Effect)
-import Type.RowList (RLProxy, RowList)
+import Type.RowList (class ListToRow, RowList)
+import Type.Proxy (Proxy)
 
-f :: forall l. RLProxy l -> Int
+f :: forall l r. ListToRow l r => Proxy l -> Int
 f _ = 0
 
 main :: Effect Unit

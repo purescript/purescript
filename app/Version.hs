@@ -17,7 +17,7 @@ import qualified Development.GitRev as GitRev
 -- prerelease identifier here (if any). When releasing a proper version, simply
 -- set this to an empty string.
 prerelease :: String
-prerelease = "-alpha-05"
+prerelease = ""
 
 versionString :: String
 versionString = showVersion Paths.version ++ prerelease ++ extra
