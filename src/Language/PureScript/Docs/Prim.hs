@@ -259,7 +259,7 @@ kindSymbol = primType "Symbol" $ T.unlines
   , "Construct types of this kind using the same literal syntax as documented"
   , "for strings."
   , ""
-  , "    type Hello :: Symbol {- String -}"
+  , "    type Hello :: Symbol"
   , "    type Hello = \"Hello, world\""
   , ""
   ]
@@ -392,7 +392,7 @@ string = primType "String" $ T.unlines
   , "At the type level, string literals represent types with kind `Symbol`."
   , "These types will have kind `String` in a future release:"
   , ""
-  , "    type Hello :: Symbol {- String -}"
+  , "    type Hello :: Symbol"
   , "    type Hello = \"Hello, world\""
   ]
 
