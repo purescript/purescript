@@ -196,6 +196,7 @@ library
     Language.PureScript.AST.Operators
     Language.PureScript.AST.SourcePos
     Language.PureScript.AST.Traversals
+    Language.PureScript.AST.Utils
     Language.PureScript.Bundle
     Language.PureScript.CodeGen
     Language.PureScript.CodeGen.JS
@@ -340,6 +341,7 @@ library
     Language.PureScript.Sugar.TypeDeclarations
     Language.PureScript.Traversals
     Language.PureScript.TypeChecker
+    Language.PureScript.TypeChecker.Deriving
     Language.PureScript.TypeChecker.Entailment
     Language.PureScript.TypeChecker.Entailment.Coercible
     Language.PureScript.TypeChecker.Entailment.IntCompare

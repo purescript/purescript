@@ -51,6 +51,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Traversals
+import Language.PureScript.TypeChecker.Deriving
 import Language.PureScript.TypeChecker.Entailment
 import Language.PureScript.TypeChecker.Kinds
 import Language.PureScript.TypeChecker.Monad
@@ -656,7 +657,7 @@ check
   => Expr
   -> SourceType
   -> m TypedValue'
-check val ty = withErrorMessageHint (ErrorCheckingType val ty) $ check' val ty
+check val ty = withErrorMessageHint' val (ErrorCheckingType val ty) $ check' val ty
 
 -- |
 -- Check the type of a value
@@ -770,6 +771,10 @@ check' e@(Literal ss (ObjectLiteral ps)) t@(TypeApp _ obj row) | obj == tyRecord
   ensureNoDuplicateProperties ps
   ps' <- checkProperties e ps row False
   return $ TypedValue' True (Literal ss (ObjectLiteral ps')) t
+check' (DerivedInstancePlaceholder name strategy) t = do
+  d <- deriveInstance t name strategy
+  d' <- tvToExpr <$> check' d t
+  return $ TypedValue' True d' t
 check' e@(ObjectUpdate obj ps) t@(TypeApp _ o row) | o == tyRecord = do
   ensureNoDuplicateProperties ps
   -- We need to be careful to avoid duplicate labels here.
@@ -923,6 +928,7 @@ isInternal = \case
   PositionedValue _ _ v -> isInternal v
   TypedValue _ v _ -> isInternal v
   Constructor _ (Qualified _ name) -> isDictTypeName name
+  DerivedInstancePlaceholder{} -> True
   _ -> False
 
 -- | Introduce a hint only if the given expression is not internal
