@@ -27,7 +27,7 @@ The following spaces are governed by the [PureScript Community Code of Conduct](
 
 ### Unaffiliated Spaces
 
-Some PureScript users also collaborate on the below spaces. These do not fall under the code of conduct linked above. They may have no code of conduct or one very different than the one linked above.
+Some PureScript users also collaborate in the below spaces. These do not fall under the code of conduct linked above. They may have no code of conduct or one very different than the one linked above.
 - [PureScript Matrix](https://matrix.to/#/#purescript:matrix.org)
 - [PureScript on StackOverflow](http://stackoverflow.com/questions/tagged/purescript)
 - [The `#purescript` channel on Libera.Chat](https://libera.chat/)
