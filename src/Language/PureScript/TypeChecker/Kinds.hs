@@ -889,7 +889,7 @@ checkInstanceDeclaration moduleName (ann, constraints, clsName, args) = do
     ty' <- checkKind ty E.kindConstraint
     constraints' <- for constraints checkConstraint
     allTy <- apply $ foldr srcConstrainedType ty' constraints'
-    allUnknowns <- unknownsWithKinds . IS.toList $ unknowns allTy
+    allUnknowns <- unknownsWithKinds . IS.toList . foldMap unknowns . (allTy :) =<< traverse (apply . snd) freeVarsDict
     let unknownVars = unknownVarNames (usedTypeVariables allTy) allUnknowns
     let allWithVars = replaceUnknownsWithVars unknownVars allTy
     let (allConstraints, (_, allKinds, allArgs)) = unapplyTypes <$> unapplyConstraints allWithVars
