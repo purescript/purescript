@@ -38,7 +38,7 @@ jobs:
         include:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
             os: "ubuntu-latest"
-            image: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
+            image: "haskell:9.2.2-buster@sha256:c2f489a95be8dd0b253da6980420a6e9c02e81c2d14838ca774f86f5b5db91f4"
           - os: "macOS-10.15"
           - os: "windows-2019"
 
