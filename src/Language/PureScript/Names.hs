@@ -260,10 +260,6 @@ isQualifiedWith :: ModuleName -> Qualified a -> Bool
 isQualifiedWith mn (Qualified (Just mn') _) = mn == mn'
 isQualifiedWith _ _ = False
 
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Qualified)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''InternalIdentData)
-
 instance ToJSON ModuleName where
   toJSON (ModuleName name) = toJSON (T.splitOn "." name)
 
@@ -277,3 +273,7 @@ instance ToJSONKey ModuleName where
 
 instance FromJSONKey ModuleName where
   fromJSONKey = fmap moduleNameFromString fromJSONKey
+
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''InternalIdentData)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Qualified)

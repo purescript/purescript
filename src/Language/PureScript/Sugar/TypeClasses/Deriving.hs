@@ -572,8 +572,7 @@ deriveNewtype ss syns kinds ds tyConNm tyConArgs unwrappedTy = do
     go (DataDeclaration (ss', _) Data name _ _) =
       throwError . errorMessage' ss' $ CannotDeriveNewtypeForData name
     go (DataDeclaration _ Newtype name args dctors) = do
-      checkNewtype name dctors
-      let (DataConstructorDeclaration _ _ [(_, ty)]) = head dctors
+      (_, (_, ty)) <- checkNewtype name dctors
       ty' <- replaceAllTypeSynonymsM syns kinds ty
       let subst = zipWith ((,) . fst) args tyConArgs
       return $ replaceAllTypeVars subst ty'

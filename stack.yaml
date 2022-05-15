@@ -1,6 +1,6 @@
 # Please update Haskell image versions under .github/workflows/ci.yml together to use the same GHC version
 # (or the CI build will fail)
-resolver: lts-18.15
+resolver: nightly-2022-05-14
 pvp-bounds: both
 packages:
 - '.'
@@ -13,17 +13,18 @@ extra-deps:
 # `async` to be used as an object key:
 # https://github.com/erikd/language-javascript/issues/131
 - language-javascript-0.7.0.0
-# The ./.hspec file uses the --times flag, which was added in hspec-2.8.0.
-# LTS-18 has only hspec-2.7.
-- hspec-2.8.3
-- hspec-core-2.8.3
-- hspec-discover-2.8.3
 # Fix issue with libtinfo.
 # See https://github.com/purescript/purescript/issues/4253
 - process-1.6.13.1
-- Cabal-3.2.1.0
-# Not included in Stackage until the lts-19 series
+# The Cabal library is not in Stackage
+- Cabal-3.6.3.0
+# monoidal-containers is not in Stackage
 - monoidal-containers-0.6.2.0
+# bower-json is not in Stackage any more
+- bower-json-1.1.0.0
+# protolude-0.3.1 is not yet on Hackage
+- github: sdiehl/protolude
+  commit: 3e249724fd0ead27370c8c297b1ecd38f92cbd5b
 nix:
   packages:
   - zlib

@@ -10,6 +10,7 @@ import Prelude (String, unlines, lookup)
 import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
+import qualified Data.Aeson.Key as A.Key
 import Data.Aeson.BetterErrors
   (Parse, keyOrDefault, throwCustomError, key, asText,
    keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser',
@@ -776,10 +777,10 @@ instance A.ToJSON a => A.ToJSON (Package a) where
       , "version"              .= showVersion pkgVersion
       , "versionTag"           .= pkgVersionTag
       , "modules"              .= pkgModules
-      , "moduleMap"            .= assocListToJSON P.runModuleName
+      , "moduleMap"            .= assocListToJSON (A.Key.fromText . P.runModuleName)
                                                   runPackageName
                                                   (Map.toList pkgModuleMap)
-      , "resolvedDependencies" .= assocListToJSON runPackageName
+      , "resolvedDependencies" .= assocListToJSON (A.Key.fromText . runPackageName)
                                                   (T.pack . showVersion)
                                                   pkgResolvedDependencies
       , "github"               .= pkgGithub
@@ -865,7 +866,7 @@ instance A.ToJSON GithubRepo where
 --
 -- For example:
 -- @assocListToJSON T.pack T.pack [("a", "b")]@ will give @{"a": "b"}@.
-assocListToJSON :: (a -> Text) -> (b -> Text) -> [(a, b)] -> A.Value
+assocListToJSON :: (a -> A.Key) -> (b -> Text) -> [(a, b)] -> A.Value
 assocListToJSON f g xs = A.object (map (uncurry (.=) . (f *** g)) xs)
 
 instance A.ToJSON a => A.ToJSON (InPackage a) where

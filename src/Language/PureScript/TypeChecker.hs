@@ -283,7 +283,7 @@ typeCheckAll moduleName = traverse go
   go :: Declaration -> m Declaration
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
-      when (dtype == Newtype) $ checkNewtype name dctors
+      when (dtype == Newtype) $ void $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
       (dataCtors, ctorKind) <- kindOfData moduleName (sa, name, args, dctors)
       let args' = args `withKinds` ctorKind
@@ -313,7 +313,7 @@ typeCheckAll moduleName = traverse go
         forM dataDeclsWithKinds $ \(_, name, args, dataCtors, _) ->
           (name, args,) <$> traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
       for_ dataDeclsWithKinds $ \(dtype, name, args', dataCtors, ctorKind) -> do
-        when (dtype == Newtype) $ checkNewtype name (map fst dataCtors)
+        when (dtype == Newtype) $ void $ checkNewtype name (map fst dataCtors)
         checkDuplicateTypeArguments $ map fst args'
         let args'' = args' `withRoles` inferRoles' name args'
         addDataType moduleName dtype name args'' dataCtors ctorKind
@@ -584,13 +584,17 @@ typeCheckAll moduleName = traverse go
       , ..
       }
 
+-- | Check that a newtype has just one data constructor with just one field, or
+-- throw an error. If the newtype is valid, this function returns the single
+-- data constructor declaration and the single field, as a 'proof' that the
+-- newtype was indeed a valid newtype.
 checkNewtype
   :: forall m
    . MonadError MultipleErrors m
   => ProperName 'TypeName
   -> [DataConstructorDeclaration]
-  -> m ()
-checkNewtype _ [DataConstructorDeclaration _ _ [_]] = return ()
+  -> m (DataConstructorDeclaration, (Ident, SourceType))
+checkNewtype _ [decl@(DataConstructorDeclaration _ _ [field])] = return (decl, field)
 checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 
 -- |
