@@ -264,16 +264,15 @@ entails SolverOptions{..} constraint context hints =
                            sortOn (tcdChain &&& tcdIndex)
                            dicts
                   -- process instances in a chain in index order
-                  let found = for (tails1 chain) $ \case
-                                tcd :| tl ->
-                                  -- Make sure the type unifies with the type in the type instance definition
-                                  case matches typeClassDependencies tcd tys'' of
-                                    Apart        -> Right ()                   -- keep searching
-                                    Match substs -> Left (Right (substs, tcd)) -- found a match
-                                    Unknown ->
-                                      if null (tcdChain tcd) || null tl
-                                      then Right ()                                   -- need proof of apartness but this is either not in a chain or at the end
-                                      else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
+                  let found = for (tails1 chain) $ \(tcd :| tl) ->
+                                -- Make sure the type unifies with the type in the type instance definition
+                                case matches typeClassDependencies tcd tys'' of
+                                  Apart        -> Right ()                   -- keep searching
+                                  Match substs -> Left (Right (substs, tcd)) -- found a match
+                                  Unknown ->
+                                    if null (tcdChain tcd) || null tl
+                                    then Right ()                                   -- need proof of apartness but this is either not in a chain or at the end
+                                    else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
 
                   lefts [found]
             solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
