@@ -8,6 +8,7 @@ module Language.PureScript.Ide.Types where
 import           Protolude hiding (moduleName)
 
 import           Control.Concurrent.STM (TVar)
+import           Control.Lens hiding (op, (.=))
 import           Control.Monad.Fail (fail)
 import           Data.Aeson (ToJSON, FromJSON, (.=))
 import qualified Data.Aeson as Aeson
@@ -17,7 +18,6 @@ import qualified Data.Map.Lazy as M
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Errors.JSON as P
 import           Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
-import           Lens.Micro.Platform hiding ((.=))
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a

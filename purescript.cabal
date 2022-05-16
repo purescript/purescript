@@ -149,8 +149,6 @@ common defaults
     lifted-async >=0.10.2.2 && <0.11,
     lifted-base >=0.2.3.12 && <0.3,
     memory >=0.15.0 && <0.16,
-    microlens >=0.4.12.0 && <0.5,
-    microlens-platform >=0.4.2 && <0.5,
     monad-control >=1.0.3.1 && <1.1,
     monad-logger >=0.3.36 && <0.4,
     monoidal-containers >=0.6.2.0 && <0.7,

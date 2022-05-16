@@ -10,6 +10,7 @@ module Language.PureScript.TypeChecker
 import Prelude.Compat
 import Protolude (headMay, maybeToLeft, ordNub)
 
+import Control.Lens ((^..), _2)
 import Control.Monad (when, unless, void, forM, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
@@ -46,8 +47,6 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Unify (varIfUnknown)
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
-
-import Lens.Micro.Platform ((^..), _2)
 
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)

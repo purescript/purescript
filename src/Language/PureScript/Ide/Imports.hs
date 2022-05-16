@@ -32,6 +32,7 @@ module Language.PureScript.Ide.Imports
 
 import           Protolude hiding (moduleName)
 
+import           Control.Lens                       ((^.), (%~), ix, has)
 import           Data.List                          (findIndex, nubBy, partition)
 import qualified Data.List.NonEmpty                 as NE
 import qualified Data.Map                           as Map
@@ -46,7 +47,6 @@ import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Prim
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           Lens.Micro.Platform                ((^.), (%~), ix, has)
 import           System.IO.UTF8                     (writeUTF8FileT)
 
 data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)

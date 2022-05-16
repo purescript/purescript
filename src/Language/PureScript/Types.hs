@@ -10,6 +10,7 @@ import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
 import Control.Arrow (first, second)
 import Control.DeepSeq (NFData)
+import Control.Lens (Lens', (^.), set)
 import Control.Monad ((<=<), (>=>))
 import Data.Aeson ((.:), (.:?), (.!=), (.=))
 import qualified Data.Aeson as A
@@ -27,8 +28,6 @@ import qualified Language.PureScript.Constants.Prim as C
 import Language.PureScript.Names
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)
-
-import Lens.Micro (Lens', (^.), set)
 
 type SourceType = Type SourceAnn
 type SourceConstraint = Constraint SourceAnn
