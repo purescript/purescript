@@ -400,6 +400,8 @@ test-suite tests
   type: exitcode-stdio-1.0
   hs-source-dirs: tests
   main-is: Main.hs
+  -- Not a problem for this warning to arise in tests
+  ghc-options: -Wno-incomplete-uni-patterns
   build-depends:
       purescript
     , hspec
