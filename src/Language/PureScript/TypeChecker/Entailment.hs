@@ -264,19 +264,16 @@ entails SolverOptions{..} constraint context hints =
                            sortOn (tcdChain &&& tcdIndex)
                            dicts
                   -- process instances in a chain in index order
-                  let found = for (init $ tails chain) $ \tail' ->
-                                case tail' of
-                                  (tcd:tl) ->
-                                    -- Make sure the type unifies with the type in the type instance definition
-                                    case matches typeClassDependencies tcd tys'' of
-                                      Apart        -> Right ()                   -- keep searching
-                                      Match substs -> Left (Right (substs, tcd)) -- found a match
-                                      Unknown ->
-                                        if null (tcdChain tcd) || null tl
-                                        then Right ()                                   -- need proof of apartness but this is either not in a chain or at the end
-                                        else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
-                                  [] ->
-                                    internalError "solve: tail' is empty"
+                  let found = for (tails1 chain) $ \case
+                                tcd :| tl ->
+                                  -- Make sure the type unifies with the type in the type instance definition
+                                  case matches typeClassDependencies tcd tys'' of
+                                    Apart        -> Right ()                   -- keep searching
+                                    Match substs -> Left (Right (substs, tcd)) -- found a match
+                                    Unknown ->
+                                      if null (tcdChain tcd) || null tl
+                                      then Right ()                                   -- need proof of apartness but this is either not in a chain or at the end
+                                      else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
 
                   lefts [found]
             solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
@@ -870,7 +867,7 @@ pairwiseM _ [] = pure ()
 pairwiseM _ [_] = pure ()
 pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs
 
--- | Return all nonempty suffixes of a nonempty list. For example:
+-- | Return all nonempty tails of a nonempty list. For example:
 --
 -- tails1 (fromList [1]) == fromList [fromList [1]]
 -- tails1 (fromList [1,2]) == fromList [fromList [1,2], fromList [2]]
@@ -878,14 +875,10 @@ pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs
 tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
 tails1 =
   -- NEL.fromList is an unsafe function, but this usage should be safe, since:
-  --
-  --     * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
-  --
-  --     * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
-  --       list, since `head (tails xs) = xs`.
-  --
-  --     * The only empty element of `tails xs` is the last one (by the definition of `tails`)
-  --
-  --     * Therefore, if we take all but the last element of `tails xs` i.e.
-  --       `init (tails xs)`, we have a nonempty list of nonempty lists
+  -- * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
+  -- * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
+  --   list, since `head (tails xs) = xs`.
+  -- * The only empty element of `tails xs` is the last one (by the definition of `tails`)
+  -- * Therefore, if we take all but the last element of `tails xs` i.e.
+  --   `init (tails xs)`, we have a nonempty list of nonempty lists
   NEL.fromList . map NEL.fromList . init . tails . NEL.toList
