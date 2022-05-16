@@ -1,7 +1,7 @@
 -- | Various constants which refer to things in the Prelude
 module Language.PureScript.Constants.Prelude where
 
-import Prelude.Compat
+import Prelude.Compat hiding (compare, map)
 
 import Data.String (IsString)
 import Language.PureScript.PSString (PSString)
@@ -339,8 +339,41 @@ pattern DataHeytingAlgebra = ModuleName "Data.HeytingAlgebra"
 pattern DataEq :: ModuleName
 pattern DataEq = ModuleName "Data.Eq"
 
+pattern Eq :: Qualified (ProperName 'ClassName)
+pattern Eq = Qualified (Just DataEq) (ProperName "Eq")
+
+pattern Eq1 :: Qualified (ProperName 'ClassName)
+pattern Eq1 = Qualified (Just DataEq) (ProperName "Eq1")
+
+identEq :: Qualified Ident
+identEq = Qualified (Just DataEq) (Ident eq)
+
+identEq1 :: Qualified Ident
+identEq1 = Qualified (Just DataEq) (Ident eq1)
+
 pattern DataOrd :: ModuleName
 pattern DataOrd = ModuleName "Data.Ord"
+
+pattern Ord :: Qualified (ProperName 'ClassName)
+pattern Ord = Qualified (Just DataOrd) (ProperName "Ord")
+
+pattern Ord1 :: Qualified (ProperName 'ClassName)
+pattern Ord1 = Qualified (Just DataOrd) (ProperName "Ord1")
+
+identCompare :: Qualified Ident
+identCompare = Qualified (Just DataOrd) (Ident compare)
+
+identCompare1 :: Qualified Ident
+identCompare1 = Qualified (Just DataOrd) (Ident compare1)
+
+pattern DataFunctor :: ModuleName
+pattern DataFunctor = ModuleName "Data.Functor"
+
+pattern Functor :: Qualified (ProperName 'ClassName)
+pattern Functor = Qualified (Just DataFunctor) (ProperName "Functor")
+
+identMap :: Qualified Ident
+identMap = Qualified (Just DataFunctor) (Ident map)
 
 pattern DataSemiring :: ModuleName
 pattern DataSemiring = ModuleName "Data.Semiring"

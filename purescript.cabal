@@ -145,6 +145,7 @@ common defaults
     Glob >=0.10.2 && <0.11,
     haskeline >=0.8.2 && <0.9,
     language-javascript ==0.7.0.0,
+    lens >=4.19.2 && <4.20,
     lifted-async >=0.10.2.2 && <0.11,
     lifted-base >=0.2.3.12 && <0.3,
     memory >=0.17.0 && <0.18,
@@ -196,6 +197,7 @@ library
     Language.PureScript.AST.Operators
     Language.PureScript.AST.SourcePos
     Language.PureScript.AST.Traversals
+    Language.PureScript.AST.Utils
     Language.PureScript.Bundle
     Language.PureScript.CodeGen
     Language.PureScript.CodeGen.JS
@@ -340,6 +342,7 @@ library
     Language.PureScript.Sugar.TypeDeclarations
     Language.PureScript.Traversals
     Language.PureScript.TypeChecker
+    Language.PureScript.TypeChecker.Deriving
     Language.PureScript.TypeChecker.Entailment
     Language.PureScript.TypeChecker.Entailment.Coercible
     Language.PureScript.TypeChecker.Entailment.IntCompare
@@ -404,8 +407,10 @@ test-suite tests
   ghc-options: -Wno-incomplete-uni-patterns
   build-depends:
       purescript
+    , generic-random
     , hspec
     , HUnit
+    , newtype
     , QuickCheck
     , regex-base
   build-tool-depends:
@@ -424,6 +429,7 @@ test-suite tests
     Language.PureScript.Ide.Test
     Language.PureScript.Ide.UsageSpec
     PscIdeSpec
+    TestAst
     TestCompiler
     TestCoreFn
     TestCst

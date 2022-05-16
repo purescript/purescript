@@ -429,7 +429,7 @@ unwrapErrorMessage :: ErrorMessage -> SimpleErrorMessage
 unwrapErrorMessage (ErrorMessage _ se) = se
 
 replaceUnknowns :: SourceType -> State TypeMap SourceType
-replaceUnknowns = everywhereOnTypesM replaceTypes where
+replaceUnknowns = everywhereOnTypesTopDownM replaceTypes where
   replaceTypes :: SourceType -> State TypeMap SourceType
   replaceTypes (TUnknown ann u) = do
     m <- get
@@ -439,14 +439,17 @@ replaceUnknowns = everywhereOnTypesM replaceTypes where
         put $ m { umUnknownMap = M.insert u u' (umUnknownMap m), umNextIndex = u' + 1 }
         return (TUnknown ann u')
       Just u' -> return (TUnknown ann u')
-  replaceTypes (Skolem ann name mbK s sko) = do
+  -- We intentionally remove the kinds from skolems, because they are never
+  -- presented when pretty-printing. Any unknowns in those kinds shouldn't
+  -- appear in the list of unknowns unless used somewhere else.
+  replaceTypes (Skolem ann name _ s sko) = do
     m <- get
     case M.lookup s (umSkolemMap m) of
       Nothing -> do
         let s' = umNextIndex m
         put $ m { umSkolemMap = M.insert s (T.unpack name, s', Just (fst ann)) (umSkolemMap m), umNextIndex = s' + 1 }
-        return (Skolem ann name mbK s' sko)
-      Just (_, s', _) -> return (Skolem ann name mbK s' sko)
+        return (Skolem ann name Nothing s' sko)
+      Just (_, s', _) -> return (Skolem ann name Nothing s' sko)
   replaceTypes other = return other
 
 onTypesInErrorMessage :: (SourceType -> SourceType) -> ErrorMessage -> ErrorMessage
