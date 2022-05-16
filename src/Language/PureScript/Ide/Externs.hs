@@ -8,6 +8,7 @@ module Language.PureScript.Ide.Externs
 import           Protolude hiding (to, from, (&))
 
 import           Codec.CBOR.Term as Term
+import           Control.Lens hiding (anyOf)
 import           "monad-logger" Control.Monad.Logger
 import           Data.Version (showVersion)
 import qualified Data.Text as Text
@@ -16,7 +17,6 @@ import qualified Language.PureScript.Make.Monad as Make
 import           Language.PureScript.Ide.Error (IdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util (properNameT)
-import           Lens.Micro.Platform
 
 readExternFile
   :: (MonadIO m, MonadError IdeError m, MonadLogger m)

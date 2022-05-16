@@ -28,6 +28,7 @@ module Language.PureScript.TypeChecker.Kinds
 import Prelude.Compat
 
 import Control.Arrow ((***))
+import Control.Lens ((^.), _1, _2, _3)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
@@ -55,7 +56,6 @@ import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, newSkolemScop
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.Types
 import Language.PureScript.Pretty.Types
-import Lens.Micro.Platform ((^.), _1, _2, _3)
 
 generalizeUnknowns :: [(Unknown, SourceType)] -> SourceType -> SourceType
 generalizeUnknowns unks ty =
