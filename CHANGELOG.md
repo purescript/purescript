@@ -2,6 +2,97 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.1
+
+New features:
+
+* Check for partially applied synonyms in kinds, ctors (#4169 by @rhendric)
+
+  This check doesn't prevent any programs from compiling; it just makes
+  sure that a more specific `PartiallyAppliedSynonym` error is raised
+  instead of a `KindsDoNotUnify` error, which could be interpreted as
+  implying that a partially applied synonym has a valid kind and would be
+  supported elsewhere if that kind is expected.
+
+* Support deriving instances for type synonyms (#4315 by @rhendric)
+
+Bugfixes:
+
+* Do not emit warnings about type wildcards used in binders (patterns). (#4309 by @fsoikin)
+
+  Type wildcards in the following examples no longer trigger a warning:
+
+  ```
+  f :: Int
+  f = 42 # \(x :: _) -> x
+
+  g :: Maybe Int
+  g = do
+    x :: _ <- getX
+    pure $ x + 5
+  ```
+
+* Fix issue with unnamed instances using type operators (#4311 by @rhendric)
+
+* Fix bad interaction between module renaming and inliner (#4322 by @rhendric)
+
+  This bug was triggered when modules that the compiler handles specially
+  are shadowed by local constructors. For example, a constructor named
+  `Prim` could have caused references to `Prim_1["undefined"]` to be
+  produced in the compiled code, leading to a reference error at run time.
+  Less severely, a constructor named `Control_Bind` would have caused the
+  compiler not to inline known monadic functions, leading to slower and
+  less readable compiled code.
+
+* Update `Prim` docs for Boolean, Int, String/Symbol, Number, Record, and Row (#4317 by @JordanMartinez)
+
+* Fix crash caused by polykinded instances (#4325 by @rhendric)
+
+  A polykinded instance is a class instance where one or more of the type
+  parameters has an indeterminate kind. For example, the kind of `a` in
+
+  ```purs
+  instance SomeClass (Proxy a) where ...
+  ```
+
+  is indeterminate unless it's somehow used in a constraint or functional
+  dependency of the instance in a way that determines it.
+
+  The above instance would not have caused the crash; instead, instances needed
+  to be of the form
+
+  ```purs
+  instance SomeClass (f a) where ...
+  ```
+
+  in order to cause it.
+
+* Fix bad interaction between newtype deriving and type synonyms (#4315 by @rhendric)
+
+  See #3453.
+
+* Fix bad interaction between instance deriving and type synonyms (#4315 by @rhendric)
+
+  See #4105.
+
+* Fix spurious kind unification error triggered by newtype deriving, type synonyms, and polykinds (#4315 by @rhendric)
+
+  See #4200.
+
+Internal:
+
+* Deploy builds continuously to GitHub and npm (#4306 and #4324 by @rhendric)
+
+  (Builds triggered by changes that shouldn't affect the published package are
+  not deployed.)
+
+* Fix incomplete type traversals (#4155 by @rhendric)
+
+  This corrects oversights in some compiler internals that are not known to be
+  the cause of any user-facing issues.
+
+* Drop dependency on microlens libraries (#4327 by @rhendric)
+
 ## 0.15.0
 
 Breaking changes:
