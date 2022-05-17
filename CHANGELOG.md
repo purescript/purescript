@@ -34,6 +34,8 @@ Bugfixes:
 
 * Fix issue with unnamed instances using type operators (#4311 by @rhendric)
 
+* Fix incorrect `Prim.Int (class Compare)` docs: `Int` & `Ordering`, not `Symbol` (#4313 by @JordanMartinez)
+
 * Fix bad interaction between module renaming and inliner (#4322 by @rhendric)
 
   This bug was triggered when modules that the compiler handles specially
