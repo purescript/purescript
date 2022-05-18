@@ -30,7 +30,7 @@ import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.Common as Common
-import Language.PureScript.CoreImp.AST (AST, everywhere, everywhereTopDownM, withSourceSpan)
+import Language.PureScript.CoreImp.AST (AST, InitializerEffects(..), everywhere, everywhereTopDownM, withSourceSpan)
 import qualified Language.PureScript.CoreImp.AST as AST
 import qualified Language.PureScript.CoreImp.Module as AST
 import Language.PureScript.CoreImp.Optimizer
@@ -62,7 +62,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     let imps' = ordNub $ map snd imps
     let mnLookup = renameImports usedNames imps'
     (jsDecls, Any needRuntimeLazy) <- runWriterT $ mapM (moduleBindToJs mn) decls
-    optimized <- traverse (traverse (fmap annotatePure . optimize)) (if needRuntimeLazy then [runtimeLazy] : jsDecls else jsDecls)
+    optimized <- fmap (fmap (fmap annotatePure)) . optimize (map identToJs exps) $ if needRuntimeLazy then [runtimeLazy] : jsDecls else jsDecls
     F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
     let header = if comments then coms else []
@@ -108,7 +108,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     maybePure' = maybePureGen True
 
     maybePureGen alreadyAnnotated = \case
-      AST.VariableIntroduction ss name j -> Just (AST.VariableIntroduction ss name (annotateOrWrap <$> j))
+      AST.VariableIntroduction ss name j -> Just (AST.VariableIntroduction ss name (fmap annotateOrWrap <$> j))
       AST.App ss f args -> (if alreadyAnnotated then AST.App else pureApp) ss <$> maybePure' f <*> traverse maybePure args
       AST.ArrayLiteral ss jss -> AST.ArrayLiteral ss <$> traverse maybePure jss
       AST.ObjectLiteral ss props -> AST.ObjectLiteral ss <$> traverse (traverse maybePure) props
@@ -209,8 +209,8 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
 
   runtimeLazy :: AST
   runtimeLazy =
-    AST.VariableIntroduction Nothing "$runtime_lazy" . Just . AST.Function Nothing Nothing ["name", "moduleName", "init"] . AST.Block Nothing $
-      [ AST.VariableIntroduction Nothing "state" . Just . AST.NumericLiteral Nothing $ Left 0
+    AST.VariableIntroduction Nothing "$runtime_lazy" . Just . (UnknownEffects, ) . AST.Function Nothing Nothing ["name", "moduleName", "init"] . AST.Block Nothing $
+      [ AST.VariableIntroduction Nothing "state" . Just . (UnknownEffects, ) . AST.NumericLiteral Nothing $ Left 0
       , AST.VariableIntroduction Nothing "val" Nothing
       , AST.Return Nothing . AST.Function Nothing Nothing ["lineNumber"] . AST.Block Nothing $
         [ AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing "state") (AST.NumericLiteral Nothing (Left 2))) (AST.Return Nothing $ AST.Var Nothing "val") Nothing
@@ -261,7 +261,13 @@ moduleBindToJs mn = bindToJs
        else AST.Comment (AST.SourceComments com) <$> nonRecToJS a i (modifyAnn removeComments e)
   nonRecToJS (ss, _, _, _) ident val = do
     js <- valueToJs val
-    withPos ss $ AST.VariableIntroduction Nothing (identToJs ident) (Just js)
+    withPos ss $ AST.VariableIntroduction Nothing (identToJs ident) (Just (guessEffects val, js))
+
+  guessEffects :: Expr Ann -> AST.InitializerEffects
+  guessEffects = \case
+    Var _ (Qualified Nothing _)            -> NoEffects
+    App (_, _, _, Just IsSyntheticApp) _ _ -> NoEffects
+    _                                      -> UnknownEffects
 
   withPos :: SourceSpan -> AST -> m AST
   withPos ss js = do
@@ -327,7 +333,7 @@ moduleBindToJs mn = bindToJs
     ret <- valueToJs val
     return $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing (ds' ++ [AST.Return Nothing ret]))) []
   valueToJs' (Constructor (_, _, _, Just IsNewtype) _ ctor _) =
-    return $ AST.VariableIntroduction Nothing (properToJs ctor) (Just $
+    return $ AST.VariableIntroduction Nothing (properToJs ctor) (Just . (UnknownEffects, ) $
                 AST.ObjectLiteral Nothing [("create",
                   AST.Function Nothing Nothing ["value"]
                     (AST.Block Nothing [AST.Return Nothing $ AST.Var Nothing "value"]))])
@@ -369,8 +375,8 @@ moduleBindToJs mn = bindToJs
       jsNewObj = AST.Var Nothing newObj
       jsEvaluatedObj = AST.Var Nothing evaluatedObj
       block = AST.Block Nothing (evaluate:objAssign:copy:extend ++ [AST.Return Nothing jsNewObj])
-      evaluate = AST.VariableIntroduction Nothing evaluatedObj (Just obj)
-      objAssign = AST.VariableIntroduction Nothing newObj (Just $ AST.ObjectLiteral Nothing [])
+      evaluate = AST.VariableIntroduction Nothing evaluatedObj (Just (UnknownEffects, obj))
+      objAssign = AST.VariableIntroduction Nothing newObj (Just (NoEffects, AST.ObjectLiteral Nothing []))
       copy = AST.ForIn Nothing key jsEvaluatedObj $ AST.Block Nothing [AST.IfElse Nothing cond assign Nothing]
       cond = AST.App Nothing (accessorString "call" (accessorString "hasOwnProperty" (AST.ObjectLiteral Nothing []))) [jsEvaluatedObj, jsKey]
       assign = AST.Block Nothing [AST.Assignment Nothing (AST.Indexer Nothing jsKey jsNewObj) (AST.Indexer Nothing jsKey jsEvaluatedObj)]
@@ -399,7 +405,7 @@ moduleBindToJs mn = bindToJs
   bindersToJs :: SourceSpan -> [CaseAlternative Ann] -> [AST] -> m AST
   bindersToJs ss binders vals = do
     valNames <- replicateM (length vals) freshName
-    let assignments = zipWith (AST.VariableIntroduction Nothing) valNames (map Just vals)
+    let assignments = zipWith (AST.VariableIntroduction Nothing) valNames (map (Just . (UnknownEffects, )) vals)
     jss <- forM binders $ \(CaseAlternative bs result) -> do
       ret <- guardsToJs result
       go valNames ret bs
@@ -448,7 +454,7 @@ moduleBindToJs mn = bindToJs
   binderToJs' varName done (LiteralBinder _ l) =
     literalToBinderJS varName done l
   binderToJs' varName done (VarBinder _ ident) =
-    return (AST.VariableIntroduction Nothing (identToJs ident) (Just (AST.Var Nothing varName)) : done)
+    return (AST.VariableIntroduction Nothing (identToJs ident) (Just (NoEffects, AST.Var Nothing varName)) : done)
   binderToJs' varName done (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
     binderToJs varName done b
   binderToJs' varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
@@ -466,12 +472,12 @@ moduleBindToJs mn = bindToJs
       argVar <- freshName
       done'' <- go remain done'
       js <- binderToJs argVar done'' binder
-      return (AST.VariableIntroduction Nothing argVar (Just $ accessorString (mkString $ identToJs field) $ AST.Var Nothing varName) : js)
+      return (AST.VariableIntroduction Nothing argVar (Just (UnknownEffects, accessorString (mkString $ identToJs field) $ AST.Var Nothing varName)) : js)
   binderToJs' _ _ ConstructorBinder{} =
     internalError "binderToJs: Invalid ConstructorBinder in binderToJs"
   binderToJs' varName done (NamedBinder _ ident binder) = do
     js <- binderToJs varName done binder
-    return (AST.VariableIntroduction Nothing (identToJs ident) (Just (AST.Var Nothing varName)) : js)
+    return (AST.VariableIntroduction Nothing (identToJs ident) (Just (NoEffects, AST.Var Nothing varName)) : js)
 
   literalToBinderJS :: Text -> [AST] -> Literal (Binder Ann) -> m [AST]
   literalToBinderJS varName done (NumericLiteral num) =
@@ -492,7 +498,7 @@ moduleBindToJs mn = bindToJs
       propVar <- freshName
       done'' <- go done' bs'
       js <- binderToJs propVar done'' binder
-      return (AST.VariableIntroduction Nothing propVar (Just (accessorString prop (AST.Var Nothing varName))) : js)
+      return (AST.VariableIntroduction Nothing propVar (Just (UnknownEffects, accessorString prop (AST.Var Nothing varName))) : js)
   literalToBinderJS varName done (ArrayLiteral bs) = do
     js <- go done 0 bs
     return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (accessorString "length" (AST.Var Nothing varName)) (AST.NumericLiteral Nothing (Left (fromIntegral $ length bs)))) (AST.Block Nothing js) Nothing]
@@ -503,7 +509,7 @@ moduleBindToJs mn = bindToJs
       elVar <- freshName
       done'' <- go done' (index + 1) bs'
       js <- binderToJs elVar done'' binder
-      return (AST.VariableIntroduction Nothing elVar (Just (AST.Indexer Nothing (AST.NumericLiteral Nothing (Left index)) (AST.Var Nothing varName))) : js)
+      return (AST.VariableIntroduction Nothing elVar (Just (UnknownEffects, AST.Indexer Nothing (AST.NumericLiteral Nothing (Left index)) (AST.Var Nothing varName))) : js)
 
 accessorString :: PSString -> AST -> AST
 accessorString prop = AST.Indexer Nothing (AST.StringLiteral Nothing prop)
