@@ -22,6 +22,7 @@ extra-source-files:
   bundle/build.sh
   bundle/README
   tests/purs/**/*.js
+  tests/purs/**/*.js.map
   tests/purs/**/*.purs
   tests/purs/**/*.json
   tests/purs/**/*.out
@@ -443,5 +444,6 @@ test-suite tests
     TestPsci.EvalTest
     TestPsci.TestEnv
     TestPscPublish
+    TestSourceMaps
     TestUtils
     Paths_purescript

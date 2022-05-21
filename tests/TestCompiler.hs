@@ -135,7 +135,7 @@ assertCompiles
   -> Handle
   -> Expectation
 assertCompiles support inputFiles outputFile = do
-  (result, _) <- compile True support inputFiles
+  (result, _) <- compile (Just IsMain) support inputFiles
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
     Right _ -> do
@@ -157,7 +157,7 @@ assertCompilesWithWarnings
   -> [String]
   -> Expectation
 assertCompilesWithWarnings support inputFiles shouldWarnWith = do
-  result'@(result, warnings) <- compile False support inputFiles
+  result'@(result, warnings) <- compile Nothing support inputFiles
   case result of
     Left errs ->
       expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
@@ -173,7 +173,7 @@ assertDoesNotCompile
   -> [String]
   -> Expectation
 assertDoesNotCompile support inputFiles shouldFailWith = do
-  result <- compile False support inputFiles
+  result <- compile Nothing support inputFiles
   case fst result of
     Left errs -> do
       when (null shouldFailWith)
@@ -193,7 +193,7 @@ assertCompilesToExpectedOutput
   -> [FilePath]
   -> Expectation
 assertCompilesToExpectedOutput support inputFiles = do
-  (result, _) <- compile False support inputFiles
+  (result, _) <- compile Nothing support inputFiles
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
     Right _ ->
