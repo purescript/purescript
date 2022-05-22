@@ -866,7 +866,7 @@ pairwiseM _ [] = pure ()
 pairwiseM _ [_] = pure ()
 pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs
 
--- | Return all nonempty tails of a nonempty list. For example:
+-- | Return all nonempty suffixes of a nonempty list. For example:
 --
 -- tails1 (fromList [1]) == fromList [fromList [1]]
 -- tails1 (fromList [1,2]) == fromList [fromList [1,2], fromList [2]]
@@ -874,10 +874,14 @@ pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs
 tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
 tails1 =
   -- NEL.fromList is an unsafe function, but this usage should be safe, since:
-  -- * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
-  -- * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
-  --   list, since `head (tails xs) = xs`.
-  -- * The only empty element of `tails xs` is the last one (by the definition of `tails`)
-  -- * Therefore, if we take all but the last element of `tails xs` i.e.
-  --   `init (tails xs)`, we have a nonempty list of nonempty lists
+  --
+  --     * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
+  --
+  --     * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
+  --       list, since `head (tails xs) = xs`.
+  --
+  --     * The only empty element of `tails xs` is the last one (by the definition of `tails`)
+  --
+  --     * Therefore, if we take all but the last element of `tails xs` i.e.
+  --       `init (tails xs)`, we have a nonempty list of nonempty lists
   NEL.fromList . map NEL.fromList . init . tails . NEL.toList
