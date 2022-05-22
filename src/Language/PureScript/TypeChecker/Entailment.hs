@@ -22,13 +22,14 @@ import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (delete, findIndices, groupBy, minimumBy, nubBy, sortOn, tails)
+import Data.List (delete, findIndices, minimumBy, nubBy, sortOn, tails)
 import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (for)
 import Data.Text (Text, stripPrefix, stripSuffix)
 import qualified Data.Text as T
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
@@ -91,7 +92,7 @@ type TypeClassDict = TypeClassDictionaryInScope Evidence
 -- | The 'InstanceContext' tracks those constraints which can be satisfied.
 type InstanceContext = M.Map (Maybe ModuleName)
                          (M.Map (Qualified (ProperName 'ClassName))
-                           (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
+                           (M.Map (Qualified Ident) (NonEmpty NamedDict)))
 
 -- | A type substitution which makes an instance head match a list of types.
 --
@@ -258,11 +259,12 @@ entails SolverOptions{..} constraint context hints =
             dicts <- lift . lift $ forClassNameM env (combineContexts context inferred) className' kinds'' tys''
 
             let (catMaybes -> ambiguous, instances) = partitionEithers $ do
-                  chain <- groupBy ((==) `on` tcdChain) $
+                  chain :: NonEmpty TypeClassDict <-
+                           NEL.groupBy ((==) `on` tcdChain) $
                            sortOn (tcdChain &&& tcdIndex)
                            dicts
                   -- process instances in a chain in index order
-                  let found = for (init $ tails chain) $ \(tcd:tl) ->
+                  let found = for (tails1 chain) $ \(tcd :| tl) ->
                                 -- Make sure the type unifies with the type in the type instance definition
                                 case matches typeClassDependencies tcd tys'' of
                                   Apart        -> Right ()                   -- keep searching
@@ -863,3 +865,23 @@ pairwiseM :: Applicative m => (a -> a -> m ()) -> [a] -> m ()
 pairwiseM _ [] = pure ()
 pairwiseM _ [_] = pure ()
 pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs
+
+-- | Return all nonempty suffixes of a nonempty list. For example:
+--
+-- tails1 (fromList [1]) == fromList [fromList [1]]
+-- tails1 (fromList [1,2]) == fromList [fromList [1,2], fromList [2]]
+-- tails1 (fromList [1,2,3]) == fromList [fromList [1,2,3], fromList [2,3], fromList [3]]
+tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
+tails1 =
+  -- NEL.fromList is an unsafe function, but this usage should be safe, since:
+  --
+  --     * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
+  --
+  --     * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
+  --       list, since `head (tails xs) = xs`.
+  --
+  --     * The only empty element of `tails xs` is the last one (by the definition of `tails`)
+  --
+  --     * Therefore, if we take all but the last element of `tails xs` i.e.
+  --       `init (tails xs)`, we have a nonempty list of nonempty lists
+  NEL.fromList . map NEL.fromList . init . tails . NEL.toList
