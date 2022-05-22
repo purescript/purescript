@@ -8,7 +8,7 @@ at tests/purs/failing/3275-BindingGroupErrorPos.purs:11:17 - 11:23 (line 11, col
   [33m      [0m
   with kind
   [33m            [0m
-  [33m  Type -> t3[0m
+  [33m  Type -> t0[0m
   [33m            [0m
 
 while checking that type [33mResult[0m

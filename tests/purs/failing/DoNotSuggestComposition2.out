@@ -3,13 +3,13 @@ in module [33mDoNotSuggestComposition2[0m
 at tests/purs/failing/DoNotSuggestComposition2.purs:7:27 - 7:30 (line 7, column 27 - line 7, column 30)
 
   Could not match type
-  [33m        [0m
-  [33m  Record[0m
-  [33m        [0m
+  [33m             [0m
+  [33m  Prim.Record[0m
+  [33m             [0m
   with type
-  [33m              [0m
-  [33m  Function Int[0m
-  [33m              [0m
+  [33m                   [0m
+  [33m  Prim.Function Int[0m
+  [33m                   [0m
 
 while trying to match type [33m{ y :: Int[0m
                            [33m}         [0m

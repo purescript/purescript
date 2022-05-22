@@ -9,7 +9,7 @@ at tests/purs/failing/3531-5.purs:16:7 - 16:27 (line 16, column 7 - line 16, col
   [33m           [0m
   The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:
 
-    instance in module [33mMain[0m with type [33mforall a. C String (Array a)[0m (line 9, column 1 - line 10, column 15)
+    instance in module [33mMain[0m with type [33mforall a. Main.C Prim.String (Prim.Array a)[0m (line 9, column 1 - line 10, column 15)
 
 
 while applying a function [33mc[0m

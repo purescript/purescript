@@ -124,7 +124,7 @@ isPlainIdent _ = False
 -- Operator alias names.
 --
 newtype OpName (a :: OpNameType) = OpName { runOpName :: Text }
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic)
 
 instance NFData (OpName a)
 instance Serialise (OpName a)
@@ -153,7 +153,7 @@ coerceOpName = OpName . runOpName
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
 --
 newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: Text }
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic)
 
 instance NFData (ProperName a)
 instance Serialise (ProperName a)
@@ -185,7 +185,7 @@ coerceProperName = ProperName . runProperName
 -- Module names
 --
 newtype ModuleName = ModuleName Text
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic)
   deriving newtype Serialise
 
 instance NFData ModuleName

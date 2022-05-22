@@ -7,13 +7,17 @@
 module Language.PureScript.Pretty.Types
   ( PrettyPrintType(..)
   , PrettyPrintConstraint
+  , TypeRenderOptions(..)
+  , defaultTypeRenderOptions
   , convertPrettyPrintType
   , typeAsBox
+  , typeAsBoxWith
   , typeDiffAsBox
   , prettyPrintType
   , prettyPrintTypeWithUnicode
   , prettyPrintSuggestedType
   , typeAtomAsBox
+  , typeAtomAsBoxWith
   , prettyPrintTypeAtom
   , prettyPrintLabel
   , prettyPrintObjectKey
@@ -181,7 +185,7 @@ explicitParens = mkPattern match
   match _ = Nothing
 
 matchTypeAtom :: TypeRenderOptions -> Pattern () PrettyPrintType Box
-matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
+matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting, troDisqualifyNames = disqualifying} =
     typeLiterals <+> fmap ((`before` text ")") . (text "(" <>)) (matchType tro)
   where
     typeLiterals :: Pattern () PrettyPrintType Box
@@ -190,7 +194,10 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
       match (PPTypeVar var _) = Just $ text $ T.unpack var
       match (PPTypeLevelString s) = Just $ text $ T.unpack $ prettyPrintString s
       match (PPTypeLevelInt n) = Just $ text $ show n
-      match (PPTypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
+      match (PPTypeConstructor ctor) = Just $ text $ T.unpack $
+        if disqualifying
+          then runProperName $ disqualify ctor
+          else showQualified runProperName ctor
       match (PPTUnknown u)
         | suggesting = Just $ text "_"
         | otherwise = Just $ text $ 't' : show u
@@ -238,10 +245,16 @@ forall_ = mkPattern match
   match (PPForAll idents ty) = Just (map (first T.unpack) idents, ty)
   match _ = Nothing
 
-typeAtomAsBox' :: PrettyPrintType -> Box
-typeAtomAsBox'
+typeAtomAsBoxWith' :: TypeRenderOptions -> PrettyPrintType -> Box
+typeAtomAsBoxWith' tro
   = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern (matchTypeAtom defaultOptions) ()
+  . PA.pattern (matchTypeAtom tro) ()
+
+typeAtomAsBox' :: PrettyPrintType -> Box
+typeAtomAsBox' = typeAtomAsBoxWith' defaultTypeRenderOptions
+
+typeAtomAsBoxWith :: Int -> TypeRenderOptions -> Type a -> Box
+typeAtomAsBoxWith maxDepth tro = typeAtomAsBoxWith' tro . convertPrettyPrintType maxDepth
 
 typeAtomAsBox :: Int -> Type a -> Box
 typeAtomAsBox maxDepth = typeAtomAsBox' . convertPrettyPrintType maxDepth
@@ -250,14 +263,22 @@ typeAtomAsBox maxDepth = typeAtomAsBox' . convertPrettyPrintType maxDepth
 prettyPrintTypeAtom :: Int -> Type a -> String
 prettyPrintTypeAtom maxDepth = render . typeAtomAsBox maxDepth
 
+typeAsBoxWith' :: TypeRenderOptions -> PrettyPrintType -> Box
+typeAsBoxWith' tro
+  = fromMaybe (internalError "Incomplete pattern")
+  . PA.pattern (matchType tro) ()
+
+typeAsBoxWith :: Int -> TypeRenderOptions -> Type a -> Box
+typeAsBoxWith maxDepth tro = typeAsBoxWith' tro . convertPrettyPrintType maxDepth
+
 typeAsBox' :: PrettyPrintType -> Box
-typeAsBox' = typeAsBoxImpl defaultOptions
+typeAsBox' = typeAsBoxWith' defaultTypeRenderOptions
 
 typeAsBox :: Int -> Type a -> Box
 typeAsBox maxDepth = typeAsBox' . convertPrettyPrintType maxDepth
 
 typeDiffAsBox' :: PrettyPrintType -> Box
-typeDiffAsBox' = typeAsBoxImpl diffOptions
+typeDiffAsBox' = typeAsBoxWith' diffOptions
 
 typeDiffAsBox :: Int -> Type a -> Box
 typeDiffAsBox maxDepth = typeDiffAsBox' . convertPrettyPrintType maxDepth
@@ -266,28 +287,29 @@ data TypeRenderOptions = TypeRenderOptions
   { troSuggesting :: Bool
   , troUnicode :: Bool
   , troRowAsDiff :: Bool
+  , troDisqualifyNames :: Bool
+  }
+
+defaultTypeRenderOptions :: TypeRenderOptions
+defaultTypeRenderOptions = TypeRenderOptions
+  { troSuggesting = False
+  , troUnicode = False
+  , troRowAsDiff = False
+  , troDisqualifyNames = True
   }
 
 suggestingOptions :: TypeRenderOptions
-suggestingOptions = TypeRenderOptions True False False
-
-defaultOptions :: TypeRenderOptions
-defaultOptions = TypeRenderOptions False False False
+suggestingOptions = defaultTypeRenderOptions { troSuggesting = True }
 
 diffOptions :: TypeRenderOptions
-diffOptions = TypeRenderOptions False False True
+diffOptions = defaultTypeRenderOptions { troRowAsDiff = True }
 
 unicodeOptions :: TypeRenderOptions
-unicodeOptions = TypeRenderOptions False True False
-
-typeAsBoxImpl :: TypeRenderOptions -> PrettyPrintType -> Box
-typeAsBoxImpl tro
-  = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern (matchType tro) ()
+unicodeOptions = defaultTypeRenderOptions { troUnicode = True }
 
 -- | Generate a pretty-printed string representing a 'Type'
 prettyPrintType :: Int -> Type a -> String
-prettyPrintType = flip prettyPrintType' defaultOptions
+prettyPrintType = flip prettyPrintType' defaultTypeRenderOptions
 
 -- | Generate a pretty-printed string representing a 'Type' using unicode
 -- symbols where applicable
@@ -299,7 +321,7 @@ prettyPrintSuggestedType :: Type a -> String
 prettyPrintSuggestedType = prettyPrintType' maxBound suggestingOptions
 
 prettyPrintType' :: Int -> TypeRenderOptions -> Type a -> String
-prettyPrintType' maxDepth tro = render . typeAsBoxImpl tro . convertPrettyPrintType maxDepth
+prettyPrintType' maxDepth tro = render . typeAsBoxWith' tro . convertPrettyPrintType maxDepth
 
 prettyPrintLabel :: Label -> Text
 prettyPrintLabel (Label s) =

@@ -7,9 +7,9 @@ at tests/purs/failing/3275-DataBindingGroupErrorPos.purs:7:19 - 7:22 (line 7, co
   [33m  Type[0m
   [33m      [0m
   with kind
-  [33m            [0m
-  [33m  t10 -> t11[0m
-  [33m            [0m
+  [33m          [0m
+  [33m  t0 -> t1[0m
+  [33m          [0m
 
 while checking that type [33mBar a[0m
   has kind [33mt0 -> t1[0m

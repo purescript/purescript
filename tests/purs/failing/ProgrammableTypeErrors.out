@@ -2,10 +2,10 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/ProgrammableTypeErrors.purs:17:13 - 17:27 (line 17, column 13 - line 17, column 27)
 
-  A custom type error occurred while solving type class constraints:
-
-    Cannot show functions
-
+  No type class instance was found for
+  [33m                                                    [0m
+  [33m  Prim.TypeError.Fail (Text "Cannot show functions")[0m
+  [33m                                                    [0m
 
 while solving type class constraint
 [33m                          [0m

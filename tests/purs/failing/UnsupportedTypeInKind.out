@@ -4,7 +4,7 @@ at tests/purs/failing/UnsupportedTypeInKind.purs:7:28 - 7:38 (line 7, column 28 
 
   The type:
 
-    [33mOk => Type[0m
+    [33mOk => Prim.Type[0m
 
   is not supported in kinds.
 

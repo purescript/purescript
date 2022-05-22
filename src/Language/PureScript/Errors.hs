@@ -460,6 +460,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   where
   gSimple (InfiniteType t) = InfiniteType <$> f t
   gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
+  gSimple (KindsDoNotUnify t1 t2) = KindsDoNotUnify <$> f t1 <*> f t2
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
@@ -481,7 +482,6 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (MissingKindDeclaration sig nm ty) = MissingKindDeclaration sig nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple (InvalidCoercibleInstanceDeclaration tys) = InvalidCoercibleInstanceDeclaration <$> traverse f tys
-  gSimple other = pure other
 
   gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
   gHint (ErrorUnifyingTypes t1 t2) = ErrorUnifyingTypes <$> f t1 <*> f t2
@@ -491,7 +491,6 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintArgs (traverse f) con
-  gHint other = pure other
 
 errorDocUri :: ErrorMessage -> Text
 errorDocUri e = "https://github.com/purescript/documentation/blob/master/errors/" <> errorCode e <> ".md"
@@ -1554,14 +1553,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     -- If verbose print all rows else only print unique rows
     printRows :: Type a -> Type a -> (Box.Box, Box.Box)
     printRows r1 r2 = case (full, r1, r2) of
-      (True, _ , _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
+      (True, _ , _) -> (printRow prettyTypeWithDepth r1, printRow prettyTypeWithDepth r2)
 
       (_, RCons{}, RCons{}) ->
         let (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
         in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
 
-      (_, _, _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
-
+      (_, _, _) -> (printRow prettyTypeWithDepth r1, printRow prettyTypeWithDepth r2)
 
     -- Keep the unique labels only
     filterRows :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)
@@ -1636,13 +1634,15 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
   prettyTypeWithDepth :: Int -> Type a -> Box.Box
   prettyTypeWithDepth depth
-    | full = typeAsBox depth
-    | otherwise = typeAsBox depth . eraseForAllKindAnnotations . eraseKindApps
+    | full = typeAsBoxWith depth prettyOptions
+    | otherwise = typeAsBoxWith depth prettyOptions . eraseForAllKindAnnotations . eraseKindApps
 
   prettyTypeAtom :: Type a -> Box.Box
   prettyTypeAtom
-    | full = typeAtomAsBox prettyDepth
-    | otherwise = typeAtomAsBox prettyDepth . eraseForAllKindAnnotations . eraseKindApps
+    | full = typeAtomAsBoxWith prettyDepth prettyOptions
+    | otherwise = typeAtomAsBoxWith prettyDepth prettyOptions . eraseForAllKindAnnotations . eraseKindApps
+
+  prettyOptions = defaultTypeRenderOptions { troDisqualifyNames = False }
 
   levelText :: Text
   levelText = case level of

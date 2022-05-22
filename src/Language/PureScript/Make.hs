@@ -41,6 +41,7 @@ import           Language.PureScript.ModuleDependencies
 import           Language.PureScript.Names
 import           Language.PureScript.Renamer
 import           Language.PureScript.Sugar
+import           Language.PureScript.Sugar.Names.Requalify
 import           Language.PureScript.TypeChecker
 import           Language.PureScript.Make.BuildPlan
 import qualified Language.PureScript.Make.BuildPlan as BuildPlan
@@ -87,13 +88,14 @@ rebuildModuleWithIndex
 rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) moduleIndex = do
   progress $ CompilingModule moduleName moduleIndex
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
-      withPrim = importPrim m
+      withPrim = importPrim m -- TODO: are we importing Prim twice
   lint withPrim
 
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     (desugared, (exEnv', usedImports)) <- runStateT (desugar externs withPrim) (exEnv, mempty)
     let modulesExports = (\(_, _, exports) -> exports) <$> exEnv'
-    (checked, CheckState{..}) <- runStateT (typeCheckModule modulesExports desugared) $ emptyCheckState env
+        localImports = maybe (internalError "no local imports") (\(_, imports, _) -> imports) $ M.lookup moduleName exEnv'
+    (checked, CheckState{..}) <- rethrow (requalifyTypesInErrors localImports) $ runStateT (typeCheckModule modulesExports desugared) $ emptyCheckState env
     let usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
           M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkConstructorImportsForCoercible
     -- Imports cannot be linted before type checking because we need to
@@ -279,3 +281,40 @@ inferForeignModules =
       if exists
         then return (Just jsFile)
         else return Nothing
+
+-- | Convert fully qualified names in errors back to unqualified or locally
+-- qualified forms in certain hints and error messages, to make errors easier
+-- to understand and to avoid error messages like @Could not match type Query
+-- with type Query@.
+requalifyTypesInErrors :: Imports -> MultipleErrors -> MultipleErrors
+requalifyTypesInErrors imports =
+  onErrorMessages $
+    onTypesInErrorMessage requal
+    -- \(ErrorMessage hints message) ->
+      -- ErrorMessage (requalifyHints hints) (requalifyMessage message)
+
+  where
+  requal = requalify (buildReverseImports imports)
+
+--   requalifyMessage =
+--     TypesDoNotUnify ty1 ty2 -> TypesDoNotUnify (requal ty1) (requal ty2)
+--     KindsDoNotUnify ty1 ty2 -> KindsDoNotUnify (requal ty1) (requal ty2)
+--     other -> other
+-- 
+--   requalifyHints = map $ \case
+--     ErrorUnifyingTypes ty1 ty2 ->
+--       ErrorUnifyingTypes (requal ty1) (requal ty2)
+--     ErrorInInstance clsName tys ->
+--       ErrorInInstance clsName (map requal tys)
+--     ErrorInSubsumption ty1 ty2 ->
+--       ErrorInSubsumption (requal ty1) (requal ty2)
+--     ErrorCheckingType expr ty ->
+--       ErrorCheckingType expr (requal ty)
+--     ErrorCheckingKind ty1 ty2 ->
+--       ErrorCheckingKind (requal ty1) (requal ty2)
+--     ErrorInferringKind ty ->
+--       ErrorInferringKind (requal ty)
+--     ErrorInApplication expr1 ty expr2 ->
+--       ErrorInApplication expr1 (requal ty) expr2
+--     other ->
+--       other
