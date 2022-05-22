@@ -51,7 +51,12 @@ flag release
   default: False
 
 common defaults
-  ghc-options: -Wall
+  -- Note: -Wall-incomplete-uni-patterns and -Wincomplete-record-updates can be
+  -- removed once we upgrade to GHC 9.2.1 since they are now included in -Wall.
+  ghc-options:
+    -Wall
+    -Wincomplete-uni-patterns
+    -Wincomplete-record-updates
   default-language: Haskell2010
   default-extensions:
     BangPatterns
@@ -403,6 +408,8 @@ test-suite tests
   type: exitcode-stdio-1.0
   hs-source-dirs: tests
   main-is: Main.hs
+  -- Not a problem for this warning to arise in tests
+  ghc-options: -Wno-incomplete-uni-patterns
   build-depends:
       purescript
     , generic-random

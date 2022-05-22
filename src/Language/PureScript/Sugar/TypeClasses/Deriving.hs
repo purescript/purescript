@@ -190,8 +190,7 @@ deriveNewtype tyCon tyConArgs =
     DataDeclaration (ss', _) Data name _ _ ->
       throwError . errorMessage' ss' $ CannotDeriveNewtypeForData name
     DataDeclaration _ Newtype name args dctors -> do
-      checkNewtype name dctors
-      let (DataConstructorDeclaration _ _ [(_, ty)]) = head dctors
+      (_, (_, ty)) <- checkNewtype name dctors
       let subst = zipWith ((,) . fst) args tyConArgs
       return ([], replaceAllTypeVars subst ty)
     _ -> internalError "deriveNewtype: expected DataDeclaration"
