@@ -24,7 +24,7 @@ import           Data.Function (on)
 import           Data.Foldable (fold, for_)
 import           Data.List (foldl', sortOn)
 import qualified Data.List.NonEmpty as NEL
-import           Data.Maybe (fromMaybe, isNothing)
+import           Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -222,7 +222,6 @@ make ma@MakeActions{..} ms = do
 
   buildModule :: BuildPlan -> ModuleName -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> [ModuleName] -> m ()
   buildModule buildPlan moduleName fp pwarnings mres deps directDeps = do
-    -- _ <- trace ((show :: (String, ModuleName) -> String) ("buildModule start", moduleName)) (pure ())
     result <- flip catchError (return . BuildJobFailed) $ do
       let pwarnings' = CST.toMultipleWarnings fp pwarnings
       tell pwarnings'
@@ -244,10 +243,6 @@ make ma@MakeActions{..} ms = do
       let ourPrebuiltIfSourceFilesDidntChange = didModuleSourceFilesChange buildPlan moduleName
       let ourCacheFileIfSourceFilesDidntChange = pbExternsFile <$> ourPrebuiltIfSourceFilesDidntChange
       let ourDirtyCacheFile = getDirtyCacheFile buildPlan moduleName
-      let didOurSourceFilesChange = isNothing ourCacheFileIfSourceFilesDidntChange
-      -- _ <- trace ((show :: (String, ModuleName, String, [ModuleName], String, Int, Maybe [ModuleName]) -> String) ("buildModule start", moduleName, "deps", deps, "mexterns", length mexterns, fmap efModuleName . snd <$> mexterns)) (pure ())
-
-
 
       let resultsWithModuleNamesDirect :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, WasRebuilt))] = traverse (\dep ->
             do
@@ -259,20 +254,6 @@ make ma@MakeActions{..} ms = do
       didEachDependencyChangeDirect :: M.Map ModuleName WasRebuilt <-
         fromMaybe M.empty . fmap M.fromList . fmap (fmap (\(mn, (_,_,c)) -> (mn, c))) . sequence <$> resultsWithModuleNamesDirect
       let didAnyDependenciesChangeDirect :: Bool = elem WasRebuilt $ M.elems didEachDependencyChangeDirect
-      -- let ourPrebuiltIfSourceFilesDidntChangeDirect = didModuleSourceFilesChange buildPlan moduleName
-      -- let ourCacheFileIfSourceFilesDidntChangeDirect = pbExternsFile <$> ourPrebuiltIfSourceFilesDidntChangeDirect
-      -- let didOurSourceFilesChangeDirect = isNothing ourCacheFileIfSourceFilesDidntChangeDirect
-      -- _ <- trace ((show :: (String, ModuleName, String, [ModuleName], String, Int, Maybe [ModuleName]) -> String) ("buildModule start", moduleName, "deps", deps, "mexterns", length mexterns, fmap efModuleName . snd <$> mexterns)) (pure ())
-
-
-
-
-      let possiblyDirtyModules :: [ModuleName] = directDeps
-      -- let nonPossiblyDirtyDeps :: [ModuleName] = possiblyDirtyModules \\ deps
-      -- let didEachDirtyDependencyChange :: M.Map ModuleName WasRebuilt = didEachDependencyChangeDirect `M.difference` (M.fromList $ (,()) <$> deps)
-      let !_ = trace (show (moduleName, "possiblyDirtyModules" :: String, possiblyDirtyModules))
-      -- depCount <- length <$> resultsWithModuleNames
-      -- let !_ = trace (show (moduleName, "didEachDirtyDependencyChange" :: String, depCount, didEachDirtyDependencyChange))
 
       case mexterns of
         Just (_, externs) -> do
@@ -286,8 +267,6 @@ make ma@MakeActions{..} ms = do
                 _ -> return e
             foldM go env deps
           env <- C.readMVar (bpEnv buildPlan)
-
-          _ <- trace (show ("buildModule pre rebuildModule'" :: String, "didOurSourceFilesChange" :: String, didOurSourceFilesChange, "didAnyDependenciesChangeDirect" :: String, didAnyDependenciesChangeDirect, moduleName, didEachDependencyChangeDirect)) (pure ())
 
           case (ourCacheFileIfSourceFilesDidntChange, didAnyDependenciesChangeDirect) of
             (Just exts, False) -> do

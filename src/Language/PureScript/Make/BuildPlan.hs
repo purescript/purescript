@@ -26,7 +26,7 @@ import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import           Data.Foldable (foldl')
 import qualified Data.Map as M
-import           Data.Maybe (fromMaybe, mapMaybe, isJust)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Time.Clock (UTCTime)
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
@@ -38,7 +38,6 @@ import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names (ModuleName)
 import           Language.PureScript.Sugar.Names.Env
 import           System.Directory (getCurrentDirectory)
-import Debug.Trace
 
 -- | The BuildPlan tracks information about our build progress, and holds all
 -- prebuilt modules for incremental builds.
@@ -193,20 +192,6 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
     )
   where
     makeBuildJob prev (moduleName, rebuildStatus) = do
-      let !_ = trace (show ("makeBuildJob" :: String,
-            case rebuildStatus of
-              RebuildStatus { statusRebuildNever
-                                  , statusNewCacheInfo
-                                  , statusPrebuilt
-                                  , statusDirtyExterns
-                                  } ->
-                      ( ("statusRebuildNever" :: String,  statusRebuildNever)
-                      , ("statusNewCacheInfo" :: String,  isJust statusNewCacheInfo)
-                      , ("statusPrebuilt" :: String,  isJust statusPrebuilt)
-                      , ("statusDirtyExterns" :: String,  isJust statusDirtyExterns)
-                      )
-
-              , moduleName)) ()
       buildJobMvar <- C.newEmptyMVar
       let buildJob = BuildJob buildJobMvar (statusPrebuilt rebuildStatus) (statusDirtyExterns rebuildStatus)
       pure (M.insert moduleName buildJob prev)
@@ -216,7 +201,6 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
       inputInfo <- getInputTimestampsAndHashes moduleName
       case inputInfo of
         Left RebuildNever -> do
-          let !_ = trace (show ("getRebuildStatus" :: String, "RebuildNever" :: String, moduleName)) ()
           prebuilt <- findExistingExtern moduleName
           dirtyExterns <- snd <$> readExterns moduleName
           pure (RebuildStatus
@@ -227,7 +211,6 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
             , statusNewCacheInfo = Nothing
             })
         Left RebuildAlways -> do
-          let !_ = trace (show ("getRebuildStatus" :: String, "RebuildAlways" :: String, moduleName)) ()
           pure (RebuildStatus
             { statusModuleName = moduleName
             , statusRebuildNever = False
@@ -244,7 +227,6 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
               then findExistingExtern moduleName
               else pure Nothing
           dirtyExterns <- snd <$> readExterns moduleName
-          let !_ = trace (show ("getRebuildStatus" :: String, "CacheFound" :: String, case prebuilt of Nothing -> "Nothing" :: String; Just _  -> "Just _" :: String, moduleName)) ()
           pure (RebuildStatus
             { statusModuleName = moduleName
             , statusRebuildNever = False
@@ -264,7 +246,6 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
       | rebuildNever = M.insert moduleName pb prev
       | otherwise = do
           let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-          -- let !_ = trace (show ("collectPrebuiltModules"::String, moduleName, "depends on"::String, deps)) ()
           case traverse (fmap pbModificationTime . flip M.lookup prev) deps of
             Nothing ->
               -- If we end up here, one of the dependencies didn't exist in the
