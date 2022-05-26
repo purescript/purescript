@@ -57,6 +57,7 @@ data BuildJob = BuildJob
   { bjResult :: C.MVar BuildJobResult
     -- ^ Note: an empty MVar indicates that the build job has not yet finished.
   , bjPrebuilt :: Maybe Prebuilt
+  , bjDirtyExterns :: Maybe ExternsFile
   }
 
 data BuildJobResult
@@ -77,8 +78,8 @@ data WasRebuilt
   | NotRebuilt
   deriving (Show, Eq)
 
-buildJobSuccess :: Maybe Prebuilt -> BuildJobResult -> Maybe (MultipleErrors, ExternsFile, WasRebuilt)
-buildJobSuccess (Just (Prebuilt _ prebuiltExterns)) (BuildJobSucceeded warnings externs) | Serialise.serialise prebuiltExterns == Serialise.serialise externs = Just (warnings, externs, NotRebuilt)
+buildJobSuccess :: Maybe ExternsFile -> BuildJobResult -> Maybe (MultipleErrors, ExternsFile, WasRebuilt)
+buildJobSuccess (Just prebuiltExterns) (BuildJobSucceeded warnings externs) | Serialise.serialise prebuiltExterns == Serialise.serialise externs = Just (warnings, externs, NotRebuilt)
 buildJobSuccess _ (BuildJobSucceeded warnings externs) = Just (warnings, externs, WasRebuilt)
 buildJobSuccess _ (BuildJobNotNeeded externs) = Just (MultipleErrors [], externs, NotRebuilt)
 buildJobSuccess _ _ = Nothing
@@ -99,6 +100,8 @@ data RebuildStatus = RebuildStatus
     -- rebuilt according to a RebuildPolicy instead.
   , statusPrebuilt :: Maybe Prebuilt
     -- ^ Prebuilt externs and timestamp for this module, if any.
+  , statusDirtyExterns :: Maybe ExternsFile
+    -- ^ Prebuilt externs and timestamp for this module, if any, but also present even if the source file is changed.
   }
 
 -- | Called when we finished compiling a module and want to report back the
@@ -110,7 +113,7 @@ markComplete
   -> BuildJobResult
   -> m ()
 markComplete buildPlan moduleName result = do
-  let BuildJob rVar _ = fromMaybe (internalError "make: markComplete no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
+  let BuildJob rVar _ _ = fromMaybe (internalError "make: markComplete no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
   putMVar rVar result
 
 -- | Whether or not the module with the given ModuleName needs to be rebuilt
@@ -143,7 +146,7 @@ getResult buildPlan moduleName =
     Nothing -> do
       let bj = fromMaybe (internalError "make: no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
       r <- readMVar $ bjResult bj
-      pure $ buildJobSuccess (bjPrebuilt bj) r
+      pure $ buildJobSuccess (bjDirtyExterns bj) r
 
 -- | Gets the Prebuilt for any modules whose source files didn't change.
 didModuleSourceFilesChange
@@ -152,6 +155,14 @@ didModuleSourceFilesChange
   -> Maybe Prebuilt
 didModuleSourceFilesChange buildPlan moduleName =
   bjPrebuilt =<< M.lookup moduleName (bpBuildJobs buildPlan)
+
+-- | Gets the Prebuilt for any modules whose source files didn't change.
+getDirtyCacheFile
+  :: BuildPlan
+  -> ModuleName
+  -> Maybe ExternsFile
+getDirtyCacheFile buildPlan moduleName =
+  bjDirtyExterns =<< M.lookup moduleName (bpBuildJobs buildPlan)
 
 -- | Constructs a BuildPlan for the given module graph.
 --
@@ -184,17 +195,20 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
     makeBuildJob prev (moduleName, rebuildStatus) = do
       let !_ = trace (show ("makeBuildJob" :: String,
             case rebuildStatus of
-              (RebuildStatus { statusRebuildNever
+              RebuildStatus { statusRebuildNever
                                   , statusNewCacheInfo
-                                  , statusPrebuilt}) ->
+                                  , statusPrebuilt
+                                  , statusDirtyExterns
+                                  } ->
                       ( ("statusRebuildNever" :: String,  statusRebuildNever)
                       , ("statusNewCacheInfo" :: String,  isJust statusNewCacheInfo)
                       , ("statusPrebuilt" :: String,  isJust statusPrebuilt)
+                      , ("statusDirtyExterns" :: String,  isJust statusDirtyExterns)
                       )
 
               , moduleName)) ()
       buildJobMvar <- C.newEmptyMVar
-      let buildJob = BuildJob buildJobMvar (statusPrebuilt rebuildStatus)
+      let buildJob = BuildJob buildJobMvar (statusPrebuilt rebuildStatus) (statusDirtyExterns rebuildStatus)
       pure (M.insert moduleName buildJob prev)
 
     getRebuildStatus :: ModuleName -> m (ModuleName, RebuildStatus)
@@ -204,10 +218,12 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
         Left RebuildNever -> do
           let !_ = trace (show ("getRebuildStatus" :: String, "RebuildNever" :: String, moduleName)) ()
           prebuilt <- findExistingExtern moduleName
+          dirtyExterns <- snd <$> readExterns moduleName
           pure (RebuildStatus
             { statusModuleName = moduleName
             , statusRebuildNever = True
             , statusPrebuilt = prebuilt
+            , statusDirtyExterns = dirtyExterns
             , statusNewCacheInfo = Nothing
             })
         Left RebuildAlways -> do
@@ -216,6 +232,7 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
             { statusModuleName = moduleName
             , statusRebuildNever = False
             , statusPrebuilt = Nothing
+            , statusDirtyExterns = Nothing
             , statusNewCacheInfo = Nothing
             })
         Right cacheInfo -> do
@@ -226,11 +243,13 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
             if isUpToDate
               then findExistingExtern moduleName
               else pure Nothing
+          dirtyExterns <- snd <$> readExterns moduleName
           let !_ = trace (show ("getRebuildStatus" :: String, "CacheFound" :: String, case prebuilt of Nothing -> "Nothing" :: String; Just _  -> "Just _" :: String, moduleName)) ()
           pure (RebuildStatus
             { statusModuleName = moduleName
             , statusRebuildNever = False
             , statusPrebuilt = prebuilt
+            , statusDirtyExterns = dirtyExterns
             , statusNewCacheInfo = Just newCacheInfo
             })
 

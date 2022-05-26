@@ -243,6 +243,7 @@ make ma@MakeActions{..} ms = do
       _ :: Bool <- elem WasRebuilt . maybe [] (fmap (\(_,_,c) -> c)) . sequence <$> results
       let ourPrebuiltIfSourceFilesDidntChange = didModuleSourceFilesChange buildPlan moduleName
       let ourCacheFileIfSourceFilesDidntChange = pbExternsFile <$> ourPrebuiltIfSourceFilesDidntChange
+      let ourDirtyCacheFile = getDirtyCacheFile buildPlan moduleName
       let didOurSourceFilesChange = isNothing ourCacheFileIfSourceFilesDidntChange
       -- _ <- trace ((show :: (String, ModuleName, String, [ModuleName], String, Int, Maybe [ModuleName]) -> String) ("buildModule start", moduleName, "deps", deps, "mexterns", length mexterns, fmap efModuleName . snd <$> mexterns)) (pure ())
 
@@ -296,7 +297,7 @@ make ma@MakeActions{..} ms = do
             (Just _, _) -> do
               (exts, warnings) <- listen $ rebuildModule' ma env externs m
 
-              case buildJobSuccess ourPrebuiltIfSourceFilesDidntChange (BuildJobSucceeded (pwarnings' <> warnings) exts) of
+              case buildJobSuccess ourDirtyCacheFile (BuildJobSucceeded (pwarnings' <> warnings) exts) of
                 Just (_, _, NotRebuilt) -> do
                   _ <- trace (show ("buildModule post rebuildModule' cache-noop" :: String, moduleName)) (pure ())
                   return $ BuildJobNotNeeded exts

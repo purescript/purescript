@@ -7,10 +7,12 @@ module Language.PureScript.AST.SourcePos where
 import Prelude.Compat
 
 import Codec.Serialise (Serialise)
+import qualified Codec.Serialise as Serialise
+import qualified Codec.Serialise.Class as Serialise
 import Control.DeepSeq (NFData)
 import Data.Aeson ((.=), (.:))
 import Data.Text (Text)
-import GHC.Generics (Generic)
+import GHC.Generics (Generic, from, to)
 import Language.PureScript.Comments
 import qualified Data.Aeson as A
 import qualified Data.Text as T
@@ -25,7 +27,12 @@ data SourcePos = SourcePos
     -- ^ Line number
   , sourcePosColumn :: Int
     -- ^ Column number
-  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
+  } deriving (Show, Eq, Ord, Generic, NFData)
+
+instance Serialise SourcePos where
+  -- NOTE[fh]: this is quite bad to push to main, since I'm sure it'll break ide integrations etc, but I'm only trying shit out now
+  encode (SourcePos _ _) = Serialise.gencode $ from (SourcePos 0 0)
+  decode = to <$> Serialise.gdecode
 
 displaySourcePos :: SourcePos -> Text
 displaySourcePos sp =
