@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 module Language.PureScript.Make.BuildPlan
   ( BuildPlan(bpEnv)
   , BuildJobResult(..)
@@ -20,7 +21,7 @@ import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import           Data.Foldable (foldl')
 import qualified Data.Map as M
-import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe, isJust)
 import           Data.Time.Clock (UTCTime)
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
@@ -32,6 +33,7 @@ import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names (ModuleName)
 import           Language.PureScript.Sugar.Names.Env
 import           System.Directory (getCurrentDirectory)
+import Debug.Trace
 
 -- | The BuildPlan tracks information about our build progress, and holds all
 -- prebuilt modules for incremental builds.
@@ -46,9 +48,10 @@ data Prebuilt = Prebuilt
   , pbExternsFile :: ExternsFile
   }
 
-newtype BuildJob = BuildJob
+data BuildJob = BuildJob
   { bjResult :: C.MVar BuildJobResult
     -- ^ Note: an empty MVar indicates that the build job has not yet finished.
+  , bjPrebuilt :: Maybe Prebuilt
   }
 
 data BuildJobResult
@@ -92,7 +95,7 @@ markComplete
   -> BuildJobResult
   -> m ()
 markComplete buildPlan moduleName result = do
-  let BuildJob rVar = fromMaybe (internalError "make: markComplete no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
+  let BuildJob rVar _ = fromMaybe (internalError "make: markComplete no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
   putMVar rVar result
 
 -- | Whether or not the module with the given ModuleName needs to be rebuilt
@@ -141,8 +144,8 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
   rebuildStatuses <- A.forConcurrently sortedModuleNames getRebuildStatus
   let prebuilt =
         foldl' collectPrebuiltModules M.empty $
-          mapMaybe (\s -> (statusModuleName s, statusRebuildNever s,) <$> statusPrebuilt s) rebuildStatuses
-  let toBeRebuilt = filter (not . flip M.member prebuilt) sortedModuleNames
+          mapMaybe (\s -> (statusModuleName s, statusRebuildNever s,) <$> statusPrebuilt s) (snd <$> rebuildStatuses)
+  let toBeRebuilt = filter (not . flip M.member prebuilt . fst) rebuildStatuses
   buildJobs <- foldM makeBuildJob M.empty toBeRebuilt
   env <- C.newMVar primEnv
   pure
@@ -151,18 +154,31 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
         update = flip $ \s ->
           M.alter (const (statusNewCacheInfo s)) (statusModuleName s)
       in
-        foldl' update cacheDb rebuildStatuses
+        foldl' update cacheDb (snd <$> rebuildStatuses)
     )
   where
-    makeBuildJob prev moduleName = do
-      buildJob <- BuildJob <$> C.newEmptyMVar
+    makeBuildJob prev (moduleName, rebuildStatus) = do
+      let !_ = trace (show ("makeBuildJob" :: String,
+            case rebuildStatus of
+              (RebuildStatus { statusRebuildNever
+                                  , statusNewCacheInfo
+                                  , statusPrebuilt}) ->
+                      ( ("statusRebuildNever" :: String,  statusRebuildNever)
+                      , ("statusNewCacheInfo" :: String,  isJust statusNewCacheInfo)
+                      , ("statusPrebuilt" :: String,  isJust statusPrebuilt)
+                      )
+
+              , moduleName)) ()
+      buildJobMvar <- C.newEmptyMVar
+      let buildJob = BuildJob buildJobMvar (statusPrebuilt rebuildStatus)
       pure (M.insert moduleName buildJob prev)
 
-    getRebuildStatus :: ModuleName -> m RebuildStatus
-    getRebuildStatus moduleName = do
+    getRebuildStatus :: ModuleName -> m (ModuleName, RebuildStatus)
+    getRebuildStatus moduleName = (moduleName,) <$> do
       inputInfo <- getInputTimestampsAndHashes moduleName
       case inputInfo of
         Left RebuildNever -> do
+          let !_ = trace (show ("getRebuildStatus" :: String, "RebuildNever" :: String, moduleName)) ()
           prebuilt <- findExistingExtern moduleName
           pure (RebuildStatus
             { statusModuleName = moduleName
@@ -171,6 +187,7 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
             , statusNewCacheInfo = Nothing
             })
         Left RebuildAlways -> do
+          let !_ = trace (show ("getRebuildStatus" :: String, "RebuildAlways" :: String, moduleName)) ()
           pure (RebuildStatus
             { statusModuleName = moduleName
             , statusRebuildNever = False
@@ -181,9 +198,11 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
           cwd <- liftBase getCurrentDirectory
           (newCacheInfo, isUpToDate) <- checkChanged cacheDb moduleName cwd cacheInfo
           prebuilt <-
+            -- NOTE[fh]: prebuilt is Nothing for source-modified files, and Just for non-source modified files
             if isUpToDate
               then findExistingExtern moduleName
               else pure Nothing
+          let !_ = trace (show ("getRebuildStatus" :: String, "CacheFound" :: String, case prebuilt of Nothing -> "Nothing" :: String; Just _  -> "Just _" :: String, moduleName)) ()
           pure (RebuildStatus
             { statusModuleName = moduleName
             , statusRebuildNever = False
@@ -202,11 +221,12 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
       | rebuildNever = M.insert moduleName pb prev
       | otherwise = do
           let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
+          -- let !_ = trace (show ("collectPrebuiltModules"::String, moduleName, "depends on"::String, deps)) ()
           case traverse (fmap pbModificationTime . flip M.lookup prev) deps of
             Nothing ->
               -- If we end up here, one of the dependencies didn't exist in the
-              -- prebuilt map and so we know a dependency needs to be rebuilt, which
-              -- means we need to be rebuilt in turn.
+              -- prebuilt map and so we know a dependency might need to be rebuilt, which
+              -- means we might need to be rebuilt in turn.
               prev
             Just modTimes ->
               case maximumMaybe modTimes of

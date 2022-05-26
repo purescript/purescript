@@ -49,6 +49,7 @@ import           Language.PureScript.Make.Monad as Monad
 import qualified Language.PureScript.CoreFn as CF
 import           System.Directory (doesFileExist)
 import           System.FilePath (replaceExtension)
+import Debug.Trace
 
 -- | Rebuild a single module.
 --
@@ -134,6 +135,14 @@ make ma@MakeActions{..} ms = do
 
   (sorted, graph) <- sortModules Transitive (moduleSignature . CST.resPartial) ms
 
+
+  -- todo `readExterns` for the file if it didn't change; deps was Transitive not Direct, that's way too safe imo, guessing we don't use the new externs for newly compiled things, and we don't figure out if that extern changed, so we always recompile transitive deps, which is sad since we don't have a cross-module non-stdlib inliner
+
+  -- want to split direct deps (should we recompile it or not?) from transitive deps (things we want to look through for e.g. type defs)
+
+  -- 3h spent day one
+  -- day 2, start 2022-05-26 12:20:00
+
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
@@ -210,6 +219,7 @@ make ma@MakeActions{..} ms = do
 
   buildModule :: BuildPlan -> ModuleName -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
   buildModule buildPlan moduleName fp pwarnings mres deps = do
+    _ <- trace ((show :: (String, ModuleName) -> String) ("buildModule start", moduleName)) (pure ())
     result <- flip catchError (return . BuildJobFailed) $ do
       let pwarnings' = CST.toMultipleWarnings fp pwarnings
       tell pwarnings'
@@ -218,6 +228,8 @@ make ma@MakeActions{..} ms = do
       -- module should be rebuilt, so the first thing to do is to wait on the
       -- MVars for the module's dependencies.
       mexterns <- fmap unzip . sequence <$> traverse (getResult buildPlan) deps
+      _ <- trace ((show :: (String, ModuleName, String, [ModuleName], String, Int, Maybe ([ModuleName])) -> String) ("buildModule start", moduleName, "deps", deps, "mexterns", length mexterns
+        , fmap efModuleName . snd <$> mexterns)) (pure ())
 
       case mexterns of
         Just (_, externs) -> do
@@ -231,7 +243,11 @@ make ma@MakeActions{..} ms = do
                 _ -> return e
             foldM go env deps
           env <- C.readMVar (bpEnv buildPlan)
+
+          _ <- trace ((show :: (String, ModuleName) -> String) ("buildModule pre rebuildModule'", moduleName)) (pure ())
+
           (exts, warnings) <- listen $ rebuildModule' ma env externs m
+          _ <- trace ((show :: (String, ModuleName) -> String) ("buildModule post rebuildModule'", moduleName)) (pure ())
           return $ BuildJobSucceeded (pwarnings' <> warnings) exts
         Nothing -> return BuildJobSkipped
 

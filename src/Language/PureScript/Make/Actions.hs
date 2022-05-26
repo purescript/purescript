@@ -72,7 +72,7 @@ data ProgressMessage
 
 -- | Render a progress message
 renderProgressMessage :: ProgressMessage -> T.Text
-renderProgressMessage (CompilingModule mn) = T.append "Compiling " (runModuleName mn)
+renderProgressMessage (CompilingModule mn) = T.append "CompilingX2 " (runModuleName mn)
 
 -- | Actions that require implementations when running in "make" mode.
 --
