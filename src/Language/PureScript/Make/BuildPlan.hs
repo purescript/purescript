@@ -1,18 +1,23 @@
 {-# LANGUAGE TypeApplications #-}
 module Language.PureScript.Make.BuildPlan
-  ( BuildPlan(bpEnv)
-  , BuildJobResult(..)
-  , buildJobSuccess
-  , buildJobFailure
-  , construct
-  , getResult
-  , collectResults
-  , markComplete
-  , needsRebuild
-  ) where
+--   ( BuildPlan(bpEnv)
+--   , BuildJobResult(..)
+--   , WasRebuilt(..)
+--   , Prebuilt(..)
+--   , buildJobSuccess
+--   , buildJobFailure
+--   , construct
+--   , didModuleSourceFilesChange
+--   , getResult
+--   , collectResults
+--   , markComplete
+--   , needsRebuild
+--   ) where
+  where
 
 import           Prelude
 
+import Codec.Serialise as Serialise
 import           Control.Concurrent.Async.Lifted as A
 import           Control.Concurrent.Lifted as C
 import           Control.Monad.Base (liftBase)
@@ -58,15 +63,25 @@ data BuildJobResult
   = BuildJobSucceeded !MultipleErrors !ExternsFile
   -- ^ Succeeded, with warnings and externs
   --
+  | BuildJobNotNeeded !ExternsFile
+  -- ^ Cache hit, so no warnings
+  --
   | BuildJobFailed !MultipleErrors
   -- ^ Failed, with errors
 
   | BuildJobSkipped
   -- ^ The build job was not run, because an upstream build job failed
 
-buildJobSuccess :: BuildJobResult -> Maybe (MultipleErrors, ExternsFile)
-buildJobSuccess (BuildJobSucceeded warnings externs) = Just (warnings, externs)
-buildJobSuccess _ = Nothing
+data WasRebuilt
+  = WasRebuilt
+  | NotRebuilt
+  deriving (Show, Eq)
+
+buildJobSuccess :: Maybe Prebuilt -> BuildJobResult -> Maybe (MultipleErrors, ExternsFile, WasRebuilt)
+buildJobSuccess (Just (Prebuilt _ prebuiltExterns)) (BuildJobSucceeded warnings externs) | Serialise.serialise prebuiltExterns == Serialise.serialise externs = Just (warnings, externs, NotRebuilt)
+buildJobSuccess _ (BuildJobSucceeded warnings externs) = Just (warnings, externs, WasRebuilt)
+buildJobSuccess _ (BuildJobNotNeeded externs) = Just (MultipleErrors [], externs, NotRebuilt)
+buildJobSuccess _ _ = Nothing
 
 buildJobFailure :: BuildJobResult -> Maybe MultipleErrors
 buildJobFailure (BuildJobFailed errors) = Just errors
@@ -120,14 +135,23 @@ getResult
   :: (MonadBaseControl IO m)
   => BuildPlan
   -> ModuleName
-  -> m (Maybe (MultipleErrors, ExternsFile))
+  -> m (Maybe (MultipleErrors, ExternsFile, WasRebuilt))
 getResult buildPlan moduleName =
   case M.lookup moduleName (bpPrebuilt buildPlan) of
     Just es ->
-      pure (Just (MultipleErrors [], pbExternsFile es))
+      pure (Just (MultipleErrors [], pbExternsFile es, NotRebuilt))
     Nothing -> do
-      r <- readMVar $ bjResult $ fromMaybe (internalError "make: no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
-      pure $ buildJobSuccess r
+      let bj = fromMaybe (internalError "make: no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
+      r <- readMVar $ bjResult bj
+      pure $ buildJobSuccess (bjPrebuilt bj) r
+
+-- | Gets the Prebuilt for any modules whose source files didn't change.
+didModuleSourceFilesChange
+  :: BuildPlan
+  -> ModuleName
+  -> Maybe Prebuilt
+didModuleSourceFilesChange buildPlan moduleName =
+  bjPrebuilt =<< M.lookup moduleName (bpBuildJobs buildPlan)
 
 -- | Constructs a BuildPlan for the given module graph.
 --

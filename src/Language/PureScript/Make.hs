@@ -24,7 +24,7 @@ import           Data.Function (on)
 import           Data.Foldable (fold, for_)
 import           Data.List (foldl', sortOn)
 import qualified Data.List.NonEmpty as NEL
-import           Data.Maybe (fromMaybe)
+import           Data.Maybe (fromMaybe, isNothing)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -133,8 +133,7 @@ make ma@MakeActions{..} ms = do
   checkModuleNames
   cacheDb <- readCacheDb
 
-  (sorted, graph) <- sortModules Transitive (moduleSignature . CST.resPartial) ms
-
+  (sorted, graph, directGraph) <- sortModules3 Transitive (moduleSignature . CST.resPartial) ms
 
   -- todo `readExterns` for the file if it didn't change; deps was Transitive not Direct, that's way too safe imo, guessing we don't use the new externs for newly compiled things, and we don't figure out if that extern changed, so we always recompile transitive deps, which is sad since we don't have a cross-module non-stdlib inliner
 
@@ -149,17 +148,21 @@ make ma@MakeActions{..} ms = do
   for_ toBeRebuilt $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
+    let directDeps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName directGraph)
     buildModule buildPlan moduleName
       (spanName . getModuleSourceSpan . CST.resPartial $ m)
       (fst $ CST.resFull m)
       (fmap importPrim . snd $ CST.resFull m)
       (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
+      (directDeps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
   -- Wait for all threads to complete, and collect results (and errors).
   (failures, successes) <-
     let
       splitResults = \case
         BuildJobSucceeded _ exts ->
+          Right exts
+        BuildJobNotNeeded exts ->
           Right exts
         BuildJobFailed errs ->
           Left errs
@@ -217,19 +220,58 @@ make ma@MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: BuildPlan -> ModuleName -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
-  buildModule buildPlan moduleName fp pwarnings mres deps = do
-    _ <- trace ((show :: (String, ModuleName) -> String) ("buildModule start", moduleName)) (pure ())
+  buildModule :: BuildPlan -> ModuleName -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> [ModuleName] -> m ()
+  buildModule buildPlan moduleName fp pwarnings mres deps directDeps = do
+    -- _ <- trace ((show :: (String, ModuleName) -> String) ("buildModule start", moduleName)) (pure ())
     result <- flip catchError (return . BuildJobFailed) $ do
       let pwarnings' = CST.toMultipleWarnings fp pwarnings
       tell pwarnings'
       m <- CST.unwrapParserError fp mres
+
       -- We need to wait for dependencies to be built, before checking if the current
       -- module should be rebuilt, so the first thing to do is to wait on the
       -- MVars for the module's dependencies.
-      mexterns <- fmap unzip . sequence <$> traverse (getResult buildPlan) deps
-      _ <- trace ((show :: (String, ModuleName, String, [ModuleName], String, Int, Maybe ([ModuleName])) -> String) ("buildModule start", moduleName, "deps", deps, "mexterns", length mexterns
-        , fmap efModuleName . snd <$> mexterns)) (pure ())
+      let resultsWithModuleNames :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, WasRebuilt))] = traverse (\dep ->
+            do
+              res <- getResult buildPlan dep
+              pure ((dep,) <$> res)
+            ) deps
+      let results = fmap fmap fmap snd <$> resultsWithModuleNames
+      mexterns <- fmap unzip . fmap (fmap (\(a,b,_) -> (a,b))) . sequence <$> results
+      _ :: M.Map ModuleName WasRebuilt <-
+        fromMaybe M.empty . fmap M.fromList . fmap (fmap (\(mn, (_,_,c)) -> (mn, c))) . sequence <$> resultsWithModuleNames
+      _ :: Bool <- elem WasRebuilt . maybe [] (fmap (\(_,_,c) -> c)) . sequence <$> results
+      let ourPrebuiltIfSourceFilesDidntChange = didModuleSourceFilesChange buildPlan moduleName
+      let ourCacheFileIfSourceFilesDidntChange = pbExternsFile <$> ourPrebuiltIfSourceFilesDidntChange
+      let didOurSourceFilesChange = isNothing ourCacheFileIfSourceFilesDidntChange
+      -- _ <- trace ((show :: (String, ModuleName, String, [ModuleName], String, Int, Maybe [ModuleName]) -> String) ("buildModule start", moduleName, "deps", deps, "mexterns", length mexterns, fmap efModuleName . snd <$> mexterns)) (pure ())
+
+
+
+      let resultsWithModuleNamesDirect :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, WasRebuilt))] = traverse (\dep ->
+            do
+              res <- getResult buildPlan dep
+              pure ((dep,) <$> res)
+            ) directDeps
+      let resultsDirect = fmap fmap fmap snd <$> resultsWithModuleNamesDirect
+      _ <- fmap unzip . fmap (fmap (\(a,b,_) -> (a,b))) . sequence <$> resultsDirect
+      didEachDependencyChangeDirect :: M.Map ModuleName WasRebuilt <-
+        fromMaybe M.empty . fmap M.fromList . fmap (fmap (\(mn, (_,_,c)) -> (mn, c))) . sequence <$> resultsWithModuleNamesDirect
+      let didAnyDependenciesChangeDirect :: Bool = elem WasRebuilt $ M.elems didEachDependencyChangeDirect
+      -- let ourPrebuiltIfSourceFilesDidntChangeDirect = didModuleSourceFilesChange buildPlan moduleName
+      -- let ourCacheFileIfSourceFilesDidntChangeDirect = pbExternsFile <$> ourPrebuiltIfSourceFilesDidntChangeDirect
+      -- let didOurSourceFilesChangeDirect = isNothing ourCacheFileIfSourceFilesDidntChangeDirect
+      -- _ <- trace ((show :: (String, ModuleName, String, [ModuleName], String, Int, Maybe [ModuleName]) -> String) ("buildModule start", moduleName, "deps", deps, "mexterns", length mexterns, fmap efModuleName . snd <$> mexterns)) (pure ())
+
+
+
+
+      let possiblyDirtyModules :: [ModuleName] = directDeps
+      -- let nonPossiblyDirtyDeps :: [ModuleName] = possiblyDirtyModules \\ deps
+      -- let didEachDirtyDependencyChange :: M.Map ModuleName WasRebuilt = didEachDependencyChangeDirect `M.difference` (M.fromList $ (,()) <$> deps)
+      let !_ = trace (show (moduleName, "possiblyDirtyModules" :: String, possiblyDirtyModules))
+      -- depCount <- length <$> resultsWithModuleNames
+      -- let !_ = trace (show (moduleName, "didEachDirtyDependencyChange" :: String, depCount, didEachDirtyDependencyChange))
 
       case mexterns of
         Just (_, externs) -> do
@@ -244,11 +286,29 @@ make ma@MakeActions{..} ms = do
             foldM go env deps
           env <- C.readMVar (bpEnv buildPlan)
 
-          _ <- trace ((show :: (String, ModuleName) -> String) ("buildModule pre rebuildModule'", moduleName)) (pure ())
+          _ <- trace (show ("buildModule pre rebuildModule'" :: String, "didOurSourceFilesChange" :: String, didOurSourceFilesChange, "didAnyDependenciesChangeDirect" :: String, didAnyDependenciesChangeDirect, moduleName, didEachDependencyChangeDirect)) (pure ())
 
-          (exts, warnings) <- listen $ rebuildModule' ma env externs m
-          _ <- trace ((show :: (String, ModuleName) -> String) ("buildModule post rebuildModule'", moduleName)) (pure ())
-          return $ BuildJobSucceeded (pwarnings' <> warnings) exts
+          case (ourCacheFileIfSourceFilesDidntChange, didAnyDependenciesChangeDirect) of
+            (Just exts, False) -> do
+              _ <- trace (show ("buildModule post rebuildModule' cache-hit" :: String, moduleName)) (pure ())
+              return $ BuildJobNotNeeded exts
+
+            (Just _, _) -> do
+              (exts, warnings) <- listen $ rebuildModule' ma env externs m
+
+              case buildJobSuccess ourPrebuiltIfSourceFilesDidntChange (BuildJobSucceeded (pwarnings' <> warnings) exts) of
+                Just (_, _, NotRebuilt) -> do
+                  _ <- trace (show ("buildModule post rebuildModule' cache-noop" :: String, moduleName)) (pure ())
+                  return $ BuildJobNotNeeded exts
+                _ -> do
+                  _ <- trace (show ("buildModule post rebuildModule' cache-miss" :: String, moduleName)) (pure ())
+                  return $ BuildJobSucceeded (pwarnings' <> warnings) exts
+
+            _ -> do
+              (exts, warnings) <- listen $ rebuildModule' ma env externs m
+              _ <- trace (show ("buildModule post rebuildModule' cache-none" :: String, moduleName)) (pure ())
+              return $ BuildJobSucceeded (pwarnings' <> warnings) exts
+
         Nothing -> return BuildJobSkipped
 
     BuildPlan.markComplete buildPlan moduleName result
