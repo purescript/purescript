@@ -3,6 +3,7 @@ bin
 dist
 cabal-dev
 .cabal-sandbox
+stack.yaml.lock
 cabal.sandbox.config
 dist-newstyle/
 cabal.project.local*
@@ -26,6 +27,9 @@ tests/support/package-lock.json
 .psc-package/
 tags
 TAGS
+
+# Gather source map files from golden tests
+.source-maps
 
 # Profiling related
 *.aux

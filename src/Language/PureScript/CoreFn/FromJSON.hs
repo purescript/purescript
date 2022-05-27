@@ -53,6 +53,8 @@ metaFromJSON v = withObject "Meta" metaFromObj v
                         -> return $ Just IsTypeClassConstructor
         "IsForeign"     -> return $ Just IsForeign
         "IsWhere"       -> return $ Just IsWhere
+        "IsSyntheticApp"
+                        -> return $ Just IsSyntheticApp
         _               -> fail ("not recognized Meta: " ++ T.unpack type_)
 
     isConstructorFromJSON o = do
@@ -99,7 +101,9 @@ literalFromJSON t = withObject "Literal" literalFromObj
     ObjectLiteral <$> recordFromJSON t val
 
 identFromJSON :: Value -> Parser Ident
-identFromJSON = withText "Ident" (return . Ident)
+identFromJSON = withText "Ident" $ \case
+  ident | ident == unusedIdent -> pure UnusedIdent 
+        | otherwise -> pure $ Ident ident 
 
 properNameFromJSON :: Value -> Parser (ProperName a)
 properNameFromJSON = fmap ProperName . parseJSON

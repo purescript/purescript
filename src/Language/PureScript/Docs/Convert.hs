@@ -28,6 +28,7 @@ import qualified Language.PureScript.Roles as P
 import qualified Language.PureScript.Sugar as P
 import qualified Language.PureScript.Types as P
 import qualified Language.PureScript.Constants.Prim as Prim
+import Language.PureScript.Sugar (RebracketCaller(CalledByDocs))
 
 -- |
 -- Convert a single module to a Docs.Module, making use of a pre-existing
@@ -270,7 +271,7 @@ partiallyDesugar externs env = evalSupplyT 0 . desugar'
       >>> P.desugarCasesModule
       >=> P.desugarTypeDeclarationsModule
       >=> fmap fst . runWriterT . flip evalStateT (env, mempty) . P.desugarImports
-      >=> P.rebracketFiltered isInstanceDecl externs
+      >=> P.rebracketFiltered CalledByDocs isInstanceDecl externs
 
   isInstanceDecl P.TypeInstanceDeclaration {} = True
   isInstanceDecl _ = False

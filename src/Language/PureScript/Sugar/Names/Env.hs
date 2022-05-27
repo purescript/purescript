@@ -34,6 +34,7 @@ import qualified Data.Set as S
 
 import qualified Language.PureScript.Constants.Prim as C
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
@@ -205,6 +206,11 @@ primSymbolExports :: Exports
 primSymbolExports = mkPrimExports primSymbolTypes primSymbolClasses
 
 -- |
+-- The exported types from the @Prim.Int@ module
+primIntExports :: Exports
+primIntExports = mkPrimExports primIntTypes primIntClasses
+
+-- |
 -- The exported types from the @Prim.TypeError@ module
 --
 primTypeErrorExports :: Exports
@@ -255,6 +261,9 @@ primEnv = M.fromList
     )
   , ( C.PrimSymbol
     , (internalModuleSourceSpan "<Prim.Symbol>", nullImports, primSymbolExports)
+    )
+  , ( C.PrimInt
+    , (internalModuleSourceSpan "<Prim.Int>", nullImports, primIntExports)
     )
   , ( C.PrimTypeError
     , (internalModuleSourceSpan "<Prim.TypeError>", nullImports, primTypeErrorExports)
@@ -480,5 +489,8 @@ checkImportConflicts ss currentModule toName xs =
         return (mnNew, mnOrig)
       _ -> throwError . errorMessage' ss $ ScopeConflict name conflictModules
     else
-      let ImportRecord (Qualified (Just mnNew) _) mnOrig _ _ = head byOrig
-      in return (mnNew, mnOrig)
+      case head byOrig of
+        ImportRecord (Qualified (Just mnNew) _) mnOrig _ _ ->
+          return (mnNew, mnOrig)
+        _ ->
+          internalError "checkImportConflicts: ImportRecord should be qualified"

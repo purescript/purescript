@@ -527,7 +527,11 @@ insoluble
   -> SourceType
   -> MultipleErrors
 insoluble k a b =
-  errorMessage $ NoInstanceFound (srcConstraint Prim.Coercible [k] [a, b] Nothing) (any containsUnknowns [a, b])
+  -- We can erase kind applications when determining whether to show the
+  -- "Consider adding a type annotation" hint, because annotating kinds to
+  -- instantiate unknowns in Coercible constraints should never resolve
+  -- NoInstanceFound errors.
+  errorMessage $ NoInstanceFound (srcConstraint Prim.Coercible [k] [a, b] Nothing) [] (any containsUnknowns [a, b])
 
 -- | Constraints of the form @Coercible a b@ can be solved if the two arguments
 -- are the same. Since we currently don't support higher-rank arguments in

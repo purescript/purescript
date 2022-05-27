@@ -6,6 +6,7 @@ module Language.PureScript.CoreFn.Traversals where
 import Prelude.Compat
 
 import Control.Arrow (second, (***), (+++))
+import Data.Bitraversable (bitraverse)
 
 import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Binders
@@ -43,3 +44,43 @@ everywhereOnValues f g h = (f', g', h')
   handleLiteral i (ArrayLiteral ls) = ArrayLiteral (map i ls)
   handleLiteral i (ObjectLiteral ls) = ObjectLiteral (map (fmap i) ls)
   handleLiteral _ other = other
+
+-- |
+-- Apply the provided functions to the top level of AST nodes.
+--
+-- This function is useful as a building block for recursive functions, but
+-- doesn't actually recurse itself.
+--
+traverseCoreFn
+  :: forall f a
+   . Applicative f
+  => (Bind a -> f (Bind a))
+  -> (Expr a -> f (Expr a))
+  -> (Binder a -> f (Binder a))
+  -> (CaseAlternative a -> f (CaseAlternative a))
+  -> (Bind a -> f (Bind a), Expr a -> f (Expr a), Binder a -> f (Binder a), CaseAlternative a -> f (CaseAlternative a))
+traverseCoreFn f g h i = (f', g', h', i')
+  where
+  f' (NonRec a name e) = NonRec a name <$> g e
+  f' (Rec es) = Rec <$> traverse (traverse g) es
+
+  g' (Literal ann e) = Literal ann <$> handleLiteral g e
+  g' (Accessor ann prop e) = Accessor ann prop <$> g e
+  g' (ObjectUpdate ann obj vs) = ObjectUpdate ann <$> g obj <*> traverse (traverse g) vs
+  g' (Abs ann name e) = Abs ann name <$> g e
+  g' (App ann v1 v2) = App ann <$> g v1 <*> g v2
+  g' (Case ann vs alts) = Case ann <$> traverse g vs <*> traverse i alts
+  g' (Let ann ds e) = Let ann <$> traverse f ds <*> g' e
+  g' e = pure e
+
+  h' (LiteralBinder a b) = LiteralBinder a <$> handleLiteral h b
+  h' (NamedBinder a name b) = NamedBinder a name <$> h b
+  h' (ConstructorBinder a q1 q2 bs) = ConstructorBinder a q1 q2 <$> traverse h bs
+  h' b = pure b
+
+  i' ca = CaseAlternative <$> traverse h (caseAlternativeBinders ca) <*> bitraverse (traverse $ bitraverse g g) g (caseAlternativeResult ca)
+
+  handleLiteral withItem = \case
+    ArrayLiteral ls -> ArrayLiteral <$> traverse withItem ls
+    ObjectLiteral ls -> ObjectLiteral <$> traverse (traverse withItem) ls
+    other -> pure other

@@ -15,7 +15,7 @@ module Language.PureScript.Docs.RenderedCode.RenderType
 import Prelude.Compat
 
 import Data.Maybe (fromMaybe)
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import Data.List (uncons)
 
 import Control.Arrow ((<+>))
@@ -55,6 +55,8 @@ typeLiterals = mkPattern match
     Just (typeOp n)
   match (PPTypeLevelString str) =
     Just (syntax (prettyPrintString str))
+  match (PPTypeLevelInt nat) =
+    Just (syntax $ pack $ show nat)
   match _ =
     Nothing
 

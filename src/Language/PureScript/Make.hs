@@ -73,8 +73,19 @@ rebuildModule'
   -> [ExternsFile]
   -> Module
   -> m ExternsFile
-rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
-  progress $ CompilingModule moduleName
+rebuildModule' act env ext mdl = rebuildModuleWithIndex act env ext mdl Nothing
+
+rebuildModuleWithIndex
+  :: forall m
+   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => MakeActions m
+  -> Env
+  -> [ExternsFile]
+  -> Module
+  -> Maybe (Int, Int)
+  -> m ExternsFile
+rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) moduleIndex = do
+  progress $ CompilingModule moduleName moduleIndex
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
       withPrim = importPrim m
   lint withPrim
@@ -100,7 +111,7 @@ rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ deguarded
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
-      optimized = CF.optimizeCoreFn corefn
+      (optimized, nextVar'') = runSupply nextVar' $ CF.optimizeCoreFn corefn
       (renamedIdents, renamed) = renameInModule optimized
       exts = moduleToExternsFile mod' env' renamedIdents
   ffiCodegen renamed
@@ -118,7 +129,7 @@ rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
                  ++ "; details:\n" ++ prettyPrintMultipleErrors defaultPPEOptions errs
                Right d -> d
 
-  evalSupplyT nextVar' $ codegen renamed docs exts
+  evalSupplyT nextVar'' $ codegen renamed docs exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.cbor@ file.
@@ -138,10 +149,11 @@ make ma@MakeActions{..} ms = do
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
+  let totalModuleCount = length toBeRebuilt
   for_ toBeRebuilt $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-    buildModule buildPlan moduleName
+    buildModule buildPlan moduleName totalModuleCount
       (spanName . getModuleSourceSpan . CST.resPartial $ m)
       (fst $ CST.resFull m)
       (fmap importPrim . snd $ CST.resFull m)
@@ -166,6 +178,8 @@ make ma@MakeActions{..} ms = do
 
   -- Write the updated build cache database to disk
   writeCacheDb $ Cache.removeModules (M.keysSet failures) newCacheDb
+
+  writePackageJson
 
   -- If generating docs, also generate them for the Prim modules
   outputPrimDocs
@@ -213,8 +227,8 @@ make ma@MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: BuildPlan -> ModuleName -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
-  buildModule buildPlan moduleName fp pwarnings mres deps = do
+  buildModule :: BuildPlan -> ModuleName -> Int -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
+  buildModule buildPlan moduleName cnt fp pwarnings mres deps = do
     result <- flip catchError (return . BuildJobFailed) $ do
       let pwarnings' = CST.toMultipleWarnings fp pwarnings
       tell pwarnings'
@@ -236,7 +250,9 @@ make ma@MakeActions{..} ms = do
                 _ -> return e
             foldM go env deps
           env <- C.readMVar (bpEnv buildPlan)
-          (exts, warnings) <- listen $ rebuildModule' ma env externs m
+          idx <- C.takeMVar (bpIndex buildPlan)
+          C.putMVar (bpIndex buildPlan) (idx + 1)
+          (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
           return $ BuildJobSucceeded (pwarnings' <> warnings) exts
         Nothing -> return BuildJobSkipped
 

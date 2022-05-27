@@ -1,13 +1,18 @@
 Warning found:
+in module [33mMain[0m
 at tests/purs/warning/NewtypeInstance4.purs:23:1 - 23:86 (line 23, column 1 - line 23, column 86)
 
   The derived newtype instance for
-  [33m                               [0m
-  [33m  Main.MonadWriter w           [0m
-  [33m                   (MyWriter w)[0m
-  [33m                               [0m
+  [33m                                [0m
+  [33m  Main.MonadWriter w0           [0m
+  [33m                   (MyWriter w0)[0m
+  [33m                                [0m
   implies an superclass instance for [33mMain.MonadTell[0m which could not be verified.
 
+in value declaration [33mmonadWriterMyWriter[0m
+
+where [33mw0[0m is a rigid type variable
+        bound at (line 0, column 0 - line 0, column 0)
 
 See https://github.com/purescript/documentation/blob/master/errors/UnverifiableSuperclassInstance.md for more information,
 or to contribute content related to this warning.

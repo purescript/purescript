@@ -43,6 +43,7 @@ data PrettyPrintType
   = PPTUnknown Int
   | PPTypeVar Text (Maybe Text)
   | PPTypeLevelString PSString
+  | PPTypeLevelInt Integer
   | PPTypeWildcard (Maybe Text)
   | PPTypeConstructor (Qualified (ProperName 'TypeName))
   | PPTypeOp (Qualified (OpName 'TypeOpName))
@@ -67,7 +68,9 @@ convertPrettyPrintType = go
   go _ (TUnknown _ n) = PPTUnknown n
   go _ (TypeVar _ t) = PPTypeVar t Nothing
   go _ (TypeLevelString _ s) = PPTypeLevelString s
-  go _ (TypeWildcard _ n) = PPTypeWildcard n
+  go _ (TypeLevelInt _ n) = PPTypeLevelInt n
+  go _ (TypeWildcard _ (HoleWildcard n)) = PPTypeWildcard (Just n)
+  go _ (TypeWildcard _ _) = PPTypeWildcard Nothing
   go _ (TypeConstructor _ c) = PPTypeConstructor c
   go _ (TypeOp _ o) = PPTypeOp o
   go _ (Skolem _ t _ n _) = PPSkolem t n
@@ -186,6 +189,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
       match (PPTypeWildcard name) = Just $ text $ maybe "_" (('?' :) . T.unpack) name
       match (PPTypeVar var _) = Just $ text $ T.unpack var
       match (PPTypeLevelString s) = Just $ text $ T.unpack $ prettyPrintString s
+      match (PPTypeLevelInt n) = Just $ text $ show n
       match (PPTypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
       match (PPTUnknown u)
         | suggesting = Just $ text "_"

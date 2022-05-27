@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/ConstraintInForeignImport.purs:6:1 - 6:50 (line 6, column 1 - line 6, column 50)
+
+  Unable to parse module:
+  Constraints are not allowed in foreign imports. Omit the constraint instead and update the foreign module accordingly.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+
