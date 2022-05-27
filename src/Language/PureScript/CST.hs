@@ -62,7 +62,7 @@ parseFromFiles toFilePath input =
     $ \(k, a) -> (k, sequence $ parseFromFile (toFilePath k) a)
 
 parseModuleFromFile :: FilePath -> Text -> Either (NE.NonEmpty ParserError) (PartialResult AST.Module)
-parseModuleFromFile fp content = fmap (convertModule fp) <$> parseModule (lex content)
+parseModuleFromFile fp content = fmap (convertModule fp) <$> parseModule (lexModule content)
 
 parseFromFile :: FilePath -> Text -> ([ParserWarning], Either (NE.NonEmpty ParserError) AST.Module)
 parseFromFile fp content = fmap (convertModule fp) <$> parse content

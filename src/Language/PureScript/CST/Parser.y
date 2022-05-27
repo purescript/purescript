@@ -792,7 +792,7 @@ lexer :: (SourceToken -> Parser a) -> Parser a
 lexer k = munch >>= k
 
 parse :: Text -> ([ParserWarning], Either (NE.NonEmpty ParserError) (Module ()))
-parse content = either (([],) . Left) resFull $ parseModule $ lex content
+parse content = either (([],) . Left) resFull $ parseModule $ lexModule content
 
 data PartialResult a = PartialResult
   { resPartial :: a
