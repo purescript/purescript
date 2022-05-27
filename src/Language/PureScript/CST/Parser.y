@@ -23,7 +23,6 @@ import Data.Bifunctor (second)
 import Data.Foldable (foldl', for_, toList)
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
-import qualified Data.Text as Text
 import Data.Traversable (for, sequence)
 import Language.PureScript.CST.Errors
 import Language.PureScript.CST.Flatten (flattenType)
@@ -591,7 +590,7 @@ recordBinder :: { RecordLabeled (Binder ()) }
 -- just the header, and then continue parsing the body while still sharing work.
 moduleHeader :: { Module () }
   : 'module' moduleName exports 'where' '\{' moduleImports
-      { (Module () [] $1 $2 $3 $4 $6 [] []) }
+      { (Module () $1 $2 $3 $4 $6 [] []) }
 
 moduleBody :: { ([Declaration ()], [Comment LineFeed]) }
   : moduleDecls '\}'
@@ -793,22 +792,20 @@ lexer :: (SourceToken -> Parser a) -> Parser a
 lexer k = munch >>= k
 
 parse :: Text -> ([ParserWarning], Either (NE.NonEmpty ParserError) (Module ()))
-parse content = either (([],) . Left) resFull $ parseModule shebang $ lex shebang rest
-  where
-  (shebang, rest) = chompShebang content
+parse content = either (([],) . Left) resFull $ parseModule $ lex content
 
 data PartialResult a = PartialResult
   { resPartial :: a
   , resFull :: ([ParserWarning], Either (NE.NonEmpty ParserError) a)
   } deriving (Functor)
 
-parseModule :: [SourceToken] -> [LexResult] -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
-parseModule shebang toks = fmap (\header -> PartialResult header (parseFull header)) headerRes
+parseModule :: [LexResult] -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
+parseModule toks = fmap (\header -> PartialResult header (parseFull header)) headerRes
   where
   (st, headerRes) =
     runParser (ParserState toks [] []) parseModuleHeader
 
   parseFull header = do
     let (ParserState _ _ warnings, res) = runParser st parseModuleBody
-    (warnings, (\(decls, trailing) -> header { modShebang = shebang, modDecls = decls, modTrailingComments = trailing }) <$> res)
+    (warnings, (\(decls, trailing) -> header { modDecls = decls, modTrailingComments = trailing }) <$> res)
 }

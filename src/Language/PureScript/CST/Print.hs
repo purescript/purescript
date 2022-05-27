@@ -60,7 +60,6 @@ printToken' showLayout = \case
   TokRawString raw         -> "\"\"\"" <> raw <> "\"\"\""
   TokInt raw _             -> raw
   TokNumber raw _          -> raw
-  TokShebang shebang       -> shebang
   TokLayoutStart           -> if showLayout then "{" else ""
   TokLayoutSep             -> if showLayout then ";" else ""
   TokLayoutEnd             -> if showLayout then "}" else ""

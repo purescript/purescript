@@ -38,13 +38,12 @@ lenient = go
     [Right (SourceToken ann TokEof)]
 
 -- | Lexes according to root layout rules.
-lex :: [SourceToken] -> Text -> [LexResult]
-lex shebang src = do
+lex :: Text -> [LexResult]
+lex src = do
   let (leading, src') = comments src
-  let start = SourcePos (length shebang + 1) 1
 
   lexWithState $ LexState
-    { lexPos = advanceLeading start leading
+    { lexPos = advanceLeading (SourcePos 1 1) leading
     , lexLeading = leading
     , lexSource = src'
     , lexStack = [(SourcePos 0 0, LytRoot)]

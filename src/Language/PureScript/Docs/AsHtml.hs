@@ -246,7 +246,7 @@ codeAsHtml r = outputWith elemAsHtml
   runParser p' =
     bimap (CST.prettyPrintError . NE.head) snd
       . CST.runTokenParser p'
-      . CST.lex []
+      . CST.lex
 
 renderLink :: HtmlRenderContext -> DocLink -> Html -> Html
 renderLink r link_@DocLink{..} =

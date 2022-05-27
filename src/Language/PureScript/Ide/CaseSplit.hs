@@ -124,7 +124,7 @@ addClause s wca = do
 parseType' :: (MonadError IdeError m) =>
               Text -> m P.SourceType
 parseType' s =
-  case CST.runTokenParser CST.parseType $ CST.lex [] s of
+  case CST.runTokenParser CST.parseType $ CST.lex s of
     Right type' -> pure $ CST.convertType "<purs-ide>" $ snd type'
     Left err ->
       throwError (GeneralError ("Parsing the splittype failed with:"
@@ -134,7 +134,7 @@ parseTypeDeclaration' :: (MonadError IdeError m) => Text -> m (P.Ident, P.Source
 parseTypeDeclaration' s =
   let x = fmap (CST.convertDeclaration "<purs-ide>" . snd)
         $ CST.runTokenParser CST.parseDecl
-        $ CST.lex [] s
+        $ CST.lex s
   in
     case x of
       Right [P.TypeDeclaration td] -> pure (P.unwrapTypeDeclaration td)

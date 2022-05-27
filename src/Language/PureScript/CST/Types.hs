@@ -75,7 +75,6 @@ data Token
   | TokRawString !Text
   | TokInt !Text !Integer
   | TokNumber !Text !Double
-  | TokShebang !Text
   | TokLayoutStart
   | TokLayoutSep
   | TokLayoutEnd
@@ -170,7 +169,6 @@ data Row a = Row
 
 data Module a = Module
   { modAnn :: a
-  , modShebang :: [SourceToken]
   , modKeyword :: SourceToken
   , modNamespace :: Name N.ModuleName
   , modExports :: Maybe (DelimitedNonEmpty (Export a))

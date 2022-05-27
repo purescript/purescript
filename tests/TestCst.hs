@@ -16,7 +16,6 @@ import Language.PureScript.CST.Errors as CST
 import Language.PureScript.CST.Lexer as CST
 import Language.PureScript.CST.Print as CST
 import Language.PureScript.CST.Types
-import Language.PureScript.CST.Utils (chompShebang)
 import System.FilePath (takeBaseName, replaceExtension)
 
 spec :: Spec
@@ -36,12 +35,11 @@ layoutSpec = do
   where
   runLexer file = do
     src <- Text.readFile file
-    let (shebang, rest) = chompShebang src
-    case sequence $ CST.lex shebang rest of
+    case sequence $ CST.lex src of
       Left (_, err) ->
         pure $ Text.pack $ CST.prettyPrintError err
       Right toks -> do
-        pure $ CST.printTokens (shebang <> toks)
+        pure $ CST.printTokens toks
 
 literalsSpec :: Spec
 literalsSpec = describe "Literals" $ do
@@ -66,7 +64,7 @@ literalsSpec = describe "Literals" $ do
   testProperty name test = specify name (property test)
 
 readTok' :: String -> Text -> Gen SourceToken
-readTok' failMsg t = case CST.lex [] t of
+readTok' failMsg t = case CST.lex t of
   Right tok : _ ->
     pure tok
   Left (_, err) : _ ->

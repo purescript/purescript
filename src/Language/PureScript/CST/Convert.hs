@@ -676,7 +676,7 @@ convertExport fileName export = case export of
   ann = sourceSpan fileName . toSourceRange $ exportRange export
 
 convertModule :: String -> Module a -> AST.Module
-convertModule fileName module'@(Module _ _ _ modName exps _ imps decls _) = do
+convertModule fileName module'@(Module _ _ modName exps _ imps decls _) = do
   let
     ann = uncurry (sourceAnnCommented fileName) $ moduleRange module'
     imps' = importCtr. convertImportDecl fileName <$> imps

@@ -33,7 +33,6 @@ import Language.PureScript.CST.Monad (Parser, ParserM(..), ParserState(..), LexR
 import Language.PureScript.CST.Parser
 import Language.PureScript.CST.Print
 import Language.PureScript.CST.Types
-import Language.PureScript.CST.Utils
 
 pureResult :: a -> PartialResult a
 pureResult a = PartialResult a ([], pure a)
@@ -63,9 +62,7 @@ parseFromFiles toFilePath input =
     $ \(k, a) -> (k, sequence $ parseFromFile (toFilePath k) a)
 
 parseModuleFromFile :: FilePath -> Text -> Either (NE.NonEmpty ParserError) (PartialResult AST.Module)
-parseModuleFromFile fp content = fmap (convertModule fp) <$> parseModule shebang (lex shebang rest)
-  where
-  (shebang, rest) = chompShebang content
+parseModuleFromFile fp content = fmap (convertModule fp) <$> parseModule (lex content)
 
 parseFromFile :: FilePath -> Text -> ([ParserWarning], Either (NE.NonEmpty ParserError) AST.Module)
 parseFromFile fp content = fmap (convertModule fp) <$> parse content
