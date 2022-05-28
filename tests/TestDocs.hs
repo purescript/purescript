@@ -930,11 +930,11 @@ testCases =
       ]
     )
   , ("Shebang3Undocumented",
-      [ ShouldHaveModuleDocs (n "Shebang3Undocumented") $ Just "Normal doc comment"
+      [ ShouldHaveModuleDocs (n "Shebang3Undocumented") $ Just "Normal doc comment\n"
       ]
     )
   , ("Shebang4Undocumented",
-      [ ShouldHaveModuleDocs (n "Shebang4Undocumented") $ Just "Normal doc comment"
+      [ ShouldHaveModuleDocs (n "Shebang4Undocumented") $ Just "Normal doc comment\n"
       ]
     )
   ]
