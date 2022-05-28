@@ -26,7 +26,7 @@ s.SourceMapConsumer.with(
   )
   .then(() => console.log(`${sourceMapFilePath} sourcemap is valid`))
   .catch((e) => {
-    console.log(`  ${e.message}`);
+    console.error(`  ${e.message}`);
     // See https://nodejs.org/dist/latest-v16.x/docs/api/process.html#processexitcode
     // for why we don't call `process.exit(1)`
     process.exitCode = 1;
