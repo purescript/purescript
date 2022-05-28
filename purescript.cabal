@@ -28,6 +28,7 @@ extra-source-files:
   tests/purs/**/*.out
   tests/json-compat/**/*.json
   tests/support/*.json
+  tests/support/checkSourceMapValidity.js
   tests/support/psci/**/*.purs
   tests/support/psci/**/*.edit
   tests/support/pscide/src/**/*.purs
@@ -181,6 +182,7 @@ common defaults
     transformers >=0.5.6.2 && <0.6,
     transformers-base >=0.4.6 && <0.5,
     transformers-compat >=0.6.6 && <0.7,
+    typed-process >=0.2.7.0 && <0.3,
     unordered-containers >=0.2.14.0 && <0.3,
     utf8-string >=1.0.2 && <1.1,
     vector >=0.12.3.1 && <0.13
