@@ -12,8 +12,6 @@ import TestUtils (goldenVsString, getTestFiles, SupportModules (..), compile', E
 import qualified Data.Set as Set
 import TestCompiler (getTestMain)
 import System.Process.Typed (proc, readProcess_)
-import System.Environment (lookupEnv)
-import Data.Maybe (isJust)
 
 spec :: SpecWith SupportModules
 spec =
@@ -68,10 +66,6 @@ assertCompilesToExpectedValidOutput support inputFiles = do
 -- | Fails the test if the produced source maps are not valid.
 sourceMapIsValid :: FilePath -> Expectation
 sourceMapIsValid sourceMapFilePath = do
-  ci <- isJust <$> lookupEnv "CI"
   let
-    localScriptPath = "tests" </> "support" </> "checkSourceMapValidity" <.> "js"
-    scriptPath
-      | ci = "sdist-test" </> localScriptPath
-      | otherwise = localScriptPath
+    scriptPath = "tests" </> "support" </> "checkSourceMapValidity" <.> "js"
   void $ readProcess_ (proc "node" [scriptPath, sourceMapFilePath])
