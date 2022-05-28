@@ -32,7 +32,7 @@ moduleToCoreFn :: Environment -> A.Module -> Module Ann
 moduleToCoreFn _ (A.Module _ _ _ _ Nothing) =
   internalError "Module exports were not elaborated before moduleToCoreFn"
 moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
-  let imports = fmap (ssAnn modSS,) (findQualModules decls) ++ mapMaybe importToCoreFn decls
+  let imports = mapMaybe importToCoreFn decls ++ fmap (ssAnn modSS,) (findQualModules decls)
       imports' = dedupeImports imports
       exps' = ordNub $ concatMap exportToCoreFn exps
       reExps = M.map ordNub $ M.unionsWith (++) (mapMaybe (fmap reExportsToCoreFn . toReExportRef) exps)
@@ -56,6 +56,9 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   dedupeImports :: [(Ann, ModuleName)] -> [(Ann, ModuleName)]
   dedupeImports = fmap swap . M.toList . M.fromListWith const . fmap swap
 
+  ssA :: SourceSpan -> Ann
+  ssA ss = (ss, [], Nothing, Nothing)
+
   -- | Desugars member declarations from AST to CoreFn representation.
   declToCoreFn :: A.Declaration -> [Bind Ann]
   declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [ctor]) =
@@ -70,13 +73,13 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       let
         ctor = A.dataCtorName ctorDecl
         (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
-      in NonRec (ssAnn ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
+      in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration ds) =
     concatMap declToCoreFn ds
   declToCoreFn (A.ValueDecl (ss, com) name _ _ [A.MkUnguarded e]) =
-    [NonRec (ssAnn ss) name (exprToCoreFn ss com Nothing e)]
+    [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
   declToCoreFn (A.BindingGroupDeclaration ds) =
-    [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssAnn ss, name), exprToCoreFn ss com Nothing e)) ds]
+    [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]
   declToCoreFn _ = []
 
   -- | Desugars expressions from AST to CoreFn representation.
@@ -92,7 +95,19 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn _ _ _ (A.Abs _ _) =
     internalError "Abs with Binder argument was not desugared before exprToCoreFn mn"
   exprToCoreFn ss com ty (A.App v1 v2) =
-    App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
+    App (ss, com, ty, (isDictCtor v1 || isSynthetic v2) `orEmpty` IsSyntheticApp) v1' v2'
+    where
+    v1' = exprToCoreFn ss [] Nothing v1
+    v2' = exprToCoreFn ss [] Nothing v2
+    isDictCtor = \case
+      A.Constructor _ (Qualified _ name) -> isDictTypeName name
+      _ -> False
+    isSynthetic = \case
+      A.App v3 v4            -> isDictCtor v3 || isSynthetic v3 && isSynthetic v4
+      A.Accessor _ v3        -> isSynthetic v3
+      A.Var NullSourceSpan _ -> True
+      A.Unused{}             -> True
+      _                      -> False
   exprToCoreFn ss com ty (A.Unused _) =
     Var (ss, com, ty, Nothing) (Qualified (Just C.Prim) (Ident C.undefined))
   exprToCoreFn _ com ty (A.Var ss ident) =

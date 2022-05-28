@@ -16,7 +16,7 @@ export PATH="$tmpdir/node_modules/.bin:$PATH"
 cd "$tmpdir"
 
 echo ::group::Ensure Spago is available
-which spago || npm install spago@0.20.3
+which spago || npm install spago@0.20.8
 echo ::endgroup::
 
 echo ::group::Create dummy project
@@ -26,7 +26,7 @@ spago upgrade-set
 # Override the `metadata` package's version to match `purs` version
 # so that `spago build` actually works
 sed -i'' "\$c in upstream with metadata.version = \"v$(purs --version | { read v z && echo $v; })\"" packages.dhall
-spago install $(spago ls packages | while read name z; do echo $name; done)
+spago install $(spago ls packages | while read name z; do if [[ $name != metadata ]]; then echo $name; fi; done)
 echo ::endgroup::
 
 echo ::group::Compile package set

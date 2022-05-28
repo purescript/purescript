@@ -1,0 +1,1 @@
+* Stop requiring `bower.json` `devDependencies` when publishing

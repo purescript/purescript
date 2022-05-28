@@ -1,4 +1,4 @@
--- @shouldFailWith KindsDoNotUnify
+-- @shouldFailWith PartiallyAppliedSynonym
 module Main where
 
 import Effect.Console (log)

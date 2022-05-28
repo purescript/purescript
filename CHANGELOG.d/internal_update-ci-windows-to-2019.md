@@ -1,1 +1,0 @@
-* Update CI to use `windows-2019` since `windows-2016` is deprecated

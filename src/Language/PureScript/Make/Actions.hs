@@ -54,8 +54,7 @@ import qualified Paths_purescript as Paths
 import           SourceMap
 import           SourceMap.Types
 import           System.Directory (getCurrentDirectory)
-import           System.FilePath ((</>), makeRelative, splitPath, normalise, splitDirectories)
-import qualified System.FilePath.Posix as Posix
+import           System.FilePath ((</>), makeRelative, splitPath, normalise)
 import           System.IO (stderr)
 
 -- | Determines when to rebuild a module
@@ -300,9 +299,9 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
-    let pathToDir = iterate (".." Posix.</>) ".." !! length (splitPath $ normalise outputDir)
+    let pathToDir = iterate (".." </>) ".." !! length (splitPath $ normalise outputDir)
         sourceFile = case mappings of
-                      (SMap file _ _ : _) -> Just $ pathToDir Posix.</> normalizeSMPath (makeRelative dir (T.unpack file))
+                      (SMap file _ _ : _) -> Just $ pathToDir </> makeRelative dir (T.unpack file)
                       _ -> Nothing
     let rawMapping = SourceMapping { smFile = "index.js", smSourceRoot = Nothing, smMappings =
       map (\(SMap _ orig gen) -> Mapping {
@@ -321,9 +320,6 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     convertPos :: SourcePos -> Pos
     convertPos SourcePos { sourcePosLine = l, sourcePosColumn = c } =
       Pos { posLine = fromIntegral l, posColumn = fromIntegral c }
-
-    normalizeSMPath :: FilePath -> FilePath
-    normalizeSMPath = Posix.joinPath . splitDirectories
 
   requiresForeign :: CF.Module a -> Bool
   requiresForeign = not . null . CF.moduleForeign

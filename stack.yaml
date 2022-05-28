@@ -4,7 +4,6 @@ resolver: lts-18.15
 pvp-bounds: both
 packages:
 - '.'
-- lib/purescript-cst
 ghc-options:
   # Build with advanced optimizations enabled by default
   "$locals": -O2 -Werror

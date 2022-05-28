@@ -1,4 +1,5 @@
 Error found:
+in module [33mMain[0m
 at tests/purs/failing/NewtypeInstance.purs:8:1 - 8:40 (line 8, column 1 - line 8, column 40)
 
   Cannot derive newtype instance for
@@ -7,6 +8,7 @@ at tests/purs/failing/NewtypeInstance.purs:8:1 - 8:40 (line 8, column 1 - line 8
   [33m                  [0m
   Make sure this is a newtype.
 
+in value declaration [33mshowX[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/InvalidNewtypeInstance.md for more information,
 or to contribute content related to this error.

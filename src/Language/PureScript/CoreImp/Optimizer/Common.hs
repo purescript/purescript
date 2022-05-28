@@ -9,6 +9,7 @@ import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash
 import Language.PureScript.CoreImp.AST
+import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString)
 
 applyAll :: [a -> a] -> a -> a
@@ -17,13 +18,13 @@ applyAll = foldl' (.) id
 replaceIdent :: Text -> AST -> AST -> AST
 replaceIdent var1 js = everywhere replace
   where
-  replace (Var ss var2) | var1 == var2 = withVarSourceSpan ss js
+  replace (Var _ var2) | var1 == var2 = js
   replace other = other
 
 replaceIdents :: [(Text, AST)] -> AST -> AST
 replaceIdents vars = everywhere replace
   where
-  replace v@(Var ss var) = withVarSourceSpan ss . fromMaybe v $ lookup var vars
+  replace v@(Var _ var) = fromMaybe v $ lookup var vars
   replace other = other
 
 isReassigned :: Text -> AST -> Bool
@@ -59,10 +60,10 @@ removeFromBlock :: ([AST] -> [AST]) -> AST -> AST
 removeFromBlock go (Block ss sts) = Block ss (go sts)
 removeFromBlock _  js = js
 
-isDict :: (Text, PSString) -> AST -> Bool
-isDict (moduleName, dictName) (Indexer _ (StringLiteral _ x) (Var _ y)) =
-  x == dictName && y == moduleName
+isDict :: (ModuleName, PSString) -> AST -> Bool
+isDict (moduleName, dictName) (ModuleAccessor _ x y) =
+  x == moduleName && y == dictName
 isDict _ _ = False
 
-isDict' :: [(Text, PSString)] -> AST -> Bool
+isDict' :: [(ModuleName, PSString)] -> AST -> Bool
 isDict' xs js = any (`isDict` js) xs

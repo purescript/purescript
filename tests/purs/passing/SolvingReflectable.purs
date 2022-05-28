@@ -7,9 +7,7 @@ import Data.Reflectable (reflectType)
 import Effect.Console (log)
 import Prim.Boolean (True, False)
 import Prim.Ordering (LT, EQ, GT)
-
-data Proxy :: forall k. k -> Type
-data Proxy n = Proxy
+import Type.Proxy (Proxy(..))
 
 refInt :: Proxy 42
 refInt = Proxy

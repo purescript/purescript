@@ -73,7 +73,7 @@ literals = mkPattern' match'
   match (Var _ ident) = return $ emit ident
   match (VariableIntroduction _ ident value) = mconcat <$> sequence
     [ return $ emit $ "var " <> ident
-    , maybe (return mempty) (fmap (emit " = " <>) . prettyPrintJS') value
+    , maybe (return mempty) (fmap (emit " = " <>) . prettyPrintJS' . snd) value
     ]
   match (Assignment _ target value) = mconcat <$> sequence
     [ prettyPrintJS' target
@@ -121,9 +121,9 @@ literals = mkPattern' match'
     , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
-  match (Comment PureAnnotation js) = mconcat <$> sequence
+  match (Comment PureAnnotation js) = mconcat <$> sequence 
     [ return $ emit "/* #__PURE__ */ "
-    , prettyPrintJS' js
+    , prettyPrintJS' js 
     ]
   match _ = mzero
 
@@ -156,8 +156,8 @@ comment (BlockComment com) = fmap mconcat $ sequence $
         Nothing -> ""
 
 prettyImport :: (Emit gen) => Import -> StateT PrinterState Maybe gen
-prettyImport (Import ss ident from) =
-  return . (addMapping' ss <>) . emit $
+prettyImport (Import ident from) =
+  return . emit $
     "import * as " <> ident <> " from " <> prettyPrintStringJS from <> ";"
 
 prettyExport :: (Emit gen) => Export -> StateT PrinterState Maybe gen

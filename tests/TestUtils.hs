@@ -209,14 +209,14 @@ compile' options expectedModule SupportModules{..} inputFiles = P.runMake option
     actions = makeActions supportModules (foreigns `M.union` supportForeigns)
     (hasExpectedModuleName, expectedModuleName, compiledModulePath) = case expectedModule of
       -- Check if there is one (and only one) module called "Main"
-      Just IsMain -> 
-        let 
+      Just IsMain ->
+        let
           moduleName = "Main"
           compiledPath = modulesDir </> moduleName </> "index.js"
         in ((==) 1 $ length $ filter (== moduleName) $ fmap (T.unpack . getPsModuleName) ms, moduleName, compiledPath)
       -- Check if main sourcemap module starts with "SourceMaps." and matches its file name
       Just (IsSourceMap modulePath) ->
-        let 
+        let
           moduleName = "SourceMaps." <> (dropExtensions . takeFileName $ modulePath)
           compiledPath = modulesDir </> moduleName </> "index.js.map"
         in (maybe False ((==) moduleName . T.unpack . getPsModuleName) (find ((==) modulePath . fst) ms), moduleName, compiledPath)

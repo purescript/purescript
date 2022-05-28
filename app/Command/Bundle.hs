@@ -11,7 +11,7 @@ app :: IO ()
 app = do
   hPutStrLn stderr $ unlines
     [ "'purs bundle' was removed in the v0.15.0 release."
-    , "See https://www.github.com/purescript/documentation/migration-guides/0.15-Migration-Guide.md "
+    , "See https://github.com/purescript/documentation/blob/master/migration-guides/0.15-Migration-Guide.md"
     , "for more information and bundler alternatives."
     ]
   exitFailure

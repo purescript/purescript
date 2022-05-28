@@ -54,6 +54,13 @@ type Syn' w a = MyWriter w a
 newtype Syn a = Syn (Syn' (MyArray Int) a)
 derive newtype instance functorSyn :: Functor Syn
 
+data Proxy2 a b = Proxy2
+derive instance Functor (Proxy2 x)
+
+newtype Foo :: forall k. k -> Type
+newtype Foo a = Foo (Proxy2 k a)
+derive newtype instance Functor Foo
+
 main = do
   logShow (X "test")
   logShow (singleton "test" :: Y String)
