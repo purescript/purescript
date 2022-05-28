@@ -117,6 +117,8 @@ data DocsAssertion
   -- | Assert that a given declaration's type parameters have the
   -- given role annotations
   | ShouldHaveRoleAnnotation P.ModuleName Text [P.Role]
+  -- | Assert that a given module has the expected doc comments
+  | ShouldHaveModuleDocs P.ModuleName (Maybe Text)
 
 data TagsAssertion
   -- | Assert that a particular declaration is tagged
@@ -183,6 +185,9 @@ displayAssertion = \case
   ShouldHaveRoleAnnotation mn decl expected ->
     showQual mn decl <> " should have the expected role annotations: " <>
     T.intercalate ", " (fmap P.displayRole expected)
+  ShouldHaveModuleDocs mn expected ->
+    "Module doc comments for module `" <> P.runModuleName mn <> "` should be " <>
+      maybe "empty" (\t -> "'" <> t <> "`") expected
 
 displayTagsAssertion :: TagsAssertion -> Text
 displayTagsAssertion = \case
@@ -260,6 +265,9 @@ data DocsAssertionFailure
   -- fields: module name, declaration title, expected role list,
   -- actual role list
   | RoleMismatch P.ModuleName Text [P.Role] [P.Role]
+  -- | The module's doc comments should be the expected
+  -- fields: module name, expected docs, actual docs
+  | WrongModuleDocs P.ModuleName (Maybe Text) (Maybe Text)
 
 data TagsAssertionFailure
   -- | A declaration was not tagged, but should have been
@@ -332,6 +340,10 @@ displayAssertionFailure = \case
     "`" <> displayRoleList actual <> "`"
     where
       displayRoleList = T.intercalate ", " . fmap P.displayRole
+  WrongModuleDocs mn expected actual ->
+    "Expected module docs for " <> P.runModuleName mn <> "\n" <>
+    "to be `" <> fromMaybe "<Nothing>" expected <> "`\n" <>
+    "  got `" <> fromMaybe "<Nothing>" actual <> "`"
 
 displayTagsAssertionFailure :: TagsAssertionFailure -> Text
 displayTagsAssertionFailure = \case
@@ -536,6 +548,12 @@ runAssertion assertion linksCtx Docs.Module{..} =
         if expected == actual
           then Pass
           else Fail (RoleMismatch mn decl expected actual)
+
+    ShouldHaveModuleDocs mn expected ->
+      if expected == modComments then
+        Pass
+      else
+        Fail (WrongModuleDocs mn expected modComments)
   where
   declarationsFor mn =
     if mn == modName
@@ -901,6 +919,22 @@ testCases =
       , ShouldMergeDocComments (n "DocCommentsMerge") "ClassOnly" $ Just "decl\n"
       , ShouldMergeDocComments (n "DocCommentsMerge") "KindOnlyClass" $ Just "kind\n"
       , ShouldMergeDocComments (n "DocCommentsMerge") "KindAndClass" $ Just "kind\n\ndecl\n"
+      ]
+    )
+  , ("Shebang1Undocumented",
+      [ ShouldHaveModuleDocs (n "Shebang1Undocumented") Nothing
+      ]
+    )
+  , ("Shebang2Undocumented",
+      [ ShouldHaveModuleDocs (n "Shebang2Undocumented") Nothing
+      ]
+    )
+  , ("Shebang3Undocumented",
+      [ ShouldHaveModuleDocs (n "Shebang3Undocumented") $ Just "Normal doc comment"
+      ]
+    )
+  , ("Shebang4Undocumented",
+      [ ShouldHaveModuleDocs (n "Shebang4Undocumented") $ Just "Normal doc comment"
       ]
     )
   ]
