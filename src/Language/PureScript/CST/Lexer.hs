@@ -158,7 +158,7 @@ shebangThenComments src = do
   (sb <> coms, src')
 
 shebang :: Text -> ([Comment LineFeed], Text)
-shebang = \src -> k src (\_ _ -> ([], src)) (\inp (a, b) -> (a <> b, inp))
+shebang = \src -> k src (\_ _ -> ([], src)) (\inp a -> (a, inp))
   where
   Parser k = breakShebang
 
@@ -238,56 +238,59 @@ breakComments = k0 []
         Just '}' -> next $> Comment (acc <> chs <> dashes <> "}")
         _ -> blockComment (acc <> chs <> dashes)
 
-breakShebang :: ParserM ParserErrorType Text ([Comment void], [Comment LineFeed])
-breakShebang = k0 []
+breakShebang :: ParserM ParserErrorType Text [Comment LineFeed]
+breakShebang = shebangComment >>= \case
+  Just comm -> k0 [comm]
+  Nothing -> pure []
   where
-  k0 acc = do
-    spaces <- nextWhile (== ' ')
-    lines  <- nextWhile isLineFeed
-    let
-      acc'
-        | Text.null spaces = acc
-        | otherwise = Space (Text.length spaces) : acc
-    if Text.null lines
-      then do
-        mbComm <- comment
-        case mbComm of
-          Just comm -> k0 (comm : acc')
-          Nothing   -> pure (reverse acc', [])
-      else
-        k1 acc' (goWs [] $ Text.unpack lines)
+  k0 acc = lineFeedShebang >>= \case
+    Just (lf, sb) -> do
+      comm <- lineComment sb
+      k0 (comm : lf : acc)
+    Nothing ->
+      pure $ reverse acc
 
-  k1 trl acc = do
-    ws <- nextWhile (\c -> c == ' ' || isLineFeed c)
-    let acc' = goWs acc $ Text.unpack ws
-    mbComm <- comment
-    case mbComm of
-      Just comm -> k1 trl (comm : acc')
-      Nothing   -> pure (reverse trl, reverse acc')
-
-  goWs a ('\r' : '\n' : ls) = goWs (Line CRLF : a) ls
-  goWs a ('\r' : ls) = goWs (Line CRLF : a) ls
-  goWs a ('\n' : ls) = goWs (Line LF : a) ls
-  goWs a (' ' : ls) = goSpace a 1 ls
-  goWs a _ = a
-
-  goSpace a !n (' ' : ls) = goSpace a (n + 1) ls
-  goSpace a !n ls = goWs (Space n : a) ls
-
-  isShebangComment = Parser $ \inp _ ksucc ->
-    case Text.uncons inp of
-      Just ('#', inp2) ->
-        case Text.uncons inp2 of
-          Just ('!', inp3) ->
-            ksucc inp3 True
-          _ ->
-            ksucc inp False
+  lineFeedShebang = Parser $ \inp _ ksucc ->
+    case unconsLineFeed inp of
+      Just (lf, inp2)
+        | Just (sb, inp3) <- unconsShebang inp2 ->
+            ksucc inp3 $ Just (lf, sb)
       _ ->
-        ksucc inp False
+        ksucc inp Nothing
 
-  comment = isShebangComment >>= \case
-    True -> Just <$> lineComment "#!"
-    False -> pure Nothing
+  unconsLineFeed :: Text -> Maybe (Comment LineFeed, Text)
+  unconsLineFeed inp =
+    case Text.uncons inp of
+      Just ('\r', inp2) ->
+        case Text.uncons inp2 of
+          Just ('\n', inp3) ->
+            Just (Line CRLF, inp3)
+          _ ->
+            Just (Line CRLF, inp2)
+      Just ('\n', inp2) ->
+        Just (Line LF, inp2)
+      _ ->
+        Nothing
+
+  unconsShebang :: Text -> Maybe (Text, Text)
+  unconsShebang inp
+    | Just ('#', inp2) <- Text.uncons inp
+    , Just ('!', inp3) <- Text.uncons inp2 = Just ("#!", inp3)
+
+    | otherwise = Nothing
+
+  shebangComment = isShebang >>= \case
+    Just sb -> do
+      Just <$> lineComment sb
+    Nothing ->
+      pure Nothing
+
+  isShebang = Parser $ \inp _ ksucc ->
+    case unconsShebang inp of
+      Just (sb, inp3) ->
+        ksucc inp3 $ Just sb
+      _ ->
+        ksucc inp Nothing
 
   lineComment acc = do
     comm <- nextWhile (\c -> c /= '\r' && c /= '\n')
