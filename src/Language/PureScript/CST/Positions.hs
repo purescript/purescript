@@ -98,6 +98,10 @@ sepLast :: Separated a -> a
 sepLast (Separated hd []) = hd
 sepLast (Separated _ tl) = snd $ last tl
 
+sepXLast :: SeparatedExtra a -> a
+sepXLast (SeparatedExtra _ hd [] _) = hd
+sepXLast (SeparatedExtra _ _ tl _) = snd $ last tl
+
 type TokenRange = (SourceToken, SourceToken)
 
 toSourceRange :: TokenRange -> SourceRange
@@ -160,7 +164,7 @@ dataMembersRange = \case
 declRange :: Declaration a -> TokenRange
 declRange = \case
   DeclData _ hd ctors
-    | Just (_, cs) <- ctors -> (fst start, snd . dataCtorRange $ sepLast cs)
+    | Just (_, cs) <- ctors -> (fst start, fromMaybe (snd . dataCtorRange $ sepXLast cs) $ sepXTrailing cs)
     | otherwise -> start
     where start = dataHeadRange hd
   DeclType _ a _ b -> (fst $ dataHeadRange a,  snd $ typeRange b)
@@ -191,7 +195,7 @@ dataCtorRange (DataCtor _ name fields)
 
 classHeadRange :: ClassHead a -> TokenRange
 classHeadRange (ClassHead kw _ name vars fdeps)
-  | Just (_, fs) <- fdeps = (kw, snd .classFundepRange $ sepLast fs)
+  | Just (_, fs) <- fdeps = (kw, fromMaybe (snd . classFundepRange $ sepXLast fs) $ sepXTrailing fs)
   | [] <- vars = (kw, snd $ nameRange name)
   | otherwise = (kw, snd . typeVarBindingRange $ last vars)
 

@@ -107,7 +107,7 @@ convertType fileName = go
         let ann = sourceAnnCommented fileName (lblTok a) (snd $ typeRange ty)
         T.RCons ann (L.Label $ lblName a) (go ty) c
     case labels of
-      Just (Separated h t) ->
+      Just (SeparatedExtra _ h t _) ->
         rowCons h $ foldr (rowCons . snd) rowTail t
       Nothing ->
         rowTail
@@ -276,7 +276,7 @@ convertExpr fileName = go
       let
         ann = sourceAnnCommented fileName a c
         vals = case bs of
-          Just (Separated x xs) -> go x : (go . snd <$> xs)
+          Just (SeparatedExtra _ x xs _) -> go x : (go . snd <$> xs)
           Nothing -> []
       positioned ann . AST.Literal (fst ann) $ AST.ArrayLiteral vals
     ExprRecord z (Wrapped a bs c) -> do
@@ -286,7 +286,7 @@ convertExpr fileName = go
           RecordPun f -> (mkString . getIdent $ nameValue f, go . ExprIdent z $ QualifiedName (nameTok f) Nothing (nameValue f))
           RecordField f _ v -> (lblName f, go v)
         vals = case bs of
-          Just (Separated x xs) -> lbl x : (lbl . snd <$> xs)
+          Just (SeparatedExtra _ x xs _) -> lbl x : (lbl . snd <$> xs)
           Nothing -> []
       positioned ann . AST.Literal (fst ann) $ AST.ObjectLiteral vals
     ExprParens _ (Wrapped a b c) ->
@@ -399,7 +399,7 @@ convertBinder fileName = go
       let
         ann = sourceAnnCommented fileName a c
         vals = case bs of
-          Just (Separated x xs) -> go x : (go . snd <$> xs)
+          Just (SeparatedExtra _ x xs _) -> go x : (go . snd <$> xs)
           Nothing -> []
       positioned ann . AST.LiteralBinder (fst ann) $ AST.ArrayLiteral vals
     BinderRecord z (Wrapped a bs c) -> do
@@ -409,7 +409,7 @@ convertBinder fileName = go
           RecordPun f -> (mkString . getIdent $ nameValue f, go $ BinderVar z f)
           RecordField f _ v -> (lblName f, go v)
         vals = case bs of
-          Just (Separated x xs) -> lbl x : (lbl . snd <$> xs)
+          Just (SeparatedExtra _ x xs _) -> lbl x : (lbl . snd <$> xs)
           Nothing -> []
       positioned ann . AST.LiteralBinder (fst ann) $ AST.ObjectLiteral vals
     BinderParens _ (Wrapped a b c) ->
@@ -442,7 +442,7 @@ convertDeclaration fileName decl = case decl of
             [] -> []
             (st', ctor) : tl' -> ctrs st' ctor tl'
           )
-    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
+    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, SeparatedExtra _ hd tl _) -> ctrs st hd tl) bd)
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
