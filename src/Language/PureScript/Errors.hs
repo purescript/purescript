@@ -145,7 +145,6 @@ data SimpleErrorMessage
   | MissingKindDeclaration KindSignatureFor (ProperName 'TypeName) SourceType
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
-  | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
   | ImportHidingModule ModuleName
   | UnusedImport ModuleName (Maybe ModuleName)
   | UnusedExplicitImport ModuleName [Name] (Maybe ModuleName) [DeclarationRef]
@@ -318,7 +317,6 @@ errorCode em = case unwrapErrorMessage em of
   MissingKindDeclaration{} -> "MissingKindDeclaration"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
-  MisleadingEmptyTypeImport{} -> "MisleadingEmptyTypeImport"
   ImportHidingModule{} -> "ImportHidingModule"
   UnusedImport{} -> "UnusedImport"
   UnusedExplicitImport{} -> "UnusedExplicitImport"
@@ -1086,8 +1084,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Declaration " <> markCode (showIdent nm) <> " was not used, and is not exported."
     renderSimpleErrorMessage (UnusedTypeVar tv) =
       line $ "Type variable " <> markCode tv <> " is ambiguous, since it is unused in the polymorphic type which introduces it."
-    renderSimpleErrorMessage (MisleadingEmptyTypeImport mn name) =
-      line $ "Importing type " <> markCode (runProperName name <> "(..)") <> " from " <> markCode (runModuleName mn) <> " is misleading as it has no exported data constructors."
     renderSimpleErrorMessage (ImportHidingModule name) =
       paras [ line "hiding imports cannot be used to hide modules."
             , line $ "An attempt was made to hide the import of " <> markCode (runModuleName name)
