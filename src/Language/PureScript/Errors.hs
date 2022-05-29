@@ -4,7 +4,6 @@ module Language.PureScript.Errors
   ) where
 
 import           Prelude.Compat
-import           Protolude (ordNub)
 
 import           Control.Arrow ((&&&))
 import           Control.Exception (displayException)
@@ -46,9 +45,6 @@ import           Language.PureScript.Traversals
 import           Language.PureScript.Types
 import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
 import qualified System.Console.ANSI as ANSI
-import qualified Text.Parsec as P
-import qualified Text.Parsec.Error as PE
-import           Text.Parsec.Error (Message(..))
 import qualified Text.PrettyPrint.Boxes as Box
 
 -- | A type of error messages
@@ -56,7 +52,6 @@ data SimpleErrorMessage
   = InternalCompilerError Text Text
   | ModuleNotFound ModuleName
   | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
-  | ErrorParsingModule P.ParseError
   | ErrorParsingCSTModule CST.ParserError
   | WarningParsingCSTModule CST.ParserWarning
   | MissingFFIModule ModuleName
@@ -150,7 +145,6 @@ data SimpleErrorMessage
   | MissingKindDeclaration KindSignatureFor (ProperName 'TypeName) SourceType
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
-  | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
   | ImportHidingModule ModuleName
   | UnusedImport ModuleName (Maybe ModuleName)
   | UnusedExplicitImport ModuleName [Name] (Maybe ModuleName) [DeclarationRef]
@@ -234,7 +228,6 @@ errorCode em = case unwrapErrorMessage em of
   InternalCompilerError{} -> "InternalCompilerError"
   ModuleNotFound{} -> "ModuleNotFound"
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
-  ErrorParsingModule{} -> "ErrorParsingModule"
   ErrorParsingCSTModule{} -> "ErrorParsingModule"
   WarningParsingCSTModule{} -> "WarningParsingModule"
   MissingFFIModule{} -> "MissingFFIModule"
@@ -324,7 +317,6 @@ errorCode em = case unwrapErrorMessage em of
   MissingKindDeclaration{} -> "MissingKindDeclaration"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
-  MisleadingEmptyTypeImport{} -> "MisleadingEmptyTypeImport"
   ImportHidingModule{} -> "ImportHidingModule"
   UnusedImport{} -> "UnusedImport"
   UnusedExplicitImport{} -> "UnusedExplicitImport"
@@ -674,10 +666,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
               , indent . lineS $ path
               ] ++
               map (indent . lineS) (concatMap Bundle.printErrorMessage (maybeToList extra))
-    renderSimpleErrorMessage (ErrorParsingModule err) =
-      paras [ line "Unable to parse module: "
-            , prettyPrintParseError err
-            ]
     renderSimpleErrorMessage (ErrorParsingCSTModule err) =
       paras [ line "Unable to parse module: "
             , line $ T.pack $ CST.prettyPrintErrorMessage err
@@ -1096,8 +1084,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Declaration " <> markCode (showIdent nm) <> " was not used, and is not exported."
     renderSimpleErrorMessage (UnusedTypeVar tv) =
       line $ "Type variable " <> markCode tv <> " is ambiguous, since it is unused in the polymorphic type which introduces it."
-    renderSimpleErrorMessage (MisleadingEmptyTypeImport mn name) =
-      line $ "Importing type " <> markCode (runProperName name <> "(..)") <> " from " <> markCode (runModuleName mn) <> " is misleading as it has no exported data constructors."
     renderSimpleErrorMessage (ImportHidingModule name) =
       paras [ line "hiding imports cannot be used to hide modules."
             , line $ "An attempt was made to hide the import of " <> markCode (runModuleName name)
@@ -1819,53 +1805,6 @@ prettyPrintMultipleErrorsWith ppeOptions _ intro (MultipleErrors es) =
   withIntro i err = [ Box.text (intro ++ " " ++ show i ++ " of " ++ show (length es) ++ ":")
                     , Box.moveRight 2 err
                     ]
-
--- | Pretty print a Parsec ParseError as a Box
-prettyPrintParseError :: P.ParseError -> Box.Box
-prettyPrintParseError = prettyPrintParseErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" . PE.errorMessages
-
--- | Pretty print 'ParseError' detail messages.
---
--- Adapted from 'Text.Parsec.Error.showErrorMessages'.
--- See <https://github.com/aslatter/parsec/blob/v3.1.9/Text/Parsec/Error.hs#L173>.
-prettyPrintParseErrorMessages :: String -> String -> String -> String -> String -> [Message] -> Box.Box
-prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEndOfInput msgs
-  | null msgs = Box.text msgUnknown
-  | otherwise = Box.vcat Box.left $ map Box.text $ clean [showSysUnExpect,showUnExpect,showExpect,showMessages]
-
-  where
-  (sysUnExpect,msgs1) = span (SysUnExpect "" ==) msgs
-  (unExpect,msgs2)    = span (UnExpect    "" ==) msgs1
-  (expect,messages)   = span (Expect      "" ==) msgs2
-
-  showExpect      = showMany msgExpecting expect
-  showUnExpect    = showMany msgUnExpected unExpect
-  showSysUnExpect | not (null unExpect) ||
-                    null sysUnExpect = ""
-                  | null firstMsg    = msgUnExpected ++ " " ++ msgEndOfInput
-                  | otherwise        = msgUnExpected ++ " " ++ firstMsg
-    where
-    firstMsg  = PE.messageString (head sysUnExpect)
-
-  showMessages      = showMany "" messages
-
-  -- helpers
-  showMany pre msgs' = case clean (map PE.messageString msgs') of
-                         [] -> ""
-                         ms | null pre  -> commasOr ms
-                            | otherwise -> pre ++ " " ++ commasOr ms
-
-  commasOr []       = ""
-  commasOr [m]      = m
-  commasOr ms       = commaSep (init ms) ++ " " ++ msgOr ++ " " ++ last ms
-
-  commaSep          = separate ", " . clean
-
-  separate   _ []     = ""
-  separate   _ [m]    = m
-  separate sep (m:ms) = m ++ sep ++ separate sep ms
-
-  clean             = ordNub . filter (not . null)
 
 -- | Indent to the right, and pad on top and bottom.
 indent :: Box.Box -> Box.Box
