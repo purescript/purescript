@@ -93,7 +93,7 @@ data ImportParse = ImportParse
 
 parseModuleHeader :: Text -> Either (NE.NonEmpty CST.ParserError) ImportParse
 parseModuleHeader src = do
-  CST.PartialResult md _ <- CST.parseModule $ CST.lenient $ CST.lex src
+  CST.PartialResult md _ <- CST.parseModule $ CST.lenient $ CST.lexModule src
   let
     mn = CST.nameValue $ CST.modNamespace md
     decls = flip fmap (CST.modImports md) $ \decl -> do
