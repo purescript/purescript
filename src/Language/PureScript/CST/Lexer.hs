@@ -225,10 +225,6 @@ breakComments = k0 []
     Just False -> Just <$> lineComment "--"
     Nothing    -> pure Nothing
 
-  lineComment acc = do
-    comm <- nextWhile (\c -> c /= '\r' && c /= '\n')
-    pure $ Comment (acc <> comm)
-
   blockComment acc = do
     chs <- nextWhile (/= '-')
     dashes <- nextWhile (== '-')
@@ -273,17 +269,9 @@ breakShebang = shebangComment >>= \case
         Nothing
 
   unconsShebang :: Text -> Maybe (Text, Text)
-  unconsShebang inp
-    | Just ('#', inp2) <- Text.uncons inp
-    , Just ('!', inp3) <- Text.uncons inp2 = Just ("#!", inp3)
+  unconsShebang = fmap ("#!",) . Text.stripPrefix "#!"
 
-    | otherwise = Nothing
-
-  shebangComment = isShebang >>= \case
-    Just sb -> do
-      Just <$> lineComment sb
-    Nothing ->
-      pure Nothing
+  shebangComment = isShebang >>= traverse lineComment
 
   isShebang = Parser $ \inp _ ksucc ->
     case unconsShebang inp of
@@ -292,9 +280,10 @@ breakShebang = shebangComment >>= \case
       _ ->
         ksucc inp Nothing
 
-  lineComment acc = do
-    comm <- nextWhile (\c -> c /= '\r' && c /= '\n')
-    pure $ Comment (acc <> comm)
+lineComment :: forall lf. Text -> ParserM ParserErrorType Text (Comment lf)
+lineComment acc = do
+  comm <- nextWhile (\c -> c /= '\r' && c /= '\n')
+  pure $ Comment (acc <> comm)
 
 token :: Lexer Token
 token = peek >>= maybe (pure TokEof) k0
