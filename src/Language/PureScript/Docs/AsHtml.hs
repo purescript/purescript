@@ -7,7 +7,6 @@ module Language.PureScript.Docs.AsHtml (
   HtmlOutputModule(..),
   HtmlRenderContext(..),
   nullRenderContext,
-  declNamespace,
   packageAsHtml,
   moduleAsHtml,
   makeFragment,
@@ -38,9 +37,6 @@ import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.RenderedCode hiding (sp)
 import qualified Language.PureScript.Docs.Render as Render
 import qualified Language.PureScript.CST as CST
-
-declNamespace :: Declaration -> Namespace
-declNamespace = declInfoNamespace . declInfo
 
 data HtmlOutput a = HtmlOutput
   { htmlIndex     :: [(Maybe Char, a)]

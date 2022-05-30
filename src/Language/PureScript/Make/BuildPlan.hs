@@ -1,18 +1,14 @@
 {-# LANGUAGE TypeApplications #-}
 module Language.PureScript.Make.BuildPlan
---   ( BuildPlan(bpEnv)
---   , BuildJobResult(..)
---   , WasRebuilt(..)
---   , Prebuilt(..)
---   , buildJobSuccess
---   , buildJobFailure
---   , construct
---   , didModuleSourceFilesChange
---   , getResult
---   , collectResults
---   , markComplete
---   , needsRebuild
---   ) where
+  -- ( BuildPlan(bpEnv)
+  -- , BuildJobResult(..)
+  -- , buildJobSuccess
+  -- , construct
+  -- , getResult
+  -- , collectResults
+  -- , markComplete
+  -- , needsRebuild
+  -- )
   where
 
 import           Prelude
@@ -82,10 +78,6 @@ buildJobSuccess (Just prebuiltExterns) (BuildJobSucceeded warnings externs) | Se
 buildJobSuccess _ (BuildJobSucceeded warnings externs) = Just (warnings, externs, WasRebuilt)
 buildJobSuccess _ (BuildJobNotNeeded externs) = Just (MultipleErrors [], externs, NotRebuilt)
 buildJobSuccess _ _ = Nothing
-
-buildJobFailure :: BuildJobResult -> Maybe MultipleErrors
-buildJobFailure (BuildJobFailed errors) = Just errors
-buildJobFailure _ = Nothing
 
 -- | Information obtained about a particular module while constructing a build
 -- plan; used to decide whether a module needs rebuilding.

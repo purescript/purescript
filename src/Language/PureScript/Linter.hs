@@ -199,7 +199,6 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go (UnaryMinus _ v1) = go v1
     go (BinaryNoParens v0 v1 v2) = go v0 <> go v1 <> go v2
     go (Parens v1) = go v1
-    go (TypeClassDictionaryConstructorApp _ v1) = go v1
     go (Accessor _ v1) = go v1
 
     go (ObjectUpdate obj vs) = mconcat (go obj : map (go . snd) vs)
@@ -234,7 +233,6 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go (Op _ _) = mempty
     go (Constructor _ _) = mempty
     go (TypeClassDictionary _ _ _) = mempty
-    go (TypeClassDictionaryAccessor _ _) = mempty
     go (DeferredDictionary _ _) = mempty
     go AnonymousArgument = mempty
     go (Hole _) = mempty
