@@ -594,7 +594,7 @@ entails SolverOptions{..} constraint context hints =
           dict | [a', b', c'] <- tcdInstanceTypes dict -> mkOrdRelation a' b' c'
                | otherwise -> Nothing
         facts = mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
-      traceM $ show $ fmap (fmap (() <$)) (givens <> facts)
+      traceM $ "Context: " <> show (fmap (fmap (() <$)) (givens <> facts))
       c' <- solveRelation (givens <> addGivens <> mulGivens <> facts) a b
       pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, srcTypeConstructor c'] Nothing Nothing]
     solveIntCompare _ _ = Nothing
