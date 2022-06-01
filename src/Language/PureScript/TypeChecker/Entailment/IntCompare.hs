@@ -76,6 +76,13 @@ solveRelation context lhs rhs =
     clean :: forall k. Ord k => [(k, [k])] -> [(k, [k])]
     clean = M.toList . M.fromListWith (<>)
 
+mkIntRelation :: P.Type a -> P.Type a -> Maybe (Relation (P.Type a))
+mkIntRelation lhs@(P.TypeLevelInt _ l) rhs@(P.TypeLevelInt _ r) = case compare l r of
+  EQ -> pure $ Equal lhs rhs
+  LT -> pure $ LessThan lhs rhs
+  GT -> pure $ LessThan rhs lhs
+mkIntRelation _ _ = Nothing
+
 mkOrdRelation :: P.Type a -> P.Type a -> P.Type a -> Maybe (Relation (P.Type a))
 mkOrdRelation lhs rhs rel = case rel of
   P.TypeConstructor _ ordering
