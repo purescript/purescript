@@ -560,11 +560,13 @@ entails SolverOptions{..} constraint context hints =
           args' = [arg0, arg1, srcTypeConstructor ordering]
       in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] args' Nothing Nothing]
     solveIntCompare ctx args@[a, b, _] = do
-      let compareDictsInScope = findDicts ctx C.IntCompare Nothing
-          givens = flip mapMaybe compareDictsInScope $ \case
-            dict | [a', b', c'] <- tcdInstanceTypes dict -> mkRelation a' b' c'
-                 | otherwise -> Nothing
-          facts = mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
+      let
+        compareDictsInScope = findDicts ctx C.IntCompare Nothing
+        givens = flip mapMaybe compareDictsInScope $ \case
+          dict | [a', b', c'] <- tcdInstanceTypes dict -> mkOrdRelation a' b' c'
+               | otherwise -> Nothing
+        facts = mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
+      traceM $ show $ fmap (fmap (() <$)) (givens <> facts)
       c' <- solveRelation (givens <> facts) a b
       pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, srcTypeConstructor c'] Nothing Nothing]
     solveIntCompare _ _ = Nothing
