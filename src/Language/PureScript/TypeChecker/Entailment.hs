@@ -49,6 +49,7 @@ import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString, mkString, decodeString)
 import qualified Language.PureScript.Constants.Prelude as C
 import qualified Language.PureScript.Constants.Prim as C
+import Debug.Trace (traceM)
 
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence
@@ -561,7 +562,7 @@ entails SolverOptions{..} constraint context hints =
       in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] args' Nothing Nothing]
     solveIntCompare ctx args@[a, b, _] = do
       let
-        solveAddMulDictsInScope tyClass solveInts = findDicts ctx tyClass Nothing >>= \case
+        solveAddMulDictsInScope solveInts dictsInScope = dictsInScope >>= \case
           dict | [a', b', c'] <- tcdInstanceTypes dict
                , Just (l, r, o) <- solveInts a' b' c' ->
                   catMaybes
@@ -572,13 +573,20 @@ entails SolverOptions{..} constraint context hints =
                     , Just $ Equal c' o
                     ]
                | otherwise -> []
-        addGivens = solveAddMulDictsInScope C.IntAdd addInts
-        mulGivens = solveAddMulDictsInScope C.IntMul (\l r _ -> mulInts l r)
+        addDictsInScope = findDicts ctx C.IntAdd Nothing
+        mulDictsInScope = findDicts ctx C.IntMul Nothing
+        addGivens = solveAddMulDictsInScope addInts addDictsInScope
+        mulGivens = solveAddMulDictsInScope (\l r _ -> mulInts l r) mulDictsInScope
         compareDictsInScope = findDicts ctx C.IntCompare Nothing
         givens = flip mapMaybe compareDictsInScope $ \case
           dict | [a', b', c'] <- tcdInstanceTypes dict -> mkOrdRelation a' b' c'
                | otherwise -> Nothing
         facts = mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
+        printContext ls = foldMap (printVal . fmap (() <$)) ls
+        printVal = \case
+          Equal x y -> "\n  Equal\n    " <> show x <> "\n    " <> show y
+          LessThan x y -> "\n  LessThan\n    " <> show x <> "\n    " <> show y
+      traceM $ "\n\nContext: " <> printContext (givens <> addGivens <> mulGivens <> facts)
       c' <- solveRelation (givens <> addGivens <> mulGivens <> facts) a b
       pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, srcTypeConstructor c'] Nothing Nothing]
     solveIntCompare _ _ = Nothing
