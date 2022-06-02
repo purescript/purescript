@@ -49,7 +49,6 @@ import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString, mkString, decodeString)
 import qualified Language.PureScript.Constants.Prelude as C
 import qualified Language.PureScript.Constants.Prim as C
-import Debug.Trace (traceM)
 
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence
@@ -561,49 +560,39 @@ entails SolverOptions{..} constraint context hints =
           args' = [arg0, arg1, srcTypeConstructor ordering]
       in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] args' Nothing Nothing]
     solveIntCompare ctx args@[a, b, _] = do
-      traceM ""
-      traceM $ "a: " <> show (() <$ a)
-      traceM $ "b: " <> show (() <$ b)
       let
-        addDictsInScope = findDicts ctx C.IntAdd Nothing
-        addGivens = addDictsInScope >>= \case
-          dict | [a', b', c'] <- tcdInstanceTypes dict -> do
-                  traceM $ "Add a': " <> show (() <$ a')
-                  traceM $ "Add b': " <> show (() <$ b')
-                  traceM $ "Add c': " <> show (() <$ c')
+        solveAddMulDictsInScope tyClass solveInts = findDicts ctx tyClass Nothing >>= \case
+          dict | [a', b', c'] <- tcdInstanceTypes dict
+               , Just (l, r, o) <- solveInts a' b' c' ->
                   catMaybes
-                    [ mkIntRelation a' b'
-                    , mkIntRelation b' c'
-                    , mkIntRelation a' c'
+                    [ mkIntRelation l r
+                    , mkIntRelation r o
+                    , Just $ Equal a' l
+                    , Just $ Equal b' r
+                    , Just $ Equal c' o
                     ]
                | otherwise -> []
-        mulDictsInScope = findDicts ctx C.IntMul Nothing
-        mulGivens = mulDictsInScope >>= \case
-          dict | [a', b', c'] <- tcdInstanceTypes dict -> do
-                  traceM $ "Mul a': " <> show (() <$ a')
-                  traceM $ "Mul b': " <> show (() <$ b')
-                  traceM $ "Mul c': " <> show (() <$ c')
-                  catMaybes
-                    [ mkIntRelation a' b'
-                    , mkIntRelation b' c'
-                    , mkIntRelation a' c'
-                    ]
-               | otherwise -> []
+        addGivens = solveAddMulDictsInScope C.IntAdd addInts
+        mulGivens = solveAddMulDictsInScope C.IntMul (\l r _ -> mulInts l r)
         compareDictsInScope = findDicts ctx C.IntCompare Nothing
         givens = flip mapMaybe compareDictsInScope $ \case
           dict | [a', b', c'] <- tcdInstanceTypes dict -> mkOrdRelation a' b' c'
                | otherwise -> Nothing
         facts = mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
-      traceM $ "Context: " <> show (fmap (fmap (() <$)) (givens <> facts))
       c' <- solveRelation (givens <> addGivens <> mulGivens <> facts) a b
       pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, srcTypeConstructor c'] Nothing Nothing]
     solveIntCompare _ _ = Nothing
 
     solveIntMul :: [SourceType] -> Maybe [TypeClassDict]
-    solveIntMul [arg0@(TypeLevelInt _ l), arg1@(TypeLevelInt _ r), _] =
-      let args' = [arg0, arg1, srcTypeLevelInt (l * r)]
-      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntMul [] [] args' Nothing Nothing]
+    solveIntMul [arg0, arg1, _] = do
+      (arg0', arg1', arg2') <- mulInts arg0 arg1
+      let args' = [arg0', arg1', arg2']
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntMul [] [] args' Nothing Nothing]
     solveIntMul _ = Nothing
+
+    mulInts :: SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
+    mulInts arg0@(TypeLevelInt _ l) arg1@(TypeLevelInt _ r) = Just (arg0, arg1, srcTypeLevelInt (l * r))
+    mulInts _ _ = Nothing
 
     solveUnion :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveUnion kinds [l, r, u] = do
