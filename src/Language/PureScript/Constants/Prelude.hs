@@ -279,14 +279,17 @@ pattern IsSymbolIdent = Qualified (Just DataSymbol) (Ident "IsSymbol")
 pattern IsSymbolDict :: Qualified Ident
 pattern IsSymbolDict = Qualified (Just DataSymbol) (Ident "IsSymbol$Dict")
 
-pattern SProxyType :: Qualified (ProperName 'TypeName)
-pattern SProxyType = Qualified (Just DataSymbol) (ProperName "SProxy")
+pattern TypeProxy :: ModuleName
+pattern TypeProxy = ModuleName "Type.Proxy"
 
-pattern SProxy :: Qualified (ProperName 'ConstructorName)
-pattern SProxy = Qualified (Just DataSymbol) (ProperName "SProxy")
+pattern ProxyType :: Qualified (ProperName 'TypeName)
+pattern ProxyType = Qualified (Just TypeProxy) (ProperName "Proxy")
 
-pattern SProxyIdent :: Qualified Ident
-pattern SProxyIdent = Qualified (Just DataSymbol) (Ident "SProxy")
+pattern Proxy :: Qualified (ProperName 'ConstructorName)
+pattern Proxy = Qualified (Just TypeProxy) (ProperName "Proxy")
+
+pattern ProxyIdent :: Qualified Ident
+pattern ProxyIdent = Qualified (Just TypeProxy) (Ident "Proxy")
 
 
 pattern DataReflectable :: ModuleName

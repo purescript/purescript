@@ -55,7 +55,7 @@ closedRecordFields (TypeApp _ (TypeConstructor _ C.Record) row) =
 closedRecordFields _ = Nothing
 
 -- | Optimize
--- `Data_Record.getField(Data_Record.hasFieldRecord(new Data_Symbol.IsSymbol(function() { return "f"; }))())(Data_Symbol.SProxy.value)(x)`
+-- `Data_Record.getField(Data_Record.hasFieldRecord(new Data_Symbol.IsSymbol(function() { return "f"; }))())(Type_Proxy.Proxy.value)(x)`
 -- into
 -- `x.f`
 optimizeRecordGetField :: Expr a -> Expr a
@@ -74,7 +74,7 @@ optimizeRecordGetField
                     (Literal _ (StringLiteral label)))
                 ]))))
           _))
-      (Var _ C.SProxyIdent))
+      (Var _ C.ProxyIdent))
     object) =
   Accessor ann label object
 optimizeRecordGetField e = e
