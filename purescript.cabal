@@ -416,7 +416,7 @@ test-suite tests
   build-depends:
       purescript
     , generic-random
-    , hspec
+    , hspec ==2.9.2
     , HUnit
     , newtype
     , QuickCheck

@@ -20,6 +20,13 @@ extra-deps:
 - Cabal-3.6.3.0
 # Protolude is not yet in resolver snapshot
 - protolude-0.3.1
+# hspec@2.9.3 is the first version that starts depending on ghc
+# ghc depends on terminfo by default, but that can be ignored
+# if one uses the '-terminfo' flag.
+# Unfortunately, hspec doesn't expose a similar flag.
+- hspec-2.9.2
+- hspec-core-2.9.2
+- hspec-discover-2.9.2
 nix:
   packages:
   - zlib
