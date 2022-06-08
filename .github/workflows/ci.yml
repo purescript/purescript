@@ -209,7 +209,7 @@ jobs:
           # `allow-newer: true` is needed so that weeder-2.2.0 can be
           # installed with the dependencies present in LTS-18.
           echo 'allow-newer: true' >> stack-weeder.yaml
-          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.2.0
+          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.4.0
 
       - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
 
