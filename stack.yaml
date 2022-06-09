@@ -1,6 +1,6 @@
 # Please update Haskell image versions under .github/workflows/ci.yml together to use the same GHC version
 # (or the CI build will fail)
-resolver: nightly-2022-06-06
+resolver: nightly-2022-06-09
 pvp-bounds: both
 packages:
 - '.'
