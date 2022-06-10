@@ -30,7 +30,8 @@ import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Filter
-import           Language.PureScript.Ide.Imports    hiding (Import)
+import           Language.PureScript.Ide.Imports hiding (Import)
+import           Language.PureScript.Ide.Imports.Actions
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Prim
 import           Language.PureScript.Ide.Rebuild

@@ -19,6 +19,7 @@ module Language.PureScript.Ide.Filter
        , exactFilter
        , prefixFilter
        , declarationTypeFilter
+       , dependencyFilter
        , applyFilters
        ) where
 
@@ -31,8 +32,13 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 import           Language.PureScript.Ide.Filter.Declaration (DeclarationType)
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Imports
 import           Language.PureScript.Ide.Util
+
 import qualified Language.PureScript           as P
+import qualified Data.Text as T
+
+import Language.PureScript.Ide.Filter.Imports 
 
 newtype Filter = Filter (Either (Set P.ModuleName) DeclarationFilter)
   deriving Show
@@ -45,6 +51,7 @@ data DeclarationFilter
   | Exact Text
   | Namespace (Set IdeNamespace)
   | DeclType (Set DeclarationType)
+  | Dependencies { qualifier :: Maybe P.ModuleName, currentModuleName :: P.ModuleName, dependencyImports :: [Import] }
   deriving Show
 
 -- | Only keeps Declarations in the given modules
@@ -67,6 +74,9 @@ prefixFilter t = Filter (Right (Prefix t))
 declarationTypeFilter :: Set DeclarationType -> Filter
 declarationTypeFilter dts = Filter (Right (DeclType dts))
 
+dependencyFilter :: Maybe P.ModuleName -> P.ModuleName -> [Import] -> Filter
+dependencyFilter q m f = Filter (Right (Dependencies q m f))
+
 optimizeFilters :: [Filter] -> (Maybe (Set P.ModuleName), [DeclarationFilter])
 optimizeFilters = first smashModuleFilters . partitionEithers . map unFilter
   where
@@ -88,17 +98,19 @@ applyDeclarationFilters
   -> ModuleMap [IdeDeclarationAnn]
 applyDeclarationFilters fs =
   Map.filter (not . null)
-  . Map.map (foldr (.) identity (map applyDeclarationFilter fs))
+  . Map.mapWithKey (\modl decls -> foldr (.) identity (map (applyDeclarationFilter modl) fs) decls)
 
 applyDeclarationFilter
-  :: DeclarationFilter
+  :: P.ModuleName
+  -> DeclarationFilter
   -> [IdeDeclarationAnn]
   -> [IdeDeclarationAnn]
-applyDeclarationFilter f = case f of
+applyDeclarationFilter modl f = case f of
   Prefix prefix -> prefixFilter' prefix
   Exact t -> exactFilter' t
   Namespace namespaces -> namespaceFilter' namespaces
   DeclType dts -> declarationTypeFilter' dts
+  Dependencies qual currentModuleName imps -> dependencyFilter' modl qual currentModuleName imps
 
 namespaceFilter' :: Set IdeNamespace -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
 namespaceFilter' namespaces =
@@ -115,6 +127,13 @@ prefixFilter' prefix =
 declarationTypeFilter' :: Set DeclarationType -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
 declarationTypeFilter' declTypes =
   filter (\decl -> declarationType (discardAnn decl) `Set.member` declTypes)
+
+dependencyFilter' :: P.ModuleName -> Maybe P.ModuleName -> P.ModuleName -> [Import] -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
+dependencyFilter' modl qual currentModuleName imports =
+  if modl == currentModuleName && isNothing qual then
+    identity
+  else
+    filter (\decl -> any (matchImport qual modl decl) imports)
 
 instance FromJSON Filter where
   parseJSON = withObject "filter" $ \o -> do
@@ -139,4 +158,11 @@ instance FromJSON Filter where
       "declarations" -> do
         declarations <- o.: "params"
         pure (declarationTypeFilter (Set.fromList declarations))
+      "dependencies" -> do
+        params <- o.: "params"
+        moduleText <- params .: "moduleText"
+        qualifier <- fmap P.moduleNameFromString <$> params .:? "qualifier"
+        case sliceImportSection (T.lines moduleText) of
+          Left err -> fail ("Couldn't parse module imports: " <> T.unpack err)
+          Right (currentModuleName, _, imports, _ ) -> pure (dependencyFilter qualifier currentModuleName imports)
       s -> fail ("Unknown filter: " <> show s)
