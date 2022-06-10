@@ -38,7 +38,7 @@ jobs:
         include:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
             os: "ubuntu-latest"
-            image: "ghcr.io/purefunctor/haskell-purs:latest@sha256:70fd2b6255deb5daa961e6983591a0e21e9ac1e793923bee54aa2cc62e01f867"
+            image: "ghcr.io/purefunctor/haskell:9.2.3-stretch@sha256:70fd2b6255deb5daa961e6983591a0e21e9ac1e793923bee54aa2cc62e01f867"
           - os: "macOS-10.15"
           - os: "windows-2019"
 
@@ -166,7 +166,7 @@ jobs:
 
   lint:
     runs-on: "ubuntu-latest"
-    container: "ghcr.io/purefunctor/haskell-purs:latest@sha256:70fd2b6255deb5daa961e6983591a0e21e9ac1e793923bee54aa2cc62e01f867"
+    container: "ghcr.io/purefunctor/haskell:9.2.3-stretch@sha256:70fd2b6255deb5daa961e6983591a0e21e9ac1e793923bee54aa2cc62e01f867"
 
     steps:
       - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
