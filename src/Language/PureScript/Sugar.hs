@@ -3,23 +3,17 @@
 --
 module Language.PureScript.Sugar (desugar, module S) where
 
-import Prelude
-
 import Control.Category ((>>>))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Writer.Class (MonadWriter)
-import Data.Maybe (mapMaybe)
-
-import qualified Data.Map as M
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Externs
 import Language.PureScript.Linter.Imports
-import Language.PureScript.Names
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.DoNotation as S
@@ -31,7 +25,6 @@ import Language.PureScript.Sugar.Operators as S
 import Language.PureScript.Sugar.TypeClasses as S
 import Language.PureScript.Sugar.TypeClasses.Deriving as S
 import Language.PureScript.Sugar.TypeDeclarations as S
-import Language.PureScript.TypeChecker.Synonyms (SynonymMap)
 
 -- |
 -- The desugaring pipeline proceeds as follows:
@@ -77,26 +70,6 @@ desugar externs =
     >=> desugarImports
     >=> rebracket externs
     >=> checkFixityExports
-    >=> (\m ->
-      -- We need to collect type synonym information, since synonyms will not be
-      -- removed until later, during type checking.
-      let syns = findTypeSynonyms externs (getModuleName m) $ getModuleDeclarations m
-      -- We cannot prevent ill-kinded expansions of type synonyms without
-      -- knowing their kinds but they're not available yet.
-          kinds = mempty
-       in deriveInstances externs syns kinds m)
+    >=> deriveInstances
     >=> desugarTypeClasses externs
     >=> createBindingGroupsModule
-    >=> desugarLocals
-
-findTypeSynonyms :: [ExternsFile] -> ModuleName -> [Declaration] -> SynonymMap
-findTypeSynonyms externs mn decls =
-    M.fromList $ (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
-              ++ mapMaybe fromLocalDecl decls
-  where
-    fromExternsDecl mn' (EDTypeSynonym name args ty) = Just (Qualified (ByModuleName mn') name, (args, ty))
-    fromExternsDecl _ _ = Nothing
-
-    fromLocalDecl (TypeSynonymDeclaration _ name args ty) =
-      Just (Qualified (ByModuleName mn) name, (args, ty))
-    fromLocalDecl _ = Nothing

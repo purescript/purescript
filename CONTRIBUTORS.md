@@ -86,6 +86,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@mrhania](https://github.com/mrhania) | Łukasz Hanuszczak | [MIT license](http://opensource.org/licenses/MIT) |
 | [@natefaubion](https://github.com/natefaubion) | Nathan Faubion | [MIT license](http://opensource.org/licenses/MIT) |
 | [@ncaq](https://github.com/ncaq) | ncaq | [MIT license](http://opensource.org/licenses/MIT) |
+| [@NickMolloy](https://github.com/NickMolloy) | Nick Molloy | [MIT license](http://opensource.org/licenses/MIT) |
 | [@nicodelpiano](https://github.com/nicodelpiano) | Nicolas Del Piano | [MIT license](http://opensource.org/licenses/MIT) |
 | [@noraesae](https://github.com/noraesae) | Hyunje Jun | [MIT license](http://opensource.org/licenses/MIT) |
 | [@nullobject](https://github.com/nullobject) | Josh Bassett | [MIT license](http://opensource.org/licenses/MIT) |
@@ -155,6 +156,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@sigma-andex](https://github.com/sigma-andex) | Jan Schulte | [MIT license](http://opensource.org/licenses/MIT) |
 | [@i-am-the-slime](https://github.com/i-am-the-slime) | Mark Eibes | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sd-yip](https://github.com/sd-yip) | Nicholas Yip | [MIT license](http://opensource.org/licenses/MIT) |
+| [@j-nava](https://github.com/j-nava) | Jesse Nava | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 

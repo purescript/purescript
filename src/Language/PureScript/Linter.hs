@@ -235,6 +235,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go (Constructor _ _) = mempty
     go (TypeClassDictionary _ _ _) = mempty
     go (DeferredDictionary _ _) = mempty
+    go (DerivedInstancePlaceholder _ _) = mempty
     go AnonymousArgument = mempty
     go (Hole _) = mempty
 

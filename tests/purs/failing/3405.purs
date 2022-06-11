@@ -1,4 +1,4 @@
--- @shouldFailWith CannotFindDerivingType
+-- @shouldFailWith OrphanInstance
 module Main where
 
 import Prelude

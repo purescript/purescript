@@ -95,7 +95,19 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn _ _ _ (A.Abs _ _) =
     internalError "Abs with Binder argument was not desugared before exprToCoreFn mn"
   exprToCoreFn ss com ty (A.App v1 v2) =
-    App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
+    App (ss, com, ty, (isDictCtor v1 || isSynthetic v2) `orEmpty` IsSyntheticApp) v1' v2'
+    where
+    v1' = exprToCoreFn ss [] Nothing v1
+    v2' = exprToCoreFn ss [] Nothing v2
+    isDictCtor = \case
+      A.Constructor _ (Qualified _ name) -> isDictTypeName name
+      _ -> False
+    isSynthetic = \case
+      A.App v3 v4            -> isDictCtor v3 || isSynthetic v3 && isSynthetic v4
+      A.Accessor _ v3        -> isSynthetic v3
+      A.Var NullSourceSpan _ -> True
+      A.Unused{}             -> True
+      _                      -> False
   exprToCoreFn ss com ty (A.Unused _) =
     Var (ss, com, ty, Nothing) (Qualified (ByModuleName C.Prim) (Ident C.undefined))
   exprToCoreFn _ com ty (A.Var ss ident) =

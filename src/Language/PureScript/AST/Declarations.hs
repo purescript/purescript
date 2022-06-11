@@ -443,15 +443,17 @@ pattern ValueFixityDeclaration sa fixity name op = FixityDeclaration sa (Left (V
 pattern TypeFixityDeclaration :: SourceAnn -> Fixity -> Qualified (ProperName 'TypeName) -> OpName 'TypeOpName -> Declaration
 pattern TypeFixityDeclaration sa fixity name op = FixityDeclaration sa (Right (TypeFixity fixity name op))
 
+data InstanceDerivationStrategy
+  = KnownClassStrategy
+  | NewtypeStrategy
+  deriving (Show)
+
 -- | The members of a type class instance declaration
 data TypeInstanceBody
   = DerivedInstance
   -- ^ This is a derived instance
   | NewtypeInstance
   -- ^ This is an instance derived from a newtype
-  | NewtypeInstanceWithDictionary Expr
-  -- ^ This is an instance derived from a newtype, desugared to include a
-  -- dictionary for the type under the newtype.
   | ExplicitInstance [Declaration]
   -- ^ This is a regular (explicit) instance
   deriving (Show)
@@ -726,6 +728,10 @@ data Expr
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
   | DeferredDictionary (Qualified (ProperName 'ClassName)) [SourceType]
+  -- |
+  -- A placeholder for a type class instance to be derived during typechecking
+  --
+  | DerivedInstancePlaceholder (Qualified (ProperName 'ClassName)) InstanceDerivationStrategy
   -- |
   -- A placeholder for an anonymous function argument
   --

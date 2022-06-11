@@ -41,6 +41,7 @@ import           Protolude hiding (moduleName)
 
 import           Control.Arrow
 import           Control.Concurrent.STM
+import           Control.Lens                       hiding (anyOf, op, (&))
 import           "monad-logger" Control.Monad.Logger
 import           Data.IORef
 import qualified Data.Map.Lazy                      as Map
@@ -54,7 +55,6 @@ import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           Lens.Micro.Platform                hiding ((&))
 import           System.Directory (getModificationTime)
 
 -- | Resets all State inside psc-ide
