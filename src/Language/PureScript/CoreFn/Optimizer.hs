@@ -11,7 +11,7 @@ import Language.PureScript.CoreFn.CSE
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.CoreFn.Traversals
-import Language.PureScript.Names (Ident(..), ModuleName(..), QualifiedBy(..), Qualified(..))
+import Language.PureScript.Names (Ident(..), QualifiedBy(..), Qualified(..))
 import Language.PureScript.Label
 import Language.PureScript.Types
 import qualified Language.PureScript.Constants.Prelude as C

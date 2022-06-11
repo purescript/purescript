@@ -60,7 +60,7 @@ deriveInstance instType className strategy = do
       unaryClass :: (ModuleName -> ProperName 'TypeName -> m [(PSString, Expr)]) -> m Expr
       unaryClass f = case tys of
         [ty] -> case unwrapTypeConstructor ty of
-          Just (Qualified (Just mn') tyCon, _, _) | mn == mn' -> do
+          Just (Qualified (ByModuleName mn') tyCon, _, _) | mn == mn' -> do
             let superclassesDicts = flip map typeClassSuperclasses $ \(Constraint _ superclass _ suTyArgs _) ->
                   let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
                   in lam UnusedIdent (DeferredDictionary superclass tyArgs)
@@ -81,7 +81,7 @@ deriveInstance instType className strategy = do
 
     NewtypeStrategy ->
       case tys of
-        _ : _ | Just (Qualified (Just mn') tyCon, kargs, args) <- unwrapTypeConstructor (last tys)
+        _ : _ | Just (Qualified (ByModuleName mn') tyCon, kargs, args) <- unwrapTypeConstructor (last tys)
               , mn == mn'
               -> deriveNewtypeInstance mn className tys tyCon kargs args
               | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys (last tys)
@@ -164,7 +164,7 @@ deriveNewtypeInstance mn className tys tyConNm dkargs dargs = do
     -- newtype-derived; see #3168. The whole verifySuperclasses feature
     -- is pretty sketchy, and could use a thorough review and probably rewrite.
     hasNewtypeSuperclassInstance (suModule, suClass) nt@(newtypeModule, _) dicts =
-      let su = Qualified (Just suModule) suClass
+      let su = Qualified (ByModuleName suModule) suClass
           lookIn mn'
             = elem nt
             . (toList . extractNewtypeName mn' . tcdInstanceTypes
@@ -332,11 +332,11 @@ lookupTypeDecl
 lookupTypeDecl mn typeName = do
   env <- getEnv
   note (errorMessage $ CannotFindDerivingType typeName) $ do
-    (kind, DataType _ args dctors) <- Qualified (Just mn) typeName `M.lookup` types env
+    (kind, DataType _ args dctors) <- Qualified (ByModuleName mn) typeName `M.lookup` types env
     (kargs, _) <- completeBinderList kind
     let dtype = do
           (ctorName, _) <- headMay dctors
-          (a, _, _, _) <- Qualified (Just mn) ctorName `M.lookup` dataConstructors env
+          (a, _, _, _) <- Qualified (ByModuleName mn) ctorName `M.lookup` dataConstructors env
           pure a
     pure (dtype, fst . snd <$> kargs, map (\(v, k, _) -> (v, k)) args, dctors)
 

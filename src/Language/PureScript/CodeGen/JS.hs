@@ -265,7 +265,7 @@ moduleBindToJs mn = bindToJs
 
   guessEffects :: Expr Ann -> AST.InitializerEffects
   guessEffects = \case
-    Var _ (Qualified Nothing _)            -> NoEffects
+    Var _ (Qualified (BySourceSpan _) _)   -> NoEffects
     App (_, _, _, Just IsSyntheticApp) _ _ -> NoEffects
     _                                      -> UnknownEffects
 

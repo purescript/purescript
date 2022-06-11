@@ -347,40 +347,40 @@ pattern DataEq :: ModuleName
 pattern DataEq = ModuleName "Data.Eq"
 
 pattern Eq :: Qualified (ProperName 'ClassName)
-pattern Eq = Qualified (Just DataEq) (ProperName "Eq")
+pattern Eq = Qualified (ByModuleName DataEq) (ProperName "Eq")
 
 pattern Eq1 :: Qualified (ProperName 'ClassName)
-pattern Eq1 = Qualified (Just DataEq) (ProperName "Eq1")
+pattern Eq1 = Qualified (ByModuleName DataEq) (ProperName "Eq1")
 
 identEq :: Qualified Ident
-identEq = Qualified (Just DataEq) (Ident eq)
+identEq = Qualified (ByModuleName DataEq) (Ident eq)
 
 identEq1 :: Qualified Ident
-identEq1 = Qualified (Just DataEq) (Ident eq1)
+identEq1 = Qualified (ByModuleName DataEq) (Ident eq1)
 
 pattern DataOrd :: ModuleName
 pattern DataOrd = ModuleName "Data.Ord"
 
 pattern Ord :: Qualified (ProperName 'ClassName)
-pattern Ord = Qualified (Just DataOrd) (ProperName "Ord")
+pattern Ord = Qualified (ByModuleName DataOrd) (ProperName "Ord")
 
 pattern Ord1 :: Qualified (ProperName 'ClassName)
-pattern Ord1 = Qualified (Just DataOrd) (ProperName "Ord1")
+pattern Ord1 = Qualified (ByModuleName DataOrd) (ProperName "Ord1")
 
 identCompare :: Qualified Ident
-identCompare = Qualified (Just DataOrd) (Ident compare)
+identCompare = Qualified (ByModuleName DataOrd) (Ident compare)
 
 identCompare1 :: Qualified Ident
-identCompare1 = Qualified (Just DataOrd) (Ident compare1)
+identCompare1 = Qualified (ByModuleName DataOrd) (Ident compare1)
 
 pattern DataFunctor :: ModuleName
 pattern DataFunctor = ModuleName "Data.Functor"
 
 pattern Functor :: Qualified (ProperName 'ClassName)
-pattern Functor = Qualified (Just DataFunctor) (ProperName "Functor")
+pattern Functor = Qualified (ByModuleName DataFunctor) (ProperName "Functor")
 
 identMap :: Qualified Ident
-identMap = Qualified (Just DataFunctor) (Ident map)
+identMap = Qualified (ByModuleName DataFunctor) (Ident map)
 
 pattern DataSemiring :: ModuleName
 pattern DataSemiring = ModuleName "Data.Semiring"
