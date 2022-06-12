@@ -73,3 +73,4 @@ desugar externs =
     >=> deriveInstances
     >=> desugarTypeClasses externs
     >=> createBindingGroupsModule
+    >=> desugarLocals
