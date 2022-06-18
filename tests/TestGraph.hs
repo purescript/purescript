@@ -21,8 +21,9 @@ spec = do
     eitherGraph <- fst <$> P.graph modulePaths
     case eitherGraph of
       Left err -> error $ "Graph creation failed. Errors: " <> show err
-      Right res ->
-        res `shouldBe` graphFixture
+      Right res -> do
+        let graphFixture' = Json.decode $ ByteString.fromStrict $ Text.encodeUtf8 graphFixture
+        graphFixture' `shouldBe` Just res
 
   it "should fail when trying to include non-existing modules in the graph" $ do
     let modulePath = sourcesDir <> "ModuleFailing.purs"
