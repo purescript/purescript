@@ -415,12 +415,12 @@ test-suite tests
   ghc-options: -Wno-incomplete-uni-patterns
   build-depends:
       purescript
-    , generic-random
-    , hspec
-    , HUnit
-    , newtype
-    , QuickCheck
-    , regex-base
+    , generic-random >=1.4.0.0 && <1.5
+    , hspec ==2.8.3
+    , HUnit >=1.6.2.0 && <1.7
+    , newtype >=0.2.2.0 && <0.3
+    , QuickCheck >=2.14.2 && <2.15
+    , regex-base >=0.94.0.1 && <0.95
   build-tool-depends:
       hspec-discover:hspec-discover -any
     -- we need the compiler's executable available for the ide tests
