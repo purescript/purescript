@@ -15,7 +15,7 @@ defaults:
 env:
   CI_PRERELEASE: "${{ github.event_name == 'push' }}"
   CI_RELEASE: "${{ github.event_name == 'release' }}"
-  STACK_VERSION: "2.7.3"
+  STACK_VERSION: "2.7.5"
 
 concurrency:
   # We never want two prereleases building at the same time, since they would
@@ -38,7 +38,7 @@ jobs:
         include:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
             os: "ubuntu-latest"
-            image: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
+            image: "ghcr.io/purescript/haskell:9.2.3-stretch@sha256:70fd2b6255deb5daa961e6983591a0e21e9ac1e793923bee54aa2cc62e01f867"
           - os: "macOS-10.15"
           - os: "windows-2019"
 
@@ -119,9 +119,9 @@ jobs:
         if: runner.os == 'Linux'
         working-directory: "sdist-test"
         run: |
-          if [ $(ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
+          if [ $(ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
             echo "libtinfo detected"
-            ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo'
+            ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo'
             exit 1
           fi
 
@@ -166,7 +166,7 @@ jobs:
 
   lint:
     runs-on: "ubuntu-latest"
-    container: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
+    container: "ghcr.io/purescript/haskell:9.2.3-stretch@sha256:70fd2b6255deb5daa961e6983591a0e21e9ac1e793923bee54aa2cc62e01f867"
 
     steps:
       - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
@@ -209,7 +209,7 @@ jobs:
           # `allow-newer: true` is needed so that weeder-2.2.0 can be
           # installed with the dependencies present in LTS-18.
           echo 'allow-newer: true' >> stack-weeder.yaml
-          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.2.0
+          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.4.0
 
       - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
 

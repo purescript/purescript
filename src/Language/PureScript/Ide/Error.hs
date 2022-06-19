@@ -19,7 +19,7 @@ module Language.PureScript.Ide.Error
 
 import           Data.Aeson
 import qualified Data.Aeson.Types as Aeson
-import qualified Data.HashMap.Lazy as HM
+import qualified Data.Aeson.KeyMap as KM
 import qualified Data.Text as T
 import qualified Language.PureScript as P
 import           Language.PureScript.Errors.JSON
@@ -57,7 +57,7 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
 
     insertTSCompletions name idents fields (Aeson.Object value) =
       Aeson.Object
-        (HM.insert "pursIde"
+        (KM.insert "pursIde"
          (object [ "name" .= name
                  , "completions" .= ordNub (map identCompletion idents ++ map fieldCompletion fields)
                  ]) value)
