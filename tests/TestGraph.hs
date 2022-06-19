@@ -17,13 +17,11 @@ spec = do
     let modulePaths = (sourcesDir <>) <$> ["Module.purs", "Module2.purs", "Module3.purs"]
     let graphFixtureName = "graph.json"
 
-    Just graphFixture <- Json.decodeFileStrict' (baseDir <> graphFixtureName)
+    graphFixture <- Json.decodeFileStrict' (baseDir <> graphFixtureName)
     eitherGraph <- fst <$> P.graph modulePaths
     case eitherGraph of
       Left err -> error $ "Graph creation failed. Errors: " <> show err
-      Right res -> do
-        let graphFixture' = Json.decode $ ByteString.fromStrict $ Text.encodeUtf8 graphFixture
-        graphFixture' `shouldBe` Just res
+      Right res -> graphFixture `shouldBe` Just res
 
   it "should fail when trying to include non-existing modules in the graph" $ do
     let modulePath = sourcesDir <> "ModuleFailing.purs"
