@@ -1,4 +1,4 @@
--- @shouldFailWith InvalidDerivedInstance
+-- @shouldFailWith ClassInstanceArityMismatch
 module Main where
 
 import Prelude

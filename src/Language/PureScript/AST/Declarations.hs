@@ -441,15 +441,17 @@ pattern ValueFixityDeclaration sa fixity name op = FixityDeclaration sa (Left (V
 pattern TypeFixityDeclaration :: SourceAnn -> Fixity -> Qualified (ProperName 'TypeName) -> OpName 'TypeOpName -> Declaration
 pattern TypeFixityDeclaration sa fixity name op = FixityDeclaration sa (Right (TypeFixity fixity name op))
 
+data InstanceDerivationStrategy
+  = KnownClassStrategy
+  | NewtypeStrategy
+  deriving (Show)
+
 -- | The members of a type class instance declaration
 data TypeInstanceBody
   = DerivedInstance
   -- ^ This is a derived instance
   | NewtypeInstance
   -- ^ This is an instance derived from a newtype
-  | NewtypeInstanceWithDictionary Expr
-  -- ^ This is an instance derived from a newtype, desugared to include a
-  -- dictionary for the type under the newtype.
   | ExplicitInstance [Declaration]
   -- ^ This is a regular (explicit) instance
   deriving (Show)
@@ -729,6 +731,10 @@ data Expr
   --
   | DeferredDictionary (Qualified (ProperName 'ClassName)) [SourceType]
   -- |
+  -- A placeholder for a type class instance to be derived during typechecking
+  --
+  | DerivedInstancePlaceholder (Qualified (ProperName 'ClassName)) InstanceDerivationStrategy
+  -- |
   -- A placeholder for an anonymous function argument
   --
   | AnonymousArgument
@@ -826,9 +832,9 @@ newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
   deriving (Show, Eq, Ord, Foldable, Functor, Traversable)
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''NameSource)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)
 
 isTrueExpr :: Expr -> Bool
 isTrueExpr (Literal _ (BooleanLiteral True)) = True

@@ -158,7 +158,7 @@ preparePackage' opts = do
 
   (pkgModules, pkgModuleMap)  <- getModules opts (map (second fst) resolvedDeps)
 
-  let declaredDeps = map fst $ Bower.bowerDependencies pkgMeta ++ Bower.bowerDevDependencies pkgMeta
+  let declaredDeps = map fst $ Bower.bowerDependencies pkgMeta
   pkgResolvedDependencies <- handleDeps declaredDeps (map (second snd) resolvedDeps)
 
   let pkgUploader = D.NotYetKnown

@@ -582,8 +582,8 @@ primIntClasses =
     -- class Compare (left :: Int) (right :: Int) (ordering :: Ordering) | left right -> ordering
     , (primSubName C.moduleInt "Compare", makeTypeClassData
         [ ("left", Just tyInt, NotVtaTypeVar)
-        , ("right", Just kindSymbol, NotVtaTypeVar)
-        , ("ordering", Just kindSymbol, NotVtaTypeVar)
+        , ("right", Just tyInt, NotVtaTypeVar)
+        , ("ordering", Just kindOrdering, NotVtaTypeVar)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         ] True)

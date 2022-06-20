@@ -72,14 +72,38 @@ considering what effects this may have:
 - JSON produced by `purs publish`
   - this might affect Pursuit
 
+## Making a release candidate
+
+- Make a commit bumping versions. The following should be updated:
+
+  - The `version` field in `purescript.cabal` should be set to the expected
+    final release version.
+
+  - The `prerelease` field in `app/Version.hs` should be set to `-rc.0`.
+
+  - The `version` field in `npm-package/package.json` should be set to the
+    concatenation of the above two items.
+
+  - The version to install in the `postinstall` script in `package.json` should
+    match the `version` field.
+
+- Upon merging the PR, the release candidate will be published to GitHub and
+  npm. There is no need to make a manual release for the RC. Subsequent builds
+  will be deployed to successive `-rc.*` numbers until a final release is made.
+
+- Verify that the release candidate can be installed via `npm i purescript@next`
+
 ## Making a release
+
+- Test that the last build published to `purescript@next` works in downstream
+  projects before starting the manual release process.
 
 - Make a commit bumping versions. The following should be updated:
 
   - The `version` field in `purescript.cabal`
 
-  - The `prerelease` field in `app/Version.hs`, if updating the prerelease
-    field
+  - The `prerelease` field in `app/Version.hs` should be cleared, if a
+    release candidate was previously published
 
   - The `version` field in `npm-package/package.json`
 
@@ -96,15 +120,17 @@ considering what effects this may have:
   completes. (If the CI build fails, binaries can also be built locally and
   manually uploaded to the release on GitHub)
 
-- Publish to Hackage: run `stack upload .` from the repo root directory.
+- If making a normal release, publish to Hackage by running `stack upload .` from the repo root directory.
 
   It's a good idea to check that the package (`purescript`)
   can be installed from Hackage at this point.
 
 - After all of the prebuilt binaries are present on the GitHub releases page,
-  publish to npm: change to the `npm-package` directory and run `npm publish`.
-  It's a good idea to check that the package can be installed from npm at this
-  point.
+  publish to npm: change to the `npm-package` directory and do the following:
+    - run `npm publish`
+    - run `npm dist-tag add purescript@VERSION next` where `VERSION` is `v0.15.0`.
+    - verify that the release can be installed via `npm i purescript@next`
+    - verify that the release can be installed via `npm i purescript`
 
 Note: if a release does not go as planned (e.g. [`v0.14.3`](https://github.com/purescript/purescript/pull/4139)), we should not delete the broken GitHub release or its Git tag. Rather, we should make a new release and update the GitHub release notes and the corresponding section in the CHANGELOG.md file for the broken release to
 1. say that it's not a real release, and

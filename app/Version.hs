@@ -17,7 +17,7 @@ import qualified Development.GitRev as GitRev
 -- prerelease identifier here (if any). When releasing a proper version, simply
 -- set this to an empty string.
 prerelease :: String
-prerelease = "-alpha-05"
+prerelease = ""
 
 versionString :: String
 versionString = showVersion Paths.version ++ prerelease ++ extra
@@ -26,7 +26,8 @@ versionString = showVersion Paths.version ++ prerelease ++ extra
   extra = ""
 #else
   extra = " [development build; commit: " ++ $(GitRev.gitHash) ++ dirty ++ "]"
-  dirty
-    | $(GitRev.gitDirty) = " DIRTY"
-    | otherwise = ""
+  dirty =
+    if $(GitRev.gitDirty)
+      then " DIRTY"
+      else ""
 #endif

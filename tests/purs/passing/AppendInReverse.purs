@@ -1,9 +1,9 @@
 module Main where
 
 import Prelude
-import Data.Symbol (SProxy(..))
 import Prim.Symbol (class Append)
 import Effect.Console (log)
+import Type.Proxy (Proxy(..))
 
 class Balanced (sym :: Symbol)
 
@@ -15,20 +15,20 @@ instance balanced2
      , Balanced sym2
      ) => Balanced sym
 
-balanced :: forall sym. Balanced sym => SProxy sym -> String
+balanced :: forall sym. Balanced sym => Proxy sym -> String
 balanced _ = "ok"
 
 b0 :: String
-b0 = balanced (SProxy :: SProxy "")
+b0 = balanced (Proxy :: Proxy "")
 
 b1 :: String
-b1 = balanced (SProxy :: SProxy "()")
+b1 = balanced (Proxy :: Proxy "()")
 
 b2 :: String
-b2 = balanced (SProxy :: SProxy "(())")
+b2 = balanced (Proxy :: Proxy "(())")
 
 b3 :: String
-b3 = balanced (SProxy :: SProxy "((()))")
+b3 = balanced (Proxy :: Proxy "((()))")
 
 main = do
   log b0

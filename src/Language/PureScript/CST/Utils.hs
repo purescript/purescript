@@ -38,10 +38,13 @@ qualifiedProperName n = QualifiedProperName (N.coerceProperName <$> n)
 -- which can be used for all of the different ProperNameTypes
 -- (via a call to getProperName).
 newtype ProperName =
-  ProperName { getProperName :: forall a. Name (N.ProperName a) }
+  ProperName { _getProperName :: forall a. Name (N.ProperName a) }
 
 properName :: Name (N.ProperName a) -> ProperName
 properName n = ProperName (N.coerceProperName <$> n)
+
+getProperName :: forall a. ProperName -> Name (N.ProperName a)
+getProperName pn = _getProperName pn -- eta expansion needed here due to simplified subsumption
 
 -- |
 -- A newtype for a qualified operator name whose OpNameType has not yet been determined.

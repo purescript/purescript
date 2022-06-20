@@ -10,6 +10,7 @@ module Language.PureScript.TypeChecker
 import Prelude.Compat
 import Protolude (headMay, maybeToLeft, ordNub)
 
+import Control.Lens ((^..), _2)
 import Control.Monad (when, unless, void, forM, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
@@ -46,8 +47,6 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Unify (varIfUnknown)
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
-
-import Lens.Micro.Platform ((^..), _2)
 
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -290,7 +289,7 @@ typeCheckAll moduleName = traverse go
   go :: Declaration -> m Declaration
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
-      when (dtype == Newtype) $ checkNewtype name dctors
+      when (dtype == Newtype) $ void $ checkNewtype name dctors
       let args_ = (\(a, b, _) -> (a, b)) <$> args
       checkDuplicateTypeArguments $ map fst args_
       (dataCtors, ctorKind) <- kindOfData moduleName (sa, name, args, dctors)
@@ -321,7 +320,7 @@ typeCheckAll moduleName = traverse go
         forM dataDeclsWithKinds $ \(_, name, args, dataCtors, _) ->
           (name, (\(a, b, _) -> (a, b)) <$> args,) <$> traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
       for_ dataDeclsWithKinds $ \(dtype, name, args', dataCtors, ctorKind) -> do
-        when (dtype == Newtype) $ checkNewtype name (map fst dataCtors)
+        when (dtype == Newtype) $ void $ checkNewtype name (map fst dataCtors)
         let args_ = (\(a, b, _) -> (a, b)) <$> args'
         checkDuplicateTypeArguments $ map fst args_
         let args'' = args' `withRoles` inferRoles' name args_
@@ -362,7 +361,8 @@ typeCheckAll moduleName = traverse go
     internalError "Type declarations should have been removed before typeCheckAlld"
   go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
-    warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (positionedError ss)) $ do
+    let declHint = if isPlainIdent name then addHint (ErrorInValueDeclaration name) else id
+    warnAndRethrow (declHint . addHint (positionedError ss)) $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
       typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')] >>= \case
@@ -600,13 +600,17 @@ typeCheckAll moduleName = traverse go
       , ..
       }
 
+-- | Check that a newtype has just one data constructor with just one field, or
+-- throw an error. If the newtype is valid, this function returns the single
+-- data constructor declaration and the single field, as a 'proof' that the
+-- newtype was indeed a valid newtype.
 checkNewtype
   :: forall m
    . MonadError MultipleErrors m
   => ProperName 'TypeName
   -> [DataConstructorDeclaration]
-  -> m ()
-checkNewtype _ [DataConstructorDeclaration _ _ [_]] = return ()
+  -> m (DataConstructorDeclaration, (Ident, SourceType))
+checkNewtype _ [decl@(DataConstructorDeclaration _ _ [field])] = return (decl, field)
 checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 
 -- |

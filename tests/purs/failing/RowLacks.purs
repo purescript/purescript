@@ -3,16 +3,16 @@ module Main where
 
 import Effect.Console (log)
 import Prim.Row (class Lacks)
-import Type.Row (RProxy(..))
+import Type.Proxy (Proxy(..))
 
 lacksX
   :: forall r
    . Lacks "x" r
-  => RProxy r
-  -> RProxy ()
-lacksX _ = RProxy
+  => Proxy r
+  -> Proxy ()
+lacksX _ = Proxy
 
-test1 :: RProxy ()
-test1 = lacksX (RProxy :: RProxy (x :: Int, y :: Int, z :: String))
+test1 :: Proxy ()
+test1 = lacksX (Proxy :: Proxy (x :: Int, y :: Int, z :: String))
 
 main = log "Done"
