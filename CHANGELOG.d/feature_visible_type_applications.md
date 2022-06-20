@@ -75,3 +75,13 @@
   rightSkip = Right @String @_ 0
   ```
 
+  This feature also exposes kind applications syntactically:
+  ```purs
+  foreign import data IdK :: forall a. a -> a
+
+  type IntId :: Int -> Int
+  type IntId = IdK @Int
+
+  type NumberId :: Number -> Number
+  type NumberId = IdK @Number
+  ```

@@ -308,6 +308,7 @@ type4 :: { Type () }
 type5 :: { Type () }
   : typeAtom { $1 }
   | type5 typeAtom { TypeApp () $1 $2 }
+  | type5 '@' typeAtom { TypeKindApp () $1 $3 }
 
 typeAtom :: { Type ()}
   : '_' { TypeWildcard () $1 }

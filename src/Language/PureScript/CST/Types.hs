@@ -143,6 +143,7 @@ data Type a
   | TypeForall a SourceToken (NonEmpty (TypeVarBinding a)) SourceToken (Type a)
   | TypeKinded a (Type a) SourceToken (Type a)
   | TypeApp a (Type a) (Type a)
+  | TypeKindApp a (Type a) (Type a)
   | TypeOp a (Type a) (QualifiedName (N.OpName 'N.TypeOpName)) (Type a)
   | TypeOpName a (QualifiedName (N.OpName 'N.TypeOpName))
   | TypeArr a (Type a) SourceToken (Type a)

@@ -156,6 +156,12 @@ convertType fileName = go
         b' = go b
         ann = Pos.widenSourceAnn (T.getAnnForType a') (T.getAnnForType b')
       T.TypeApp ann a' b'
+    TypeKindApp _ a b -> do
+      let
+        a' = go a
+        b' = go b
+        ann = Pos.widenSourceAnn (T.getAnnForType a') (T.getAnnForType b')
+      T.KindApp ann a' b'
     ty@(TypeOp _ _ _ _) -> do
       let
         reassoc op b' a = do
@@ -590,6 +596,7 @@ convertDeclaration fileName decl = case decl of
         -- Polytypes are disallowed in instance heads
         TypeForall{} -> ""
         TypeApp _ t1 t2 -> argName t1 <> argName t2
+        TypeKindApp _ t1 t2 -> argName t1 <> argName t2
         TypeOp _ t1 op t2 ->
           argName t1 <> N.runOpName (qualName op) <> argName t2
         TypeArr _ t1 _ t2 -> argName t1 <> "Function" <> argName t2

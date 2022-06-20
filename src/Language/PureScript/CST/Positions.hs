@@ -251,6 +251,7 @@ typeRange = \case
   TypeForall _ a _ _ b -> (a, snd $ typeRange b)
   TypeKinded _ a _ b -> (fst $ typeRange a, snd $ typeRange b)
   TypeApp _ a b -> (fst $ typeRange a, snd $ typeRange b)
+  TypeKindApp _ a b -> (fst $ typeRange a, snd $ typeRange b)
   TypeOp _ a _ b -> (fst $ typeRange a, snd $ typeRange b)
   TypeOpName _ a -> qualRange a
   TypeArr _ a _ b -> (fst $ typeRange a, snd $ typeRange b)

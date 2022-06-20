@@ -289,6 +289,7 @@ flattenType = \case
   TypeForall _ a b c d -> pure a <> foldMap flattenTypeVarBinding b <> pure c <> flattenType d
   TypeKinded _ a b c -> flattenType a <> pure b <> flattenType c
   TypeApp _ a b -> flattenType a <> flattenType b
+  TypeKindApp _ a b -> flattenType a <> flattenType b
   TypeOp _ a b c -> flattenType a <> pure (qualTok b) <> flattenType c
   TypeOpName _ a -> pure $ qualTok a
   TypeArr _ a b c -> flattenType a <> pure b <> flattenType c

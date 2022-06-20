@@ -20,6 +20,7 @@ everythingOnTypes op k = goTy
     TypeForall _ _ _ _ ty2 -> k ty `op` goTy ty2
     TypeKinded _ ty2 _ ty3 -> k ty `op` (goTy ty2 `op` goTy ty3)
     TypeApp _ ty2 ty3 -> k ty `op` (goTy ty2 `op` goTy ty3)
+    TypeKindApp _ ty2 ty3 -> k ty `op` (goTy ty2 `op` goTy ty3)
     TypeOp _ ty2 _ ty3 -> k ty `op` (goTy ty2 `op` goTy ty3)
     TypeOpName _ _ -> k ty
     TypeArr _ ty2 _ ty3 -> k ty `op` (goTy ty2 `op` goTy ty3)
