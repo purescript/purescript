@@ -294,6 +294,7 @@ library
     Language.PureScript.Ide.Types
     Language.PureScript.Ide.Usage
     Language.PureScript.Ide.Util
+    Language.PureScript.Ide.Psii
     Language.PureScript.Interactive
     Language.PureScript.Interactive.Completion
     Language.PureScript.Interactive.Directive

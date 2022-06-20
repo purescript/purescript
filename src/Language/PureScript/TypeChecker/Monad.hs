@@ -21,6 +21,7 @@ import qualified Data.List.NonEmpty as NEL
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Ide.Psii
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Types
 import Language.PureScript.Pretty.Values
@@ -104,11 +105,15 @@ data CheckState = CheckState
   , checkConstructorImportsForCoercible :: S.Set (ModuleName, Qualified (ProperName 'ConstructorName))
   -- ^ Newtype constructors imports required to solve Coercible constraints.
   -- We have to keep track of them so that we don't emit unused import warnings.
+  , checkPsiiVerbosity :: PsiiVerbosity
+  -- ^ The verbosity of IDE information to be collected.
+  , checkPsiiInformation :: S.Set (PsiiInformation)
+  -- ^ The IDE information collected through type-checking.
   }
 
 -- | Create an empty @CheckState@
 emptyCheckState :: Environment -> CheckState
-emptyCheckState env = CheckState env 0 0 0 Nothing [] emptySubstitution [] mempty
+emptyCheckState env = CheckState env 0 0 0 Nothing [] emptySubstitution [] mempty PsiiNoInformation mempty
 
 -- | Unification variables
 type Unknown = Int
@@ -165,6 +170,10 @@ withErrorMessageHint hint action = do
   a <- rethrow (addHint hint) action
   modify $ \st -> st { checkHints = checkHints orig }
   return a
+
+insertPsiiInformation :: MonadState CheckState m => PsiiInformation -> m ()
+insertPsiiInformation information =
+  modify $ \st -> st { checkPsiiInformation = S.insert information $ checkPsiiInformation st }
 
 -- | These hints are added at the front, so the most nested hint occurs
 -- at the front, but the simplifier assumes the reverse order.

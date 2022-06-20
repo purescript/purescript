@@ -34,6 +34,7 @@ import qualified Language.PureScript.Constants.Data.Newtype as DataNewtype
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Ide.Psii
 import Language.PureScript.Linter
 import Language.PureScript.Linter.Wildcards
 import Language.PureScript.Names
@@ -359,6 +360,7 @@ typeCheckAll moduleName = traverse go
       typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')] >>= \case
         [(_, (val'', ty))] -> do
           addValue moduleName name ty nameKind
+          insertPsiiInformation $ PsiiValueDecl $ PsiiValueDecl' ss (Qualified (Just moduleName) name) ty
           return $ ValueDecl sa name nameKind [] [MkUnguarded val'']
         _ -> internalError "typesOf did not return a singleton"
   go ValueDeclaration{} = internalError "Binders were not desugared"
