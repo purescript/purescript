@@ -64,17 +64,18 @@ metaFromJSON v = withObject "Meta" metaFromObj v
       is <- o .: "identifiers" >>= listParser identFromJSON
       return $ Just (IsConstructor ct is)
 
-annFromJSON :: FilePath -> Value -> Parser Ann
-annFromJSON modulePath = withObject "Ann" annFromObj
+annFromJSON :: Value -> Parser Ann
+annFromJSON = withObject "Ann" annFromObj
   where
   annFromObj o = do
-    ss <- o .: "sourceSpan" >>= sourceSpanFromJSON modulePath
+    ss <- o .: "sourceSpan" >>= sourceSpanFromJSON
     mm <- o .: "meta" >>= metaFromJSON
     return (ss, [], Nothing, mm)
 
-sourceSpanFromJSON :: FilePath -> Value -> Parser SourceSpan
-sourceSpanFromJSON modulePath = withObject "SourceSpan" $ \o ->
-  SourceSpan modulePath <$>
+sourceSpanFromJSON :: Value -> Parser SourceSpan
+sourceSpanFromJSON = withObject "SourceSpan" $ \o ->
+  SourceSpan <$>
+    o .: "name" <*>
     o .: "start" <*>
     o .: "end"
 
@@ -120,11 +121,9 @@ qualifiedFromJSON f = withObject "Qualified" qualifiedFromObj
     i  <- o .: "identifier" >>= withText "Ident" (return . f)
     pure $ Qualified (ByModuleName mn) i
   qualifiedBySourceSpanFromObj o = do
-    -- TODO: Should `sourceSpanXJSON` encode this information as well?
-    sn <- o .: "spanName" >>= withText "SpanName" (pure . T.unpack)
-    ss <- o .: "sourceSpan" >>= sourceSpanFromJSON sn
+    ss <- o .: "sourceSpan" >>= sourceSpanFromJSON
     i  <- o .: "identifier" >>= withText "Ident" (return . f)
-    pure $ Qualified (BySourceSpan ss { spanName = sn }) i
+    pure $ Qualified (BySourceSpan ss) i
 
 moduleNameFromJSON :: Value -> Parser ModuleName
 moduleNameFromJSON v = ModuleName . T.intercalate "." <$> listParser parseJSON v
@@ -136,8 +135,8 @@ moduleFromJSON = withObject "Module" moduleFromObj
     version <- o .: "builtWith" >>= versionFromJSON
     moduleName <- o .: "moduleName" >>= moduleNameFromJSON
     modulePath <- o .: "modulePath"
-    moduleSourceSpan <- o .: "sourceSpan" >>= sourceSpanFromJSON modulePath
-    moduleImports <- o .: "imports" >>= listParser (importFromJSON modulePath)
+    moduleSourceSpan <- o .: "sourceSpan" >>= sourceSpanFromJSON
+    moduleImports <- o .: "imports" >>= listParser importFromJSON
     moduleExports <- o .: "exports" >>= listParser identFromJSON
     moduleReExports <- o .: "reExports" >>= reExportsFromJSON
     moduleDecls <- o .: "decls" >>= listParser (bindFromJSON modulePath)
@@ -151,10 +150,10 @@ moduleFromJSON = withObject "Module" moduleFromObj
       Just r -> return r
       Nothing -> fail "failed parsing purs version"
 
-  importFromJSON :: FilePath -> Value -> Parser (Ann, ModuleName)
-  importFromJSON modulePath = withObject "Import"
+  importFromJSON :: Value -> Parser (Ann, ModuleName)
+  importFromJSON = withObject "Import"
     (\o -> do
-      ann <- o .: "annotation" >>= annFromJSON modulePath
+      ann <- o .: "annotation" >>= annFromJSON
       mn  <- o .: "moduleName" >>= moduleNameFromJSON
       return (ann, mn))
 
@@ -174,7 +173,7 @@ bindFromJSON modulePath = withObject "Bind" bindFromObj
         
   bindFromObj' :: Object -> Parser ((Ann, Ident), Expr Ann)
   bindFromObj' o = do
-    a <- o .: "annotation" >>= annFromJSON modulePath
+    a <- o .: "annotation" >>= annFromJSON
     i <- o .: "identifier" >>= identFromJSON
     e <- o .: "expression" >>= exprFromJSON modulePath
     return ((a, i), e)
@@ -205,54 +204,54 @@ exprFromJSON modulePath = withObject "Expr" exprFromObj
       _               -> fail ("not recognized expression type: \"" ++ T.unpack type_ ++ "\"")
 
   varFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     qi <- o .: "value" >>= qualifiedFromJSON Ident
     return $ Var ann qi
 
   literalExprFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     lit <- o .: "value" >>= literalFromJSON (exprFromJSON modulePath)
     return $ Literal ann lit
 
   constructorFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     tyn <- o .: "typeName" >>= properNameFromJSON
     con <- o .: "constructorName" >>= properNameFromJSON
     is  <- o .: "fieldNames" >>= listParser identFromJSON
     return $ Constructor ann tyn con is
 
   accessorFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     f   <- o .: "fieldName"
     e <- o .: "expression" >>= exprFromJSON modulePath
     return $ Accessor ann f e
 
   objectUpdateFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     e   <- o .: "expression" >>= exprFromJSON modulePath
     us  <- o .: "updates" >>= recordFromJSON (exprFromJSON modulePath)
     return $ ObjectUpdate ann e us
 
   absFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     idn <- o .: "argument" >>= identFromJSON
     e   <- o .: "body" >>= exprFromJSON modulePath
     return $ Abs ann idn e
 
   appFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     e   <- o .: "abstraction" >>= exprFromJSON modulePath
     e'  <- o .: "argument" >>= exprFromJSON modulePath
     return $ App ann e e'
 
   caseFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     cs  <- o .: "caseExpressions" >>= listParser (exprFromJSON modulePath)
     cas <- o .: "caseAlternatives" >>= listParser (caseAlternativeFromJSON modulePath)
     return $ Case ann cs cas
 
   letFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     bs  <- o .: "binds" >>= listParser (bindFromJSON modulePath)
     e   <- o .: "expression" >>= exprFromJSON modulePath
     return $ Let ann bs e
@@ -293,28 +292,28 @@ binderFromJSON modulePath = withObject "Binder" binderFromObj
 
 
   nullBinderFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     return $ NullBinder ann
 
   varBinderFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     idn <- o .: "identifier" >>= identFromJSON
     return $ VarBinder ann idn
 
   literalBinderFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     lit <- o .: "literal" >>= literalFromJSON (binderFromJSON modulePath)
     return $ LiteralBinder ann lit
 
   constructorBinderFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     tyn <- o .: "typeName" >>= qualifiedFromJSON ProperName
     con <- o .: "constructorName" >>= qualifiedFromJSON ProperName
     bs  <- o .: "binders" >>= listParser (binderFromJSON modulePath)
     return $ ConstructorBinder ann tyn con bs
 
   namedBinderFromObj o = do
-    ann <- o .: "annotation" >>= annFromJSON modulePath
+    ann <- o .: "annotation" >>= annFromJSON
     n   <- o .: "identifier" >>= identFromJSON
     b   <- o .: "binder" >>= binderFromJSON modulePath
     return $ NamedBinder ann n b

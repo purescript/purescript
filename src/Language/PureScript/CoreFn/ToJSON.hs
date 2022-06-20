@@ -48,8 +48,9 @@ metaToJSON IsWhere                = object [ "metaType"  .= "IsWhere" ]
 metaToJSON IsSyntheticApp         = object [ "metaType"  .= "IsSyntheticApp" ]
 
 sourceSpanToJSON :: SourceSpan -> Value
-sourceSpanToJSON (SourceSpan _ spanStart spanEnd) =
-  object [ "start" .= spanStart
+sourceSpanToJSON (SourceSpan spanName spanStart spanEnd) =
+  object [ "name"  .= spanName
+         , "start" .= spanStart
          , "end"   .= spanEnd
          ]
 
@@ -109,9 +110,7 @@ qualifiedToJSON f (Qualified qb a) =
       , "identifier" .= toJSON (f a)
       ]
     BySourceSpan ss -> object
-      -- TODO: Should `sourceSpanXJSON` encode this information as well?
-      [ "spanName"   .= toJSON (spanName ss)
-      , "sourceSpan" .= sourceSpanToJSON ss
+      [ "sourceSpan" .= sourceSpanToJSON ss
       , "identifier" .= toJSON (f a)
       ]
 
