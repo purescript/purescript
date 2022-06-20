@@ -290,21 +290,18 @@ isQualifiedWith _ _ = False
 
 instance ToJSON a => ToJSON (Qualified a) where
   toJSON (Qualified qb a) = case qb of
-    ByModuleName mn -> toJSON (mn, a)
-    BySourceSpan ss -> toJSON (ss, a)
+    ByModuleName mn -> toJSON2 (mn, a)
+    BySourceSpan ss -> toJSON2 (ss, a)
 
 instance FromJSON a => FromJSON (Qualified a) where
   parseJSON v = byModule <|> bySourceSpan
     where
     byModule = do
-      (mn, a) <- parseJSON v
+      (mn, a) <- parseJSON2 v
       pure $ Qualified (ByModuleName mn) a
     bySourceSpan = do
-      (ss, a) <- parseJSON v
+      (ss, a) <- parseJSON2 v
       pure $ Qualified (BySourceSpan ss) a
-
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''InternalIdentData)
 
 instance ToJSON ModuleName where
   toJSON (ModuleName name) = toJSON (T.splitOn "." name)
@@ -319,3 +316,6 @@ instance ToJSONKey ModuleName where
 
 instance FromJSONKey ModuleName where
   fromJSONKey = fmap moduleNameFromString fromJSONKey
+
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''InternalIdentData)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)

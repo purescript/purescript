@@ -3,12 +3,14 @@ module TestSourceMaps where
 import Prelude
 
 import Control.Monad (void, forM_)
+import Data.Aeson as Json
 import Test.Hspec
 import System.FilePath (replaceExtension, takeFileName, (</>), (<.>))
 import qualified Language.PureScript as P
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import Data.Foldable (fold)
-import TestUtils (goldenVsString, getTestFiles, SupportModules (..), compile', ExpectedModuleName (IsSourceMap))
+import TestUtils (getTestFiles, SupportModules (..), compile', ExpectedModuleName (IsSourceMap))
 import qualified Data.Set as Set
 import TestCompiler (getTestMain)
 import System.Process.Typed (proc, readProcess_)
@@ -54,9 +56,12 @@ assertCompilesToExpectedValidOutput support inputFiles = do
   case result of
     Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
     Right actualSourceMapFile -> do
-      goldenVsString
-        (replaceExtension modulePath ".out.js.map")
-        (BS.readFile actualSourceMapFile)
+      let
+        readAndDecode :: FilePath ->  IO (Maybe Json.Value)
+        readAndDecode = fmap (Json.decode . LBS.fromStrict) . BS.readFile
+      goldenFile <- readAndDecode $ replaceExtension modulePath ".out.js.map"
+      actualFile <- readAndDecode actualSourceMapFile
+      goldenFile `shouldBe` actualFile
       sourceMapIsValid actualSourceMapFile
 
   where

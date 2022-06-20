@@ -26,7 +26,8 @@ versionString = showVersion Paths.version ++ prerelease ++ extra
   extra = ""
 #else
   extra = " [development build; commit: " ++ $(GitRev.gitHash) ++ dirty ++ "]"
-  dirty
-    | $(GitRev.gitDirty) = " DIRTY"
-    | otherwise = ""
+  dirty =
+    if $(GitRev.gitDirty)
+      then " DIRTY"
+      else ""
 #endif
