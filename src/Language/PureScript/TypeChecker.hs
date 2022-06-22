@@ -297,7 +297,7 @@ typeCheckAll moduleName = traverse go
         dataDecls = mapMaybe toDataDecl tysList
         roleDecls = mapMaybe toRoleDecl tysList
         clss = mapMaybe toClassDecl tysList
-        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2) ++ fmap coerceProperName (clss^..traverse._2._2))
+        bindingGroupNames = ordNub ((syns ^.. traverse . _2) ++ (dataDecls ^.. traverse . _2 . _2) ++ fmap coerceProperName (clss ^.. traverse . _2 . _2))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
       env <- getEnv

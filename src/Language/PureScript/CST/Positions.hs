@@ -191,7 +191,7 @@ dataCtorRange (DataCtor _ name fields)
 
 classHeadRange :: ClassHead a -> TokenRange
 classHeadRange (ClassHead kw _ name vars fdeps)
-  | Just (_, fs) <- fdeps = (kw, snd .classFundepRange $ sepLast fs)
+  | Just (_, fs) <- fdeps = (kw, snd . classFundepRange $ sepLast fs)
   | [] <- vars = (kw, snd $ nameRange name)
   | otherwise = (kw, snd . typeVarBindingRange $ last vars)
 
