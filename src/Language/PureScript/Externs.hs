@@ -179,7 +179,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
     env { typeClassDictionaries =
             updateMap
               (updateMap (M.insertWith (<>) (qual ident) (pure dict)) className)
-              (Just efModuleName) (typeClassDictionaries env) }
+              (ByModuleName efModuleName) (typeClassDictionaries env) }
     where
     dict :: NamedDict
     dict = TypeClassDictionaryInScope ch idx (qual ident) [] className vars kinds tys cs instTy
@@ -258,7 +258,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsF
       ]
   toExternsDeclaration (TypeInstanceRef ss' ident ns)
     = [ EDInstance tcdClassName (lookupRenamedIdent ident) tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex ns ss'
-      | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
+      | m1 <- maybeToList (M.lookup (ByModuleName mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , nel <- maybeToList (M.lookup (Qualified (ByModuleName mn) ident) m2)
       , TypeClassDictionaryInScope{..} <- NEL.toList nel

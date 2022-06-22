@@ -206,7 +206,7 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)
-  => Maybe ModuleName
+  => QualifiedBy
   -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))
   -> m ()
 addTypeClassDictionaries mn entries =
@@ -433,7 +433,7 @@ typeCheckAll moduleName = traverse go
           let dict =
                 TypeClassDictionaryInScope chainId idx qualifiedDictName [] className vars kinds' tys'' (Just deps'') $
                   if isPlainIdent dictName then Nothing else Just $ srcInstanceType ss vars className tys''
-          addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
+          addTypeClassDictionaries (ByModuleName moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 
   checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [SourceType] -> m ()
@@ -515,7 +515,7 @@ typeCheckAll moduleName = traverse go
     -> m ()
   checkOverlappingInstance ss ch dictName vars className typeClass tys' nonOrphanModules = do
     for_ nonOrphanModules $ \m -> do
-      dicts <- M.toList <$> lookupTypeClassDictionariesForClass (Just m) className
+      dicts <- M.toList <$> lookupTypeClassDictionariesForClass (ByModuleName m) className
 
       for_ dicts $ \(Qualified mn' ident, dictNel) -> do
         for_ dictNel $ \dict -> do
@@ -794,7 +794,7 @@ typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
       ] $ \className -> do
         env <- getEnv
         let dicts = foldMap (foldMap NEL.toList) $
-              M.lookup (Just mn) (typeClassDictionaries env) >>= M.lookup className
+              M.lookup (ByModuleName mn) (typeClassDictionaries env) >>= M.lookup className
         when (any isDictOfTypeRef dicts) $
           tell . errorMessage' ss' $ HiddenConstructors dr className
     | otherwise = do

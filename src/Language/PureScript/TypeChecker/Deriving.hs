@@ -169,7 +169,7 @@ deriveNewtypeInstance mn className tys tyConNm dkargs dargs = do
             = elem nt
             . (toList . extractNewtypeName mn' . tcdInstanceTypes
                 <=< foldMap toList . M.elems
-                <=< toList . (M.lookup su <=< M.lookup (Just mn')))
+                <=< toList . (M.lookup su <=< M.lookup (ByModuleName mn')))
             $ dicts
       in lookIn suModule || lookIn newtypeModule
 

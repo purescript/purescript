@@ -706,4 +706,4 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   g other = other
   updateDict fn dict = dict { tcdInstanceTypes = fn (tcdInstanceTypes dict) }
   updateScope = fmap . fmap . fmap . fmap $ updateDict $ fmap f
-  updateCtx = M.alter updateScope Nothing
+  updateCtx = M.alter updateScope ByNullSourceSpan

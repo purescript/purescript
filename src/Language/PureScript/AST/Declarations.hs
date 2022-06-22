@@ -722,7 +722,7 @@ data Expr
   -- instance type, and the type class dictionaries in scope.
   --
   | TypeClassDictionary SourceConstraint
-                        (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
+                        (M.Map QualifiedBy (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
                         [ErrorMessageHint]
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking

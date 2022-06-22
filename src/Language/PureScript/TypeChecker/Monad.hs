@@ -196,8 +196,8 @@ withTypeClassDictionaries entries action = do
 
   let mentries =
         M.fromListWith (M.unionWith (M.unionWith (<>)))
-          [ (getQual tcdValue, M.singleton className (M.singleton tcdValue (pure entry)))
-          | entry@TypeClassDictionaryInScope{ tcdValue, tcdClassName = className }
+          [ (qb, M.singleton className (M.singleton tcdValue (pure entry)))
+          | entry@TypeClassDictionaryInScope{ tcdValue = tcdValue@(Qualified qb _), tcdClassName = className }
               <- entries
           ]
 
@@ -209,20 +209,20 @@ withTypeClassDictionaries entries action = do
 -- | Get the currently available map of type class dictionaries
 getTypeClassDictionaries
   :: (MonadState CheckState m)
-  => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
+  => m (M.Map QualifiedBy (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
 getTypeClassDictionaries = gets $ typeClassDictionaries . checkEnv
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionaries
   :: (MonadState CheckState m)
-  => Maybe ModuleName
+  => QualifiedBy
   -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
 lookupTypeClassDictionaries mn = gets $ fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionariesForClass
   :: (MonadState CheckState m)
-  => Maybe ModuleName
+  => QualifiedBy
   -> Qualified (ProperName 'ClassName)
   -> m (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))
 lookupTypeClassDictionariesForClass mn cn = fromMaybe M.empty . M.lookup cn <$> lookupTypeClassDictionaries mn
@@ -444,7 +444,7 @@ debugTypeClassDictionaries = go . typeClassDictionaries
     (className, instances) <- M.toList classes
     (ident, dicts) <- M.toList instances
     let
-      moduleName = maybe "" (\m -> "[" <> runModuleName m <> "] ") mbModuleName
+      moduleName = maybe "" (\m -> "[" <> runModuleName m <> "] ") (toMaybeModuleName mbModuleName)
       className' = showQualified runProperName className
       ident' = showQualified runIdent ident
       kds = unwords $ fmap ((\a -> "@(" <> a <> ")") . debugType) $ tcdInstanceKinds $ NEL.head dicts
