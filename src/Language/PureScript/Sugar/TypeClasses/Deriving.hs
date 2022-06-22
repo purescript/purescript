@@ -157,9 +157,9 @@ deriveGenericRep ss mn tyCon tyConArgs =
       argName <- freshIdent "arg"
       pure ( srcTypeApp (srcTypeConstructor DataGenericRep.Argument) arg
            , ConstructorBinder ss DataGenericRep.Argument [ VarBinder ss argName ]
-           , Var ss (Qualified ByNullSourcePos argName)
+           , Var ss (Qualified (BySourcePos $ spanStart ss) argName)
            , VarBinder ss argName
-           , App (Constructor ss DataGenericRep.Argument) (Var ss (Qualified ByNullSourcePos argName))
+           , App (Constructor ss DataGenericRep.Argument) (Var ss (Qualified (BySourcePos $ spanStart ss) argName))
            )
 
     underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative
