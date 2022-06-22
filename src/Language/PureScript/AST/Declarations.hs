@@ -149,7 +149,7 @@ importPrim =
     primModName = C.Prim
   in
     addDefaultImport (Qualified (ByModuleName primModName) primModName)
-      . addDefaultImport (Qualified ByNullSourceSpan primModName)
+      . addDefaultImport (Qualified ByNullSourcePos primModName)
 
 data NameSource = UserNamed | CompilerNamed
   deriving (Show, Generic, NFData, Serialise)

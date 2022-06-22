@@ -109,8 +109,8 @@ qualifiedToJSON f (Qualified qb a) =
       [ "moduleName" .= moduleNameToJSON mn
       , "identifier" .= toJSON (f a)
       ]
-    BySourceSpan ss -> object
-      [ "sourceSpan" .= sourceSpanToJSON ss
+    BySourcePos ss -> object
+      [ "sourcePos"  .= toJSON ss
       , "identifier" .= toJSON (f a)
       ]
 

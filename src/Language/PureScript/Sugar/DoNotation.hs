@@ -70,7 +70,7 @@ desugarDo d =
         return $ App (App (bind pos m) val) (Abs (VarBinder ss ident) rest')
       _ -> do
         ident <- freshIdent'
-        return $ App (App (bind pos m) val) (Abs (VarBinder pos ident) (Case [Var pos (Qualified ByNullSourceSpan ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
+        return $ App (App (bind pos m) val) (Abs (VarBinder pos ident) (Case [Var pos (Qualified ByNullSourcePos ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
   go _ _ [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go pos m (DoNotationLet ds : rest) = do
     let checkBind :: Declaration -> m ()

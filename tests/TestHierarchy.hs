@@ -51,7 +51,7 @@ spec = describe "hierarchy" $ do
                  (P.internalModuleSourceSpan "<B>", [])
                  (P.ProperName "B")
                  []
-                 [P.srcConstraint (P.Qualified P.ByNullSourceSpan $ P.ProperName "A") [] [] Nothing]
+                 [P.srcConstraint (P.Qualified P.ByNullSourcePos $ P.ProperName "A") [] [] Nothing]
                  []
                  []
               ]

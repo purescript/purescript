@@ -115,15 +115,15 @@ qualifiedFromJSON :: (Text -> a) -> Value -> Parser (Qualified a)
 qualifiedFromJSON f = withObject "Qualified" qualifiedFromObj
   where
   qualifiedFromObj o =
-    qualifiedByModuleFromObj o <|> qualifiedBySourceSpanFromObj o
+    qualifiedByModuleFromObj o <|> qualifiedBySourcePosFromObj o
   qualifiedByModuleFromObj o = do
     mn <- o .: "moduleName" >>= moduleNameFromJSON
     i  <- o .: "identifier" >>= withText "Ident" (return . f)
     pure $ Qualified (ByModuleName mn) i
-  qualifiedBySourceSpanFromObj o = do
-    ss <- o .: "sourceSpan" >>= sourceSpanFromJSON
+  qualifiedBySourcePosFromObj o = do
+    ss <- o .: "sourcePos"
     i  <- o .: "identifier" >>= withText "Ident" (return . f)
-    pure $ Qualified (BySourceSpan ss) i
+    pure $ Qualified (BySourcePos ss) i
 
 moduleNameFromJSON :: Value -> Parser ModuleName
 moduleNameFromJSON v = ModuleName . T.intercalate "." <$> listParser parseJSON v

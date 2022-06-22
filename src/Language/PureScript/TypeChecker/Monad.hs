@@ -234,7 +234,7 @@ bindLocalVariables
   -> m a
   -> m a
 bindLocalVariables bindings =
-  bindNames (M.fromList $ flip map bindings $ \(ss, name, ty, visibility) -> (Qualified (BySourceSpan ss) name, (ty, Private, visibility)))
+  bindNames (M.fromList $ flip map bindings $ \(ss, name, ty, visibility) -> (Qualified (BySourcePos $ spanStart ss) name, (ty, Private, visibility)))
 
 -- | Temporarily bind a collection of names to local type variables
 bindLocalTypeVariables
@@ -309,7 +309,7 @@ lookupTypeVariable currentModule (Qualified qb name) = do
   where
   qb' = ByModuleName $ case qb of
     ByModuleName m -> m
-    BySourceSpan _ -> currentModule
+    BySourcePos _ -> currentModule
 
 -- | Get the current @Environment@
 getEnv :: (MonadState CheckState m) => m Environment
@@ -319,7 +319,7 @@ getEnv = gets checkEnv
 getLocalContext :: MonadState CheckState m => m Context
 getLocalContext = do
   env <- getEnv
-  return [ (ident, ty') | (Qualified (BySourceSpan _) ident@Ident{}, (ty', _, Defined)) <- M.toList (names env) ]
+  return [ (ident, ty') | (Qualified (BySourcePos _) ident@Ident{}, (ty', _, Defined)) <- M.toList (names env) ]
 
 -- | Update the @Environment@
 putEnv :: (MonadState CheckState m) => Environment -> m ()

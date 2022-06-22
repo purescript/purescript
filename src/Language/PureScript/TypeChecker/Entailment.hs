@@ -198,7 +198,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ ctx cn@C.Warn _ [msg] =
       -- Prefer a warning dictionary in scope if there is one available.
       -- This allows us to defer a warning by propagating the constraint.
-      findDicts ctx cn ByNullSourceSpan ++ [TypeClassDictionaryInScope Nothing 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing Nothing]
+      findDicts ctx cn ByNullSourcePos ++ [TypeClassDictionaryInScope Nothing 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing Nothing]
     forClassName _ _ C.IsSymbol _ args | Just dicts <- solveIsSymbol args = dicts
     forClassName _ _ C.SymbolCompare _ args | Just dicts <- solveSymbolCompare args = dicts
     forClassName _ _ C.SymbolAppend _ args | Just dicts <- solveSymbolAppend args = dicts
@@ -213,12 +213,12 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.RowLacks kinds args | Just dicts <- solveLacks kinds args = dicts
     forClassName _ _ C.RowCons kinds args | Just dicts <- solveRowCons kinds args = dicts
     forClassName _ _ C.RowToList kinds args | Just dicts <- solveRowToList kinds args = dicts
-    forClassName _ ctx cn@(Qualified (ByModuleName mn) _) _ tys = concatMap (findDicts ctx cn) (ordNub (ByNullSourceSpan : ByModuleName mn : map ByModuleName (mapMaybe ctorModules tys)))
+    forClassName _ ctx cn@(Qualified (ByModuleName mn) _) _ tys = concatMap (findDicts ctx cn) (ordNub (ByNullSourcePos : ByModuleName mn : map ByModuleName (mapMaybe ctorModules tys)))
     forClassName _ _ _ _ _ = internalError "forClassName: expected qualified class name"
 
     ctorModules :: SourceType -> Maybe ModuleName
     ctorModules (TypeConstructor _ (Qualified (ByModuleName mn) _)) = Just mn
-    ctorModules (TypeConstructor _ (Qualified (BySourceSpan _) _)) = internalError "ctorModules: unqualified type name"
+    ctorModules (TypeConstructor _ (Qualified (BySourcePos _) _)) = internalError "ctorModules: unqualified type name"
     ctorModules (TypeApp _ ty _) = ctorModules ty
     ctorModules (KindApp _ ty _) = ctorModules ty
     ctorModules (KindedType _ ty _) = ctorModules ty
@@ -306,7 +306,7 @@ entails SolverOptions{..} constraint context hints =
               Unsolved unsolved -> do
                 -- Generate a fresh name for the unsolved constraint's new dictionary
                 ident <- freshIdent ("dict" <> runProperName (disqualify (constraintClass unsolved)))
-                let qident = Qualified ByNullSourceSpan ident
+                let qident = Qualified ByNullSourcePos ident
                 -- Store the new dictionary in the InstanceContext so that we can solve this goal in
                 -- future.
                 newDicts <- lift . lift $ newDictionaries [] qident unsolved
@@ -432,7 +432,7 @@ entails SolverOptions{..} constraint context hints =
 
     solveCoercible :: Environment -> InstanceContext -> [SourceType] -> [SourceType] -> m (Maybe [TypeClassDict])
     solveCoercible env ctx kinds [a, b] = do
-      let coercibleDictsInScope = findDicts ctx C.Coercible ByNullSourceSpan
+      let coercibleDictsInScope = findDicts ctx C.Coercible ByNullSourcePos
           givens = flip mapMaybe coercibleDictsInScope $ \case
             dict | [a', b'] <- tcdInstanceTypes dict -> Just (a', b')
                  | otherwise -> Nothing
@@ -560,7 +560,7 @@ entails SolverOptions{..} constraint context hints =
           args' = [arg0, arg1, srcTypeConstructor ordering]
       in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] args' Nothing Nothing]
     solveIntCompare ctx args@[a, b, _] = do
-      let compareDictsInScope = findDicts ctx C.IntCompare ByNullSourceSpan
+      let compareDictsInScope = findDicts ctx C.IntCompare ByNullSourcePos
           givens = flip mapMaybe compareDictsInScope $ \case
             dict | [a', b', c'] <- tcdInstanceTypes dict -> mkRelation a' b' c'
                  | otherwise -> Nothing
@@ -847,7 +847,7 @@ newDictionaries path name (Constraint _ className instanceKinds instanceTy _) = 
 
 mkContext :: [NamedDict] -> InstanceContext
 mkContext = foldr combineContexts M.empty . map fromDict where
-  fromDict d = M.singleton ByNullSourceSpan (M.singleton (tcdClassName d) (M.singleton (tcdValue d) (pure d)))
+  fromDict d = M.singleton ByNullSourcePos (M.singleton (tcdClassName d) (M.singleton (tcdValue d) (pure d)))
 
 -- | Check all pairs of values in a list match a predicate
 pairwiseAll :: Monoid m => (a -> a -> m) -> [a] -> m

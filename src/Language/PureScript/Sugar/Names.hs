@@ -258,7 +258,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let w ds val')
-  updateValue (_, bound) (Var ss name'@(Qualified (BySourceSpan _) ident)) | ident `notElem` bound =
+  updateValue (_, bound) (Var ss name'@(Qualified (BySourcePos _) ident)) | ident `notElem` bound =
     ((ss, bound), ) <$> (Var ss <$> updateValueName name' ss)
   updateValue (_, bound) (Var ss name'@(Qualified (ByModuleName _) _)) =
     ((ss, bound), ) <$> (Var ss <$> updateValueName name' ss)
@@ -393,7 +393,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
       (Nothing, ByModuleName mn'') ->
         if mn'' `S.member` importedQualModules imports || mn'' `S.member` importedModules imports
         then throwUnknown
-        else throwError . errorMessage . UnknownName . Qualified ByNullSourceSpan $ ModName mn''
+        else throwError . errorMessage . UnknownName . Qualified ByNullSourcePos $ ModName mn''
 
       -- If neither of the above cases are true then it's an undefined or
       -- unimported symbol.
@@ -431,10 +431,10 @@ desugarLocals (Module ms cm mn dc ex) = pure $ Module ms cm mn dc' ex
     where
     goDecl declaration = case declaration of
       ValueDeclaration ValueDeclarationData{..} -> do
-        insertOne valdeclIdent $ fst valdeclSourceAnn
+        insertOne valdeclIdent $ spanStart $ fst $ valdeclSourceAnn
         pure declaration
       BindingGroupDeclaration declarations -> do
-        let findSsI (((ss, _), i), _, _) = (i, ss)
+        let findSsI (((ss, _), i), _, _) = (i, spanStart ss)
         insertMany $ M.fromList $ NEL.toList $ findSsI <$> declarations
         pure declaration
       _ ->
@@ -450,11 +450,11 @@ desugarLocals (Module ms cm mn dc ex) = pure $ Module ms cm mn dc' ex
       Case _ _ -> do
         pushScope
         pure expression
-      Var ss (Qualified (BySourceSpan _) i) -> do
+      Var ss (Qualified (BySourcePos _) i) -> do
         result <- lookupIdent i
         pure $ case result of
           Just ss' ->
-            Var ss (Qualified (BySourceSpan ss') i)
+            Var ss (Qualified (BySourcePos ss') i)
           Nothing ->
             expression
       _ ->
@@ -475,10 +475,10 @@ desugarLocals (Module ms cm mn dc ex) = pure $ Module ms cm mn dc' ex
 
     goBinder binder = case binder of
       VarBinder s i -> do
-        insertOne i s
+        insertOne i $ spanStart s
         pure binder
       NamedBinder s i _ -> do
-        insertOne i s
+        insertOne i $ spanStart s
         pure binder
       _ ->
         pure binder

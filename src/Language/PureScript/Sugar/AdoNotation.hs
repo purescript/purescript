@@ -53,7 +53,7 @@ desugarAdo d =
   go ss (yield, args) (DoNotationBind binder val) = do
     ident <- freshIdent'
     let abs = Abs (VarBinder ss ident)
-                  (Case [Var ss (Qualified ByNullSourceSpan ident)]
+                  (Case [Var ss (Qualified ByNullSourcePos ident)]
                         [CaseAlternative [binder] [MkUnguarded yield]])
     return (abs, val : args)
   go _ (yield, args) (DoNotationLet ds) = do

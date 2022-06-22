@@ -50,7 +50,7 @@ desugarSignedLiterals (Module ss coms mn ds exts) =
   Module ss coms mn (map f' ds) exts
   where
   (f', _, _) = everywhereOnValues id go id
-  go (UnaryMinus ss' val) = App (Var ss' (Qualified ByNullSourceSpan (Ident C.negate))) val
+  go (UnaryMinus ss' val) = App (Var ss' (Qualified ByNullSourcePos (Ident C.negate))) val
   go other = other
 
 -- |
@@ -252,9 +252,9 @@ removeBinaryNoParens u
                             where err = throwError . errorMessage $ IncorrectAnonymousArgument
 removeBinaryNoParens (Parens (stripPositionInfo -> BinaryNoParens op l r))
   | isAnonymousArgument r = do arg <- freshIdent'
-                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op l) (Var nullSourceSpan (Qualified ByNullSourceSpan arg))
+                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op l) (Var nullSourceSpan (Qualified ByNullSourcePos arg))
   | isAnonymousArgument l = do arg <- freshIdent'
-                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op (Var nullSourceSpan (Qualified ByNullSourceSpan arg))) r
+                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op (Var nullSourceSpan (Qualified ByNullSourcePos arg))) r
 removeBinaryNoParens (BinaryNoParens op l r) = return $ App (App op l) r
 removeBinaryNoParens e = return e
 

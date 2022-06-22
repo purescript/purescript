@@ -41,7 +41,7 @@ createTemporaryModule exec st val =
     effImport     = (effModuleName, P.Implicit, Just (P.ModuleName "$Effect"))
     supportImport = (fst (psciInteractivePrint st), P.Implicit, Just (P.ModuleName "$Support"))
     eval          = P.Var internalSpan (P.Qualified (P.ByModuleName (P.ModuleName "$Support")) (snd (psciInteractivePrint st)))
-    mainValue     = P.App eval (P.Var internalSpan (P.Qualified P.ByNullSourceSpan (P.Ident "it")))
+    mainValue     = P.App eval (P.Var internalSpan (P.Qualified P.ByNullSourcePos (P.Ident "it")))
     itDecl        = P.ValueDecl (internalSpan, []) (P.Ident "it") P.Public [] [P.MkUnguarded val]
     typeDecl      = P.TypeDeclaration
                       (P.TypeDeclarationData (internalSpan, []) (P.Ident "$main")

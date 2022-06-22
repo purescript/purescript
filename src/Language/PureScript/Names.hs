@@ -20,7 +20,7 @@ import Data.Aeson.TH
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import Language.PureScript.AST.SourcePos (SourceSpan, pattern NullSourceSpan)
+import Language.PureScript.AST.SourcePos (SourcePos, pattern SourcePos)
 
 -- | A sum of the possible name types, useful for error and lint messages.
 data Name
@@ -203,27 +203,27 @@ isBuiltinModuleName :: ModuleName -> Bool
 isBuiltinModuleName (ModuleName mn) = mn == "Prim" || "Prim." `T.isPrefixOf` mn
 
 data QualifiedBy
-  = BySourceSpan SourceSpan
+  = BySourcePos SourcePos
   | ByModuleName ModuleName
   deriving (Show, Eq, Ord, Generic)
 
-pattern ByNullSourceSpan :: QualifiedBy
-pattern ByNullSourceSpan = BySourceSpan NullSourceSpan
+pattern ByNullSourcePos :: QualifiedBy
+pattern ByNullSourcePos = BySourcePos (SourcePos 0 0)
 
 instance NFData QualifiedBy
 instance Serialise QualifiedBy
 
-isBySourceSpan :: QualifiedBy -> Bool
-isBySourceSpan (BySourceSpan _) = True
-isBySourceSpan _ = False
+isBySourcePos :: QualifiedBy -> Bool
+isBySourcePos (BySourcePos _) = True
+isBySourcePos _ = False
 
 byMaybeModuleName :: Maybe ModuleName -> QualifiedBy
 byMaybeModuleName (Just mn) = ByModuleName mn
-byMaybeModuleName Nothing = ByNullSourceSpan
+byMaybeModuleName Nothing = ByNullSourcePos
 
 toMaybeModuleName :: QualifiedBy -> Maybe ModuleName
 toMaybeModuleName (ByModuleName mn) = Just mn
-toMaybeModuleName (BySourceSpan _) = Nothing
+toMaybeModuleName (BySourcePos _) = Nothing
 
 -- |
 -- A qualified name, i.e. a name with an optional module name
@@ -235,7 +235,7 @@ instance NFData a => NFData (Qualified a)
 instance Serialise a => Serialise (Qualified a)
 
 showQualified :: (a -> Text) -> Qualified a -> Text
-showQualified f (Qualified (BySourceSpan  _) a) = f a
+showQualified f (Qualified (BySourcePos  _) a) = f a
 showQualified f (Qualified (ByModuleName name) a) = runModuleName name <> "." <> f a
 
 getQual :: Qualified a -> Maybe ModuleName
@@ -245,7 +245,7 @@ getQual (Qualified qb _) = toMaybeModuleName qb
 -- Provide a default module name, if a name is unqualified
 --
 qualify :: ModuleName -> Qualified a -> (ModuleName, a)
-qualify m (Qualified (BySourceSpan _) a) = (m, a)
+qualify m (Qualified (BySourcePos _) a) = (m, a)
 qualify _ (Qualified (ByModuleName m) a) = (m, a)
 
 -- |
@@ -270,7 +270,7 @@ disqualifyFor _ _ = Nothing
 -- Checks whether a qualified value is actually qualified with a module reference
 --
 isQualified :: Qualified a -> Bool
-isQualified (Qualified (BySourceSpan  _) _) = False
+isQualified (Qualified (BySourcePos  _) _) = False
 isQualified _ = True
 
 -- |
@@ -289,7 +289,7 @@ isQualifiedWith _ _ = False
 instance ToJSON a => ToJSON (Qualified a) where
   toJSON (Qualified qb a) = case qb of
     ByModuleName mn -> toJSON2 (mn, a)
-    BySourceSpan ss -> toJSON2 (ss, a)
+    BySourcePos ss -> toJSON2 (ss, a)
 
 instance FromJSON a => FromJSON (Qualified a) where
   parseJSON v = byModule <|> bySourceSpan
@@ -299,7 +299,7 @@ instance FromJSON a => FromJSON (Qualified a) where
       pure $ Qualified (ByModuleName mn) a
     bySourceSpan = do
       (ss, a) <- parseJSON2 v
-      pure $ Qualified (BySourceSpan ss) a
+      pure $ Qualified (BySourcePos ss) a
 
 instance ToJSON ModuleName where
   toJSON (ModuleName name) = toJSON (T.splitOn "." name)

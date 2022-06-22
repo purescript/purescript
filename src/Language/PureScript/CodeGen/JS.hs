@@ -265,7 +265,7 @@ moduleBindToJs mn = bindToJs
 
   guessEffects :: Expr Ann -> AST.InitializerEffects
   guessEffects = \case
-    Var _ (Qualified (BySourceSpan _) _)   -> NoEffects
+    Var _ (Qualified (BySourcePos _) _)    -> NoEffects
     App (_, _, _, Just IsSyntheticApp) _ _ -> NoEffects
     _                                      -> UnknownEffects
 
@@ -387,7 +387,7 @@ moduleBindToJs mn = bindToJs
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable.
   varToJs :: Qualified Ident -> AST
-  varToJs (Qualified (BySourceSpan _) ident) = var ident
+  varToJs (Qualified (BySourcePos _) ident) = var ident
   varToJs qual = qualifiedToJS id qual
 
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a

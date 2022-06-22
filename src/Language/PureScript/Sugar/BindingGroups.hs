@@ -145,7 +145,7 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
   usedNamesE :: S.Set ScopedIdent -> Expr -> [Ident]
-  usedNamesE scope (Var _ (Qualified (BySourceSpan _) name))
+  usedNamesE scope (Var _ (Qualified (BySourcePos _) name))
     | LocalIdent name `S.notMember` scope = [name]
   usedNamesE scope (Var _ (Qualified (ByModuleName moduleName') name))
     | moduleName == moduleName' && ToplevelIdent name `S.notMember` scope = [name]
@@ -159,7 +159,7 @@ usedImmediateIdents moduleName =
   def s _ = (s, [])
 
   usedNamesE :: Bool -> Expr -> (Bool, [Ident])
-  usedNamesE True (Var _ (Qualified (BySourceSpan _) name)) = (True, [name])
+  usedNamesE True (Var _ (Qualified (BySourcePos _) name)) = (True, [name])
   usedNamesE True (Var _ (Qualified (ByModuleName moduleName') name))
     | moduleName == moduleName' = (True, [name])
   usedNamesE True (Abs _ _) = (False, [])
@@ -248,8 +248,8 @@ toDataBindingGroup (CyclicSCC ds')
         $ typeSynonymCycles
   | otherwise = return . DataBindingGroupDeclaration . NEL.fromList $ getDecl <$> ds'
   where
-  kindDecl (KindDeclaration sa _ pn _) = [(fst sa, Qualified ByNullSourceSpan pn)]
-  kindDecl (ExternDataDeclaration sa pn _) = [(fst sa, Qualified ByNullSourceSpan pn)]
+  kindDecl (KindDeclaration sa _ pn _) = [(fst sa, Qualified ByNullSourcePos pn)]
+  kindDecl (ExternDataDeclaration sa pn _) = [(fst sa, Qualified ByNullSourcePos pn)]
   kindDecl _ = []
 
   getDecl (decl, _, _) = decl

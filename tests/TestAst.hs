@@ -73,7 +73,7 @@ genTypeAnnotatedWith genTypeAnn genConstraintAnn = genType where
   genConstraintData = genericArbitraryUG generatorEnvironment
 
   genQualified :: forall b. (Text -> b) -> Gen (Qualified b)
-  genQualified ctor = Qualified ByNullSourceSpan . ctor <$> genText
+  genQualified ctor = Qualified ByNullSourcePos . ctor <$> genText
 
   genSkolemScope :: Gen SkolemScope
   genSkolemScope = SkolemScope <$> arbitrary

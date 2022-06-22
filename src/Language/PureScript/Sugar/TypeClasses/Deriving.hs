@@ -84,13 +84,13 @@ deriveGenericRep ss mn tyCon tyConArgs =
                       lamCase x
                         [ CaseAlternative
                             [NullBinder]
-                            (unguarded (App (Var ss DataGenericRep.to) (Var ss' (Qualified ByNullSourceSpan x))))
+                            (unguarded (App (Var ss DataGenericRep.to) (Var ss' (Qualified ByNullSourcePos x))))
                         ]
                    , ValueDecl (ss', []) (Ident "from") Public [] $ unguarded $
                       lamCase x
                         [ CaseAlternative
                             [NullBinder]
-                            (unguarded (App (Var ss DataGenericRep.from) (Var ss' (Qualified ByNullSourceSpan x))))
+                            (unguarded (App (Var ss DataGenericRep.from) (Var ss' (Qualified ByNullSourcePos x))))
                         ]
                    ]
                | otherwise =
@@ -157,9 +157,9 @@ deriveGenericRep ss mn tyCon tyConArgs =
       argName <- freshIdent "arg"
       pure ( srcTypeApp (srcTypeConstructor DataGenericRep.Argument) arg
            , ConstructorBinder ss DataGenericRep.Argument [ VarBinder ss argName ]
-           , Var ss (Qualified ByNullSourceSpan argName)
+           , Var ss (Qualified ByNullSourcePos argName)
            , VarBinder ss argName
-           , App (Constructor ss DataGenericRep.Argument) (Var ss (Qualified ByNullSourceSpan argName))
+           , App (Constructor ss DataGenericRep.Argument) (Var ss (Qualified ByNullSourcePos argName))
            )
 
     underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative

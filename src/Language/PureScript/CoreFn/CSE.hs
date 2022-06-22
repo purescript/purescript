@@ -261,7 +261,7 @@ nullAnn = (nullSourceSpan, [], Nothing, Nothing)
 replaceLocals :: M.Map Ident (Expr Ann) -> [Bind Ann] -> [Bind Ann]
 replaceLocals m = if M.null m then identity else map f' where
   (f', g', _) = everywhereOnValues identity f identity
-  f e@(Var _ (Qualified (BySourceSpan _) ident)) = maybe e g' $ ident `M.lookup` m
+  f e@(Var _ (Qualified (BySourcePos _) ident)) = maybe e g' $ ident `M.lookup` m
   f e = e
 
 -- |
@@ -280,7 +280,7 @@ floatExpr = \case
     let w' = w
           & (if isNew then newBindings %~ addToScope deepestScope [(ident, (_plurality, e))] else identity)
           & plurality .~ PluralityMap (M.singleton ident False)
-    pure (Var nullAnn (Qualified (BySourceSpan nullSourceSpan) ident), w')
+    pure (Var nullAnn (Qualified ByNullSourcePos ident), w')
   (e, w) -> pure (e, w)
 
 -- |

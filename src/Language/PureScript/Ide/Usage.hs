@@ -120,7 +120,7 @@ eligibleModules
   -> ModuleMap (NonEmpty Search)
 eligibleModules query@(moduleName, declaration) decls modules =
   let
-    searchDefiningModule = P.Qualified P.ByNullSourceSpan declaration :| []
+    searchDefiningModule = P.Qualified P.ByNullSourcePos declaration :| []
   in
     Map.insert moduleName searchDefiningModule $
       foldMap (directDependants declaration modules) (moduleName :| findReexportingModules query decls)

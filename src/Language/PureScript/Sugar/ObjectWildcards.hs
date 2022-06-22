@@ -98,4 +98,4 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
     | otherwise = return Nothing
 
   argToExpr :: Ident -> Expr
-  argToExpr = Var nullSourceSpan . Qualified ByNullSourceSpan
+  argToExpr = Var nullSourceSpan . Qualified ByNullSourcePos

@@ -63,7 +63,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   declToCoreFn :: A.Declaration -> [Bind Ann]
   declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [ctor]) =
     [NonRec (ss, [], Nothing, declMeta) (properToIdent $ A.dataCtorName ctor) $
-      Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var (ssAnn ss) $ Qualified ByNullSourceSpan (Ident "x"))]
+      Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var (ssAnn ss) $ Qualified ByNullSourcePos (Ident "x"))]
     where
     declMeta = isDictTypeName (A.dataCtorName ctor) `orEmpty` IsTypeClassConstructor
   declToCoreFn d@(A.DataDeclaration _ Newtype _ _ _) =

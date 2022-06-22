@@ -532,7 +532,7 @@ applyLazinessTransform mn rawItems = let
   where
 
   nullAnn = ssAnn nullSourceSpan
-  runtimeLazy = Var nullAnn . Qualified ByNullSourceSpan $ InternalIdent RuntimeLazyFactory
+  runtimeLazy = Var nullAnn . Qualified ByNullSourcePos $ InternalIdent RuntimeLazyFactory
   runFn3 = Var nullAnn . Qualified (ByModuleName C.DataFunctionUncurried) . Ident $ C.runFn <> "3"
   strLit = Literal nullAnn . StringLiteral . mkString
 
@@ -546,7 +546,7 @@ applyLazinessTransform mn rawItems = let
     -- argument: the line number on which this reference is made. The runtime
     -- code uses this number to generate a message that identifies where the
     -- evaluation looped.
-    = App nullAnn (Var nullAnn . Qualified ByNullSourceSpan $ lazifyIdent ident)
+    = App nullAnn (Var nullAnn . Qualified ByNullSourcePos $ lazifyIdent ident)
     . Literal nullAnn . NumericLiteral . Left . toInteger . sourcePosLine
     $ spanStart ss
 

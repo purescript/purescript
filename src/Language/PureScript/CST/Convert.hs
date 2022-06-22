@@ -92,7 +92,7 @@ moduleName = \case
 qualified :: QualifiedName a -> N.Qualified a
 qualified q = N.Qualified qb (qualName q)
   where
-  qb = maybe N.ByNullSourceSpan N.ByModuleName $ qualModule q
+  qb = maybe N.ByNullSourcePos N.ByModuleName $ qualModule q
 
 ident :: Ident -> N.Ident
 ident = N.Ident . getIdent

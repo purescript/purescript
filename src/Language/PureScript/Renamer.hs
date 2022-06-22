@@ -172,7 +172,7 @@ renameInValue (Abs ann name v) =
   newScope $ Abs ann <$> updateScope name <*> renameInValue v
 renameInValue (App ann v1 v2) =
   App ann <$> renameInValue v1 <*> renameInValue v2
-renameInValue (Var ann (Qualified qb name)) | isBySourceSpan qb || not (isPlainIdent name) =
+renameInValue (Var ann (Qualified qb name)) | isBySourcePos qb || not (isPlainIdent name) =
   -- This should only rename identifiers local to the current module: either
   -- they aren't qualified, or they are but they have a name that should not
   -- have appeared in a module's externs, so they must be from this module's

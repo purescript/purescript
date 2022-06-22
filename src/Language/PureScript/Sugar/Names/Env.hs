@@ -231,11 +231,11 @@ mkPrimExports ts cs =
   where
   mkTypeEntry (Qualified (ByModuleName mn) name) = (name, ([], primExportSource mn))
   mkTypeEntry _ = internalError
-    "mkPrimExports.mkTypeEntry: a name is qualified BySourceSpan instead of ByModuleName"
+    "mkPrimExports.mkTypeEntry: a name is qualified BySourcePos instead of ByModuleName"
 
   mkClassEntry (Qualified (ByModuleName mn) name) = (name, primExportSource mn)
   mkClassEntry _ = internalError
-    "mkPrimExports.mkClassEntry: a name is qualified BySourceSpan instead of ByModuleName"
+    "mkPrimExports.mkClassEntry: a name is qualified BySourcePos instead of ByModuleName"
 
   primExportSource mn =
     ExportSource

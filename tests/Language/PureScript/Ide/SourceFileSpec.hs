@@ -29,13 +29,13 @@ valueFixity =
   P.ValueFixityDeclaration
     ann1
     (P.Fixity P.Infix 0)
-    (P.Qualified P.ByNullSourceSpan (Left (P.Ident "")))
+    (P.Qualified P.ByNullSourcePos (Left (P.Ident "")))
     (P.OpName "<$>")
 typeFixity =
   P.TypeFixityDeclaration
     ann1
     (P.Fixity P.Infix 0)
-    (P.Qualified P.ByNullSourceSpan (P.ProperName ""))
+    (P.Qualified P.ByNullSourcePos (P.ProperName ""))
     (P.OpName "~>")
 foreign1 = P.ExternDeclaration ann1 (P.Ident "foreign1") P.srcREmpty
 foreign2 = P.ExternDataDeclaration ann1 (P.ProperName "Foreign2") P.kindType
@@ -106,9 +106,9 @@ getLocation s = do
          , ideDtor "SFTwo" "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFThree" "SFData" Nothing `annLoc` typeSS
          , ideTypeClass "SFClass" P.kindType [] `annLoc` classSS
-         , ideValueOp "<$>" (P.Qualified P.ByNullSourceSpan (Left "")) 0 Nothing Nothing
+         , ideValueOp "<$>" (P.Qualified P.ByNullSourcePos (Left "")) 0 Nothing Nothing
            `annLoc` valueOpSS
-         , ideTypeOp "~>" (P.Qualified P.ByNullSourceSpan "") 0 Nothing Nothing
+         , ideTypeOp "~>" (P.Qualified P.ByNullSourcePos "") 0 Nothing Nothing
            `annLoc` typeOpSS
          ])
       ]
