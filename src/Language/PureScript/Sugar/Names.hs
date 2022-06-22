@@ -431,7 +431,7 @@ desugarLocals (Module ms cm mn dc ex) = pure $ Module ms cm mn dc' ex
     where
     goDecl declaration = case declaration of
       ValueDeclaration ValueDeclarationData{..} -> do
-        insertOne valdeclIdent $ spanStart $ fst $ valdeclSourceAnn
+        insertOne valdeclIdent $ spanStart $ fst valdeclSourceAnn
         pure declaration
       BindingGroupDeclaration declarations -> do
         let findSsI (((ss, _), i), _, _) = (i, spanStart ss)
