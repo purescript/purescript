@@ -292,12 +292,12 @@ instance ToJSON a => ToJSON (Qualified a) where
     BySourcePos ss -> toJSON2 (ss, a)
 
 instance FromJSON a => FromJSON (Qualified a) where
-  parseJSON v = byModule <|> bySourceSpan
+  parseJSON v = byModule <|> bySourcePos
     where
     byModule = do
       (mn, a) <- parseJSON2 v
       pure $ Qualified (ByModuleName mn) a
-    bySourceSpan = do
+    bySourcePos = do
       (ss, a) <- parseJSON2 v
       pure $ Qualified (BySourcePos ss) a
 
