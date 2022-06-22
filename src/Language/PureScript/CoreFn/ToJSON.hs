@@ -48,9 +48,8 @@ metaToJSON IsWhere                = object [ "metaType"  .= "IsWhere" ]
 metaToJSON IsSyntheticApp         = object [ "metaType"  .= "IsSyntheticApp" ]
 
 sourceSpanToJSON :: SourceSpan -> Value
-sourceSpanToJSON (SourceSpan spanName spanStart spanEnd) =
-  object [ "name"  .= spanName
-         , "start" .= spanStart
+sourceSpanToJSON (SourceSpan _ spanStart spanEnd) =
+  object [ "start" .= spanStart
          , "end"   .= spanEnd
          ]
 
