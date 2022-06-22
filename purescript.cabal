@@ -84,6 +84,7 @@ common defaults
     PatternSynonyms
     RankNTypes
     RecordWildCards
+    OverloadedRecordDot
     OverloadedStrings
     ScopedTypeVariables
     TupleSections
