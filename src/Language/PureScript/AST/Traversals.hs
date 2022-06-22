@@ -124,63 +124,48 @@ everywhereOnValuesTopDownM
      , Expr -> m Expr
      , Binder -> m Binder
      )
-everywhereOnValuesTopDownM f g h = everywhereOnValuesTopDownThenM f g h pure pure pure
-
-everywhereOnValuesTopDownThenM
-  :: forall m
-   . (Monad m)
-  => (Declaration -> m Declaration)
-  -> (Expr -> m Expr)
-  -> (Binder -> m Binder)
-  -> (Declaration -> m Declaration)
-  -> (Expr -> m Expr)
-  -> (Binder -> m Binder)
-  -> ( Declaration -> m Declaration
-     , Expr -> m Expr
-     , Binder -> m Binder
-     )
-everywhereOnValuesTopDownThenM f g h f'' g'' h'' = (f' <=< f, g' <=< g, h' <=< h)
+everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   where
 
   f' :: Declaration -> m Declaration
-  f' (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> traverse (f' <=< f) ds >>= f''
+  f' (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> traverse (f' <=< f) ds
   f' (ValueDecl sa name nameKind bs val) =
-     ValueDecl sa name nameKind <$> traverse (h' <=< h) bs <*> traverse (guardedExprM handleGuard (g' <=< g)) val >>= f''
-  f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (name, nameKind, ) <$> (g val >>= g')) ds >>= f''
-  f' (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f' <=< f) ds >>= f''
-  f' (TypeInstanceDeclaration sa ch idx name cs className args ds) = TypeInstanceDeclaration sa ch idx name cs className args <$> traverseTypeInstanceBody (traverse (f' <=< f)) ds >>= f''
-  f' (BoundValueDeclaration sa b expr) = BoundValueDeclaration sa <$> (h' <=< h) b <*> (g' <=< g) expr >>= f''
-  f' other = f other >>= f''
+     ValueDecl sa name nameKind <$> traverse (h' <=< h) bs <*> traverse (guardedExprM handleGuard (g' <=< g)) val
+  f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (name, nameKind, ) <$> (g val >>= g')) ds
+  f' (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f' <=< f) ds
+  f' (TypeInstanceDeclaration sa ch idx name cs className args ds) = TypeInstanceDeclaration sa ch idx name cs className args <$> traverseTypeInstanceBody (traverse (f' <=< f)) ds
+  f' (BoundValueDeclaration sa b expr) = BoundValueDeclaration sa <$> (h' <=< h) b <*> (g' <=< g) expr
+  f' other = f other
 
   g' :: Expr -> m Expr
-  g' (Literal ss l) = Literal ss <$> litM (g >=> g') l >>= g''
-  g' (UnaryMinus ss v) = UnaryMinus ss <$> (g v >>= g') >>= g''
-  g' (BinaryNoParens op v1 v2) = BinaryNoParens <$> (g op >>= g') <*> (g v1 >>= g') <*> (g v2 >>= g') >>= g''
-  g' (Parens v) = Parens <$> (g v >>= g') >>= g''
-  g' (Accessor prop v) = Accessor prop <$> (g v >>= g') >>= g''
-  g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> traverse (sndM (g' <=< g)) vs >>= g''
-  g' (ObjectUpdateNested obj vs) = ObjectUpdateNested <$> (g obj >>= g') <*> traverse (g' <=< g) vs >>= g''
-  g' (Abs binder v) = Abs <$> (h binder >>= h') <*> (g v >>= g') >>= g''
-  g' (App v1 v2) = App <$> (g v1 >>= g') <*> (g v2 >>= g') >>= g''
-  g' (Unused v) = Unused <$> (g v >>= g') >>= g''
-  g' (IfThenElse v1 v2 v3) = IfThenElse <$> (g v1 >>= g') <*> (g v2 >>= g') <*> (g v3 >>= g') >>= g''
-  g' (Case vs alts) = Case <$> traverse (g' <=< g) vs <*> traverse handleCaseAlternative alts >>= g''
-  g' (TypedValue check v ty) = TypedValue check <$> (g v >>= g') <*> pure ty >>= g''
-  g' (Let w ds v) = Let w <$> traverse (f' <=< f) ds <*> (g v >>= g') >>= g''
-  g' (Do m es) = Do m <$> traverse handleDoNotationElement es >>= g''
-  g' (Ado m es v) = Ado m <$> traverse handleDoNotationElement es <*> (g v >>= g') >>= g''
-  g' (PositionedValue pos com v) = PositionedValue pos com <$> (g v >>= g') >>= g''
-  g' other = g other >>= g''
+  g' (Literal ss l) = Literal ss <$> litM (g >=> g') l
+  g' (UnaryMinus ss v) = UnaryMinus ss <$> (g v >>= g')
+  g' (BinaryNoParens op v1 v2) = BinaryNoParens <$> (g op >>= g') <*> (g v1 >>= g') <*> (g v2 >>= g')
+  g' (Parens v) = Parens <$> (g v >>= g')
+  g' (Accessor prop v) = Accessor prop <$> (g v >>= g')
+  g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> traverse (sndM (g' <=< g)) vs
+  g' (ObjectUpdateNested obj vs) = ObjectUpdateNested <$> (g obj >>= g') <*> traverse (g' <=< g) vs
+  g' (Abs binder v) = Abs <$> (h binder >>= h') <*> (g v >>= g')
+  g' (App v1 v2) = App <$> (g v1 >>= g') <*> (g v2 >>= g')
+  g' (Unused v) = Unused <$> (g v >>= g')
+  g' (IfThenElse v1 v2 v3) = IfThenElse <$> (g v1 >>= g') <*> (g v2 >>= g') <*> (g v3 >>= g')
+  g' (Case vs alts) = Case <$> traverse (g' <=< g) vs <*> traverse handleCaseAlternative alts
+  g' (TypedValue check v ty) = TypedValue check <$> (g v >>= g') <*> pure ty
+  g' (Let w ds v) = Let w <$> traverse (f' <=< f) ds <*> (g v >>= g')
+  g' (Do m es) = Do m <$> traverse handleDoNotationElement es
+  g' (Ado m es v) = Ado m <$> traverse handleDoNotationElement es <*> (g v >>= g')
+  g' (PositionedValue pos com v) = PositionedValue pos com <$> (g v >>= g')
+  g' other = g other
 
   h' :: Binder -> m Binder
-  h' (LiteralBinder ss l) = LiteralBinder ss <$> litM (h >=> h') l >>= h''
-  h' (ConstructorBinder ss ctor bs) = ConstructorBinder ss ctor <$> traverse (h' <=< h) bs >>= h''
-  h' (BinaryNoParensBinder b1 b2 b3) = BinaryNoParensBinder <$> (h b1 >>= h') <*> (h b2 >>= h') <*> (h b3 >>= h') >>= h''
-  h' (ParensInBinder b) = ParensInBinder <$> (h b >>= h') >>= h''
-  h' (NamedBinder ss name b) = NamedBinder ss name <$> (h b >>= h') >>= h''
-  h' (PositionedBinder pos com b) = PositionedBinder pos com <$> (h b >>= h') >>= h''
-  h' (TypedBinder t b) = TypedBinder t <$> (h b >>= h') >>= h''
-  h' other = h other >>= h''
+  h' (LiteralBinder ss l) = LiteralBinder ss <$> litM (h >=> h') l
+  h' (ConstructorBinder ss ctor bs) = ConstructorBinder ss ctor <$> traverse (h' <=< h) bs
+  h' (BinaryNoParensBinder b1 b2 b3) = BinaryNoParensBinder <$> (h b1 >>= h') <*> (h b2 >>= h') <*> (h b3 >>= h')
+  h' (ParensInBinder b) = ParensInBinder <$> (h b >>= h')
+  h' (NamedBinder ss name b) = NamedBinder ss name <$> (h b >>= h')
+  h' (PositionedBinder pos com b) = PositionedBinder pos com <$> (h b >>= h')
+  h' (TypedBinder t b) = TypedBinder t <$> (h b >>= h')
+  h' other = h other
 
   handleCaseAlternative :: CaseAlternative -> m CaseAlternative
   handleCaseAlternative (CaseAlternative bs val) =

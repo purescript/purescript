@@ -252,7 +252,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateValue (pos, bound) (Abs (VarBinder ss arg) val') =
     return ((pos, M.insert arg (spanStart ss) bound), Abs (VarBinder ss arg) val')
   updateValue (pos, bound) (Let w ds val') = do
-    let args = mapMaybe letBoundVariable $ ds
+    let args = mapMaybe letBoundVariable ds
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, declarationsToMap ds `M.union` bound), Let w ds val')
