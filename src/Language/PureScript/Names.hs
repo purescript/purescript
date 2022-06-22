@@ -239,8 +239,7 @@ showQualified f (Qualified (BySourceSpan  _) a) = f a
 showQualified f (Qualified (ByModuleName name) a) = runModuleName name <> "." <> f a
 
 getQual :: Qualified a -> Maybe ModuleName
-getQual (Qualified (ByModuleName mn) _) = Just mn
-getQual _ = Nothing
+getQual (Qualified qb _) = toMaybeModuleName qb
 
 -- |
 -- Provide a default module name, if a name is unqualified
@@ -264,8 +263,7 @@ disqualify (Qualified _ a) = a
 -- module name.
 --
 disqualifyFor :: Maybe ModuleName -> Qualified a -> Maybe a
-disqualifyFor (Just mn) (Qualified (ByModuleName mn') a) | mn == mn' = Just a
-disqualifyFor Nothing (Qualified _ a) = Just a
+disqualifyFor mn (Qualified qb a) | mn == toMaybeModuleName qb = Just a
 disqualifyFor _ _ = Nothing
 
 -- |
