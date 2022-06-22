@@ -1,6 +1,5 @@
 module Language.PureScript.Sugar.Names
   ( desugarImports
-  , desugarLocals
   , Env
   , externsEnv
   , primEnv
@@ -11,7 +10,7 @@ module Language.PureScript.Sugar.Names
   ) where
 
 import Prelude.Compat
-import Protolude (ordNub, sortOn)
+import Protolude (ordNub, sortOn, swap, foldl')
 
 import Control.Arrow (first, second)
 import Control.Monad
@@ -20,7 +19,6 @@ import Control.Monad.State.Lazy
 import Control.Monad.Writer (MonadWriter(..))
 
 import Data.Maybe (fromMaybe, mapMaybe)
-import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -176,7 +174,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
 
   (go, _, _, _, _) =
     everywhereWithContextOnValuesM
-      (modSS, [])
+      (modSS, M.empty)
       (\(_, bound) d -> (\(bound', d') -> ((declSourceSpan d', bound'), d')) <$> updateDecl bound d)
       updateValue
       updateBinder
@@ -184,9 +182,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
       defS
 
   updateDecl
-    :: [Ident]
+    :: M.Map Ident SourcePos
     -> Declaration
-    -> m ([Ident], Declaration)
+    -> m (M.Map Ident SourcePos, Declaration)
   updateDecl bound (DataDeclaration sa dtype name args dctors) =
     fmap (bound,) $
       DataDeclaration sa dtype name
@@ -220,7 +218,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
       TypeDeclaration . TypeDeclarationData sa name
         <$> updateTypesEverywhere ty
   updateDecl bound (ExternDeclaration sa name ty) =
-    fmap (name : bound,) $
+    fmap (M.insert name (spanStart $ fst sa) bound,) $
       ExternDeclaration sa name
         <$> updateTypesEverywhere ty
   updateDecl bound (ExternDataDeclaration sa name ki) =
@@ -246,20 +244,23 @@ renameInModule imports (Module modSS coms mn decls exps) =
     return (b, d)
 
   updateValue
-    :: (SourceSpan, [Ident])
+    :: (SourceSpan, M.Map Ident SourcePos)
     -> Expr
-    -> m ((SourceSpan, [Ident]), Expr)
+    -> m ((SourceSpan, M.Map Ident SourcePos), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _ _) =
     return ((pos', bound), v)
   updateValue (pos, bound) (Abs (VarBinder ss arg) val') =
-    return ((pos, arg : bound), Abs (VarBinder ss arg) val')
+    return ((pos, M.insert arg (spanStart ss) bound), Abs (VarBinder ss arg) val')
   updateValue (pos, bound) (Let w ds val') = do
-    let args = mapMaybe letBoundVariable ds
+    let args = mapMaybe letBoundVariable $ ds
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
-    return ((pos, args ++ bound), Let w ds val')
-  updateValue (_, bound) (Var ss name'@(Qualified (BySourcePos _) ident)) | ident `notElem` bound =
-    ((ss, bound), ) <$> (Var ss <$> updateValueName name' ss)
+    return ((pos, declarationsToMap ds `M.union` bound), Let w ds val')
+  updateValue (_, bound) (Var ss name'@(Qualified (BySourcePos _) ident)) =
+    ((ss, bound), ) <$> case M.lookup ident bound of
+      Just sourcePos -> pure $ Var ss (Qualified (BySourcePos sourcePos) ident)
+      Nothing -> Var ss <$> updateValueName name' ss
+
   updateValue (_, bound) (Var ss name'@(Qualified (ByModuleName _) _)) =
     ((ss, bound), ) <$> (Var ss <$> updateValueName name' ss)
   updateValue (_, bound) (Op ss op) =
@@ -271,9 +272,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateValue s v = return (s, v)
 
   updateBinder
-    :: (SourceSpan, [Ident])
+    :: (SourceSpan, M.Map Ident SourcePos)
     -> Binder
-    -> m ((SourceSpan, [Ident]), Binder)
+    -> m ((SourceSpan, M.Map Ident SourcePos), Binder)
   updateBinder (_, bound) v@(PositionedBinder pos _ _) =
     return ((pos, bound), v)
   updateBinder (_, bound) (ConstructorBinder ss name b) =
@@ -287,22 +288,37 @@ renameInModule imports (Module modSS coms mn decls exps) =
     return (s, v)
 
   updateCase
-    :: (SourceSpan, [Ident])
+    :: (SourceSpan, M.Map Ident SourcePos)
     -> CaseAlternative
-    -> m ((SourceSpan, [Ident]), CaseAlternative)
+    -> m ((SourceSpan, M.Map Ident SourcePos), CaseAlternative)
   updateCase (pos, bound) c@(CaseAlternative bs gs) =
-    return ((pos, concatMap binderNames bs ++ updateGuard gs ++ bound), c)
+    return ((pos, updateGuard gs `M.union` rUnionMap binderNamesWithSpans' bs `M.union` bound), c)
     where
-    updateGuard :: [GuardedExpr] -> [Ident]
-    updateGuard [] = []
+    updateGuard :: [GuardedExpr] -> M.Map Ident SourcePos
+    updateGuard [] = M.empty
     updateGuard (GuardedExpr g _ : xs) =
-      concatMap updatePatGuard g ++ updateGuard xs
+      updateGuard xs `M.union` rUnionMap updatePatGuard g
       where
-        updatePatGuard (PatternGuard b _) = binderNames b
-        updatePatGuard _                  = []
+        updatePatGuard (PatternGuard b _) = binderNamesWithSpans' b
+        updatePatGuard _                  = M.empty
+
+    rUnionMap f = foldl' (flip M.union) M.empty . fmap f
+
+    binderNamesWithSpans'
+      = M.fromList
+      . fmap (second spanStart . swap)
+      . binderNamesWithSpans
 
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable = fmap valdeclIdent . getValueDeclaration
+
+  declarationsToMap :: [Declaration] -> M.Map Ident SourcePos
+  declarationsToMap = foldl goDTM M.empty
+    where
+      goDTM a (ValueDeclaration ValueDeclarationData {..}) =
+        M.insert valdeclIdent (spanStart $ fst valdeclSourceAnn) a
+      goDTM a _ =
+        a
 
   updateTypeArguments
     :: (Traversable f, Traversable g)
@@ -401,84 +417,3 @@ renameInModule imports (Module modSS coms mn decls exps) =
 
     where
     throwUnknown = throwError . errorMessage . UnknownName . fmap toName $ qname
-
--- |
--- Qualifies locally-bound names such that they're indexed by the `SourceSpan`
--- of the definition they're referencing. Names that are already qualified by
--- a module name aren't affected at all.
---
--- Note: Unlike @desugarImports@, this function requires that binding groups are
--- created first, hence the reason why this is a separate desugaring step.
-desugarLocals :: Monad m => Module -> m Module
-desugarLocals (Module ms cm mn dc ex) = pure $ Module ms cm mn dc' ex
-  where
-  dc' = flip evalState (M.empty, []) . go <$> dc
-
-  insertOne k v = modify' $ first $ M.insert k v
-
-  insertMany e' = modify' $ first $ M.union e'
-
-  lookupIdent k = gets (M.lookup k . fst)
-
-  pushScope = modify' $ \(e, b) ->
-    (e, e : b)
-
-  popScope = modify' $ \(e, b) -> case b of
-    [] -> (e, [])
-    (e' : b') -> (e', b')
-
-  (go, _, _) = everywhereOnValuesTopDownThenM goDecl goExpr goBinder pure thenExpr pure
-    where
-    goDecl declaration = case declaration of
-      ValueDeclaration ValueDeclarationData{..} -> do
-        insertOne valdeclIdent $ spanStart $ fst valdeclSourceAnn
-        pure declaration
-      BindingGroupDeclaration declarations -> do
-        let findSsI (((ss, _), i), _, _) = (i, spanStart ss)
-        insertMany $ M.fromList $ NEL.toList $ findSsI <$> declarations
-        pure declaration
-      _ ->
-        pure declaration
-
-    goExpr expression = case expression of
-      Abs _ _ -> do
-        pushScope
-        pure expression
-      Let _ _ _ -> do
-        pushScope
-        pure expression
-      Case _ _ -> do
-        pushScope
-        pure expression
-      Var ss (Qualified (BySourcePos _) i) -> do
-        result <- lookupIdent i
-        pure $ case result of
-          Just ss' ->
-            Var ss (Qualified (BySourcePos ss') i)
-          Nothing ->
-            expression
-      _ ->
-        pure expression
-
-    thenExpr expression = case expression of
-      Abs _ _ -> do
-        popScope
-        pure expression
-      Let _ _ _ -> do
-        popScope
-        pure expression
-      Case _ _ -> do
-        popScope
-        pure expression
-      _ ->
-        pure expression
-
-    goBinder binder = case binder of
-      VarBinder s i -> do
-        insertOne i $ spanStart s
-        pure binder
-      NamedBinder s i _ -> do
-        insertOne i $ spanStart s
-        pure binder
-      _ ->
-        pure binder
