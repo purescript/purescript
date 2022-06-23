@@ -314,7 +314,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
         updatePatGuard (PatternGuard b _) = binderNamesWithSpans' b
         updatePatGuard _                  = M.empty
 
-    rUnionMap f = foldl' (flip M.union) M.empty . fmap f
+    rUnionMap f = foldl' (flip (M.union . f)) M.empty
 
     binderNamesWithSpans'
       = M.fromList
