@@ -256,12 +256,25 @@ renameInModule imports (Module modSS coms mn decls exps) =
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, declarationsToMap ds `M.union` bound), Let w ds val')
-  updateValue (_, bound) (Var ss name'@(Qualified ByNullSourcePos ident)) =
-    ((ss, bound), ) <$> case M.lookup ident bound of
-      Just sourcePos -> pure $ Var ss (Qualified (BySourcePos sourcePos) ident)
-      Nothing -> Var ss <$> updateValueName name' ss
-  updateValue (_, bound) (Var ss name'@(Qualified (ByModuleName _) _)) =
-    ((ss, bound), ) <$> (Var ss <$> updateValueName name' ss)
+  updateValue (_, bound) (Var ss name'@(Qualified qualifiedBy ident)) =
+    ((ss, bound), ) <$> case (M.lookup ident bound, qualifiedBy) of
+      -- bound idents that have yet to be locally qualified.
+      (Just sourcePos, ByNullSourcePos) ->
+        pure $ Var ss (Qualified (BySourcePos sourcePos) ident)
+      -- unbound idents are likely import unqualified imports, so we
+      -- handle them through updateValueName if they don't exist as a
+      -- local binding.
+      (Nothing, ByNullSourcePos) ->
+        Var ss <$> updateValueName name' ss
+      -- bound/unbound idents with explicit qualification is still
+      -- handled through updateValueName, as it fully resolves the
+      -- ModuleName.
+      (_, ByModuleName _) ->
+        Var ss <$> updateValueName name' ss
+      -- encountering non-null source spans may be a bug in previous
+      -- desugaring steps or with the AST traversals.
+      (_, BySourcePos _) ->
+        internalError "updateValue: ident is locally-qualified by a non-null source position"
   updateValue (_, bound) (Op ss op) =
     ((ss, bound), ) <$> (Op ss <$> updateValueOpName op ss)
   updateValue (_, bound) (Constructor ss name) =
