@@ -256,11 +256,10 @@ renameInModule imports (Module modSS coms mn decls exps) =
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, declarationsToMap ds `M.union` bound), Let w ds val')
-  updateValue (_, bound) (Var ss name'@(Qualified (BySourcePos _) ident)) =
+  updateValue (_, bound) (Var ss name'@(Qualified ByNullSourcePos ident)) =
     ((ss, bound), ) <$> case M.lookup ident bound of
       Just sourcePos -> pure $ Var ss (Qualified (BySourcePos sourcePos) ident)
       Nothing -> Var ss <$> updateValueName name' ss
-
   updateValue (_, bound) (Var ss name'@(Qualified (ByModuleName _) _)) =
     ((ss, bound), ) <$> (Var ss <$> updateValueName name' ss)
   updateValue (_, bound) (Op ss op) =
