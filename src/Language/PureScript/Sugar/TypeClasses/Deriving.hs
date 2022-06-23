@@ -50,7 +50,7 @@ deriveInstance mn ds decl =
       binaryWildcardClass :: (Declaration -> [SourceType] -> m ([Declaration], SourceType)) -> m Declaration
       binaryWildcardClass f = case tys of
         [ty1, ty2] -> case unwrapTypeConstructor ty1 of
-          Just (Qualified (Just mn') tyCon, _, args) | mn == mn' -> do
+          Just (Qualified (ByModuleName mn') tyCon, _, args) | mn == mn' -> do
             checkIsWildcard ss tyCon ty2
             tyConDecl <- findTypeDecl ss tyCon ds
             (members, ty2') <- f tyConDecl args
@@ -84,13 +84,13 @@ deriveGenericRep ss mn tyCon tyConArgs =
                       lamCase x
                         [ CaseAlternative
                             [NullBinder]
-                            (unguarded (App (Var ss DataGenericRep.to) (Var ss' (Qualified Nothing x))))
+                            (unguarded (App (Var ss DataGenericRep.to) (Var ss' (Qualified ByNullSourcePos x))))
                         ]
                    , ValueDecl (ss', []) (Ident "from") Public [] $ unguarded $
                       lamCase x
                         [ CaseAlternative
                             [NullBinder]
-                            (unguarded (App (Var ss DataGenericRep.from) (Var ss' (Qualified Nothing x))))
+                            (unguarded (App (Var ss DataGenericRep.from) (Var ss' (Qualified ByNullSourcePos x))))
                         ]
                    ]
                | otherwise =
@@ -133,8 +133,8 @@ deriveGenericRep ss mn tyCon tyConArgs =
                                   (srcTypeLevelString $ mkString (runProperName ctorName)))
                          ctorTy
                , CaseAlternative [ ConstructorBinder ss DataGenericRep.Constructor [matchProduct] ]
-                                 (unguarded (foldl' App (Constructor ss (Qualified (Just mn) ctorName)) ctorArgs))
-               , CaseAlternative [ ConstructorBinder ss (Qualified (Just mn) ctorName) matchCtor ]
+                                 (unguarded (foldl' App (Constructor ss (Qualified (ByModuleName mn) ctorName)) ctorArgs))
+               , CaseAlternative [ ConstructorBinder ss (Qualified (ByModuleName mn) ctorName) matchCtor ]
                                  (unguarded (App (Constructor ss DataGenericRep.Constructor) mkProduct))
                )
 
@@ -157,9 +157,9 @@ deriveGenericRep ss mn tyCon tyConArgs =
       argName <- freshIdent "arg"
       pure ( srcTypeApp (srcTypeConstructor DataGenericRep.Argument) arg
            , ConstructorBinder ss DataGenericRep.Argument [ VarBinder ss argName ]
-           , Var ss (Qualified Nothing argName)
+           , Var ss (Qualified (BySourcePos $ spanStart ss) argName)
            , VarBinder ss argName
-           , App (Constructor ss DataGenericRep.Argument) (Var ss (Qualified Nothing argName))
+           , App (Constructor ss DataGenericRep.Argument) (Var ss (Qualified (BySourcePos $ spanStart ss) argName))
            )
 
     underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative

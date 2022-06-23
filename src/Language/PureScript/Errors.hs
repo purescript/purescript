@@ -741,35 +741,35 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "The role declaration for " <> markCode (runProperName nm) <> " should follow its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
-    renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
+    renderSimpleErrorMessage (UnknownName name@(Qualified (BySourcePos _) (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
       line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode "bind" <> " and " <> markCode "discard" <> " functions. Please import " <> markCode i <> " from module " <> markCode "Prelude"
-    renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i == C.negate =
+    renderSimpleErrorMessage (UnknownName name@(Qualified (BySourcePos _) (IdentName (Ident i)))) | i == C.negate =
       line $ "Unknown " <> printName name <> ". You're probably using numeric negation (the unary " <> markCode "-" <> " operator), which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name) =
       line $ "Unknown " <> printName name
     renderSimpleErrorMessage (UnknownImport mn name) =
-      paras [ line $ "Cannot import " <> printName (Qualified Nothing name) <> " from module " <> markCode (runModuleName mn)
+      paras [ line $ "Cannot import " <> printName (Qualified ByNullSourcePos name) <> " from module " <> markCode (runModuleName mn)
             , line "It either does not exist or the module does not export it."
             ]
     renderSimpleErrorMessage (UnknownImportDataConstructor mn tcon dcon) =
       line $ "Module " <> runModuleName mn <> " does not export data constructor " <> markCode (runProperName dcon) <> " for type " <> markCode (runProperName tcon)
     renderSimpleErrorMessage (UnknownExport name) =
-      line $ "Cannot export unknown " <> printName (Qualified Nothing name)
+      line $ "Cannot export unknown " <> printName (Qualified ByNullSourcePos name)
     renderSimpleErrorMessage (UnknownExportDataConstructor tcon dcon) =
       line $ "Cannot export data constructor " <> markCode (runProperName dcon) <> " for type " <> markCode (runProperName tcon) <> ", as it has not been declared."
     renderSimpleErrorMessage (ScopeConflict nm ms) =
-      paras [ line $ "Conflicting definitions are in scope for " <> printName (Qualified Nothing nm) <> " from the following modules:"
+      paras [ line $ "Conflicting definitions are in scope for " <> printName (Qualified ByNullSourcePos nm) <> " from the following modules:"
             , indent $ paras $ map (line . markCode . runModuleName) ms
             ]
     renderSimpleErrorMessage (ScopeShadowing nm exmn ms) =
-      paras [ line $ "Shadowed definitions are in scope for " <> printName (Qualified Nothing nm) <> " from the following open imports:"
+      paras [ line $ "Shadowed definitions are in scope for " <> printName (Qualified ByNullSourcePos nm) <> " from the following open imports:"
             , indent $ paras $ map (line . markCode . ("import " <>) . runModuleName) ms
             , line $ "These will be ignored and the " <> case exmn of
                 Just exmn' -> "declaration from " <> markCode (runModuleName exmn') <> " will be used."
                 Nothing -> "local declaration will be used."
             ]
     renderSimpleErrorMessage (DeclConflict new existing) =
-      line $ "Declaration for " <> printName (Qualified Nothing new) <> " conflicts with an existing " <> nameType existing <> " of the same name."
+      line $ "Declaration for " <> printName (Qualified ByNullSourcePos new) <> " conflicts with an existing " <> nameType existing <> " of the same name."
     renderSimpleErrorMessage (ExportConflict new existing) =
       line $ "Export for " <> printName new <> " conflicts with " <> printName existing
     renderSimpleErrorMessage (DuplicateModule mn) =
@@ -1152,7 +1152,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
     renderSimpleErrorMessage msg@(UnusedExplicitImport mn names _ _) =
       paras [ line $ "The import of module " <> markCode (runModuleName mn) <> " contains the following unused references:"
-            , indent $ paras $ map (line . markCode . runName . Qualified Nothing) names
+            , indent $ paras $ map (line . markCode . runName . Qualified ByNullSourcePos) names
             , line "It could be replaced with:"
             , indent $ line $ markCode $ showSuggestion msg ]
 
@@ -1176,10 +1176,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Duplicate import of " <> markCode (prettyPrintImport name imp qual)
 
     renderSimpleErrorMessage (DuplicateImportRef name) =
-      line $ "Import list contains multiple references to " <> printName (Qualified Nothing name)
+      line $ "Import list contains multiple references to " <> printName (Qualified ByNullSourcePos name)
 
     renderSimpleErrorMessage (DuplicateExportRef name) =
-      line $ "Export list contains multiple references to " <> printName (Qualified Nothing name)
+      line $ "Export list contains multiple references to " <> printName (Qualified ByNullSourcePos name)
 
     renderSimpleErrorMessage (IntOutOfRange value backend lo hi) =
       paras [ line $ "Integer value " <> markCode (T.pack (show value)) <> " is out of range for the " <> backend <> " backend."
@@ -1596,19 +1596,19 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     nameType (ModName _) = "module"
 
     runName :: Qualified Name -> Text
-    runName (Qualified mn (IdentName name)) =
-      showQualified showIdent (Qualified mn name)
-    runName (Qualified mn (ValOpName op)) =
-      showQualified showOp (Qualified mn op)
-    runName (Qualified mn (TyName name)) =
-      showQualified runProperName (Qualified mn name)
-    runName (Qualified mn (TyOpName op)) =
-      showQualified showOp (Qualified mn op)
-    runName (Qualified mn (DctorName name)) =
-      showQualified runProperName (Qualified mn name)
-    runName (Qualified mn (TyClassName name)) =
-      showQualified runProperName (Qualified mn name)
-    runName (Qualified Nothing (ModName name)) =
+    runName (Qualified qb (IdentName name)) =
+      showQualified showIdent (Qualified qb name)
+    runName (Qualified qb (ValOpName op)) =
+      showQualified showOp (Qualified qb op)
+    runName (Qualified qb (TyName name)) =
+      showQualified runProperName (Qualified qb name)
+    runName (Qualified qb (TyOpName op)) =
+      showQualified showOp (Qualified qb op)
+    runName (Qualified qb (DctorName name)) =
+      showQualified runProperName (Qualified qb name)
+    runName (Qualified qb (TyClassName name)) =
+      showQualified runProperName (Qualified qb name)
+    runName (Qualified (BySourcePos _) (ModName name)) =
       runModuleName name
     runName (Qualified _ ModName{}) =
       internalError "qualified ModName in runName"
@@ -1713,13 +1713,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
   prettyInstanceName :: Qualified (Either SourceType Ident) -> Box.Box
   prettyInstanceName = \case
-    Qualified maybeMn (Left ty) ->
+    Qualified qb (Left ty) ->
       "instance "
-        Box.<> (case maybeMn of
-                  Just mn -> "in module "
+        Box.<> (case qb of
+                  ByModuleName mn -> "in module "
                     Box.<> line (markCode $ runModuleName mn)
                     Box.<> " "
-                  Nothing -> Box.nullBox)
+                  _ -> Box.nullBox)
         Box.<> "with type "
         Box.<> markCodeBox (prettyType ty)
         Box.<> " "

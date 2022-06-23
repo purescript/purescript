@@ -65,13 +65,13 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
 
     identCompletion (P.Qualified mn i, ty) =
       Completion     
-        { complModule = maybe "" P.runModuleName mn
+        { complModule = maybe "" P.runModuleName $ P.toMaybeModuleName mn
         , complIdentifier = i
         , complType = prettyPrintTypeSingleLine ty
         , complExpandedType = prettyPrintTypeSingleLine ty
         , complLocation = Nothing
         , complDocumentation = Nothing
-        , complExportedFrom = toList mn
+        , complExportedFrom = toList $ P.toMaybeModuleName mn
         , complDeclarationType = Nothing
         }
     fieldCompletion (label, ty) =

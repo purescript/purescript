@@ -265,7 +265,7 @@ moduleBindToJs mn = bindToJs
 
   guessEffects :: Expr Ann -> AST.InitializerEffects
   guessEffects = \case
-    Var _ (Qualified Nothing _)            -> NoEffects
+    Var _ (Qualified (BySourcePos _) _)    -> NoEffects
     App (_, _, _, Just IsSyntheticApp) _ _ -> NoEffects
     _                                      -> UnknownEffects
 
@@ -318,7 +318,7 @@ moduleBindToJs mn = bindToJs
     unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
     unApp (App _ val arg) args = unApp val (arg : args)
     unApp other args = (other, args)
-  valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
+  valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (ByModuleName mn') ident)) =
     return $ if mn' == mn
              then foreignIdent ident
              else varToJs qi
@@ -387,14 +387,14 @@ moduleBindToJs mn = bindToJs
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable.
   varToJs :: Qualified Ident -> AST
-  varToJs (Qualified Nothing ident) = var ident
+  varToJs (Qualified (BySourcePos _) ident) = var ident
   varToJs qual = qualifiedToJS id qual
 
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable that may have a qualified name.
   qualifiedToJS :: (a -> Ident) -> Qualified a -> AST
-  qualifiedToJS f (Qualified (Just C.Prim) a) = AST.Var Nothing . runIdent $ f a
-  qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = AST.ModuleAccessor Nothing mn' . mkString . T.concatMap identCharToText . runIdent $ f a
+  qualifiedToJS f (Qualified (ByModuleName C.Prim) a) = AST.Var Nothing . runIdent $ f a
+  qualifiedToJS f (Qualified (ByModuleName mn') a) | mn /= mn' = AST.ModuleAccessor Nothing mn' . mkString . T.concatMap identCharToText . runIdent $ f a
   qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToJs (f a)
 
   foreignIdent :: Ident -> AST

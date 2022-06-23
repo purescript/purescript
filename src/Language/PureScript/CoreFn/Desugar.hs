@@ -63,7 +63,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   declToCoreFn :: A.Declaration -> [Bind Ann]
   declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [ctor]) =
     [NonRec (ss, [], Nothing, declMeta) (properToIdent $ A.dataCtorName ctor) $
-      Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var (ssAnn ss) $ Qualified Nothing (Ident "x"))]
+      Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var (ssAnn ss) $ Qualified ByNullSourcePos (Ident "x"))]
     where
     declMeta = isDictTypeName (A.dataCtorName ctor) `orEmpty` IsTypeClassConstructor
   declToCoreFn d@(A.DataDeclaration _ Newtype _ _ _) =
@@ -72,7 +72,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     flip fmap ctors $ \ctorDecl ->
       let
         ctor = A.dataCtorName ctorDecl
-        (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
+        (_, _, _, fields) = lookupConstructor env (Qualified (ByModuleName mn) ctor)
       in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration ds) =
     concatMap declToCoreFn ds
@@ -109,7 +109,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       A.Unused{}             -> True
       _                      -> False
   exprToCoreFn ss com ty (A.Unused _) =
-    Var (ss, com, ty, Nothing) (Qualified (Just C.Prim) (Ident C.undefined))
+    Var (ss, com, ty, Nothing) (Qualified (ByModuleName C.Prim) (Ident C.undefined))
   exprToCoreFn _ com ty (A.Var ss ident) =
     Var (ss, com, ty, getValueMeta ident) ident
   exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =
@@ -201,7 +201,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     typeConstructor
       :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, SourceType, [Ident]))
       -> (ModuleName, ProperName 'TypeName)
-    typeConstructor (Qualified (Just mn') _, (_, tyCtor, _, _)) = (mn', tyCtor)
+    typeConstructor (Qualified (ByModuleName mn') _, (_, tyCtor, _, _)) = (mn', tyCtor)
     typeConstructor _ = internalError "Invalid argument to typeConstructor"
 
 -- | Find module names from qualified references to values. This is used to

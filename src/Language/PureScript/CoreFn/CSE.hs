@@ -261,7 +261,7 @@ nullAnn = (nullSourceSpan, [], Nothing, Nothing)
 replaceLocals :: M.Map Ident (Expr Ann) -> [Bind Ann] -> [Bind Ann]
 replaceLocals m = if M.null m then identity else map f' where
   (f', g', _) = everywhereOnValues identity f identity
-  f e@(Var _ (Qualified Nothing ident)) = maybe e g' $ ident `M.lookup` m
+  f e@(Var _ (Qualified (BySourcePos _) ident)) = maybe e g' $ ident `M.lookup` m
   f e = e
 
 -- |
@@ -280,7 +280,7 @@ floatExpr = \case
     let w' = w
           & (if isNew then newBindings %~ addToScope deepestScope [(ident, (_plurality, e))] else identity)
           & plurality .~ PluralityMap (M.singleton ident False)
-    pure (Var nullAnn (Qualified Nothing ident), w')
+    pure (Var nullAnn (Qualified ByNullSourcePos ident), w')
   (e, w) -> pure (e, w)
 
 -- |
@@ -331,7 +331,7 @@ summarizeName mn (Qualified mn' ident) = do
   m <- view bound
   let (s, bt) =
         fromMaybe (0, NonRecursive) $
-          guard (all (== mn) mn') *> ident `M.lookup` m
+          guard (all (== mn) (toMaybeModuleName mn')) *> ident `M.lookup` m
   tell $ mempty
        & scopesUsed .~ IS.singleton s
        & noFloatWithin .~ (guard (bt == Recursive) $> Min s)

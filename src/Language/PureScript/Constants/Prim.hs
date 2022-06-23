@@ -1,8 +1,6 @@
 -- | Various constants which refer to things in Prim
 module Language.PureScript.Constants.Prim where
 
-import Prelude.Compat
-
 import Data.String (IsString)
 import Language.PureScript.Names
 
@@ -17,25 +15,25 @@ pattern Prim :: ModuleName
 pattern Prim = ModuleName "Prim"
 
 pattern Partial :: Qualified (ProperName 'ClassName)
-pattern Partial = Qualified (Just Prim) (ProperName "Partial")
+pattern Partial = Qualified (ByModuleName Prim) (ProperName "Partial")
 
 pattern Record :: Qualified (ProperName 'TypeName)
-pattern Record = Qualified (Just Prim) (ProperName "Record")
+pattern Record = Qualified (ByModuleName Prim) (ProperName "Record")
 
 pattern Type :: Qualified (ProperName 'TypeName)
-pattern Type = Qualified (Just Prim) (ProperName "Type")
+pattern Type = Qualified (ByModuleName Prim) (ProperName "Type")
 
 pattern Constraint :: Qualified (ProperName 'TypeName)
-pattern Constraint = Qualified (Just Prim) (ProperName "Constraint")
+pattern Constraint = Qualified (ByModuleName Prim) (ProperName "Constraint")
 
 pattern Function :: Qualified (ProperName 'TypeName)
-pattern Function = Qualified (Just Prim) (ProperName "Function")
+pattern Function = Qualified (ByModuleName Prim) (ProperName "Function")
 
 pattern Array :: Qualified (ProperName 'TypeName)
-pattern Array = Qualified (Just Prim) (ProperName "Array")
+pattern Array = Qualified (ByModuleName Prim) (ProperName "Array")
 
 pattern Row :: Qualified (ProperName 'TypeName)
-pattern Row = Qualified (Just Prim) (ProperName "Row")
+pattern Row = Qualified (ByModuleName Prim) (ProperName "Row")
 
 -- Prim.Boolean
 
@@ -43,10 +41,10 @@ pattern PrimBoolean :: ModuleName
 pattern PrimBoolean = ModuleName "Prim.Boolean"
 
 booleanTrue :: Qualified (ProperName 'TypeName)
-booleanTrue = Qualified (Just PrimBoolean) (ProperName "True")
+booleanTrue = Qualified (ByModuleName PrimBoolean) (ProperName "True")
 
 booleanFalse :: Qualified (ProperName 'TypeName)
-booleanFalse = Qualified (Just PrimBoolean) (ProperName "False")
+booleanFalse = Qualified (ByModuleName PrimBoolean) (ProperName "False")
 
 -- Prim.Coerce
 
@@ -54,7 +52,7 @@ pattern PrimCoerce :: ModuleName
 pattern PrimCoerce = ModuleName "Prim.Coerce"
 
 pattern Coercible :: Qualified (ProperName 'ClassName)
-pattern Coercible = Qualified (Just PrimCoerce) (ProperName "Coercible")
+pattern Coercible = Qualified (ByModuleName PrimCoerce) (ProperName "Coercible")
 
 -- Prim.Ordering
 
@@ -62,13 +60,13 @@ pattern PrimOrdering :: ModuleName
 pattern PrimOrdering = ModuleName "Prim.Ordering"
 
 orderingLT :: Qualified (ProperName 'TypeName)
-orderingLT = Qualified (Just PrimOrdering) (ProperName "LT")
+orderingLT = Qualified (ByModuleName PrimOrdering) (ProperName "LT")
 
 orderingEQ :: Qualified (ProperName 'TypeName)
-orderingEQ = Qualified (Just PrimOrdering) (ProperName "EQ")
+orderingEQ = Qualified (ByModuleName PrimOrdering) (ProperName "EQ")
 
 orderingGT :: Qualified (ProperName 'TypeName)
-orderingGT = Qualified (Just PrimOrdering) (ProperName "GT")
+orderingGT = Qualified (ByModuleName PrimOrdering) (ProperName "GT")
 
 -- Prim.Row
 
@@ -76,16 +74,16 @@ pattern PrimRow :: ModuleName
 pattern PrimRow = ModuleName "Prim.Row"
 
 pattern RowUnion :: Qualified (ProperName 'ClassName)
-pattern RowUnion = Qualified (Just PrimRow) (ProperName "Union")
+pattern RowUnion = Qualified (ByModuleName PrimRow) (ProperName "Union")
 
 pattern RowNub :: Qualified (ProperName 'ClassName)
-pattern RowNub = Qualified (Just PrimRow) (ProperName "Nub")
+pattern RowNub = Qualified (ByModuleName PrimRow) (ProperName "Nub")
 
 pattern RowCons :: Qualified (ProperName 'ClassName)
-pattern RowCons = Qualified (Just PrimRow) (ProperName "Cons")
+pattern RowCons = Qualified (ByModuleName PrimRow) (ProperName "Cons")
 
 pattern RowLacks :: Qualified (ProperName 'ClassName)
-pattern RowLacks = Qualified (Just PrimRow) (ProperName "Lacks")
+pattern RowLacks = Qualified (ByModuleName PrimRow) (ProperName "Lacks")
 
 -- Prim.RowList
 
@@ -93,13 +91,13 @@ pattern PrimRowList :: ModuleName
 pattern PrimRowList = ModuleName "Prim.RowList"
 
 pattern RowToList :: Qualified (ProperName 'ClassName)
-pattern RowToList = Qualified (Just PrimRowList) (ProperName "RowToList")
+pattern RowToList = Qualified (ByModuleName PrimRowList) (ProperName "RowToList")
 
 pattern RowListNil :: Qualified (ProperName 'TypeName)
-pattern RowListNil = Qualified (Just PrimRowList) (ProperName "Nil")
+pattern RowListNil = Qualified (ByModuleName PrimRowList) (ProperName "Nil")
 
 pattern RowListCons :: Qualified (ProperName 'TypeName)
-pattern RowListCons = Qualified (Just PrimRowList) (ProperName "Cons")
+pattern RowListCons = Qualified (ByModuleName PrimRowList) (ProperName "Cons")
 
 -- Prim.Int
 
@@ -107,16 +105,16 @@ pattern PrimInt :: ModuleName
 pattern PrimInt = ModuleName "Prim.Int"
 
 pattern IntAdd :: Qualified (ProperName 'ClassName)
-pattern IntAdd = Qualified (Just PrimInt) (ProperName "Add")
+pattern IntAdd = Qualified (ByModuleName PrimInt) (ProperName "Add")
 
 pattern IntCompare :: Qualified (ProperName 'ClassName)
-pattern IntCompare = Qualified (Just PrimInt) (ProperName "Compare")
+pattern IntCompare = Qualified (ByModuleName PrimInt) (ProperName "Compare")
 
 pattern IntMul :: Qualified (ProperName 'ClassName)
-pattern IntMul = Qualified (Just PrimInt) (ProperName "Mul")
+pattern IntMul = Qualified (ByModuleName PrimInt) (ProperName "Mul")
 
 pattern IntToString :: Qualified (ProperName 'ClassName)
-pattern IntToString = Qualified (Just PrimInt) (ProperName "ToString")
+pattern IntToString = Qualified (ByModuleName PrimInt) (ProperName "ToString")
 
 -- Prim.Symbol
 
@@ -124,13 +122,13 @@ pattern PrimSymbol :: ModuleName
 pattern PrimSymbol = ModuleName "Prim.Symbol"
 
 pattern SymbolCompare :: Qualified (ProperName 'ClassName)
-pattern SymbolCompare = Qualified (Just PrimSymbol) (ProperName "Compare")
+pattern SymbolCompare = Qualified (ByModuleName PrimSymbol) (ProperName "Compare")
 
 pattern SymbolAppend :: Qualified (ProperName 'ClassName)
-pattern SymbolAppend = Qualified (Just PrimSymbol) (ProperName "Append")
+pattern SymbolAppend = Qualified (ByModuleName PrimSymbol) (ProperName "Append")
 
 pattern SymbolCons :: Qualified (ProperName 'ClassName)
-pattern SymbolCons = Qualified (Just PrimSymbol) (ProperName "Cons")
+pattern SymbolCons = Qualified (ByModuleName PrimSymbol) (ProperName "Cons")
 
 -- Prim.TypeError
 
@@ -138,10 +136,10 @@ pattern PrimTypeError :: ModuleName
 pattern PrimTypeError = ModuleName "Prim.TypeError"
 
 pattern Fail :: Qualified (ProperName 'ClassName)
-pattern Fail = Qualified (Just PrimTypeError) (ProperName "Fail")
+pattern Fail = Qualified (ByModuleName PrimTypeError) (ProperName "Fail")
 
 pattern Warn :: Qualified (ProperName 'ClassName)
-pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
+pattern Warn = Qualified (ByModuleName PrimTypeError) (ProperName "Warn")
 
 primModules :: [ModuleName]
 primModules = [Prim, PrimBoolean, PrimCoerce, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimInt, PrimTypeError]

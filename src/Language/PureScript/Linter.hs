@@ -187,7 +187,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
     goDecl _ = mempty
 
     go :: Expr -> (S.Set Ident, MultipleErrors)
-    go (Var _ (Qualified Nothing v)) = (S.singleton v, mempty)
+    go (Var _ (Qualified (BySourcePos _) v)) = (S.singleton v, mempty)
     go (Var _ _) = (S.empty, mempty)
 
     go (Let _ ds e) = onDecls ds (go e)

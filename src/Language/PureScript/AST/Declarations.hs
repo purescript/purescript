@@ -130,13 +130,15 @@ getModuleDeclarations (Module _ _ _ declarations _) = declarations
 addDefaultImport :: Qualified ModuleName -> Module -> Module
 addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps) =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit toImportAs : decls) exps
+  else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit toImportAs' : decls) exps
   where
+  toImportAs' = toMaybeModuleName toImportAs
+
   isExistingImport (ImportDeclaration _ mn' _ as')
     | mn' == toImport =
-        case toImportAs of
+        case toImportAs' of
           Nothing -> True
-          _ -> as' == toImportAs
+          _ -> as' == toImportAs'
   isExistingImport _ = False
 
 -- | Adds import declarations to a module for an implicit Prim import and Prim
@@ -146,8 +148,8 @@ importPrim =
   let
     primModName = C.Prim
   in
-    addDefaultImport (Qualified (Just primModName) primModName)
-      . addDefaultImport (Qualified Nothing primModName)
+    addDefaultImport (Qualified (ByModuleName primModName) primModName)
+      . addDefaultImport (Qualified ByNullSourcePos primModName)
 
 data NameSource = UserNamed | CompilerNamed
   deriving (Show, Generic, NFData, Serialise)
@@ -720,7 +722,7 @@ data Expr
   -- instance type, and the type class dictionaries in scope.
   --
   | TypeClassDictionary SourceConstraint
-                        (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
+                        (M.Map QualifiedBy (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
                         [ErrorMessageHint]
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
@@ -834,8 +836,8 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDe
 
 isTrueExpr :: Expr -> Bool
 isTrueExpr (Literal _ (BooleanLiteral True)) = True
-isTrueExpr (Var _ (Qualified (Just (ModuleName "Prelude")) (Ident "otherwise"))) = True
-isTrueExpr (Var _ (Qualified (Just (ModuleName "Data.Boolean")) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (ByModuleName (ModuleName "Prelude")) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (ByModuleName (ModuleName "Data.Boolean")) (Ident "otherwise"))) = True
 isTrueExpr (TypedValue _ e _) = isTrueExpr e
 isTrueExpr (PositionedValue _ _ e) = isTrueExpr e
 isTrueExpr _ = False

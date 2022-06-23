@@ -149,9 +149,9 @@ withScopedTypeVars
 withScopedTypeVars mn ks ma = do
   orig <- get
   forM_ ks $ \(name, _) ->
-    when (Qualified (Just mn) (ProperName name) `M.member` types (checkEnv orig)) $
+    when (Qualified (ByModuleName mn) (ProperName name) `M.member` types (checkEnv orig)) $
       tell . errorMessage $ ShadowedTypeVar name
-  bindTypes (M.fromList (map (\(name, k) -> (Qualified (Just mn) (ProperName name), (k, ScopedTypeVar))) ks)) ma
+  bindTypes (M.fromList (map (\(name, k) -> (Qualified (ByModuleName mn) (ProperName name), (k, ScopedTypeVar))) ks)) ma
 
 withErrorMessageHint
   :: (MonadState CheckState m, MonadError MultipleErrors m)
@@ -196,8 +196,8 @@ withTypeClassDictionaries entries action = do
 
   let mentries =
         M.fromListWith (M.unionWith (M.unionWith (<>)))
-          [ (mn, M.singleton className (M.singleton (tcdValue entry) (pure entry)))
-          | entry@TypeClassDictionaryInScope{ tcdValue = Qualified mn _, tcdClassName = className }
+          [ (qb, M.singleton className (M.singleton tcdValue (pure entry)))
+          | entry@TypeClassDictionaryInScope{ tcdValue = tcdValue@(Qualified qb _), tcdClassName = className }
               <- entries
           ]
 
@@ -209,20 +209,20 @@ withTypeClassDictionaries entries action = do
 -- | Get the currently available map of type class dictionaries
 getTypeClassDictionaries
   :: (MonadState CheckState m)
-  => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
+  => m (M.Map QualifiedBy (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
 getTypeClassDictionaries = gets $ typeClassDictionaries . checkEnv
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionaries
   :: (MonadState CheckState m)
-  => Maybe ModuleName
+  => QualifiedBy
   -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
 lookupTypeClassDictionaries mn = gets $ fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionariesForClass
   :: (MonadState CheckState m)
-  => Maybe ModuleName
+  => QualifiedBy
   -> Qualified (ProperName 'ClassName)
   -> m (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))
 lookupTypeClassDictionariesForClass mn cn = fromMaybe M.empty . M.lookup cn <$> lookupTypeClassDictionaries mn
@@ -230,11 +230,11 @@ lookupTypeClassDictionariesForClass mn cn = fromMaybe M.empty . M.lookup cn <$> 
 -- | Temporarily bind a collection of names to local variables
 bindLocalVariables
   :: (MonadState CheckState m)
-  => [(Ident, SourceType, NameVisibility)]
+  => [(SourceSpan, Ident, SourceType, NameVisibility)]
   -> m a
   -> m a
 bindLocalVariables bindings =
-  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> (Qualified Nothing name, (ty, Private, visibility)))
+  bindNames (M.fromList $ flip map bindings $ \(ss, name, ty, visibility) -> (Qualified (BySourcePos $ spanStart ss) name, (ty, Private, visibility)))
 
 -- | Temporarily bind a collection of names to local type variables
 bindLocalTypeVariables
@@ -244,7 +244,7 @@ bindLocalTypeVariables
   -> m a
   -> m a
 bindLocalTypeVariables moduleName bindings =
-  bindTypes (M.fromList $ flip map bindings $ \(pn, kind) -> (Qualified (Just moduleName) pn, (kind, LocalTypeVariable)))
+  bindTypes (M.fromList $ flip map bindings $ \(pn, kind) -> (Qualified (ByModuleName moduleName) pn, (kind, LocalTypeVariable)))
 
 -- | Update the visibility of all names to Defined
 makeBindingGroupVisible :: (MonadState CheckState m) => m ()
@@ -301,11 +301,15 @@ lookupTypeVariable
   => ModuleName
   -> Qualified (ProperName 'TypeName)
   -> m SourceType
-lookupTypeVariable currentModule (Qualified moduleName name) = do
+lookupTypeVariable currentModule (Qualified qb name) = do
   env <- getEnv
-  case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of
+  case M.lookup (Qualified qb' name) (types env) of
     Nothing -> throwError . errorMessage $ UndefinedTypeVariable name
     Just (k, _) -> return k
+  where
+  qb' = ByModuleName $ case qb of
+    ByModuleName m -> m
+    BySourcePos _ -> currentModule
 
 -- | Get the current @Environment@
 getEnv :: (MonadState CheckState m) => m Environment
@@ -315,7 +319,7 @@ getEnv = gets checkEnv
 getLocalContext :: MonadState CheckState m => m Context
 getLocalContext = do
   env <- getEnv
-  return [ (ident, ty') | (Qualified Nothing ident@Ident{}, (ty', _, Defined)) <- M.toList (names env) ]
+  return [ (ident, ty') | (Qualified (BySourcePos _) ident@Ident{}, (ty', _, Defined)) <- M.toList (names env) ]
 
 -- | Update the @Environment@
 putEnv :: (MonadState CheckState m) => Environment -> m ()
@@ -440,7 +444,7 @@ debugTypeClassDictionaries = go . typeClassDictionaries
     (className, instances) <- M.toList classes
     (ident, dicts) <- M.toList instances
     let
-      moduleName = maybe "" (\m -> "[" <> runModuleName m <> "] ") mbModuleName
+      moduleName = maybe "" (\m -> "[" <> runModuleName m <> "] ") (toMaybeModuleName mbModuleName)
       className' = showQualified runProperName className
       ident' = showQualified runIdent ident
       kds = unwords $ fmap ((\a -> "@(" <> a <> ")") . debugType) $ tcdInstanceKinds $ NEL.head dicts

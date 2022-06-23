@@ -19,7 +19,7 @@ mkRef :: Qualified Ident -> Expr
 mkRef = Var nullSourceSpan
 
 mkVarMn :: Maybe ModuleName -> Ident -> Expr
-mkVarMn mn = mkRef . Qualified mn
+mkVarMn mn = mkRef . Qualified (byMaybeModuleName mn)
 
 mkVar :: Ident -> Expr
 mkVar = mkVarMn Nothing
@@ -31,10 +31,10 @@ mkLit :: Literal Expr -> Expr
 mkLit = Literal nullSourceSpan
 
 mkCtor :: ModuleName -> ProperName 'ConstructorName -> Expr
-mkCtor mn name = Constructor nullSourceSpan (Qualified (Just mn) name)
+mkCtor mn name = Constructor nullSourceSpan (Qualified (ByModuleName mn) name)
 
 mkCtorBinder :: ModuleName -> ProperName 'ConstructorName -> [Binder] -> Binder
-mkCtorBinder mn name = ConstructorBinder nullSourceSpan (Qualified (Just mn) name)
+mkCtorBinder mn name = ConstructorBinder nullSourceSpan (Qualified (ByModuleName mn) name)
 
 unguarded :: Expr -> [GuardedExpr]
 unguarded e = [MkUnguarded e]
