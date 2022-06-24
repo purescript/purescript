@@ -1579,7 +1579,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
           [ Box.hcat Box.left [ Box.text (T.unpack (showIdent ident) ++ " :: ")
                               , markCodeBox $ typeAsBox prettyDepth ty'
                               ]
-          | (ident, ty') <- take 5 ctx
+          | (ident, ty') <- take 30 ctx
           ]
       ]
 
