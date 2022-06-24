@@ -16,6 +16,8 @@ PureScript uses the following Haskell library packages. Their license files foll
 
   Cabal
   Glob
+  OneTuple
+  QuickCheck
   StateVar
   adjunctions
   aeson
@@ -42,7 +44,6 @@ PureScript uses the following Haskell library packages. Their license files foll
   bower-json
   boxes
   bytestring
-  cabal-doctest
   call-stack
   case-insensitive
   cborg
@@ -77,6 +78,7 @@ PureScript uses the following Haskell library packages. Their license files foll
   filepath
   free
   fsnotify
+  ghc-bignum
   ghc-prim
   half
   happy
@@ -141,6 +143,7 @@ PureScript uses the following Haskell library packages. Their license files foll
   tagsoup
   template-haskell
   text
+  text-short
   th-abstraction
   th-compat
   these
@@ -168,8 +171,11 @@ PureScript uses the following Haskell library packages. Their license files foll
 
 Cabal LICENSE file:
 
-  Copyright (c) 2003-2017, Cabal Development Team.
+  Copyright (c) 2003-2020, Cabal Development Team.
   See the AUTHORS file for the full list of copyright holders.
+
+  See */LICENSE for the copyright holders of the subcomponents.
+
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -230,6 +236,75 @@ Glob LICENSE file:
   LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
   OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
   ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+OneTuple LICENSE file:
+
+
+  Copyright (c) 2008, John A. Dorsey.
+  All rights reserved.
+
+  Redistribution and use of this software in source and binary forms,
+  with or without modification, are permitted provided that the
+  following conditions are met:
+
+  * Redistributions of source code must retain the above
+    copyright notice, this list of conditions and the
+    following disclaimer.
+
+  * Redistributions in binary form must reproduce the above
+    copyright notice, this list of conditions and the
+    following disclaimer in the documentation and/or other
+    materials provided with the distribution.
+
+  * Neither the name of John Dorsey nor the names of its
+    contributors may be used to endorse or promote products
+    derived from this software without specific prior
+    written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+  OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+  OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+QuickCheck LICENSE file:
+
+  (The following is the 3-clause BSD license.)
+
+  Copyright (c) 2000-2019, Koen Claessen
+  Copyright (c) 2006-2008, Björn Bringert
+  Copyright (c) 2009-2019, Nick Smallbone
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+
+  - Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+  - Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+  - Neither the names of the copyright owners nor the names of the
+    contributors may be used to endorse or promote products derived
+    from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 StateVar LICENSE file:
 
@@ -676,92 +751,6 @@ auto-update LICENSE file:
   TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-base LICENSE file:
-
-  This library (libraries/base) is derived from code from several
-  sources:
-
-    * Code from the GHC project which is largely (c) The University of
-      Glasgow, and distributable under a BSD-style license (see below),
-
-    * Code from the Haskell 98 Report which is (c) Simon Peyton Jones
-      and freely redistributable (but see the full license for
-      restrictions).
-
-    * Code from the Haskell Foreign Function Interface specification,
-      which is (c) Manuel M. T. Chakravarty and freely redistributable
-      (but see the full license for restrictions).
-
-  The full text of these licenses is reproduced below.  All of the
-  licenses are BSD-style or compatible.
-
-  -----------------------------------------------------------------------------
-
-  The Glasgow Haskell Compiler License
-
-  Copyright 2004, The University Court of the University of Glasgow.
-  All rights reserved.
-
-  Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the following conditions are met:
-
-  - Redistributions of source code must retain the above copyright notice,
-  this list of conditions and the following disclaimer.
-
-  - Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-  - Neither name of the University nor the names of its contributors may be
-  used to endorse or promote products derived from this software without
-  specific prior written permission.
-
-  THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY COURT OF THE UNIVERSITY OF
-  GLASGOW AND THE CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
-  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
-  FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-  UNIVERSITY COURT OF THE UNIVERSITY OF GLASGOW OR THE CONTRIBUTORS BE LIABLE
-  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
-  DAMAGE.
-
-  -----------------------------------------------------------------------------
-
-  Code derived from the document "Report on the Programming Language
-  Haskell 98", is distributed under the following license:
-
-    Copyright (c) 2002 Simon Peyton Jones
-
-    The authors intend this Report to belong to the entire Haskell
-    community, and so we grant permission to copy and distribute it for
-    any purpose, provided that it is reproduced in its entirety,
-    including this Notice.  Modified versions of this Report may also be
-    copied and distributed for any purpose, provided that the modified
-    version is clearly presented as such, and that it does not claim to
-    be a definition of the Haskell 98 Language.
-
-  -----------------------------------------------------------------------------
-
-  Code derived from the document "The Haskell 98 Foreign Function
-  Interface, An Addendum to the Haskell 98 Report" is distributed under
-  the following license:
-
-    Copyright (c) 2002 Manuel M. T. Chakravarty
-
-    The authors intend this Report to belong to the entire Haskell
-    community, and so we grant permission to copy and distribute it for
-    any purpose, provided that it is reproduced in its entirety,
-    including this Notice.  Modified versions of this Report may also be
-    copied and distributed for any purpose, provided that the modified
-    version is clearly presented as such, and that it does not claim to
-    be a definition of the Haskell 98 Foreign Function Interface.
-
-  -----------------------------------------------------------------------------
-
 base-compat LICENSE file:
 
   Copyright (c) 2012-2018 Simon Hengel <sol@typeful.net> and Ryan Scott <ryan.gl.scott@gmail.com>
@@ -1080,6 +1069,7 @@ bytestring LICENSE file:
             (c) Duncan Coutts 2006-2015
             (c) David Roundy 2003-2005
             (c) Simon Meier 2010-2011
+            (c) Koz Ross 2021
 
   All rights reserved.
 
@@ -1106,39 +1096,6 @@ bytestring LICENSE file:
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
   OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
   SUCH DAMAGE.
-
-cabal-doctest LICENSE file:
-
-  Copyright (c) 2017, Oleg Grenrus
-
-  All rights reserved.
-
-  Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the following conditions are met:
-
-      * Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-
-      * Redistributions in binary form must reproduce the above
-        copyright notice, this list of conditions and the following
-        disclaimer in the documentation and/or other materials provided
-        with the distribution.
-
-      * Neither the name of Oleg Grenrus nor the names of other
-        contributors may be used to endorse or promote products derived
-        from this software without specific prior written permission.
-
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 call-stack LICENSE file:
 
@@ -2084,7 +2041,7 @@ file-embed LICENSE file:
 
 filepath LICENSE file:
 
-  Copyright Neil Mitchell 2005-2018.
+  Copyright Neil Mitchell 2005-2020.
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -2180,6 +2137,40 @@ fsnotify LICENSE file:
   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ghc-bignum LICENSE file:
+
+  The Glasgow Haskell Compiler License
+
+  Copyright 2020, The University Court of the University of Glasgow.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+
+  - Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+
+  - Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+  - Neither name of the University nor the names of its contributors may be
+  used to endorse or promote products derived from this software without
+  specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY COURT OF THE UNIVERSITY OF
+  GLASGOW AND THE CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+  FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+  UNIVERSITY COURT OF THE UNIVERSITY OF GLASGOW OR THE CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+  DAMAGE.
 
 ghc-prim LICENSE file:
 
@@ -2494,39 +2485,6 @@ indexed-traversable-instances LICENSE file:
   STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
   POSSIBILITY OF SUCH DAMAGE.
-
-integer-gmp LICENSE file:
-
-  Copyright (c) 2014, Herbert Valerio Riedel
-
-  All rights reserved.
-
-  Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the following conditions are met:
-
-      * Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-
-      * Redistributions in binary form must reproduce the above
-        copyright notice, this list of conditions and the following
-        disclaimer in the documentation and/or other materials provided
-        with the distribution.
-
-      * Neither the name of Herbert Valerio Riedel nor the names of other
-        contributors may be used to endorse or promote products derived
-        from this software without specific prior written permission.
-
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 integer-logarithms LICENSE file:
 
@@ -3593,8 +3551,6 @@ reflection LICENSE file:
 
 regex-base LICENSE file:
 
-  This modile is under this "3 clause" BSD license:
-
   Copyright (c) 2007, Christopher Kuklewicz
   All rights reserved.
 
@@ -3602,6 +3558,7 @@ regex-base LICENSE file:
 
       * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
       * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
       * The names of the contributors may not be used to endorse or promote products derived from this software without specific prior written permission.
 
   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
@@ -4348,6 +4305,39 @@ text LICENSE file:
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+text-short LICENSE file:
+
+  Copyright (c) 2017, Herbert Valerio Riedel
+
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+
+      * Redistributions of source code must retain the above copyright
+        notice, this list of conditions and the following disclaimer.
+
+      * Redistributions in binary form must reproduce the above
+        copyright notice, this list of conditions and the following
+        disclaimer in the documentation and/or other materials provided
+        with the distribution.
+
+      * Neither the name of Herbert Valerio Riedel nor the names of other
+        contributors may be used to endorse or promote products derived
+        from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 th-abstraction LICENSE file:
 
   Copyright (c) 2017-2020 Eric Mertens
@@ -4432,7 +4422,7 @@ these LICENSE file:
 
 time LICENSE file:
 
-  TimeLib is Copyright (c) Ashley Yakeley, 2004-2014. All rights reserved.
+  TimeLib is Copyright (c) Ashley Yakeley and contributors, 2004-2020. All rights reserved.
   Certain sections are Copyright 2004, The University Court of the University of Glasgow. All rights reserved.
 
   Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
