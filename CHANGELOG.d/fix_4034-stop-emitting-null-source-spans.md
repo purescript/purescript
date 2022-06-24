@@ -1,1 +1,0 @@
-* Stop emitting source spans with negative line/column numbers
