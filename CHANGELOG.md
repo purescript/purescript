@@ -43,13 +43,15 @@ Internal:
 
 * Accommodate internally-generated identifiers that start with digits (#4334 by @rhendric)
 
-* Update purescript.cabal so that the PureScript compiler is built with the (#4336 by @hdgarrood)
-  flags -Wincomplete-uni-patterns and -Wincomplete-record-updates enabled by
-  default.
+* Enable `-Wincomplete-uni-patterns` and `-Wincomplete-record-updates` by default (#4336 by @hdgarrood)
+
+  Update `purescript.cabal` so that the PureScript compiler is built with the
+  flags `-Wincomplete-uni-patterns` and `-Wincomplete-record-updates`
+  enabled by default.
 
 * Setup infrastructure for testing source maps (#4335 by @JordanMartinez)
 
-* Removed a couple of unused SimpleErrorMessage constructors (#4344 by @hdgarrood)
+* Removed a couple of unused `SimpleErrorMessage` constructors (#4344 by @hdgarrood)
 
 * Compare json files through `aeson` in tests (#4354 by @PureFunctor)
 
