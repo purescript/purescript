@@ -17,7 +17,7 @@ New features:
   written by users. If you want those floated to a higher scope, you have to do
   so manually.
 
-* Add support for optional shebang lines (#4214 by @colinwahl)
+* Add support for optional shebang lines (#4214 by @colinwahl and @JordanMartinez)
 
   One or more shebang line are only allowed as the first lines of a file
 
@@ -37,7 +37,7 @@ Bugfixes:
 
 * Stop requiring `bower.json` `devDependencies` when publishing (#4332 by @JordanMartinez)
 
-* Stop emitting source spans with negative line/column numbers (#4343 by @JordanMartinez)
+* Stop emitting source spans with negative line/column numbers (#4343 by @j-nava and @JordanMartinez)
 
 Internal:
 
@@ -58,7 +58,7 @@ Internal:
 
 * Add version bounds to the test suite's `build-depends`. (#4354 by @PureFunctor)
 
-* Update GHC to 9.2.3 (#4351 by @JordanMartinez)
+* Update GHC to 9.2.3 (#4351 by @hdgarrood and @JordanMartinez)
 
 * Add qualification for locally-bound names (#4293 by @PureFunctor)
 
