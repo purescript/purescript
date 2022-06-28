@@ -172,7 +172,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
   Module modSS coms mn <$> parU decls go <*> pure exps
   where
 
-  (go, _, _, _, _) =
+  (go, _, _, _, _, _) =
     everywhereWithContextOnValuesM
       (modSS, M.empty)
       (\(_, bound) d -> (\(bound', d') -> ((declSourceSpan d', bound'), d')) <$> updateDecl bound d)
@@ -180,6 +180,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
       updateBinder
       updateCase
       defS
+      updateGuard
 
   updateDecl
     :: M.Map Ident SourcePos
@@ -256,7 +257,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, declarationsToMap ds `M.union` bound), Let w ds val')
-  updateValue (_, bound) (Var ss name'@(Qualified qualifiedBy ident)) =
+  updateValue (_, bound) (Var ss name'@(Qualified qualifiedBy ident)) = do
     ((ss, bound), ) <$> case (M.lookup ident bound, qualifiedBy) of
       -- bound idents that have yet to be locally qualified.
       (Just sourcePos, ByNullSourcePos) ->
@@ -303,23 +304,25 @@ renameInModule imports (Module modSS coms mn decls exps) =
     :: (SourceSpan, M.Map Ident SourcePos)
     -> CaseAlternative
     -> m ((SourceSpan, M.Map Ident SourcePos), CaseAlternative)
-  updateCase (pos, bound) c@(CaseAlternative bs gs) =
-    return ((pos, updateGuard gs `M.union` rUnionMap binderNamesWithSpans' bs `M.union` bound), c)
+  updateCase (pos, bound) c@(CaseAlternative bs _) =
+    return ((pos, rUnionMap binderNamesWithSpans' bs `M.union` bound), c)
     where
-    updateGuard :: [GuardedExpr] -> M.Map Ident SourcePos
-    updateGuard [] = M.empty
-    updateGuard (GuardedExpr g _ : xs) =
-      updateGuard xs `M.union` rUnionMap updatePatGuard g
-      where
-        updatePatGuard (PatternGuard b _) = binderNamesWithSpans' b
-        updatePatGuard _                  = M.empty
-
     rUnionMap f = foldl' (flip (M.union . f)) M.empty
 
-    binderNamesWithSpans'
-      = M.fromList
-      . fmap (second spanStart . swap)
-      . binderNamesWithSpans
+  updateGuard
+    :: (SourceSpan, M.Map Ident SourcePos)
+    -> Guard
+    -> m ((SourceSpan, M.Map Ident SourcePos), Guard)
+  updateGuard (pos, bound) g@(ConditionGuard _) =
+    return ((pos, bound), g)
+  updateGuard (pos, bound) g@(PatternGuard b _) =
+    return ((pos, binderNamesWithSpans' b `M.union` bound), g)
+
+  binderNamesWithSpans' :: Binder -> M.Map Ident SourcePos
+  binderNamesWithSpans'
+    = M.fromList
+    . fmap (second spanStart . swap)
+    . binderNamesWithSpans
 
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable = fmap valdeclIdent . getValueDeclaration

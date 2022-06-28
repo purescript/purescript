@@ -424,15 +424,17 @@ everywhereWithContextOnValues
   -> (s -> Binder            -> (s, Binder))
   -> (s -> CaseAlternative   -> (s, CaseAlternative))
   -> (s -> DoNotationElement -> (s, DoNotationElement))
+  -> (s -> Guard             -> (s, Guard))
   -> ( Declaration       -> Declaration
      , Expr              -> Expr
      , Binder            -> Binder
      , CaseAlternative   -> CaseAlternative
      , DoNotationElement -> DoNotationElement
+     , Guard             -> Guard
      )
-everywhereWithContextOnValues s f g h i j = (runIdentity . f', runIdentity . g', runIdentity . h', runIdentity . i', runIdentity . j')
+everywhereWithContextOnValues s f g h i j k = (runIdentity . f', runIdentity . g', runIdentity . h', runIdentity . i', runIdentity . j', runIdentity . k')
   where
-  (f', g', h', i', j') = everywhereWithContextOnValuesM s (wrap f) (wrap g) (wrap h) (wrap i) (wrap j)
+  (f', g', h', i', j', k') = everywhereWithContextOnValuesM s (wrap f) (wrap g) (wrap h) (wrap i) (wrap j) (wrap k)
   wrap = ((pure .) .)
 
 everywhereWithContextOnValuesM
@@ -444,13 +446,15 @@ everywhereWithContextOnValuesM
   -> (s -> Binder            -> m (s, Binder))
   -> (s -> CaseAlternative   -> m (s, CaseAlternative))
   -> (s -> DoNotationElement -> m (s, DoNotationElement))
+  -> (s -> Guard             -> m (s, Guard))
   -> ( Declaration       -> m Declaration
      , Expr              -> m Expr
      , Binder            -> m Binder
      , CaseAlternative   -> m CaseAlternative
      , DoNotationElement -> m DoNotationElement
+     , Guard             -> m Guard
      )
-everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j'' s0)
+everywhereWithContextOnValuesM s0 f g h i j k = (f'' s0, g'' s0, h'' s0, i'' s0, j'' s0, k'' s0)
   where
   f'' s = uncurry f' <=< f s
 
@@ -501,7 +505,22 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 
   i'' s = uncurry i' <=< i s
 
-  i' s (CaseAlternative bs val) = CaseAlternative <$> traverse (h'' s) bs <*> traverse (guardedExprM (k' s) (g'' s)) val
+  i' s (CaseAlternative bs val) = CaseAlternative <$> traverse (h'' s) bs <*> traverse (guardedExprM' s) val
+
+  -- A specialized `guardedExprM` that keeps track of the context `s`
+  -- after traversing `guards`, such that it's also exposed to `expr`.
+  guardedExprM' :: s -> GuardedExpr -> m GuardedExpr
+  guardedExprM' s (GuardedExpr guards expr) = do
+    (s', guards') <- goGuards s guards
+    GuardedExpr guards' <$> g'' s' expr
+
+  goGuards :: s -> [Guard] -> m (s, [Guard])
+  goGuards s [] = pure (s, [])
+  goGuards s (x : xs) = do
+    -- Like k'', but `s` is tracked.
+    (s', x') <- k s x >>= sndM' k'
+    (s'', xs') <- goGuards s' xs
+    pure (s'', x' : xs')
 
   j'' s = uncurry j' <=< j s
 
@@ -509,6 +528,8 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   j' s (DoNotationBind b v) = DoNotationBind <$> h'' s b <*> g'' s v
   j' s (DoNotationLet ds) = DoNotationLet <$> traverse (f'' s) ds
   j' s (PositionedDoNotationElement pos com e1) = PositionedDoNotationElement pos com <$> j'' s e1
+
+  k'' s = uncurry k' <=< k s
 
   k' s (ConditionGuard e) = ConditionGuard <$> g'' s e
   k' s (PatternGuard b e) = PatternGuard <$> h'' s b <*> g'' s e

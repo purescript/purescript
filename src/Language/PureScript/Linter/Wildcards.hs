@@ -22,7 +22,7 @@ import Language.PureScript.Types
 ignoreWildcardsUnderCompleteTypeSignatures :: Declaration -> Declaration
 ignoreWildcardsUnderCompleteTypeSignatures = onDecl
   where
-  (onDecl, _, _, _, _) = everywhereWithContextOnValues False (,) handleExpr handleBinder (,) (,)
+  (onDecl, _, _, _, _, _) = everywhereWithContextOnValues False (,) handleExpr handleBinder (,) (,) (,)
 
   handleExpr isCovered = \case
     tv@(TypedValue chk v ty)
