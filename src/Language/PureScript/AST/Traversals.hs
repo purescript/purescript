@@ -4,8 +4,10 @@
 module Language.PureScript.AST.Traversals where
 
 import Prelude.Compat
+import Protolude (swap)
 
 import Control.Monad
+import Control.Monad.Trans.State
 
 import Data.Foldable (fold)
 import Data.Functor.Identity (runIdentity)
@@ -511,16 +513,12 @@ everywhereWithContextOnValuesM s0 f g h i j k = (f'' s0, g'' s0, h'' s0, i'' s0,
   -- after traversing `guards`, such that it's also exposed to `expr`.
   guardedExprM' :: s -> GuardedExpr -> m GuardedExpr
   guardedExprM' s (GuardedExpr guards expr) = do
-    (s', guards') <- goGuards s guards
+    (guards', s') <- runStateT (traverse (StateT . goGuard) guards) s
     GuardedExpr guards' <$> g'' s' expr
 
-  goGuards :: s -> [Guard] -> m (s, [Guard])
-  goGuards s [] = pure (s, [])
-  goGuards s (x : xs) = do
-    -- Like k'', but `s` is tracked.
-    (s', x') <- k s x >>= sndM' k'
-    (s'', xs') <- goGuards s' xs
-    pure (s'', x' : xs')
+  -- Like k'', but `s` is tracked.
+  goGuard :: Guard -> s -> m (Guard, s)
+  goGuard x s  = k s x >>= fmap swap . sndM' k'
 
   j'' s = uncurry j' <=< j s
 

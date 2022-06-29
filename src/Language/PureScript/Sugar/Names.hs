@@ -257,7 +257,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, declarationsToMap ds `M.union` bound), Let w ds val')
-  updateValue (_, bound) (Var ss name'@(Qualified qualifiedBy ident)) = do
+  updateValue (_, bound) (Var ss name'@(Qualified qualifiedBy ident)) =
     ((ss, bound), ) <$> case (M.lookup ident bound, qualifiedBy) of
       -- bound idents that have yet to be locally qualified.
       (Just sourcePos, ByNullSourcePos) ->
