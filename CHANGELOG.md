@@ -2,6 +2,30 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.4
+
+Bugfixes:
+
+* Fix name clash in guard clauses introduced in #4293 (#4385 by @PureFunctor)
+
+  As a consequence, a problem with the compiler not being able to see
+  imported names if they're shadowed by a guard binder is also solved.
+  ```purs
+  import Data.Foldable (fold)
+  import Data.Maybe (Maybe(..))
+  import Data.Monoid.Additive (Additive(..))
+
+  test :: Maybe Int -> Int
+  test = case _ of
+    m | Just fold <- m -> fold
+      -- Previously would complain about `fold` being undefined
+      | otherwise -> case fold [] of Additive x -> x
+  ```
+
+Internal:
+
+* Add `Guard` handler for the `everywhereWithContextOnValuesM` traversal. (#4385 by @PureFunctor)
+
 ## 0.15.3
 
 New features:
