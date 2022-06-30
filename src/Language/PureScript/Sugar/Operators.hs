@@ -136,12 +136,13 @@ rebracketFiltered !caller pred_ externs m = do
     Module ss coms mn <$> mapM (usingPredicate pred_ f') ds <*> pure exts
     where
     (goDecl', goExpr', goBinder') = updateTypes goType
-    (f', _, _, _, _) =
+    (f', _, _, _, _, _) =
       everywhereWithContextOnValuesM
         ss
         (\_ d -> (declSourceSpan d,) <$> goDecl' d)
         (\pos -> uncurry goExpr <=< goExpr' pos)
         (\pos -> uncurry goBinder <=< goBinder' pos)
+        defS
         defS
         defS
 
@@ -225,12 +226,13 @@ rebracketModule !caller pred_ valueOpTable typeOpTable (Module ss coms mn ds ext
     CalledByDocs -> f
     CalledByCompile -> g <=< f
 
-  (f, _, _, _, _) =
+  (f, _, _, _, _, _) =
       everywhereWithContextOnValuesM
         ss
         (\_ d -> (declSourceSpan d,) <$> goDecl d)
         (\pos -> wrap (matchExprOperators valueOpTable) <=< goExpr' pos)
         (\pos -> wrap (matchBinderOperators valueOpTable) <=< goBinder' pos)
+        defS
         defS
         defS
 
