@@ -2,9 +2,9 @@ name: "CI"
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "0.15.4-next" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "0.15.4-next" ]
   release:
     types: [ "published" ]
 
