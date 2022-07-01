@@ -167,13 +167,18 @@ manyOrEmpty(a) :: { [a] }
 sep(a, s) :: { Separated a }
   : sep1(a, s) { separated $1 }
 
+sepx(a, s) :: { SeparatedExtra a }
+  : sep1(a, s) { separatedExtra Nothing Nothing $1 }
+  | sep1(a, s) s { separatedExtra Nothing (Just $2) $1 }
+  | s sep1(a, s) { separatedExtra (Just $1) Nothing $2 }
+
 sep1(a, s) :: { [(SourceToken, a)] }
   : a %shift { [(placeholder, $1)] }
   | sep1(a, s) s a { ($2, $3) : $1 }
 
 delim(a, b, c, d) :: { Delimited b }
   : a d { Wrapped $1 Nothing $2 }
-  | a sep(b, c) d { Wrapped $1 (Just $2) $3 }
+  | a sepx(b, c) d { Wrapped $1 (Just $2) $3 }
 
 moduleName :: { Name N.ModuleName }
   : UPPER {% upperToModuleName $1 }
@@ -340,8 +345,8 @@ typeKindedAtom :: { Type () }
 row :: { Row () }
   : {- empty -} { Row Nothing Nothing }
   | '|' type { Row Nothing (Just ($1, $2)) }
-  | sep(rowLabel, ',') { Row (Just $1) Nothing }
-  | sep(rowLabel, ',') '|' type { Row (Just $1) (Just ($2, $3)) }
+  | sepx(rowLabel, ',') { Row (Just $1) Nothing }
+  | sepx(rowLabel, ',') '|' type { Row (Just $1) (Just ($2, $3)) }
 
 rowLabel :: { Labeled Label (Type ()) }
   : label '::' type { Labeled $1 $2 $3 }
@@ -409,7 +414,7 @@ expr5 :: { Expr () }
 expr6 :: { Expr () }
   : expr7 %shift { $1 }
   | expr7 '{' '}' { ExprApp () $1 (ExprRecord () (Wrapped $2 Nothing $3)) }
-  | expr7 '{' sep(recordUpdateOrLabel, ',') '}'
+  | expr7 '{' sepx(recordUpdateOrLabel, ',') '}'
       {% toRecordFields $3 >>= \case
           Left xs -> pure $ ExprApp () $1 (ExprRecord () (Wrapped $2 (Just xs) $4))
           Right xs -> pure $ ExprRecordUpdate () $1 (Wrapped $2 xs $4)
@@ -442,11 +447,11 @@ recordUpdateOrLabel :: { Either (RecordLabeled (Expr ())) (RecordUpdate ()) }
   : label ':' expr { Left (RecordField $1 $2 $3) }
   | label {% fmap (Left . RecordPun) . toName Ident $ lblTok $1 }
   | label '=' expr { Right (RecordUpdateLeaf $1 $2 $3) }
-  | label '{' sep(recordUpdate, ',') '}' { Right (RecordUpdateBranch $1 (Wrapped $2 $3 $4)) }
+  | label '{' sepx(recordUpdate, ',') '}' { Right (RecordUpdateBranch $1 (Wrapped $2 $3 $4)) }
 
 recordUpdate :: { RecordUpdate () }
   : label '=' expr { RecordUpdateLeaf $1 $2 $3 }
-  | label '{' sep(recordUpdate, ',') '}' { RecordUpdateBranch $1 (Wrapped $2 $3 $4) }
+  | label '{' sepx(recordUpdate, ',') '}' { RecordUpdateBranch $1 (Wrapped $2 $3 $4) }
 
 letBinding :: { LetBinding () }
   : ident '::' type { LetBindingSignature () (Labeled $1 $2 $3) }
@@ -620,7 +625,7 @@ declElse :: { SourceToken }
 
 exports :: { Maybe (DelimitedNonEmpty (Export ())) }
   : {- empty -} { Nothing }
-  | '(' sep(export, ',') ')' { Just (Wrapped $1 $2 $3) }
+  | '(' sepx(export, ',') ')' { Just (Wrapped $1 $2 $3) }
 
 export :: { Export () }
   : ident { ExportValue () $1 }
@@ -634,7 +639,7 @@ export :: { Export () }
 dataMembers :: { (DataMembers ()) }
  : '(..)' { DataAll () $1 }
  | '(' ')' { DataEnumerated () (Wrapped $1 Nothing $2) }
- | '(' sep(properName, ',') ')' { DataEnumerated () (Wrapped $1 (Just \$ getProperName <\$> $2) $3) }
+ | '(' sepx(properName, ',') ')' { DataEnumerated () (Wrapped $1 (Just \$ getProperName <\$> $2) $3) }
 
 importDecl :: { ImportDecl () }
   : 'import' moduleName imports { ImportDecl () $1 $2 $3 Nothing }
@@ -642,8 +647,8 @@ importDecl :: { ImportDecl () }
 
 imports :: { Maybe (Maybe SourceToken, DelimitedNonEmpty (Import ())) }
   : {- empty -} { Nothing }
-  | '(' sep(import, ',') ')' { Just (Nothing, Wrapped $1 $2 $3) }
-  | 'hiding' '(' sep(import, ',') ')' { Just (Just $1, Wrapped $2 $3 $4) }
+  | '(' sepx(import, ',') ')' { Just (Nothing, Wrapped $1 $2 $3) }
+  | 'hiding' '(' sepx(import, ',') ')' { Just (Just $1, Wrapped $2 $3 $4) }
 
 import :: { Import () }
   : ident { ImportValue () $1 }
@@ -655,7 +660,7 @@ import :: { Import () }
 
 decl :: { Declaration () }
   : dataHead { DeclData () $1 Nothing }
-  | dataHead '=' sep(dataCtor, '|') { DeclData () $1 (Just ($2, $3)) }
+  | dataHead '=' sepx(dataCtor, '|') { DeclData () $1 (Just ($2, $3)) }
   | typeHead '=' type {% checkNoWildcards $3 *> pure (DeclType () $1 $2 $3) }
   | newtypeHead '=' properName typeAtom {% checkNoWildcards $4 *> pure (DeclNewtype () $1 $2 (getProperName $3) $4) }
   | classHead { either id (\h -> DeclClass () h Nothing) $1 }
@@ -714,12 +719,12 @@ classSignature :: { Labeled (Name (N.ProperName 'N.TypeName)) (Type ()) }
 classSuper :: { (OneOrDelimited (Constraint ()), SourceToken) }
   : constraints '<=' {%^ revert $ pure ($1, $2) }
 
-classNameAndFundeps :: { (Name (N.ProperName 'N.ClassName), [TypeVarBinding ()], Maybe (SourceToken, Separated ClassFundep)) }
+classNameAndFundeps :: { (Name (N.ProperName 'N.ClassName), [TypeVarBinding ()], Maybe (SourceToken, SeparatedExtra ClassFundep)) }
   : properName manyOrEmpty(typeVarBinding) fundeps {%^ revert $ pure (getProperName $1, $2, $3) }
 
-fundeps :: { Maybe (SourceToken, Separated ClassFundep) }
+fundeps :: { Maybe (SourceToken, SeparatedExtra ClassFundep) }
   : {- empty -} { Nothing }
-  | '|' sep(fundep, ',') { Just ($1, $2) }
+  | '|' sepx(fundep, ',') { Just ($1, $2) }
 
 fundep :: { ClassFundep }
   : '->' many(ident) { FundepDetermined $1 $2 }
@@ -740,7 +745,7 @@ instHead :: { InstanceHead () }
 
 constraints :: { OneOrDelimited (Constraint ()) }
   : constraint { One $1 }
-  | '(' sep(constraint, ',') ')' { Many (Wrapped $1 $2 $3) }
+  | '(' sepx(constraint, ',') ')' { Many (Wrapped $1 $2 $3) }
 
 constraint :: { Constraint () }
   : qualProperName manyOrEmpty(typeAtom) {% for_ $2 checkNoWildcards *> for_ $2 checkNoForalls *> pure (Constraint () (getQualifiedProperName $1) $2) }

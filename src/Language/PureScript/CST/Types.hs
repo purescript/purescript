@@ -117,14 +117,21 @@ data Separated a = Separated
   , sepTail :: [(SourceToken, a)]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+data SeparatedExtra a = SeparatedExtra
+  { sepXLeading :: Maybe SourceToken
+  , sepXHead :: a
+  , sepXTail :: [(SourceToken, a)]
+  , sepXTrailing :: Maybe SourceToken
+  } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
 data Labeled a b = Labeled
   { lblLabel :: a
   , lblSep :: SourceToken
   , lblValue  :: b
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
-type Delimited a = Wrapped (Maybe (Separated a))
-type DelimitedNonEmpty a = Wrapped (Separated a)
+type Delimited a = Wrapped (Maybe (SeparatedExtra a))
+type DelimitedNonEmpty a = Wrapped (SeparatedExtra a)
 
 data OneOrDelimited a
   = One a
@@ -163,7 +170,7 @@ data Constraint a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data Row a = Row
-  { rowLabels :: Maybe (Separated (Labeled Label (Type a)))
+  { rowLabels :: Maybe (SeparatedExtra (Labeled Label (Type a)))
   , rowTail :: Maybe (SourceToken, Type a)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
@@ -193,7 +200,7 @@ data DataMembers a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data Declaration a
-  = DeclData a (DataHead a) (Maybe (SourceToken, Separated (DataCtor a)))
+  = DeclData a (DataHead a) (Maybe (SourceToken, SeparatedExtra (DataCtor a)))
   | DeclType a (DataHead a) SourceToken (Type a)
   | DeclNewtype a (DataHead a) SourceToken (Name (N.ProperName 'N.ConstructorName)) (Type a)
   | DeclClass a (ClassHead a) (Maybe (SourceToken, NonEmpty (Labeled (Name Ident) (Type a))))
@@ -250,7 +257,7 @@ data ClassHead a = ClassHead
   , clsSuper :: Maybe (OneOrDelimited (Constraint a), SourceToken)
   , clsName :: Name (N.ProperName 'N.ClassName)
   , clsVars :: [TypeVarBinding a]
-  , clsFundeps :: Maybe (SourceToken, Separated ClassFundep)
+  , clsFundeps :: Maybe (SourceToken, SeparatedExtra ClassFundep)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data ClassFundep

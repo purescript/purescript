@@ -113,6 +113,13 @@ separated = go []
   go accum (x : xs) = go (x : accum) xs
   go _ [] = internalError "Separated should not be empty"
 
+separatedExtra :: Maybe SourceToken -> Maybe SourceToken -> [(SourceToken, a)] -> SeparatedExtra a
+separatedExtra lead trail = go []
+  where
+  go accum [(_, a)] = SeparatedExtra lead a accum trail
+  go accum (x : xs) = go (x : accum) xs
+  go _ [] = internalError "SeparatedExtra should not be empty"
+
 internalError :: String -> a
 internalError = error . ("Internal parser error: " <>)
 
@@ -224,13 +231,13 @@ toBinderConstructor = \case
 
 toRecordFields
   :: Monoid a
-  => Separated (Either (RecordLabeled (Expr a)) (RecordUpdate a))
-  -> Parser (Either (Separated (RecordLabeled (Expr a))) (Separated (RecordUpdate a)))
+  => SeparatedExtra (Either (RecordLabeled (Expr a)) (RecordUpdate a))
+  -> Parser (Either (SeparatedExtra (RecordLabeled (Expr a))) (SeparatedExtra (RecordUpdate a)))
 toRecordFields = \case
-  Separated (Left a) as ->
-    Left . Separated a <$> traverse (traverse unLeft) as
-  Separated (Right a) as ->
-    Right . Separated a <$> traverse (traverse unRight) as
+  SeparatedExtra ld (Left a) as tr ->
+    Left . flip (SeparatedExtra ld a) tr <$> traverse (traverse unLeft) as
+  SeparatedExtra ld (Right a) as tr ->
+    Right . flip (SeparatedExtra ld a) tr <$> traverse (traverse unRight) as
   where
   unLeft (Left tok) = pure tok
   unLeft (Right tok) =

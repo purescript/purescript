@@ -10,7 +10,7 @@ flattenModule :: Module a -> DList SourceToken
 flattenModule m@(Module _ a b c d e f g) =
   pure a <>
   flattenName b <>
-  foldMap (flattenWrapped (flattenSeparated flattenExport)) c <>
+  foldMap (flattenWrapped (flattenSeparatedExtra flattenExport)) c <>
   pure d <>
   foldMap flattenImportDecl e <>
   foldMap flattenDeclaration f <>
@@ -32,7 +32,7 @@ flattenClassHead (ClassHead a b c d e) =
   foldMap (\(f, g) -> flattenOneOrDelimited flattenConstraint f <> pure g) b <>
   flattenName c <>
   foldMap flattenTypeVarBinding d <>
-  foldMap (\(f, g) -> pure f <> flattenSeparated flattenClassFundep g) e
+  foldMap (\(f, g) -> pure f <> flattenSeparatedExtra flattenClassFundep g) e
 
 flattenClassFundep :: ClassFundep -> DList SourceToken
 flattenClassFundep = \case
@@ -74,9 +74,9 @@ flattenBinder = \case
   BinderChar _ a _ -> pure a
   BinderString _ a _ -> pure a
   BinderNumber _ a b _ -> foldMap pure a <> pure b
-  BinderArray _ a -> flattenWrapped (foldMap (flattenSeparated flattenBinder)) a
+  BinderArray _ a -> flattenWrapped (foldMap (flattenSeparatedExtra flattenBinder)) a
   BinderRecord _ a ->
-    flattenWrapped (foldMap (flattenSeparated (flattenRecordLabeled flattenBinder))) a
+    flattenWrapped (foldMap (flattenSeparatedExtra (flattenRecordLabeled flattenBinder))) a
   BinderParens _ a -> flattenWrapped flattenBinder a
   BinderTyped _ a b c -> flattenBinder a <> pure b <> flattenType c
   BinderOp _ a b c -> flattenBinder a <> flattenQualifiedName b <> flattenBinder c
@@ -94,7 +94,7 @@ flattenRecordUpdate :: RecordUpdate a -> DList SourceToken
 flattenRecordUpdate = \case
   RecordUpdateLeaf a b c -> flattenLabel a <> pure b <> flattenExpr c
   RecordUpdateBranch a b ->
-    flattenLabel a <> flattenWrapped (flattenSeparated flattenRecordUpdate) b
+    flattenLabel a <> flattenWrapped (flattenSeparatedExtra flattenRecordUpdate) b
 
 flattenLambda :: Lambda a -> DList SourceToken
 flattenLambda (Lambda a b c d) =
@@ -139,9 +139,9 @@ flattenExpr = \case
   ExprChar _ a _ -> pure a
   ExprString _ a _ -> pure a
   ExprNumber _ a _ -> pure a
-  ExprArray _ a -> flattenWrapped (foldMap (flattenSeparated flattenExpr)) a
+  ExprArray _ a -> flattenWrapped (foldMap (flattenSeparatedExtra flattenExpr)) a
   ExprRecord _ a ->
-    flattenWrapped (foldMap (flattenSeparated (flattenRecordLabeled flattenExpr))) a
+    flattenWrapped (foldMap (flattenSeparatedExtra (flattenRecordLabeled flattenExpr))) a
   ExprParens _ a -> flattenWrapped flattenExpr a
   ExprTyped _ a b c -> flattenExpr a <> pure b <> flattenType c
   ExprInfix _ a b c -> flattenExpr a <> flattenWrapped flattenExpr b <> flattenExpr c
@@ -149,7 +149,7 @@ flattenExpr = \case
   ExprOpName _ a -> flattenQualifiedName a
   ExprNegate _ a b -> pure a <> flattenExpr b
   ExprRecordAccessor _ a -> flattenRecordAccessor a
-  ExprRecordUpdate _ a b -> flattenExpr a <> flattenWrapped (flattenSeparated flattenRecordUpdate) b
+  ExprRecordUpdate _ a b -> flattenExpr a <> flattenWrapped (flattenSeparatedExtra flattenRecordUpdate) b
   ExprApp _ a b -> flattenExpr a <> flattenExpr b
   ExprLambda _ a -> flattenLambda a
   ExprIf _ a -> flattenIfThenElse a
@@ -206,7 +206,7 @@ flattenDeclaration :: Declaration a -> DList SourceToken
 flattenDeclaration = \case
   DeclData _ a b ->
     flattenDataHead a <>
-    foldMap (\(t, cs) -> pure t <> flattenSeparated flattenDataCtor cs) b
+    foldMap (\(t, cs) -> pure t <> flattenSeparatedExtra flattenDataCtor cs) b
   DeclType _ a b c ->flattenDataHead a <> pure b <> flattenType c
   DeclNewtype _ a b c d -> flattenDataHead a <> pure b <> flattenName c <> flattenType d
   DeclClass _ a b ->
@@ -242,14 +242,14 @@ flattenExport = \case
 flattenDataMembers :: DataMembers a -> DList SourceToken
 flattenDataMembers = \case
   DataAll _ t -> pure t
-  DataEnumerated _ ns -> flattenWrapped (foldMap (flattenSeparated flattenName)) ns
+  DataEnumerated _ ns -> flattenWrapped (foldMap (flattenSeparatedExtra flattenName)) ns
 
 flattenImportDecl :: ImportDecl a -> DList SourceToken
 flattenImportDecl (ImportDecl _ a b c d) =
   pure a <>
   flattenName b <>
   foldMap (\(mt, is) ->
-             foldMap pure mt <> flattenWrapped (flattenSeparated flattenImport) is) c <>
+             foldMap pure mt <> flattenWrapped (flattenSeparatedExtra flattenImport) is) c <>
   foldMap (\(t, n) -> pure t <> flattenName n) d
 
 flattenImport :: Import a -> DList SourceToken
@@ -266,11 +266,14 @@ flattenWrapped k (Wrapped a b c) = pure a <> k b <> pure c
 flattenSeparated :: (a -> DList SourceToken) -> Separated a -> DList SourceToken
 flattenSeparated k (Separated a b) = k a <> foldMap (\(c, d) -> pure c <> k d) b
 
+flattenSeparatedExtra :: (a -> DList SourceToken) -> SeparatedExtra a -> DList SourceToken
+flattenSeparatedExtra k (SeparatedExtra a b c d) = foldMap pure a <> k b <> foldMap (\(e, f) -> pure e <> k f) c <> foldMap pure d
+
 flattenOneOrDelimited
   :: (a -> DList SourceToken) -> OneOrDelimited a -> DList SourceToken
 flattenOneOrDelimited f = \case
   One a -> f a
-  Many a -> flattenWrapped (flattenSeparated f) a
+  Many a -> flattenWrapped (flattenSeparatedExtra f) a
 
 flattenLabeled :: (a -> DList SourceToken) -> (b -> DList SourceToken) -> Labeled a b -> DList SourceToken
 flattenLabeled ka kc (Labeled a b c) = ka a <> pure b <> kc c
@@ -298,7 +301,7 @@ flattenType = \case
 
 flattenRow :: Row a -> DList SourceToken
 flattenRow (Row lbls tl) =
-  foldMap (flattenSeparated (flattenLabeled (pure . lblTok) flattenType)) lbls
+  foldMap (flattenSeparatedExtra (flattenLabeled (pure . lblTok) flattenType)) lbls
     <> foldMap (\(a, b) -> pure a <> flattenType b) tl
 
 flattenTypeVarBinding :: TypeVarBinding a -> DList SourceToken
