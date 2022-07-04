@@ -16,8 +16,10 @@ import qualified Data.Set                        as S
 import qualified Data.Time                       as Time
 import qualified Data.Text                       as Text
 import qualified Language.PureScript             as P
+import           Language.PureScript.Make (ffiCodegen')
 import           Language.PureScript.Make.Cache (CacheInfo(..), normaliseForCache)
 import qualified Language.PureScript.CST         as CST
+
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
@@ -69,10 +71,15 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton moduleName (Left P.RebuildAlways)
-  let pureRebuild = S.null codegenTargets
-  foreigns <- P.inferForeignModules (M.singleton moduleName (Right file))
+  let pureRebuild = fp == ""
+  let modulePath = if pureRebuild then fp' else file
+  foreigns <- P.inferForeignModules (M.singleton moduleName (Right modulePath))
   let makeEnv = P.buildMakeActions outputDirectory filePathMap foreigns False
         & (if pureRebuild then shushCodegen else identity)
+        & ( if pureRebuild
+              then enableForeignCheck foreigns codegenTargets
+              else identity
+          )
         & shushProgress
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
@@ -182,6 +189,16 @@ shushCodegen :: Monad m => P.MakeActions m -> P.MakeActions m
 shushCodegen ma =
   ma { P.codegen = \_ _ _ -> pure ()
      , P.ffiCodegen = \_ -> pure ()
+     }
+
+-- | Enables foreign module check without actual codegen.
+enableForeignCheck
+  :: M.Map P.ModuleName FilePath
+  -> S.Set P.CodegenTarget
+  -> P.MakeActions P.Make
+  -> P.MakeActions P.Make
+enableForeignCheck foreigns codegenTargets ma =
+  ma { P.ffiCodegen = ffiCodegen' foreigns codegenTargets Nothing
      }
 
 -- | Returns a topologically sorted list of dependent ExternsFiles for the given
