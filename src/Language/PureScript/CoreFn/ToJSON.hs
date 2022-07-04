@@ -21,7 +21,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 
 import           Language.PureScript.AST.Literals
-import           Language.PureScript.AST.SourcePos (SourceSpan(SourceSpan))
+import           Language.PureScript.AST.SourcePos (SourceSpan(..))
 import           Language.PureScript.CoreFn
 import           Language.PureScript.Names
 import           Language.PureScript.PSString (PSString)
@@ -102,10 +102,16 @@ properNameToJSON :: ProperName a -> Value
 properNameToJSON = toJSON . runProperName
 
 qualifiedToJSON :: (a -> Text) -> Qualified a -> Value
-qualifiedToJSON f (Qualified mn a) = object
-  [ "moduleName"   .= maybe Null moduleNameToJSON mn
-  , "identifier"   .= toJSON (f a)
-  ]
+qualifiedToJSON f (Qualified qb a) =
+  case qb of
+    ByModuleName mn -> object
+      [ "moduleName" .= moduleNameToJSON mn
+      , "identifier" .= toJSON (f a)
+      ]
+    BySourcePos ss -> object
+      [ "sourcePos"  .= toJSON ss
+      , "identifier" .= toJSON (f a)
+      ]
 
 moduleNameToJSON :: ModuleName -> Value
 moduleNameToJSON (ModuleName name) = toJSON (T.splitOn (T.pack ".") name)

@@ -2,6 +2,97 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.4
+
+Bugfixes:
+
+* Fix name clash in guard clauses introduced in #4293 (#4385 by @PureFunctor)
+
+  As a consequence, a problem with the compiler not being able to see
+  imported names if they're shadowed by a guard binder is also solved.
+  ```purs
+  import Data.Foldable (fold)
+  import Data.Maybe (Maybe(..))
+  import Data.Monoid.Additive (Additive(..))
+
+  test :: Maybe Int -> Int
+  test = case _ of
+    m | Just fold <- m -> fold
+      -- Previously would complain about `fold` being undefined
+      | otherwise -> case fold [] of Additive x -> x
+  ```
+
+Internal:
+
+* Add `Guard` handler for the `everywhereWithContextOnValuesM` traversal. (#4385 by @PureFunctor)
+
+## 0.15.3
+
+New features:
+
+* Float compiler-synthesized function applications (#3915 by @rhendric)
+
+  This is a limited implementation of common subexpression elimination for
+  expressions created by the compiler in the process of creating and using
+  typeclass dictionaries. Users can expect code that heavily uses typeclasses
+  to produce JavaScript that is shorter, simpler, and faster.
+
+  Common subexpression elimination is not applied to any expressions explicitly
+  written by users. If you want those floated to a higher scope, you have to do
+  so manually.
+
+* Add support for optional shebang lines (#4214 by @colinwahl and @JordanMartinez)
+
+  One or more shebang line are only allowed as the first lines of a file
+
+  ```purs
+  #! a shebang line
+  #! another shebang line
+  -- | module doc comment
+  -- other comment
+  module MyModule where
+
+  #! Using a shebang here will fail to parse
+  foo :: String
+  foo = ""
+  ```
+
+Bugfixes:
+
+* Stop requiring `bower.json` `devDependencies` when publishing (#4332 by @JordanMartinez)
+
+* Stop emitting source spans with negative line/column numbers (#4343 by @j-nava and @JordanMartinez)
+
+Internal:
+
+* Accommodate internally-generated identifiers that start with digits (#4334 by @rhendric)
+
+* Enable `-Wincomplete-uni-patterns` and `-Wincomplete-record-updates` by default (#4336 by @hdgarrood)
+
+  Update `purescript.cabal` so that the PureScript compiler is built with the
+  flags `-Wincomplete-uni-patterns` and `-Wincomplete-record-updates`
+  enabled by default.
+
+* Setup infrastructure for testing source maps (#4335 by @JordanMartinez)
+
+* Removed a couple of unused `SimpleErrorMessage` constructors (#4344 by @hdgarrood)
+
+* Compare json files through `aeson` in tests (#4354 by @PureFunctor)
+
+  This fixes the tests for the graph and source map outputs, as the
+  ordering is inconsistent between `stack test` and `cabal test`.
+
+* Add version bounds to the test suite's `build-depends`. (#4354 by @PureFunctor)
+
+* Update GHC to 9.2.3 (#4351 by @hdgarrood and @JordanMartinez)
+
+* Add qualification for locally-bound names (#4293 by @PureFunctor)
+
+  This change makes it so that `Qualified` names can now be qualified by either
+  a `ModuleName` for module-level declarations or the starting `SourcePos` for
+  bindings introduced locally. This makes disambiguation between references to
+  local bindings much easier in AST-driven analysis.
+
 ## 0.15.2
 
 New features:

@@ -196,7 +196,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
             _ -> Nothing
       | isQualifiedWith k q =
           case importName (head is) of
-            Qualified (Just mn') name -> Just (mn', Qualified mnq (toName name))
+            Qualified (ByModuleName mn') name -> Just (mn', Qualified mnq (toName name))
             _ -> internalError "unqualified name in extractByQual"
     go _ = Nothing
 

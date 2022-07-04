@@ -50,7 +50,7 @@ qualifyName
   -> ModuleName
   -> Qualified (ProperName b)
   -> Qualified (ProperName a)
-qualifyName n defmn qn = Qualified (Just mn) n
+qualifyName n defmn qn = Qualified (ByModuleName mn) n
   where
   (mn, _) = qualify defmn qn
 
