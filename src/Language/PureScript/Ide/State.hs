@@ -442,12 +442,12 @@ resolveDataConstructorsForModule decls =
     resolveDataConstructors :: IdeDeclaration -> IdeDeclaration
     resolveDataConstructors decl = case decl of
       IdeDeclType ty ->
-        IdeDeclType (ty & ideTypeDtors .~ fromMaybe [] (Map.lookup (ty^.ideTypeName) dtors))
+        IdeDeclType (ty & ideTypeDtors .~ fromMaybe [] (Map.lookup (ty ^. ideTypeName) dtors))
       _ ->
         decl
 
     dtors =
       decls
-      & mapMaybe (preview (idaDeclaration._IdeDeclDataConstructor))
+      & mapMaybe (preview (idaDeclaration . _IdeDeclDataConstructor))
       & foldr (\(IdeDataConstructor name typeName type') ->
                   Map.insertWith (<>) typeName [(name, type')]) Map.empty
