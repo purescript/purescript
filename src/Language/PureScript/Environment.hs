@@ -30,19 +30,44 @@ import qualified Language.PureScript.Constants.Prim as C
 data Environment = Environment
   { names :: M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
   -- ^ Values currently in scope
+  -- Updated in a couple of places:
+  -- - bindNames: for one action, temporarily unions new names with environment's current names, resetting back to original after action is done
+  -- - makeBindingGroupVisible: sets the NameVisibility to Defined
+  -- - withBindingGroupVisible: for one action, sets the NameVisibility to Defined, resetting back to original visibility after action is done
+  -- - addValue: Inserts the given name with Defined visibility
+  --    - adds ValueDecl and value in a BindingGroupDeclaration
+  -- - typeCheckAll: Inserts the given name of an ExternDeclaration with External visibility
   , types :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
   -- ^ Type names currently in scope
+  -- Updated in a couple of places:
+  -- - bindTypes: for one action, temporarily unions new types with environment's current types, resetting back to original after action is done
+  -- - withScopedTypeVars: calls bindTypes, setting the args kind to ScopedTyVar
+  -- - bindLocalTypeVariables: call bindTypes, setting the args kind to LocalTypeVariable
   , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
   -- ^ Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
+  -- Updated in a couple of places:
+  -- - addDataConstructor
+  --    - addDataType
+  --        - DataDeclaration
+  --        - DataBindingGroupDeclaration
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceType)], SourceType)
-  -- ^ Type synonyms currently in scope
+  -- ^ Type synonyms currently in scope. The type synonym name maps to its ty vars and kind
+  -- Updated in a couple of places:
+  -- - addTypeSynonym
+  --    - typeCheckAll (DataBindingGroupDeclaration)
+  --    - typeCheckAll (TypeSynonymDeclaration)
   , typeClassDictionaries :: M.Map QualifiedBy (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
   -- ^ Available type class dictionaries. When looking up 'Nothing' in the
   -- outer map, this returns the map of type class dictionaries in local
   -- scope (ie dictionaries brought in by a constrained type).
+  -- Updated in a couple of places:
+  -- - addTypeClassDictionaries: adds type class dictionary permanently
+  -- - withTypeClassDictionaries: for one action, temporarily unions new dictionaries with environment's current dictionaries, resetting back to original after action is done
   , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
   -- ^ Type classes
+  -- Updated in one place:
+  -- - addTypeClass
   } deriving (Show, Generic)
 
 instance NFData Environment
@@ -121,11 +146,11 @@ initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPr
 -- determine X that X does not determine. This is the same thing: everything X determines includes everything
 -- in its SCC, and everything determining X is either before it in an SCC path, or in the same SCC.
 makeTypeClassData
-  :: [(Text, Maybe SourceType)]
-  -> [(Ident, SourceType)]
-  -> [SourceConstraint]
-  -> [FunctionalDependency]
-  -> Bool
+  :: [(Text, Maybe SourceType)] -- ^ args
+  -> [(Ident, SourceType)] -- ^ members
+  -> [SourceConstraint] -- ^ superclasses
+  -> [FunctionalDependency] -- ^ functional deps
+  -> Bool -- ^ whether dictionary is necesarily empty
   -> TypeClassData
 makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
   where
