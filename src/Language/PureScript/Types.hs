@@ -509,10 +509,10 @@ usedTypeVariables = ordNub . everythingOnTypes (++) go where
   go (TypeVar _ v) = [v]
   go _ = []
 
--- | Collect all free type variables appearing in a type
+-- | Collect all free type variables appearing in a type,
+-- tracking kind levels so that variables appearing in kind annotations are listed first.
 freeTypeVariables :: Type a -> [Text]
 freeTypeVariables = ordNub . fmap snd . sort . go 0 [] where
-  -- Tracks kind levels so that variables appearing in kind annotations are listed first.
   go :: Int -> [Text] -> Type a -> [(Int, Text)]
   go lvl bound (TypeVar _ v) | v `notElem` bound = [(lvl, v)]
   go lvl bound (TypeApp _ t1 t2) = go lvl bound t1 ++ go lvl bound t2
@@ -552,6 +552,7 @@ containsForAll = everythingOnTypes (||) go where
   go ForAll{} = True
   go _ = False
 
+-- | Collects the set of 'TUnknown's in a type
 unknowns :: Type a -> IS.IntSet
 unknowns = everythingOnTypes (<>) go where
   go :: Type a -> IS.IntSet
@@ -566,6 +567,10 @@ containsUnknowns = everythingOnTypes (||) go . eraseKindApps where
   go TUnknown{} = True
   go _ = False
 
+-- |
+-- Inlines a `KindApp` with its type,
+-- clears a `ConstrainedType`'s @constraintKindArgs@,
+-- and clears a 'Skolem''s kind.
 eraseKindApps :: Type a -> Type a
 eraseKindApps = everywhereOnTypes $ \case
   KindApp _ ty _ -> ty
@@ -589,6 +594,11 @@ eraseForAllKindAnnotations = removeAmbiguousVars . removeForAllKinds
       | otherwise -> ty
     other -> other
 
+-- |
+-- Takes something like
+-- @TypeApp (TypeApp (KindApp (KindApp (KindApp f k1) k2) k3) t1) t2@
+-- and returns
+-- @(f, [k1, k2, k3], [t1, t2])@
 unapplyTypes :: Type a -> (Type a, [Type a], [Type a])
 unapplyTypes = goTypes []
   where
@@ -598,6 +608,11 @@ unapplyTypes = goTypes []
   goKinds acc (KindApp _ a b) = goKinds (b : acc) a
   goKinds acc a = (a, acc)
 
+-- |
+-- Takes something like
+-- @Constraint1 => Constraint2 => SomeType@
+-- and returns
+-- @([Constraint2, Constraint1], SomeType)@
 unapplyConstraints :: Type a -> ([Constraint a], Type a)
 unapplyConstraints = go []
   where
@@ -618,6 +633,8 @@ srcInstanceType ss vars className tys
   . flip (foldl' srcTypeApp) tys
   $ srcTypeConstructor $ coerceProperName <$> className
 
+-- |
+-- Bottom-up, subterm1-subternN-parent @fmap@ on types
 everywhereOnTypes :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypes f = go where
   go (TypeApp ann t1 t2) = f (TypeApp ann (go t1) (go t2))
@@ -631,6 +648,8 @@ everywhereOnTypes f = go where
   go (ParensInType ann t) = f (ParensInType ann (go t))
   go other = f other
 
+-- |
+-- Bottom-up, subterm1-subternN-parent @bind@ on types
 everywhereOnTypesM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesM f = go where
   go (TypeApp ann t1 t2) = (TypeApp ann <$> go t1 <*> go t2) >>= f
@@ -644,6 +663,8 @@ everywhereOnTypesM f = go where
   go (ParensInType ann t) = (ParensInType ann <$> go t) >>= f
   go other = f other
 
+-- |
+-- Top-down, parent-subterm1-subtermN @bind@ on types
 everywhereOnTypesTopDownM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesTopDownM f = go <=< f where
   go (TypeApp ann t1 t2) = TypeApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
@@ -657,6 +678,8 @@ everywhereOnTypesTopDownM f = go <=< f where
   go (ParensInType ann t) = ParensInType ann <$> (f t >>= go)
   go other = pure other
 
+-- |
+-- Top-down, parent-subterm1-subtermN @foldMap@ on types
 everythingOnTypes :: (r -> r -> r) -> (Type a -> r) -> Type a -> r
 everythingOnTypes (<+>) f = go where
   go t@(TypeApp _ t1 t2) = f t <+> go t1 <+> go t2
@@ -671,6 +694,9 @@ everythingOnTypes (<+>) f = go where
   go t@(ParensInType _ t1) = f t <+> go t1
   go other = f other
 
+-- |
+-- Top-down, parent-subterm1-subtermN stateful @foldMap@ on types
+-- (i.e. same as 'everywithWithTypes' but uses state).
 everythingWithContextOnTypes :: s -> r -> (r -> r -> r) -> (s -> Type a -> (s, r)) -> Type a -> r
 everythingWithContextOnTypes s0 r0 (<+>) f = go' s0 where
   go' s t = let (s', r) = f s t in r <+> go s' t
@@ -763,6 +789,8 @@ compareType (ParensInType _ a) (ParensInType _ a') = compareType a a'
 compareType typ typ' =
   compare (orderOf typ) (orderOf typ')
     where
+      -- Note: order here matches the order of data constructors
+      -- in 'Type' definition
       orderOf :: Type a -> Int
       orderOf TUnknown{} = 0
       orderOf TypeVar{} = 1
