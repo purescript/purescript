@@ -28,6 +28,9 @@ type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Source
 
 type KindMap = M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 
+-- |
+-- Replaces all type synonyms with their body
+-- or throws an error if a type synonym is partially applied.
 replaceAllTypeSynonyms'
   :: SynonymMap
   -> KindMap
@@ -46,6 +49,7 @@ replaceAllTypeSynonyms' syns kinds = everywhereOnTypesTopDownM try
     , length kargs == length kindArgs
     = let repl = replaceAllTypeVars (zip (map fst synArgs) args <> zip kindArgs kargs) body
       in Just <$> try repl
+
     | Just (synArgs, _) <- M.lookup ctor syns
     , length synArgs > c
     = throwError . errorMessage' ss $ PartiallyAppliedSynonym ctor
@@ -56,13 +60,15 @@ replaceAllTypeSynonyms' syns kinds = everywhereOnTypesTopDownM try
   lookupKindArgs :: Qualified (ProperName 'TypeName) -> [Text]
   lookupKindArgs ctor = fromMaybe [] $ fmap (fmap (fst . snd) . fst) . completeBinderList . fst =<< M.lookup ctor kinds
 
--- | Replace fully applied type synonyms
+-- | Replace fully applied type synonyms by using the Environment's 'SynonymMap'.
+-- Partially applied type synonyms will throw an error.
 replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => SourceType -> m SourceType
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either throwError return $ replaceAllTypeSynonyms' (typeSynonyms env) (types env) d
 
 -- | Replace fully applied type synonyms by explicitly providing a 'SynonymMap'.
+-- Partially applied type synonyms will throw an error.
 replaceAllTypeSynonymsM
   :: MonadError MultipleErrors m
   => SynonymMap
