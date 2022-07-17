@@ -415,6 +415,9 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goExpr pos (TypedValue check v ty) = do
     ty' <- goType' pos ty
     return (pos, TypedValue check v ty')
+  goExpr pos (VisibleTypeApp v ty) = do
+    ty' <- goType' pos ty
+    return (pos, VisibleTypeApp v ty')
   goExpr pos other = return (pos, other)
 
   goBinder :: SourceSpan -> Binder -> m (SourceSpan, Binder)

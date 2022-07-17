@@ -6,6 +6,8 @@ import Effect.Console (log)
 
 data Tuple a b = Tuple a b
 
+infixr 5 type Tuple as /\
+
 tuple :: forall @a @b. a -> b -> Tuple a b
 tuple = Tuple
 
@@ -22,6 +24,9 @@ id' = id @(forall a. a -> a) (\x -> x)
 
 data Proxy :: forall k. k -> Type
 data Proxy a = Proxy
+
+syn :: Proxy (Tuple Int Int)
+syn = Proxy @(Int /\ Int)
 
 class TypeClass1 a
 
