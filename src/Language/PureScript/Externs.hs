@@ -45,56 +45,6 @@ import Paths_purescript as Paths
 
 import qualified Data.ByteString.Lazy as B
 
-data WhatDidItLookLikeLastTime = WhatDidItLookLikeLastTime
-
--- The plan?
--- 1. get a list of everything we depend on
--- 2. figure out the shape of all those things #[partially done]
--- 3. cache what each thing looked like as part of the externs file
--- 4. did any of them change? if not, we're good
-
--- 1 and 2 are hard, approximate by just looking at the imports for now
---
-
-
--- DeclarationRef+:
--- + TypeClassRef
--- + TypeOpRef
--- + TypeRef
--- + ValueRef
--- + ValueOpRef
--- + TypeInstanceRef
--- + ModuleRef
--- + ReExportRef
---
--- ExternsDeclaration-:
--- - EDType
--- - EDTypeSynonym
--- - EDDataConstructor
--- - EDValue
--- - EDClass
--- - EDInstance
---
--- DeclarationRef+:
--- _ EDType
--- ' TypeRef
--- ' TypeOpRef
--- _ EDValue
--- ' ValueRef
--- ' ValueOpRef
--- _ EDClass
--- ' TypeClassRef
--- _ EDInstance
--- ' TypeInstanceRef
-
--- ' ModuleRef (re-export (everything imported from) an entire module)
--- ' ReExportRef (recursive, module + DeclarationRef)
---
--- ?_ EDValue
--- _ EDTypeSynonym -> look att the underlying type?
--- _ EDDataConstructor -> look at the underlying type?
-
-
 
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile
@@ -240,7 +190,7 @@ data ExternsDeclaration =
       , edInstanceNameSource      :: NameSource
       , edInstanceSourceSpan      :: SourceSpan
       }
-  deriving (Eq, Show, Generic) -- TODO[drathier]: less strict comparison fn here, that ignores sourcepos
+  deriving (Show, Generic)
 
 instance Serialise ExternsDeclaration
 
@@ -318,7 +268,7 @@ data DeclarationCacheRef
   -- elaboration in name desugaring.
   --
   | DeclCacheReExportRef ExportSource DeclarationRef
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Generic)
 
 instance Serialise DeclarationCacheRef
 
@@ -381,7 +331,7 @@ data ExternCacheKey =
       , cacheEdInstanceNameSource      :: NameSource
       -- , cacheEdInstanceSourceSpan      :: SourceSpan
       }
-  deriving (Eq, Show, Generic) -- TODO[drathier]: less strict comparison fn here, that ignores sourcepos
+  deriving (Show, Generic)
 
 instance Serialise ExternCacheKey
 
