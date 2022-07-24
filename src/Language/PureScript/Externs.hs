@@ -8,6 +8,9 @@ module Language.PureScript.Externs
   , ExternsFixity(..)
   , ExternsTypeFixity(..)
   , ExternsDeclaration(..)
+  , BuildCacheFile(..)
+  , ExternCacheKey(..)
+  , DeclarationCacheRef(..)
   , externsIsCurrentVersion
   , moduleToExternsFile
   , applyExternsFileToEnvironment
@@ -16,7 +19,7 @@ module Language.PureScript.Externs
 
 import Prelude.Compat
 
-import Codec.Serialise (Serialise)
+import Codec.Serialise (Serialise, serialise)
 import Control.Monad (join)
 import GHC.Generics (Generic)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
@@ -27,6 +30,7 @@ import qualified Data.Text as T
 import Data.Version (showVersion)
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NEL
+import Data.Function ((&))
 
 import Language.PureScript.AST
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
@@ -37,6 +41,59 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
 import Paths_purescript as Paths
+
+import qualified Data.ByteString.Lazy as B
+
+data WhatDidItLookLikeLastTime = WhatDidItLookLikeLastTime
+
+-- The plan?
+-- 1. get a list of everything we depend on
+-- 2. figure out the shape of all those things #[partially done]
+-- 3. cache what each thing looked like as part of the externs file
+-- 4. did any of them change? if not, we're good
+
+-- 1 and 2 are hard, approximate by just looking at the imports for now
+--
+
+
+-- DeclarationRef+:
+-- + TypeClassRef
+-- + TypeOpRef
+-- + TypeRef
+-- + ValueRef
+-- + ValueOpRef
+-- + TypeInstanceRef
+-- + ModuleRef
+-- + ReExportRef
+--
+-- ExternsDeclaration-:
+-- - EDType
+-- - EDTypeSynonym
+-- - EDDataConstructor
+-- - EDValue
+-- - EDClass
+-- - EDInstance
+--
+-- DeclarationRef+:
+-- _ EDType
+-- ' TypeRef
+-- ' TypeOpRef
+-- _ EDValue
+-- ' ValueRef
+-- ' ValueOpRef
+-- _ EDClass
+-- ' TypeClassRef
+-- _ EDInstance
+-- ' TypeInstanceRef
+
+-- ' ModuleRef (re-export (everything imported from) an entire module)
+-- ' ReExportRef (recursive, module + DeclarationRef)
+--
+-- ?_ EDValue
+-- _ EDTypeSynonym -> look att the underlying type?
+-- _ EDDataConstructor -> look at the underlying type?
+
+
 
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile
@@ -59,9 +116,35 @@ data ExternsFile = ExternsFile
   -- ^ List of type and value declaration
   , efSourceSpan :: SourceSpan
   -- ^ Source span for error reporting
+  , efBuildCache :: BuildCacheFile
   } deriving (Show, Generic)
 
 instance Serialise ExternsFile
+
+-- | The data which will be serialized to a build cache file
+data BuildCacheFile = BuildCacheFile
+  -- NOTE: Make sure to keep `efVersion` as the first field in this
+  -- record, so the derived Serialise instance produces CBOR that can
+  -- be checked for its version independent of the remaining format
+  { bcVersion :: Text
+  -- ^ The externs version
+  , bcModuleName :: ModuleName
+  -- ^ Module name
+  -- NOTE[drathier]: using bytestrings here for faster encoding/decoding
+  -- , bcCacheDeclarations :: M.Map DeclarationCacheRef [ExternCacheKey]
+  , bcCacheDeclarations :: M.Map B.ByteString [B.ByteString]
+  -- ^ Duplicated to avoid having to update all usages
+  -- , bcCacheImports :: M.Map ModuleName (M.Map DeclarationCacheRef [ExternCacheKey])
+  , bcCacheImports :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])
+  -- ^ all declarations explicitly imported from a specific module, if explicitly imported
+  -- 1. open imports are not cached, for now, since we don't know which things are used
+  -- 2. hiding imports are also not cached, even though we could skip the hidden things and treat it as a closed import afterwards
+  -- 3. explicit imports are matched to see if anything differs
+  -- 4. if an imported modulename is missing, it's a new import or something we couldn't cache, so treat it as a cache miss
+  -- 5. [ExternsDeclaration] is the list of extdecls we saw when building this module/externsfile; it's what we should compare against when looking for cache hits
+  } deriving (Show, Generic)
+instance Serialise BuildCacheFile
+
 
 -- | A module import in an externs file
 data ExternsImport = ExternsImport
@@ -155,7 +238,7 @@ data ExternsDeclaration =
       , edInstanceNameSource      :: NameSource
       , edInstanceSourceSpan      :: SourceSpan
       }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic) -- TODO[drathier]: less strict comparison fn here, that ignores sourcepos
 
 instance Serialise ExternsDeclaration
 
@@ -195,6 +278,188 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   qual :: a -> Qualified a
   qual = Qualified (Just efModuleName)
 
+
+_efBuildCache = efBuildCache
+_bcCacheDeclarations = bcCacheDeclarations
+
+data DeclarationCacheRef
+  -- |
+  -- A type class
+  --
+  = DeclCacheTypeClassRef (ProperName 'ClassName)
+  -- |
+  -- A type operator
+  --
+  | DeclCacheTypeOpRef (OpName 'TypeOpName)
+  -- |
+  -- A type constructor with data constructors
+  --
+  | DeclCacheTypeRef (ProperName 'TypeName) (Maybe [ProperName 'ConstructorName])
+  -- |
+  -- A value
+  --
+  | DeclCacheValueRef Ident
+  -- |
+  -- A value-level operator
+  --
+  | DeclCacheValueOpRef (OpName 'ValueOpName)
+  -- |
+  -- A type class instance, created during typeclass desugaring
+  --
+  | DeclCacheTypeInstanceRef Ident NameSource
+  -- |
+  -- A module, in its entirety
+  --
+  | DeclCacheModuleRef ModuleName
+  -- |
+  -- A value re-exported from another module. These will be inserted during
+  -- elaboration in name desugaring.
+  --
+  | DeclCacheReExportRef ExportSource DeclarationRef
+  deriving (Show, Eq, Ord, Generic)
+
+instance Serialise DeclarationCacheRef
+
+declRefToCacheRef :: DeclarationRef -> DeclarationCacheRef
+declRefToCacheRef = \case
+  TypeClassRef _ className -> DeclCacheTypeClassRef className
+  TypeOpRef _ typeOpName -> DeclCacheTypeOpRef typeOpName
+  TypeRef _ typeName mConstructorNames -> DeclCacheTypeRef typeName mConstructorNames
+  ValueRef _ ident -> DeclCacheValueRef ident
+  ValueOpRef _ valueOpName -> DeclCacheValueOpRef valueOpName
+  TypeInstanceRef _ ident nameSource -> DeclCacheTypeInstanceRef ident nameSource
+  ModuleRef _ moduleName -> DeclCacheModuleRef moduleName
+  ReExportRef _ exportSource declarationRef -> DeclCacheReExportRef exportSource declarationRef
+
+data ExternCacheKey =
+  -- | A type declaration
+    CacheEDType
+      { cacheEdTypeName                :: ProperName 'TypeName
+      , cacheEdTypeKind                :: Type ()
+      -- , cacheEdTypeDeclarationKind     :: TypeKind -- contains SourceType for adt's, can we safely skip the entire field?
+      }
+  -- | A type synonym
+  | CacheEDTypeSynonym
+      { cacheEdTypeSynonymName         :: ProperName 'TypeName
+      , cacheEdTypeSynonymArguments    :: [(Text, Maybe (Type ()))]
+      , cacheEdTypeSynonymType         :: Type ()
+      }
+  -- | A data constructor
+  | CacheEDDataConstructor
+      { cacheEdDataCtorName            :: ProperName 'ConstructorName
+      , cacheEdDataCtorOrigin          :: DataDeclType
+      , cacheEdDataCtorTypeCtor        :: ProperName 'TypeName
+      , cacheEdDataCtorType            :: Type ()
+      , cacheEdDataCtorFields          :: [Ident]
+      }
+  -- | A value declaration
+  | CacheEDValue
+      { cacheEdValueName               :: Ident
+      , cacheEdValueType               :: Type ()
+      }
+  -- | A type class declaration
+  | CacheEDClass
+      { cacheEdClassName               :: ProperName 'ClassName
+      , cacheEdClassTypeArguments      :: [(Text, Maybe (Type ()))]
+      , cacheEdClassMembers            :: [(Ident, (Type ()))]
+      , cacheEdClassConstraints        :: [Constraint ()]
+      , cacheEdFunctionalDependencies  :: [FunctionalDependency]
+      , cacheEdIsEmpty                 :: Bool
+      }
+  -- | An instance declaration
+  | CacheEDInstance
+      { cacheEdInstanceClassName       :: Qualified (ProperName 'ClassName)
+      , cacheEdInstanceName            :: Ident
+      , cacheEdInstanceForAll          :: [(Text, Type ())]
+      , cacheEdInstanceKinds           :: [Type ()]
+      , cacheEdInstanceTypes           :: [Type ()]
+      , cacheEdInstanceConstraints     :: Maybe [Constraint ()]
+      , cacheEdInstanceChain           :: Maybe ChainId -- contains sourcepos, can we skip it?
+      , cacheEdInstanceChainIndex      :: Integer
+      , cacheEdInstanceNameSource      :: NameSource
+      -- , cacheEdInstanceSourceSpan      :: SourceSpan
+      }
+  deriving (Eq, Show, Generic) -- TODO[drathier]: less strict comparison fn here, that ignores sourcepos
+
+instance Serialise ExternCacheKey
+
+extDeclToCacheKey :: ExternsDeclaration -> ExternCacheKey
+extDeclToCacheKey = \case
+    EDType
+      edTypeName             --   :: ProperName 'TypeName
+      edTypeKind             --   :: Type ()
+      _ -- (edTypeDeclarationKind     :: TypeKind) -- contains SourceType for adt's, can we safely skip the entire field?
+       ->
+        CacheEDType
+          edTypeName
+          (const () <$> edTypeKind)
+    -- | A type synonym
+    EDTypeSynonym
+        edTypeSynonymName       --  :: ProperName 'TypeName
+        edTypeSynonymArguments  --  :: [(Text, Maybe (Type ()))]
+        edTypeSynonymType       --  :: Type ()
+      -> CacheEDTypeSynonym
+          edTypeSynonymName
+          (fmap (fmap (fmap (const ()))) <$> edTypeSynonymArguments)
+          (const () <$> edTypeSynonymType)
+    -- | A data constructor
+    EDDataConstructor
+        edDataCtorName          --  :: ProperName 'ConstructorName
+        edDataCtorOrigin        --  :: DataDeclType
+        edDataCtorTypeCtor      --  :: ProperName 'TypeName
+        edDataCtorType          --  :: Type ()
+        edDataCtorFields        --  :: [Ident]
+      -> CacheEDDataConstructor
+          edDataCtorName
+          edDataCtorOrigin
+          edDataCtorTypeCtor
+          (const () <$> edDataCtorType)
+          edDataCtorFields
+    -- | A value declaration
+    EDValue
+        edValueName        --  :: Ident
+        edValueType        --  :: Type ()
+      -> CacheEDValue
+          edValueName
+          (const () <$> edValueType)
+    -- | A type class declaration
+    EDClass
+        edClassName              --  :: ProperName 'ClassName
+        edClassTypeArguments     --  :: [(Text, Maybe (Type ()))]
+        edClassMembers           --  :: [(Ident, Type ())]
+        edClassConstraints       --  :: [Constraint ()]
+        edFunctionalDependencies --  :: [FunctionalDependency]
+        edIsEmpty                --  :: Bool
+      -> CacheEDClass
+          edClassName
+          (fmap (fmap (fmap (const ()))) <$> edClassTypeArguments)
+          (fmap (fmap (const ())) <$> edClassMembers)
+          (fmap (const ()) <$> edClassConstraints)
+          edFunctionalDependencies
+          edIsEmpty
+    -- | An instance declaration
+    EDInstance
+        edInstanceClassName     --   :: Qualified (ProperName 'ClassName)
+        edInstanceName          --   :: Ident
+        edInstanceForAll        --   :: [(Text, Type ())]
+        edInstanceKinds         --   :: [Type ()]
+        edInstanceTypes         --   :: [Type ()]
+        edInstanceConstraints   --   :: Maybe [Constraint ()]
+        edInstanceChain         --   :: Maybe ChainId -- contains sourcepos, can we skip it?
+        edInstanceChainIndex    --   :: Integer
+        edInstanceNameSource    --   :: NameSource
+        _ -- (edInstanceSourceSpan      :: SourceSpan
+      -> CacheEDInstance
+          edInstanceClassName
+          edInstanceName
+          (fmap (fmap (const ())) <$> edInstanceForAll)
+          (fmap (const ()) <$> edInstanceKinds)
+          (fmap (const ()) <$> edInstanceTypes)
+          (fmap (fmap (const ())) <$> edInstanceConstraints)
+          edInstanceChain
+          edInstanceChainIndex
+          edInstanceNameSource
+
 -- | Generate an externs file for all declarations in a module.
 --
 -- The `Map Ident Ident` argument should contain any top-level `GenIdent`s that
@@ -202,9 +467,9 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
 -- happens in the CoreFn, not the original module AST, so it needs to be
 -- applied to the exported names here also. (The appropriate map is returned by
 -- `L.P.Renamer.renameInModule`.)
-moduleToExternsFile :: Module -> Environment -> M.Map Ident Ident -> ExternsFile
-moduleToExternsFile (Module _ _ _ _ Nothing) _ _ = internalError "moduleToExternsFile: module exports were not elaborated"
-moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsFile{..}
+moduleToExternsFile :: M.Map ModuleName ExternsFile -> Module -> Environment -> M.Map Ident Ident -> ExternsFile
+moduleToExternsFile _ (Module _ _ _ _ Nothing) _ _ = internalError "moduleToExternsFile: module exports were not elaborated"
+moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsFile{..}
   where
   efVersion       = T.pack (showVersion Paths.version)
   efModuleName    = mn
@@ -212,8 +477,40 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsF
   efImports       = mapMaybe importDecl ds
   efFixities      = mapMaybe fixityDecl ds
   efTypeFixities  = mapMaybe typeFixityDecl ds
-  efDeclarations  = concatMap toExternsDeclaration exps
+  efDeclarations  = concat $ map snd $ bcCacheDeclarationsPre
   efSourceSpan    = ss
+
+  efBuildCache = BuildCacheFile efVersion efModuleName bcCacheDeclarations bcCacheImports
+
+  bcCacheDeclarations =
+    foldr
+      (\(k,vs) m1 ->
+        foldr
+          (\v m2 ->
+            M.insertWith (++) (serialise (declRefToCacheRef k)) [serialise (extDeclToCacheKey v)] m2
+          )
+          m1
+          vs
+      )
+      M.empty
+      bcCacheDeclarationsPre
+  bcCacheDeclarationsPre :: [(DeclarationRef, [ExternsDeclaration])]
+  bcCacheDeclarationsPre = (\ref -> (ref, (toExternsDeclaration ref))) <$> exps
+
+  bcCacheImports :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])
+  bcCacheImports =  -- TODO[drathier]: fill in
+
+  -----
+
+      externsMap
+        & M.filterWithKey (\k _ -> elem k importModuleNames)
+        & fmap _efBuildCache
+        & fmap _bcCacheDeclarations
+
+
+  importModuleNames = eiModule <$> efImports
+
+  -----
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
   fixityDecl (ValueFixityDeclaration _ (Fixity assoc prec) name op) =

@@ -96,6 +96,18 @@ checkChanged
   -> FilePath
   -> Map FilePath (UTCTime, m ContentHash)
   -> m (CacheInfo, Bool)
+  -- TODO[drathier]: this Bool can return three values; NeedsRebuildSrcChanged | RebuildIfDepsChanged | NoRebuild, this can be propagated into RebuildStatus
+  -- in BuildPlan when making a buildJob we can pass in the full rebuildStatus: let buildJob = BuildJob buildJobMvar (statusPrebuilt rebuildStatus) (statusDirtyExterns rebuildStatus)
+  -- or "just" pass in the rebuild status flag here too, as new arg to BuildJob
+  --
+  -- then, to check for cache hit,
+  -- things we didn't rebuild are always cache hits; we've already checked those when creating the buildjob (NoRebuild)
+  -- things that are NeedsRebuildSrcChanged are never cache hits; it itself changed
+  -- RebuildIfDepsChanged is what we should check for changes
+  -- Q: how do we know if any dep changed?
+  -- We see if the externs changed after rebuilding, i.e. if it was a needless rebuild or not, we can probably use the new isCacheHit function for this?
+  --
+  --
 checkChanged cacheDb mn basePath currentInfo = do
 
   let dbInfo = unCacheInfo $ fromMaybe mempty (Map.lookup mn cacheDb)

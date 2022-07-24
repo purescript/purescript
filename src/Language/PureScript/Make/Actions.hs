@@ -43,7 +43,7 @@ import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Docs.Prim as Docs.Prim
 import qualified Language.PureScript.Docs.Types as Docs
 import           Language.PureScript.Errors
-import           Language.PureScript.Externs (ExternsFile, externsFileName)
+import           Language.PureScript.Externs (ExternsFile, externsFileName, BuildCacheFile)
 import           Language.PureScript.Make.Monad
 import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names
@@ -55,6 +55,8 @@ import           SourceMap.Types
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath ((</>), makeRelative, splitPath, normalise)
 import           System.IO (stderr)
+
+import Debug.Trace
 
 -- | Determines when to rebuild a module
 data RebuildPolicy
@@ -109,9 +111,28 @@ data MakeActions m = MakeActions
   , writeCacheDb :: CacheDb -> m ()
   -- ^ Write the given cache database to some external source (e.g. a file on
   -- disk).
+  , readBuildCacheDb :: m BuildCacheDb
+  -- ^ Read the build cache database (which contains cache keys) from some
+  -- external source, e.g. a file on disk.
+  , writeBuildCacheDb :: BuildCacheDb -> m ()
+  -- ^ Write the given build cache database to some external source (e.g. a
+  -- file on disk).
   , outputPrimDocs :: m ()
   -- ^ If generating docs, output the documentation for the Prim modules
   }
+
+type BuildCacheDb = M.Map ModuleName BuildCacheFile
+
+{-
+Task: load less data from disk, to load it faster on cache hits, since deserializing cbor takes time
+
+These two are loaded in all BuildJob's but they're pretty much not needed there:
+- bjPrebuilt -- existance check, to figure out if src files changed,
+- bjDirtyExterns -- used to fetch module name and to get cached imports for caching, and can be lazy loaded on cache miss / recompile, where the whole thing is seemingly needed
+
+We might not need a BuildCacheDb file. We'll see.
+
+-}
 
 -- | Given the output directory, determines the location for the
 -- CacheDb file
@@ -135,6 +156,26 @@ writeCacheDb'
   -> m ()
 writeCacheDb' = writeJSONFile . cacheDbFile
 
+externsDbFile :: FilePath -> FilePath
+externsDbFile = (</> "cache-externs.cbor")
+
+readBuildCacheDb'
+  :: (MonadIO m, MonadError MultipleErrors m)
+  => FilePath
+  -- ^ The path to the output directory
+  -> m BuildCacheDb
+readBuildCacheDb' outputDir =
+  fromMaybe mempty <$> readCborFile (externsDbFile outputDir)
+
+writeBuildCacheDb'
+  :: (MonadIO m, MonadError MultipleErrors m)
+  => FilePath
+  -- ^ The path to the output directory
+  -> BuildCacheDb
+  -- ^ The BuildCacheDb to be written
+  -> m ()
+writeBuildCacheDb' = writeCborFile . externsDbFile
+
 -- | A set of make actions that read and write modules from the given directory.
 buildMakeActions
   :: FilePath
@@ -147,7 +188,7 @@ buildMakeActions
   -- ^ Generate a prefix comment?
   -> MakeActions Make
 buildMakeActions outputDir filePathMap foreigns usePrefix =
-    MakeActions getInputTimestampsAndHashes getOutputTimestamp readExterns codegen ffiCodegen progress readCacheDb writeCacheDb outputPrimDocs
+    MakeActions getInputTimestampsAndHashes getOutputTimestamp readExterns codegen ffiCodegen progress readCacheDb writeCacheDb readBuildCacheDb writeBuildCacheDb outputPrimDocs
   where
 
   getInputTimestampsAndHashes
@@ -209,6 +250,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   readExterns :: ModuleName -> Make (FilePath, Maybe ExternsFile)
   readExterns mn = do
+    _ <- trace (show ("readExterns" :: String, mn)) $ pure ()
     let path = outputDir </> T.unpack (runModuleName mn) </> externsFileName
     (path, ) <$> readExternsFile path
 
@@ -302,6 +344,12 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   writeCacheDb :: CacheDb -> Make ()
   writeCacheDb = writeCacheDb' outputDir
+
+  readBuildCacheDb :: Make BuildCacheDb
+  readBuildCacheDb = readBuildCacheDb' outputDir
+
+  writeBuildCacheDb :: BuildCacheDb -> Make ()
+  writeBuildCacheDb = writeBuildCacheDb' outputDir
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
