@@ -1,15 +1,25 @@
 {-# LANGUAGE TypeApplications #-}
 module Language.PureScript.Make.BuildPlan
-  -- ( BuildPlan(bpEnv)
-  -- , BuildJobResult(..)
-  -- , buildJobSuccess
-  -- , construct
-  -- , getResult
-  -- , collectResults
-  -- , markComplete
-  -- , needsRebuild
-  -- )
-  where
+  ( BuildPlan(bpEnv)
+  , BuildJobResult(..)
+  , WasRebuildNeeded(..)
+  , buildJobSucceeded
+  , buildJobSuccess
+  , construct
+  , getResult
+  , collectResults
+  , markComplete
+  , needsRebuild
+  --
+  , bjResult
+  , bpBuildJobs
+  , pbExternsFile
+  , bpPrebuilt
+  , getDirtyCacheFile
+  , bjPrebuilt
+  , bjDirtyExterns
+  , isCacheHit
+  ) where
 
 import           Prelude
 
@@ -68,12 +78,13 @@ data Prebuilt = Prebuilt
 data BuildJob = BuildJob
   { bjResult :: C.MVar BuildJobResult
     -- ^ Note: an empty MVar indicates that the build job has not yet finished.
+    -- TODO[drathier]: remove both fields here:
   , bjPrebuilt :: Maybe Prebuilt
   , bjDirtyExterns :: Maybe ExternsFile
   }
 
 data BuildJobResult
-  = BuildJobSucceeded !MultipleErrors !ExternsFile !WasRebuildNeeded -- we built it, but was the rebuild actually needed?
+  = BuildJobSucceeded !MultipleErrors !ExternsFile !WasRebuildNeeded
   -- ^ Succeeded, with warnings and externs
   --
   | BuildJobCacheHit !ExternsFile
@@ -96,24 +107,18 @@ buildJobSucceeded mDirtyExterns warnings externs =
     Just dirtyExterns | fastEqExterns dirtyExterns externs -> BuildJobSucceeded warnings externs RebuildWasNotNeeded
     _ -> BuildJobSucceeded warnings externs RebuildWasNeeded
 
+fastEqExterns a b =
+  let
+    -- TODO[drathier]: is it enough to look at just the cacheDeclarations (what we export)? or do we need to look at the cached imports too?
+    toCmp x = bcCacheDeclarations $ efBuildCache x
+  in
+  Serialise.serialise (toCmp a) == Serialise.serialise (toCmp b)
+
 buildJobSuccess :: BuildJobResult -> Maybe (MultipleErrors, ExternsFile, WasRebuildNeeded)
--- buildJobSuccess (Just dirtyExterns) (BuildJobSucceeded warnings externs) | Serialise.serialise dirtyExterns == Serialise.serialise externs = Just (warnings, externs, RebuildWasNotNeeded)
 buildJobSuccess (BuildJobSucceeded warnings externs wasRebuildNeeded) = Just (warnings, externs, wasRebuildNeeded)
 buildJobSuccess (BuildJobCacheHit externs) = Just (MultipleErrors [], externs, RebuildWasNotNeeded)
 buildJobSuccess _ = Nothing
 
-fastEqExterns a b =
-  let
-    -- TODO[drathier]: is it enough to look at just the cacheDeclarations (what we export)? or do we need to look at the cached imports too?
-    -- toCmp x = (bcCacheDeclarations $ efBuildCache x, (bcCacheImports . efBuildCache) x)
-    toCmp x = bcCacheDeclarations $ efBuildCache x
-  in
-  Serialise.serialise (toCmp a) == Serialise.serialise (toCmp b)
-  -- case Serialise.serialise (toCmp a) == Serialise.serialise (toCmp b) of
-  --   True -> True
-  --   False ->
-  --     trace (show ("fastEqExterns" :: String, efModuleName a, "/=", efModuleName a, "dep", toCmp a, toCmp b))
-  --     False
 
 
 isCacheHit
@@ -137,16 +142,6 @@ isCacheHit deps directDeps depsExternsFromPrebuilts dirtyExterns = do
         bjmap
         & M.elems
         & fmap (fromMaybe (internalError "isCacheHit1: no barrier"))
-        -- & fmap (\(k,v) -> (k, fromMaybe (internalError "isCacheHit1: no barrier") v))
-        -- & fmap (\(k,v) -> trace (show ("noUpstreamChanges"::String, efModuleName dirtyExterns, "->", k,
-        --   case v of
-        --     BuildJobSucceeded _ _ RebuildWasNeeded -> "BuildJobSucceeded:RebuildWasNeeded"
-        --     BuildJobSucceeded _ _ RebuildWasNotNeeded -> "BuildJobSucceeded:RebuildWasNotNeeded"
-        --     BuildJobCacheHit _ -> "BuildJobCacheHit"
-        --     BuildJobFailed _ -> "BuildJobFailed"
-        --     BuildJobSkipped -> "BuildJobSkipped"
-        -- , directDeps)) (k,v))
-        -- & fmap snd
         & all (\case
           BuildJobSucceeded _ _ RebuildWasNotNeeded -> True
           BuildJobCacheHit _ -> True
@@ -154,74 +149,6 @@ isCacheHit deps directDeps depsExternsFromPrebuilts dirtyExterns = do
         )
       )
   pure noUpstreamChanges
-
--- isCacheHit deps depsExternsFromPrebuilts dirtyExterns = do
---   let
---
---
---     externFromBJRes = \case
---       BuildJobSucceeded _ e _ -> Just e -- TODO[drathier]: look at the rebuild flag!
---       BuildJobCacheHit e -> Just e
---       BuildJobFailed _ -> Nothing
---       BuildJobSkipped -> Nothing
---
---     dirtyCachedImports :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])
---     dirtyCachedImports =
---       dirtyExterns
---         & (bcCacheImports . efBuildCache)
---
---     dirtyImportedModules :: [ModuleName]
---     dirtyImportedModules =
---       dirtyExterns
---         & efImports
---         <&> eiModule
---         & L.nub
---
---   (depsExternDeclsFromMVars :: M.Map ModuleName ExternsFile) <-
---     deps
---     -- & (\v -> trace (show ("depsExternDecls1" :: String, M.keys v)) v)
---     & (id :: M.Map ModuleName (MVar BuildJobResult) -> M.Map ModuleName (MVar BuildJobResult))
---     & M.filterWithKey (\k _ -> elem k dirtyImportedModules)
---     -- & (\v -> trace (show ("depsExternDecls2" :: String, M.keys v, "dirtyImportedModules" :: String, dirtyImportedModules)) v)
---     & (id :: M.Map ModuleName (MVar BuildJobResult) -> M.Map ModuleName (MVar BuildJobResult))
---     & traverse tryReadMVar
---     -- -- & fmap (\v -> trace (show ("depsExternDecls3" :: String, v)) v)
---     & (id :: m (M.Map ModuleName (Maybe BuildJobResult)) -> m (M.Map ModuleName (Maybe BuildJobResult)))
---     & fmap (\v ->
---       v
---       & M.mapMaybe id
---       -- -- & (\v -> trace (show ("depsExternDecls4" :: String, v)) v)
---       & (id :: M.Map ModuleName BuildJobResult -> M.Map ModuleName BuildJobResult)
---       & M.mapMaybe externFromBJRes
---       -- & (\v -> trace (show ("depsExternDecls5" :: String, M.keys v)) v)
---     )
---
---   let (depsExternDecls :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])) =
---         (depsExternDeclsFromMVars <> depsExternsFromPrebuilts)
---         & M.filterWithKey (\k _ -> elem k dirtyImportedModules)
---         & (id :: M.Map ModuleName ExternsFile -> M.Map ModuleName ExternsFile)
---         & fmap (bcCacheDeclarations . efBuildCache)
---         -- & (\v -> trace (show ("depsExternDecls6" :: String, M.keys v)) v)
---         & (id :: M.Map ModuleName (M.Map B.ByteString [B.ByteString]) -> M.Map ModuleName (M.Map B.ByteString [B.ByteString]))
---
---   -- (\res -> if depsExternDecls == dirtyCachedImports then res else trace (show ("isCacheHit cache miss" :: String, res, efModuleName dirtyExterns, ("deps-len", length deps), ("depsExternDecls" :: String, M.keys depsExternDecls), ("dirtyCachedImports" :: String, M.keys dirtyCachedImports))) res) <$>
---   (pure $ depsExternDecls == dirtyCachedImports)
-
--- eqDeclRefIgnoringSourceSpan a b =
---   case (a, b) of
---     (TypeClassRef _ aname, TypeClassRef _ bname) -> aname == bname
---     (TypeOpRef _ aname, TypeOpRef _ bname) -> aname == bname
---     (ValueRef _ aname, ValueRef _ bname) -> aname == bname
---     (ValueOpRef _ aname, ValueOpRef _ bname) -> aname == bname
---
---     (TypeRef _ aname amname2, TypeRef _ bname bmname2) -> aname == bname && amname2 == bmname2
---     (TypeInstanceRef _ aname anamesrc, TypeInstanceRef _ bname bnamesrc) -> aname == bname && anamesrc == bnamesrc
---
---     -- TODO[drathier]: handle re-exports; did the referenced module change?
---     -- | exporting everything imported from a module
---     (ModuleRef _ amoduname, ModuleRef _ bmoduname) -> amoduname == bmoduname
---      -- | exporting something from another module
---     (ReExportRef _ _ adeclref, ReExportRef _ _ bdeclref) -> eqDeclRefIgnoringSourceSpan adeclref bdeclref
 
 -- | Information obtained about a particular module while constructing a build
 -- plan; used to decide whether a module needs rebuilding.
@@ -310,14 +237,11 @@ construct
   -> ([CST.PartialResult Module], [(ModuleName, [ModuleName])])
   -> m (BuildPlan, CacheDb)
 construct MakeActions{..} cacheDb (sorted, graph) = do
-  -- _ <- trace (show ("BuildPlan.construct 1 start" :: String, unsafePerformIO dt)) $ pure ()
   let sortedModuleNames = map (getModuleName . CST.resPartial) sorted
-  -- _ <- trace (show ("BuildPlan.construct 2 start" :: String, unsafePerformIO dt)) $ pure ()
   rebuildStatuses <- A.forConcurrently sortedModuleNames getRebuildStatus
-  -- _ <- trace (show ("BuildPlan.construct 3 start" :: String, unsafePerformIO dt)) $ pure ()
-  let prebuilt = mempty
-        -- foldl' collectPrebuiltModules M.empty $
-        --   mapMaybe (\s -> (statusModuleName s, statusRebuildNever s,) <$> statusPrebuilt s) (snd <$> rebuildStatuses)
+  let prebuilt =
+        foldl' collectPrebuiltModules M.empty $
+          mapMaybe (\s -> (statusModuleName s, statusRebuildNever s,) <$> statusPrebuilt s) (snd <$> rebuildStatuses)
   let toBeRebuilt = filter (not . flip M.member prebuilt . fst) rebuildStatuses
   -- _ <- trace (show ("BuildPlan.construct 4 start" :: String, unsafePerformIO dt)) $ pure ()
   buildJobs <- foldM makeBuildJob M.empty toBeRebuilt
@@ -341,18 +265,6 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
       pure (M.insert moduleName buildJob prev)
 
     getRebuildStatus :: ModuleName -> m (ModuleName, RebuildStatus)
---     getRebuildStatus moduleName = (moduleName,) <$> do
---           dirtyExterns <- snd <$> readExterns moduleName
---           -- prebuilt <- findExistingExtern dirtyExterns moduleName
---           let prebuilt = Prebuilt <$> pure (UTCTime (fromOrdinalDate 0 1) (fromInteger 0)) <*> dirtyExterns
---           pure (RebuildStatus
---             { statusModuleName = moduleName
---             , statusRebuildNever = True
---             , statusPrebuilt = prebuilt
---             , statusDirtyExterns = dirtyExterns
---             , statusNewCacheInfo = Nothing
---             })
---
     -- TODO[drathier]: statusDirtyExterns seemingly contains no more info than Prebuilt does; are we filtering Prebuilt but not DirtyExterns somewhere? Why have both?
     getRebuildStatus moduleName = (moduleName,) <$> do
       inputInfo <- getInputTimestampsAndHashes moduleName

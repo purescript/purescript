@@ -53,7 +53,15 @@ import Debug.Trace
 import Data.Function ((&))
 
 -- for debug prints, timestamps
+import Language.PureScript.Docs.Types (formatTime)
+import Data.Time.Clock (getCurrentTime)
 import System.IO.Unsafe (unsafePerformIO)
+
+{-# NOINLINE dt #-}
+dt = do
+  ts <- getCurrentTime
+  pure (formatTime ts)
+
 
 -- | Rebuild a single module.
 --
