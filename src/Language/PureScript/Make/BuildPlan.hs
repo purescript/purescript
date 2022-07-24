@@ -109,125 +109,103 @@ fastEqExterns a b =
     toCmp x = bcCacheDeclarations $ efBuildCache x
   in
   Serialise.serialise (toCmp a) == Serialise.serialise (toCmp b)
+  -- case Serialise.serialise (toCmp a) == Serialise.serialise (toCmp b) of
+  --   True -> True
+  --   False ->
+  --     trace (show ("fastEqExterns" :: String, efModuleName a, "/=", efModuleName a, "dep", toCmp a, toCmp b))
+  --     False
 
 
 isCacheHit
   :: MonadBaseControl IO m
   => M.Map ModuleName (MVar BuildJobResult)
+  -> M.Map ModuleName ()
   -> M.Map ModuleName ExternsFile
   -> ExternsFile
   -> m Bool
-isCacheHit deps depsExternsFromPrebuilts dirtyExterns = do
-  let
-    -- was any of the direct deps RebuildWasNeeded? if so, rebuild.
-    -- 1. find all direct deps by looking at the dirty externsfile
-    dirtyExternsCachedImports :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])
-    dirtyExternsCachedImports =
-      dirtyExterns
-        & (bcCacheImports . efBuildCache)
-
-  (depsExternDeclsFromMVars :: M.Map ModuleName ExternsFile) <-
-      deps
+isCacheHit deps directDeps depsExternsFromPrebuilts dirtyExterns = do
+  -- did any dependency change? if not, early return
+  noUpstreamChanges <-
+    deps
       -- & (\v -> trace (show ("depsExternDecls1" :: String, M.keys v)) v)
       & (id :: M.Map ModuleName (MVar BuildJobResult) -> M.Map ModuleName (MVar BuildJobResult))
-      & (\keepValues -> M.intersection keepValues dirtyExternsCachedImports)
+      & (\keepValues -> M.intersection keepValues directDeps)
       -- & (\v -> trace (show ("depsExternDecls2" :: String, M.keys v, "dirtyImportedModules" :: String, dirtyImportedModules)) v)
       & (id :: M.Map ModuleName (MVar BuildJobResult) -> M.Map ModuleName (MVar BuildJobResult))
       & traverse tryReadMVar
-      -- -- & fmap (\v -> trace (show ("depsExternDecls3" :: String, v)) v)
-      & (id :: m (M.Map ModuleName (Maybe BuildJobResult)) -> m (M.Map ModuleName (Maybe BuildJobResult)))
-      & fmap (\v ->
-        v
-        & M.mapMaybe id
-        -- & (\v -> trace (show ("depsExternDecls4" :: String, efModuleName dirtyExterns, M.keys v)) v)
-        & (id :: M.Map ModuleName BuildJobResult -> M.Map ModuleName BuildJobResult)
-        & traverse (\case
-          BuildJobSucceeded _ externs RebuildWasNotNeeded ->
-            -- trace (show ("isCacheHit" :: String, efModuleName dirtyExterns, "dep", "RebuiltWasNotNeeded", efModuleName externs)) $
-            Just externs
-          BuildJobSucceeded _ externs RebuildWasNeeded ->
-            -- trace (show ("isCacheHit:no" :: String, efModuleName dirtyExterns, "dep", "RebuiltWasNeeded", efModuleName externs)) $
-            Nothing
-          BuildJobCacheHit externs ->
-            -- trace (show ("isCacheHit" :: String, efModuleName dirtyExterns, "dep", "BuildJobCacheHit", efModuleName externs)) $
-              Just externs
-          BuildJobFailed _ -> Nothing
-          BuildJobSkipped -> Nothing
+      & fmap (\bjmap ->
+        bjmap
+        & M.elems
+        & fmap (fromMaybe (internalError "isCacheHit1: no barrier"))
+        -- & fmap (\(k,v) -> (k, fromMaybe (internalError "isCacheHit1: no barrier") v))
+        -- & fmap (\(k,v) -> trace (show ("noUpstreamChanges"::String, efModuleName dirtyExterns, "->", k,
+        --   case v of
+        --     BuildJobSucceeded _ _ RebuildWasNeeded -> "BuildJobSucceeded:RebuildWasNeeded"
+        --     BuildJobSucceeded _ _ RebuildWasNotNeeded -> "BuildJobSucceeded:RebuildWasNotNeeded"
+        --     BuildJobCacheHit _ -> "BuildJobCacheHit"
+        --     BuildJobFailed _ -> "BuildJobFailed"
+        --     BuildJobSkipped -> "BuildJobSkipped"
+        -- , directDeps)) (k,v))
+        -- & fmap snd
+        & all (\case
+          BuildJobSucceeded _ _ RebuildWasNotNeeded -> True
+          BuildJobCacheHit _ -> True
+          _ -> False
         )
-        -- & fromMaybe (internalError "isCacheHit: no barrier")
-        & fromMaybe (trace (show ("isCacheHit:Nothing" :: String, efModuleName dirtyExterns)) mempty)
       )
+  pure noUpstreamChanges
 
-  let (depsExternDecls :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])) =
-        (depsExternDeclsFromMVars <> depsExternsFromPrebuilts)
-        & (\keepValues -> M.intersection keepValues dirtyExternsCachedImports)
-        & (id :: M.Map ModuleName ExternsFile -> M.Map ModuleName ExternsFile)
-        & fmap (bcCacheDeclarations . efBuildCache)
-        -- TODO[drathier]: only look at the keys we care about
-        -- & (\v -> trace (show ("depsExternDecls6" :: String, M.keys v)) v)
-        & (id :: M.Map ModuleName (M.Map B.ByteString [B.ByteString]) -> M.Map ModuleName (M.Map B.ByteString [B.ByteString]))
-
-  pure $
-    case depsExternDecls == dirtyExternsCachedImports of
-      False ->
-        -- trace (show ("isCacheHit1 cache miss" :: String, efModuleName dirtyExterns, ("deps-len", length deps), ("dirtyCachedImports" :: String, M.keys dirtyExternsCachedImports))) $
-        False
-      True ->
-        -- trace (show ("isCacheHit1 cache hit" :: String, efModuleName dirtyExterns, ("deps-len", length deps), ("dirtyCachedImports" :: String, M.keys dirtyExternsCachedImports))) $
-        True
-
-
-isCacheHit deps depsExternsFromPrebuilts dirtyExterns = do
-  let
-
-
-    externFromBJRes = \case
-      BuildJobSucceeded _ e _ -> Just e -- TODO[drathier]: look at the rebuild flag!
-      BuildJobCacheHit e -> Just e
-      BuildJobFailed _ -> Nothing
-      BuildJobSkipped -> Nothing
-
-    dirtyCachedImports :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])
-    dirtyCachedImports =
-      dirtyExterns
-        & (bcCacheImports . efBuildCache)
-
-    dirtyImportedModules :: [ModuleName]
-    dirtyImportedModules =
-      dirtyExterns
-        & efImports
-        <&> eiModule
-        & L.nub
-
-  (depsExternDeclsFromMVars :: M.Map ModuleName ExternsFile) <-
-    deps
-    -- & (\v -> trace (show ("depsExternDecls1" :: String, M.keys v)) v)
-    & (id :: M.Map ModuleName (MVar BuildJobResult) -> M.Map ModuleName (MVar BuildJobResult))
-    & M.filterWithKey (\k _ -> elem k dirtyImportedModules)
-    -- & (\v -> trace (show ("depsExternDecls2" :: String, M.keys v, "dirtyImportedModules" :: String, dirtyImportedModules)) v)
-    & (id :: M.Map ModuleName (MVar BuildJobResult) -> M.Map ModuleName (MVar BuildJobResult))
-    & traverse tryReadMVar
-    -- -- & fmap (\v -> trace (show ("depsExternDecls3" :: String, v)) v)
-    & (id :: m (M.Map ModuleName (Maybe BuildJobResult)) -> m (M.Map ModuleName (Maybe BuildJobResult)))
-    & fmap (\v ->
-      v
-      & M.mapMaybe id
-      -- -- & (\v -> trace (show ("depsExternDecls4" :: String, v)) v)
-      & (id :: M.Map ModuleName BuildJobResult -> M.Map ModuleName BuildJobResult)
-      & M.mapMaybe externFromBJRes
-      -- & (\v -> trace (show ("depsExternDecls5" :: String, M.keys v)) v)
-    )
-
-  let (depsExternDecls :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])) =
-        (depsExternDeclsFromMVars <> depsExternsFromPrebuilts)
-        & M.filterWithKey (\k _ -> elem k dirtyImportedModules)
-        & (id :: M.Map ModuleName ExternsFile -> M.Map ModuleName ExternsFile)
-        & fmap (bcCacheDeclarations . efBuildCache)
-        -- & (\v -> trace (show ("depsExternDecls6" :: String, M.keys v)) v)
-        & (id :: M.Map ModuleName (M.Map B.ByteString [B.ByteString]) -> M.Map ModuleName (M.Map B.ByteString [B.ByteString]))
-
-  -- (\res -> if depsExternDecls == dirtyCachedImports then res else trace (show ("isCacheHit cache miss" :: String, res, efModuleName dirtyExterns, ("deps-len", length deps), ("depsExternDecls" :: String, M.keys depsExternDecls), ("dirtyCachedImports" :: String, M.keys dirtyCachedImports))) res) <$>
-  (pure $ depsExternDecls == dirtyCachedImports)
+-- isCacheHit deps depsExternsFromPrebuilts dirtyExterns = do
+--   let
+--
+--
+--     externFromBJRes = \case
+--       BuildJobSucceeded _ e _ -> Just e -- TODO[drathier]: look at the rebuild flag!
+--       BuildJobCacheHit e -> Just e
+--       BuildJobFailed _ -> Nothing
+--       BuildJobSkipped -> Nothing
+--
+--     dirtyCachedImports :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])
+--     dirtyCachedImports =
+--       dirtyExterns
+--         & (bcCacheImports . efBuildCache)
+--
+--     dirtyImportedModules :: [ModuleName]
+--     dirtyImportedModules =
+--       dirtyExterns
+--         & efImports
+--         <&> eiModule
+--         & L.nub
+--
+--   (depsExternDeclsFromMVars :: M.Map ModuleName ExternsFile) <-
+--     deps
+--     -- & (\v -> trace (show ("depsExternDecls1" :: String, M.keys v)) v)
+--     & (id :: M.Map ModuleName (MVar BuildJobResult) -> M.Map ModuleName (MVar BuildJobResult))
+--     & M.filterWithKey (\k _ -> elem k dirtyImportedModules)
+--     -- & (\v -> trace (show ("depsExternDecls2" :: String, M.keys v, "dirtyImportedModules" :: String, dirtyImportedModules)) v)
+--     & (id :: M.Map ModuleName (MVar BuildJobResult) -> M.Map ModuleName (MVar BuildJobResult))
+--     & traverse tryReadMVar
+--     -- -- & fmap (\v -> trace (show ("depsExternDecls3" :: String, v)) v)
+--     & (id :: m (M.Map ModuleName (Maybe BuildJobResult)) -> m (M.Map ModuleName (Maybe BuildJobResult)))
+--     & fmap (\v ->
+--       v
+--       & M.mapMaybe id
+--       -- -- & (\v -> trace (show ("depsExternDecls4" :: String, v)) v)
+--       & (id :: M.Map ModuleName BuildJobResult -> M.Map ModuleName BuildJobResult)
+--       & M.mapMaybe externFromBJRes
+--       -- & (\v -> trace (show ("depsExternDecls5" :: String, M.keys v)) v)
+--     )
+--
+--   let (depsExternDecls :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])) =
+--         (depsExternDeclsFromMVars <> depsExternsFromPrebuilts)
+--         & M.filterWithKey (\k _ -> elem k dirtyImportedModules)
+--         & (id :: M.Map ModuleName ExternsFile -> M.Map ModuleName ExternsFile)
+--         & fmap (bcCacheDeclarations . efBuildCache)
+--         -- & (\v -> trace (show ("depsExternDecls6" :: String, M.keys v)) v)
+--         & (id :: M.Map ModuleName (M.Map B.ByteString [B.ByteString]) -> M.Map ModuleName (M.Map B.ByteString [B.ByteString]))
+--
+--   -- (\res -> if depsExternDecls == dirtyCachedImports then res else trace (show ("isCacheHit cache miss" :: String, res, efModuleName dirtyExterns, ("deps-len", length deps), ("depsExternDecls" :: String, M.keys depsExternDecls), ("dirtyCachedImports" :: String, M.keys dirtyCachedImports))) res) <$>
+--   (pure $ depsExternDecls == dirtyCachedImports)
 
 -- eqDeclRefIgnoringSourceSpan a b =
 --   case (a, b) of
@@ -332,28 +310,28 @@ construct
   -> ([CST.PartialResult Module], [(ModuleName, [ModuleName])])
   -> m (BuildPlan, CacheDb)
 construct MakeActions{..} cacheDb (sorted, graph) = do
-  _ <- trace (show ("BuildPlan.construct 1 start" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("BuildPlan.construct 1 start" :: String, unsafePerformIO dt)) $ pure ()
   let sortedModuleNames = map (getModuleName . CST.resPartial) sorted
-  _ <- trace (show ("BuildPlan.construct 2 start" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("BuildPlan.construct 2 start" :: String, unsafePerformIO dt)) $ pure ()
   rebuildStatuses <- A.forConcurrently sortedModuleNames getRebuildStatus
-  _ <- trace (show ("BuildPlan.construct 3 start" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("BuildPlan.construct 3 start" :: String, unsafePerformIO dt)) $ pure ()
   let prebuilt = mempty
         -- foldl' collectPrebuiltModules M.empty $
         --   mapMaybe (\s -> (statusModuleName s, statusRebuildNever s,) <$> statusPrebuilt s) (snd <$> rebuildStatuses)
   let toBeRebuilt = filter (not . flip M.member prebuilt . fst) rebuildStatuses
-  _ <- trace (show ("BuildPlan.construct 4 start" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("BuildPlan.construct 4 start" :: String, unsafePerformIO dt)) $ pure ()
   buildJobs <- foldM makeBuildJob M.empty toBeRebuilt
-  _ <- trace (show ("BuildPlan.construct 5 start" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("BuildPlan.construct 5 start" :: String, unsafePerformIO dt)) $ pure ()
   env <- C.newMVar primEnv
-  _ <- trace (show ("BuildPlan.construct 6 start" :: String, unsafePerformIO dt)) $ pure ()
-  res <- pure
-    ( BuildPlan prebuilt buildJobs env
-    , let
-        update = flip $ \s ->
-          M.alter (const (statusNewCacheInfo s)) (statusModuleName s)
-      in
-        foldl' update cacheDb (snd <$> rebuildStatuses)
-    )
+  -- _ <- trace (show ("BuildPlan.construct 6 start" :: String, unsafePerformIO dt)) $ pure ()
+  let res =
+        ( BuildPlan prebuilt buildJobs env
+        , let
+            update = flip $ \s ->
+              M.alter (const (statusNewCacheInfo s)) (statusModuleName s)
+          in
+            foldl' update cacheDb (snd <$> rebuildStatuses)
+        )
   -- trace (show ("BuildPlan.construct 7 end" :: String, unsafePerformIO dt)) $ pure ()
   pure res
   where
@@ -364,8 +342,8 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
 
     getRebuildStatus :: ModuleName -> m (ModuleName, RebuildStatus)
 --     getRebuildStatus moduleName = (moduleName,) <$> do
---           -- prebuilt <- findExistingExtern moduleName
---           let dirtyExterns = pbExternsFile <$> prebuilt
+--           dirtyExterns <- snd <$> readExterns moduleName
+--           -- prebuilt <- findExistingExtern dirtyExterns moduleName
 --           let prebuilt = Prebuilt <$> pure (UTCTime (fromOrdinalDate 0 1) (fromInteger 0)) <*> dirtyExterns
 --           pure (RebuildStatus
 --             { statusModuleName = moduleName
@@ -380,8 +358,8 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
       inputInfo <- getInputTimestampsAndHashes moduleName
       case inputInfo of
         Left RebuildNever -> do
-          prebuilt <- findExistingExtern moduleName
-          let dirtyExterns = pbExternsFile <$> prebuilt
+          dirtyExterns <- snd <$> readExterns moduleName
+          prebuilt <- findExistingExtern dirtyExterns moduleName
           pure (RebuildStatus
             { statusModuleName = moduleName
             , statusRebuildNever = True
@@ -400,12 +378,12 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
         Right cacheInfo -> do
           cwd <- liftBase getCurrentDirectory
           (newCacheInfo, isUpToDate) <- checkChanged cacheDb moduleName cwd cacheInfo
+          dirtyExterns <- snd <$> readExterns moduleName
           prebuilt <-
             -- NOTE[fh]: prebuilt is Nothing for source-modified files, and Just for non-source modified files
             if isUpToDate
-              then findExistingExtern moduleName
+              then findExistingExtern dirtyExterns moduleName
               else pure Nothing
-          let dirtyExterns = pbExternsFile <$> prebuilt
           pure (RebuildStatus
             { statusModuleName = moduleName
             , statusRebuildNever = False
@@ -414,10 +392,10 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
             , statusNewCacheInfo = Just newCacheInfo
             })
 
-    findExistingExtern :: ModuleName -> m (Maybe Prebuilt)
-    findExistingExtern moduleName = runMaybeT $ do
+    findExistingExtern :: Maybe ExternsFile -> ModuleName -> m (Maybe Prebuilt)
+    findExistingExtern mexterns moduleName = runMaybeT $ do
       timestamp <- MaybeT $ getOutputTimestamp moduleName
-      externs <- MaybeT $ snd <$> readExterns moduleName
+      externs <- MaybeT $ pure mexterns
       pure (Prebuilt timestamp externs)
 
     collectPrebuiltModules :: M.Map ModuleName Prebuilt -> (ModuleName, Bool, Prebuilt) -> M.Map ModuleName Prebuilt

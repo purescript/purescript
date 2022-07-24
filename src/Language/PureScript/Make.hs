@@ -50,10 +50,9 @@ import qualified Language.PureScript.CoreFn as CF
 import           System.Directory (doesFileExist)
 import           System.FilePath (replaceExtension)
 import Debug.Trace
+import Data.Function ((&))
 
 -- for debug prints, timestamps
-import Language.PureScript.Docs.Types (formatTime)
-import Data.Time.Clock (getCurrentTime)
 import System.IO.Unsafe (unsafePerformIO)
 
 -- | Rebuild a single module.
@@ -142,7 +141,7 @@ make ma@MakeActions{..} ms = do
   cacheDb <- readCacheDb
 
   (sorted, graph, directGraph) <- sortModules3 Transitive (moduleSignature . CST.resPartial) ms
-  _ <- trace (show ("make pre fork1" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("make pre fork1" :: String, unsafePerformIO dt)) $ pure ()
 
   -- todo `readExterns` for the file if it didn't change; deps was Transitive not Direct, that's way too safe imo, guessing we don't use the new externs for newly compiled things, and we don't figure out if that extern changed, so we always recompile transitive deps, which is sad since we don't have a cross-module non-stdlib inliner
 
@@ -157,10 +156,10 @@ make ma@MakeActions{..} ms = do
   -- day 2, start 2022-05-26 12:20:00
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
-  _ <- trace (show ("make pre fork2" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("make pre fork2" :: String, unsafePerformIO dt)) $ pure ()
 
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
-  _ <- trace (show ("make pre fork3" :: String, unsafePerformIO dt)) $ pure ()
+  _ <- trace (show ("make build plan done" :: String, unsafePerformIO dt)) $ pure ()
   for_ toBeRebuilt $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     -- _ <- trace (show ("make start fork" :: String, unsafePerformIO dt, moduleName)) $ pure ()
@@ -193,13 +192,6 @@ make ma@MakeActions{..} ms = do
   -- Write the updated build cache database to disk
   writeCacheDb $ Cache.removeModules (M.keysSet failures) newCacheDb
 
-  -- Write all new externs to the db file
-  _ <- trace (show ("make pre_ read externsDB" :: String, unsafePerformIO dt)) $ pure ()
-  externsDb <- readBuildCacheDb
-  _ <- trace (show ("make pre_ write externsDB" :: String, unsafePerformIO dt)) $ pure ()
-  writeBuildCacheDb (M.union (efBuildCache <$> successes) externsDb)
-  _ <- trace (show ("make post write externsDB" :: String, unsafePerformIO dt)) $ pure ()
-
   -- If generating docs, also generate them for the Prim modules
   outputPrimDocs
 
@@ -213,7 +205,7 @@ make ma@MakeActions{..} ms = do
   let lookupResult mn =
         fromMaybe (internalError "make: module not found in results")
         $ M.lookup mn successes
-  _ <- trace (show ("make done last" :: String, unsafePerformIO dt)) $ pure ()
+  _ <- trace (show ("make done" :: String, unsafePerformIO dt)) $ pure ()
   return (map (lookupResult . getModuleName . CST.resPartial) sorted)
 
   where
@@ -254,46 +246,54 @@ make ma@MakeActions{..} ms = do
       -- We need to wait for dependencies to be built, before checking if the current
       -- module should be rebuilt, so the first thing to do is to wait on the
       -- MVars for the module's dependencies.
-      traverse_
-        (\dep ->
-          do
-            res <- getResult buildPlan dep
-            pure ()
-        ) deps
+      traverse_ (void <$> getResult buildPlan) deps
 
       -- _ <- trace (show ("buildModule pre_ first1" :: String, unsafePerformIO dt, moduleName)) $ pure ()
       let depsExterns = bjResult <$> bpBuildJobs buildPlan
       let prebuiltExterns = pbExternsFile <$> bpPrebuilt buildPlan
 
-      let ourPrebuiltIfSourceFilesDidntChange = didModuleSourceFilesChange buildPlan moduleName
-      let ourCacheFileIfSourceFilesDidntChange = pbExternsFile <$> ourPrebuiltIfSourceFilesDidntChange
       let ourDirtyCacheFile = getDirtyCacheFile buildPlan moduleName
+
+      -------
+      let resultsWithModuleNamesDirect :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, WasRebuildNeeded))] = traverse (\dep ->
+            do
+              res <- getResult buildPlan dep
+              pure ((dep,) <$> res)
+            ) directDeps
+      let resultsDirect = fmap fmap fmap snd <$> resultsWithModuleNamesDirect
+      _ <- fmap unzip . fmap (fmap (\(a,b,_) -> (a,b))) . sequence <$> resultsDirect
+
+      -------
+
+      let directDepsMap = M.fromList $ (,()) <$> directDeps
+      let buildJob = M.lookup moduleName (bpBuildJobs buildPlan) & fromMaybe (internalError "buildModule: no barrier")
 
       -- try to early return
       firstCacheResult <-
-            case M.lookup moduleName (bpBuildJobs buildPlan) of
-              -- did this module change? then we can never get a cache hit
-              -- did any deps public api change?
-              Just bj | Nothing <- bjPrebuilt bj ->
-                trace (show ("buildModule pre_ rebuildModule' cache:src-changed" :: String, moduleName)) $
-                pure Nothing
-              Just bj | Just bjde <- bjDirtyExterns bj -> do
-                -- TODO[drathier]: we don't have to look at all deps, just the ones we're rebuilding
-                ich <- isCacheHit depsExterns prebuiltExterns bjde
-                case () of
-                  () | ich ->
-                    pure $ Just bjde
-                  _ ->
-                    trace (show ("buildModule pre_ rebuildModule' cache:miss-inner" :: String, moduleName)) $
-                    pure $ Nothing
-              _ ->
-                trace (show ("buildModule pre_ rebuildModule' cache:miss-outer" :: String, moduleName)) $
+          -- TODO[drathier]: lazy load bjPrebuilt; we don't need it here, we only need to know if input src files changed
+          -- did this module change? then we can never get a cache hit
+          -- did any deps public api change?
+        case (bjPrebuilt buildJob, bjDirtyExterns buildJob) of
+          (Nothing, Just _) ->
+            trace (show ("buildModule pre_ rebuildModule' cache:src-changed" :: String, moduleName)) $
+            pure Nothing
+          (_, Nothing) ->
+            trace (show ("buildModule pre_ rebuildModule' cache:first-build" :: String, moduleName)) $
+            pure Nothing
+          (_, Just bjde) -> do
+            -- TODO[drathier]: we don't have to look at all deps, just the ones we're rebuilding
+            ich <- isCacheHit depsExterns directDepsMap prebuiltExterns bjde
+            case ich of
+              True ->
+                pure $ Just bjde
+              False ->
+                trace (show ("buildModule pre_ rebuildModule' cache:miss" :: String, moduleName)) $
                 pure $ Nothing
 
       case firstCacheResult of
         Just bjde ->
           -- first cache was a hit, early return
-          trace (show ("buildModule pre_ rebuildModule' cache:hit" :: String, moduleName)) $
+          -- trace (show ("buildModule pre_ rebuildModule' cache:hit" :: String, moduleName)) $
           pure $ BuildJobCacheHit bjde
 
         Nothing -> do
@@ -315,17 +315,6 @@ make ma@MakeActions{..} ms = do
             fromMaybe M.empty . fmap M.fromList . fmap (fmap (\(mn, (_,_,c)) -> (mn, c))) . sequence <$> resultsWithModuleNames
           _anyDepWasRebuiltNeeded :: Bool <- elem RebuildWasNeeded . maybe [] (fmap (\(_,_,c) -> c)) . sequence <$> results
 
-          let resultsWithModuleNamesDirect :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, WasRebuildNeeded))] = traverse (\dep ->
-                do
-                  res <- getResult buildPlan dep
-                  pure ((dep,) <$> res)
-                ) directDeps
-          let resultsDirect = fmap fmap fmap snd <$> resultsWithModuleNamesDirect
-          _ <- fmap unzip . fmap (fmap (\(a,b,_) -> (a,b))) . sequence <$> resultsDirect
-          didEachDependencyChangeDirect :: M.Map ModuleName WasRebuildNeeded <-
-            fromMaybe M.empty . fmap M.fromList . fmap (fmap (\(mn, (_,_,c)) -> (mn, c))) . sequence <$> resultsWithModuleNamesDirect
-          let didAnyDependenciesChangeDirect :: Bool = elem RebuildWasNeeded $ M.elems didEachDependencyChangeDirect
-
           -- _ <- trace (show ("buildModule pre_ first3" :: String, unsafePerformIO dt, moduleName)) $ pure ()
           case mexterns of
             Just (_, externs) -> do
@@ -340,28 +329,8 @@ make ma@MakeActions{..} ms = do
                 foldM go env deps
               env <- C.readMVar (bpEnv buildPlan)
 
-              case (ourCacheFileIfSourceFilesDidntChange, didAnyDependenciesChangeDirect) of
-                (Just exts, False) -> do
-                  _ <- trace (show ("buildModule post rebuildModule' cache:hit" :: String, unsafePerformIO dt, moduleName)) (pure ())
-                  return $ BuildJobCacheHit exts
-                  -- TODO[drathier]: does this work out? carrying forward the oldWarnings value here? Is it the right set of warnings? Will we get duplicates?
-
-                (Just _, _) -> do
-                  (exts, warnings) <- listen $ rebuildModule' ma env externs m
-
-                  bjs <- pure $ buildJobSuccess $ buildJobSucceeded ourDirtyCacheFile (pwarnings' <> warnings) exts
-                  case bjs of
-                    Just (_, _, RebuildWasNotNeeded) -> do
-                      _ <- trace (show ("buildModule post rebuildModule' cache:useless-rebuild" :: String, unsafePerformIO dt, moduleName)) (pure ())
-                      return $ BuildJobCacheHit exts
-                    _ -> do
-                      _ <- trace (show ("buildModule post rebuildModule' cache:changed" :: String, unsafePerformIO dt, moduleName)) (pure ())
-                      return $ buildJobSucceeded ourDirtyCacheFile (pwarnings' <> warnings) exts
-
-                _ -> do
-                  _ <- trace (show ("buildModule pre_ rebuildModule' cache:missing" :: String, unsafePerformIO dt, moduleName)) (pure ())
-                  (exts, warnings) <- listen $ rebuildModule' ma env externs m
-                  return $ buildJobSucceeded ourDirtyCacheFile (pwarnings' <> warnings) exts
+              (exts, warnings) <- listen $ rebuildModule' ma env externs m
+              pure $ buildJobSucceeded ourDirtyCacheFile (pwarnings' <> warnings) exts
 
             Nothing -> return BuildJobSkipped
 

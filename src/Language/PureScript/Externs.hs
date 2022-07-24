@@ -11,6 +11,7 @@ module Language.PureScript.Externs
   , BuildCacheFile(..)
   , ExternCacheKey(..)
   , DeclarationCacheRef(..)
+  , BuildCacheDb
   , externsIsCurrentVersion
   , moduleToExternsFile
   , applyExternsFileToEnvironment
@@ -145,6 +146,7 @@ data BuildCacheFile = BuildCacheFile
   } deriving (Show, Generic)
 instance Serialise BuildCacheFile
 
+type BuildCacheDb = M.Map ModuleName BuildCacheFile
 
 -- | A module import in an externs file
 data ExternsImport = ExternsImport

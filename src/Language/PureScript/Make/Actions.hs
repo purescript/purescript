@@ -43,7 +43,7 @@ import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Docs.Prim as Docs.Prim
 import qualified Language.PureScript.Docs.Types as Docs
 import           Language.PureScript.Errors
-import           Language.PureScript.Externs (ExternsFile, externsFileName, BuildCacheFile)
+import           Language.PureScript.Externs (ExternsFile, externsFileName, BuildCacheFile, BuildCacheDb)
 import           Language.PureScript.Make.Monad
 import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names
@@ -120,8 +120,6 @@ data MakeActions m = MakeActions
   , outputPrimDocs :: m ()
   -- ^ If generating docs, output the documentation for the Prim modules
   }
-
-type BuildCacheDb = M.Map ModuleName BuildCacheFile
 
 {-
 Task: load less data from disk, to load it faster on cache hits, since deserializing cbor takes time
@@ -250,7 +248,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   readExterns :: ModuleName -> Make (FilePath, Maybe ExternsFile)
   readExterns mn = do
-    _ <- trace (show ("readExterns" :: String, mn)) $ pure ()
+    -- _ <- trace (show ("readExterns" :: String, mn)) $ pure ()
     let path = outputDir </> T.unpack (runModuleName mn) </> externsFileName
     (path, ) <$> readExternsFile path
 
