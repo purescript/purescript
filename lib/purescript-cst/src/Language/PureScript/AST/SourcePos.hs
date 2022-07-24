@@ -27,12 +27,7 @@ data SourcePos = SourcePos
     -- ^ Line number
   , sourcePosColumn :: Int
     -- ^ Column number
-  } deriving (Show, Eq, Ord, Generic, NFData)
-
-instance Serialise SourcePos where
-  -- NOTE[fh]: this is quite bad to push to main, since I'm sure it'll break ide integrations etc, but I'm only trying shit out now
-  encode (SourcePos _ _) = Serialise.gencode $ from (SourcePos 0 0)
-  decode = to <$> Serialise.gdecode
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 displaySourcePos :: SourcePos -> Text
 displaySourcePos sp =
