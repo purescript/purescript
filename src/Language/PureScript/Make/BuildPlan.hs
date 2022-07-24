@@ -15,7 +15,6 @@ module Language.PureScript.Make.BuildPlan
   , bpBuildJobs
   , pbExternsFile
   , bpPrebuilt
-  , getDirtyCacheFile
   , bjPrebuilt
   , bjDirtyExterns
   , isCacheHit
@@ -31,11 +30,9 @@ import           Control.Monad hiding (sequence)
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import           Data.Foldable (foldl')
-import qualified Data.List as L
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Time.Clock (UTCTime(..))
-import           Data.Time.Calendar.OrdinalDate (fromOrdinalDate)
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST as CST
@@ -47,9 +44,7 @@ import           Language.PureScript.Names (ModuleName(..))
 import           Language.PureScript.Sugar.Names.Env
 import           System.Directory (getCurrentDirectory)
 import Data.Function
-import Data.Functor
 import Debug.Trace
-import qualified Data.ByteString.Lazy as B
 
 -- for debug prints, timestamps
 import Language.PureScript.Docs.Types (formatTime)
@@ -101,18 +96,23 @@ data WasRebuildNeeded
   | RebuildWasNotNeeded
   deriving (Show, Eq)
 
-buildJobSucceeded :: Maybe ExternsFile -> MultipleErrors -> ExternsFile -> BuildJobResult
-buildJobSucceeded mDirtyExterns warnings externs =
-  case mDirtyExterns of
-    Just dirtyExterns | fastEqExterns dirtyExterns externs -> BuildJobSucceeded warnings externs RebuildWasNotNeeded
+buildJobSucceeded :: Maybe BuildCacheFile -> MultipleErrors -> ExternsFile -> BuildJobResult
+buildJobSucceeded mDirtyCache warnings externs =
+  case mDirtyCache of
+    Just dirtyCache | fastEqBuildCache dirtyCache (efBuildCache externs) -> BuildJobSucceeded warnings externs RebuildWasNotNeeded
     _ -> BuildJobSucceeded warnings externs RebuildWasNeeded
 
-fastEqExterns a b =
+fastEqBuildCache :: BuildCacheFile -> BuildCacheFile -> Bool
+fastEqBuildCache cache externsCache =
   let
-    -- TODO[drathier]: is it enough to look at just the cacheDeclarations (what we export)? or do we need to look at the cached imports too?
-    toCmp x = bcCacheDeclarations $ efBuildCache x
+    toCmp (BuildCacheFile {..}) =
+        let
+          -- don't compare imports; it will result in two layers being rebuilt instead of one
+          bcCacheImports = mempty
+        in
+          BuildCacheFile {..}
   in
-  Serialise.serialise (toCmp a) == Serialise.serialise (toCmp b)
+  Serialise.serialise (toCmp cache) == Serialise.serialise (toCmp externsCache)
 
 buildJobSuccess :: BuildJobResult -> Maybe (MultipleErrors, ExternsFile, WasRebuildNeeded)
 buildJobSuccess (BuildJobSucceeded warnings externs wasRebuildNeeded) = Just (warnings, externs, wasRebuildNeeded)
@@ -125,11 +125,9 @@ isCacheHit
   :: MonadBaseControl IO m
   => M.Map ModuleName (MVar BuildJobResult)
   -> M.Map ModuleName ()
-  -> M.Map ModuleName ExternsFile
-  -> ExternsFile
   -> m Bool
-isCacheHit deps directDeps depsExternsFromPrebuilts dirtyExterns = do
-  -- did any dependency change? if not, early return
+isCacheHit deps directDeps = do
+  -- did any dependency change?
   noUpstreamChanges <-
     deps
       -- & (\v -> trace (show ("depsExternDecls1" :: String, M.keys v)) v)
@@ -145,10 +143,20 @@ isCacheHit deps directDeps depsExternsFromPrebuilts dirtyExterns = do
         & all (\case
           BuildJobSucceeded _ _ RebuildWasNotNeeded -> True
           BuildJobCacheHit _ -> True
-          _ -> False
+          v ->
+            -- trace (show ("isCacheHit:no"::String,
+            --    case v of
+            --      BuildJobSucceeded _ _ RebuildWasNeeded -> "BuildJobSucceeded:RebuildWasNeeded"
+            --      BuildJobSucceeded _ _ RebuildWasNotNeeded -> "BuildJobSucceeded:RebuildWasNotNeeded"
+            --      BuildJobCacheHit _ -> "BuildJobCacheHit"
+            --      BuildJobFailed _ -> "BuildJobFailed"
+            --      BuildJobSkipped -> "BuildJobSkipped"
+            --  , directDeps))
+            False
         )
       )
   pure noUpstreamChanges
+  -- TODO[drathier]: we can do more here; if a dep changed but we don't import the changed thing, we can consider the dep unchanged
 
 -- | Information obtained about a particular module while constructing a build
 -- plan; used to decide whether a module needs rebuilding.
@@ -209,22 +217,6 @@ getResult buildPlan moduleName =
       let bj = fromMaybe (internalError "make: no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
       r <- readMVar $ bjResult bj
       pure $ buildJobSuccess r
-
--- | Gets the Prebuilt for any modules whose source files didn't change.
-didModuleSourceFilesChange
-  :: BuildPlan
-  -> ModuleName
-  -> Maybe Prebuilt
-didModuleSourceFilesChange buildPlan moduleName =
-  bjPrebuilt =<< M.lookup moduleName (bpBuildJobs buildPlan)
-
--- | Gets the Prebuilt for any modules whose source files didn't change.
-getDirtyCacheFile
-  :: BuildPlan
-  -> ModuleName
-  -> Maybe ExternsFile
-getDirtyCacheFile buildPlan moduleName =
-  bjDirtyExterns =<< M.lookup moduleName (bpBuildJobs buildPlan)
 
 -- | Constructs a BuildPlan for the given module graph.
 --

@@ -160,8 +160,6 @@ make ma@MakeActions{..} ms = do
   -- new:
   -- 3. for each fork, when all deps are rebuilt, figure out if their public api changed, and if not, no need to rebuild
 
-  -- 3h spent day one
-  -- day 2, start 2022-05-26 12:20:00
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
   -- _ <- trace (show ("make pre fork2" :: String, unsafePerformIO dt)) $ pure ()
@@ -258,9 +256,9 @@ make ma@MakeActions{..} ms = do
 
       -- _ <- trace (show ("buildModule pre_ first1" :: String, unsafePerformIO dt, moduleName)) $ pure ()
       let depsExterns = bjResult <$> bpBuildJobs buildPlan
-      let prebuiltExterns = pbExternsFile <$> bpPrebuilt buildPlan
 
-      let ourDirtyCacheFile = getDirtyCacheFile buildPlan moduleName
+      let buildJob = M.lookup moduleName (bpBuildJobs buildPlan) & fromMaybe (internalError "buildModule: no barrier")
+      let ourDirtyCacheFile = fmap efBuildCache $ bjDirtyExterns =<< M.lookup moduleName (bpBuildJobs buildPlan)
 
       -------
       let resultsWithModuleNamesDirect :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, WasRebuildNeeded))] = traverse (\dep ->
@@ -274,7 +272,6 @@ make ma@MakeActions{..} ms = do
       -------
 
       let directDepsMap = M.fromList $ (,()) <$> directDeps
-      let buildJob = M.lookup moduleName (bpBuildJobs buildPlan) & fromMaybe (internalError "buildModule: no barrier")
 
       -- try to early return
       firstCacheResult <-
@@ -288,12 +285,12 @@ make ma@MakeActions{..} ms = do
           (_, Nothing) ->
             trace (show ("buildModule pre_ rebuildModule' cache:first-build" :: String, moduleName)) $
             pure Nothing
-          (_, Just bjde) -> do
+          (_, Just externs) -> do
             -- TODO[drathier]: we don't have to look at all deps, just the ones we're rebuilding
-            ich <- isCacheHit depsExterns directDepsMap prebuiltExterns bjde
+            ich <- isCacheHit depsExterns directDepsMap
             case ich of
               True ->
-                pure $ Just bjde
+                pure $ Just externs
               False ->
                 trace (show ("buildModule pre_ rebuildModule' cache:miss" :: String, moduleName)) $
                 pure $ Nothing
@@ -316,14 +313,11 @@ make ma@MakeActions{..} ms = do
                   res <- getResult buildPlan dep
                   pure ((dep,) <$> res)
                 ) deps
-          -- _ <- trace (show ("buildModule pre_ first2" :: String, unsafePerformIO dt, moduleName)) $ pure ()
           let results = fmap fmap fmap snd <$> resultsWithModuleNames
           mexterns <- fmap unzip . fmap (fmap (\(a,b,_) -> (a,b))) . sequence <$> results
           _ :: M.Map ModuleName WasRebuildNeeded <-
             fromMaybe M.empty . fmap M.fromList . fmap (fmap (\(mn, (_,_,c)) -> (mn, c))) . sequence <$> resultsWithModuleNames
-          _anyDepWasRebuiltNeeded :: Bool <- elem RebuildWasNeeded . maybe [] (fmap (\(_,_,c) -> c)) . sequence <$> results
 
-          -- _ <- trace (show ("buildModule pre_ first3" :: String, unsafePerformIO dt, moduleName)) $ pure ()
           case mexterns of
             Just (_, externs) -> do
               -- We need to ensure that all dependencies have been included in Env

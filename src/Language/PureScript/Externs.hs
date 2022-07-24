@@ -72,7 +72,9 @@ data ExternsFile = ExternsFile
 
 instance Serialise ExternsFile
 
--- | The data which will be serialized to a build cache file
+-- TODO[drathier]: is it enough to look at just the cacheDeclarations (what we export)? or do we need to look at the cached imports too?
+
+-- -- | The data which will be serialized to a build cache file
 data BuildCacheFile = BuildCacheFile
   -- NOTE: Make sure to keep `efVersion` as the first field in this
   -- record, so the derived Serialise instance produces CBOR that can
