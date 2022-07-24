@@ -76,6 +76,7 @@ instance Serialise ExternsFile
 
 -- -- | The data which will be serialized to a build cache file
 data BuildCacheFile = BuildCacheFile
+  -- NOTE[drathier]: using bytestrings here for much faster encoding/decoding, since we only care about equality for now. When we want to look at what's actually imported, we have to split this up a bit; BS into Map BS BS.
   -- NOTE: Make sure to keep `efVersion` as the first field in this
   -- record, so the derived Serialise instance produces CBOR that can
   -- be checked for its version independent of the remaining format
@@ -83,12 +84,10 @@ data BuildCacheFile = BuildCacheFile
   -- ^ The externs version
   , bcModuleName :: ModuleName
   -- ^ Module name
-  -- NOTE[drathier]: using bytestrings here for faster encoding/decoding
   -- , bcCacheDeclarations :: M.Map DeclarationCacheRef [ExternCacheKey]
-  , bcCacheDeclarations :: M.Map B.ByteString [B.ByteString]
-  -- ^ Duplicated to avoid having to update all usages
-  -- , bcCacheImports :: M.Map ModuleName (M.Map DeclarationCacheRef [ExternCacheKey])
-  , bcCacheImports :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])
+  , bcCacheBlob :: B.ByteString
+  -- ^ All of the things, in one ByteString. We only care about equality anyway.
+  , bcCacheDeps :: M.Map ModuleName B.ByteString
   -- ^ all declarations explicitly imported from a specific module, if explicitly imported
   -- 1. open imports are not cached, for now, since we don't know which things are used
   -- 2. hiding imports are also not cached, even though we could skip the hidden things and treat it as a closed import afterwards
@@ -234,7 +233,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
 
 
 _efBuildCache = efBuildCache
-_bcCacheDeclarations = bcCacheDeclarations
+_bcCacheBlob = bcCacheBlob
 
 data DeclarationCacheRef
   -- |
@@ -434,33 +433,53 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
   efDeclarations  = concat $ map snd $ bcCacheDeclarationsPre
   efSourceSpan    = ss
 
-  efBuildCache = BuildCacheFile efVersion efModuleName bcCacheDeclarations bcCacheImports
+  efBuildCache = BuildCacheFile efVersion efModuleName bcCacheBlob bcCacheImports
 
-  bcCacheDeclarations =
-    foldr
-      (\(k,vs) m1 ->
+  bcCacheBlob :: B.ByteString
+  bcCacheBlob =
+    let
+      foldCache :: Show a => Serialise a => [a] -> B.ByteString
+      foldCache = foldr (\a acc -> serialise a <> acc) B.empty
+
+      cacheDecls =
         foldr
-          (\v m2 ->
-            M.insertWith (++) (serialise (declRefToCacheRef k)) [serialise (extDeclToCacheKey v)] m2
+          (\(k,vs) m1 ->
+            case elem k efExports of
+              False -> m1
+              True ->
+                foldr
+                  (\v acc -> serialise (declRefToCacheRef k) <> serialise (extDeclToCacheKey v) <> acc)
+                  m1
+                  vs
           )
-          m1
-          vs
-      )
-      M.empty
-      bcCacheDeclarationsPre
+          B.empty
+          bcCacheDeclarationsPre
+
+      cacheExports = foldCache (declRefToCacheRef <$> efExports)
+      cacheImports = foldr (<>) B.empty (removeSourceSpansFromImport <$> eiImportType <$> efImports)
+      cacheFixities = foldCache efFixities
+      cacheTypeFixities = foldCache efTypeFixities
+
+      removeSourceSpansFromImport = \case
+        Implicit -> "Implicit"
+        Explicit declRefs -> "Explicit" <> foldCache (declRefToCacheRef <$> declRefs)
+        Hiding declRefs -> "Hiding" <> foldCache (declRefToCacheRef <$> declRefs)
+    in
+      cacheDecls
+      <> cacheExports
+      <> cacheImports
+      <> cacheFixities
+      <> cacheTypeFixities
+
   bcCacheDeclarationsPre :: [(DeclarationRef, [ExternsDeclaration])]
   bcCacheDeclarationsPre = (\ref -> (ref, (toExternsDeclaration ref))) <$> exps
 
-  bcCacheImports :: M.Map ModuleName (M.Map B.ByteString [B.ByteString])
+  bcCacheImports :: M.Map ModuleName B.ByteString
   bcCacheImports =  -- TODO[drathier]: fill in
-
-  -----
-
-      externsMap
-        & M.filterWithKey (\k _ -> elem k importModuleNames)
-        & fmap _efBuildCache
-        & fmap _bcCacheDeclarations
-
+    externsMap
+      & M.filterWithKey (\k _ -> elem k importModuleNames)
+      & fmap _efBuildCache
+      & fmap _bcCacheBlob
 
   importModuleNames = eiModule <$> efImports
 

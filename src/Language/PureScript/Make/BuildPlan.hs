@@ -108,7 +108,7 @@ fastEqBuildCache cache externsCache =
     toCmp (BuildCacheFile {..}) =
         let
           -- don't compare imports; it will result in two layers being rebuilt instead of one
-          bcCacheImports = mempty
+          bcCacheDeps = mempty
         in
           BuildCacheFile {..}
   in
@@ -118,7 +118,6 @@ buildJobSuccess :: BuildJobResult -> Maybe (MultipleErrors, ExternsFile, WasRebu
 buildJobSuccess (BuildJobSucceeded warnings externs wasRebuildNeeded) = Just (warnings, externs, wasRebuildNeeded)
 buildJobSuccess (BuildJobCacheHit externs) = Just (MultipleErrors [], externs, RebuildWasNotNeeded)
 buildJobSuccess _ = Nothing
-
 
 
 isCacheHit
