@@ -7,12 +7,10 @@ module Language.PureScript.AST.SourcePos where
 import Prelude.Compat
 
 import Codec.Serialise (Serialise)
-import qualified Codec.Serialise as Serialise
-import qualified Codec.Serialise.Class as Serialise
 import Control.DeepSeq (NFData)
 import Data.Aeson ((.=), (.:))
 import Data.Text (Text)
-import GHC.Generics (Generic, from, to)
+import GHC.Generics (Generic)
 import Language.PureScript.Comments
 import qualified Data.Aeson as A
 import qualified Data.Text as T
