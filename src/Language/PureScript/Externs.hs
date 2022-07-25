@@ -232,7 +232,10 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   qual = Qualified (Just efModuleName)
 
 
+_efBuildCache :: ExternsFile -> BuildCacheFile
 _efBuildCache = efBuildCache
+
+_bcCacheBlob :: BuildCacheFile -> B.ByteString
 _bcCacheBlob = bcCacheBlob
 
 data DeclarationCacheRef

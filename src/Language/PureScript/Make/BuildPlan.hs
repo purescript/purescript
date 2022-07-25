@@ -44,17 +44,17 @@ import           Language.PureScript.Names (ModuleName(..))
 import           Language.PureScript.Sugar.Names.Env
 import           System.Directory (getCurrentDirectory)
 import Data.Function
-import Debug.Trace
 
 -- for debug prints, timestamps
-import Language.PureScript.Docs.Types (formatTime)
-import Data.Time.Clock (getCurrentTime)
-import System.IO.Unsafe (unsafePerformIO)
-
-{-# NOINLINE dt #-}
-dt = do
-  ts <- getCurrentTime
-  pure (formatTime ts)
+-- import Debug.Trace
+-- import Language.PureScript.Docs.Types (formatTime)
+-- import Data.Time.Clock (getCurrentTime)
+-- import System.IO.Unsafe (unsafePerformIO)
+--
+-- {-# NOINLINE dt #-}
+-- dt = do
+--   ts <- getCurrentTime
+--   pure (formatTime ts)
 
 
 -- | The BuildPlan tracks information about our build progress, and holds all
@@ -105,12 +105,9 @@ buildJobSucceeded mDirtyCache warnings externs =
 fastEqBuildCache :: BuildCacheFile -> BuildCacheFile -> Bool
 fastEqBuildCache cache externsCache =
   let
-    toCmp (BuildCacheFile {..}) =
-        let
-          -- don't compare imports; it will result in two layers being rebuilt instead of one
-          bcCacheDeps = mempty
-        in
-          BuildCacheFile {..}
+    toCmp (BuildCacheFile bcVersion bcModuleName bcCacheBlob _bcCacheDeps) =
+      -- don't compare imports; it will result in two layers being rebuilt instead of one
+      BuildCacheFile bcVersion bcModuleName bcCacheBlob mempty
   in
   Serialise.serialise (toCmp cache) == Serialise.serialise (toCmp externsCache)
 
@@ -142,16 +139,17 @@ isCacheHit deps directDeps = do
         & all (\case
           BuildJobSucceeded _ _ RebuildWasNotNeeded -> True
           BuildJobCacheHit _ -> True
-          v ->
-            -- trace (show ("isCacheHit:no"::String,
-            --    case v of
-            --      BuildJobSucceeded _ _ RebuildWasNeeded -> "BuildJobSucceeded:RebuildWasNeeded"
-            --      BuildJobSucceeded _ _ RebuildWasNotNeeded -> "BuildJobSucceeded:RebuildWasNotNeeded"
-            --      BuildJobCacheHit _ -> "BuildJobCacheHit"
-            --      BuildJobFailed _ -> "BuildJobFailed"
-            --      BuildJobSkipped -> "BuildJobSkipped"
-            --  , directDeps))
-            False
+          _ -> False
+          -- v ->
+          --   trace (show ("isCacheHit:no"::String,
+          --      case v of
+          --        BuildJobSucceeded _ _ RebuildWasNeeded -> "BuildJobSucceeded:RebuildWasNeeded"
+          --        BuildJobSucceeded _ _ RebuildWasNotNeeded -> "BuildJobSucceeded:RebuildWasNotNeeded"
+          --        BuildJobCacheHit _ -> "BuildJobCacheHit"
+          --        BuildJobFailed _ -> "BuildJobFailed"
+          --        BuildJobSkipped -> "BuildJobSkipped"
+          --    , directDeps))
+          --   False
         )
       )
   pure noUpstreamChanges

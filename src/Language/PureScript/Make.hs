@@ -58,6 +58,7 @@ import Data.Time.Clock (getCurrentTime)
 import System.IO.Unsafe (unsafePerformIO)
 
 {-# NOINLINE dt #-}
+dt :: IO String
 dt = do
   ts <- getCurrentTime
   pure (formatTime ts)
