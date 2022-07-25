@@ -349,7 +349,7 @@ extDeclToCacheKey = \case
         CacheEDType
           edTypeName
           (const () <$> edTypeKind)
-    -- | A type synonym
+    -- A type synonym
     EDTypeSynonym
         edTypeSynonymName       --  :: ProperName 'TypeName
         edTypeSynonymArguments  --  :: [(Text, Maybe (Type ()))]
@@ -358,7 +358,7 @@ extDeclToCacheKey = \case
           edTypeSynonymName
           (fmap (fmap (fmap (const ()))) <$> edTypeSynonymArguments)
           (const () <$> edTypeSynonymType)
-    -- | A data constructor
+    -- A data constructor
     EDDataConstructor
         edDataCtorName          --  :: ProperName 'ConstructorName
         edDataCtorOrigin        --  :: DataDeclType
@@ -371,14 +371,14 @@ extDeclToCacheKey = \case
           edDataCtorTypeCtor
           (const () <$> edDataCtorType)
           edDataCtorFields
-    -- | A value declaration
+    -- A value declaration
     EDValue
         edValueName        --  :: Ident
         edValueType        --  :: Type ()
       -> CacheEDValue
           edValueName
           (const () <$> edValueType)
-    -- | A type class declaration
+    -- A type class declaration
     EDClass
         edClassName              --  :: ProperName 'ClassName
         edClassTypeArguments     --  :: [(Text, Maybe (Type ()))]
@@ -393,7 +393,7 @@ extDeclToCacheKey = \case
           (fmap (const ()) <$> edClassConstraints)
           edFunctionalDependencies
           edIsEmpty
-    -- | An instance declaration
+    -- An instance declaration
     EDInstance
         edInstanceClassName     --   :: Qualified (ProperName 'ClassName)
         edInstanceName          --   :: Ident
