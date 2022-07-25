@@ -2,11 +2,11 @@ name: "CI"
 
 on:
   push:
-    branches: [ "master" ]
+    # branches: [ "master" ]
   pull_request:
-    branches: [ "master" ]
+    # branches: [ "master" ]
   release:
-    types: [ "published" ]
+    # types: [ "published" ]
 
 defaults:
   run:
