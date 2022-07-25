@@ -105,8 +105,8 @@ spec = do
     it "recompiles downstream modules when a module is rebuilt" $ do
       let moduleAPath = sourcesDir </> "A.purs"
           moduleBPath = sourcesDir </> "B.purs"
-          moduleAContent1 = "module A where\nfoo = 0\n"
-          moduleAContent2 = "module A where\nfoo = 1\n"
+          moduleAContent1 = "module A where\nfoo = 10\n"
+          moduleAContent2 = "module A where\nfoo = 11\n"
           moduleBContent = "module B where\nimport A (foo)\nbar = foo\n"
 
       writeFileWithTimestamp moduleAPath timestampA moduleAContent1
@@ -121,10 +121,10 @@ spec = do
           moduleBPath = sourcesDir </> "B.purs"
           moduleCPath = sourcesDir </> "C.purs"
           modulePaths = [moduleAPath, moduleBPath, moduleCPath]
-          moduleAContent1 = "module A where\nfoo = 0\n"
-          moduleAContent2 = "module A where\nfoo = 1\n"
+          moduleAContent1 = "module A where\nfoo = 20\n"
+          moduleAContent2 = "module A where\nfoo = 21\n"
           moduleBContent = "module B where\nimport A (foo)\nbar = foo\n"
-          moduleCContent = "module C where\nbaz = 3\n"
+          moduleCContent = "module C where\nbaz = 23\n"
 
       writeFileWithTimestamp moduleAPath timestampA moduleAContent1
       writeFileWithTimestamp moduleBPath timestampB moduleBContent
