@@ -380,10 +380,10 @@ makeCaseDeclaration ss ident alternatives = do
       argNames = foldl1 resolveNames namedArgs
   args <- if allUnique (catMaybes argNames)
             then mapM argName argNames
-            else replicateM (length argNames) freshIdent'
-  let vars = map (Var ss . Qualified ByNullSourcePos) args
+            else replicateM (length argNames) ((nullSourceSpan, ) <$> freshIdent')
+  let vars = map (Var ss . Qualified ByNullSourcePos . snd) args
       binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
-  let value = foldr (Abs . VarBinder ss) (Case vars binders) args
+  let value = foldr (Abs . uncurry VarBinder) (Case vars binders) args
 
   return $ ValueDecl (ss, []) ident Public [] [MkUnguarded value]
   where
@@ -391,8 +391,8 @@ makeCaseDeclaration ss ident alternatives = do
   -- VarBinders will become Just _ which is a potential name.
   -- Everything else becomes Nothing, which indicates that we
   -- have to generate a name.
-  findName :: Binder -> Maybe Ident
-  findName (VarBinder _ name) = Just name
+  findName :: Binder -> Maybe (SourceSpan, Ident)
+  findName (VarBinder ss' name) = Just (ss', name)
   findName (PositionedBinder _ _ binder) = findName binder
   findName _ = Nothing
 
@@ -401,18 +401,18 @@ makeCaseDeclaration ss ident alternatives = do
   allUnique :: (Ord a) => [a] -> Bool
   allUnique xs = length xs == length (ordNub xs)
 
-  argName :: Maybe Ident -> m Ident
-  argName (Just name) = return name
-  argName _ = freshIdent'
+  argName :: Maybe (SourceSpan, Ident) -> m (SourceSpan, Ident)
+  argName (Just (ss', name)) = return (ss', name)
+  argName _ = (nullSourceSpan, ) <$> freshIdent'
 
   -- Combine two lists of potential names from two case alternatives
   -- by zipping corresponding columns.
-  resolveNames :: [Maybe Ident] -> [Maybe Ident] -> [Maybe Ident]
+  resolveNames :: [Maybe (SourceSpan, Ident)] -> [Maybe (SourceSpan, Ident)] -> [Maybe (SourceSpan, Ident)]
   resolveNames = zipWith resolveName
 
   -- Resolve a pair of names. VarBinder beats NullBinder, and everything
   -- else results in Nothing.
-  resolveName :: Maybe Ident -> Maybe Ident -> Maybe Ident
+  resolveName :: Maybe (SourceSpan, Ident) -> Maybe (SourceSpan, Ident) -> Maybe (SourceSpan, Ident)
   resolveName (Just a) (Just b)
     | a == b = Just a
     | otherwise = Nothing
