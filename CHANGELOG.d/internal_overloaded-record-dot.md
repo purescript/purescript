@@ -1,0 +1,1 @@
+* Enable `OverloadedRecordDot` extension throughout codebase

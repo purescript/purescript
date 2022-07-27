@@ -96,7 +96,7 @@ groupCompletionReexports initial =
         (Namespaced (namespaceForDeclaration decl)
          (P.runModuleName origin <> "." <> identifierFromIdeDeclaration decl))
     insertDeclaration moduleName origin d old = case old of
-      Nothing -> Just ( Match (origin, d & idaAnnotation.annExportedFrom .~ Nothing)
+      Nothing -> Just ( Match (origin, d & idaAnnotation . annExportedFrom .~ Nothing)
                       , [moduleName]
                       )
       Just x -> Just (second (moduleName :) x)

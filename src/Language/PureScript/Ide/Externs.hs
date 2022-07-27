@@ -70,14 +70,14 @@ resolveSynonymsAndClasses trs decls = foldr go decls trs
             acc
           Just tyDecl -> IdeDeclTypeClass
             (IdeTypeClass tcn (tyDecl^.ideTypeKind) [])
-            : filter (not . anyOf (_IdeDeclType.ideTypeName) (== P.coerceProperName tcn)) acc
+            : filter (not . anyOf (_IdeDeclType . ideTypeName) (== P.coerceProperName tcn)) acc
       SynonymToResolve tn ty ->
         case findType tn acc of
           Nothing ->
             acc
           Just tyDecl ->
             IdeDeclTypeSynonym (IdeTypeSynonym tn ty (tyDecl^.ideTypeKind))
-            : filter (not . anyOf (_IdeDeclType.ideTypeName) (== tn)) acc
+            : filter (not . anyOf (_IdeDeclType . ideTypeName) (== tn)) acc
 
 findType :: P.ProperName 'P.TypeName -> [IdeDeclaration] -> Maybe IdeType
 findType tn decls =
