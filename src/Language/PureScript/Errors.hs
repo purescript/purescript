@@ -190,6 +190,7 @@ data SimpleErrorMessage
   | DuplicateRoleDeclaration (ProperName 'TypeName)
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
   | CannotSkipTypeApplication Text SourceType
+  | CannotApplyTypeOnType SourceType SourceType
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -357,6 +358,7 @@ errorCode em = case unwrapErrorMessage em of
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
   CannotApplyExpressionOfTypeOnType {} -> "CannotApplyExpressionOfTypeOnType"
   CannotSkipTypeApplication {} -> "CannotSkipTypeApplication"
+  CannotApplyTypeOnType {} -> "CannotApplyTypeOnType"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1400,6 +1402,19 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         , markCodeBox $ indent $ prettyType ttyp
         , "cannot be skipped during type application."
         ]
+
+    renderSimpleErrorMessage (CannotApplyTypeOnType tabs targ) =
+      paras $
+        [ "A type of type:"
+        , markCodeBox $ indent $ prettyType tabs
+        , "cannot be applied to the type:"
+        , markCodeBox $ indent $ prettyType targ
+        ] <> comments
+      where
+      comments | isMonoType tabs =
+                   [ "as it is a monotype." ]
+               | otherwise =
+                   []
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
