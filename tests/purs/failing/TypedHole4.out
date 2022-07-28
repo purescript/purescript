@@ -1,0 +1,52 @@
+Error 1 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/failing/TypedHole4.purs:8:9 - 8:14 (line 8, column 9 - line 8, column 14)
+
+    Hole '[33mhelp[0m' has the inferred type
+    [33m    [0m
+    [33m  a0[0m
+    [33m    [0m
+    You could substitute the hole with one of these values:
+    [33m          [0m
+    [33m  b  :: a0[0m
+    [33m          [0m
+    in the following context:
+
+      b :: [33ma0[0m
+
+
+  in value declaration [33mf[0m
+
+  where [33ma0[0m is a rigid type variable
+          bound at (line 0, column 0 - line 0, column 0)
+
+  See https://github.com/purescript/documentation/blob/master/errors/HoleInferredType.md for more information,
+  or to contribute content related to this error.
+
+Error 2 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/failing/TypedHole4.purs:9:9 - 9:14 (line 9, column 9 - line 9, column 14)
+
+    Hole '[33mhelp[0m' has the inferred type
+    [33m    [0m
+    [33m  a0[0m
+    [33m    [0m
+    You could substitute the hole with one of these values:
+    [33m          [0m
+    [33m  b  :: a0[0m
+    [33m          [0m
+    in the following context:
+
+      b :: [33ma0[0m
+
+
+  in value declaration [33mf[0m
+
+  where [33ma0[0m is a rigid type variable
+          bound at (line 0, column 0 - line 0, column 0)
+
+  See https://github.com/purescript/documentation/blob/master/errors/HoleInferredType.md for more information,
+  or to contribute content related to this error.
+
