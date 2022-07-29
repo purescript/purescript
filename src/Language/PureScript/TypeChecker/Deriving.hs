@@ -7,6 +7,7 @@ import Data.Foldable (foldl1)
 import Data.List (init, last, zipWith3, (!!))
 import qualified Data.Map as M
 
+import Control.Lens ((^.), _1, _2)
 import Control.Monad.Supply.Class
 import Language.PureScript.AST
 import Language.PureScript.AST.Utils
@@ -62,7 +63,7 @@ deriveInstance instType className strategy = do
         [ty] -> case unwrapTypeConstructor ty of
           Just (Qualified (ByModuleName mn') tyCon, _, _) | mn == mn' -> do
             let superclassesDicts = flip map typeClassSuperclasses $ \(Constraint _ superclass _ suTyArgs _) ->
-                  let tyArgs = map (replaceAllTypeVars (zip (map (\(a, _, _) -> a) typeClassArguments) tys)) suTyArgs
+                  let tyArgs = map (replaceAllTypeVars (zip ((^. _1) <$> typeClassArguments) tys)) suTyArgs
                   in lam UnusedIdent (DeferredDictionary superclass tyArgs)
             let superclasses = map mkString (superClassDictionaryNames typeClassSuperclasses) `zip` superclassesDicts
             App (Constructor nullSourceSpan ctorName) . mkLit . ObjectLiteral . (++ superclasses) <$> f mn tyCon
@@ -143,14 +144,14 @@ deriveNewtypeInstance mn className tys tyConNm dkargs dargs = do
           for_ (M.lookup constraintClass (typeClasses env)) $ \TypeClassData{ typeClassDependencies = deps } ->
             -- We need to check whether the newtype is mentioned, because of classes like MonadWriter
             -- with its Monoid superclass constraint.
-            when (not (null args) && any (((\(a, _, _) -> a) (last args) `elem`) . usedTypeVariables) constraintArgs) $ do
+            when (not (null args) && any ((last args ^. _1 `elem`) . usedTypeVariables) constraintArgs) $ do
               -- For now, we only verify superclasses where the newtype is the only argument,
               -- or for which all other arguments are determined by functional dependencies.
               -- Everything else raises a UnverifiableSuperclassInstance warning.
               -- This covers pretty much all cases we're interested in, but later we might want to do
               -- more work to extend this to other superclass relationships.
-              let determined = map (srcTypeVar . (\(a, _, _) -> a) . (args !!)) . ordNub . concatMap fdDetermined . filter ((== [length args - 1]) . fdDeterminers) $ deps
-              if eqType (last constraintArgs) (srcTypeVar . (\(a, _, _) -> a) $ last args) && all (`elem` determined) (init constraintArgs)
+              let determined = map (srcTypeVar . (^. _1) . (args !!)) . ordNub . concatMap fdDetermined . filter ((== [length args - 1]) . fdDeterminers) $ deps
+              if eqType (last constraintArgs) (srcTypeVar . (^. _1) $ last args) && all (`elem` determined) (init constraintArgs)
                 then do
                   -- Now make sure that a superclass instance was derived. Again, this is not a complete
                   -- check, since the superclass might have multiple type arguments, so overlaps might still
@@ -338,7 +339,8 @@ lookupTypeDecl mn typeName = do
           (ctorName, _) <- headMay dctors
           (a, _, _, _) <- Qualified (ByModuleName mn) ctorName `M.lookup` dataConstructors env
           pure a
-    pure (dtype, fst . snd <$> kargs, map (\(v, k, _, _) -> (v, k)) args, dctors)
+        fstSnd = (,) <$> (^. _1) <*> (^. _2)
+    pure (dtype, fst . snd <$> kargs, fstSnd <$> args, dctors)
 
 isAppliedVar :: Type a -> Bool
 isAppliedVar (TypeApp _ (TypeVar _ _) _) = True

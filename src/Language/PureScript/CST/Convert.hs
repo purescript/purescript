@@ -17,6 +17,7 @@ module Language.PureScript.CST.Convert
 
 import Prelude hiding (take)
 
+import Control.Lens ((^.), _1, _2)
 import Data.Bifunctor (bimap, first)
 import Data.Char (toLower)
 import Data.Foldable (foldl', toList)
@@ -605,14 +606,28 @@ convertDeclaration fileName decl = case decl of
         TypeConstrained{} -> ""
         TypeUnaryRow{} -> "Row"
 
+  -- Convert a TypeVarBinding into a (Text, Maybe SourceType, VtaTypeVar) triple,
+  -- where VtaTypeVar is determined by atSign.
+  goVtvTypeVar_ :: T.VtaTypeVar -> TypeVarBinding a -> (Text.Text, Maybe T.SourceType, T.VtaTypeVar)
   goVtvTypeVar_ atSign = \case
     TypeVarKinded (Wrapped _ (Labeled (_, x) _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y, atSign)
     TypeVarName (_, x) -> (getIdent $ nameValue x, Nothing, atSign)
 
-  goTypeVar = (\(a, b, _) -> (a, b)) . goVtvTypeVar_ T.NotVtaTypeVar
+  fstSnd :: (Text.Text, Maybe T.SourceType, T.VtaTypeVar) -> (Text.Text, Maybe T.SourceType)
+  fstSnd = (,) <$> (^. _1) <*> (^. _2)
 
+  -- Convert a TypeVarBinding into a (Text, Maybe SourceType) pair.
+  goTypeVar :: TypeVarBinding a -> (Text.Text, Maybe T.SourceType)
+  goTypeVar = fstSnd . goVtvTypeVar_ T.NotVtaTypeVar
+
+  -- Convert a TypeVarBinding into a (Text, Maybe SourceType, VtaTypeVar) triple,
+  -- where `VtaTypeVar` is always set to `IsVtaTypeVar`.
+  goVtvTypeVarAlways :: TypeVarBinding a -> (Text.Text, Maybe T.SourceType, T.VtaTypeVar)
   goVtvTypeVarAlways = goVtvTypeVar_ T.IsVtaTypeVar
 
+  -- Convert a TypeVarBinding into a (Text, Maybe SourceType, VtaTypeVar) triple,
+  -- where `VtaTypeVar` is always set to `IsVtaTypeVarRequired`.
+  goVtvTypeVarRequired :: TypeVarBinding a -> (Text.Text, Maybe T.SourceType, T.VtaTypeVar)
   goVtvTypeVarRequired = goVtvTypeVar_ T.IsVtaTypeVarRequired
 
   goInstanceBinding = \case

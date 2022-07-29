@@ -650,12 +650,13 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
       k_ <- maybe (freshKind (fst ann)) pure mbK
       k <- replaceAllTypeSynonyms <=< apply <=< checkIsSaturatedType $ k_
       pure (n, k, v)
-    subsumesKind (foldr ((E.-:>) . \(_, b, _) -> b) E.kindType tyArgs') tyKind'
+    subsumesKind (foldr ((E.-:>) . (^. _2)) E.kindType tyArgs') tyKind'
     bindLocalTypeVariables moduleName ((\(a, b, _) -> (ProperName a, b)) <$> tyArgs') $ do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
-          tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . \(a, _, _) -> a) tyCtor tyArgs'
-          vtas = map (\(i, _, v) -> (i, v)) tyArgs
+          tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . (^. _1)) tyCtor tyArgs'
+          fstThd = (,) <$> (^. _1) <*> (^. _3)
+          vtas = fstThd <$> tyArgs
           ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (\(a, b, _) -> (nullSourceAnn, (a, b))) tyArgs'
       for ctors $
         fmap (fmap (makeTopLevelVta vtas . mkForAll ctorBinders)) . inferDataConstructor tyCtor'
@@ -822,8 +823,9 @@ inferClassDeclaration moduleName (ann, clsName, clsArgs, superClasses, decls) = 
       k_ <- maybe (freshKind (fst ann)) pure mbK
       k <- replaceAllTypeSynonyms <=< apply <=< checkIsSaturatedType $ k_
       pure (n, k, v)
-    unifyKinds clsKind' $ foldr ((E.-:>) . \(_, b, _) -> b) E.kindConstraint clsArgs'
-    bindLocalTypeVariables moduleName ((\(a, b, _) -> (ProperName a, b)) <$> clsArgs') $ do
+    unifyKinds clsKind' $ foldr ((E.-:>) . (^. _2)) E.kindConstraint clsArgs'
+    let fstSnd = (,) <$> (ProperName . (^. _1)) <*> (^. _2)
+    bindLocalTypeVariables moduleName (fstSnd <$> clsArgs') $ do
       (clsArgs',,)
         <$> for superClasses checkConstraint
         <*> for decls checkClassMemberDeclaration

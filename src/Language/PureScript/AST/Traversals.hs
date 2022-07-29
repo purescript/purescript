@@ -6,6 +6,7 @@ module Language.PureScript.AST.Traversals where
 import Prelude.Compat
 import Protolude (swap)
 
+import Control.Lens ((^.), _2)
 import Control.Monad
 import Control.Monad.Trans.State
 
@@ -677,12 +678,12 @@ accumTypes
 accumTypes f = everythingOnValues mappend forDecls forValues forBinders (const mempty) (const mempty)
   where
   forDecls (DataDeclaration _ _ _ args dctors) =
-    foldMap (foldMap f . \(_, b, _) -> b) args <>
+    foldMap (foldMap f . (^. _2)) args <>
     foldMap (foldMap (f . snd) . dataCtorFields) dctors
   forDecls (ExternDataDeclaration _ _ ty) = f ty
   forDecls (ExternDeclaration _ _ ty) = f ty
   forDecls (TypeClassDeclaration _ _ args implies _ _) =
-    foldMap (foldMap f . \(_, b, _) -> b) args <>
+    foldMap (foldMap f . (^. _2)) args <>
     foldMap (foldMap f . constraintArgs) implies
   forDecls (TypeInstanceDeclaration _ _ _ _ cs _ tys _) =
     foldMap (foldMap f . constraintArgs) cs <> foldMap f tys

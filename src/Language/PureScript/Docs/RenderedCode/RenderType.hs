@@ -240,12 +240,8 @@ renderTypeVars tyVars = mintersperse sp (map renderTypeVar tyVars)
 
 renderTypeVar :: (Text, Maybe PrettyPrintType, VtaTypeVar) -> RenderedCode
 renderTypeVar (v, mbK, vta) = case mbK of
-  Nothing -> renderVtaTypeVar vta <> typeVar v
-  Just k -> mintersperse sp [ mconcat [syntax "(", renderVtaTypeVar vta, typeVar v], syntax "::", mconcat [renderType' k, syntax ")"] ]
-  where
-  renderVtaTypeVar IsVtaTypeVar = syntax "@"
-  renderVtaTypeVar IsVtaTypeVarRequired = syntax "@"
-  renderVtaTypeVar NotVtaTypeVar = syntax ""
+  Nothing -> syntax (vtaTypeVarPrefix vta) <> typeVar v
+  Just k -> mintersperse sp [ mconcat [syntax "(", syntax $ vtaTypeVarPrefix vta, typeVar v], syntax "::", mconcat [renderType' k, syntax ")"] ]
 
 -- |
 -- Render code representing a Type, as it should appear inside parentheses

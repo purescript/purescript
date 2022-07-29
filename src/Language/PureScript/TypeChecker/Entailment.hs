@@ -13,6 +13,7 @@ import Prelude.Compat
 import Protolude (ordNub)
 
 import Control.Arrow (second, (&&&))
+import Control.Lens ((^.), _1)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
@@ -843,7 +844,7 @@ newDictionaries path name (Constraint _ className instanceKinds instanceTy _) = 
     tcs <- gets (typeClasses . checkEnv)
     let TypeClassData{..} = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
     supDicts <- join <$> zipWithM (\(Constraint ann supName supKinds supArgs _) index ->
-                                      let sub = zip (map (\(a, _, _) -> a) typeClassArguments) instanceTy in
+                                      let sub = zip ((^. _1) <$> typeClassArguments) instanceTy in
                                       newDictionaries ((supName, index) : path)
                                                       name
                                                       (Constraint ann supName

@@ -6,6 +6,7 @@ module Language.PureScript.Docs.Convert.Single
 import Protolude hiding (moduleName)
 
 import Control.Category ((>>>))
+import Control.Lens ((^.), _1, _2)
 
 import qualified Data.Text as T
 
@@ -167,7 +168,10 @@ convertDeclaration (P.ExternDeclaration sa _ ty) title =
 convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
   Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
-  info = DataDeclaration dtype ((\(a, b, _) -> (a, fmap ($> ()) b)) <$> args) []
+  -- We drop the VtaTypeVar here because type variables in data
+  -- declarations do not need explicit syntax unlike in values.
+  convertArg = (,) <$> (^. _1) <*> (fmap void . (^. _2))
+  info = DataDeclaration dtype (convertArg <$> args) []
   children = map convertCtor ctors
   convertCtor :: P.DataConstructorDeclaration -> ChildDeclaration
   convertCtor P.DataConstructorDeclaration{..} =
@@ -180,7 +184,10 @@ convertDeclaration (P.TypeSynonymDeclaration sa _ args ty) title =
 convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
   Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
-  args' = (\(a, b, _) -> (a, fmap ($> ()) b)) <$> args
+  -- We drop the VtaTypeVar here because type variables in type class
+  -- declarations do not need explicit syntax unlike in values.
+  convertArg = (,) <$> (^. _1) <*> (fmap void . (^. _2))
+  args' = convertArg <$> args
   info = TypeClassDeclaration args' (fmap ($> ()) implies) (convertFundepsToStrings args' fundeps)
   children = map convertClassMember ds
   convertClassMember (P.TypeDeclaration (P.TypeDeclarationData (ss, com) ident' ty)) =

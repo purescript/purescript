@@ -5,6 +5,7 @@ module Language.PureScript.Linter (lint, module L) where
 
 import Prelude.Compat
 
+import Control.Lens ((^.), _1)
 import Control.Monad.Writer.Class
 
 import Data.Maybe (mapMaybe)
@@ -42,7 +43,7 @@ lint modl@(Module _ _ mn ds _) = do
     (warningsInDecl, _, _, _, _) = everythingWithScope (\_ _ -> mempty) stepE stepB (\_ _ -> mempty) stepDo
 
     f :: Declaration -> MultipleErrors
-    f (TypeClassDeclaration _ name args _ _ decs) = addHint (ErrorInTypeClassDeclaration name) (foldMap (f' (S.fromList $ (\(a, _, _) -> a) <$> args)) decs)
+    f (TypeClassDeclaration _ name args _ _ decs) = addHint (ErrorInTypeClassDeclaration name) (foldMap (f' (S.fromList $ (^. _1) <$> args)) decs)
     f dec = f' S.empty dec
 
     f' :: S.Set Text -> Declaration -> MultipleErrors

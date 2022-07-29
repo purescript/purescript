@@ -4,6 +4,7 @@ module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 import           Prelude.Compat
 import           Protolude (note)
 
+import           Control.Lens ((^.), _1)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.List (foldl', find, unzip5)
@@ -100,7 +101,7 @@ deriveGenericRep ss mn tyCon tyConArgs =
                        lamCase x (zipWith ($) (map underExpr (sumExprs (length dctors))) from)
                    ]
 
-          subst = zipWith ((,) . \(a, _, _) -> a) args tyConArgs
+          subst = zipWith ((,) . (^. _1)) args tyConArgs
       return (inst, replaceAllTypeVars subst rep)
     _ -> internalError "deriveGenericRep: expected DataDeclaration"
 
@@ -191,7 +192,7 @@ deriveNewtype tyCon tyConArgs =
       throwError . errorMessage' ss' $ CannotDeriveNewtypeForData name
     DataDeclaration _ Newtype name args dctors -> do
       (_, (_, ty)) <- checkNewtype name dctors
-      let subst = zipWith ((,) . (\(a, _, _) -> a)) args tyConArgs
+      let subst = zipWith ((,) . (^. _1)) args tyConArgs
       return ([], replaceAllTypeVars subst ty)
     _ -> internalError "deriveNewtype: expected DataDeclaration"
 

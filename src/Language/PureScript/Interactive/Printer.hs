@@ -2,6 +2,7 @@ module Language.PureScript.Interactive.Printer where
 
 import           Prelude.Compat
 
+import           Control.Lens ((^.), _1)
 import           Data.List (intersperse)
 import qualified Data.Map as M
 import           Data.Maybe (mapMaybe)
@@ -67,7 +68,7 @@ printModuleSignatures moduleName P.Environment{..} =
                          Box.<> Box.text ") <= "
                 className =
                     textT (P.runProperName name)
-                    Box.<> textT (foldMap ((" " <>) . \(a, _, _) -> a) typeClassArguments)
+                    Box.<> textT (foldMap ((" " <>) . (^. _1)) typeClassArguments)
                 classBody =
                     Box.vcat Box.top (map (\(i, t) -> textT (P.showIdent i <> " ::") Box.<+> P.typeAsBox maxBound t) typeClassMembers)
 
@@ -113,7 +114,7 @@ printModuleSignatures moduleName P.Environment{..} =
                       _ -> "data"
 
               in
-                Just $ textT (prefix <> " " <> P.runProperName name <> foldMap ((" " <>) . (\(v, _, _, _) -> v)) typevars) Box.// printCons pt
+                Just $ textT (prefix <> " " <> P.runProperName name <> foldMap ((" " <>) . (^. _1)) typevars) Box.// printCons pt
 
             _ ->
               Nothing

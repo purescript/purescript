@@ -11,6 +11,7 @@ module Language.PureScript.Sugar.TypeClasses
 import Prelude.Compat
 
 import           Control.Arrow (first, second)
+import           Control.Lens ((^.), _1)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.State
 import           Control.Monad.Supply.Class
@@ -354,7 +355,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
       superclassesDicts <- for typeClassSuperclasses $ \(Constraint _ superclass _ suTyArgs _) -> do
-        let tyArgs = map (replaceAllTypeVars (zip (map (\(a, _, _) -> a) typeClassArguments) tys)) suTyArgs
+        let tyArgs = map (replaceAllTypeVars (zip ((^. _1) <$> typeClassArguments) tys)) suTyArgs
         pure $ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
       let superclasses = superClassDictionaryNames typeClassSuperclasses `zip` superclassesDicts
 

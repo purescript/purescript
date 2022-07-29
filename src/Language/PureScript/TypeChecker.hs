@@ -10,7 +10,7 @@ module Language.PureScript.TypeChecker
 import Prelude.Compat
 import Protolude (headMay, maybeToLeft, ordNub)
 
-import Control.Lens ((^..), _2)
+import Control.Lens ((^.), (^..), (%~), _1, _2)
 import Control.Monad (when, unless, void, forM, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
@@ -184,7 +184,7 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
     coveringSets = S.toList . typeClassCoveringSets
 
     argToIndex :: Text -> Maybe Int
-    argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . \(a, _, _) -> a) args [0..])
+    argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . (^. _1)) args [0..])
 
     toPair (TypeDeclaration (TypeDeclarationData _ ident ty)) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
@@ -207,7 +207,7 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
 
       unless (any null leftovers) . throwError . errorMessage $
         let
-          solutions = map (map ((\(a, _, _) -> a) . (args !!)) . S.toList) leftovers
+          solutions = map (map ((^. _1) . (args !!)) . S.toList) leftovers
         in
           UnusableDeclaration ident (nub solutions)
 
@@ -290,7 +290,9 @@ typeCheckAll moduleName = traverse go
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
       when (dtype == Newtype) $ void $ checkNewtype name dctors
-      let args_ = (\(a, b, _) -> (a, b)) <$> args
+      let
+        fstSnd = (,) <$> (^. _1) <*> (^. _2)
+        args_ = fstSnd <$> args
       checkDuplicateTypeArguments $ map fst args_
       (dataCtors, ctorKind) <- kindOfData moduleName (sa, name, args, dctors)
       let args' = args `withKinds'` ctorKind
@@ -317,8 +319,9 @@ typeCheckAll moduleName = traverse go
       let dataDeclsWithKinds = zipWith (\(dtype, (_, name, args, _)) (dataCtors, ctorKind) ->
             (dtype, name, args `withKinds'` ctorKind, dataCtors, ctorKind)) dataDecls data_ks
       inferRoles' <- fmap (inferDataBindingGroupRoles env moduleName roleDecls) .
-        forM dataDeclsWithKinds $ \(_, name, args, dataCtors, _) ->
-          (name, (\(a, b, _) -> (a, b)) <$> args,) <$> traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
+        forM dataDeclsWithKinds $ \(_, name, args, dataCtors, _) -> do
+          let fstSnd = (,) <$> (^. _1) <*> (^. _2)
+          (name, fstSnd <$> args,) <$> traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
       for_ dataDeclsWithKinds $ \(dtype, name, args', dataCtors, ctorKind) -> do
         when (dtype == Newtype) $ void $ checkNewtype name (map fst dataCtors)
         let args_ = (\(a, b, _) -> (a, b)) <$> args'
@@ -330,7 +333,7 @@ typeCheckAll moduleName = traverse go
         let qualifiedClassName = Qualified (ByModuleName moduleName) pn
         guardWith (errorMessage (DuplicateTypeClass pn (fst sa))) $
           not (M.member qualifiedClassName (typeClasses env))
-        addTypeClass moduleName qualifiedClassName ((\(a, b, c) -> (a, Just b, c)) <$> args') implies' deps tys' kind
+        addTypeClass moduleName qualifiedClassName ((_2 %~ Just) <$> args') implies' deps tys' kind
     return d
     where
     toTypeSynonym (TypeSynonymDeclaration sa nm args ty) = Just (sa, nm, args, ty)
@@ -416,7 +419,7 @@ typeCheckAll moduleName = traverse go
       guardWith (errorMessage (DuplicateTypeClass pn ss)) $
         not (M.member qualifiedClassName (typeClasses env))
       (args', implies', tys', kind) <- kindOfClass moduleName (sa, pn, args, implies, tys)
-      addTypeClass moduleName qualifiedClassName ((\(a, b, c) -> (a, Just b, c)) <$> args') implies' deps tys' kind
+      addTypeClass moduleName qualifiedClassName ((_2 %~ Just) <$> args') implies' deps tys' kind
       return d
   go (TypeInstanceDeclaration _ _ _ (Left _) _ _ _ _) = internalError "typeCheckAll: type class instance generated name should have been desugared"
   go d@(TypeInstanceDeclaration sa@(ss, _) ch idx (Right dictName) deps className tys body) =

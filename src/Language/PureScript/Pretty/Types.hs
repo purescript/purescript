@@ -22,6 +22,7 @@ module Language.PureScript.Pretty.Types
 import Prelude.Compat hiding ((<>))
 
 import Control.Arrow ((<+>))
+import Control.Lens ((%~), _1)
 import Control.PatternArrows as PA
 
 import Data.Maybe (fromMaybe, catMaybes)
@@ -222,12 +223,8 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   forall' = if troUnicode tro then "∀" else "forall"
   doubleColon = if troUnicode tro then "∷" else "::"
 
-  printMbKindedType (v, Nothing, vta) = text (printVtaTypeVar vta) <> text v
-  printMbKindedType (v, Just k, vta) = text ("(" ++ printVtaTypeVar vta ++ v ++ " " ++ doubleColon ++ " ") <> typeAsBox' k <> text ")"
-
-  printVtaTypeVar IsVtaTypeVar = "@"
-  printVtaTypeVar IsVtaTypeVarRequired = "@"
-  printVtaTypeVar NotVtaTypeVar = ""
+  printMbKindedType (v, Nothing, vta) = text (vtaTypeVarPrefix vta) <> text v
+  printMbKindedType (v, Just k, vta) = text ("(" ++ vtaTypeVarPrefix vta ++ v ++ " " ++ doubleColon ++ " ") <> typeAsBox' k <> text ")"
 
   -- If both boxes span a single line, keep them on the same line, or else
   -- use the specified function to modify the second box, then combine vertically.
@@ -239,7 +236,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
 forall_ :: Pattern () PrettyPrintType ([(String, Maybe PrettyPrintType, VtaTypeVar)], PrettyPrintType)
 forall_ = mkPattern match
   where
-  match (PPForAll idents ty) = Just (map (\(a, b, c) -> (T.unpack a, b, c)) idents, ty)
+  match (PPForAll idents ty) = Just ((_1 %~ T.unpack) <$> idents, ty)
   match _ = Nothing
 
 typeAtomAsBox' :: PrettyPrintType -> Box

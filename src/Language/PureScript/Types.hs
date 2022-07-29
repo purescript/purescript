@@ -4,7 +4,7 @@
 module Language.PureScript.Types where
 
 import Prelude.Compat
-import Protolude (ordNub)
+import Protolude (ordNub, IsString)
 
 import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
@@ -53,6 +53,12 @@ data VtaTypeVar
 
 instance NFData VtaTypeVar
 instance Serialise VtaTypeVar
+
+vtaTypeVarPrefix :: IsString a => VtaTypeVar -> a
+vtaTypeVarPrefix = \case
+  IsVtaTypeVar -> "@"
+  IsVtaTypeVarRequired -> "@"
+  NotVtaTypeVar -> ""
 
 -- Describes how a TypeWildcard should be presented to the user during
 -- type checking: holes (?foo) are always emitted as errors, whereas unnamed
