@@ -1006,7 +1006,7 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
                       <> foldMap (foldMap usedTypeVariables . (\c -> constraintKindArgs c <> constraintArgs c)) supers
                       <> foldMap usedTypeVariablesInDecls decls
               unkBinders = unknownVarNames usedVars tyUnks
-              args' = (_2 %~ replaceUnknownsWithVars unkBinders . replaceTypeCtors) <$> args where
+              args' = (_2 %~ replaceUnknownsWithVars unkBinders . replaceTypeCtors) <$> args
               supers' = mapConstraintArgsAll (fmap (replaceUnknownsWithVars unkBinders . replaceTypeCtors)) <$> supers
               decls' = mapTypeDeclaration (replaceUnknownsWithVars unkBinders . replaceTypeCtors) <$> decls
           (args', supers', decls', generalizeUnknownsWithVars unkBinders clsKind)
