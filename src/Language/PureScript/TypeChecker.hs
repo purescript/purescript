@@ -185,8 +185,7 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
       let withoutAtBinder = S.fromList $ findWithoutAtBinder newClass
       inMembers <- fmap S.unions $ forM classMembers $ \(_, t) ->
         S.fromList <$> mapMaybe argToIndex . freeTypeVariables <$> T.replaceAllTypeSynonymsM syns knds t
-      let inSuperclass = foldMap findInSuperclass $ typeClassSuperclasses newClass
-      let notInUse = withoutAtBinder `S.difference` inMembers `S.difference` inSuperclass
+      let notInUse = withoutAtBinder `S.difference` inMembers
       let hasMembers = not $ null classMembers
       if hasMembers && null (typeClassDependencies newClass) && not (null notInUse) then
         tell . errorMessage $ OnlyPartiallyDetermined $ S.toList $ S.map indexToArg notInUse
@@ -213,9 +212,6 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
       where
       fn i (_, _, IsVtaTypeVar False) = Just i
       fn _ (_, _, _) = Nothing
-
-    findInSuperclass :: SourceConstraint -> S.Set Int
-    findInSuperclass = S.fromList . mapMaybe argToIndex . concatMap freeTypeVariables . constraintArgs
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)

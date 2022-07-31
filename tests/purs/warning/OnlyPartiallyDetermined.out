@@ -144,6 +144,7 @@ Warning 7 of 8:
 
     The following type arguments:
     [33m   [0m
+    [33m  a[0m
     [33m  b[0m
     [33m   [0m
     in a type class cannot be determined by its members or
