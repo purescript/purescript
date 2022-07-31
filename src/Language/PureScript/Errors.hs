@@ -1389,7 +1389,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                    []
 
       hasNoVta (ForAll _ _ _ t _ NotVtaTypeVar) = hasNoVta t
-      hasNoVta (ForAll _ _ _ _ _ IsVtaTypeVar) = False
+      hasNoVta (ForAll _ _ _ _ _ (IsVtaTypeVar _)) = False
       hasNoVta (ParensInType _ t) = hasNoVta t
       hasNoVta (KindedType _ t _) = hasNoVta t
       hasNoVta _ = True

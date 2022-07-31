@@ -346,8 +346,7 @@ instantiatePolyTypeWithUnknownsAndSpecify shouldSpecify = go []
         insertUnkName i ident
         let sp' = case vtv of
               NotVtaTypeVar -> sp
-              IsVtaTypeVar -> (ann, i, False) : sp
-              IsVtaTypeVarRequired -> (ann, i, True) : sp
+              IsVtaTypeVar isRequired -> (ann, i, isRequired) : sp
         go sp' val $ replaceTypeVars ident u ty
       _ ->
         internalError "type is not TUnknown"

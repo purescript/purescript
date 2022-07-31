@@ -303,14 +303,7 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarati
       dictObjIdent = Ident "v"
       ctor = ConstructorBinder ss (coerceProperName . dictTypeName <$> className) [VarBinder ss dictObjIdent]
       acsr = Accessor (mkString $ runIdent ident) (Var ss (Qualified ByNullSourcePos dictObjIdent))
-      vtas = map go args where
-        utv = usedTypeVariables ty
-        go (i, _, v) = case v of
-          IsVtaTypeVarRequired
-            | i `elem` utv ->
-                (i, IsVtaTypeVar)
-          _ ->
-            (i, v)
+      vtas = (\(i, _, v) -> (i, v)) <$> args
   in ValueDecl sa ident Private []
     [MkUnguarded (
      TypedValue False (Abs (VarBinder ss dictIdent) (Case [Var ss $ Qualified ByNullSourcePos dictIdent] [CaseAlternative [ctor] [MkUnguarded acsr]])) $

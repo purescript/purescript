@@ -46,8 +46,7 @@ instance Serialise SkolemScope
 -- visible type applications.
 --
 data VtaTypeVar
-  = IsVtaTypeVar
-  | IsVtaTypeVarRequired
+  = IsVtaTypeVar Bool
   | NotVtaTypeVar
   deriving (Show, Eq, Ord, Generic)
 
@@ -56,8 +55,7 @@ instance Serialise VtaTypeVar
 
 vtaTypeVarPrefix :: IsString a => VtaTypeVar -> a
 vtaTypeVarPrefix = \case
-  IsVtaTypeVar -> "@"
-  IsVtaTypeVarRequired -> "@"
+  IsVtaTypeVar _ -> "@"
   NotVtaTypeVar -> ""
 
 -- Describes how a TypeWildcard should be presented to the user during
@@ -240,9 +238,9 @@ constraintToJSON annToJSON Constraint {..} =
     ]
 
 vtaTypeVarToJSON :: VtaTypeVar -> A.Value
-vtaTypeVarToJSON IsVtaTypeVar = A.toJSON ("IsVtaTypeVar" :: String)
-vtaTypeVarToJSON IsVtaTypeVarRequired = A.toJSON ("IsVtaTypeVarRequired" :: String)
-vtaTypeVarToJSON NotVtaTypeVar = A.toJSON ("NotVtaTypeVar" :: String)
+vtaTypeVarToJSON = \case
+  IsVtaTypeVar isRequired -> A.toJSON ("IsVtaTypeVar" :: Text, isRequired)
+  NotVtaTypeVar -> A.toJSON ("NotVtaTypeVar" :: Text)
 
 typeToJSON :: forall a. (a -> A.Value) -> Type a -> A.Value
 typeToJSON annToJSON ty =
@@ -337,13 +335,22 @@ constraintFromJSON defaultAnn annFromJSON = A.withObject "Constraint" $ \o -> do
   pure $ Constraint {..}
 
 vtaTypeVarFromJSON :: A.Value -> A.Parser VtaTypeVar
-vtaTypeVarFromJSON v = do
-  v' <- A.parseJSON v
-  case v' of
-    "IsVtaTypeVar" -> pure IsVtaTypeVar
-    "NotVtaTypeVar" -> pure NotVtaTypeVar
-    "IsVtaTypeVarRequired" -> pure IsVtaTypeVarRequired
-    _ -> fail $ "Unrecognized VtaTypeVar: " <> v'
+vtaTypeVarFromJSON v = isVtaTypeVar <|> notVtaTypeVar
+  where
+  isVtaTypeVar = do
+    v' <- A.parseJSON v
+    case v' of
+      ("IsVtaTypeVar" :: Text, isRequired) ->
+        pure $ IsVtaTypeVar isRequired
+      _ ->
+        fail "Unrecognized VtaTypeVar"
+  notVtaTypeVar = do
+    v' <- A.parseJSON v
+    case v' of
+      ("NotVtaTypeVar" :: Text) ->
+        pure NotVtaTypeVar
+      _ ->
+        fail "Unrecognized VtaTypeVar"
 
 typeFromJSON :: forall a. A.Parser a -> (A.Value -> A.Parser a) -> A.Value -> A.Parser (Type a)
 typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do

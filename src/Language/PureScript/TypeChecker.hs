@@ -191,8 +191,7 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
 
     findVtaTypeVars = catMaybes . zipWith fn [0..] . typeClassArguments
       where
-      fn i (_, _, IsVtaTypeVar) = Just i
-      fn i (_, _, IsVtaTypeVarRequired) = Just i
+      fn i (_, _, IsVtaTypeVar _) = Just i
       fn _ (_, _, NotVtaTypeVar) = Nothing
 
     -- Currently we are only checking usability based on the type class currently
