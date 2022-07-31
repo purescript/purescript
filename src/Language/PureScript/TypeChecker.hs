@@ -295,7 +295,7 @@ typeCheckAll moduleName = traverse go
       let args' = args `withKinds` ctorKind
       env <- getEnv
       dctors' <- traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
-      let args'' = args' `withRoles` inferRoles env moduleName name args dctors'
+      let args'' = args' `withRoles` inferRoles env moduleName name args' dctors'
       addDataType moduleName dtype name args'' dataCtors ctorKind
     return $ DataDeclaration sa dtype name args dctors
   go d@(DataBindingGroupDeclaration tys) = do
@@ -316,9 +316,8 @@ typeCheckAll moduleName = traverse go
       let dataDeclsWithKinds = zipWith (\(dtype, (_, name, args, _)) (dataCtors, ctorKind) ->
             (dtype, name, args `withKinds` ctorKind, dataCtors, ctorKind)) dataDecls data_ks
       inferRoles' <- fmap (inferDataBindingGroupRoles env moduleName roleDecls) .
-        forM dataDeclsWithKinds $ \(_, name, args, dataCtors, _) -> do
-          let fstSnd = (,) <$> (^. _1) <*> (^. _2)
-          (name, fstSnd <$> args,) <$> traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
+        forM dataDeclsWithKinds $ \(_, name, args, dataCtors, _) ->
+          (name, args,) <$> traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
       for_ dataDeclsWithKinds $ \(dtype, name, args', dataCtors, ctorKind) -> do
         when (dtype == Newtype) $ void $ checkNewtype name (map fst dataCtors)
         checkDuplicateTypeArguments $ map fst args'

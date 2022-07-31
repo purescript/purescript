@@ -341,7 +341,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
       M.lookup (qualify mn className) m
 
   -- Replace the type arguments with the appropriate types in the member types
-  let memberTypes = map (second (replaceAllTypeVars (zip (map (\(a, _, _) -> a) typeClassArguments) tys))) typeClassMembers
+  let memberTypes = map (second (replaceAllTypeVars (zip (map (^. _1) typeClassArguments) tys))) typeClassMembers
 
   let declaredMembers = S.fromList $ mapMaybe declIdent decls
 

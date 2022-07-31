@@ -17,7 +17,6 @@ import Prelude.Compat hiding (interact)
 
 import Control.Applicative ((<|>), empty)
 import Control.Arrow ((&&&))
-import Control.Lens ((^.), _1)
 import Control.Monad ((<=<), guard, unless, when)
 import Control.Monad.Error.Class (MonadError, catchError, throwError)
 import Control.Monad.State (MonadState, StateT, get, gets, modify, put)
@@ -669,7 +668,7 @@ lookupNewtypeConstructor env qualifiedNewtypeName ks = do
   (newtyk, DataType Newtype tvs [(ctorName, [wrappedTy])]) <- M.lookup qualifiedNewtypeName (types env)
   let (kvs, _) = fromMaybe (internalError "lookupNewtypeConstructor: unkinded forall binder") $ completeBinderList newtyk
       instantiatedKinds = zipWith (\(_, (kv, _)) k -> (kv, k)) kvs ks
-  pure ((^. _1) <$> tvs, ctorName, replaceAllTypeVars instantiatedKinds wrappedTy)
+  pure (map (\(name, _, _) -> name) tvs, ctorName, replaceAllTypeVars instantiatedKinds wrappedTy)
 
 -- | Behaves like 'lookupNewtypeConstructor' but also returns whether the
 -- newtype constructor is in scope and the module from which it is imported, or

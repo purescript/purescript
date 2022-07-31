@@ -7,7 +7,8 @@ module Language.PureScript.Docs.Prim
   ) where
 
 import Prelude.Compat hiding (fail)
-import Data.Functor (($>))
+import Control.Lens ((^.), _1, _2)
+import Data.Functor (($>), void)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map
@@ -225,7 +226,8 @@ primClassOf gen title comments = Declaration
   , declInfo =
       let
         tcd = lookupPrimClassOf gen title
-        args = (\(a, b, _) -> (a, fmap ($> ()) b)) <$> P.typeClassArguments tcd
+        fstSnd = (,) <$> (^. _1) <*> (fmap void . (^. _2))
+        args = fstSnd <$> P.typeClassArguments tcd
         superclasses = ($> ()) <$> P.typeClassSuperclasses tcd
         fundeps = convertFundepsToStrings args (P.typeClassDependencies tcd)
       in

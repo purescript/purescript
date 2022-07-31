@@ -7,7 +7,7 @@ import Data.Foldable (foldl1)
 import Data.List (init, last, zipWith3, (!!))
 import qualified Data.Map as M
 
-import Control.Lens ((^.), _1, _2)
+import Control.Lens ((^.), _1)
 import Control.Monad.Supply.Class
 import Language.PureScript.AST
 import Language.PureScript.AST.Utils
@@ -339,8 +339,7 @@ lookupTypeDecl mn typeName = do
           (ctorName, _) <- headMay dctors
           (a, _, _, _) <- Qualified (ByModuleName mn) ctorName `M.lookup` dataConstructors env
           pure a
-        fstSnd = (,) <$> (^. _1) <*> (^. _2)
-    pure (dtype, fst . snd <$> kargs, fstSnd <$> args, dctors)
+    pure (dtype, fst . snd <$> kargs, map (\(v, k, _) -> (v, k)) args, dctors)
 
 isAppliedVar :: Type a -> Bool
 isAppliedVar (TypeApp _ (TypeVar _ _) _) = True

@@ -373,10 +373,7 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goDecl :: Declaration -> m Declaration
   goDecl (DataDeclaration sa@(ss, _) ddt name args dctors) =
     DataDeclaration sa ddt name
-      <$> for args ( \(n, mbK) -> do
-                       mbK' <- traverse (goType' ss) mbK
-                       pure (n, mbK')
-                   )
+      <$> traverse (traverse (traverse (goType' ss))) args
       <*> traverse (traverseDataCtorFields (traverse (sndM (goType' ss)))) dctors
   goDecl (ExternDeclaration sa@(ss, _) name ty) =
     ExternDeclaration sa name <$> goType' ss ty

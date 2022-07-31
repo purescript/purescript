@@ -28,7 +28,7 @@ module Language.PureScript.TypeChecker.Kinds
 import Prelude.Compat
 
 import Control.Arrow ((***), second)
-import Control.Lens ((^.), _1, _2, _3)
+import Control.Lens ((^.), (%~), _1, _2, _3)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
@@ -646,12 +646,9 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
   tyKind <- apply =<< lookupTypeVariable moduleName (Qualified ByNullSourcePos tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    tyArgs' <- for tyArgs $ \(n, mbK) -> do
-      k_ <- maybe (freshKind (fst ann)) pure mbK
-      k <- replaceAllTypeSynonyms <=< apply <=< checkIsSaturatedType $ k_
-      pure (n, k)
-    subsumesKind (foldr ((E.-:>) . (^. _2)) E.kindType tyArgs') tyKind'
-    bindLocalTypeVariables moduleName ((\(a, b) -> (ProperName a, b)) <$> tyArgs') $ do
+    tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< checkIsSaturatedType
+    subsumesKind (foldr ((E.-:>) . snd) E.kindType tyArgs') tyKind'
+    bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
           tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . (^. _1)) tyCtor tyArgs'
@@ -1005,12 +1002,11 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
           let tyUnks = snd . fromJust $ lookup (mkQualified clsName moduleName) tySubs
               (usedTypeVariablesInDecls, _, _, _, _) = accumTypes usedTypeVariables
               usedVars = usedTypeVariables clsKind
-                      <> foldMap (usedTypeVariables . \(_, b, _) -> b) args
+                      <> foldMap (usedTypeVariables . (^. _2)) args
                       <> foldMap (foldMap usedTypeVariables . (\c -> constraintKindArgs c <> constraintArgs c)) supers
                       <> foldMap usedTypeVariablesInDecls decls
               unkBinders = unknownVarNames usedVars tyUnks
-              args' = go <$> args where
-                go (a, b, c) = (a, replaceUnknownsWithVars unkBinders $ replaceTypeCtors b, c)
+              args' = (_2 %~ replaceUnknownsWithVars unkBinders . replaceTypeCtors) <$> args where
               supers' = mapConstraintArgsAll (fmap (replaceUnknownsWithVars unkBinders . replaceTypeCtors)) <$> supers
               decls' = mapTypeDeclaration (replaceUnknownsWithVars unkBinders . replaceTypeCtors) <$> decls
           (args', supers', decls', generalizeUnknownsWithVars unkBinders clsKind)

@@ -678,7 +678,7 @@ accumTypes
 accumTypes f = everythingOnValues mappend forDecls forValues forBinders (const mempty) (const mempty)
   where
   forDecls (DataDeclaration _ _ _ args dctors) =
-    foldMap (foldMap f . (^. _2)) args <>
+    foldMap (foldMap f . snd) args <>
     foldMap (foldMap (f . snd) . dataCtorFields) dctors
   forDecls (ExternDataDeclaration _ _ ty) = f ty
   forDecls (ExternDeclaration _ _ ty) = f ty

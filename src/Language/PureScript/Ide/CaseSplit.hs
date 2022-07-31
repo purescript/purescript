@@ -23,8 +23,6 @@ module Language.PureScript.Ide.CaseSplit
 
 import           Protolude                     hiding (Constructor)
 
-import           Control.Lens ((^.), _1, _2, _3)
-
 import qualified Data.List.NonEmpty            as NE
 import qualified Data.Map                      as M
 import qualified Data.Text                     as T
@@ -76,12 +74,10 @@ findTypeDeclaration'
   :: P.ProperName 'P.TypeName
   -> ExternsFile
   -> First DataType
-findTypeDeclaration' t ExternsFile{..} = do
-  let
-    fstSndThd = (,,) <$> (^. _1) <*> (^. _2) <*> (^. _3)
+findTypeDeclaration' t ExternsFile{..} =
   First $ head $ mapMaybe (\case
             EDType tn _ (P.DataType _ typeVars ctors)
-              | tn == t -> Just (fstSndThd <$> typeVars, ctors)
+              | tn == t -> Just (typeVars, ctors)
             _ -> Nothing) efDeclarations
 
 splitTypeConstructor :: (MonadError IdeError m) =>

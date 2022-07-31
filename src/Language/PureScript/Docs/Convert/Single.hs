@@ -168,10 +168,7 @@ convertDeclaration (P.ExternDeclaration sa _ ty) title =
 convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
   Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
-  -- We drop the VtaTypeVar here because type variables in data
-  -- declarations do not need explicit syntax unlike in values.
-  convertArg = (,) <$> (^. _1) <*> (fmap void . (^. _2))
-  info = DataDeclaration dtype (convertArg <$> args) []
+  info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args) []
   children = map convertCtor ctors
   convertCtor :: P.DataConstructorDeclaration -> ChildDeclaration
   convertCtor P.DataConstructorDeclaration{..} =
