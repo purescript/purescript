@@ -651,9 +651,9 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
-          tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . (^. _1)) tyCtor tyArgs'
+          tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . fst) tyCtor tyArgs'
+          ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (nullSourceAnn,) tyArgs'
           vtas = second (const IsVtaTypeVar) <$> tyArgs
-          ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (\(a, b) -> (nullSourceAnn, (a, b))) tyArgs'
       for ctors $
         fmap (fmap (makeTopLevelVta vtas . mkForAll ctorBinders)) . inferDataConstructor tyCtor'
 
