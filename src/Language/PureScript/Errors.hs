@@ -170,8 +170,6 @@ data SimpleErrorMessage
   | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
   -- | a user-defined warning raised by using the Warn type class
   | UserDefinedWarning SourceType
-  -- | a declaration couldn't be used because it contained free variables
-  | UnusableDeclaration Ident [[Text]]
   | CannotDefinePrimModules ModuleName
   | MixedAssociativityError (NEL.NonEmpty (Qualified (OpName 'AnyOpName), Associativity))
   | NonAssociativeError (NEL.NonEmpty (Qualified (OpName 'AnyOpName)))
@@ -191,6 +189,7 @@ data SimpleErrorMessage
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
   | CannotSkipTypeApplication Text SourceType
   | CannotApplyTypeOnType SourceType SourceType
+  | OnlyPartiallyDetermined [Text]
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -343,7 +342,6 @@ errorCode em = case unwrapErrorMessage em of
   CannotUseBindWithDo{} -> "CannotUseBindWithDo"
   ClassInstanceArityMismatch{} -> "ClassInstanceArityMismatch"
   UserDefinedWarning{} -> "UserDefinedWarning"
-  UnusableDeclaration{} -> "UnusableDeclaration"
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
   MixedAssociativityError{} -> "MixedAssociativityError"
   NonAssociativeError{} -> "NonAssociativeError"
@@ -359,6 +357,7 @@ errorCode em = case unwrapErrorMessage em of
   CannotApplyExpressionOfTypeOnType {} -> "CannotApplyExpressionOfTypeOnType"
   CannotSkipTypeApplication {} -> "CannotSkipTypeApplication"
   CannotApplyTypeOnType {} -> "CannotApplyTypeOnType"
+  OnlyPartiallyDetermined {} -> "OnlyPartiallyDetermined"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1260,22 +1259,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent msg
             ]
 
-    renderSimpleErrorMessage (UnusableDeclaration ident unexplained) =
-      paras $
-        [ line $ "The declaration " <> markCode (showIdent ident) <> " contains arguments that couldn't be determined."
-        ] <>
-
-        case unexplained of
-          [required] ->
-            [ line $ "These arguments are: { " <> T.intercalate ", " required <> " }"
-            ]
-
-          options  ->
-            [ line "To fix this, one of the following sets of variables must be determined:"
-            , Box.moveRight 2 . Box.vsep 0 Box.top $
-                map (\set -> line $ "{ " <> T.intercalate ", " set <> " }") options
-            ]
-
     renderSimpleErrorMessage (CannotDefinePrimModules mn) =
       paras
         [ line $ "The module name " <> markCode (runModuleName mn) <> " is in the Prim namespace."
@@ -1415,6 +1398,24 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                    [ "as it is a monotype." ]
                | otherwise =
                    []
+
+    renderSimpleErrorMessage (OnlyPartiallyDetermined tvars) =
+      paras
+        [ "The following type arguments:"
+        , markCodeBox $ indent typeVars
+        , "in a type class cannot be determined by its members or"
+        , "functional dependencies, if any."
+        , ""
+        , "This means that skipping them in a type application will"
+        , "prevent the compiler from choosing an instance, throwing"
+        , "an AmbiguousTypeVariables error during generalization."
+        , ""
+        , "You can add a @-binder to mark them as unskippable."
+        , ""
+        , "This warning will be promoted to an error in PureScript v0.16.0"
+        ]
+      where
+      typeVars = Box.vcat Box.left $ line <$> tvars
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =

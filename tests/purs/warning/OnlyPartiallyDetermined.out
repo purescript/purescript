@@ -1,0 +1,189 @@
+Warning 1 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/OnlyPartiallyDetermined.purs:18:3 - 18:29 (line 18, column 3 - line 18, column 29)
+
+    Type variable [33ma[0m was shadowed.
+
+  in type declaration for [33mnotInMember[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/ShadowedTypeVar.md for more information,
+  or to contribute content related to this warning.
+
+Warning 2 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/OnlyPartiallyDetermined.purs:17:1 - 18:29 (line 17, column 1 - line 18, column 29)
+
+    The following type arguments:
+    [33m   [0m
+    [33m  a[0m
+    [33m   [0m
+    in a type class cannot be determined by its members or
+    functional dependencies, if any.
+
+    This means that skipping them in a type application will
+    prevent the compiler from choosing an instance, throwing
+    an AmbiguousTypeVariables error during generalization.
+
+    You can add a @-binder to mark them as unskippable.
+
+    This warning will be promoted to an error in PureScript v0.16.0
+
+  in type class declaration for [33mNotInMember[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/OnlyPartiallyDetermined.md for more information,
+  or to contribute content related to this warning.
+
+Warning 3 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/OnlyPartiallyDetermined.purs:15:1 - 15:56 (line 15, column 1 - line 15, column 56)
+
+    The following type arguments:
+    [33m   [0m
+    [33m  a[0m
+    [33m   [0m
+    in a type class cannot be determined by its members or
+    functional dependencies, if any.
+
+    This means that skipping them in a type application will
+    prevent the compiler from choosing an instance, throwing
+    an AmbiguousTypeVariables error during generalization.
+
+    You can add a @-binder to mark them as unskippable.
+
+    This warning will be promoted to an error in PureScript v0.16.0
+
+  in type class declaration for [33mNotBidirectional[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/OnlyPartiallyDetermined.md for more information,
+  or to contribute content related to this warning.
+
+Warning 4 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/OnlyPartiallyDetermined.purs:13:1 - 13:38 (line 13, column 1 - line 13, column 38)
+
+    The following type arguments:
+    [33m   [0m
+    [33m  a[0m
+    [33m  b[0m
+    [33m   [0m
+    in a type class cannot be determined by its members or
+    functional dependencies, if any.
+
+    This means that skipping them in a type application will
+    prevent the compiler from choosing an instance, throwing
+    an AmbiguousTypeVariables error during generalization.
+
+    You can add a @-binder to mark them as unskippable.
+
+    This warning will be promoted to an error in PureScript v0.16.0
+
+  in type class declaration for [33mJustTwo[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/OnlyPartiallyDetermined.md for more information,
+  or to contribute content related to this warning.
+
+Warning 5 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/OnlyPartiallyDetermined.purs:22:1 - 22:67 (line 22, column 1 - line 22, column 67)
+
+    The following type arguments:
+    [33m   [0m
+    [33m  a[0m
+    [33m  b[0m
+    [33m   [0m
+    in a type class cannot be determined by its members or
+    functional dependencies, if any.
+
+    This means that skipping them in a type application will
+    prevent the compiler from choosing an instance, throwing
+    an AmbiguousTypeVariables error during generalization.
+
+    You can add a @-binder to mark them as unskippable.
+
+    This warning will be promoted to an error in PureScript v0.16.0
+
+  in type class declaration for [33mJustThreeButCIsRequired[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/OnlyPartiallyDetermined.md for more information,
+  or to contribute content related to this warning.
+
+Warning 6 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/OnlyPartiallyDetermined.purs:11:1 - 11:26 (line 11, column 1 - line 11, column 26)
+
+    The following type arguments:
+    [33m   [0m
+    [33m  a[0m
+    [33m   [0m
+    in a type class cannot be determined by its members or
+    functional dependencies, if any.
+
+    This means that skipping them in a type application will
+    prevent the compiler from choosing an instance, throwing
+    an AmbiguousTypeVariables error during generalization.
+
+    You can add a @-binder to mark them as unskippable.
+
+    This warning will be promoted to an error in PureScript v0.16.0
+
+  in type class declaration for [33mJustOne[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/OnlyPartiallyDetermined.md for more information,
+  or to contribute content related to this warning.
+
+Warning 7 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/OnlyPartiallyDetermined.purs:20:1 - 20:49 (line 20, column 1 - line 20, column 49)
+
+    The following type arguments:
+    [33m   [0m
+    [33m  b[0m
+    [33m   [0m
+    in a type class cannot be determined by its members or
+    functional dependencies, if any.
+
+    This means that skipping them in a type application will
+    prevent the compiler from choosing an instance, throwing
+    an AmbiguousTypeVariables error during generalization.
+
+    You can add a @-binder to mark them as unskippable.
+
+    This warning will be promoted to an error in PureScript v0.16.0
+
+  in type class declaration for [33mNotInSuperclass[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/OnlyPartiallyDetermined.md for more information,
+  or to contribute content related to this warning.
+
+Warning 8 of 8:
+
+  in module [33mMain[0m
+  at tests/purs/warning/OnlyPartiallyDetermined.purs:24:1 - 26:13 (line 24, column 1 - line 26, column 13)
+
+    The following type arguments:
+    [33m   [0m
+    [33m  a[0m
+    [33m   [0m
+    in a type class cannot be determined by its members or
+    functional dependencies, if any.
+
+    This means that skipping them in a type application will
+    prevent the compiler from choosing an instance, throwing
+    an AmbiguousTypeVariables error during generalization.
+
+    You can add a @-binder to mark them as unskippable.
+
+    This warning will be promoted to an error in PureScript v0.16.0
+
+  in type class declaration for [33mAlmostThere[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/OnlyPartiallyDetermined.md for more information,
+  or to contribute content related to this warning.
+

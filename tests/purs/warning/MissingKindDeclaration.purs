@@ -10,4 +10,4 @@ newtype F a b = F b
 
 type Natural f g = forall a. f a -> g a
 
-class Clazz a b c
+class Clazz @a @b @c

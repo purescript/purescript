@@ -47,9 +47,11 @@
   or to contribute content related to this error.
   ```
 
-  `@`-syntax can also be used in class and data heads, like so:
+  By default, the type variables present in a `data` or `newtype` constructor
+  can be eliminated using visible type applications, without needing to prefix
+  them with `@`. They can also be skipped using a type wildcard:
   ```purs
-  data Either @a @b = Left a | Right b
+  data Either a b = Left a | Right b
 
   left :: Either Int String
   left = Left @Int @String 0
@@ -57,17 +59,6 @@
   right :: Either Int String
   right = Right @Int @String "0"
 
-  class Functor @f where
-    map :: forall a b. (a -> b) -> (f a -> f b)
-
-  -- map :: forall @f a b. Functor f => (a -> b) -> (f a -> f b)
-
-  map' :: (a -> b) -> (Array a -> Array b)
-  map' = map @Array
-  ```
-
-  Finally, type wildcards `_` can be used to "skip" a binding:
-  ```purs
   -- Either Int String
   leftSkip = Left @_ @String 0
 
@@ -75,7 +66,25 @@
   rightSkip = Right @String @_ 0
   ```
 
-  This feature also exposes kind applications syntactically:
+  Like with `data`/`newtype`, type variables are available for type application
+  by default in `class` declarations. Instead, `@` is used to determine whether
+  a type variable can be skipped during type application:
+  ```purs
+  class Functor f where
+    map :: forall a b. (a -> b) -> (f a -> f b)
+
+  -- map :: forall @f a b. Functor f => (a -> b) -> (f a -> f b)
+
+  map' :: (a -> b) -> (Array a -> Array b)
+  map' = map @Array
+
+  class MonadState s @m | m -> s where
+    state :: forall a. (s -> (Tuple a s)) -> m a
+
+  state' = state @Int @_  -- Invalid!
+  ```
+
+  Kind applications are now also exposed syntactically:
   ```purs
   foreign import data IdK :: forall a. a -> a
 
@@ -85,3 +94,9 @@
   type NumberId :: Number -> Number
   type NumberId = IdK @Number
   ```
+
+  The following errors have been added:
+  1. `CannotApplyExpressionOfTypeOnType`
+  2. `CannotSkipTypeApplication`
+  3. `CannotApplyTypeOnType`
+  4. `OnlyPartiallyDetermined`, replacing `UnusableDeclaration`
