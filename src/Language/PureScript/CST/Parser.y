@@ -751,9 +751,13 @@ instBinding :: { InstanceBinding () }
   | ident manyOrEmpty(binderAtom) guardedDecl { InstanceBindingName () (ValueBindingFields $1 $2 $3) }
 
 fixity :: { FixityFields }
-  : infix int qualIdent 'as' op { FixityFields $1 $2 (FixityValue (fmap Left $3) $4 (getOpName $5)) }
-  | infix int qualProperName 'as' op { FixityFields $1 $2 (FixityValue (fmap Right (getQualifiedProperName $3)) $4 (getOpName $5)) }
-  | infix int 'type' qualProperName 'as' op { FixityFields $1 $2 (FixityType $3 (getQualifiedProperName $4) $5 (getOpName $6)) }
+  : infix int qualIdent 'as' fixityOp { FixityFields $1 $2 (FixityValue (fmap Left $3) $4 (getOpName $5)) }
+  | infix int qualProperName 'as' fixityOp { FixityFields $1 $2 (FixityValue (fmap Right (getQualifiedProperName $3)) $4 (getOpName $5)) }
+  | infix int 'type' qualProperName 'as' fixityOp { FixityFields $1 $2 (FixityType $3 (getQualifiedProperName $4) $5 (getOpName $6)) }
+
+fixityOp :: { OpName }
+  : op { $1 }
+  | symbol { $1 }
 
 infix :: { (SourceToken, Fixity) }
   : 'infix' { ($1, Infix) }

@@ -71,6 +71,14 @@ test18 = negate $ negate 1.0
 test19 :: Number
 test19 = negate $ negate (-1.0)
 
+pairUp :: forall a b. a -> b -> { a :: a, b :: b }
+pairUp = \a -> \b -> { a, b }
+
+infixr 4 pairUp as (/\)
+
+test20 :: { a :: Int, b :: { a :: Int, b :: Int } }
+test20 = 1 /\ 2 /\ 3
+
 main = do
   let t1 = test1 1.0 2.0 (\x y -> x + y)
   let t2 = test2
@@ -88,4 +96,5 @@ main = do
   let t17 = test17
   let t18 = test18
   let t19 = test19
+  let t20 = test20
   log "Done"
