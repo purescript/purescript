@@ -53,7 +53,7 @@ addDataType
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
-  -> [(Text, Maybe SourceType, Role, VtaTypeVar)]
+  -> [(Text, Maybe SourceType, Role)]
   -> [(DataConstructorDeclaration, SourceType)]
   -> SourceType
   -> m ()
@@ -97,7 +97,7 @@ checkRoleDeclaration moduleName (RoleDeclarationData (ss, _) name declaredRoles)
       Just (kind, DataType dtype args dctors) -> do
         checkRoleDeclarationArity name declaredRoles (length args)
         checkRoles args declaredRoles
-        let args' = zipWith (\(v, k, _, t) r -> (v, k, r, t)) args declaredRoles
+        let args' = zipWith (\(v, k, _) r -> (v, k, r)) args declaredRoles
         putEnv $ env { types = M.insert qualName (kind, DataType dtype args' dctors) (types env) }
       Just (kind, ExternData _) -> do
         checkRoleDeclarationArity name declaredRoles (kindArity kind)
@@ -290,15 +290,12 @@ typeCheckAll moduleName = traverse go
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
       when (dtype == Newtype) $ void $ checkNewtype name dctors
-      let
-        fstSnd = (,) <$> (^. _1) <*> (^. _2)
-        args_ = fstSnd <$> args
-      checkDuplicateTypeArguments $ map fst args_
+      checkDuplicateTypeArguments $ map fst args
       (dataCtors, ctorKind) <- kindOfData moduleName (sa, name, args, dctors)
-      let args' = args `withKinds'` ctorKind
+      let args' = args `withKinds` ctorKind
       env <- getEnv
       dctors' <- traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
-      let args'' = args' `withRoles` inferRoles env moduleName name args_ dctors'
+      let args'' = args' `withRoles` inferRoles env moduleName name args dctors'
       addDataType moduleName dtype name args'' dataCtors ctorKind
     return $ DataDeclaration sa dtype name args dctors
   go d@(DataBindingGroupDeclaration tys) = do
@@ -317,16 +314,15 @@ typeCheckAll moduleName = traverse go
         let args' = args `withKinds` kind
         addTypeSynonym moduleName name args' elabTy kind
       let dataDeclsWithKinds = zipWith (\(dtype, (_, name, args, _)) (dataCtors, ctorKind) ->
-            (dtype, name, args `withKinds'` ctorKind, dataCtors, ctorKind)) dataDecls data_ks
+            (dtype, name, args `withKinds` ctorKind, dataCtors, ctorKind)) dataDecls data_ks
       inferRoles' <- fmap (inferDataBindingGroupRoles env moduleName roleDecls) .
         forM dataDeclsWithKinds $ \(_, name, args, dataCtors, _) -> do
           let fstSnd = (,) <$> (^. _1) <*> (^. _2)
           (name, fstSnd <$> args,) <$> traverse (replaceTypeSynonymsInDataConstructor . fst) dataCtors
       for_ dataDeclsWithKinds $ \(dtype, name, args', dataCtors, ctorKind) -> do
         when (dtype == Newtype) $ void $ checkNewtype name (map fst dataCtors)
-        let args_ = (\(a, b, _) -> (a, b)) <$> args'
-        checkDuplicateTypeArguments $ map fst args_
-        let args'' = args' `withRoles` inferRoles' name args_
+        checkDuplicateTypeArguments $ map fst args'
+        let args'' = args' `withRoles` inferRoles' name args'
         addDataType moduleName dtype name args'' dataCtors ctorKind
       for_ roleDecls $ checkRoleDeclaration moduleName
       for_ (zip clss cls_ks) $ \((deps, (sa, pn, _, _, _)), (args', implies', tys', kind)) -> do
@@ -585,15 +581,8 @@ typeCheckAll moduleName = traverse go
   withKinds ((s, Nothing):ss) (TypeApp _ (TypeApp _ tyFn k1) k2) | eqType tyFn tyFunction = (s, Just k1) : withKinds ss k2
   withKinds _ _ = internalError "Invalid arguments to withKinds"
 
-  withKinds' :: [(Text, Maybe SourceType, VtaTypeVar)] -> SourceType -> [(Text, Maybe SourceType, VtaTypeVar)]
-  withKinds' [] _ = []
-  withKinds' ss (ForAll _ _ _ k _ _) = withKinds' ss k
-  withKinds' (s@(_, Just _, _):ss) (TypeApp _ (TypeApp _ tyFn _) k2) | eqType tyFn tyFunction = s : withKinds' ss k2
-  withKinds' ((s, Nothing, v):ss) (TypeApp _ (TypeApp _ tyFn k1) k2) | eqType tyFn tyFunction = (s, Just k1, v) : withKinds' ss k2
-  withKinds' _ _ = internalError "Invalid arguments to withKinds"
-
-  withRoles :: [(Text, Maybe SourceType, VtaTypeVar)] -> [Role] -> [(Text, Maybe SourceType, Role, VtaTypeVar)]
-  withRoles = zipWith $ \(v, k, t) r -> (v, k, r, t)
+  withRoles :: [(Text, Maybe SourceType)] -> [Role] -> [(Text, Maybe SourceType, Role)]
+  withRoles = zipWith $ \(v, k) r -> (v, k, r)
 
   replaceTypeSynonymsInDataConstructor :: DataConstructorDeclaration -> m DataConstructorDeclaration
   replaceTypeSynonymsInDataConstructor DataConstructorDeclaration{..} = do

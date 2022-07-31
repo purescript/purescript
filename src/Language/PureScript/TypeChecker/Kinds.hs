@@ -27,7 +27,7 @@ module Language.PureScript.TypeChecker.Kinds
 
 import Prelude.Compat
 
-import Control.Arrow ((***))
+import Control.Arrow ((***), second)
 import Control.Lens ((^.), _1, _2, _3)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
@@ -618,7 +618,7 @@ kindOfWithScopedVars ty = do
 type DataDeclarationArgs =
   ( SourceAnn
   , ProperName 'TypeName
-  , [(Text, Maybe SourceType, VtaTypeVar)]
+  , [(Text, Maybe SourceType)]
   , [DataConstructorDeclaration]
   )
 
@@ -646,18 +646,17 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
   tyKind <- apply =<< lookupTypeVariable moduleName (Qualified ByNullSourcePos tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    tyArgs' <- for tyArgs $ \(n, mbK, v) -> do
+    tyArgs' <- for tyArgs $ \(n, mbK) -> do
       k_ <- maybe (freshKind (fst ann)) pure mbK
       k <- replaceAllTypeSynonyms <=< apply <=< checkIsSaturatedType $ k_
-      pure (n, k, v)
+      pure (n, k)
     subsumesKind (foldr ((E.-:>) . (^. _2)) E.kindType tyArgs') tyKind'
-    bindLocalTypeVariables moduleName ((\(a, b, _) -> (ProperName a, b)) <$> tyArgs') $ do
+    bindLocalTypeVariables moduleName ((\(a, b) -> (ProperName a, b)) <$> tyArgs') $ do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
           tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . (^. _1)) tyCtor tyArgs'
-          fstThd = (,) <$> (^. _1) <*> (^. _3)
-          vtas = fstThd <$> tyArgs
-          ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (\(a, b, _) -> (nullSourceAnn, (a, b))) tyArgs'
+          vtas = second (const IsVtaTypeVar) <$> tyArgs
+          ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (\(a, b) -> (nullSourceAnn, (a, b))) tyArgs'
       for ctors $
         fmap (fmap (makeTopLevelVta vtas . mkForAll ctorBinders)) . inferDataConstructor tyCtor'
 

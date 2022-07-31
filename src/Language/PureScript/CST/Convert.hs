@@ -459,7 +459,7 @@ convertDeclaration fileName decl = case decl of
             [] -> []
             (st', ctor) : tl' -> ctrs st' ctor tl'
           )
-    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goVtvTypeVarAlways <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
+    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
@@ -467,7 +467,7 @@ convertDeclaration fileName decl = case decl of
       (convertType fileName bd)
   DeclNewtype _ (DataHead _ a vars) st x ys -> do
     let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(head ctrFields, convertType fileName ys)]]
-    pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goVtvTypeVarAlways <$> vars) ctrs
+    pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
       goTyVar (TypeVarKinded (Wrapped _ (Labeled (_, a) _ _) _)) = nameValue a
@@ -619,11 +619,6 @@ convertDeclaration fileName decl = case decl of
   -- Convert a TypeVarBinding into a (Text, Maybe SourceType) pair.
   goTypeVar :: TypeVarBinding a -> (Text.Text, Maybe T.SourceType)
   goTypeVar = fstSnd . goVtvTypeVar_ T.NotVtaTypeVar
-
-  -- Convert a TypeVarBinding into a (Text, Maybe SourceType, VtaTypeVar) triple,
-  -- where `VtaTypeVar` is always set to `IsVtaTypeVar`.
-  goVtvTypeVarAlways :: TypeVarBinding a -> (Text.Text, Maybe T.SourceType, T.VtaTypeVar)
-  goVtvTypeVarAlways = goVtvTypeVar_ T.IsVtaTypeVar
 
   -- Convert a TypeVarBinding into a (Text, Maybe SourceType, VtaTypeVar) triple,
   -- where `VtaTypeVar` is always set to `IsVtaTypeVarRequired`.
