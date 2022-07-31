@@ -689,7 +689,7 @@ typeHead :: { DataHead () }
   : 'type' properName manyOrEmpty(typeVarBindingPlain) { DataHead $1 (getProperName $2) $3 }
 
 newtypeHead :: { DataHead () }
-  : 'newtype' properName manyOrEmpty(typeVarBinding) { DataHead $1 (getProperName $2) $3 }
+  : 'newtype' properName manyOrEmpty(typeVarBindingPlain) { DataHead $1 (getProperName $2) $3 }
 
 dataCtor :: { DataCtor () }
   : properName manyOrEmpty(typeAtom)

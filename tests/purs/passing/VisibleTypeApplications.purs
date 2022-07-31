@@ -95,7 +95,7 @@ kindCheck = Proxy
 kindCheck' :: Proxy "Type"
 kindCheck' = kindCheck @Symbol @"Type"
 
-newtype Id' @a = Id' a
+newtype Id' a = Id' a
 
 _IdInt :: Int -> Id' Int
 _IdInt = Id' @Int
