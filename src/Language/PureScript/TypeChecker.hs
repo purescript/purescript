@@ -187,16 +187,17 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
         S.fromList <$> mapMaybe argToIndex . freeTypeVariables <$> T.replaceAllTypeSynonymsM syns knds t
       let inSuperclass = foldMap findInSuperclass $ typeClassSuperclasses newClass
       let notInUse = withoutAtBinder `S.difference` inMembers `S.difference` inSuperclass
-      let noMembers = null classMembers
-      if not noMembers && null (typeClassDependencies newClass) && not (null notInUse) then
+      let hasMembers = not $ null classMembers
+      if hasMembers && null (typeClassDependencies newClass) && not (null notInUse) then
         tell . errorMessage $ OnlyPartiallyDetermined $ S.toList $ S.map indexToArg notInUse
       else do
         let
           determinedArguments = typeClassDeterminedArguments newClass
-          fullyDetermined = notInUse `S.intersection` determinedArguments
-          notFullyDetermined = notInUse `S.difference` determinedArguments
-        when (not noMembers && not (null fullyDetermined) && not (null notFullyDetermined)) $ do
-          tell . errorMessage $ OnlyPartiallyDetermined $ S.toList $ S.map indexToArg notFullyDetermined
+          hasFullyDetermined = not $ null $ notInUse `S.intersection` determinedArguments
+          partiallyDetermined = notInUse `S.difference` determinedArguments
+          hasPartiallyDetermined = not $ null partiallyDetermined
+        when (hasMembers && hasFullyDetermined && hasPartiallyDetermined) $ do
+          tell . errorMessage $ OnlyPartiallyDetermined $ S.toList $ S.map indexToArg partiallyDetermined
 
     argToIndex :: Text -> Maybe Int
     argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . (^. _1)) args [0..])
