@@ -15,7 +15,7 @@ const' = const @_
 
 -- Application on a wildcard should generalize with a constraint
 class MultiKind :: (Type -> Type -> Type) -> Constraint
-class MultiKind @f where
+class MultiKind f where
   foo :: forall @a @b. f a b -> String
 
 data Tuplet1 a b c = Tuplet1 a b c
