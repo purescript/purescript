@@ -187,14 +187,15 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
         S.fromList <$> mapMaybe argToIndex . freeTypeVariables <$> T.replaceAllTypeSynonymsM syns knds t
       let inSuperclass = foldMap findInSuperclass $ typeClassSuperclasses newClass
       let notInUse = withoutAtBinder `S.difference` inMembers `S.difference` inSuperclass
-      if not (typeClassIsEmpty newClass) && null (typeClassDependencies newClass) && not (null notInUse) then
+      let noMembers = null classMembers
+      if not noMembers && null (typeClassDependencies newClass) && not (null notInUse) then
         tell . errorMessage $ OnlyPartiallyDetermined $ S.toList $ S.map indexToArg notInUse
       else do
         let
           determinedArguments = typeClassDeterminedArguments newClass
           fullyDetermined = notInUse `S.intersection` determinedArguments
           notFullyDetermined = notInUse `S.difference` determinedArguments
-        unless (typeClassIsEmpty newClass || null fullyDetermined || null notFullyDetermined) $ do
+        when (not noMembers && not (null fullyDetermined) && not (null notFullyDetermined)) $ do
           tell . errorMessage $ OnlyPartiallyDetermined $ S.toList $ S.map indexToArg notFullyDetermined
 
     argToIndex :: Text -> Maybe Int

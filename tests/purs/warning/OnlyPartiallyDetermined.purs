@@ -32,3 +32,5 @@ class AlmostThere (a :: Type) (b :: Type) (c :: Type)
   almostThere :: String
 
 class TypeLevelFunction (a :: Type) (b :: Type) | a -> b
+
+class JustOne a <= SuperclassNonEmpty (a :: Type) (b :: Type)
