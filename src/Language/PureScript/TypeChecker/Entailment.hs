@@ -223,7 +223,6 @@ entails SolverOptions{..} constraint context hints =
     ctorModules (TypeApp _ ty _) = ctorModules ty
     ctorModules (KindApp _ ty _) = ctorModules ty
     ctorModules (KindedType _ ty _) = ctorModules ty
-    ctorModules (Specified _ _ _ ty) = ctorModules ty
     ctorModules _ = Nothing
 
     findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> QualifiedBy -> [TypeClassDict]
@@ -378,7 +377,6 @@ entails SolverOptions{..} constraint context hints =
 
             canBeGeneralized :: Type a -> Bool
             canBeGeneralized TUnknown{} = True
-            canBeGeneralized (Specified _ _ _ t) = canBeGeneralized t
             canBeGeneralized (KindedType _ t _) = canBeGeneralized t
             canBeGeneralized _ = False
 
@@ -737,8 +735,6 @@ matches deps TypeClassDictionaryInScope{..} tys =
     -- and return a substitution from type variables to types which makes the type heads unify.
     --
     typeHeadsAreEqual :: Type a -> Type a -> (Matched (), Matching [Type a])
-    typeHeadsAreEqual (Specified _ _ _ t1) t2                                  = typeHeadsAreEqual t1 t2
-    typeHeadsAreEqual t1                   (Specified _ _ _ t2)                = typeHeadsAreEqual t1 t2
     typeHeadsAreEqual (KindedType _  t1 _) t2                                  = typeHeadsAreEqual t1 t2
     typeHeadsAreEqual t1                     (KindedType _ t2 _)               = typeHeadsAreEqual t1 t2
     typeHeadsAreEqual (TUnknown _ u1)        (TUnknown _ u2)      | u1 == u2   = (Match (), M.empty)
@@ -758,8 +754,6 @@ matches deps TypeClassDictionaryInScope{..} tys =
         (common, rest) = alignRowsWith typeHeadsAreEqual r1 r2
 
         go :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Matched (), Matching [Type a])
-        go (l,  Specified _ _ _ t1) (r,  t2)                           = go (l, t1) (r, t2)
-        go (l,  t1)                 (r, Specified _ _ _ t2)            = go (l, t1) (r, t2)
         go (l,  KindedType _ t1 _) (r,  t2)                            = go (l, t1) (r, t2)
         go (l,  t1)                (r,  KindedType _ t2 _)             = go (l, t1) (r, t2)
         go (l,  KindApp _ t1 k1)   (r,  KindApp _ t2 k2) | eqType k1 k2 = go (l, t1) (r, t2)
@@ -786,8 +780,6 @@ matches deps TypeClassDictionaryInScope{..} tys =
       -- which was _not_ solved, i.e. one which was inferred by a functional
       -- dependency.
       typesAreEqual :: Type a -> Type a -> Matched ()
-      typesAreEqual (Specified _ _ _ t1)   t2                     = typesAreEqual t1 t2
-      typesAreEqual t1                     (Specified _ _ _ t2)   = typesAreEqual t1 t2
       typesAreEqual (KindedType _ t1 _)    t2                     = typesAreEqual t1 t2
       typesAreEqual t1                     (KindedType _ t2 _)    = typesAreEqual t1 t2
       typesAreEqual (TUnknown _ u1)        (TUnknown _ u2)        | u1 == u2 = Match ()

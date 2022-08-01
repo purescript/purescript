@@ -114,10 +114,6 @@ unifyTypes t1 t2 = do
   unifyTypes' (TUnknown _ u1) (TUnknown _ u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown _ u) t = solveType u t
   unifyTypes' t (TUnknown _ u) = solveType u t
-  unifyTypes' (Specified _ u1 v1 ty1) (Specified _ u2 v2 ty2)
-    | u1 == u2 && v1 == v2 = unifyTypes' ty1 ty2
-  unifyTypes' ty1 (Specified _ _ _ ty2) = unifyTypes' ty1 ty2
-  unifyTypes' (Specified _ _ _ ty1) ty2 = unifyTypes' ty1 ty2
   unifyTypes' (ForAll ann1 ident1 mbK1 ty1 sc1 _) (ForAll ann2 ident2 mbK2 ty2 sc2 _) =
     case (sc1, sc2) of
       (Just sc1', Just sc2') -> do

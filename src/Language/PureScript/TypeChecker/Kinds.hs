@@ -225,7 +225,6 @@ inferKind = \tyToInfer ->
       t1' <- checkKind t1 t2'
       t2'' <- apply t2'
       pure (t1', t2'')
-    Specified _ _ _ ty -> go ty
     ForAll ann arg mbKind ty sc vta -> do
       moduleName <- unsafeCheckCurrentModule
       kind <- case mbKind of
@@ -563,8 +562,6 @@ elaborateKind = \case
         flip (replaceTypeVars a) n . ($> ann) <$> apply t2
       _ ->
         cannotApplyKindToType t1 t2
-  Specified ann _ _ _ -> do
-    pure $ E.kindType $> ann
   ForAll ann _ _ _ _ _ -> do
     pure $ E.kindType $> ann
   ConstrainedType ann _ _ ->

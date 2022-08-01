@@ -1,22 +1,18 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/failing/VisibleTypeApplications1.purs:10:9 - 10:30 (line 10, column 9 - line 10, column 30)
+at tests/purs/failing/VisibleTypeApplications1.purs:10:21 - 10:30 (line 10, column 21 - line 10, column 30)
 
   Could not match kind
-  [33m        [0m
-  [33m  Symbol[0m
-  [33m        [0m
-  with kind
   [33m      [0m
   [33m  Type[0m
   [33m      [0m
+  with kind
+  [33m        [0m
+  [33m  Symbol[0m
+  [33m        [0m
 
-while trying to match type [33mt0[0m
-  with type [33m"NotType"[0m
 while inferring the type of [33mfail[0m
 in value declaration [33mfail'[0m
-
-where [33mt0[0m is an unknown type
 
 See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
 or to contribute content related to this error.
