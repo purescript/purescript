@@ -18,9 +18,9 @@ Warning 2 of 5:
     No type declaration was provided for the top-level declaration of [33mtestFooGeneralize[0m.
     It is good practice to provide type declarations as a form of documentation.
     The inferred type of [33mtestFooGeneralize[0m was:
-    [33m                                                    [0m
-    [33m  forall f76. MultiKind f76 => f76 Int Int -> String[0m
-    [33m                                                    [0m
+    [33m                                              [0m
+    [33m  forall f. MultiKind f => f Int Int -> String[0m
+    [33m                                              [0m
 
   in value declaration [33mtestFooGeneralize[0m
 
@@ -35,9 +35,9 @@ Warning 3 of 5:
     No type declaration was provided for the top-level declaration of [33mconst'[0m.
     It is good practice to provide type declarations as a form of documentation.
     The inferred type of [33mconst'[0m was:
-    [33m                                   [0m
-    [33m  forall a84 b85. a84 -> b85 -> a84[0m
-    [33m                                   [0m
+    [33m                          [0m
+    [33m  forall a @b. a -> b -> a[0m
+    [33m                          [0m
 
   in value declaration [33mconst'[0m
 
@@ -69,9 +69,9 @@ Warning 5 of 5:
     No type declaration was provided for the top-level declaration of [33m_A[0m.
     It is good practice to provide type declarations as a form of documentation.
     The inferred type of [33m_A[0m was:
-    [33m                                         [0m
-    [33m  forall a88. (forall a. a -> a) -> A a88[0m
-    [33m                                         [0m
+    [33m                                      [0m
+    [33m  forall @a. (forall a. a -> a) -> A a[0m
+    [33m                                      [0m
 
   in value declaration [33m_A[0m
 

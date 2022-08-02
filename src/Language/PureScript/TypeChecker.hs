@@ -18,7 +18,7 @@ import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter, tell)
 
 import Data.Foldable (for_, traverse_, toList)
-import Data.List (nubBy, (\\), sort, group)
+import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import Data.Either (partitionEithers)
 import Data.Text (Text)
@@ -162,7 +162,7 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
       hasSig = qualName `M.member` types env
   unless (hasSig || not (containsForAll kind)) $ do
     tell . errorMessage $ MissingKindDeclaration ClassSig (disqualify qualName) kind
-  warnIfAmbiguous newClass (typeSynonyms env) (types env)
+  traverse_ (checkMemberIsUsable newClass (typeSynonyms env) (types env)) classMembers
   putEnv $ env { types = M.insert qualName (kind, ExternData (nominalRolesForKind kind)) (types env)
                , typeClasses = M.insert qualifiedClassName newClass (typeClasses env) }
   where
@@ -180,38 +180,35 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
         Just tcd -> tcd
         Nothing -> internalError "Unknown super class in TypeClassDeclaration"
 
-    warnIfAmbiguous :: TypeClassData -> T.SynonymMap -> T.KindMap -> m ()
-    warnIfAmbiguous newClass syns knds = do
-      let withoutAtBinder = S.fromList $ findWithoutAtBinder newClass
-      inMembers <- fmap S.unions $ forM classMembers $ \(_, t) ->
-        S.fromList <$> mapMaybe argToIndex . freeTypeVariables <$> T.replaceAllTypeSynonymsM syns knds t
-      let notInUse = withoutAtBinder `S.difference` inMembers
-      let hasMembers = not $ null classMembers
-      if hasMembers && null (typeClassDependencies newClass) && not (null notInUse) then
-        tell . errorMessage $ OnlyPartiallyDetermined $ S.toList $ S.map indexToArg notInUse
-      else do
-        let
-          determinedArguments = typeClassDeterminedArguments newClass
-          hasFullyDetermined = not $ null $ notInUse `S.intersection` determinedArguments
-          partiallyDetermined = notInUse `S.difference` determinedArguments
-          hasPartiallyDetermined = not $ null partiallyDetermined
-        when (hasMembers && hasFullyDetermined && hasPartiallyDetermined) $ do
-          tell . errorMessage $ OnlyPartiallyDetermined $ S.toList $ S.map indexToArg partiallyDetermined
+    coveringSets :: TypeClassData -> [S.Set Int]
+    coveringSets = S.toList . typeClassCoveringSets
 
     argToIndex :: Text -> Maybe Int
     argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . (^. _1)) args [0..])
 
-    indexToArg :: Int -> Text
-    indexToArg = (^. _1) . (args !!)
-
     toPair (TypeDeclaration (TypeDeclarationData _ ident ty)) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
-    findWithoutAtBinder :: TypeClassData -> [Int]
-    findWithoutAtBinder = catMaybes . zipWith fn [0..] . typeClassArguments
+    findVtaTypeVars = catMaybes . zipWith fn [0..] . typeClassArguments
       where
-      fn i (_, _, IsVtaTypeVar False) = Just i
-      fn _ (_, _, _) = Nothing
+      fn i (_, _, IsVtaTypeVar _) = Just i
+      fn _ (_, _, NotVtaTypeVar) = Nothing
+
+    -- Currently we are only checking usability based on the type class currently
+    -- being defined.  If the mentioned arguments don't include a covering set,
+    -- then we won't be able to find a instance.
+    checkMemberIsUsable :: TypeClassData -> T.SynonymMap -> T.KindMap -> (Ident, SourceType) -> m ()
+    checkMemberIsUsable newClass syns kinds (ident, memberTy) = do
+      memberTy' <- T.replaceAllTypeSynonymsM syns kinds memberTy
+      let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
+      let vtaTypeVars = S.fromList $ findVtaTypeVars newClass
+      let leftovers = map ((`S.difference` vtaTypeVars) . (`S.difference` mentionedArgIndexes)) (coveringSets newClass)
+
+      unless (any null leftovers) . throwError . errorMessage $
+        let
+          solutions = map (map ((^. _1) . (args !!)) . S.toList) leftovers
+        in
+          UnusableDeclaration ident (nub solutions)
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)

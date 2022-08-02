@@ -6,7 +6,8 @@
   paper by Richard Eisenberg.
 
   Expressions can now be applied to types using `@`-based syntax, similar to
-  GHC's `TypeApplications` extension:
+  GHC's `TypeApplications` extension.
+
   ```purs
   id :: forall @a. a -> a
   id a = a
@@ -18,7 +19,8 @@
   Note that for a polytyped expression to be applied to a type, at least
   one of its type variable bindings must be prefixed with a `@`, denoting
   that a type variable can be bound using visible type application syntax.
-  For example, the following snippet will fail to compile:
+  For example, the following snippet will fail to compile.
+
   ```purs
   idFail :: forall a. a -> a
   idFail a = a
@@ -49,7 +51,8 @@
 
   By default, the type variables present in a `data` or `newtype` constructor
   can be eliminated using visible type applications, without needing to prefix
-  them with `@`. They can also be skipped using a type wildcard:
+  them with `@`. They can also be skipped using a type wildcard.
+
   ```purs
   data Either a b = Left a | Right b
 
@@ -66,25 +69,21 @@
   rightSkip = Right @String @_ 0
   ```
 
-  Like with `data`/`newtype`, type variables are available for type application
-  by default in `class` declarations. Instead, `@` is used to determine whether
-  a type variable can be skipped during type application:
+  Unlike with `data`/`newtype`, type variables for `class` declarations are opt-in
+  for visible type applications, and they can be made visible with an `@` prefix.
+
   ```purs
-  class Functor f where
+  class Functor @f where
     map :: forall a b. (a -> b) -> (f a -> f b)
 
   -- map :: forall @f a b. Functor f => (a -> b) -> (f a -> f b)
 
   map' :: (a -> b) -> (Array a -> Array b)
   map' = map @Array
-
-  class MonadState s @m | m -> s where
-    state :: forall a. (s -> (Tuple a s)) -> m a
-
-  state' = state @Int @_  -- Invalid!
   ```
 
-  Kind applications are now also exposed syntactically:
+  Kind applications are now also exposed syntactically.
+
   ```purs
   foreign import data IdK :: forall a. a -> a
 
@@ -97,6 +96,4 @@
 
   The following errors have been added:
   1. `CannotApplyExpressionOfTypeOnType`
-  2. `CannotSkipTypeApplication`
-  3. `CannotApplyTypeOnType`
-  4. `OnlyPartiallyDetermined`, replacing `UnusableDeclaration`
+  2. `CannotApplyTypeOnType`
