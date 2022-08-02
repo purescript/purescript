@@ -423,7 +423,7 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceType, VtaTypeVar)] [SourceConstraint] [FunctionalDependency] [Declaration]
+  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceType, TypeVarVisibility)] [SourceConstraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)

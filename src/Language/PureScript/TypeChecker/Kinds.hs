@@ -225,7 +225,7 @@ inferKind = \tyToInfer ->
       t1' <- checkKind t1 t2'
       t2'' <- apply t2'
       pure (t1', t2'')
-    ForAll ann arg mbKind ty sc vta -> do
+    ForAll ann arg mbKind ty sc vis -> do
       moduleName <- unsafeCheckCurrentModule
       kind <- case mbKind of
         Just k -> replaceAllTypeSynonyms =<< checkIsSaturatedType k
@@ -235,7 +235,7 @@ inferKind = \tyToInfer ->
         unks <- unknownsWithKinds . IS.toList $ unknowns ty'
         pure (ty', unks)
       for_ unks . uncurry $ addUnsolved Nothing
-      pure (ForAll ann arg (Just kind) ty' sc vta, E.kindType $> ann)
+      pure (ForAll ann arg (Just kind) ty' sc vis, E.kindType $> ann)
     ParensInType _ ty ->
       go ty
     ty ->
@@ -650,9 +650,9 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
           tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . fst) tyCtor tyArgs'
           ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (nullSourceAnn,) tyArgs'
-          vtas = second (const IsVtaTypeVar) <$> tyArgs
+          vis = second (const TypeVarVisible) <$> tyArgs
       for ctors $
-        fmap (fmap (makeTopLevelVta vtas . mkForAll ctorBinders)) . inferDataConstructor tyCtor'
+        fmap (fmap (addVisibility vis . mkForAll ctorBinders)) . inferDataConstructor tyCtor'
 
 inferDataConstructor
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
@@ -779,13 +779,13 @@ checkTypeQuantification =
 type ClassDeclarationArgs =
   ( SourceAnn
   , ProperName 'ClassName
-  , [(Text, Maybe SourceType, VtaTypeVar)]
+  , [(Text, Maybe SourceType, TypeVarVisibility)]
   , [SourceConstraint]
   , [Declaration]
   )
 
 type ClassDeclarationResult =
-  ( [(Text, SourceType, VtaTypeVar)]
+  ( [(Text, SourceType, TypeVarVisibility)]
   -- The kind annotated class arguments
   , [SourceConstraint]
   -- The kind annotated superclass constraints
@@ -807,7 +807,7 @@ inferClassDeclaration
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
   -> ClassDeclarationArgs
-  -> m ([(Text, SourceType, VtaTypeVar)], [SourceConstraint], [Declaration])
+  -> m ([(Text, SourceType, TypeVarVisibility)], [SourceConstraint], [Declaration])
 inferClassDeclaration moduleName (ann, clsName, clsArgs, superClasses, decls) = do
   clsKind <- apply =<< lookupTypeVariable moduleName (Qualified ByNullSourcePos $ coerceProperName clsName)
   let (sigBinders, clsKind') = fromJust . completeBinderList $ clsKind
@@ -920,15 +920,15 @@ checkKindDeclaration _ ty = do
   -- be referenced (easily).
   freshVar arg = (arg <>) . T.pack . show <$> fresh
   freshenForAlls = curry $ \case
-    (ForAll _ v1 _ ty1 _ _, ForAll a2 v2 k2 ty2 sc2 vta) | v1 == v2 -> do
+    (ForAll _ v1 _ ty1 _ _, ForAll a2 v2 k2 ty2 sc2 vis) | v1 == v2 -> do
       ty2' <- freshenForAlls ty1 ty2
-      pure $ ForAll a2 v2 k2 ty2' sc2 vta
+      pure $ ForAll a2 v2 k2 ty2' sc2 vis
     (_, ty2) -> go ty2 where
       go = \case
-        ForAll a' v' k' ty' sc' vta -> do
+        ForAll a' v' k' ty' sc' vis -> do
           v'' <- freshVar v'
           ty'' <- go (replaceTypeVars v' (TypeVar a' v'') ty')
-          pure $ ForAll a' v'' k' ty'' sc' vta
+          pure $ ForAll a' v'' k' ty'' sc' vis
         other -> pure other
 
   checkValidKind = everywhereOnTypesM $ \case

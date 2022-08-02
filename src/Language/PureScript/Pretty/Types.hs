@@ -54,7 +54,7 @@ data PrettyPrintType
   | PPKindedType PrettyPrintType PrettyPrintType
   | PPBinaryNoParensType PrettyPrintType PrettyPrintType PrettyPrintType
   | PPParensInType PrettyPrintType
-  | PPForAll [(Text, Maybe PrettyPrintType, VtaTypeVar)] PrettyPrintType
+  | PPForAll [(Text, Maybe PrettyPrintType, TypeVarVisibility)] PrettyPrintType
   | PPFunction PrettyPrintType PrettyPrintType
   | PPRecord [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
   | PPRow [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
@@ -84,11 +84,11 @@ convertPrettyPrintType = go
   go d (BinaryNoParensType _ ty1 ty2 ty3) = PPBinaryNoParensType (go (d-1) ty1) (go (d-1) ty2) (go (d-1) ty3)
   go d (ParensInType _ ty) = PPParensInType (go (d-1) ty)
   go d ty@RCons{} = uncurry PPRow (goRow d ty)
-  go d (ForAll _ v mbK ty _ vta) = goForAll d [(v, fmap (go (d-1)) mbK, vta)] ty
+  go d (ForAll _ v mbK ty _ vis) = goForAll d [(v, fmap (go (d-1)) mbK, vis)] ty
   go d (TypeApp _ a b) = goTypeApp d a b
   go d (KindApp _ a b) = PPTypeApp (go (d-1) a) (PPKindArg (go (d-1) b))
 
-  goForAll d vs (ForAll _ v mbK ty _ vta) = goForAll d ((v, fmap (go (d-1)) mbK, vta) : vs) ty
+  goForAll d vs (ForAll _ v mbK ty _ vis) = goForAll d ((v, fmap (go (d-1)) mbK, vis) : vs) ty
   goForAll d vs ty = PPForAll (reverse vs) (go (d-1) ty)
 
   goRow d ty =
@@ -222,8 +222,8 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   forall' = if troUnicode tro then "∀" else "forall"
   doubleColon = if troUnicode tro then "∷" else "::"
 
-  printMbKindedType (v, Nothing, vta) = text (vtaTypeVarPrefix vta) <> text v
-  printMbKindedType (v, Just k, vta) = text ("(" ++ vtaTypeVarPrefix vta ++ v ++ " " ++ doubleColon ++ " ") <> typeAsBox' k <> text ")"
+  printMbKindedType (v, Nothing, vis) = text (typeVarVisPrefix vis) <> text v
+  printMbKindedType (v, Just k, vis) = text ("(" ++ typeVarVisPrefix vis ++ v ++ " " ++ doubleColon ++ " ") <> typeAsBox' k <> text ")"
 
   -- If both boxes span a single line, keep them on the same line, or else
   -- use the specified function to modify the second box, then combine vertically.
@@ -232,7 +232,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
     | rows b1 > 1 || rows b2 > 1 = vcat left [ b1, f b2 ]
     | otherwise = hcat top [ b1, text " ", b2]
 
-forall_ :: Pattern () PrettyPrintType ([(String, Maybe PrettyPrintType, VtaTypeVar)], PrettyPrintType)
+forall_ :: Pattern () PrettyPrintType ([(String, Maybe PrettyPrintType, TypeVarVisibility)], PrettyPrintType)
 forall_ = mkPattern match
   where
   match (PPForAll idents ty) = Just ((_1 %~ T.unpack) <$> idents, ty)

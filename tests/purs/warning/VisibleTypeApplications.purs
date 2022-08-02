@@ -30,7 +30,7 @@ instance MultiKind (Tuplet2 a) where
 testFooGeneralize = foo @_ @Int @Int
 
 
--- Only top-level foralls should be vta-ified
+-- Only top-level foralls should be made visible
 data A :: Type -> Type
 data A a = A (forall a. a -> a)
 

@@ -344,7 +344,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
 
   updateTypeArguments'
     :: (Traversable f, Traversable g)
-    => f (a, g SourceType, VtaTypeVar) -> m (f (a, g SourceType, VtaTypeVar))
+    => f (a, g SourceType, TypeVarVisibility) -> m (f (a, g SourceType, TypeVarVisibility))
   updateTypeArguments' = traverse $ \(a, b, c) -> do
     b' <- traverse updateTypesEverywhere b
     pure (a, b', c)

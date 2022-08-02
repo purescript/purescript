@@ -139,10 +139,10 @@ convertType fileName = go
         mkForAll a b v t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
           T.ForAll ann' (getIdent $ nameValue a) b t Nothing v
-        k (TypeVarKinded (Wrapped _ (Labeled (Just _, a) _ b) _)) = mkForAll a (Just (go b)) T.IsVtaTypeVar
-        k (TypeVarKinded (Wrapped _ (Labeled (_, a) _ b) _)) = mkForAll a (Just (go b)) T.NotVtaTypeVar
-        k (TypeVarName (Just _, a)) = mkForAll a Nothing T.IsVtaTypeVar
-        k (TypeVarName (_, a)) = mkForAll a Nothing T.NotVtaTypeVar
+        k (TypeVarKinded (Wrapped _ (Labeled (Just _, a) _ b) _)) = mkForAll a (Just (go b)) T.TypeVarVisible
+        k (TypeVarKinded (Wrapped _ (Labeled (_, a) _ b) _)) = mkForAll a (Just (go b)) T.TypeVarInvisible
+        k (TypeVarName (Just _, a)) = mkForAll a Nothing T.TypeVarVisible
+        k (TypeVarName (_, a)) = mkForAll a Nothing T.TypeVarInvisible
         ty' = foldr k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
       T.setAnnForType ann ty'
@@ -482,7 +482,7 @@ convertDeclaration fileName decl = case decl of
         AST.TypeDeclaration $ AST.TypeDeclarationData ann' (ident $ nameValue n) ty'
     pure $ AST.TypeClassDeclaration ann
       (nameValue name)
-      (goVtvTypeVarRequired <$> vars)
+      (goTypeVarWithVisibility <$> vars)
       (convertConstraint fileName <$> maybe [] (toList . fst) sup)
       (goFundep <$> maybe [] (toList . snd) fdeps)
       (goSig <$> maybe [] (NE.toList . snd) bd)
@@ -609,11 +609,11 @@ convertDeclaration fileName decl = case decl of
     TypeVarKinded (Wrapped _ (Labeled (_, x) _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
     TypeVarName (_, x) -> (getIdent $ nameValue x, Nothing)
 
-  goVtvTypeVarRequired = \case
+  goTypeVarWithVisibility = \case
     TypeVarKinded (Wrapped _ (Labeled (atSign, x) _ y) _) ->
-      (getIdent $ nameValue x, Just $ convertType fileName y, if isJust atSign then T.IsVtaTypeVar else T.NotVtaTypeVar)
+      (getIdent $ nameValue x, Just $ convertType fileName y, if isJust atSign then T.TypeVarVisible else T.TypeVarInvisible)
     TypeVarName (atSign, x) ->
-      (getIdent $ nameValue x, Nothing, if isJust atSign then T.IsVtaTypeVar else T.NotVtaTypeVar)
+      (getIdent $ nameValue x, Nothing, if isJust atSign then T.TypeVarVisible else T.TypeVarInvisible)
 
   goInstanceBinding = \case
     InstanceBindingSignature _ lbl ->

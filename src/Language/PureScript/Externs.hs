@@ -136,7 +136,7 @@ data ExternsDeclaration =
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
-      , edClassTypeArguments      :: [(Text, Maybe SourceType, VtaTypeVar)]
+      , edClassTypeArguments      :: [(Text, Maybe SourceType, TypeVarVisibility)]
       , edClassMembers            :: [(Ident, SourceType)]
       , edClassConstraints        :: [SourceConstraint]
       , edFunctionalDependencies  :: [FunctionalDependency]

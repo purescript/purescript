@@ -49,7 +49,7 @@ instance NFData Environment
 
 -- | Information about a type class
 data TypeClassData = TypeClassData
-  { typeClassArguments :: [(Text, Maybe SourceType, VtaTypeVar)]
+  { typeClassArguments :: [(Text, Maybe SourceType, TypeVarVisibility)]
   -- ^ A list of type argument names; their kinds, where kind annotations
   -- were provided; and whether an argument can be bound using a visible
   -- type application.
@@ -122,7 +122,7 @@ initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPr
 -- determine X that X does not determine. This is the same thing: everything X determines includes everything
 -- in its SCC, and everything determining X is either before it in an SCC path, or in the same SCC.
 makeTypeClassData
-  :: [(Text, Maybe SourceType, VtaTypeVar)]
+  :: [(Text, Maybe SourceType, TypeVarVisibility)]
   -> [(Ident, SourceType)]
   -> [SourceConstraint]
   -> [FunctionalDependency]
@@ -321,7 +321,7 @@ tyVar :: Text -> SourceType
 tyVar = TypeVar nullSourceAnn
 
 tyForall :: Text -> SourceType -> SourceType -> SourceType
-tyForall var k ty = ForAll nullSourceAnn var (Just k) ty Nothing NotVtaTypeVar
+tyForall var k ty = ForAll nullSourceAnn var (Just k) ty Nothing TypeVarInvisible
 
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
@@ -474,8 +474,8 @@ primCoerceClasses =
   M.fromList
     -- class Coercible (a :: k) (b :: k)
     [ (primSubName C.moduleCoerce "Coercible", makeTypeClassData
-        [ ("a", Just (tyVar "k"), NotVtaTypeVar)
-        , ("b", Just (tyVar "k"), NotVtaTypeVar)
+        [ ("a", Just (tyVar "k"), TypeVarInvisible)
+        , ("b", Just (tyVar "k"), TypeVarInvisible)
         ] [] [] [] True)
     ]
 
@@ -484,9 +484,9 @@ primRowClasses =
   M.fromList
     -- class Union (left :: Row k) (right :: Row k) (union :: Row k) | left right -> union, right union -> left, union left -> right
     [ (primSubName C.moduleRow "Union", makeTypeClassData
-        [ ("left", Just (kindRow (tyVar "k")), NotVtaTypeVar)
-        , ("right", Just (kindRow (tyVar "k")), NotVtaTypeVar)
-        , ("union", Just (kindRow (tyVar "k")), NotVtaTypeVar)
+        [ ("left", Just (kindRow (tyVar "k")), TypeVarInvisible)
+        , ("right", Just (kindRow (tyVar "k")), TypeVarInvisible)
+        , ("union", Just (kindRow (tyVar "k")), TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [1, 2] [0]
@@ -495,24 +495,24 @@ primRowClasses =
 
     -- class Nub (original :: Row k) (nubbed :: Row k) | original -> nubbed
     , (primSubName C.moduleRow "Nub", makeTypeClassData
-        [ ("original", Just (kindRow (tyVar "k")), NotVtaTypeVar)
-        , ("nubbed", Just (kindRow (tyVar "k")), NotVtaTypeVar)
+        [ ("original", Just (kindRow (tyVar "k")), TypeVarInvisible)
+        , ("nubbed", Just (kindRow (tyVar "k")), TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0] [1]
         ] True)
 
     -- class Lacks (label :: Symbol) (row :: Row k)
     , (primSubName C.moduleRow "Lacks", makeTypeClassData
-        [ ("label", Just kindSymbol, NotVtaTypeVar)
-        , ("row", Just (kindRow (tyVar "k")), NotVtaTypeVar)
+        [ ("label", Just kindSymbol, TypeVarInvisible)
+        , ("row", Just (kindRow (tyVar "k")), TypeVarInvisible)
         ] [] [] [] True)
 
     -- class RowCons (label :: Symbol) (a :: k) (tail :: Row k) (row :: Row k) | label tail a -> row, label row -> tail a
     , (primSubName C.moduleRow "Cons", makeTypeClassData
-        [ ("label", Just kindSymbol, NotVtaTypeVar)
-        , ("a", Just (tyVar "k"), NotVtaTypeVar)
-        , ("tail", Just (kindRow (tyVar "k")), NotVtaTypeVar)
-        , ("row", Just (kindRow (tyVar "k")), NotVtaTypeVar)
+        [ ("label", Just kindSymbol, TypeVarInvisible)
+        , ("a", Just (tyVar "k"), TypeVarInvisible)
+        , ("tail", Just (kindRow (tyVar "k")), TypeVarInvisible)
+        , ("row", Just (kindRow (tyVar "k")), TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0, 1, 2] [3]
         , FunctionalDependency [0, 3] [1, 2]
@@ -524,8 +524,8 @@ primRowListClasses =
   M.fromList
     -- class RowToList (row :: Row k) (list :: RowList k) | row -> list
     [ (primSubName C.moduleRowList "RowToList", makeTypeClassData
-        [ ("row", Just (kindRow (tyVar "k")), NotVtaTypeVar)
-        , ("list", Just (kindRowList (tyVar "k")), NotVtaTypeVar)
+        [ ("row", Just (kindRow (tyVar "k")), TypeVarInvisible)
+        , ("list", Just (kindRowList (tyVar "k")), TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0] [1]
         ] True)
@@ -536,9 +536,9 @@ primSymbolClasses =
   M.fromList
     -- class Append (left :: Symbol) (right :: Symbol) (appended :: Symbol) | left right -> appended, right appended -> left, appended left -> right
     [ (primSubName C.moduleSymbol "Append", makeTypeClassData
-        [ ("left", Just kindSymbol, NotVtaTypeVar)
-        , ("right", Just kindSymbol, NotVtaTypeVar)
-        , ("appended", Just kindSymbol, NotVtaTypeVar)
+        [ ("left", Just kindSymbol, TypeVarInvisible)
+        , ("right", Just kindSymbol, TypeVarInvisible)
+        , ("appended", Just kindSymbol, TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [1, 2] [0]
@@ -547,18 +547,18 @@ primSymbolClasses =
 
     -- class Compare (left :: Symbol) (right :: Symbol) (ordering :: Ordering) | left right -> ordering
     , (primSubName C.moduleSymbol "Compare", makeTypeClassData
-        [ ("left", Just kindSymbol, NotVtaTypeVar)
-        , ("right", Just kindSymbol, NotVtaTypeVar)
-        , ("ordering", Just kindOrdering, NotVtaTypeVar)
+        [ ("left", Just kindSymbol, TypeVarInvisible)
+        , ("right", Just kindSymbol, TypeVarInvisible)
+        , ("ordering", Just kindOrdering, TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         ] True)
 
     -- class Cons (head :: Symbol) (tail :: Symbol) (symbol :: Symbol) | head tail -> symbol, symbol -> head tail
     , (primSubName C.moduleSymbol "Cons", makeTypeClassData
-        [ ("head", Just kindSymbol, NotVtaTypeVar)
-        , ("tail", Just kindSymbol, NotVtaTypeVar)
-        , ("symbol", Just kindSymbol, NotVtaTypeVar)
+        [ ("head", Just kindSymbol, TypeVarInvisible)
+        , ("tail", Just kindSymbol, TypeVarInvisible)
+        , ("symbol", Just kindSymbol, TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [2] [0, 1]
@@ -570,9 +570,9 @@ primIntClasses =
   M.fromList
     -- class Add (left :: Int) (right :: Int) (sum :: Int) | left right -> sum, left sum -> right, right sum -> left
     [ (primSubName C.moduleInt "Add", makeTypeClassData
-        [ ("left", Just tyInt, NotVtaTypeVar)
-        , ("right", Just tyInt, NotVtaTypeVar)
-        , ("sum", Just tyInt, NotVtaTypeVar)
+        [ ("left", Just tyInt, TypeVarInvisible)
+        , ("right", Just tyInt, TypeVarInvisible)
+        , ("sum", Just tyInt, TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [0, 2] [1]
@@ -581,26 +581,26 @@ primIntClasses =
 
     -- class Compare (left :: Int) (right :: Int) (ordering :: Ordering) | left right -> ordering
     , (primSubName C.moduleInt "Compare", makeTypeClassData
-        [ ("left", Just tyInt, NotVtaTypeVar)
-        , ("right", Just tyInt, NotVtaTypeVar)
-        , ("ordering", Just kindOrdering, NotVtaTypeVar)
+        [ ("left", Just tyInt, TypeVarInvisible)
+        , ("right", Just tyInt, TypeVarInvisible)
+        , ("ordering", Just kindOrdering, TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         ] True)
 
     -- class Mul (left :: Int) (right :: Int) (product :: Int) | left right -> product
     , (primSubName C.moduleInt "Mul", makeTypeClassData
-        [ ("left", Just tyInt, NotVtaTypeVar)
-        , ("right", Just tyInt, NotVtaTypeVar)
-        , ("product", Just tyInt, NotVtaTypeVar)
+        [ ("left", Just tyInt, TypeVarInvisible)
+        , ("right", Just tyInt, TypeVarInvisible)
+        , ("product", Just tyInt, TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         ] True)
 
     -- class ToString (int :: Int) (string :: Symbol) | int -> string
     , (primSubName C.moduleInt "ToString", makeTypeClassData
-        [ ("int", Just tyInt, NotVtaTypeVar)
-        , ("string", Just kindSymbol, NotVtaTypeVar)
+        [ ("int", Just tyInt, TypeVarInvisible)
+        , ("string", Just kindSymbol, TypeVarInvisible)
         ] [] []
         [ FunctionalDependency [0] [1]
         ] True)
@@ -611,11 +611,11 @@ primTypeErrorClasses =
   M.fromList
     -- class Fail (message :: Symbol)
     [ (primSubName C.typeError "Fail", makeTypeClassData
-        [("message", Just kindDoc, NotVtaTypeVar)] [] [] [] True)
+        [("message", Just kindDoc, TypeVarInvisible)] [] [] [] True)
 
     -- class Warn (message :: Symbol)
     , (primSubName C.typeError "Warn", makeTypeClassData
-        [("message", Just kindDoc, NotVtaTypeVar)] [] [] [] True)
+        [("message", Just kindDoc, TypeVarInvisible)] [] [] [] True)
     ]
 
 -- | Finds information about data constructors from the current environment.

@@ -274,7 +274,7 @@ memberToNameAndType _ = internalError "Invalid declaration in type class definit
 typeClassDictionaryDeclaration
   :: SourceAnn
   -> ProperName 'ClassName
-  -> [(Text, Maybe SourceType, VtaTypeVar)]
+  -> [(Text, Maybe SourceType, TypeVarVisibility)]
   -> [SourceConstraint]
   -> [Declaration]
   -> Declaration
@@ -294,7 +294,7 @@ typeClassDictionaryDeclaration sa name args implies members =
 typeClassMemberToDictionaryAccessor
   :: ModuleName
   -> ProperName 'ClassName
-  -> [(Text, Maybe SourceType, VtaTypeVar)]
+  -> [(Text, Maybe SourceType, TypeVarVisibility)]
   -> Declaration
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa@(ss, _) ident ty)) =
@@ -303,11 +303,11 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarati
       dictObjIdent = Ident "v"
       ctor = ConstructorBinder ss (coerceProperName . dictTypeName <$> className) [VarBinder ss dictObjIdent]
       acsr = Accessor (mkString $ runIdent ident) (Var ss (Qualified ByNullSourcePos dictObjIdent))
-      vtas = (\(i, _, v) -> (i, v)) <$> args
+      vis = (\(i, _, v) -> (i, v)) <$> args
   in ValueDecl sa ident Private []
     [MkUnguarded (
      TypedValue False (Abs (VarBinder ss dictIdent) (Case [Var ss $ Qualified ByNullSourcePos dictIdent] [CaseAlternative [ctor] [MkUnguarded acsr]])) $
-       makeTopLevelVta vtas (moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . \(a, _, _) -> a) args) Nothing) ty)))
+       addVisibility vis (moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . \(a, _, _) -> a) args) Nothing) ty)))
     )]
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 

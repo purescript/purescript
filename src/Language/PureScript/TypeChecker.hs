@@ -149,7 +149,7 @@ addTypeClass
    . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> Qualified (ProperName 'ClassName)
-  -> [(Text, Maybe SourceType, VtaTypeVar)]
+  -> [(Text, Maybe SourceType, TypeVarVisibility)]
   -> [SourceConstraint]
   -> [FunctionalDependency]
   -> [Declaration]
@@ -189,10 +189,10 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
     toPair (TypeDeclaration (TypeDeclarationData _ ident ty)) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
-    findVtaTypeVars = catMaybes . zipWith fn [0..] . typeClassArguments
+    findVisible = catMaybes . zipWith fn [0..] . typeClassArguments
       where
-      fn i (_, _, IsVtaTypeVar) = Just i
-      fn _ (_, _, NotVtaTypeVar) = Nothing
+      fn i (_, _, TypeVarVisible) = Just i
+      fn _ (_, _, TypeVarInvisible) = Nothing
 
     -- Currently we are only checking usability based on the type class currently
     -- being defined.  If the mentioned arguments don't include a covering set,
@@ -201,8 +201,8 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
     checkMemberIsUsable newClass syns kinds (ident, memberTy) = do
       memberTy' <- T.replaceAllTypeSynonymsM syns kinds memberTy
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
-      let vtaTypeVars = S.fromList $ findVtaTypeVars newClass
-      let leftovers = map ((`S.difference` vtaTypeVars) . (`S.difference` mentionedArgIndexes)) (coveringSets newClass)
+      let typeVarVis = S.fromList $ findVisible newClass
+      let leftovers = map ((`S.difference` typeVarVis) . (`S.difference` mentionedArgIndexes)) (coveringSets newClass)
 
       unless (any null leftovers) . throwError . errorMessage $
         let

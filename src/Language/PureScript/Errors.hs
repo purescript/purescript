@@ -1381,16 +1381,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       where
       comments | isMonoType tabs =
                    [ "as it has no visible type abstraction." ]
-               | hasNoVta tabs =
+               | hasNoVis tabs =
                    [ "Try adding a visible type abstraction." ]
                | otherwise =
                    []
 
-      hasNoVta (ForAll _ _ _ t _ NotVtaTypeVar) = hasNoVta t
-      hasNoVta (ForAll _ _ _ _ _ IsVtaTypeVar) = False
-      hasNoVta (ParensInType _ t) = hasNoVta t
-      hasNoVta (KindedType _ t _) = hasNoVta t
-      hasNoVta _ = True
+      hasNoVis (ForAll _ _ _ t _ TypeVarInvisible) = hasNoVis t
+      hasNoVis (ForAll _ _ _ _ _ TypeVarVisible) = False
+      hasNoVis (ParensInType _ t) = hasNoVis t
+      hasNoVis (KindedType _ t _) = hasNoVis t
+      hasNoVis _ = True
 
     renderSimpleErrorMessage (CannotApplyTypeOnType tabs targ) =
       paras $

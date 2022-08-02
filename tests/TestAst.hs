@@ -65,7 +65,7 @@ genTypeAnnotatedWith genTypeAnn genConstraintAnn = genType where
     :+ listOf' genType
     :+ maybeOf genType
     :+ genWildcardData
-    :+ genVtaTypeVar
+    :+ genTypeVarVis
 
   genConstraint :: Gen (Constraint a)
   genConstraint = genericArbitraryUG (genConstraintAnn :+ generatorEnvironment)
@@ -94,5 +94,5 @@ genTypeAnnotatedWith genTypeAnn genConstraintAnn = genType where
   genPSString :: Gen PSString
   genPSString = pure "x" -- Ditto.
 
-  genVtaTypeVar :: Gen VtaTypeVar
-  genVtaTypeVar = pure NotVtaTypeVar -- Ditto.
+  genTypeVarVis :: Gen TypeVarVisibility
+  genTypeVarVis = pure TypeVarInvisible -- Ditto.

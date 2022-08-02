@@ -34,7 +34,7 @@ newSkolemConstant = do
 introduceSkolemScope :: MonadState CheckState m => Type a -> m (Type a)
 introduceSkolemScope = everywhereOnTypesM go
   where
-  go (ForAll ann ident mbK ty Nothing vta) = ForAll ann ident mbK ty <$> (Just <$> newSkolemScope) <*> pure vta
+  go (ForAll ann ident mbK ty Nothing vis) = ForAll ann ident mbK ty <$> (Just <$> newSkolemScope) <*> pure vis
   go other = return other
 
 -- | Generate a new skolem scope

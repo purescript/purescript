@@ -343,9 +343,9 @@ insertUnkName' _ _ = internalCompilerError "type is not TUnknown"
 findVisible :: SourceType -> Maybe (Text, Maybe SourceType)
 findVisible = \case
   ForAll _ i k t _ v -> case v of
-    IsVtaTypeVar ->
+    TypeVarVisible ->
       Just (i, k)
-    NotVtaTypeVar ->
+    TypeVarInvisible ->
       findVisible t
   _ ->
     Nothing
@@ -355,7 +355,7 @@ peelVisible q = go
   where
   go = \case
     ForAll a i k t s v
-      | i `elem` q -> ForAll a i k (go t) s NotVtaTypeVar
+      | i `elem` q -> ForAll a i k (go t) s TypeVarInvisible
       | otherwise -> ForAll a i k (go t) s v
     t -> t
 
@@ -646,7 +646,7 @@ inferBinder val (ConstructorBinder ss ctor binders) = do
   env <- getEnv
   case M.lookup ctor (dataConstructors env) of
     Just (_, _, ty, _) -> do
-      (_, fn) <- instantiatePolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") $ removeVtaTypeVars ty
+      (_, fn) <- instantiatePolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") ty
       fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
       let (args, ret) = peelArgs fn'
           expected = length args
@@ -661,12 +661,6 @@ inferBinder val (ConstructorBinder ss ctor binders) = do
     where
     go args (TypeApp _ (TypeApp _ fn arg) ret) | eqType fn tyFunction = go (arg : args) ret
     go args ret = (args, ret)
-
-  removeVtaTypeVars :: Type a -> Type a
-  removeVtaTypeVars = go where
-    go (ForAll a b c d e _) = ForAll a b c (go d) e NotVtaTypeVar
-    go (ParensInType a t) = ParensInType a (go t)
-    go t = t
 inferBinder val (LiteralBinder _ (ObjectLiteral props)) = do
   row <- freshTypeWithKind (kindRow kindType)
   rest <- freshTypeWithKind (kindRow kindType)
@@ -789,7 +783,7 @@ check'
   => Expr
   -> SourceType
   -> m TypedValue'
-check' val (ForAll ann ident mbK ty _ vta) = do
+check' val (ForAll ann ident mbK ty _ vis) = do
   env <- getEnv
   mn <- gets checkCurrentModule
   scope <- newSkolemScope
@@ -807,7 +801,7 @@ check' val (ForAll ann ident mbK ty _ vta) = do
             skolemizeTypesInValue ss ident mbK sko scope val
         | otherwise = val
   val' <- tvToExpr <$> check skVal sk
-  return $ TypedValue' True val' (ForAll ann ident mbK ty (Just scope) vta)
+  return $ TypedValue' True val' (ForAll ann ident mbK ty (Just scope) vis)
 check' val t@(ConstrainedType _ con@(Constraint _ cls@(Qualified _ (ProperName className)) _ _ _) ty) = do
   TypeClassData{ typeClassIsEmpty } <- lookupTypeClass cls
   -- An empty class dictionary is never used; see code in `TypeChecker.Entailment`

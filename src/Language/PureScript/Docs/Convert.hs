@@ -236,8 +236,8 @@ insertValueTypesAndAdjustKinds env m =
           -- changes `forall (k :: Type). k -> ...`
           -- to      `forall k          . k -> ...`
           dropTypeSortAnnotation = \case
-            P.ForAll sa txt (Just (P.TypeConstructor _ Prim.Type)) rest skol vta ->
-              P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol vta
+            P.ForAll sa txt (Just (P.TypeConstructor _ Prim.Type)) rest skol vis ->
+              P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol vis
             rest -> rest
 
       Nothing ->

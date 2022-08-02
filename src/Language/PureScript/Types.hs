@@ -45,18 +45,18 @@ instance Serialise SkolemScope
 -- Metadata for determining whether or not a type variable is used for
 -- visible type applications.
 --
-data VtaTypeVar
-  = IsVtaTypeVar
-  | NotVtaTypeVar
+data TypeVarVisibility
+  = TypeVarVisible
+  | TypeVarInvisible
   deriving (Show, Eq, Ord, Generic)
 
-instance NFData VtaTypeVar
-instance Serialise VtaTypeVar
+instance NFData TypeVarVisibility
+instance Serialise TypeVarVisibility
 
-vtaTypeVarPrefix :: IsString a => VtaTypeVar -> a
-vtaTypeVarPrefix = \case
-  IsVtaTypeVar -> "@"
-  NotVtaTypeVar -> ""
+typeVarVisPrefix :: IsString a => TypeVarVisibility -> a
+typeVarVisPrefix = \case
+  TypeVarVisible -> "@"
+  TypeVarInvisible -> ""
 
 -- Describes how a TypeWildcard should be presented to the user during
 -- type checking: holes (?foo) are always emitted as errors, whereas unnamed
@@ -93,7 +93,7 @@ data Type a
   -- | Explicit kind application
   | KindApp a (Type a) (Type a)
   -- | Forall quantifier
-  | ForAll a Text (Maybe (Type a)) (Type a) (Maybe SkolemScope) VtaTypeVar
+  | ForAll a Text (Maybe (Type a)) (Type a) (Maybe SkolemScope) TypeVarVisibility
   -- | A type with a set of type class constraints
   | ConstrainedType a (Constraint a) (Type a)
   -- | A skolem constant
@@ -142,7 +142,7 @@ srcTypeApp = TypeApp NullSourceAnn
 srcKindApp :: SourceType -> SourceType -> SourceType
 srcKindApp = KindApp NullSourceAnn
 
-srcForAll :: Text -> Maybe SourceType -> SourceType -> Maybe SkolemScope -> VtaTypeVar -> SourceType
+srcForAll :: Text -> Maybe SourceType -> SourceType -> Maybe SkolemScope -> TypeVarVisibility -> SourceType
 srcForAll = ForAll NullSourceAnn
 
 srcConstrainedType :: SourceConstraint -> SourceType -> SourceType
@@ -235,10 +235,10 @@ constraintToJSON annToJSON Constraint {..} =
     , "constraintData"  .= fmap constraintDataToJSON constraintData
     ]
 
-vtaTypeVarToJSON :: VtaTypeVar -> A.Value
-vtaTypeVarToJSON = \case
-  IsVtaTypeVar -> A.toJSON ("IsVtaTypeVar" :: Text)
-  NotVtaTypeVar -> A.toJSON ("NotVtaTypeVar" :: Text)
+typeVarVisToJSON :: TypeVarVisibility -> A.Value
+typeVarVisToJSON = \case
+  TypeVarVisible -> A.toJSON ("TypeVarVisible" :: Text)
+  TypeVarInvisible -> A.toJSON ("TypeVarInvisible" :: Text)
 
 typeToJSON :: forall a. (a -> A.Value) -> Type a -> A.Value
 typeToJSON annToJSON ty =
@@ -313,8 +313,8 @@ instance A.ToJSON a => A.ToJSON (Constraint a) where
 instance A.ToJSON ConstraintData where
   toJSON = constraintDataToJSON
 
-instance A.ToJSON VtaTypeVar where
-  toJSON = vtaTypeVarToJSON
+instance A.ToJSON TypeVarVisibility where
+  toJSON = typeVarVisToJSON
 
 constraintDataFromJSON :: A.Value -> A.Parser ConstraintData
 constraintDataFromJSON = A.withObject "PartialConstraintData" $ \o -> do
@@ -330,13 +330,13 @@ constraintFromJSON defaultAnn annFromJSON = A.withObject "Constraint" $ \o -> do
   constraintData  <- o .: "constraintData" >>= traverse constraintDataFromJSON
   pure $ Constraint {..}
 
-vtaTypeVarFromJSON :: A.Value -> A.Parser VtaTypeVar
-vtaTypeVarFromJSON v = do
+typeVarVisFromJSON :: A.Value -> A.Parser TypeVarVisibility
+typeVarVisFromJSON v = do
   v' <- A.parseJSON v
   case v' of
-    "IsVtaTypeVar" -> pure IsVtaTypeVar
-    "NotVtaTypeVar" -> pure NotVtaTypeVar
-    _ -> fail $ "Unrecognized VtaTypeVar: " <> v'
+    "TypeVarVisible" -> pure TypeVarVisible
+    "TypeVarInvisible" -> pure TypeVarInvisible
+    _ -> fail $ "Unrecognized TypeVarVisibility: " <> v'
 
 typeFromJSON :: forall a. A.Parser a -> (A.Value -> A.Parser a) -> A.Value -> A.Parser (Type a)
 typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
@@ -371,16 +371,16 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
       let
         withoutMbKind = do
           (b, c, d) <- contents
-          ForAll a b Nothing <$> go c <*> pure d <*> pure NotVtaTypeVar
+          ForAll a b Nothing <$> go c <*> pure d <*> pure TypeVarInvisible
         withoutMbKind' = do
           (b, c, d, e) <- contents
-          ForAll a b Nothing <$> go c <*> pure d <*> vtaTypeVarFromJSON e
+          ForAll a b Nothing <$> go c <*> pure d <*> typeVarVisFromJSON e
         withMbKind = do
           (b, c, d, e) <- contents
-          ForAll a b <$> (Just <$> go c) <*> go d <*> pure e <*> pure NotVtaTypeVar
+          ForAll a b <$> (Just <$> go c) <*> go d <*> pure e <*> pure TypeVarInvisible
         withMbKind' = do
           (b, c, d, e, f) <- contents
-          ForAll a b <$> (Just <$> go c) <*> go d <*> pure e <*> vtaTypeVarFromJSON f
+          ForAll a b <$> (Just <$> go c) <*> go d <*> pure e <*> typeVarVisFromJSON f
       withMbKind' <|> withMbKind <|> withoutMbKind' <|> withoutMbKind
     "ConstrainedType" -> do
       (b, c) <- contents
@@ -442,8 +442,8 @@ instance {-# OVERLAPPING #-} A.FromJSON a => A.FromJSON (Constraint a) where
 instance A.FromJSON ConstraintData where
   parseJSON = constraintDataFromJSON
 
-instance A.FromJSON VtaTypeVar where
-  parseJSON = vtaTypeVarFromJSON
+instance A.FromJSON TypeVarVisibility where
+  parseJSON = typeVarVisFromJSON
 
 instance A.FromJSON WildcardData where
   parseJSON = \case
@@ -508,7 +508,7 @@ isMonoType _        = True
 
 -- | Universally quantify a type
 mkForAll :: [(a, (Text, Maybe (Type a)))] -> Type a -> Type a
-mkForAll args ty = foldr (\(ann, (arg, mbK)) t -> ForAll ann arg mbK t Nothing NotVtaTypeVar) ty args
+mkForAll args ty = foldr (\(ann, (arg, mbK)) t -> ForAll ann arg mbK t Nothing TypeVarInvisible) ty args
 
 -- | Replace a type variable, taking into account variable shadowing
 replaceTypeVars :: Text -> Type a -> Type a -> Type a
@@ -521,13 +521,13 @@ replaceAllTypeVars = go [] where
   go _  m (TypeVar ann v) = fromMaybe (TypeVar ann v) (v `lookup` m)
   go bs m (TypeApp ann t1 t2) = TypeApp ann (go bs m t1) (go bs m t2)
   go bs m (KindApp ann t1 t2) = KindApp ann (go bs m t1) (go bs m t2)
-  go bs m (ForAll ann v mbK t sco vta)
-    | v `elem` keys = go bs (filter ((/= v) . fst) m) $ ForAll ann v mbK' t sco vta
+  go bs m (ForAll ann v mbK t sco vis)
+    | v `elem` keys = go bs (filter ((/= v) . fst) m) $ ForAll ann v mbK' t sco vis
     | v `elem` usedVars =
       let v' = genName v (keys ++ bs ++ usedVars)
           t' = go bs [(v, TypeVar ann v')] t
-      in ForAll ann v' mbK' (go (v' : bs) m t') sco vta
-    | otherwise = ForAll ann v mbK' (go (v : bs) m t) sco vta
+      in ForAll ann v' mbK' (go (v' : bs) m t') sco vis
+    | otherwise = ForAll ann v mbK' (go (v : bs) m t) sco vis
     where
       mbK' = go bs m <$> mbK
       keys = map fst m
@@ -545,13 +545,13 @@ replaceAllTypeVars = go [] where
            | otherwise = orig <> T.pack (show n)
 
 -- | Add visible type abstractions to top-level foralls.
-makeTopLevelVta :: [(Text, VtaTypeVar)] -> Type a -> Type a
-makeTopLevelVta v = go where
-  go (ForAll ann arg mbK ty sco vta) = case lookup arg v of
-    Just vtv ->
-      ForAll ann arg mbK (go ty) sco vtv
+addVisibility :: [(Text, TypeVarVisibility)] -> Type a -> Type a
+addVisibility v = go where
+  go (ForAll ann arg mbK ty sco vis) = case lookup arg v of
+    Just vis' ->
+      ForAll ann arg mbK (go ty) sco vis'
     Nothing ->
-      ForAll ann arg mbK (go ty) sco vta
+      ForAll ann arg mbK (go ty) sco vis
   go (ParensInType ann ty) = ParensInType ann (go ty)
   go ty = ty
 
@@ -588,14 +588,14 @@ completeBinderList = go []
 
 -- | Universally quantify over all type variables appearing free in a type
 quantify :: Type a -> Type a
-quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) arg Nothing t Nothing NotVtaTypeVar) ty $ freeTypeVariables ty
+quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) arg Nothing t Nothing TypeVarInvisible) ty $ freeTypeVariables ty
 
 -- | Move all universal quantifiers to the front of a type
 moveQuantifiersToFront :: Type a -> Type a
 moveQuantifiersToFront = go [] [] where
-  go qs cs (ForAll ann q mbK ty sco vta) = go ((ann, q, sco, mbK, vta) : qs) cs ty
+  go qs cs (ForAll ann q mbK ty sco vis) = go ((ann, q, sco, mbK, vis) : qs) cs ty
   go qs cs (ConstrainedType ann c ty) = go qs ((ann, c) : cs) ty
-  go qs cs ty = foldl (\ty' (ann, q, sco, mbK, vta) -> ForAll ann q mbK ty' sco vta) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
+  go qs cs ty = foldl (\ty' (ann, q, sco, mbK, vis) -> ForAll ann q mbK ty' sco vis) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
 
 -- | Check if a type contains `forall`
 containsForAll :: Type a -> Bool
@@ -631,11 +631,10 @@ eraseForAllKindAnnotations :: Type a -> Type a
 eraseForAllKindAnnotations = removeAmbiguousVars . removeForAllKinds
   where
   removeForAllKinds = everywhereOnTypes $ \case
-    ForAll ann arg _ ty sco vta ->
-      ForAll ann arg Nothing ty sco vta
+    ForAll ann arg _ ty sco vis ->
+      ForAll ann arg Nothing ty sco vis
     other -> other
 
-  -- TODO: consider ambiguity of VtaTypeVars
   removeAmbiguousVars = everywhereOnTypes $ \case
     fa@(ForAll _ arg _ ty _ _)
       | arg `elem` freeTypeVariables ty -> fa
@@ -667,7 +666,7 @@ srcInstanceType
   -> SourceType
 srcInstanceType ss vars className tys
   = setAnnForType (ss, [])
-  . flip (foldr $ \(tv, k) ty -> srcForAll tv (Just k) ty Nothing NotVtaTypeVar) vars
+  . flip (foldr $ \(tv, k) ty -> srcForAll tv (Just k) ty Nothing TypeVarInvisible) vars
   . flip (foldl' srcTypeApp) tys
   $ srcTypeConstructor $ coerceProperName <$> className
 
@@ -675,7 +674,7 @@ everywhereOnTypes :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypes f = go where
   go (TypeApp ann t1 t2) = f (TypeApp ann (go t1) (go t2))
   go (KindApp ann t1 t2) = f (KindApp ann (go t1) (go t2))
-  go (ForAll ann arg mbK ty sco vta) = f (ForAll ann arg (go <$> mbK) (go ty) sco vta)
+  go (ForAll ann arg mbK ty sco vis) = f (ForAll ann arg (go <$> mbK) (go ty) sco vis)
   go (ConstrainedType ann c ty) = f (ConstrainedType ann (mapConstraintArgsAll (map go) c) (go ty))
   go (Skolem ann name mbK i sc) = f (Skolem ann name (go <$> mbK) i sc)
   go (RCons ann name ty rest) = f (RCons ann name (go ty) (go rest))
@@ -688,7 +687,7 @@ everywhereOnTypesM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesM f = go where
   go (TypeApp ann t1 t2) = (TypeApp ann <$> go t1 <*> go t2) >>= f
   go (KindApp ann t1 t2) = (KindApp ann <$> go t1 <*> go t2) >>= f
-  go (ForAll ann arg mbK ty sco vta) = (ForAll ann arg <$> traverse go mbK <*> go ty <*> pure sco <*> pure vta) >>= f
+  go (ForAll ann arg mbK ty sco vis) = (ForAll ann arg <$> traverse go mbK <*> go ty <*> pure sco <*> pure vis) >>= f
   go (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgsAll (mapM go) c <*> go ty) >>= f
   go (Skolem ann name mbK i sc) = (Skolem ann name <$> traverse go mbK <*> pure i <*> pure sc) >>= f
   go (RCons ann name ty rest) = (RCons ann name <$> go ty <*> go rest) >>= f
@@ -701,7 +700,7 @@ everywhereOnTypesTopDownM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (T
 everywhereOnTypesTopDownM f = go <=< f where
   go (TypeApp ann t1 t2) = TypeApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (KindApp ann t1 t2) = KindApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
-  go (ForAll ann arg mbK ty sco vta) = ForAll ann arg <$> traverse (f >=> go) mbK <*> (f ty >>= go) <*> pure sco <*> pure vta
+  go (ForAll ann arg mbK ty sco vis) = ForAll ann arg <$> traverse (f >=> go) mbK <*> (f ty >>= go) <*> pure sco <*> pure vis
   go (ConstrainedType ann c ty) = ConstrainedType ann <$> overConstraintArgsAll (mapM (go <=< f)) c <*> (f ty >>= go)
   go (Skolem ann name mbK i sc) = Skolem ann name <$> traverse (f >=> go) mbK <*> pure i <*> pure sc
   go (RCons ann name ty rest) = RCons ann name <$> (f ty >>= go) <*> (f rest >>= go)
