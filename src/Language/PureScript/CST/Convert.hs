@@ -139,9 +139,9 @@ convertType fileName = go
         mkForAll a b v t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
           T.ForAll ann' (getIdent $ nameValue a) b t Nothing v
-        k (TypeVarKinded (Wrapped _ (Labeled (Just _, a) _ b) _)) = mkForAll a (Just (go b)) (T.IsVtaTypeVar False)
+        k (TypeVarKinded (Wrapped _ (Labeled (Just _, a) _ b) _)) = mkForAll a (Just (go b)) T.IsVtaTypeVar
         k (TypeVarKinded (Wrapped _ (Labeled (_, a) _ b) _)) = mkForAll a (Just (go b)) T.NotVtaTypeVar
-        k (TypeVarName (Just _, a)) = mkForAll a Nothing (T.IsVtaTypeVar False)
+        k (TypeVarName (Just _, a)) = mkForAll a Nothing T.IsVtaTypeVar
         k (TypeVarName (_, a)) = mkForAll a Nothing T.NotVtaTypeVar
         ty' = foldr k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
@@ -611,9 +611,9 @@ convertDeclaration fileName decl = case decl of
 
   goVtvTypeVarRequired = \case
     TypeVarKinded (Wrapped _ (Labeled (atSign, x) _ y) _) ->
-      (getIdent $ nameValue x, Just $ convertType fileName y, T.IsVtaTypeVar $ isJust atSign)
+      (getIdent $ nameValue x, Just $ convertType fileName y, if isJust atSign then T.IsVtaTypeVar else T.NotVtaTypeVar)
     TypeVarName (atSign, x) ->
-      (getIdent $ nameValue x, Nothing, T.IsVtaTypeVar $ isJust atSign)
+      (getIdent $ nameValue x, Nothing, if isJust atSign then T.IsVtaTypeVar else T.NotVtaTypeVar)
 
   goInstanceBinding = \case
     InstanceBindingSignature _ lbl ->

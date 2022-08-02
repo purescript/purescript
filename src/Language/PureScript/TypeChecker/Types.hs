@@ -340,11 +340,11 @@ insertUnkName' :: (MonadState CheckState m, MonadError MultipleErrors m) => Sour
 insertUnkName' (TUnknown _ i) n = insertUnkName i n
 insertUnkName' _ _ = internalCompilerError "type is not TUnknown"
 
-findVisible :: SourceType -> Maybe (Text, Maybe SourceType, Bool)
+findVisible :: SourceType -> Maybe (Text, Maybe SourceType)
 findVisible = \case
   ForAll _ i k t _ v -> case v of
-    IsVtaTypeVar r ->
-      Just (i, k, r)
+    IsVtaTypeVar ->
+      Just (i, k)
     NotVtaTypeVar ->
       findVisible t
   _ ->
@@ -516,9 +516,7 @@ infer' (TypedValue checkType val ty) = do
 infer' (VisibleTypeApp val arg@(TypeWildcard _ _)) = do
   TypedValue' _ val' valTy <- infer' val
   case findVisible valTy of
-    Just (visibleVar, _, True) ->
-      throwError . errorMessage $ CannotSkipTypeApplication visibleVar valTy
-    Just (visibleVar, _, False) ->
+    Just (visibleVar, _) ->
       pure $ TypedValue' True val' $ peelVisible [visibleVar] valTy
     _ ->
       throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy arg
@@ -528,17 +526,17 @@ infer' (VisibleTypeApp val arg) = do
   (arg'', argKn) <- kindOf arg'
   case findVisible valTy of
     -- forall (k :: Type) (@t :: k)
-    Just (visibleVar, Just (TypeVar _ visibleKnd), _) -> do
+    Just (visibleVar, Just (TypeVar _ visibleKnd)) -> do
       pure $ TypedValue' True val'
         $ replaceAllTypeVars [(visibleVar, arg''), (visibleKnd, argKn)]
         $ peelQuantifier [visibleVar, visibleKnd] valTy
     -- forall (@t :: Type)
-    Just (visibleVar, Just visibleKnd, _) -> do
+    Just (visibleVar, Just visibleKnd) -> do
       subsumesKind visibleKnd argKn
       pure $ TypedValue' True val'
         $ replaceTypeVars visibleVar arg''
         $ peelQuantifier [visibleVar] valTy
-    Just (_, Nothing, _) -> do
+    Just (_, Nothing) -> do
       internalCompilerError "Unelaborated forall during type application."
     _ ->
       throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy arg

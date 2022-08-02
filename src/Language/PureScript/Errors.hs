@@ -189,7 +189,6 @@ data SimpleErrorMessage
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
-  | CannotSkipTypeApplication Text SourceType
   | CannotApplyTypeOnType SourceType SourceType
   deriving (Show)
 
@@ -357,7 +356,6 @@ errorCode em = case unwrapErrorMessage em of
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
   CannotApplyExpressionOfTypeOnType {} -> "CannotApplyExpressionOfTypeOnType"
-  CannotSkipTypeApplication {} -> "CannotSkipTypeApplication"
   CannotApplyTypeOnType {} -> "CannotApplyTypeOnType"
 
 -- | A stack trace for an error
@@ -1389,19 +1387,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                    []
 
       hasNoVta (ForAll _ _ _ t _ NotVtaTypeVar) = hasNoVta t
-      hasNoVta (ForAll _ _ _ _ _ (IsVtaTypeVar _)) = False
+      hasNoVta (ForAll _ _ _ _ _ IsVtaTypeVar) = False
       hasNoVta (ParensInType _ t) = hasNoVta t
       hasNoVta (KindedType _ t _) = hasNoVta t
       hasNoVta _ = True
-
-    renderSimpleErrorMessage (CannotSkipTypeApplication tvar ttyp) =
-      paras
-        [ "A type variable:"
-        , markCodeBox $ indent $ line tvar
-        , "in the type:"
-        , markCodeBox $ indent $ prettyType ttyp
-        , "cannot be skipped during type application."
-        ]
 
     renderSimpleErrorMessage (CannotApplyTypeOnType tabs targ) =
       paras $
