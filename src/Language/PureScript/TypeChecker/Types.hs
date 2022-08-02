@@ -24,9 +24,10 @@ module Language.PureScript.TypeChecker.Types
 -}
 
 import Prelude.Compat
-import Protolude (ordNub, fold, atMay)
+import Protolude (ordNub, fold, atMay, foldl')
 
 import Control.Arrow (first, second, (***))
+import Control.Lens ((^.), _2)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
@@ -340,33 +341,63 @@ insertUnkName' :: (MonadState CheckState m, MonadError MultipleErrors m) => Sour
 insertUnkName' (TUnknown _ i) n = insertUnkName i n
 insertUnkName' _ _ = internalCompilerError "type is not TUnknown"
 
-findVisible :: SourceType -> Maybe (Text, Maybe SourceType)
-findVisible = \case
-  ForAll _ i k t _ v -> case v of
-    TypeVarVisible ->
-      Just (i, k)
-    TypeVarInvisible ->
-      findVisible t
-  _ ->
-    Nothing
+-- | The information contained by each quantifier.
+type QuantifierInformation =
+  ( SourceAnn
+  , Text
+  , SourceType
+  , Maybe SkolemScope
+  , TypeVarVisibility
+  )
 
-peelVisible :: [Text] -> SourceType -> SourceType
-peelVisible q = go
+-- |
+-- Partitions a @SourceType@ to find:
+--
+-- * The first visible quantifier;
+-- * the quantifiers before it;
+-- * the quantifiers after it;
+-- * and the underlying monotype.
+partitionQuantifiers
+  :: SourceType
+  -> Maybe ([QuantifierInformation], QuantifierInformation, [QuantifierInformation], SourceType)
+partitionQuantifiers = go [] Nothing []
   where
-  go = \case
-    ForAll a i k t s v
-      | i `elem` q -> ForAll a i k (go t) s TypeVarInvisible
-      | otherwise -> ForAll a i k (go t) s v
-    t -> t
+  go before visible after = \case
+    ForAll a i (Just k) t s v ->
+      case (visible, v) of
+        (Nothing, TypeVarVisible) ->
+          go before (Just (a, i, k, s, v)) after t
+        (Nothing, TypeVarInvisible) ->
+          go ((a, i, k, s, v) : before) visible after t
+        _ ->
+          go before visible ((a, i, k, s, v) : after) t
+    ForAll _ _ Nothing _ _ _ ->
+      internalError "Unelaborated forall while partitioning."
+    t ->
+      (reverse before,,reverse after,t) <$> visible
 
-peelQuantifier :: [Text] -> SourceType -> SourceType
-peelQuantifier q = go
+-- | Requantifies a @SourceType@ given @[QuantifierInformation]@
+unPartitionQuantifiers :: [QuantifierInformation] -> SourceType -> SourceType
+unPartitionQuantifiers = flip (foldl' unPartition) . reverse
   where
-  go = \case
-    ForAll a i k t s v
-      | i `elem` q -> go t
-      | otherwise -> ForAll a i k (go t) s v
-    t -> t
+  unPartition :: SourceType -> QuantifierInformation -> SourceType
+  unPartition t (a, i, k, s, v) = ForAll a i (Just k) t s v
+
+-- | Removes the first visible quantifier, returning the modified
+-- @SourceType@ if it exists.
+removeFirstVisible :: SourceType -> Maybe SourceType
+removeFirstVisible = go False
+  where
+  go found = \case
+    ForAll a i k t s v | not found -> case v of
+      TypeVarVisible -> do
+        t' <- go True t
+        pure $ ForAll a i k t' s TypeVarInvisible
+      TypeVarInvisible -> do
+        t' <- go found t
+        pure $ ForAll a i k t' s TypeVarInvisible
+    t ->
+      if found then Just t else Nothing
 
 -- | Infer a type for a value, rethrowing any error to provide a more useful error message
 infer
@@ -515,30 +546,56 @@ infer' (TypedValue checkType val ty) = do
   return $ TypedValue' True (tvToExpr tv) ty'
 infer' (VisibleTypeApp val arg@(TypeWildcard _ _)) = do
   TypedValue' _ val' valTy <- infer' val
-  case findVisible valTy of
-    Just (visibleVar, _) ->
-      pure $ TypedValue' True val' $ peelVisible [visibleVar] valTy
-    _ ->
+  case removeFirstVisible valTy of
+    Just valTy' ->
+      pure $ TypedValue' True val' valTy'
+    Nothing ->
       throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy arg
 infer' (VisibleTypeApp val arg) = do
   TypedValue' _ val' valTy <- infer' val
   arg' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ arg
-  (arg'', argKn) <- kindOf arg'
-  case findVisible valTy of
-    -- forall (k :: Type) (@t :: k)
-    Just (visibleVar, Just (TypeVar _ visibleKnd)) -> do
-      pure $ TypedValue' True val'
-        $ replaceAllTypeVars [(visibleVar, arg''), (visibleKnd, argKn)]
-        $ peelQuantifier [visibleVar, visibleKnd] valTy
-    -- forall (@t :: Type)
-    Just (visibleVar, Just visibleKnd) -> do
-      subsumesKind visibleKnd argKn
-      pure $ TypedValue' True val'
-        $ replaceTypeVars visibleVar arg''
-        $ peelQuantifier [visibleVar] valTy
-    Just (_, Nothing) -> do
-      internalCompilerError "Unelaborated forall during type application."
-    _ ->
+  (arg'', argKnd) <- kindOf arg'
+  case partitionQuantifiers valTy of
+    -- bfrVis: quantified variables before the visible variable
+    -- visArg: the visible quantified variable
+    -- visKnd: the visible quantified variable's kind
+    -- aftVis: quantified variables after the visible variable
+    -- valTy': the underlying monotype stripped of quantifiers
+    Just (bfrVis, (_, visArg, visKnd, _, _), aftVis, valTy') -> do
+      let
+        -- Collect all free type variables in visKnd, such that
+        -- quantifiers in bfrVis can be partitioned by whether
+        -- or not they appear within visKnd.
+        --
+        -- Given:
+        --
+        -- forall (j :: Type) (k :: Type) (@t :: k -> Type)
+        --
+        -- Then:
+        --
+        -- 1. freeInVisKnd: { k }
+        -- 2. bfrVisY: [ k ]
+        -- 3. bfrVisN: [ j ]
+        freeInVisKnd = S.fromList $ freeTypeVariables visKnd
+        (bfrVisY, bfrVisN) = partition ((`S.member` freeInVisKnd) . (^. _2)) bfrVis
+      -- Then, generate a unification variable for every
+      -- quantified variable that appears in visKnd.
+      unkInVisKnd <- forM bfrVisY $ \(_, i, k, _, _) -> do
+        u <- freshTypeWithKind k
+        insertUnkName' u i
+        pure (i, u)
+      -- Replace the free type variables with the unknowns, and then
+      -- subsume visKnd with argKnd. Using subsumption here allows for
+      -- higher-ranked polymorphism, much like what is done in regular
+      -- function application.
+      subsumesKind (replaceAllTypeVars unkInVisKnd visKnd) argKnd
+      -- Finally, requantify valTy' with bfrVisN and aftVis, then
+      -- replace all occurrences of visArg with the type argument.
+      pure
+        $ TypedValue' True val'
+        $ replaceAllTypeVars ((visArg, arg'') : unkInVisKnd)
+        $ unPartitionQuantifiers (bfrVisN <> aftVis) valTy'
+    Nothing ->
       throwError . errorMessage $ CannotApplyExpressionOfTypeOnType valTy arg
 infer' (Hole name) = do
   ty <- freshTypeWithKind kindType
