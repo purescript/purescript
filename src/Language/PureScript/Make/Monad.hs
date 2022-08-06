@@ -47,6 +47,7 @@ import qualified System.Directory as Directory
 import           System.FilePath (takeDirectory)
 import           System.IO.Error (tryIOError, isDoesNotExistError)
 import           System.IO.UTF8 (readUTF8FileT)
+import Debug.Trace
 
 -- | A monad for running make actions
 newtype Make a = Make
@@ -139,6 +140,7 @@ catchDoesNotExist inner = do
   r <- tryJust (guard . isDoesNotExistError) inner
   case r of
     Left () ->
+      trace ("cborExternsDoesNotExistError") $
       return Nothing
     Right x ->
       return (Just x)
@@ -148,6 +150,7 @@ catchDeserialiseFailure inner = do
   r <- tryJust fromException inner
   case r of
     Left (_ :: Serialise.DeserialiseFailure) ->
+      trace ("cborExternsDeserialiseFailure") $
       return Nothing
     Right x ->
       return (Just x)

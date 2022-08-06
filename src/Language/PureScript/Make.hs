@@ -49,19 +49,19 @@ import           Language.PureScript.Make.Monad as Monad
 import qualified Language.PureScript.CoreFn as CF
 import           System.Directory (doesFileExist)
 import           System.FilePath (replaceExtension)
-import Debug.Trace
 import Data.Function ((&))
 
 -- for debug prints, timestamps
-import Language.PureScript.Docs.Types (formatTime)
-import Data.Time.Clock (getCurrentTime)
-import System.IO.Unsafe (unsafePerformIO)
+-- import Debug.Trace
+-- import Language.PureScript.Docs.Types (formatTime)
+-- import Data.Time.Clock (getCurrentTime)
+-- import System.IO.Unsafe (unsafePerformIO)
 
-{-# NOINLINE dt #-}
-dt :: IO String
-dt = do
-  ts <- getCurrentTime
-  pure (formatTime ts)
+-- {-# NOINLINE dt #-}
+-- dt :: IO String
+-- dt = do
+--   ts <- getCurrentTime
+--   pure (formatTime ts)
 
 
 -- | Rebuild a single module.
@@ -145,12 +145,11 @@ make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, 
      -> [CST.PartialResult Module]
      -> m [ExternsFile]
 make ma@MakeActions{..} ms = do
-  _ <- trace (show ("make start" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("make start" :: String, unsafePerformIO dt)) $ pure ()
   checkModuleNames
   cacheDb <- readCacheDb
 
   (sorted, graph, directGraph) <- sortModules3 Transitive (moduleSignature . CST.resPartial) ms
-  -- _ <- trace (show ("make pre fork1" :: String, unsafePerformIO dt)) $ pure ()
 
   -- todo `readExterns` for the file if it didn't change; deps was Transitive not Direct, that's way too safe imo, guessing we don't use the new externs for newly compiled things, and we don't figure out if that extern changed, so we always recompile transitive deps, which is sad since we don't have a cross-module non-stdlib inliner
 
@@ -163,13 +162,11 @@ make ma@MakeActions{..} ms = do
 
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
-  -- _ <- trace (show ("make pre fork2" :: String, unsafePerformIO dt)) $ pure ()
 
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
-  _ <- trace (show ("make build plan done" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("make build plan done" :: String, unsafePerformIO dt)) $ pure ()
   for_ toBeRebuilt $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
-    -- _ <- trace (show ("make start fork" :: String, unsafePerformIO dt, moduleName)) $ pure ()
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
     let directDeps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName directGraph)
     buildModule buildPlan moduleName
@@ -179,7 +176,7 @@ make ma@MakeActions{..} ms = do
       (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
       (directDeps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
-  _ <- trace (show ("make done compiling all" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("make done compiling all" :: String, unsafePerformIO dt)) $ pure ()
 
   -- Wait for all threads to complete, and collect results (and errors).
   (failures, successes) <-
@@ -212,7 +209,7 @@ make ma@MakeActions{..} ms = do
   let lookupResult mn =
         fromMaybe (internalError "make: module not found in results")
         $ M.lookup mn successes
-  _ <- trace (show ("make done" :: String, unsafePerformIO dt)) $ pure ()
+  -- _ <- trace (show ("make done" :: String, unsafePerformIO dt)) $ pure ()
   return (map (lookupResult . getModuleName . CST.resPartial) sorted)
 
   where
@@ -255,7 +252,6 @@ make ma@MakeActions{..} ms = do
       -- MVars for the module's dependencies.
       traverse_ (void <$> getResult buildPlan) deps
 
-      -- _ <- trace (show ("buildModule pre_ first1" :: String, unsafePerformIO dt, moduleName)) $ pure ()
       let depsExterns = bjResult <$> bpBuildJobs buildPlan
 
       let buildJob = M.lookup moduleName (bpBuildJobs buildPlan) & fromMaybe (internalError "buildModule: no barrier")
@@ -274,17 +270,16 @@ make ma@MakeActions{..} ms = do
 
       let directDepsMap = M.fromList $ (,()) <$> directDeps
 
-      -- try to early return
       firstCacheResult <-
           -- TODO[drathier]: lazy load bjPrebuilt; we don't need it here, we only need to know if input src files changed
           -- did this module change? then we can never get a cache hit
           -- did any deps public api change?
         case (bjPrebuilt buildJob, bjDirtyExterns buildJob) of
           (Nothing, Just _) ->
-            trace (show ("buildModule pre_ rebuildModule' cache:src-changed" :: String, moduleName)) $
+            -- trace (show ("buildModule pre_ rebuildModule' cache:src-changed" :: String, moduleName)) $
             pure Nothing
           (_, Nothing) ->
-            trace (show ("buildModule pre_ rebuildModule' cache:first-build" :: String, moduleName)) $
+            -- trace (show ("buildModule pre_ rebuildModule' cache:first-build" :: String, moduleName)) $
             pure Nothing
           (_, Just externs) -> do
             -- TODO[drathier]: we don't have to look at all deps, just the ones we're rebuilding
@@ -293,13 +288,12 @@ make ma@MakeActions{..} ms = do
               True ->
                 pure $ Just externs
               False ->
-                trace (show ("buildModule pre_ rebuildModule' cache:miss" :: String, moduleName)) $
+                -- trace (show ("buildModule pre_ rebuildModule' cache:miss" :: String, moduleName)) $
                 pure $ Nothing
 
       case firstCacheResult of
         Just bjde ->
           -- first cache was a hit, early return
-          -- trace (show ("buildModule pre_ rebuildModule' cache:hit" :: String, moduleName)) $
           pure $ BuildJobCacheHit bjde
 
         Nothing -> do
@@ -337,7 +331,6 @@ make ma@MakeActions{..} ms = do
 
             Nothing -> return BuildJobSkipped
 
-    -- _ <- trace (show ("buildModule post last" :: String, unsafePerformIO dt, moduleName)) $ pure ()
     BuildPlan.markComplete buildPlan moduleName result
 
 -- | Infer the module name for a module by looking for the same filename with
