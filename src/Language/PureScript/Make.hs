@@ -56,7 +56,6 @@ import Data.Function ((&))
 -- import Language.PureScript.Docs.Types (formatTime)
 -- import Data.Time.Clock (getCurrentTime)
 -- import System.IO.Unsafe (unsafePerformIO)
-
 -- {-# NOINLINE dt #-}
 -- dt :: IO String
 -- dt = do
@@ -258,7 +257,7 @@ make ma@MakeActions{..} ms = do
       let ourDirtyCacheFile = fmap efBuildCache $ bjDirtyExterns =<< M.lookup moduleName (bpBuildJobs buildPlan)
 
       -------
-      let resultsWithModuleNamesDirect :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, WasRebuildNeeded))] = traverse (\dep ->
+      let resultsWithModuleNamesDirect :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, DidPublicApiChange))] = traverse (\dep ->
             do
               res <- getResult buildPlan dep
               pure ((dep,) <$> res)
@@ -283,11 +282,12 @@ make ma@MakeActions{..} ms = do
             pure Nothing
           (_, Just externs) -> do
             -- TODO[drathier]: we don't have to look at all deps, just the ones we're rebuilding
-            ich <- isCacheHit depsExterns directDepsMap
-            case ich of
-              True ->
-                pure $ Just externs
+            shouldRebuild <- shouldWeRebuild moduleName depsExterns directDepsMap
+            case shouldRebuild of
               False ->
+                -- trace (show ("buildModule pre_ rebuildModule' cache:hit" :: String, moduleName)) $
+                pure $ Just externs
+              True ->
                 -- trace (show ("buildModule pre_ rebuildModule' cache:miss" :: String, moduleName)) $
                 pure $ Nothing
 
@@ -303,14 +303,14 @@ make ma@MakeActions{..} ms = do
           m <- CST.unwrapParserError fp mres
 
 
-          let resultsWithModuleNames :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, WasRebuildNeeded))] = traverse (\dep ->
+          let resultsWithModuleNames :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, DidPublicApiChange))] = traverse (\dep ->
                 do
                   res <- getResult buildPlan dep
                   pure ((dep,) <$> res)
                 ) deps
           let results = fmap fmap fmap snd <$> resultsWithModuleNames
           mexterns <- fmap unzip . fmap (fmap (\(a,b,_) -> (a,b))) . sequence <$> results
-          _ :: M.Map ModuleName WasRebuildNeeded <-
+          _ :: M.Map ModuleName DidPublicApiChange <-
             fromMaybe M.empty . fmap M.fromList . fmap (fmap (\(mn, (_,_,c)) -> (mn, c))) . sequence <$> resultsWithModuleNames
 
           case mexterns of

@@ -2,7 +2,7 @@
 module Language.PureScript.Make.BuildPlan
   ( BuildPlan(bpEnv)
   , BuildJobResult(..)
-  , WasRebuildNeeded(..)
+  , DidPublicApiChange(..)
   , buildJobSucceeded
   , buildJobSuccess
   , construct
@@ -17,7 +17,7 @@ module Language.PureScript.Make.BuildPlan
   , bpPrebuilt
   , bjPrebuilt
   , bjDirtyExterns
-  , isCacheHit
+  , shouldWeRebuild
   ) where
 
 import           Prelude
@@ -50,8 +50,8 @@ import Data.Function
 -- import Language.PureScript.Docs.Types (formatTime)
 -- import Data.Time.Clock (getCurrentTime)
 -- import System.IO.Unsafe (unsafePerformIO)
---
 -- {-# NOINLINE dt #-}
+-- dt :: IO String
 -- dt = do
 --   ts <- getCurrentTime
 --   pure (formatTime ts)
@@ -79,7 +79,7 @@ data BuildJob = BuildJob
   }
 
 data BuildJobResult
-  = BuildJobSucceeded !MultipleErrors !ExternsFile !WasRebuildNeeded
+  = BuildJobSucceeded !MultipleErrors !ExternsFile !DidPublicApiChange
   -- ^ Succeeded, with warnings and externs
   --
   | BuildJobCacheHit !ExternsFile
@@ -91,16 +91,16 @@ data BuildJobResult
   | BuildJobSkipped
   -- ^ The build job was not run, because an upstream build job failed
 
-data WasRebuildNeeded
-  = RebuildWasNeeded
-  | RebuildWasNotNeeded
+data DidPublicApiChange
+  = PublicApiChanged
+  | PublicApiStayedTheSame
   deriving (Show, Eq)
 
 buildJobSucceeded :: Maybe BuildCacheFile -> MultipleErrors -> ExternsFile -> BuildJobResult
 buildJobSucceeded mDirtyCache warnings externs =
   case mDirtyCache of
-    Just dirtyCache | fastEqBuildCache dirtyCache (efBuildCache externs) -> BuildJobSucceeded warnings externs RebuildWasNotNeeded
-    _ -> BuildJobSucceeded warnings externs RebuildWasNeeded
+    Just dirtyCache | fastEqBuildCache dirtyCache (efBuildCache externs) -> BuildJobSucceeded warnings externs PublicApiStayedTheSame
+    _ -> BuildJobSucceeded warnings externs PublicApiChanged
 
 fastEqBuildCache :: BuildCacheFile -> BuildCacheFile -> Bool
 fastEqBuildCache cache externsCache =
@@ -111,20 +111,37 @@ fastEqBuildCache cache externsCache =
   in
   Serialise.serialise (toCmp cache) == Serialise.serialise (toCmp externsCache)
 
-buildJobSuccess :: BuildJobResult -> Maybe (MultipleErrors, ExternsFile, WasRebuildNeeded)
+buildJobSuccess :: BuildJobResult -> Maybe (MultipleErrors, ExternsFile, DidPublicApiChange)
 buildJobSuccess (BuildJobSucceeded warnings externs wasRebuildNeeded) = Just (warnings, externs, wasRebuildNeeded)
-buildJobSuccess (BuildJobCacheHit externs) = Just (MultipleErrors [], externs, RebuildWasNotNeeded)
+buildJobSuccess (BuildJobCacheHit externs) = Just (MultipleErrors [], externs, PublicApiStayedTheSame)
 buildJobSuccess _ = Nothing
 
 
-isCacheHit
+shouldWeRebuild
   :: MonadBaseControl IO m
-  => M.Map ModuleName (MVar BuildJobResult)
+  => ModuleName
+  -> M.Map ModuleName (MVar BuildJobResult)
   -> M.Map ModuleName ()
   -> m Bool
-isCacheHit deps directDeps = do
+shouldWeRebuild _moduleName deps directDeps = do
+  let depChangedAndWeShouldBuild =
+        \case
+          BuildJobSucceeded _ _ PublicApiChanged -> True
+          BuildJobSucceeded _ _ PublicApiStayedTheSame -> False
+          BuildJobCacheHit _ -> False
+          BuildJobSkipped -> False
+          BuildJobFailed _ -> False
+
+  let _bjKey =
+        \case
+          BuildJobSucceeded _ _ PublicApiChanged -> "BuildJobSucceeded:PublicApiChanged" :: String
+          BuildJobSucceeded _ _ PublicApiStayedTheSame -> "BuildJobSucceeded:PublicApiStayedTheSame" :: String
+          BuildJobCacheHit _ -> "BuildJobCacheHit" :: String
+          BuildJobFailed _ -> "BuildJobFailed" :: String
+          BuildJobSkipped -> "BuildJobSkipped" :: String
+
   -- did any dependency change?
-  noUpstreamChanges <-
+  anyUpstreamChanges <-
     deps
       -- & (\v -> trace (show ("depsExternDecls1" :: String, M.keys v)) v)
       & (id :: M.Map ModuleName (MVar BuildJobResult) -> M.Map ModuleName (MVar BuildJobResult))
@@ -134,25 +151,26 @@ isCacheHit deps directDeps = do
       & traverse tryReadMVar
       & fmap (\bjmap ->
         bjmap
-        & M.elems
-        & fmap (fromMaybe (internalError "isCacheHit1: no barrier"))
-        & all (\case
-          BuildJobSucceeded _ _ RebuildWasNotNeeded -> True
-          BuildJobCacheHit _ -> True
-          _ -> False
+        -- & M.elems
+        & fmap (fromMaybe (internalError "shouldWeRebuild1: no barrier"))
+        & M.filter depChangedAndWeShouldBuild
+        & \case
+          m | M.null m -> False
+          _changedDeps ->
+            -- trace (show ("shouldWeRebuild:yes" :: String, moduleName, "changed" :: String, fmap bjKey changedDeps ))
+            True
           -- v ->
-          --   trace (show ("isCacheHit:no"::String,
-          --      case v of
-          --        BuildJobSucceeded _ _ RebuildWasNeeded -> "BuildJobSucceeded:RebuildWasNeeded"
-          --        BuildJobSucceeded _ _ RebuildWasNotNeeded -> "BuildJobSucceeded:RebuildWasNotNeeded"
-          --        BuildJobCacheHit _ -> "BuildJobCacheHit"
-          --        BuildJobFailed _ -> "BuildJobFailed"
-          --        BuildJobSkipped -> "BuildJobSkipped"
-          --    , directDeps))
-          --   False
-        )
+          --   trace (show ("shouldWeRebuild:no" :: String,
+          --       case v of
+          --         BuildJobSucceeded _ _ PublicApiChanged -> "BuildJobSucceeded:PublicApiChanged" :: String
+          --         BuildJobSucceeded _ _ PublicApiStayedTheSame -> "BuildJobSucceeded:PublicApiStayedTheSame" :: String
+          --         BuildJobCacheHit _ -> "BuildJobCacheHit" :: String
+          --         BuildJobFailed _ -> "BuildJobFailed" :: String
+          --         BuildJobSkipped -> "BuildJobSkipped" :: String
+          --     , M.keys directDeps))
+          --    False
       )
-  pure noUpstreamChanges
+  pure anyUpstreamChanges
   -- TODO[drathier]: we can do more here; if a dep changed but we don't import the changed thing, we can consider the dep unchanged
 
 -- | Information obtained about a particular module while constructing a build
@@ -205,11 +223,11 @@ getResult
   :: (MonadBaseControl IO m)
   => BuildPlan
   -> ModuleName
-  -> m (Maybe (MultipleErrors, ExternsFile, WasRebuildNeeded))
+  -> m (Maybe (MultipleErrors, ExternsFile, DidPublicApiChange))
 getResult buildPlan moduleName =
   case M.lookup moduleName (bpPrebuilt buildPlan) of
     Just es ->
-      pure (Just (MultipleErrors [], pbExternsFile es, RebuildWasNotNeeded))
+      pure (Just (MultipleErrors [], pbExternsFile es, PublicApiStayedTheSame))
     Nothing -> do
       let bj = fromMaybe (internalError "make: no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
       r <- readMVar $ bjResult bj
