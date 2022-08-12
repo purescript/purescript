@@ -442,7 +442,7 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
   bcCacheBlob :: B.ByteString
   bcCacheBlob =
     let
-      bshow a = BLU.fromString (show a)
+      bshow a = BLU.fromString ("[" <> show a <> "]")
 
       _ = (serialise :: Int -> B.ByteString)
 
