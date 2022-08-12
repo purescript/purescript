@@ -44,6 +44,7 @@ import Language.PureScript.Types
 import Paths_purescript as Paths
 
 import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Lazy.UTF8 as BLU
 
 
 -- | The data which will be serialized to an externs file
@@ -441,8 +442,12 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
   bcCacheBlob :: B.ByteString
   bcCacheBlob =
     let
+      bshow a = BLU.fromString (show a)
+
+      _ = (serialise :: Int -> B.ByteString)
+
       foldCache :: Show a => Serialise a => [a] -> B.ByteString
-      foldCache = foldr (\a acc -> serialise a <> acc) B.empty
+      foldCache = foldr (\a acc -> bshow a <> acc) B.empty
 
       cacheDecls =
         foldr
@@ -451,7 +456,7 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
               False -> m1
               True ->
                 foldr
-                  (\v acc -> serialise (declRefToCacheRef k) <> serialise (extDeclToCacheKey v) <> acc)
+                  (\v acc -> bshow (declRefToCacheRef k) <> bshow (extDeclToCacheKey v) <> acc)
                   m1
                   vs
           )
