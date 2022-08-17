@@ -521,7 +521,7 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
       expsTypeNames
     -- add in re-exports
     & (<>) bcReExportDeclShapes
-    & (\v -> trace ("bcDeclShapes:" <> sShow (mn, exps, v)) v)
+    -- & (\v -> trace ("bcDeclShapes:" <> sShow (mn, exps, v)) v)
 
 
   bcDeclShapesAll :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeDetails)
