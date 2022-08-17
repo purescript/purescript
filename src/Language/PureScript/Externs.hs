@@ -478,6 +478,7 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
       f (ValueOpRef _ _) = []
       f (TypeInstanceRef _ _ _) = []
       f (ModuleRef _ _) = [] -- Anything re-exported via a ModuleRef is also exposed on a per-decl basis via an ReExportRef, so we only use ReExportRef to find re-exports.
+      f (ReExportRef _ (ExportSource _ (ModuleName moduName)) _) | "Prim" `T.isPrefixOf` moduName = []
       f (ReExportRef _ (ExportSource _ mn2) (TypeRef _ tn _)) =
         getModu mn2
         & (\m -> M.intersection m (M.singleton tn ()))
