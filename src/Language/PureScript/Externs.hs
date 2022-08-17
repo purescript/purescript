@@ -460,6 +460,32 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
   bcDeclarations = M.fromList $ concatMap typeDeclForCache ds
   efBuildCache = BuildCacheFile efVersion efModuleName bcCacheBlob bcCacheDecls bcDeclarations bcDeclShapes bcCacheImports
 
+  bcReExportDeclShapes :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeDetails)
+  bcReExportDeclShapes =
+    -- ASSUMPTION[drathier]: no exposed constructors? then other modules cannot possibly care about the internal shape of this data type, since cross-module inlining isn't a thing
+    let
+      getModu modu =
+        externsMap
+          & M.lookup modu
+          & fromMaybe (trace ("bcReExportDeclShapes: missing module in externsMap:" <> sShow (mn, modu, M.keys externsMap)) $ internalError "bcReExportDeclShapes: missing module in externsMap")
+          & _efBuildCache
+          & _bcDeclShapes
+
+      f (TypeClassRef _ _) = []
+      f (TypeOpRef _ _) = []
+      f (TypeRef _ _ _) = []
+      f (ValueRef _ _) = []
+      f (ValueOpRef _ _) = []
+      f (TypeInstanceRef _ _ _) = []
+      f (ModuleRef _ _) = [] -- Anything re-exported via a ModuleRef is also exposed on a per-decl basis via an ReExportRef, so we only use ReExportRef to find re-exports.
+      f (ReExportRef _ (ExportSource _ mn2) (TypeRef _ tn _)) =
+        getModu mn2
+        & (\m -> M.intersection m (M.singleton tn ()))
+        & M.toList
+      f (ReExportRef _ _ _) = []
+    in
+    M.fromList $ concatMap f exps
+
   expsTypeNames :: M.Map (ProperName 'TypeName) Bool
   expsTypeNames =
     -- ASSUMPTION[drathier]: no exposed constructors? then other modules cannot possibly care about the internal shape of this data type, since cross-module inlining isn't a thing
@@ -475,6 +501,7 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
       f (ValueRef _ _) = []
       f (ValueOpRef _ _) = []
       f (TypeInstanceRef _ _ _) = []
+      -- re-exports are handled elsewhere
       f (ModuleRef _ _) = []
       f (ReExportRef _ _ _) = []
     in
@@ -491,6 +518,8 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
       )
       bcDeclShapesAll
       expsTypeNames
+    -- add in re-exports
+    & (<>) bcReExportDeclShapes
     & (\v -> trace ("bcDeclShapes:" <> sShow (mn, exps, v)) v)
 
 
