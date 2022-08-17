@@ -46,7 +46,7 @@ import Paths_purescript as Paths
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.UTF8 as BLU
 
-import Control.Monad.State.Lazy
+import Control.Monad.State.Lazy (State, runState, modify)
 import Debug.Trace
 import PrettyPrint
 

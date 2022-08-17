@@ -315,6 +315,7 @@ library
     Language.PureScript.TypeChecker.Types
     Language.PureScript.TypeChecker.TypeSearch
     Language.PureScript.TypeChecker.Unify
+    PrettyPrint
     System.IO.UTF8
   other-modules:
     Paths_purescript
