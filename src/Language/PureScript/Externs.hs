@@ -46,6 +46,9 @@ import Paths_purescript as Paths
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.UTF8 as BLU
 
+import Control.Monad.State.Lazy
+import Debug.Trace
+import PrettyPrint
 
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile
@@ -88,6 +91,12 @@ data BuildCacheFile = BuildCacheFile
   -- , bcCacheDeclarations :: M.Map DeclarationCacheRef [ExternCacheKey]
   , bcCacheBlob :: B.ByteString
   -- ^ All of the things, in one ByteString. We only care about equality anyway.
+  , bcCacheDecls :: M.Map DeclarationRef B.ByteString
+  -- ^ Exported things which we might want to re-export in modules depending on this one
+  , bcDeclarations :: M.Map Text ([(Text, Maybe (Type ()))], Type ())
+  -- ^ Exported things which we might want to re-export in modules depending on this one
+  , bcDeclShapes :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeDetails)
+  -- ^ WIP
   , bcCacheDeps :: M.Map ModuleName B.ByteString
   -- ^ all declarations explicitly imported from a specific module, if explicitly imported
   -- 1. open imports are not cached, for now, since we don't know which things are used
@@ -239,6 +248,9 @@ _efBuildCache = efBuildCache
 _bcCacheBlob :: BuildCacheFile -> B.ByteString
 _bcCacheBlob = bcCacheBlob
 
+_bcDeclShapes :: BuildCacheFile -> M.Map (ProperName 'TypeName) (CacheShape, CacheTypeDetails)
+_bcDeclShapes = bcDeclShapes
+
 data DeclarationCacheRef
   -- |
   -- A type class
@@ -293,13 +305,13 @@ data ExternCacheKey =
     CacheEDType
       { cacheEdTypeName                :: ProperName 'TypeName
       , cacheEdTypeKind                :: Type ()
-      -- , cacheEdTypeDeclarationKind     :: TypeKind -- contains SourceType for adt's, can we safely skip the entire field?
+      -- , cacheEdTypeDeclarationKind     :: TypeKind -- TODO[drathier]: contains SourceType for adt's, can we safely skip the entire field? Probably not
       }
   -- | A type synonym
   | CacheEDTypeSynonym
       { cacheEdTypeSynonymName         :: ProperName 'TypeName
       , cacheEdTypeSynonymArguments    :: [(Text, Maybe (Type ()))]
-      , cacheEdTypeSynonymType         :: Type ()
+      , cacheEdTypeSynonymType         :: Type () -- CacheType
       }
   -- | A data constructor
   | CacheEDDataConstructor
@@ -340,8 +352,8 @@ data ExternCacheKey =
 
 instance Serialise ExternCacheKey
 
-extDeclToCacheKey :: ExternsDeclaration -> ExternCacheKey
-extDeclToCacheKey = \case
+extDeclToCacheKey :: Environment -> M.Map Text ([(Text, Maybe (Type ()))], Type ()) -> ExternsDeclaration -> ExternCacheKey
+extDeclToCacheKey env _decls = \case
     EDType
       edTypeName             --   :: ProperName 'TypeName
       edTypeKind             --   :: Type ()
@@ -355,7 +367,8 @@ extDeclToCacheKey = \case
         edTypeSynonymName       --  :: ProperName 'TypeName
         edTypeSynonymArguments  --  :: [(Text, Maybe (Type ()))]
         edTypeSynonymType       --  :: Type ()
-      -> CacheEDTypeSynonym
+      ->
+        CacheEDTypeSynonym
           edTypeSynonymName
           (fmap (fmap (fmap (const ()))) <$> edTypeSynonymArguments)
           (const () <$> edTypeSynonymType)
@@ -437,34 +450,114 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
   efDeclarations  = concat $ map snd $ bcCacheDeclarationsPre
   efSourceSpan    = ss
 
-  efBuildCache = BuildCacheFile efVersion efModuleName bcCacheBlob bcCacheImports
+  -- TODO[drathier]: look up relevant defs in `ds` when exposing type aliases (and presumably type classes too?), and add them to the externs file for easy diffing
 
-  bcCacheBlob :: B.ByteString
-  bcCacheBlob =
+  ------ decls
+
+  ------
+
+  bcDeclarations :: M.Map Text ([(Text, Maybe (Type ()))], Type ())
+  bcDeclarations = M.fromList $ concatMap typeDeclForCache ds
+  efBuildCache = BuildCacheFile efVersion efModuleName bcCacheBlob bcCacheDecls bcDeclarations bcDeclShapes bcCacheImports
+
+  expsTypeNames :: M.Map (ProperName 'TypeName) ()
+  expsTypeNames =
     let
+      f (TypeClassRef _ _) = []
+      f (TypeOpRef _ _) = []
+      -- ASSUMPTION[drathier]: no exposed constructors? then we cannot possibly care about the shape of the data in other modules, since cross-module inlining isn't a thing
+      -- type synonyms don't have ctors but should still be left in
+      f (TypeRef _ tn _) | (Just (kind, TypeSynonym)) <- Qualified (Just mn) tn `M.lookup` types env = [tn]
+      -- data types with no public ctors are opaque to all other modules, so no need to expose its internal shapes
+      f (TypeRef _ tn (Just [])) = []
+      -- if there are exposed ctors, expose the types shape
+      f (TypeRef _ tn _) = [tn]
+      f (ValueRef _ _) = []
+      f (ValueOpRef _ _) = []
+      f (TypeInstanceRef _ _ _) = []
+      f (ModuleRef _ _) = []
+      f (ReExportRef _ _ _) = []
+    in
+    M.fromList $ (,()) <$> concatMap f exps
+
+  bcDeclShapes :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeDetails)
+  bcDeclShapes =
+    M.intersection bcDeclShapesAll expsTypeNames
+    & (\v -> trace ("bcDeclShapes:" <> sShow (mn, exps, v)) v)
+
+
+  bcDeclShapesAll :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeDetails)
+  bcDeclShapesAll =
+    ds
+    & concatMap declToCacheShape
+    & M.fromList
+    & M.mapWithKey (\tipe (cs, cts) ->
+      ( cs
+      , cts
+        & M.mapWithKey (\k () ->
+          case k of
+            Qualified Nothing tn ->
+              internalError "dsCacheShapesWithDetails: missing module name"
+
+            Qualified (Just km@(ModuleName kmn)) tn | "Prim" `T.isPrefixOf` kmn -> (PrimType km tn, CacheTypeDetails mempty)
+            Qualified (Just km) tn | "$" `T.isInfixOf` runProperName tn -> (TypeClassDictType km tn, CacheTypeDetails mempty)
+            Qualified (Just km) tn | km == mn -> (OwnModuleRef km tn, CacheTypeDetails mempty)
+            Qualified (Just km) tn ->
+              let
+                moduExterns =
+                  M.lookup km externsMap
+                    & fromMaybe (trace ("dsCacheShapesWithDetails: missing module in externsMap:" <> sShow (km, tn, M.keys externsMap)) $ internalError "dsCacheShapesWithDetails: missing module in externsMap")
+                    & _efBuildCache
+                    & _bcDeclShapes
+              in
+              moduExterns
+                & M.lookup tn
+                & fromMaybe (trace ("dsCacheShapesWithDetails: missing type in externsMap:" <> sShow (mn, km, tn, M.keys externsMap, moduExterns)) $ internalError "dsCacheShapesWithDetails: missing type in externsMap")
+        )
+        & M.toList
+        & fmap (\(Qualified (Just km) k, v) -> ((km,k), v))
+        & M.fromList
+        & CacheTypeDetails
+      )
+    )
+
+  bcCacheDecls :: M.Map DeclarationRef B.ByteString
+  bcCacheBlob :: B.ByteString
+  (bcCacheDecls, bcCacheBlob) =
+    let
+      -- !_ = trace (T.unpack $ "declToCacheShape:" <> T.intercalate "\ndeclToCacheShape:" ((\v -> T.pack $ show (v, runState (declToCacheShape v) mempty)) <$> ds)) ()
+
+      dsCacheShapes :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeState)
+      dsCacheShapes = M.fromList $ concatMap declToCacheShape ds
+
+
       bshow a = BLU.fromString ("[" <> show a <> "]")
 
       _ = (serialise :: Int -> B.ByteString)
 
       foldCache :: Show a => Serialise a => [a] -> B.ByteString
-      foldCache = foldr (\a acc -> bshow a <> acc) B.empty
+      foldCache = foldr (\a acc -> bshow a <> "|" <> acc) B.empty
 
+      cacheDecls :: M.Map DeclarationRef B.ByteString
       cacheDecls =
-        foldr
-          (\(k,vs) m1 ->
-            case elem k efExports of
-              False -> m1
-              True ->
-                foldr
-                  (\v acc -> bshow (declRefToCacheRef k) <> bshow (extDeclToCacheKey v) <> acc)
-                  m1
-                  vs
-          )
-          B.empty
-          bcCacheDeclarationsPre
+        M.fromList $ fmap (\(k,v) -> (k, foldCache (extDeclToCacheKey env bcDeclarations <$> v))) $ filter (\(k, _) -> elem k efExports) bcCacheDeclarationsPre
+
+      -- cacheDecls2 =
+      --   foldr
+      --     (\(k,vs) m1 ->
+      --       case elem k efExports of
+      --         False -> m1
+      --         True ->
+      --           foldr
+      --             (\v acc -> bshow (declRefToCacheRef k) <> ":" <> bshow (extDeclToCacheKey v) <> acc)
+      --             m1
+      --             vs
+      --     )
+      --     B.empty
+      --     bcCacheDeclarationsPre
 
       cacheExports = foldCache (declRefToCacheRef <$> efExports)
-      cacheImports = foldr (<>) B.empty (removeSourceSpansFromImport <$> eiImportType <$> efImports)
+      cacheImports = foldr (<>) B.empty $ (\v -> (serialise (eiModule v) <> ":" <> removeSourceSpansFromImport (eiImportType v))) <$> efImports
       cacheFixities = foldCache efFixities
       cacheTypeFixities = foldCache efTypeFixities
 
@@ -473,11 +566,12 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
         Explicit declRefs -> "Explicit" <> foldCache (declRefToCacheRef <$> declRefs)
         Hiding declRefs -> "Hiding" <> foldCache (declRefToCacheRef <$> declRefs)
     in
-      cacheDecls
-      <> cacheExports
+      ( cacheDecls
+      , cacheExports
       <> cacheImports
       <> cacheFixities
       <> cacheTypeFixities
+      )
 
   bcCacheDeclarationsPre :: [(DeclarationRef, [ExternsDeclaration])]
   bcCacheDeclarationsPre = (\ref -> (ref, (toExternsDeclaration ref))) <$> exps
@@ -490,6 +584,69 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
       & fmap _bcCacheBlob
 
   importModuleNames = eiModule <$> efImports
+
+  typeDeclForCache :: Declaration -> [(Text ,([(Text, Maybe (Type ()))] , Type ()))]
+  typeDeclForCache (TypeSynonymDeclaration _ typeName targs underlyingType) =
+    [(runProperName typeName, (fmap (fmap (fmap (const ()))) <$> targs, const () <$> underlyingType))]
+  typeDeclForCache _ = []
+
+  declToCacheShape
+    :: Declaration
+    -> [(ProperName 'TypeName, (CacheShape, CacheTypeState))]
+  declToCacheShape decl =
+    let
+      (things, cts) = runState (declToCacheShapeImpl decl) mempty
+      f (name, cs) = (name, (cs, cts))
+    in f <$> things
+
+  declToCacheShapeImpl
+    :: Declaration
+    -> State CacheTypeState [(ProperName 'TypeName, CacheShape)]
+  declToCacheShapeImpl (DataDeclaration _ dataOrNewtype typeName targs ctors) = do
+    let
+      handleCtor (DataConstructorDeclaration _ ctorName ctorFields) = do
+        ctorFieldsv <- mapM (mapM typeToCacheTypeImpl) ctorFields
+        pure (ctorName, ctorFieldsv)
+
+    targsv <- mapM (mapM (mapM typeToCacheTypeImpl)) targs
+    ctorsv <- mapM handleCtor ctors
+
+    pure
+      [ ( typeName
+        , CacheShapeDataDecl
+          dataOrNewtype
+          typeName
+          targsv
+          ctorsv
+        )
+      ]
+  -- TODO[drathier]: how do we handle mutually recursive data types?
+  declToCacheShapeImpl (DataBindingGroupDeclaration things) = do
+    -- e.g. the Void type lives here
+    thingsv <- mapM declToCacheShapeImpl things
+    pure $ concat thingsv
+
+  declToCacheShapeImpl (ExternDataDeclaration _ typeName underlyingType) = do
+    underlyingTypev <- typeToCacheTypeImpl underlyingType
+    pure
+      [ ( typeName
+        , CacheShapeForeignTypeDecl
+          typeName
+          underlyingTypev
+        )
+      ]
+  declToCacheShapeImpl (TypeSynonymDeclaration _ typeName targs underlyingType) = do
+    targsv <- mapM (mapM (mapM typeToCacheTypeImpl)) targs
+    underlyingTypev <- typeToCacheTypeImpl underlyingType
+    pure
+      [ ( typeName
+        , CacheShapeTypeDecl
+          typeName
+          targsv
+          underlyingTypev
+        )
+      ]
+  declToCacheShapeImpl _ = pure []
 
   -----
 
@@ -554,3 +711,105 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
 
 externsFileName :: FilePath
 externsFileName = "externs.cbor"
+
+data CacheShape
+  = PrimType ModuleName (ProperName 'TypeName)
+  | TypeClassDictType ModuleName (ProperName 'TypeName)
+  | OwnModuleRef ModuleName (ProperName 'TypeName)
+  | CacheShapeTypeDecl
+    (ProperName 'TypeName)
+    [(Text, Maybe (Type ()))]
+    (Type ())
+  | CacheShapeForeignTypeDecl
+    (ProperName 'TypeName)
+    (Type ())
+  | CacheShapeDataDecl
+    DataDeclType
+    (ProperName 'TypeName)
+    [(Text, Maybe (Type ()))]
+    [(ProperName 'ConstructorName, [(Ident, Type ())])]
+  -- | CacheShapeDataRecDecl
+  --   DataDeclType
+  --   (ProperName 'TypeName)
+  --   [(Text, Maybe (Type ()))]
+  --   [(ProperName 'ConstructorName, [(Ident, Type ())])]
+  deriving (Show, Eq, Ord, Generic)
+
+instance Serialise CacheShape
+
+data CacheTypeDetails = CacheTypeDetails (M.Map (ModuleName, ProperName 'TypeName) (CacheShape, CacheTypeDetails))
+  deriving (Show, Eq, Generic)
+
+instance Serialise CacheTypeDetails
+
+
+
+
+
+
+----------------
+
+
+type CacheTypeState = M.Map (Qualified (ProperName 'TypeName)) ()
+
+typeToCacheType :: Type a -> (Type (), CacheTypeState)
+typeToCacheType t =
+  runState (typeToCacheTypeImpl t) mempty
+
+typeToCacheTypeImpl :: Type a -> State CacheTypeState (Type ())
+typeToCacheTypeImpl t = case t of
+  TUnknown _ a -> pure $ TUnknown () a
+  TypeVar _ a -> pure $ TypeVar () a
+  TypeLevelString _ a -> pure $ TypeLevelString () a
+  TypeWildcard _ a -> pure $ TypeWildcard () a
+  TypeConstructor _ a -> do
+    modify (M.insert a ())
+    pure $ TypeConstructor () a
+  TypeOp _ a -> pure $ TypeOp () a
+  TypeApp _ a b -> do
+    av <- typeToCacheTypeImpl a
+    bv <- typeToCacheTypeImpl b
+    pure $ TypeApp () av bv
+  KindApp _ a b -> do
+    av <- typeToCacheTypeImpl a
+    bv <- typeToCacheTypeImpl b
+    pure $ KindApp () av bv
+  ForAll _ a b c d -> do
+    bv <- mapM typeToCacheTypeImpl b
+    cv <- typeToCacheTypeImpl c
+    pure $ ForAll () a bv cv d
+  ConstrainedType _ a b -> do
+    av <- constraintToCacheTypeImpl a
+    bv <- typeToCacheTypeImpl b
+    pure $ ConstrainedType () av bv
+  Skolem _ a b c d -> do
+    bv <- mapM typeToCacheTypeImpl b
+    pure $ Skolem () a bv c d
+  REmpty _ -> pure $ REmpty ()
+  RCons _ a b c -> do
+    bv <- typeToCacheTypeImpl b
+    cv <- typeToCacheTypeImpl c
+    pure $ RCons () a bv cv
+  KindedType _ a b -> do
+    av <- typeToCacheTypeImpl a
+    bv <- typeToCacheTypeImpl b
+    pure $ KindedType () av bv
+  BinaryNoParensType _ a b c -> do
+    av <- typeToCacheTypeImpl a
+    bv <- typeToCacheTypeImpl b
+    cv <- typeToCacheTypeImpl c
+    pure $ BinaryNoParensType () av bv cv
+  ParensInType _ a -> do
+    av <- typeToCacheTypeImpl a
+    pure $ ParensInType () av
+
+constraintToCacheTypeImpl :: Constraint a -> State CacheTypeState (Constraint ())
+constraintToCacheTypeImpl (Constraint {..}) = do
+  cka <- mapM typeToCacheTypeImpl constraintKindArgs
+  ca <- mapM typeToCacheTypeImpl constraintArgs
+  pure $ Constraint
+    ()
+    constraintClass
+    cka
+    ca
+    constraintData

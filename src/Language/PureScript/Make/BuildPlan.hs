@@ -105,9 +105,9 @@ buildJobSucceeded mDirtyCache warnings externs =
 fastEqBuildCache :: BuildCacheFile -> BuildCacheFile -> Bool
 fastEqBuildCache cache externsCache =
   let
-    toCmp (BuildCacheFile bcVersion bcModuleName bcCacheBlob _bcCacheDeps) =
+    toCmp (BuildCacheFile bcVersion bcModuleName bcCacheBlob bcCacheDecls bcDeclarations bcDeclShapes _bcCacheDeps) =
       -- don't compare imports; it will result in two layers being rebuilt instead of one
-      BuildCacheFile bcVersion bcModuleName bcCacheBlob mempty
+      BuildCacheFile bcVersion bcModuleName bcCacheBlob bcCacheDecls bcDeclarations bcDeclShapes mempty
   in
   Serialise.serialise (toCmp cache) == Serialise.serialise (toCmp externsCache)
 
