@@ -460,30 +460,38 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
   bcDeclarations = M.fromList $ concatMap typeDeclForCache ds
   efBuildCache = BuildCacheFile efVersion efModuleName bcCacheBlob bcCacheDecls bcDeclarations bcDeclShapes bcCacheImports
 
-  expsTypeNames :: M.Map (ProperName 'TypeName) ()
+  expsTypeNames :: M.Map (ProperName 'TypeName) Bool
   expsTypeNames =
+    -- ASSUMPTION[drathier]: no exposed constructors? then other modules cannot possibly care about the internal shape of this data type, since cross-module inlining isn't a thing
     let
       f (TypeClassRef _ _) = []
       f (TypeOpRef _ _) = []
-      -- ASSUMPTION[drathier]: no exposed constructors? then we cannot possibly care about the shape of the data in other modules, since cross-module inlining isn't a thing
-      -- type synonyms don't have ctors but should still be left in
-      f (TypeRef _ tn _) | (Just (_, TypeSynonym)) <- Qualified (Just mn) tn `M.lookup` types env = [tn]
+      -- type synonyms don't have ctors in ast but do effectively have a single exposed ctor, so keep it in
+      f (TypeRef _ tn _) | (Just (_, TypeSynonym)) <- Qualified (Just mn) tn `M.lookup` types env = [(tn, True)]
       -- data types with no public ctors are opaque to all other modules, so no need to expose its internal shapes
-      f (TypeRef _ _ (Just [])) = []
-      -- if there are exposed ctors, expose the types shape
-      f (TypeRef _ tn _) = [tn]
+      f (TypeRef _ tn (Just [])) = [(tn, False)]
+      -- if there are any exposed ctors, expose the type shape
+      f (TypeRef _ tn _) = [(tn, True)]
       f (ValueRef _ _) = []
       f (ValueOpRef _ _) = []
       f (TypeInstanceRef _ _ _) = []
       f (ModuleRef _ _) = []
       f (ReExportRef _ _ _) = []
     in
-    M.fromList $ (,()) <$> concatMap f exps
+    M.fromList $ concatMap f exps
 
   bcDeclShapes :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeDetails)
   bcDeclShapes =
-    M.intersection bcDeclShapesAll expsTypeNames
-    -- & (\v -> trace ("bcDeclShapes:" <> sShow (mn, exps, v)) v)
+    M.intersectionWith
+      (\(cs, ctd) shouldShowInternals ->
+        if shouldShowInternals then
+          (cs, ctd)
+        else
+          (cs, CacheTypeDetails mempty)
+      )
+      bcDeclShapesAll
+      expsTypeNames
+    & (\v -> trace ("bcDeclShapes:" <> sShow (mn, exps, v)) v)
 
 
   bcDeclShapesAll :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeDetails)
