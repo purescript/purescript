@@ -352,8 +352,8 @@ data ExternCacheKey =
 
 instance Serialise ExternCacheKey
 
-extDeclToCacheKey :: Environment -> M.Map Text ([(Text, Maybe (Type ()))], Type ()) -> ExternsDeclaration -> ExternCacheKey
-extDeclToCacheKey env _decls = \case
+extDeclToCacheKey :: M.Map Text ([(Text, Maybe (Type ()))], Type ()) -> ExternsDeclaration -> ExternCacheKey
+extDeclToCacheKey _decls = \case
     EDType
       edTypeName             --   :: ProperName 'TypeName
       edTypeKind             --   :: Type ()
@@ -467,9 +467,9 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
       f (TypeOpRef _ _) = []
       -- ASSUMPTION[drathier]: no exposed constructors? then we cannot possibly care about the shape of the data in other modules, since cross-module inlining isn't a thing
       -- type synonyms don't have ctors but should still be left in
-      f (TypeRef _ tn _) | (Just (kind, TypeSynonym)) <- Qualified (Just mn) tn `M.lookup` types env = [tn]
+      f (TypeRef _ tn _) | (Just (_, TypeSynonym)) <- Qualified (Just mn) tn `M.lookup` types env = [tn]
       -- data types with no public ctors are opaque to all other modules, so no need to expose its internal shapes
-      f (TypeRef _ tn (Just [])) = []
+      f (TypeRef _ _ (Just [])) = []
       -- if there are exposed ctors, expose the types shape
       f (TypeRef _ tn _) = [tn]
       f (ValueRef _ _) = []
@@ -483,7 +483,7 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
   bcDeclShapes :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeDetails)
   bcDeclShapes =
     M.intersection bcDeclShapesAll expsTypeNames
-    & (\v -> trace ("bcDeclShapes:" <> sShow (mn, exps, v)) v)
+    -- & (\v -> trace ("bcDeclShapes:" <> sShow (mn, exps, v)) v)
 
 
   bcDeclShapesAll :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeDetails)
@@ -491,12 +491,12 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
     ds
     & concatMap declToCacheShape
     & M.fromList
-    & M.mapWithKey (\tipe (cs, cts) ->
+    & M.map (\(cs, cts) ->
       ( cs
       , cts
         & M.mapWithKey (\k () ->
           case k of
-            Qualified Nothing tn ->
+            Qualified Nothing _ ->
               internalError "dsCacheShapesWithDetails: missing module name"
 
             Qualified (Just km@(ModuleName kmn)) tn | "Prim" `T.isPrefixOf` kmn -> (PrimType km tn, CacheTypeDetails mempty)
@@ -525,12 +525,6 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
   bcCacheBlob :: B.ByteString
   (bcCacheDecls, bcCacheBlob) =
     let
-      -- !_ = trace (T.unpack $ "declToCacheShape:" <> T.intercalate "\ndeclToCacheShape:" ((\v -> T.pack $ show (v, runState (declToCacheShape v) mempty)) <$> ds)) ()
-
-      dsCacheShapes :: M.Map (ProperName 'TypeName) (CacheShape, CacheTypeState)
-      dsCacheShapes = M.fromList $ concatMap declToCacheShape ds
-
-
       bshow a = BLU.fromString ("[" <> show a <> "]")
 
       _ = (serialise :: Int -> B.ByteString)
@@ -540,7 +534,7 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
 
       cacheDecls :: M.Map DeclarationRef B.ByteString
       cacheDecls =
-        M.fromList $ fmap (\(k,v) -> (k, foldCache (extDeclToCacheKey env bcDeclarations <$> v))) $ filter (\(k, _) -> elem k efExports) bcCacheDeclarationsPre
+        M.fromList $ fmap (\(k,v) -> (k, foldCache (extDeclToCacheKey bcDeclarations <$> v))) $ filter (\(k, _) -> elem k efExports) bcCacheDeclarationsPre
 
       -- cacheDecls2 =
       --   foldr
@@ -751,10 +745,6 @@ instance Serialise CacheTypeDetails
 
 
 type CacheTypeState = M.Map (Qualified (ProperName 'TypeName)) ()
-
-typeToCacheType :: Type a -> (Type (), CacheTypeState)
-typeToCacheType t =
-  runState (typeToCacheTypeImpl t) mempty
 
 typeToCacheTypeImpl :: Type a -> State CacheTypeState (Type ())
 typeToCacheTypeImpl t = case t of
