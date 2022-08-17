@@ -722,7 +722,7 @@ data CacheShape
     (ProperName 'TypeName)
     [(Text, Maybe (Type ()))]
     [(ProperName 'ConstructorName, [(Ident, Type ())])]
-  -- | CacheShapeDataRecDecl
+  -- CacheShapeDataRecDecl
   --   DataDeclType
   --   (ProperName 'TypeName)
   --   [(Text, Maybe (Type ()))]
