@@ -19,11 +19,16 @@ moduleNameToJs (ModuleName mn) =
 --
 --  * Alphanumeric characters are kept unmodified.
 --
---  * Reserved javascript identifiers are prefixed with '$$'.
+--  * Reserved javascript identifiers and identifiers starting with digits are
+--    prefixed with '$$'.
 identToJs :: Ident -> Text
-identToJs (Ident name) = anyNameToJs name
+identToJs (Ident name)
+  | not (T.null name) && isDigit (T.head name) = "$$" <> T.concatMap identCharToText name
+  | otherwise = anyNameToJs name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
-identToJs UnusedIdent = "$__unused"
+identToJs UnusedIdent = unusedIdent
+identToJs (InternalIdent RuntimeLazyFactory) = "$runtime_lazy"
+identToJs (InternalIdent (Lazy name)) = "$lazy_" <> anyNameToJs name
 
 -- | Convert a 'ProperName' into a valid JavaScript identifier:
 --

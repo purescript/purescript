@@ -1,0 +1,11 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/RoleDeclarationArityMismatchForeign2.purs:5:1 - 5:20 (line 5, column 1 - line 5, column 20)
+
+  The type [33mA[0m expects 2 arguments but its role declaration lists only 1 role.
+
+in role declaration for [33mA[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/RoleDeclarationArityMismatch.md for more information,
+or to contribute content related to this error.
+

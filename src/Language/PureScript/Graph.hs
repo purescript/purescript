@@ -3,7 +3,8 @@ module Language.PureScript.Graph (graph) where
 import Prelude.Compat
 
 import qualified Data.Aeson as Json
-import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Aeson.Key as Json.Key
+import qualified Data.Aeson.KeyMap as Json.Map
 import qualified Data.Map as Map
 
 import           Control.Monad (forM)
@@ -44,7 +45,7 @@ moduleGraphToJSON
 moduleGraphToJSON paths = Json.Object . foldl' insert mempty
   where
   insert :: Json.Object -> (ModuleName, [ModuleName]) -> Json.Object
-  insert obj (mn, depends) = HashMap.insert (runModuleName mn) value obj
+  insert obj (mn, depends) = Json.Map.insert (Json.Key.fromText (runModuleName mn)) value obj
     where
       path = fromMaybe (Crash.internalError "missing module name in graph") $ Map.lookup mn paths
       value = Json.object

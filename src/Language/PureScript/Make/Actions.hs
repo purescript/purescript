@@ -2,6 +2,7 @@ module Language.PureScript.Make.Actions
   ( MakeActions(..)
   , RebuildPolicy(..)
   , ProgressMessage(..)
+  , renderProgressMessage
   , buildMakeActions
   , checkForeignDecls
   , cacheDbFile
@@ -18,7 +19,8 @@ import           Control.Monad.Reader (asks)
 import           Control.Monad.Supply
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
-import           Data.Bifunctor (bimap)
+import           Data.Aeson (Value(String), (.=), object)
+import           Data.Bifunctor (bimap, first)
 import           Data.Either (partitionEithers)
 import           Data.Foldable (for_)
 import qualified Data.List.NonEmpty as NEL
@@ -37,7 +39,6 @@ import qualified Language.PureScript.CodeGen.JS as J
 import           Language.PureScript.CodeGen.JS.Printer
 import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.CoreFn.ToJSON as CFJ
-import qualified Language.PureScript.CoreImp.AST as Imp
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Docs.Prim as Docs.Prim
@@ -53,7 +54,8 @@ import qualified Paths_purescript as Paths
 import           SourceMap
 import           SourceMap.Types
 import           System.Directory (getCurrentDirectory)
-import           System.FilePath ((</>), makeRelative, splitPath, normalise)
+import           System.FilePath ((</>), makeRelative, splitPath, normalise, splitDirectories)
+import qualified System.FilePath.Posix as Posix
 import           System.IO (stderr)
 
 -- | Determines when to rebuild a module
@@ -66,13 +68,25 @@ data RebuildPolicy
 
 -- | Progress messages from the make process
 data ProgressMessage
-  = CompilingModule ModuleName
+  = CompilingModule ModuleName (Maybe (Int, Int))
   -- ^ Compilation started for the specified module
   deriving (Show, Eq, Ord)
 
 -- | Render a progress message
-renderProgressMessage :: ProgressMessage -> T.Text
-renderProgressMessage (CompilingModule mn) = T.append "Compiling " (runModuleName mn)
+renderProgressMessage :: T.Text -> ProgressMessage -> T.Text
+renderProgressMessage infx (CompilingModule mn mi) =
+  T.concat
+    [ renderProgressIndex mi
+    , infx
+    , runModuleName mn
+    ]
+  where
+  renderProgressIndex :: Maybe (Int, Int) -> T.Text
+  renderProgressIndex = maybe "" $ \(start, end) ->
+    let start' = T.pack (show start)
+        end' = T.pack (show end)
+        preSpace = T.replicate (T.length end' - T.length start') " "
+    in "[" <> preSpace <> start' <> " of " <> end' <> "] "
 
 -- | Actions that require implementations when running in "make" mode.
 --
@@ -109,6 +123,9 @@ data MakeActions m = MakeActions
   , writeCacheDb :: CacheDb -> m ()
   -- ^ Write the given cache database to some external source (e.g. a file on
   -- disk).
+  , writePackageJson :: m ()
+  -- ^ Write to the output directory the package.json file allowing Node.js to
+  -- load .js files as ES modules.
   , outputPrimDocs :: m ()
   -- ^ If generating docs, output the documentation for the Prim modules
   }
@@ -135,6 +152,15 @@ writeCacheDb'
   -> m ()
 writeCacheDb' = writeJSONFile . cacheDbFile
 
+writePackageJson'
+  :: (MonadIO m, MonadError MultipleErrors m)
+  => FilePath
+  -- ^ The path to the output directory
+  -> m ()
+writePackageJson' outputDir = writeJSONFile (outputDir </> "package.json") $ object
+  [ "type" .= String "module"
+  ]
+
 -- | A set of make actions that read and write modules from the given directory.
 buildMakeActions
   :: FilePath
@@ -147,7 +173,7 @@ buildMakeActions
   -- ^ Generate a prefix comment?
   -> MakeActions Make
 buildMakeActions outputDir filePathMap foreigns usePrefix =
-    MakeActions getInputTimestampsAndHashes getOutputTimestamp readExterns codegen ffiCodegen progress readCacheDb writeCacheDb outputPrimDocs
+    MakeActions getInputTimestampsAndHashes getOutputTimestamp readExterns codegen ffiCodegen progress readCacheDb writeCacheDb writePackageJson outputPrimDocs
   where
 
   getInputTimestampsAndHashes
@@ -233,7 +259,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
           | not $ requiresForeign m -> do
               return Nothing
           | otherwise -> do
-              return $ Just $ Imp.App Nothing (Imp.Var Nothing "require") [Imp.StringLiteral Nothing "./foreign.js"]
+              return $ Just "./foreign.js"
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return Nothing
       rawJs <- J.moduleToJs m foreignInclude
@@ -260,18 +286,23 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         Just path
           | not $ requiresForeign m ->
               tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
-          | otherwise ->
-              checkForeignDecls m path
+          | otherwise -> do
+              checkResult <- checkForeignDecls m path
+              case checkResult of
+                Left _ -> copyFile path (outputFilename mn "foreign.js")
+                Right (ESModule, _) -> copyFile path (outputFilename mn "foreign.js")
+                Right (CJSModule, _) -> do
+                  throwError $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
+
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return ()
-      for_ (mn `M.lookup` foreigns) $ \path ->
-        copyFile path (outputFilename mn "foreign.js")
+
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
-    let pathToDir = iterate (".." </>) ".." !! length (splitPath $ normalise outputDir)
+    let pathToDir = iterate (".." Posix.</>) ".." !! length (splitPath $ normalise outputDir)
         sourceFile = case mappings of
-                      (SMap file _ _ : _) -> Just $ pathToDir </> makeRelative dir (T.unpack file)
+                      (SMap file _ _ : _) -> Just $ pathToDir Posix.</> normalizeSMPath (makeRelative dir (T.unpack file))
                       _ -> Nothing
     let rawMapping = SourceMapping { smFile = "index.js", smSourceRoot = Nothing, smMappings =
       map (\(SMap _ orig gen) -> Mapping {
@@ -291,11 +322,14 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     convertPos SourcePos { sourcePosLine = l, sourcePosColumn = c } =
       Pos { posLine = fromIntegral l, posColumn = fromIntegral c }
 
+    normalizeSMPath :: FilePath -> FilePath
+    normalizeSMPath = Posix.joinPath . splitDirectories
+
   requiresForeign :: CF.Module a -> Bool
   requiresForeign = not . null . CF.moduleForeign
 
   progress :: ProgressMessage -> Make ()
-  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage
+  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage "Compiling "
 
   readCacheDb :: Make CacheDb
   readCacheDb = readCacheDb' outputDir
@@ -303,52 +337,90 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   writeCacheDb :: CacheDb -> Make ()
   writeCacheDb = writeCacheDb' outputDir
 
+  writePackageJson :: Make ()
+  writePackageJson = writePackageJson' outputDir
+
+data ForeignModuleType = ESModule | CJSModule deriving (Show)
+
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
-checkForeignDecls :: CF.Module ann -> FilePath -> Make ()
+checkForeignDecls :: CF.Module ann -> FilePath -> Make (Either MultipleErrors (ForeignModuleType, S.Set Ident))
 checkForeignDecls m path = do
   jsStr <- T.unpack <$> readTextFile path
-  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse jsStr path
 
-  foreignIdentsStrs <- either errorParsingModule pure $ getExps js
-
-  let deprecatedFFI = filter (elem '\'') foreignIdentsStrs
-  unless (null deprecatedFFI) $
-    warningDeprecatedForeignPrimes deprecatedFFI
-
-  foreignIdents <- either
-                     errorInvalidForeignIdentifiers
-                     (pure . S.fromList)
-                     (parseIdents foreignIdentsStrs)
-  let importedIdents = S.fromList (CF.moduleForeign m)
-
-  let unusedFFI = foreignIdents S.\\ importedIdents
-  unless (null unusedFFI) $
-    tell . errorMessage' modSS . UnusedFFIImplementations mname $
-      S.toList unusedFFI
-
-  let missingFFI = importedIdents S.\\ foreignIdents
-  unless (null missingFFI) $
-    throwError . errorMessage' modSS . MissingFFIImplementations mname $
-      S.toList missingFFI
+  let
+    parseResult :: Either MultipleErrors JS.JSAST
+    parseResult = first (errorParsingModule . Bundle.UnableToParseModule) $ JS.parseModule jsStr path
+  traverse checkFFI parseResult
 
   where
   mname = CF.moduleName m
   modSS = CF.moduleSourceSpan m
 
-  errorParsingModule :: Bundle.ErrorMessage -> Make a
-  errorParsingModule = throwError . errorMessage' modSS . ErrorParsingFFIModule path . Just
+  checkFFI :: JS.JSAST -> Make (ForeignModuleType, S.Set Ident)
+  checkFFI js = do 
+    (foreignModuleType, foreignIdentsStrs) <-
+        case (,) <$> getForeignModuleExports js <*> getForeignModuleImports js of
+          Left reason -> throwError $ errorParsingModule reason
+          Right (Bundle.ForeignModuleExports{..}, Bundle.ForeignModuleImports{..})
+            | not (null cjsExports && null cjsImports)
+            , null esExports
+            , null esImports -> do
+                let deprecatedFFI = filter (elem '\'') cjsExports
+                unless (null deprecatedFFI) $
+                  errorDeprecatedForeignPrimes deprecatedFFI
 
-  getExps :: JS.JSAST -> Either Bundle.ErrorMessage [String]
-  getExps = Bundle.getExportedIdentifiers (T.unpack (runModuleName mname))
+                pure (CJSModule, cjsExports)
+            | otherwise -> do
+                unless (null cjsImports) $
+                  errorUnsupportedFFICommonJSImports cjsImports
+
+                unless (null cjsExports) $
+                  errorUnsupportedFFICommonJSExports cjsExports
+
+                pure (ESModule, esExports)
+
+    foreignIdents <- either
+                      errorInvalidForeignIdentifiers
+                      (pure . S.fromList)
+                      (parseIdents foreignIdentsStrs)
+    let importedIdents = S.fromList (CF.moduleForeign m)
+
+    let unusedFFI = foreignIdents S.\\ importedIdents
+    unless (null unusedFFI) $
+      tell . errorMessage' modSS . UnusedFFIImplementations mname $
+        S.toList unusedFFI
+
+    let missingFFI = importedIdents S.\\ foreignIdents
+    unless (null missingFFI) $
+      throwError . errorMessage' modSS . MissingFFIImplementations mname $
+        S.toList missingFFI
+    pure (foreignModuleType, foreignIdents)
+
+  errorParsingModule :: Bundle.ErrorMessage -> MultipleErrors
+  errorParsingModule = errorMessage' modSS . ErrorParsingFFIModule path . Just
+
+  getForeignModuleExports :: JS.JSAST -> Either Bundle.ErrorMessage  Bundle.ForeignModuleExports
+  getForeignModuleExports = Bundle.getExportedIdentifiers (T.unpack (runModuleName mname))
+
+  getForeignModuleImports :: JS.JSAST -> Either Bundle.ErrorMessage Bundle.ForeignModuleImports
+  getForeignModuleImports = Bundle.getImportedModules (T.unpack (runModuleName mname))
 
   errorInvalidForeignIdentifiers :: [String] -> Make a
   errorInvalidForeignIdentifiers =
     throwError . mconcat . map (errorMessage . InvalidFFIIdentifier mname . T.pack)
 
-  warningDeprecatedForeignPrimes :: [String] -> Make ()
-  warningDeprecatedForeignPrimes =
-    tell . mconcat . map (errorMessage' modSS . DeprecatedFFIPrime mname . T.pack)
+  errorDeprecatedForeignPrimes :: [String] -> Make a
+  errorDeprecatedForeignPrimes =
+    throwError . mconcat . map (errorMessage' modSS . DeprecatedFFIPrime mname . T.pack)
+
+  errorUnsupportedFFICommonJSExports :: [String] -> Make a
+  errorUnsupportedFFICommonJSExports =
+    throwError . errorMessage' modSS . UnsupportedFFICommonJSExports mname . map T.pack
+
+  errorUnsupportedFFICommonJSImports :: [String] -> Make a
+  errorUnsupportedFFICommonJSImports =
+    throwError . errorMessage' modSS . UnsupportedFFICommonJSImports mname . map T.pack
 
   parseIdents :: [String] -> Either [String] [Ident]
   parseIdents strs =

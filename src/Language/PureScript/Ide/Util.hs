@@ -32,6 +32,7 @@ module Language.PureScript.Ide.Util
 import           Protolude                           hiding (decodeUtf8,
                                                       encodeUtf8, to)
 
+import           Control.Lens                        hiding (op, (&))
 import           Data.Aeson
 import qualified Data.Text                           as T
 import qualified Data.Text.Lazy                      as TL
@@ -40,7 +41,6 @@ import qualified Language.PureScript                 as P
 import           Language.PureScript.Ide.Error       (IdeError(..))
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.Types
-import           Lens.Micro.Platform                 hiding ((&))
 import           System.IO.UTF8                      (readUTF8FileT)
 import           System.Directory                    (makeAbsolute)
 

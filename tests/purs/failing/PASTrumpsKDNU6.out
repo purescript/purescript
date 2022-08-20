@@ -1,0 +1,14 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/PASTrumpsKDNU6.purs:6:14 - 6:24 (line 6, column 14 - line 6, column 24)
+
+  Type synonym [33mData.NaturalTransformation.NaturalTransformation[0m is partially applied.
+  Type synonyms must be applied to all of their type arguments.
+
+while checking that type [33mNaturalTransformation Array[0m
+  has kind [33mType[0m
+in type synonym [33mT[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/PartiallyAppliedSynonym.md for more information,
+or to contribute content related to this error.
+

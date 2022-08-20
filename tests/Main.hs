@@ -7,6 +7,7 @@ import Prelude.Compat
 
 import Test.Hspec
 
+import qualified TestAst
 import qualified TestCompiler
 import qualified TestCoreFn
 import qualified TestCst
@@ -16,7 +17,8 @@ import qualified TestPrimDocs
 import qualified TestPsci
 import qualified TestIde
 import qualified TestPscPublish
-import qualified TestBundle
+import qualified TestSourceMaps
+-- import qualified TestBundle
 import qualified TestMake
 import qualified TestUtils
 import qualified TestGraph
@@ -32,10 +34,11 @@ main = do
 
   hspec $ do
     describe "cst" TestCst.spec
+    describe "ast" TestAst.spec
     describe "ide" TestIde.spec
     beforeAll TestUtils.setupSupportModules $ do
       describe "compiler" TestCompiler.spec
-      describe "bundle" TestBundle.spec
+      describe "sourcemaps" TestSourceMaps.spec
     describe "make" TestMake.spec
     describe "psci" TestPsci.spec
     describe "corefn" TestCoreFn.spec

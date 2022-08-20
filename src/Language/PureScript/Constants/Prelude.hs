@@ -1,8 +1,6 @@
 -- | Various constants which refer to things in the Prelude
 module Language.PureScript.Constants.Prelude where
 
-import Prelude.Compat
-
 import Data.String (IsString)
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Names
@@ -25,7 +23,7 @@ discard :: forall a. (IsString a) => a
 discard = "discard"
 
 pattern Discard :: Qualified (ProperName 'ClassName)
-pattern Discard = Qualified (Just ControlBind) (ProperName "Discard")
+pattern Discard = Qualified (ByModuleName ControlBind) (ProperName "Discard")
 
 add :: forall a. (IsString a) => a
 add = "add"
@@ -112,6 +110,9 @@ zshr = "zshr"
 
 complement :: forall a. (IsString a) => a
 complement = "complement"
+
+identity :: forall a. (IsString a) => a
+identity = "identity"
 
 -- Prelude Values
 
@@ -265,85 +266,142 @@ semigroupString = "semigroupString"
 semigroupoidFn :: forall a. (IsString a) => a
 semigroupoidFn = "semigroupoidFn"
 
+categoryFn :: forall a. (IsString a) => a
+categoryFn = "categoryFn"
+
 -- Data.Symbol
 
 pattern DataSymbol :: ModuleName
 pattern DataSymbol = ModuleName "Data.Symbol"
 
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
-pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
+pattern IsSymbol = Qualified (ByModuleName DataSymbol) (ProperName "IsSymbol")
 
-dataArray :: forall a. (IsString a) => a
-dataArray = "Data_Array"
+pattern DataReflectable :: ModuleName
+pattern DataReflectable = ModuleName "Data.Reflectable"
 
-eff :: forall a. (IsString a) => a
-eff = "Control_Monad_Eff"
+pattern Reflectable :: Qualified (ProperName 'ClassName)
+pattern Reflectable = Qualified (ByModuleName DataReflectable) (ProperName "Reflectable")
 
-effect :: forall a. (IsString a) => a
-effect = "Effect"
+pattern DataOrdering :: ModuleName
+pattern DataOrdering = ModuleName "Data.Ordering"
 
-st :: forall a. (IsString a) => a
-st = "Control_Monad_ST_Internal"
+pattern DataFunctionUncurried :: ModuleName
+pattern DataFunctionUncurried = ModuleName "Data.Function.Uncurried"
 
-controlApplicative :: forall a. (IsString a) => a
-controlApplicative = "Control_Applicative"
+pattern PartialUnsafe :: ModuleName
+pattern PartialUnsafe = ModuleName "Partial.Unsafe"
 
-controlSemigroupoid :: forall a. (IsString a) => a
-controlSemigroupoid = "Control_Semigroupoid"
+pattern Ordering :: Qualified (ProperName 'TypeName)
+pattern Ordering = Qualified (ByModuleName DataOrdering) (ProperName "Ordering")
+
+pattern LT :: Qualified (ProperName 'ConstructorName)
+pattern LT = Qualified (ByModuleName DataOrdering) (ProperName "LT")
+
+pattern EQ :: Qualified (ProperName 'ConstructorName)
+pattern EQ = Qualified (ByModuleName DataOrdering) (ProperName "EQ")
+
+pattern GT :: Qualified (ProperName 'ConstructorName)
+pattern GT = Qualified (ByModuleName DataOrdering) (ProperName "GT")
+
+pattern DataArray :: ModuleName
+pattern DataArray = ModuleName "Data.Array"
+
+pattern Eff :: ModuleName
+pattern Eff = ModuleName "Control.Monad.Eff"
+
+pattern Effect :: ModuleName
+pattern Effect = ModuleName "Effect"
+
+pattern ST :: ModuleName
+pattern ST = ModuleName "Control.Monad.ST.Internal"
+
+pattern ControlApplicative :: ModuleName
+pattern ControlApplicative = ModuleName "Control.Applicative"
+
+pattern ControlSemigroupoid :: ModuleName
+pattern ControlSemigroupoid = ModuleName "Control.Semigroupoid"
 
 pattern ControlBind :: ModuleName
 pattern ControlBind = ModuleName "Control.Bind"
 
-controlBind :: forall a. (IsString a) => a
-controlBind = "Control_Bind"
+pattern ControlCategory :: ModuleName
+pattern ControlCategory = ModuleName "Control.Category"
 
-controlMonadEffUncurried :: forall a. (IsString a) => a
-controlMonadEffUncurried = "Control_Monad_Eff_Uncurried"
+pattern ControlMonadEffUncurried :: ModuleName
+pattern ControlMonadEffUncurried = ModuleName "Control.Monad.Eff.Uncurried"
 
-effectUncurried :: forall a. (IsString a) => a
-effectUncurried = "Effect_Uncurried"
+pattern EffectUncurried :: ModuleName
+pattern EffectUncurried = ModuleName "Effect.Uncurried"
 
-dataBounded :: forall a. (IsString a) => a
-dataBounded = "Data_Bounded"
+pattern DataBounded :: ModuleName
+pattern DataBounded = ModuleName "Data.Bounded"
 
-dataSemigroup :: forall a. (IsString a) => a
-dataSemigroup = "Data_Semigroup"
+pattern DataSemigroup :: ModuleName
+pattern DataSemigroup = ModuleName "Data.Semigroup"
 
-dataHeytingAlgebra :: forall a. (IsString a) => a
-dataHeytingAlgebra = "Data_HeytingAlgebra"
+pattern DataHeytingAlgebra :: ModuleName
+pattern DataHeytingAlgebra = ModuleName "Data.HeytingAlgebra"
 
-dataEq :: forall a. (IsString a) => a
-dataEq = "Data_Eq"
+pattern DataEq :: ModuleName
+pattern DataEq = ModuleName "Data.Eq"
 
-dataOrd :: forall a. (IsString a) => a
-dataOrd = "Data_Ord"
+pattern Eq :: Qualified (ProperName 'ClassName)
+pattern Eq = Qualified (ByModuleName DataEq) (ProperName "Eq")
 
-dataSemiring :: forall a. (IsString a) => a
-dataSemiring = "Data_Semiring"
+pattern Eq1 :: Qualified (ProperName 'ClassName)
+pattern Eq1 = Qualified (ByModuleName DataEq) (ProperName "Eq1")
 
-dataRing :: forall a. (IsString a) => a
-dataRing = "Data_Ring"
+identEq :: Qualified Ident
+identEq = Qualified (ByModuleName DataEq) (Ident eq)
 
-dataEuclideanRing :: forall a. (IsString a) => a
-dataEuclideanRing = "Data_EuclideanRing"
+identEq1 :: Qualified Ident
+identEq1 = Qualified (ByModuleName DataEq) (Ident eq1)
 
-dataFunction :: forall a. (IsString a) => a
-dataFunction = "Data_Function"
+pattern DataOrd :: ModuleName
+pattern DataOrd = ModuleName "Data.Ord"
 
-dataFunctionUncurried :: forall a. (IsString a) => a
-dataFunctionUncurried = "Data_Function_Uncurried"
+pattern Ord :: Qualified (ProperName 'ClassName)
+pattern Ord = Qualified (ByModuleName DataOrd) (ProperName "Ord")
 
-dataIntBits :: forall a. (IsString a) => a
-dataIntBits = "Data_Int_Bits"
+pattern Ord1 :: Qualified (ProperName 'ClassName)
+pattern Ord1 = Qualified (ByModuleName DataOrd) (ProperName "Ord1")
 
-partialUnsafe :: forall a. (IsString a) => a
-partialUnsafe = "Partial_Unsafe"
+identCompare :: Qualified Ident
+identCompare = Qualified (ByModuleName DataOrd) (Ident compare)
+
+identCompare1 :: Qualified Ident
+identCompare1 = Qualified (ByModuleName DataOrd) (Ident compare1)
+
+pattern DataFunctor :: ModuleName
+pattern DataFunctor = ModuleName "Data.Functor"
+
+pattern Functor :: Qualified (ProperName 'ClassName)
+pattern Functor = Qualified (ByModuleName DataFunctor) (ProperName "Functor")
+
+identMap :: Qualified Ident
+identMap = Qualified (ByModuleName DataFunctor) (Ident map)
+
+pattern DataSemiring :: ModuleName
+pattern DataSemiring = ModuleName "Data.Semiring"
+
+pattern DataRing :: ModuleName
+pattern DataRing = ModuleName "Data.Ring"
+
+pattern DataEuclideanRing :: ModuleName
+pattern DataEuclideanRing = ModuleName "Data.EuclideanRing"
+
+pattern DataFunction :: ModuleName
+pattern DataFunction = ModuleName "Data.Function"
+
+pattern DataIntBits :: ModuleName
+pattern DataIntBits = ModuleName "Data.Int.Bits"
 
 unsafePartial :: forall a. (IsString a) => a
 unsafePartial = "unsafePartial"
 
-unsafeCoerce :: forall a. (IsString a) => a
-unsafeCoerce = "Unsafe_Coerce"
+pattern UnsafeCoerce :: ModuleName
+pattern UnsafeCoerce = ModuleName "Unsafe.Coerce"
 
 unsafeCoerceFn :: forall a. (IsString a) => a
 unsafeCoerceFn = "unsafeCoerce"

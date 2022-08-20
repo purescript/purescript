@@ -8,13 +8,13 @@ module Language.PureScript.Ide.Usage
 
 import           Protolude hiding (moduleName)
 
+import           Control.Lens (preview)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.State (getAllModules, getFileState)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           Lens.Micro.Platform (preview)
 
 -- |
 -- How we find usages, given an IdeDeclaration and the module it was defined in:
@@ -67,7 +67,7 @@ directDependants declaration modules mn = Map.mapMaybe (nonEmpty . go) modules
     go = foldMap isImporting . P.getModuleDeclarations
 
     isImporting d = case d of
-      P.ImportDeclaration _ mn' it qual | mn == mn' -> P.Qualified qual <$> case it of
+      P.ImportDeclaration _ mn' it qual | mn == mn' -> P.Qualified (P.byMaybeModuleName qual) <$> case it of
         P.Implicit -> pure declaration
         P.Explicit refs
           | any (declaration `matchesRef`) refs -> pure declaration
@@ -120,7 +120,7 @@ eligibleModules
   -> ModuleMap (NonEmpty Search)
 eligibleModules query@(moduleName, declaration) decls modules =
   let
-    searchDefiningModule = P.Qualified Nothing declaration :| []
+    searchDefiningModule = P.Qualified P.ByNullSourcePos declaration :| []
   in
     Map.insert moduleName searchDefiningModule $
       foldMap (directDependants declaration modules) (moduleName :| findReexportingModules query decls)

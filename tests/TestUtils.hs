@@ -5,6 +5,9 @@ import Prelude.Compat
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
+import qualified Language.PureScript.AST as AST
+import qualified Language.PureScript.Names as N
+import Language.PureScript.Interactive.IO (findNodeProcess)
 
 import Control.Arrow ((***), (>>>))
 import Control.Monad
@@ -17,7 +20,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char (isSpace)
 import Data.Function (on)
-import Data.List (sort, sortBy, stripPrefix, groupBy)
+import Data.List (sort, sortBy, stripPrefix, groupBy, find)
 import qualified Data.Map as M
 import Data.Maybe (isJust)
 import qualified Data.Text as T
@@ -34,11 +37,6 @@ import System.Process hiding (cwd)
 import qualified System.FilePath.Glob as Glob
 import System.IO
 import Test.Hspec
-
-findNodeProcess :: IO (Maybe String)
-findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
-  where
-  names = ["nodejs", "node"]
 
 -- |
 -- Fetches code necessary to run the tests with. The resulting support code
@@ -75,15 +73,15 @@ updateSupportCode = withCurrentDirectory "tests/support" $ do
     heading "Updating support code"
     callCommand "npm install"
     -- bower uses shebang "/usr/bin/env node", but we might have nodejs
-    node <- maybe cannotFindNode pure =<< findNodeProcess
+    node <- either cannotFindNode pure =<< findNodeProcess
     -- Sometimes we run as a root (e.g. in simple docker containers)
     -- And we are non-interactive: https://github.com/bower/bower/issues/1162
     callProcess node ["node_modules/bower/bin/bower", "--allow-root", "install", "--config.interactive=false"]
     writeFile lastUpdatedFile ""
   where
-  cannotFindNode :: IO a
-  cannotFindNode = do
-    hPutStrLn stderr "Cannot find node (or nodejs) executable"
+  cannotFindNode :: String -> IO a
+  cannotFindNode message = do
+    hPutStrLn stderr message
     exitFailure
 
   getModificationTimeMaybe :: FilePath -> IO (Maybe UTCTime)
@@ -158,23 +156,8 @@ setupSupportModules = do
 
 getTestFiles :: FilePath -> IO [[FilePath]]
 getTestFiles testDir = do
-  cwd <- getCurrentDirectory
   let dir = "tests" </> "purs" </> testDir
-  testsInPath <- getFiles dir <$> testGlob dir
-  let rerunPath = dir </> "RerunCompilerTests.txt"
-  hasRerunFile <- doesFileExist rerunPath
-  rerunTests <-
-    if hasRerunFile
-    then let compilerTestDir = cwd </> "tests" </> "purs" </> "passing"
-             textToTestFiles
-               = mapM (\path -> ((path ++ ".purs") :) <$> testGlob path)
-               . map ((compilerTestDir </>) . T.unpack)
-               . filter (not . T.null)
-               . map (T.strip . fst . T.breakOn "--")
-               . T.lines
-         in readUTF8FileT rerunPath >>= textToTestFiles
-    else return []
-  return $ testsInPath ++ rerunTests
+  getFiles dir <$> testGlob dir
   where
   -- A glob for all purs and js files within a test directory
   testGlob :: FilePath -> IO [FilePath]
@@ -198,21 +181,61 @@ getTestFiles testDir = do
        then maybe fp reverse $ stripPrefix ext $ reverse fp
        else dir
 
+data ExpectedModuleName
+  = IsMain
+  | IsSourceMap FilePath
+
 compile
-  :: SupportModules
+  :: Maybe ExpectedModuleName
+  -> SupportModules
   -> [FilePath]
-  -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile SupportModules{..} inputFiles = runTest $ do
+  -> IO (Either P.MultipleErrors FilePath, P.MultipleErrors)
+compile = compile' P.defaultOptions
+
+compile'
+  :: P.Options
+  -> Maybe ExpectedModuleName
+  -> SupportModules
+  -> [FilePath]
+  -> IO (Either P.MultipleErrors FilePath, P.MultipleErrors)
+compile' options expectedModule SupportModules{..} inputFiles = P.runMake options $ do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
   fs <- liftIO $ readInput (sort inputFiles)
   msWithWarnings <- CST.parseFromFiles id fs
   tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
   let ms = fmap snd <$> msWithWarnings
   foreigns <- inferForeignModules ms
-  let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
+  let
+    actions = makeActions supportModules (foreigns `M.union` supportForeigns)
+    (hasExpectedModuleName, expectedModuleName, compiledModulePath) = case expectedModule of
+      -- Check if there is one (and only one) module called "Main"
+      Just IsMain ->
+        let
+          moduleName = "Main"
+          compiledPath = modulesDir </> moduleName </> "index.js"
+        in ((==) 1 $ length $ filter (== moduleName) $ fmap (T.unpack . getPsModuleName) ms, moduleName, compiledPath)
+      -- Check if main sourcemap module starts with "SourceMaps." and matches its file name
+      Just (IsSourceMap modulePath) ->
+        let
+          moduleName = "SourceMaps." <> (dropExtensions . takeFileName $ modulePath)
+          compiledPath = modulesDir </> moduleName </> "index.js.map"
+        in (maybe False ((==) moduleName . T.unpack . getPsModuleName) (find ((==) modulePath . fst) ms), moduleName, compiledPath)
+      Nothing -> (True, mempty, mempty)
+
   case ms of
-    [singleModule] -> pure <$> P.rebuildModule actions supportExterns (snd singleModule)
-    _ -> P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
+    [singleModule] -> do
+      unless hasExpectedModuleName $
+        error ("While testing a single PureScript file, the expected module name was '" <> expectedModuleName <>
+          "' but got '" <> T.unpack (getPsModuleName singleModule) <> "'.")
+      compiledModulePath <$ P.rebuildModule actions supportExterns (snd singleModule)
+    _ -> do
+      unless hasExpectedModuleName $
+        error $ "While testing multiple PureScript files, the expected main module was not found: '" <> expectedModuleName <> "'."
+      compiledModulePath <$ P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
+
+getPsModuleName :: (a, AST.Module) -> T.Text
+getPsModuleName psModule = case snd psModule of
+  AST.Module _ _ (N.ModuleName t) _ _ -> t
 
 makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
 makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
@@ -251,7 +274,7 @@ trim :: String -> String
 trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
 
 modulesDir :: FilePath
-modulesDir = ".test_modules" </> "node_modules"
+modulesDir = ".test_modules"
 
 logpath :: FilePath
 logpath = "purescript-output"

@@ -1,4 +1,4 @@
--- @shouldFailWith ExpectedTypeConstructor
+-- @shouldFailWith InvalidInstanceHead
 module Main where
 
 import Prelude

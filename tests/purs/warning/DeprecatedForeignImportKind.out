@@ -1,9 +1,0 @@
-Warning found:
-at tests/purs/warning/DeprecatedForeignImportKind.purs:4:1 - 4:24 (line 4, column 1 - line 4, column 24)
-
-  Foreign kind imports are deprecated and will be removed in a future release. Use empty 'data' instead.
-
-
-See https://github.com/purescript/documentation/blob/master/errors/WarningParsingModule.md for more information,
-or to contribute content related to this warning.
-
