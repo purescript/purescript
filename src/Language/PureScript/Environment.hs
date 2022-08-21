@@ -1,19 +1,18 @@
 module Language.PureScript.Environment where
 
 import Prelude.Compat
-import Protolude (ordNub)
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Codec.Serialise (Serialise)
 import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
+import Data.Foldable (fold)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Graph as G
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST.SourcePos
@@ -132,7 +131,7 @@ makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs cov
 computeCoveringSets :: Int -> [FunctionalDependency] -> (S.Set Int, S.Set (S.Set Int))
 computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
   where
-    argumentIndices = [0 .. nargs - 1]
+    argumentIndices = S.fromList [0 .. nargs - 1]
 
     -- Map from an argument to the set of all dependency-sets that will determine it
     revDeps :: M.Map Int (S.Set (S.Set Int))
@@ -155,13 +154,13 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
     -- Populate the empty and singleton sets first
     closeMap0, closeMap1, closeMap2, closeMap :: M.Map (S.Set Int) (S.Set Int)
     closeMap0 = M.singleton S.empty S.empty
-    closeMap1 = M.fromSet close (S.fromList (S.singleton <$> argumentIndices))
+    closeMap1 = M.fromSet close (S.map S.singleton argumentIndices)
     closeMap2 = closeMap0 <> closeMap1
 
     -- Populate the full map of closures:
     -- For sets v1 and v2, close (v1 <> v2) = close (close v1 <> close v2)
     -- So we save some work by looking up smaller items in `closeMap`
-    closeMap = M.fromSet close' (S.powerSet (S.fromList argumentIndices))
+    closeMap = M.fromSet close' (S.powerSet argumentIndices)
       where
         close' v0 = case closeMap2 M.!? v0 of
           Just v1 -> v1
@@ -173,37 +172,12 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
             _ -> S.empty
 
     -- Find all the covering sets: sets that have reached all arguments in their closure
-    allCoveringSets = M.keysSet (M.filter (== S.fromList argumentIndices) closeMap)
+    allCoveringSets = M.keysSet (M.filter (== argumentIndices) closeMap)
     -- Reduce to the inclusion-minimal sets
     coveringSets = S.filter (\v -> not (any (\c -> c `S.isProperSubsetOf` v) allCoveringSets)) allCoveringSets
 
-    -- An argument is determined if determining any argument determines it?
-    -- determinedArgs = S.fromList $ filter argIsDetermined argumentIndices
-    -- argIsDetermined k = all (S.member k) closeMap1
-
-    -- each argument determines themselves
-    identities = (\i -> (i, [i])) <$> argumentIndices
-
-    -- list all the edges in the graph: for each fundep an edge exists for each determiner to each determined
-    contributingDeps = M.fromListWith (++) $ identities ++ do
-      fd <- deps
-      src <- fdDeterminers fd
-      (src, fdDetermined fd) : map (, []) (fdDetermined fd)
-
-    -- build a graph of which arguments determine other arguments
-    (depGraph, _, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, ordNub v)) <$> M.toList contributingDeps)
-
-    -- do there exist any arguments that contribute to `arg` that `arg` doesn't contribute to
-    isFunDepDetermined :: Int -> Bool
-    isFunDepDetermined arg = case fromKey arg of
-      Nothing -> internalError "Unknown argument index in makeTypeClassData"
-      Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
-                    varContributesTo = G.reachable depGraph v
-                in any (`notElem` varContributesTo) contributesToVar
-
-    -- find all the arguments that are determined
-    determinedArgs :: S.Set Int
-    determinedArgs = S.fromList $ filter isFunDepDetermined argumentIndices
+    -- An argument is determined if it is in no covering set
+    determinedArgs = argumentIndices `S.difference` fold coveringSets
 
 -- | The visibility of a name in scope
 data NameVisibility
