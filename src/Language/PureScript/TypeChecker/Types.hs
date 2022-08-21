@@ -369,20 +369,10 @@ infer' (Literal ss (ArrayLiteral vals)) = do
   return $ TypedValue' True (Literal ss (ArrayLiteral ts')) (srcTypeApp tyArray els)
 infer' (Literal ss (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
-  -- We make a special case for Vars in record labels, since these are the
-  -- only types of expressions for which 'infer' can return a polymorphic type.
-  -- They need to be instantiated here.
-  let shouldInstantiate :: Expr -> Bool
-      shouldInstantiate Var{} = True
-      shouldInstantiate (PositionedValue _ _ e) = shouldInstantiate e
-      shouldInstantiate _ = False
-
-      inferProperty :: (PSString, Expr) -> m (PSString, (Expr, SourceType))
+  let inferProperty :: (PSString, Expr) -> m (PSString, (Expr, SourceType))
       inferProperty (name, val) = do
         TypedValue' _ val' ty <- infer val
-        valAndType <- if shouldInstantiate val
-                        then instantiatePolyTypeWithUnknowns val' ty
-                        else pure (val', ty)
+        valAndType <- instantiatePolyTypeWithUnknowns val' ty
         pure (name, valAndType)
 
       toRowListItem (lbl, (_, ty)) = srcRowListItem (Label lbl) ty
