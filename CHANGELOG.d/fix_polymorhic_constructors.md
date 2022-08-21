@@ -27,3 +27,14 @@
     { a :: Maybe a1
     }
   ```
+
+  Also as a consequence, record updates should not throw
+  `ConstrainedTypeUnified` in cases such as:
+
+  ```purs
+  v1 :: { a :: Maybe Unit }
+  v1 = { a : Just Unit }
+
+  v2 :: { a :: Maybe Unit }
+  v2 = let v3 = v1 { a = mempty } in v3
+  ```
