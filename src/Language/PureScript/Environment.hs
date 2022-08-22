@@ -153,7 +153,7 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
 
     -- Populate the empty and singleton sets first
     closeMap0, closeMap1, closeMap2, closeMap :: M.Map (S.Set Int) (S.Set Int)
-    closeMap0 = M.singleton S.empty S.empty
+    closeMap0 = M.singleton S.empty (close S.empty)
     closeMap1 = M.fromSet close (S.map S.singleton argumentIndices)
     closeMap2 = closeMap0 <> closeMap1
 
