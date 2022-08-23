@@ -4,13 +4,17 @@ import Prelude.Compat
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
+import Control.Monad (unless)
 import Codec.Serialise (Serialise)
 import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
-import Data.Foldable (fold)
+import Data.Foldable (find, fold)
+import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (fromMaybe)
+import Data.Semigroup (First(..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.List.NonEmpty as NEL
@@ -128,53 +132,53 @@ makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs cov
   where
     ( determinedArgs, coveringSets ) = computeCoveringSets (length args) deps
 
+type Frontier = M.Map IS.IntSet (First (IM.IntMap (NEL.NonEmpty IS.IntSet)))
+--                         ^                 ^          ^          ^
+--         when *these* parameters           |          |          |
+--         are still needed,                 |          |          |
+--                              *these* parameters      |          |
+--                              can be determined       |          |
+--                                         from a non-zero         |
+--                                         number of fundeps,      |
+--                                                      which accept *these*
+--                                                      parameters as inputs.
+
 computeCoveringSets :: Int -> [FunctionalDependency] -> (S.Set Int, S.Set (S.Set Int))
 computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
   where
     argumentIndices = S.fromList [0 .. nargs - 1]
 
-    -- Map from an argument to the set of all dependency-sets that will determine it
-    revDeps :: M.Map Int (S.Set (S.Set Int))
-    revDeps = M.fromListWith (<>) $ do
-      fd <- deps
-      tgt <- fdDetermined fd
-      pure (tgt, S.singleton (S.fromList (fdDeterminers fd)))
+    coveringSets :: S.Set (S.Set Int)
+    coveringSets = S.map (S.fromDistinctAscList . IS.toAscList) $ fst $ search $
+      M.singleton
+        (IS.fromList [0 .. nargs - 1]) $
+          First $ IM.fromListWith (<>) $ do
+            fd <- deps
+            let srcs = pure (IS.fromList (fdDeterminers fd))
+            tgt <- fdDetermined fd
+            pure (tgt, srcs)
 
-    -- Compute the closure of `determined` under the `deps`
-    close determined =
-      -- These are the arguments that can be determined in one step
-      let more = close1 determined in
-      if more `S.isSubsetOf` determined
-        then determined
-        else close (determined <> more)
-    -- An argument can be determined in one step if all of its dependencies are met
-    close1 determined = M.keysSet (M.filterWithKey adding revDeps)
-      where adding k v = S.notMember k determined && any (`S.isSubsetOf` determined) v
-
-    -- Populate the empty and singleton sets first
-    closeMap0, closeMap1, closeMap2, closeMap :: M.Map (S.Set Int) (S.Set Int)
-    closeMap0 = M.singleton S.empty (close S.empty)
-    closeMap1 = M.fromSet close (S.map S.singleton argumentIndices)
-    closeMap2 = closeMap0 <> closeMap1
-
-    -- Populate the full map of closures:
-    -- For sets v1 and v2, close (v1 <> v2) = close (close v1 <> close v2)
-    -- So we save some work by looking up smaller items in `closeMap`
-    closeMap = M.fromSet close' (S.powerSet argumentIndices)
       where
-        close' v0 = case closeMap2 M.!? v0 of
-          Just v1 -> v1
-          _ -> case S.maxView v0 of
-            Just (k, v1)
-              | Just v2 <- closeMap2 M.!? S.singleton k
-              , Just v3 <- closeMap M.!? v1 ->
-                close (v2 <> v3)
-            _ -> S.empty
 
-    -- Find all the covering sets: sets that have reached all arguments in their closure
-    allCoveringSets = M.keysSet (M.filter (== argumentIndices) closeMap)
-    -- Reduce to the inclusion-minimal sets
-    coveringSets = S.filter (\v -> not (any (\c -> c `S.isProperSubsetOf` v) allCoveringSets)) allCoveringSets
+      search :: Frontier -> (S.Set IS.IntSet, ())
+      search frontier = unless (null frontier) $ M.foldMapWithKey step frontier >>= search
+
+      step :: IS.IntSet -> First (IM.IntMap (NEL.NonEmpty IS.IntSet)) -> (S.Set IS.IntSet, Frontier)
+      step needed (First inEdges)
+        | IM.null inEdges = (S.singleton needed, M.empty)
+        | otherwise       = (S.empty, foldMap removeParameter paramsToTry)
+
+          where
+
+          determined = IM.keys inEdges
+          acycDetermined = find (`IS.notMember` (IS.unions $ concatMap NEL.toList $ IM.elems inEdges)) determined
+          paramsToTry = maybe determined pure acycDetermined
+
+          removeParameter :: Int -> Frontier
+          removeParameter y =
+            M.singleton
+              (IS.delete y needed)
+              (First $ IM.mapMaybe (NEL.nonEmpty . NEL.filter (y `IS.notMember`)) $ IM.delete y inEdges)
 
     -- An argument is determined if it is in no covering set
     determinedArgs = argumentIndices `S.difference` fold coveringSets
