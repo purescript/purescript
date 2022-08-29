@@ -1,6 +1,5 @@
 module TestUtils where
 
-import Prelude ()
 import Prelude
 
 import qualified Language.PureScript as P

@@ -1,6 +1,5 @@
 module TestDocs where
 
-import Prelude ()
 import Prelude
 
 import Data.Bifunctor (first)

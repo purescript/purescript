@@ -22,7 +22,6 @@ module TestCompiler where
 -- missing, and can be updated by setting the "HSPEC_ACCEPT" environment
 -- variable, e.g. by running `HSPEC_ACCEPT=true stack test`.
 
-import Prelude ()
 import Prelude
 
 import qualified Language.PureScript as P

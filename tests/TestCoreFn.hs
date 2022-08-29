@@ -2,7 +2,6 @@
 
 module TestCoreFn (spec) where
 
-import Prelude ()
 import Prelude
 
 import Data.Aeson

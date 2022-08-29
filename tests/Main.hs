@@ -2,7 +2,6 @@
 
 module Main (main) where
 
-import Prelude ()
 import Prelude
 
 import Test.Hspec

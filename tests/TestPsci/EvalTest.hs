@@ -1,6 +1,5 @@
 module TestPsci.EvalTest where
 
-import Prelude ()
 import Prelude
 
 import           Control.Monad (forM_, foldM_)

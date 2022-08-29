@@ -1,6 +1,5 @@
 module TestPsci.TestEnv where
 
-import Prelude ()
 import Prelude
 
 import           Control.Exception.Lifted (bracket_)

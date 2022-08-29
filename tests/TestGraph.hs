@@ -1,6 +1,5 @@
 module TestGraph where
 
-import Prelude ()
 import Prelude
 
 import Test.Hspec
