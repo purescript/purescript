@@ -3,7 +3,7 @@
 
 module Language.PureScript.Sugar.AdoNotation (desugarAdoModule) where
 
-import           Prelude
+import           Prelude hiding (abs)
 
 import           Control.Monad (foldM)
 import           Control.Monad.Error.Class (MonadError(..))
