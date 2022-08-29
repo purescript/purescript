@@ -15,7 +15,7 @@
 
 module Language.PureScript.Hierarchy where
 
-import           Prelude.Compat
+import           Prelude
 import           Protolude (ordNub)
 
 import           Data.List (sort)

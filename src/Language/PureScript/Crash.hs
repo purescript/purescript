@@ -2,7 +2,7 @@
 
 module Language.PureScript.Crash where
 
-import Prelude.Compat
+import Prelude
 
 import qualified GHC.Stack
 

@@ -25,7 +25,7 @@ module Language.PureScript.TypeChecker.Kinds
   , freshKindWithKind
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((***))
 import Control.Lens ((^.), _1, _2, _3)

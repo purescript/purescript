@@ -7,7 +7,7 @@ module Language.PureScript.CoreFn.FromJSON
   , parseVersion'
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import           Control.Applicative ((<|>))
 

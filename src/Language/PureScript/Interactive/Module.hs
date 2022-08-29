@@ -1,6 +1,6 @@
 module Language.PureScript.Interactive.Module where
 
-import           Prelude.Compat
+import           Prelude
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST

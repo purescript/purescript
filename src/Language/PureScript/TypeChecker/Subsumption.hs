@@ -5,7 +5,7 @@ module Language.PureScript.TypeChecker.Subsumption
   ( subsumes
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad (when)
 import Control.Monad.Error.Class (MonadError(..))

@@ -9,7 +9,7 @@ module Language.PureScript.PSString
   , mkString
   ) where
 
-import Prelude.Compat
+import Prelude
 import GHC.Generics (Generic)
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)

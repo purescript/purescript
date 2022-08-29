@@ -1,7 +1,7 @@
 module TestPsci.TestEnv where
 
 import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import           Control.Exception.Lifted (bracket_)
 import           Control.Monad (void, when)

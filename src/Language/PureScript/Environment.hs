@@ -1,6 +1,6 @@
 module Language.PureScript.Environment where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import GHC.Generics (Generic)

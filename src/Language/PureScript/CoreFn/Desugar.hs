@@ -1,6 +1,6 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub, orEmpty)
 
 import Control.Arrow (second)

@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Pretty.Common where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.State (StateT, modify, get)
 

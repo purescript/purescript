@@ -8,7 +8,7 @@ module Language.PureScript.Roles
   , displayRole
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)

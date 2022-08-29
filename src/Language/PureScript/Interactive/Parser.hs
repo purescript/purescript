@@ -6,7 +6,7 @@ module Language.PureScript.Interactive.Parser
   , parseCommand
   ) where
 
-import           Prelude.Compat hiding (lex)
+import           Prelude
 
 import           Control.Monad (join)
 import           Data.Bifunctor (bimap)

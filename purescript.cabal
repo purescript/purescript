@@ -131,7 +131,6 @@ common defaults
     ansi-terminal >=0.11.3 && <0.12,
     array >=0.5.4.0 && <0.6,
     base >=4.16.2.0 && <4.17,
-    base-compat >=0.12.1 && <0.13,
     blaze-html >=0.9.1.2 && <0.10,
     bower-json >=1.1.0.0 && <1.2,
     boxes >=0.1.5 && <0.2,

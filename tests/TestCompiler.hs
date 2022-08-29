@@ -23,7 +23,7 @@ module TestCompiler where
 -- variable, e.g. by running `HSPEC_ACCEPT=true stack test`.
 
 import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import qualified Language.PureScript as P
 import Language.PureScript.Interactive.IO (readNodeProcessWithExitCode)

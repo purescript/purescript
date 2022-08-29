@@ -3,7 +3,7 @@ module Language.PureScript.Errors
   , module Language.PureScript.Errors
   ) where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Arrow ((&&&))
 import           Control.Exception (displayException)

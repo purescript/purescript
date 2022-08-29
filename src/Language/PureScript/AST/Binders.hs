@@ -3,7 +3,7 @@
 --
 module Language.PureScript.AST.Binders where
 
-import Prelude.Compat
+import Prelude
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Literals

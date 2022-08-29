@@ -1,7 +1,7 @@
 module TestDocs where
 
 import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import Data.Bifunctor (first)
 import Data.List (findIndex)

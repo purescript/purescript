@@ -3,7 +3,7 @@
 --
 module Language.PureScript.AST.Traversals where
 
-import Prelude.Compat
+import Prelude
 import Protolude (swap)
 
 import Control.Monad

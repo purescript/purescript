@@ -1,7 +1,7 @@
 -- | This module implements the generic deriving elaboration that takes place during desugaring.
 module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 
-import           Prelude.Compat
+import           Prelude
 import           Protolude (note)
 
 import           Control.Monad.Error.Class (MonadError(..))

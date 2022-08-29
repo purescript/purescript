@@ -8,7 +8,7 @@ module Language.PureScript.Sugar.CaseDeclarations
   , desugarCaseGuards
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Data.List (groupBy, foldl1')

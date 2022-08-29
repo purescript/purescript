@@ -6,7 +6,7 @@ module Language.PureScript.Sugar.TypeDeclarations
   ( desugarTypeDeclarationsModule
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad (unless)
 import Control.Monad.Error.Class (MonadError(..))
