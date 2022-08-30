@@ -161,7 +161,20 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
       where
 
       search :: Frontier -> (S.Set IS.IntSet, ())
-      search frontier = unless (null frontier) $ M.foldMapWithKey step frontier >>= search
+      search frontier = unless (null frontier) $
+        filterMinimal (M.foldMapWithKey step frontier) >>= search
+
+      -- Some branches may produce a covering set that is not minimal
+      -- We detect this at each step by filtering out those with a subset still
+      -- in the frontier, since every item in the frontier is a superset of a
+      -- covering set.
+      filterMinimal :: (S.Set IS.IntSet, Frontier) -> (S.Set IS.IntSet, Frontier)
+      filterMinimal (potentialCovers, frontier) =
+          (S.filter isMinimal potentialCovers, frontier)
+        where
+        continuing = M.keysSet frontier
+        isMinimal potentialCover =
+          all (\c -> not (c `IS.isSubsetOf` potentialCover)) continuing
 
       step :: IS.IntSet -> First (IM.IntMap (NEL.NonEmpty IS.IntSet)) -> (S.Set IS.IntSet, Frontier)
       step needed (First inEdges)
