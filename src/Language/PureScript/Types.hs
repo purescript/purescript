@@ -541,6 +541,17 @@ replaceAllTypeVars = go [] where
     try' n | (orig <> T.pack (show n)) `elem` inUse = try' (n + 1)
            | otherwise = orig <> T.pack (show n)
 
+-- | Add visible type abstractions to top-level foralls.
+addVisibility :: [(Text, TypeVarVisibility)] -> Type a -> Type a
+addVisibility v = go where
+  go (ForAll ann arg mbK ty sco vis) = case lookup arg v of
+    Just vis' ->
+      ForAll ann arg mbK (go ty) sco vis'
+    Nothing ->
+      ForAll ann arg mbK (go ty) sco vis
+  go (ParensInType ann ty) = ParensInType ann (go ty)
+  go ty = ty
+
 -- | Collect all type variables appearing in a type
 usedTypeVariables :: Type a -> [Text]
 usedTypeVariables = ordNub . everythingOnTypes (++) go where

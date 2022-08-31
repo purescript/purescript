@@ -34,7 +34,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Supply.Class
 
-import Data.Bifunctor (first)
+import Data.Bifunctor (first, second)
 import Data.Bitraversable (bitraverse)
 import Data.Foldable (for_, traverse_)
 import Data.Function (on)
@@ -650,8 +650,9 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
           tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . fst) tyCtor tyArgs'
           ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (nullSourceAnn,) tyArgs'
+          visibility = second (const TypeVarVisible) <$> tyArgs
       for ctors $
-        fmap (fmap (mkForAll ctorBinders)) . inferDataConstructor tyCtor'
+        fmap (fmap (addVisibility visibility . mkForAll ctorBinders)) . inferDataConstructor tyCtor'
 
 inferDataConstructor
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
