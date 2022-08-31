@@ -471,11 +471,11 @@ infer' (VisibleTypeApp valFn tyArg) = do
   TypedValue' _ valFn' valTy <- infer valFn
   (valFn'', valTy') <- instantiatePolyTypeWithUnknownsUntilVisible valFn' valTy
   case valTy' of
-    ForAll _ qName _ qBody _ _ -> do
+    ForAll _ qName (Just qKind) qBody _ _ -> do
       let resTy = replaceTypeVars qName tyArg qBody
       (valFn''', resTy') <- instantiateConstraint valFn'' resTy
-      elaborate <- subsumes valTy' resTy'
-      pure $ TypedValue' True (elaborate valFn''') resTy'
+      _ <- checkKind tyArg qKind
+      pure $ TypedValue' True valFn''' resTy'
     _ ->
       internalError $ "Invalid type application " <> debugType valTy'
 infer' (Var ss var) = do
