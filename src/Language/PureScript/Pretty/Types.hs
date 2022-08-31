@@ -223,7 +223,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   doubleColon = if troUnicode tro then "∷" else "::"
 
   printMbKindedType (v, Nothing, vis) = text (T.unpack $ typeVarVisibilityPrefix vis) <> text v
-  printMbKindedType (v, Just k, vis) = text (T.unpack $ typeVarVisibilityPrefix vis) <> text ("(" ++ v ++ " " ++ doubleColon ++ " ") <> typeAsBox' k <> text ")"
+  printMbKindedType (v, Just k, vis) = text ("(" ++ T.unpack (typeVarVisibilityPrefix vis) ++ v ++ " " ++ doubleColon ++ " ") <> typeAsBox' k <> text ")"
 
   -- If both boxes span a single line, keep them on the same line, or else
   -- use the specified function to modify the second box, then combine vertically.
