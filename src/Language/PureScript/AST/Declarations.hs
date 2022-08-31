@@ -671,6 +671,10 @@ data Expr
   --
   | App Expr Expr
   -- |
+  -- A type application
+  --
+  | VisibleTypeApp Expr SourceType
+  -- |
   -- Hint that an expression is unused.
   -- This is used to ignore type class dictionaries that are necessarily empty.
   -- The inner expression lets us solve subgoals before eliminating the whole expression.

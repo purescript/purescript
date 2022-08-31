@@ -66,6 +66,7 @@ prettyPrintValue d (ObjectUpdateNested o ps) = prettyPrintValueAtom (d - 1) o `b
     printNode (key, Leaf val) = prettyPrintUpdateEntry d key val
     printNode (key, Branch val) = textT (prettyPrintObjectKey key) `beforeWithSpace` prettyPrintUpdate val
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
+prettyPrintValue d (VisibleTypeApp val _) = prettyPrintValueAtom (d - 1) val
 prettyPrintValue d (Unused val) = prettyPrintValue d val
 prettyPrintValue d (Abs arg val) = text ('\\' : T.unpack (prettyPrintBinder arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (Case values binders) =

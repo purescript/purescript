@@ -337,6 +337,7 @@ data Expr a
   | ExprRecordAccessor a (RecordAccessor a)
   | ExprRecordUpdate a (Expr a) (DelimitedNonEmpty (RecordUpdate a))
   | ExprApp a (Expr a) (Expr a)
+  | ExprVisibleTypeApp a (Expr a) SourceToken (Type a)
   | ExprLambda a (Lambda a)
   | ExprIf a (IfThenElse a)
   | ExprCase a (CaseOf a)

@@ -335,6 +335,9 @@ convertExpr fileName = go
     expr@(ExprApp _ a b) -> do
       let ann = uncurry (sourceAnn fileName) $ exprRange expr
       positioned ann $ AST.App (go a) (go b)
+    expr@(ExprVisibleTypeApp _ a _ b) -> do
+      let ann = uncurry (sourceAnn fileName) $ exprRange expr
+      positioned ann $ AST.VisibleTypeApp (go a) (convertType fileName b)
     expr@(ExprLambda _ (Lambda _ as _ b)) -> do
       let ann = uncurry (sourceAnnCommented fileName) $ exprRange expr
       positioned ann
