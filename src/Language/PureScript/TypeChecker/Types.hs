@@ -459,6 +459,14 @@ infer' (App f arg) = do
   f'@(TypedValue' _ _ ft) <- infer f
   (ret, app) <- checkFunctionApplication (tvToExpr f') ft arg
   return $ TypedValue' True app ret
+infer' (VisibleTypeApp valFn (TypeWildcard _ _)) = do
+  TypedValue' _ valFn' valTy <- infer valFn
+  (valFn'', valTy') <- instantiatePolyTypeWithUnknownsUntilVisible valFn' valTy
+  case valTy' of
+    ForAll qAnn qName qKind qBody qSko _ -> do
+      pure $ TypedValue' True valFn'' (ForAll qAnn qName qKind qBody qSko TypeVarInvisible)
+    _ ->
+      internalError "Cannot skip."
 infer' (VisibleTypeApp valFn tyArg) = do
   TypedValue' _ valFn' valTy <- infer valFn
   (valFn'', valTy') <- instantiatePolyTypeWithUnknownsUntilVisible valFn' valTy
