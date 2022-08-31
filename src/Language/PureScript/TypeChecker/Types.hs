@@ -473,9 +473,10 @@ infer' (VisibleTypeApp valFn tyArg) = do
   (valFn'', valTy') <- instantiatePolyTypeWithUnknownsUntilVisible valFn' valTy
   case valTy' of
     ForAll _ qName (Just qKind) qBody _ _ -> do
-      let resTy = replaceTypeVars qName tyArg' qBody
+      tyArg'' <- checkKind tyArg' qKind
+      tyArg''' <- replaceAllTypeSynonyms tyArg''
+      let resTy = replaceTypeVars qName tyArg''' qBody
       (valFn''', resTy') <- instantiateConstraint valFn'' resTy
-      _ <- checkKind tyArg' qKind
       pure $ TypedValue' True valFn''' resTy'
     _ ->
       internalError $ "Invalid type application " <> debugType valTy'
