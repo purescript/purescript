@@ -304,8 +304,10 @@ flattenRow (Row lbls tl) =
 
 flattenTypeVarBinding :: TypeVarBinding a -> DList SourceToken
 flattenTypeVarBinding = \case
-  TypeVarKinded a -> flattenWrapped (flattenLabeled (pure . nameTok) flattenType) a
-  TypeVarName a -> pure $ nameTok a
+  TypeVarKinded a -> flattenWrapped (flattenLabeled go flattenType) a
+  TypeVarName a -> go a
+  where
+  go (a, b) = maybe mempty pure a <> pure (nameTok b)
 
 flattenConstraint :: Constraint a -> DList SourceToken
 flattenConstraint = \case

@@ -326,7 +326,7 @@ instantiatePolyTypeWithUnknowns
   => Expr
   -> SourceType
   -> m (Expr, SourceType)
-instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _) = do
+instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _ _) = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   insertUnkName' u ident
   instantiatePolyTypeWithUnknowns val $ replaceTypeVars ident u ty
@@ -418,6 +418,15 @@ infer' (App f arg) = do
   f'@(TypedValue' _ _ ft) <- infer f
   (ret, app) <- checkFunctionApplication (tvToExpr f') ft arg
   return $ TypedValue' True app ret
+infer' (VisibleTypeApp valFn tyArg) = do
+  TypedValue' _ valFn' valTy <- infer valFn
+  case valTy of
+    ForAll _ qName _ qBody _ _ -> do
+      let resTy = replaceTypeVars qName tyArg qBody
+      elaborate <- subsumes valTy resTy
+      pure $ TypedValue' True (elaborate valFn') resTy
+    _ ->
+      internalError "Invalid type application."
 infer' (Var ss var) = do
   checkVisibility var
   ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable $ var
@@ -668,7 +677,7 @@ check'
   => Expr
   -> SourceType
   -> m TypedValue'
-check' val (ForAll ann ident mbK ty _) = do
+check' val (ForAll ann ident mbK ty _ vis) = do
   env <- getEnv
   mn <- gets checkCurrentModule
   scope <- newSkolemScope
@@ -686,7 +695,7 @@ check' val (ForAll ann ident mbK ty _) = do
             skolemizeTypesInValue ss ident mbK sko scope val
         | otherwise = val
   val' <- tvToExpr <$> check skVal sk
-  return $ TypedValue' True val' (ForAll ann ident mbK ty (Just scope))
+  return $ TypedValue' True val' (ForAll ann ident mbK ty (Just scope) vis)
 check' val t@(ConstrainedType _ con@(Constraint _ cls@(Qualified _ (ProperName className)) _ _ _) ty) = do
   TypeClassData{ typeClassIsEmpty } <- lookupTypeClass cls
   -- An empty class dictionary is never used; see code in `TypeChecker.Entailment`
@@ -890,7 +899,7 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   unifyTypes tyFunction' tyFunction
   arg' <- tvToExpr <$> check arg argTy
   return (retTy, App fn arg')
-checkFunctionApplication' fn (ForAll _ ident mbK ty _) arg = do
+checkFunctionApplication' fn (ForAll _ ident mbK ty _ _) arg = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   insertUnkName' u ident
   let replaced = replaceTypeVars ident u ty

@@ -383,7 +383,7 @@ rewrite env (Skolem _ _ _ s1 _, ty1) | not $ occurs s1 ty1 = go where
          | (TypeConstructor _ tyName, _, _) <- unapplyTypes ty2 = do
     rewriteTyConApp go (lookupRoles env tyName) ty2
   go (KindApp sa ty k) = KindApp sa <$> go ty <*> pure k
-  go (ForAll sa tv k ty scope) = ForAll sa tv k <$> go ty <*> pure scope
+  go (ForAll sa tv k ty scope vis) = ForAll sa tv k <$> go ty <*> pure scope <*> pure vis
   go (ConstrainedType sa Constraint{..} ty) | s1 `S.notMember` foldMap skolems constraintArgs =
     ConstrainedType sa Constraint{..} <$> go ty
   go (RCons sa label ty rest) = RCons sa label <$> go ty <*> go rest
