@@ -648,7 +648,7 @@ checkConstrained ty tyClass =
     P.ConstrainedType _ c ty'
       | matches tyClass c -> True
       | otherwise -> checkConstrained ty' tyClass
-    P.ForAll _ _ _ ty' _ ->
+    P.ForAll _ _ _ ty' _ _ ->
       checkConstrained ty' tyClass
     _ ->
       False
