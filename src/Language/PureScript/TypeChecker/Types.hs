@@ -336,6 +336,21 @@ instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
   instantiatePolyTypeWithUnknowns (App val (TypeClassDictionary con dicts hints)) ty
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
+instantiatePolyTypeWithUnknownsUntilVisible
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => Expr
+  -> SourceType
+  -> m (Expr, SourceType)
+instantiatePolyTypeWithUnknownsUntilVisible val (ForAll _ ident mbK ty _ TypeVarInvisible) = do
+  u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
+  insertUnkName' u ident
+  instantiatePolyTypeWithUnknownsUntilVisible val $ replaceTypeVars ident u ty
+instantiatePolyTypeWithUnknownsUntilVisible val (ConstrainedType _ con ty) = do
+  dicts <- getTypeClassDictionaries
+  hints <- getHints
+  instantiatePolyTypeWithUnknownsUntilVisible (App val (TypeClassDictionary con dicts hints)) ty
+instantiatePolyTypeWithUnknownsUntilVisible val ty = return (val, ty)
+
 -- | Match against TUnknown and call insertUnkName, failing otherwise.
 insertUnkName' :: (MonadState CheckState m, MonadError MultipleErrors m) => SourceType -> Text -> m ()
 insertUnkName' (TUnknown _ i) n = insertUnkName i n
@@ -420,13 +435,14 @@ infer' (App f arg) = do
   return $ TypedValue' True app ret
 infer' (VisibleTypeApp valFn tyArg) = do
   TypedValue' _ valFn' valTy <- infer valFn
-  case valTy of
+  (valFn'', valTy') <- instantiatePolyTypeWithUnknownsUntilVisible valFn' valTy
+  case valTy' of
     ForAll _ qName _ qBody _ _ -> do
       let resTy = replaceTypeVars qName tyArg qBody
-      elaborate <- subsumes valTy resTy
-      pure $ TypedValue' True (elaborate valFn') resTy
+      elaborate <- subsumes valTy' resTy
+      pure $ TypedValue' True (elaborate valFn'') resTy
     _ ->
-      internalError "Invalid type application."
+      internalError $ "Invalid type application " <> debugType valTy'
 infer' (Var ss var) = do
   checkVisibility var
   ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable $ var
