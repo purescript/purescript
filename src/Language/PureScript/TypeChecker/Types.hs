@@ -469,12 +469,13 @@ infer' (VisibleTypeApp valFn (TypeWildcard _ _)) = do
       internalError "Cannot skip."
 infer' (VisibleTypeApp valFn tyArg) = do
   TypedValue' _ valFn' valTy <- infer valFn
+  tyArg' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ tyArg
   (valFn'', valTy') <- instantiatePolyTypeWithUnknownsUntilVisible valFn' valTy
   case valTy' of
     ForAll _ qName (Just qKind) qBody _ _ -> do
-      let resTy = replaceTypeVars qName tyArg qBody
+      let resTy = replaceTypeVars qName tyArg' qBody
       (valFn''', resTy') <- instantiateConstraint valFn'' resTy
-      _ <- checkKind tyArg qKind
+      _ <- checkKind tyArg' qKind
       pure $ TypedValue' True valFn''' resTy'
     _ ->
       internalError $ "Invalid type application " <> debugType valTy'
