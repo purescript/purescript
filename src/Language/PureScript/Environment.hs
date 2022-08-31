@@ -148,8 +148,8 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
   where
     argumentIndices = S.fromList [0 .. nargs - 1]
 
-    coveringSets :: S.Set (S.Set Int)
-    coveringSets = S.map (S.fromDistinctAscList . IS.toAscList) $ fst $ search $
+    allCoveringSets :: S.Set (S.Set Int)
+    allCoveringSets = S.map (S.fromDistinctAscList . IS.toAscList) $ fst $ search $
       M.singleton
         (IS.fromList [0 .. nargs - 1]) $
           First $ IM.fromListWith (<>) $ do
@@ -161,20 +161,7 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
       where
 
       search :: Frontier -> (S.Set IS.IntSet, ())
-      search frontier = unless (null frontier) $
-        filterMinimal (M.foldMapWithKey step frontier) >>= search
-
-      -- Some branches may produce a covering set that is not minimal
-      -- We detect this at each step by filtering out those with a subset still
-      -- in the frontier, since every item in the frontier is a superset of a
-      -- covering set.
-      filterMinimal :: (S.Set IS.IntSet, Frontier) -> (S.Set IS.IntSet, Frontier)
-      filterMinimal (potentialCovers, frontier) =
-          (S.filter isMinimal potentialCovers, frontier)
-        where
-        continuing = M.keysSet frontier
-        isMinimal potentialCover =
-          all (\c -> not (c `IS.isSubsetOf` potentialCover)) continuing
+      search frontier = unless (null frontier) $ M.foldMapWithKey step frontier >>= search
 
       step :: IS.IntSet -> First (IM.IntMap (NEL.NonEmpty IS.IntSet)) -> (S.Set IS.IntSet, Frontier)
       step needed (First inEdges)
@@ -192,6 +179,9 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
             M.singleton
               (IS.delete y needed)
               (First $ IM.mapMaybe (NEL.nonEmpty . NEL.filter (y `IS.notMember`)) $ IM.delete y inEdges)
+
+    -- Reduce to the inclusion-minimal sets
+    coveringSets = S.filter (\v -> not (any (\c -> c `S.isProperSubsetOf` v) allCoveringSets)) allCoveringSets
 
     -- An argument is determined if it is in no covering set
     determinedArgs = argumentIndices `S.difference` fold coveringSets
