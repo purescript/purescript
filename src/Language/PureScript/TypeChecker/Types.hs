@@ -50,7 +50,6 @@ import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
-import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Deriving
 import Language.PureScript.TypeChecker.Entailment
 import Language.PureScript.TypeChecker.Kinds
@@ -384,38 +383,62 @@ infer' (Literal ss (ArrayLiteral vals)) = do
   return $ TypedValue' True (Literal ss (ArrayLiteral ts')) (srcTypeApp tyArray els)
 infer' (Literal ss (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
-  -- We make a special case for Vars in record labels, since these are the
-  -- only types of expressions for which 'infer' can return a polymorphic type.
-  -- They need to be instantiated here.
-  let shouldInstantiate :: Expr -> Bool
-      shouldInstantiate Var{} = True
-      shouldInstantiate (PositionedValue _ _ e) = shouldInstantiate e
-      shouldInstantiate _ = False
+  typedFields <- inferProperties ps
+  let
+    toRowListItem :: (PSString, (Expr, SourceType)) -> RowListItem SourceAnn
+    toRowListItem (l, (_, t)) = srcRowListItem (Label l) t
 
-      inferProperty :: (PSString, Expr) -> m (PSString, (Expr, SourceType))
-      inferProperty (name, val) = do
-        TypedValue' _ val' ty <- infer val
-        valAndType <- if shouldInstantiate val
-                        then instantiatePolyTypeWithUnknowns val' ty
-                        else pure (val', ty)
-        pure (name, valAndType)
+    recordType :: SourceType
+    recordType = srcTypeApp tyRecord $ rowFromList (toRowListItem <$> typedFields, srcKindApp srcREmpty kindType)
 
-      toRowListItem (lbl, (_, ty)) = srcRowListItem (Label lbl) ty
-
-  fields <- forM ps inferProperty
-  let ty = srcTypeApp tyRecord $ rowFromList (map toRowListItem fields, srcKindApp srcREmpty kindType)
-  return $ TypedValue' True (Literal ss (ObjectLiteral (map (fmap (uncurry (TypedValue True))) fields))) ty
-infer' (ObjectUpdate o ps) = do
+    typedProperties :: [(PSString, Expr)]
+    typedProperties = fmap (fmap (uncurry (TypedValue True))) typedFields
+  pure $ TypedValue' True (Literal ss (ObjectLiteral typedProperties)) recordType
+infer' (ObjectUpdate ob ps) = do
   ensureNoDuplicateProperties ps
-  row <- freshTypeWithKind (kindRow kindType)
-  typedVals <- zipWith (\(name, _) t -> (name, t)) ps <$> traverse (infer . snd) ps
-  let toRowListItem = uncurry srcRowListItem
-  let newTys = map (\(name, TypedValue' _ _ ty) -> (Label name, ty)) typedVals
-  oldTys <- zip (map (Label . fst) ps) <$> replicateM (length ps) (freshTypeWithKind kindType)
-  let oldTy = srcTypeApp tyRecord $ rowFromList (toRowListItem <$> oldTys, row)
-  o' <- TypedValue True <$> (tvToExpr <$> check o oldTy) <*> pure oldTy
-  let newVals = map (fmap tvToExpr) typedVals
-  return $ TypedValue' True (ObjectUpdate o' newVals) $ srcTypeApp tyRecord $ rowFromList (toRowListItem <$> newTys, row)
+  -- This "tail" holds all other fields not being updated.
+  rowType <- freshTypeWithKind (kindRow kindType)
+  let updateLabels = Label . fst <$> ps
+  -- Generate unification variables for each field in ps.
+  --
+  -- Given:
+  --
+  -- ob { a = 0, b = 0 }
+  --
+  -- Then:
+  --
+  -- obTypes = [(a, ?0), (b, ?1)]
+  obTypes <- zip updateLabels <$> replicateM (length updateLabels) (freshTypeWithKind kindType)
+  let obItems :: [RowListItem SourceAnn]
+      obItems = uncurry srcRowListItem <$> obTypes
+      -- Create a record type that contains the unification variables.
+      --
+      -- obRecordType = Record ( a :: ?0, b :: ?1 | rowType )
+      obRecordType :: SourceType
+      obRecordType = srcTypeApp tyRecord $ rowFromList (obItems, rowType)
+  -- Check ob against obRecordType.
+  --
+  -- Given:
+  --
+  -- ob : { a :: Int, b :: Int }
+  --
+  -- Then:
+  --
+  -- ?0  ~  Int
+  -- ?1  ~  Int
+  -- ob' : { a :: ?0, b :: ?1 }
+  ob' <- TypedValue True <$> (tvToExpr <$> check ob obRecordType) <*> pure obRecordType
+  -- Infer the types of the values used for the record update.
+  typedFields <- inferProperties ps
+  let newItems :: [RowListItem SourceAnn]
+      newItems = (\(l, (_, t)) -> srcRowListItem (Label l) t) <$> typedFields
+
+      ps' :: [(PSString, Expr)]
+      ps' = (\(l, (e, t)) -> (l, TypedValue True e t)) <$> typedFields
+
+      newRecordType :: SourceType
+      newRecordType = srcTypeApp tyRecord $ rowFromList (newItems, rowType)
+  pure $ TypedValue' True (ObjectUpdate ob' ps') newRecordType
 infer' (Accessor prop val) = withErrorMessageHint (ErrorCheckingAccessor val prop) $ do
   field <- freshTypeWithKind kindType
   rest <- freshTypeWithKind (kindRow kindType)
@@ -456,8 +479,7 @@ infer' v@(Constructor _ c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
-    Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
-                             return $ TypedValue' True v' ty'
+    Just (_, _, ty, _) -> TypedValue' True v <$> (introduceSkolemScope <=< replaceAllTypeSynonyms $ ty)
 infer' (Case vals binders) = do
   (vals', ts) <- instantiateForBinders vals binders
   ret <- freshTypeWithKind kindType
@@ -498,6 +520,44 @@ infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue' t v ty <- infer' val
   return $ TypedValue' t (PositionedValue pos c v) ty
 infer' v = internalError $ "Invalid argument to infer: " ++ show v
+
+-- |
+-- Infer the types of named record fields.
+inferProperties
+  :: ( MonadSupply m
+     , MonadState CheckState m
+     , MonadError MultipleErrors m
+     , MonadWriter MultipleErrors m
+     )
+  => [(PSString, Expr)]
+  -> m [(PSString, (Expr, SourceType))]
+inferProperties = traverse (traverse inferWithinRecord)
+
+-- |
+-- Infer the type of a value when used as a record field.
+inferWithinRecord
+  :: ( MonadSupply m
+     , MonadState CheckState m
+     , MonadError MultipleErrors m
+     , MonadWriter MultipleErrors m
+     )
+  => Expr
+  -> m (Expr, SourceType)
+inferWithinRecord e = do
+  TypedValue' _ v t <- infer e
+  if propertyShouldInstantiate e
+    then instantiatePolyTypeWithUnknowns v t
+    else pure (v, t)
+
+-- |
+-- Determines if a value's type needs to be monomorphized when
+-- used inside of a record.
+propertyShouldInstantiate :: Expr -> Bool
+propertyShouldInstantiate = \case
+  Var{} -> True
+  Constructor{} -> True
+  PositionedValue _ _ e -> propertyShouldInstantiate e
+  _ -> False
 
 inferLetBinding
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -820,7 +880,7 @@ check' v@(Constructor _ c) ty = do
     Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
     Just (_, _, ty1, _) -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
-      ty' <- introduceSkolemScope ty
+      ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
       elaborate <- subsumes repl ty'
       return $ TypedValue' True (elaborate v) ty'
 check' (Let w ds val) ty = do
@@ -866,11 +926,11 @@ checkProperties expr ps row lax = convert <$> go ps (toRowPair <$> ts') r' where
   go ((p,v):ps') ts r =
     case lookup (Label p) ts of
       Nothing -> do
-        v'@(TypedValue' _ _ ty) <- infer v
+        (v', ty) <- inferWithinRecord v
         rest <- freshTypeWithKind (kindRow kindType)
         unifyTypes r (srcRCons (Label p) ty rest)
         ps'' <- go ps' ts rest
-        return $ (p, v') : ps''
+        return $ (p, TypedValue' True v' ty) : ps''
       Just ty -> do
         v' <- check v ty
         ps'' <- go ps' (delete (Label p, ty) ts) r
