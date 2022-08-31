@@ -210,6 +210,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
         goNode (Branch val) = goTree val
 
     go (App v1 v2) = go v1 <> go v2
+    go (VisibleTypeApp v _) = go v
     go (Unused v) = go v
     go (IfThenElse v1 v2 v3) = go v1 <> go v2 <> go v3
     go (Case vs alts) =
