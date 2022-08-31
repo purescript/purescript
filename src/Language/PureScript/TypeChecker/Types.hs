@@ -344,11 +344,14 @@ instantiatePolyTypeWithUnknownsUntilVisible val (ForAll _ ident mbK ty _ TypeVar
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   insertUnkName' u ident
   instantiatePolyTypeWithUnknownsUntilVisible val $ replaceTypeVars ident u ty
-instantiatePolyTypeWithUnknownsUntilVisible val (ConstrainedType _ con ty) = do
+instantiatePolyTypeWithUnknownsUntilVisible val ty = return (val, ty)
+
+instantiateConstraint :: MonadState CheckState m => Expr -> Type SourceAnn -> m (Expr, Type SourceAnn)
+instantiateConstraint val (ConstrainedType _ con ty) = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
-  instantiatePolyTypeWithUnknownsUntilVisible (App val (TypeClassDictionary con dicts hints)) ty
-instantiatePolyTypeWithUnknownsUntilVisible val ty = return (val, ty)
+  instantiateConstraint (App val (TypeClassDictionary con dicts hints)) ty
+instantiateConstraint val ty = pure (val, ty)
 
 -- | Match against TUnknown and call insertUnkName, failing otherwise.
 insertUnkName' :: (MonadState CheckState m, MonadError MultipleErrors m) => SourceType -> Text -> m ()
@@ -462,8 +465,9 @@ infer' (VisibleTypeApp valFn tyArg) = do
   case valTy' of
     ForAll _ qName _ qBody _ _ -> do
       let resTy = replaceTypeVars qName tyArg qBody
-      elaborate <- subsumes valTy' resTy
-      pure $ TypedValue' True (elaborate valFn'') resTy
+      (valFn''', resTy') <- instantiateConstraint valFn'' resTy
+      elaborate <- subsumes valTy' resTy'
+      pure $ TypedValue' True (elaborate valFn''') resTy'
     _ ->
       internalError $ "Invalid type application " <> debugType valTy'
 infer' (Var ss var) = do
