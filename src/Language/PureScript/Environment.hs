@@ -202,9 +202,9 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
             M.singleton
               (IS.delete y needed) $
                 case acycDetermined of
-                  Just _ -> First $ IM.delete y $ inEdges
+                  Just _ -> First $ IM.delete y inEdges
                   Nothing ->
-                    (First $ IM.mapMaybe (NEL.nonEmpty . NEL.filter (y `IS.notMember`)) $ IM.delete y inEdges)
+                    First $ IM.mapMaybe (NEL.nonEmpty . NEL.filter (y `IS.notMember`)) $ IM.delete y inEdges
 
     -- Reduce to the inclusion-minimal sets
     coveringSets = S.filter (\v -> not (any (\c -> c `S.isProperSubsetOf` v) allCoveringSets)) allCoveringSets
