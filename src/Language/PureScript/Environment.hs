@@ -132,6 +132,9 @@ makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs cov
   where
     ( determinedArgs, coveringSets ) = computeCoveringSets (length args) deps
 
+-- A moving frontier of sets to consider, along with the fundeps that can be
+-- applied in each case. At each stage, all sets in the frontier will be the
+-- same size, decreasing by 1 each time.
 type Frontier = M.Map IS.IntSet (First (IM.IntMap (NEL.NonEmpty IS.IntSet)))
 --                         ^                 ^          ^          ^
 --         when *these* parameters           |          |          |
@@ -148,8 +151,13 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
   where
     argumentIndices = S.fromList [0 .. nargs - 1]
 
+    -- Compute all sets of arguments that determine the remaining arguments via
+    -- functional dependencies. This is done in stages, where each stage
+    -- considers sets of the same size to share work.
     allCoveringSets :: S.Set (S.Set Int)
     allCoveringSets = S.map (S.fromDistinctAscList . IS.toAscList) $ fst $ search $
+      -- The initial frontier consists of just the set of all parameters and all
+      -- fundeps organized into the map structure.
       M.singleton
         (IS.fromList [0 .. nargs - 1]) $
           First $ IM.fromListWith (<>) $ do
@@ -160,25 +168,43 @@ computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
 
       where
 
+      -- Recursively advance the frontier until all frontiers are exhausted
+      -- and coverings sets found. The covering sets found during the process
+      -- are locally-minimal, in that none can be reduced by a fundep, but
+      -- there may be subsets found from other frontiers.
       search :: Frontier -> (S.Set IS.IntSet, ())
       search frontier = unless (null frontier) $ M.foldMapWithKey step frontier >>= search
 
+      -- The input set from the frontier is known to cover all parameters, but
+      -- it may be able to be reduced by more fundeps.
       step :: IS.IntSet -> First (IM.IntMap (NEL.NonEmpty IS.IntSet)) -> (S.Set IS.IntSet, Frontier)
       step needed (First inEdges)
+        -- If there are no applicable fundeps, record it as a locally minimal
+        -- covering set. This has already been reduced to only applicable fundeps
         | IM.null inEdges = (S.singleton needed, M.empty)
         | otherwise       = (S.empty, foldMap removeParameter paramsToTry)
 
           where
 
           determined = IM.keys inEdges
+          -- If there is an acyclically determined functional dependency, prefer
+          -- it to reduce the number of cases to check. That is a dependency
+          -- that does not help determine other parameters.
           acycDetermined = find (`IS.notMember` (IS.unions $ concatMap NEL.toList $ IM.elems inEdges)) determined
           paramsToTry = maybe determined pure acycDetermined
 
+          -- For each parameter to be removed to build the next frontier,
+          -- delete the fundeps that determine it and filter out the fundeps
+          -- that make use of it. Of course, if it an acyclic fundep we already
+          -- found that there are none that use it.
           removeParameter :: Int -> Frontier
           removeParameter y =
             M.singleton
-              (IS.delete y needed)
-              (First $ IM.mapMaybe (NEL.nonEmpty . NEL.filter (y `IS.notMember`)) $ IM.delete y inEdges)
+              (IS.delete y needed) $
+                case acycDetermined of
+                  Just _ -> First $ IM.delete y $ inEdges
+                  Nothing ->
+                    (First $ IM.mapMaybe (NEL.nonEmpty . NEL.filter (y `IS.notMember`)) $ IM.delete y inEdges)
 
     -- Reduce to the inclusion-minimal sets
     coveringSets = S.filter (\v -> not (any (\c -> c `S.isProperSubsetOf` v) allCoveringSets)) allCoveringSets
