@@ -477,11 +477,7 @@ convertDeclaration fileName decl = case decl of
       chainId = mkChainId fileName $ startSourcePos $ instKeyword $ instHead $ sepHead insts
       goInst ix inst@(Instance (InstanceHead _ nameSep ctrs cls args) bd) = do
         let ann' = uncurry (sourceAnnCommented fileName) $ instanceRange inst
-            clsAnn = uncurry (sourceAnnCommented fileName) $
-              if null args then
-                qualRange cls
-              else
-                (fst $ qualRange cls, snd $ typeRange $ last args)
+            clsAnn = findInstanceAnn cls args
         AST.TypeInstanceDeclaration ann' clsAnn chainId ix
           (mkPartialInstanceName nameSep cls args)
           (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
@@ -496,11 +492,7 @@ convertDeclaration fileName decl = case decl of
       instTy
         | isJust new = AST.NewtypeInstance
         | otherwise = AST.DerivedInstance
-      clsAnn = uncurry (sourceAnnCommented fileName) $
-        if null args then
-          qualRange cls
-        else
-          (fst $ qualRange cls, snd $ typeRange $ last args)
+      clsAnn = findInstanceAnn cls args
     pure $ AST.TypeInstanceDeclaration ann clsAnn chainId 0 name'
       (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
       (qualified cls)
@@ -610,6 +602,12 @@ convertDeclaration fileName decl = case decl of
     binding@(InstanceBindingName _ fields) -> do
       let ann' = uncurry (sourceAnnCommented fileName) $ instanceBindingRange binding
       convertValueBindingFields fileName ann' fields
+
+  findInstanceAnn cls args = uncurry (sourceAnnCommented fileName) $
+    if null args then
+      qualRange cls
+    else
+      (fst $ qualRange cls, snd $ typeRange $ last args)
 
 convertSignature :: String -> Labeled (Name Ident) (Type a) -> AST.Declaration
 convertSignature fileName (Labeled a _ b) = do
