@@ -1,20 +1,24 @@
 module Language.PureScript.TypeChecker.Deriving (deriveInstance) where
 
-import Protolude hiding (Type)
+-- import Protolude hiding (Type)
+import Protolude hiding (Type, traceM)
 
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Foldable (foldl1)
 import Data.List (init, last, zipWith3, (!!))
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as M
 
 import Control.Monad.Supply.Class
 import Language.PureScript.AST
 import Language.PureScript.AST.Utils
+import qualified Language.PureScript.Constants.Data.Foldable as Foldable
+import qualified Language.PureScript.Constants.Data.Traversable as Traversable
 import qualified Language.PureScript.Constants.Prelude as Prelude
 import qualified Language.PureScript.Constants.Prim as Prim
 import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Errors
+import Language.PureScript.Errors hiding (nonEmpty)
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.Names
 import Language.PureScript.PSString
@@ -69,12 +73,37 @@ deriveInstance instType className strategy = do
           _ -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
         _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
 
+      validateFFTArgs
+        :: ProperName 'TypeName
+        -> (ModuleName -> [(ProperName 'ConstructorName, [Maybe (FftArg ())])] -> m [(PSString, Expr)])
+        -> m [(PSString, Expr)]
+      validateFFTArgs tyConNm f = do
+        (_, _, argTypes, ctors) <- lookupTypeDecl mn tyConNm
+        case reverse argTypes of
+          [] ->
+            throwError . errorMessage $ KindsDoNotUnify (kindType -:> kindType) kindType
+          ((iTy, _) : _) -> do
+            ctors' <- traverse (traverse (traverse replaceAllTypeSynonyms)) ctors
+            case unaryFftCheckCtorValidity iTy ctors' of
+              Left invalidUsages -> do
+                throwError $ fold $ do
+                  iu <- invalidUsages
+                  (withHints, ss) <- sortOn snd $ toList iu
+                  pure
+                    $ addHint (ErrorInInstance className tys)
+                    $ withHints
+                    $ errorMessage $ CannotDeriveInvalidConstructorArg iTy ss
+              Right validCtors -> do
+                f mn validCtors
+
       in case className of
         Prelude.Eq -> unaryClass deriveEq
         Prelude.Eq1 -> unaryClass $ \_ _ -> deriveEq1
-        Prelude.Functor -> unaryClass deriveFunctor
         Prelude.Ord -> unaryClass deriveOrd
         Prelude.Ord1 -> unaryClass $ \_ _ -> deriveOrd1
+        Prelude.Functor -> unaryClass $ \_ tyConNm -> validateFFTArgs tyConNm deriveFunctor
+        Foldable.Foldable -> unaryClass $ \_ tyConNm -> validateFFTArgs tyConNm deriveFoldable
+        Traversable.Traversable -> unaryClass $ \_ tyConNm -> validateFFTArgs tyConNm deriveTraversable
         -- See L.P.Sugar.TypeClasses.Deriving for the classes that can be
         -- derived prior to type checking.
         _ -> throwError . errorMessage $ CannotDerive className tys
@@ -354,10 +383,124 @@ decomposeRec = fmap (sortOn fst) . go
         go (REmptyKinded _ _) = Just []
         go _ = Nothing
 
-decomposeRec' :: SourceType -> [(Label, SourceType)]
-decomposeRec' = sortOn fst . go
-  where go (RCons _ str typ typs) = (str, typ) : go typs
-        go _ = []
+decomposeRecSorted :: SourceType -> [(PSString, SourceType)]
+decomposeRecSorted = sortOn fst . go []
+  where go !acc (RCons _ str typ typs) = go ((runLabel str, typ) : acc) typs
+        go !acc _ = acc
+
+data FftArg a
+  = FftBaseArg a
+  | FftRecursiveArg a (FftArg ())
+  | FftRecordArg (NonEmpty (PSString, FftArg a))
+  deriving (Show, Functor, Foldable, Traversable)
+
+unaryFftCheckCtorValidity
+  :: Text
+  -> [(ProperName 'ConstructorName, [SourceType])]
+  -> Either
+      [NonEmpty (MultipleErrors -> MultipleErrors, SourceSpan)]
+      [(ProperName 'ConstructorName, [Maybe (FftArg ())])]
+unaryFftCheckCtorValidity iTy ctors = do
+  let
+    (ctorLefts, ctorRights) = foldl' (\(ctorLs, ctorRs) (ctor, subterms) -> do
+      let
+        (subLefts, subRights) = foldl' (
+            \(ls, rs) relevance -> case unaryFunctorArgs iTy relevance of
+              Left xs -> (toList xs : ls, rs)
+              Right arg -> (ls, arg : rs)
+          ) ([], []) subterms
+      case nonEmpty $ join $ reverse subLefts of
+        Just subLefts' -> (map (first (map (addHint (ErrorInDataConstructor ctor)))) subLefts' : ctorLs, ctorRs)
+        Nothing -> (ctorLs, (ctor, reverse subRights) : ctorRs)
+      ) ([], []) ctors
+  if null ctorLefts then Right $ reverse ctorRights else Left $ reverse ctorLefts
+
+unaryFunctorArgs
+  :: Text -- ^ The type var for which we're looking (e.g. @c@ in @data Foo a b c = ...@)
+  -> SourceType -- ^ the data constructor arg's type
+  -> Either (NonEmpty (MultipleErrors -> MultipleErrors, SourceSpan)) (Maybe (FftArg ()))
+unaryFunctorArgs iTyName = goTypeNested
+  where
+  goTypeNested :: SourceType -> Either (NonEmpty (MultipleErrors -> MultipleErrors, SourceSpan)) (Maybe (FftArg ()))
+  goTypeNested = \case
+    -- quantifiers
+    (ForAll _ scopedVar _ t _) | scopedVar /= iTyName ->
+      goTypeNested t
+
+    -- constraints
+    (ConstrainedType _ _ t) ->
+      goTypeNested t
+
+    -- bare index type
+    TypeVar _ t | t == iTyName ->
+      pure $ Just $ FftBaseArg ()
+
+    TypeApp _ (TypeConstructor _ Prim.Record) rows -> do
+      let
+        (errors, validRows) = partitionEithers $ decomposeRecSorted rows <&> \next -> do
+          bimap (map (first (map (addHint (ErrorUnderLabel $ fst next))))) sequence $ traverse goTypeNested next
+      case nonEmpty errors of
+        Just errs ->
+          Left $ join errs
+        Nothing ->
+          pure $ map FftRecordArg $ nonEmpty $ catMaybes validRows
+
+    (TypeApp _ tf ta) -> do
+      case nonEmpty $ hasInvalidUsage False False tf of
+        Nothing ->
+          map (map (FftRecursiveArg ())) $ goTypeNested ta
+        Just invalidUsageIndices ->
+          Left invalidUsageIndices
+
+    -- otherwise invalid arg
+    _ -> do
+      pure Nothing
+
+  hasInvalidUsage :: Bool -> Bool -> SourceType -> [(MultipleErrors -> MultipleErrors, SourceSpan)]
+  hasInvalidUsage reportRightmostTyParam isRightmostTyParam = \case
+    (ForAll _ scopedVar _ t _) | scopedVar /= iTyName ->
+      hasInvalidUsage reportRightmostTyParam isRightmostTyParam t
+
+    (ConstrainedType _ _ t) ->
+      hasInvalidUsage reportRightmostTyParam isRightmostTyParam t
+    
+    TypeVar ann t
+      | t == iTyName
+      , isRightmostTyParam
+      , reportRightmostTyParam -> [ (identity, fst ann) ]
+      
+      | t == iTyName -> [ (identity, fst ann) ]
+      
+      | otherwise -> []
+
+    TypeApp _ (TypeConstructor _ Prim.Record) rows -> do
+      decomposeRecSorted rows >>= (hasInvalidUsage reportRightmostTyParam True . snd)
+
+    TypeApp _ tf ta -> do
+      hasInvalidUsage reportRightmostTyParam False tf <> hasInvalidUsage reportRightmostTyParam isRightmostTyParam ta
+
+    _ -> []
+
+unaryMkCtorClauseWith
+  :: forall m
+   . MonadSupply m
+  => ModuleName
+  -> (Expr -> [(Ident, Maybe (FftArg ()))] -> m Expr)
+  -> (ProperName 'ConstructorName, [Maybe (FftArg ())])
+  -> m CaseAlternative
+unaryMkCtorClauseWith mn buildExpr (ctorName, ctorArgs) = do
+  subterms <- traverse (\arg -> (,arg) <$> freshIdent "v") ctorArgs
+  let
+    idents = map fst subterms
+    ctor = mkCtor mn ctorName
+    caseBinder = mkCtorBinder mn ctorName $ map mkBinder idents
+  finalExpr <- buildExpr ctor subterms
+  return (CaseAlternative [caseBinder] (unguarded finalExpr))
+
+usingLamIdent :: forall m. MonadSupply m => (Expr -> m Expr) -> m Expr
+usingLamIdent cb = do
+  x <- freshIdent "v"
+  lam x <$> cb (mkVar x)
 
 deriveFunctor
   :: forall m
@@ -365,67 +508,320 @@ deriveFunctor
   => MonadState CheckState m
   => MonadSupply m
   => ModuleName
-  -> ProperName 'TypeName
+  -> [(ProperName 'ConstructorName, [Maybe (FftArg ())])]
   -> m [(PSString, Expr)]
-deriveFunctor mn tyConNm = do
-  (_, _, tys, ctors) <- lookupTypeDecl mn tyConNm
-  mapFun <- mkMapFunction tys ctors
-  pure [(Prelude.map, mapFun)]
+deriveFunctor mn validCtors = do
+    mapFn <- mkMapFn
+    pure [(Prelude.map, mapFn)]
   where
-    mkMapFunction :: [(Text, Maybe SourceType)] -> [(ProperName 'ConstructorName, [SourceType])] -> m Expr
-    mkMapFunction tys ctors = case reverse tys of
-      [] -> throwError . errorMessage $ KindsDoNotUnify (kindType -:> kindType) kindType
-      ((iTy, _) : _) -> do
-        f <- freshIdent "f"
-        m <- freshIdent "m"
-        lam f . lamCase m <$> mapM (mkCtorClause iTy f) ctors
+    mapVar = mkRef Prelude.identMap
 
-    mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [SourceType]) -> m CaseAlternative
-    mkCtorClause iTyName f (ctorName, ctorTys) = do
-      idents <- replicateM (length ctorTys) (freshIdent "v")
-      ctorTys' <- mapM replaceAllTypeSynonyms ctorTys
-      args <- zipWithM transformArg idents ctorTys'
-      let ctor = mkCtor mn ctorName
-          rebuilt = foldl' App ctor args
-          caseBinder = mkCtorBinder mn ctorName $ map mkBinder idents
-      return $ CaseAlternative [caseBinder] (unguarded rebuilt)
-      where
+    mkMapFn = do
+      f <- freshIdent "f"
+      m <- freshIdent "m"
+      let
         fVar = mkVar f
-        mapVar = mkRef Prelude.identMap
 
-        transformArg :: Ident -> SourceType -> m Expr
-        transformArg ident = fmap (foldr App (mkVar ident)) . goType where
+        buildExpr :: Expr -> [(Ident, Maybe (FftArg ()))] -> m Expr
+        buildExpr ctorExpr ctorArgs = do
+          args <- for ctorArgs $ \(caseBinderIdent, nextArg) -> do
+            let cbIdent = mkVar caseBinderIdent
+            mbArg <- traverse (mapArgExpr cbIdent) nextArg
+            pure $ fromMaybe cbIdent mbArg
+          pure $ foldl' App ctorExpr args
 
-          goType :: SourceType -> m (Maybe Expr)
-          -- argument matches the index type
-          goType (TypeVar _ t) | t == iTyName = return (Just fVar)
+        mapArgExpr :: Expr -> FftArg () -> m Expr
+        mapArgExpr argIdent = \case
+          FftBaseArg _ -> do
+            pure $ App fVar argIdent
+          FftRecursiveArg _ subArg -> do
+            fnExpr <- mapRecursiveArg subArg
+            pure $ App (App mapVar fnExpr) argIdent
+          FftRecordArg fields -> do
+            fields' <- for fields $ \(lbl, fieldArg) ->
+              (lbl,) <$> mapArgExpr (Accessor lbl argIdent) fieldArg
+            pure $ ObjectUpdate argIdent $ toList fields'
 
-          -- records
-          goType recTy | Just row <- objectType recTy =
-              traverse buildUpdate (decomposeRec' row) >>= (traverse buildRecord . justUpdates)
-            where
-              justUpdates :: [Maybe (Label, Expr)] -> Maybe [(Label, Expr)]
-              justUpdates = foldMap (fmap return)
+        mapRecursiveArg :: FftArg () -> m Expr
+        mapRecursiveArg = \case
+          FftBaseArg _ ->
+            pure fVar
+          FftRecursiveArg _ subArg -> do
+            fnExpr <- mapRecursiveArg subArg
+            pure $ App mapVar fnExpr
+          FftRecordArg fields -> do
+            usingLamIdent $ \xIdent -> do
+              fields' <- for fields $ \(lbl, fieldArg) ->
+                (lbl,) <$> mapArgExpr (Accessor lbl xIdent) fieldArg
+              pure $ ObjectUpdate xIdent $ toList fields'
 
-              buildUpdate :: (Label, SourceType) -> m (Maybe (Label, Expr))
-              buildUpdate (lbl, ty) = do upd <- goType ty
-                                         return ((lbl,) <$> upd)
+      lam f . lamCase m <$> traverse (unaryMkCtorClauseWith mn buildExpr) validCtors
 
-              buildRecord :: [(Label, Expr)] -> m Expr
-              buildRecord updates = do
-                arg <- freshIdent "o"
-                let argVar = mkVar arg
-                    mkAssignment (Label l, x) = (l, App x (Accessor l argVar))
-                return (lam arg (ObjectUpdate argVar (mkAssignment <$> updates)))
+deriveFoldable
+  :: forall m
+   . MonadError MultipleErrors m
+  => MonadState CheckState m
+  => MonadSupply m
+  => ModuleName
+  -> [(ProperName 'ConstructorName, [Maybe (FftArg ())])]
+  -> m [(PSString, Expr)]
+deriveFoldable mn validCtors = do
+  foldlFn <- mkFoldlFn
+  foldrFn <- mkFoldrFn
+  foldMapFn <- mkFoldMapFn
+  pure [(Foldable.foldl, foldlFn), (Foldable.foldr, foldrFn), (Foldable.foldMap, foldMapFn)]
+  where
+    foldlVar = mkRef Foldable.identFoldl
+    foldrVar = mkRef Foldable.identFoldr
+    foldMapVar = mkRef Foldable.identFoldMap
+    appendVar = mkRef Prelude.identAppend
+    memptyVar = mkRef Prelude.identMempty
+    flipVar = mkRef Prelude.identFlip
 
-          -- quantifiers
-          goType (ForAll _ scopedVar _ t _) | scopedVar /= iTyName = goType t
+    mkFoldlFn = do
+      f <- freshIdent "f"
+      z <- freshIdent "z"
+      m <- freshIdent "m"
+      let
+        fVar = mkVar f
+        zVar = mkVar z
 
-          -- constraints
-          goType (ConstrainedType _ _ t) = goType t
+        buildExpr :: Expr -> [(Ident, Maybe (FftArg ()))] -> m Expr
+        buildExpr _ ctorArgs =
+          foldl' (\acc (ident, arg) -> foldArg acc (mkVar ident) arg) (pure zVar) $ mapMaybe sequence ctorArgs
 
-          -- under a `* -> *`, just assume functor for now
-          goType (TypeApp _ _ t) = fmap (App mapVar) <$> goType t
+        foldArg :: m Expr -> Expr -> FftArg () -> m Expr
+        foldArg accExpr identExpr = \case
+          FftBaseArg _ -> do
+            acc <- accExpr
+            pure $ App (App fVar acc) identExpr
+          FftRecursiveArg _ subArg -> do
+            acc <- accExpr
+            fn <- foldRecursiveArg subArg
+            pure $ App (App (App foldlVar fn) acc) identExpr
+          FftRecordArg fields -> do
+            foldl' (\acc (lbl, arg) -> foldArg acc (Accessor lbl identExpr) arg) accExpr fields
 
-          -- otherwise do nothing - will fail type checking if type does actually contain index
-          goType _ = return Nothing
+        foldRecursiveArg :: FftArg () -> m Expr
+        foldRecursiveArg = \case
+          FftBaseArg _ -> do
+            pure fVar
+          FftRecursiveArg _ subArg -> do
+            usingLamIdent $ \accIdent -> do
+              fn <- foldRecursiveArg subArg
+              pure $ App (App foldlVar fn) accIdent
+          FftRecordArg fields -> do
+            usingLamIdent $ \accIdent -> do
+              usingLamIdent $ \recIdent -> do
+                foldl' (\acc (lbl, arg) -> foldArg acc (Accessor lbl recIdent) arg) (pure accIdent) fields
+
+      lam f . lam z . lamCase m <$> traverse (unaryMkCtorClauseWith mn buildExpr) validCtors
+
+    mkFoldrFn = do
+      f <- freshIdent "f"
+      z <- freshIdent "z"
+      m <- freshIdent "m"
+      let
+        fVar = mkVar f
+        zVar = mkVar z
+
+        buildExpr :: Expr -> [(Ident, Maybe (FftArg ()))] -> m Expr
+        buildExpr _ ctorArgs =
+          foldr (\(ident, arg) acc -> foldArg acc (mkVar ident) arg) (pure zVar) $ mapMaybe sequence ctorArgs
+
+        foldArg :: m Expr -> Expr -> FftArg () -> m Expr
+        foldArg accExpr identExpr = \case
+          FftBaseArg _ -> do
+            App (App fVar identExpr) <$> accExpr
+          FftRecursiveArg _ subArg -> do
+            acc <- accExpr
+            fn <- foldRecursiveArg subArg
+            pure $ App (App (App foldrVar fn) acc) identExpr
+          FftRecordArg fields -> do
+            foldr' (\(lbl, arg) acc -> foldArg acc (Accessor lbl identExpr) arg) accExpr fields
+
+        foldRecursiveArg :: FftArg () -> m Expr
+        foldRecursiveArg = \case
+          FftBaseArg _ -> do
+            pure fVar
+          FftRecursiveArg _ subArg -> do
+            usingLamIdent $ \accIdent -> do
+              fn <- foldRecursiveArg subArg
+              pure $ App (App flipVar (App foldrVar fn)) accIdent
+          FftRecordArg fields -> do
+            usingLamIdent $ \recIdent -> do
+              usingLamIdent $ \accIdent -> do
+                foldr' (\(lbl, arg) acc -> foldArg acc (Accessor lbl recIdent) arg) (pure accIdent) fields
+
+      lam f . lam z . lamCase m <$> traverse (unaryMkCtorClauseWith mn buildExpr) validCtors
+
+    mkFoldMapFn = do
+      f <- freshIdent "f"
+      m <- freshIdent "m"
+      let
+        fVar = mkVar f
+
+        buildExpr :: Expr -> [(Ident, Maybe (FftArg ()))] -> m Expr
+        buildExpr _ ctorArgs = case nonEmpty $ mapMaybe sequence ctorArgs of
+          Nothing ->
+            pure memptyVar
+          Just args ->
+            foldl1 appendArgs . join <$> traverse (\(ident, arg) -> foldArgs (mkVar ident) arg) args
+
+        foldArgs :: Expr -> FftArg () -> m (NonEmpty Expr)
+        foldArgs identExpr = \case
+          FftBaseArg _ -> do
+            pure $ App fVar identExpr :| []
+          FftRecursiveArg _ subArg -> do
+            fn <- foldRecursiveArg subArg
+            pure $ App (App foldMapVar fn) identExpr :| []
+          FftRecordArg fields -> do
+            map join $ traverse (\(lbl, arg) -> foldArgs (Accessor lbl identExpr) arg) fields
+
+        foldRecursiveArg :: FftArg () -> m Expr
+        foldRecursiveArg = \case
+          FftBaseArg _ -> do
+            pure fVar
+          FftRecursiveArg _ subArg -> do
+            fn <- foldRecursiveArg subArg
+            pure $ App foldMapVar fn
+          FftRecordArg fields -> do
+            usingLamIdent $ \xIdent -> do
+              map (foldl1 appendArgs . join) $ traverse (\(lbl, arg) -> foldArgs (Accessor lbl xIdent) arg) fields
+
+        appendArgs :: Expr -> Expr -> Expr
+        appendArgs l r = App (App appendVar l) r
+
+      lam f . lamCase m <$> traverse (unaryMkCtorClauseWith mn buildExpr) validCtors
+
+deriveTraversable
+  :: forall m
+   . MonadError MultipleErrors m
+  => MonadState CheckState m
+  => MonadSupply m
+  => ModuleName
+  -> [(ProperName 'ConstructorName, [Maybe (FftArg ())])]
+  -> m [(PSString, Expr)]
+deriveTraversable mn validCtors = do
+  traverseFn <- mkTraverseFn validCtors
+  sequenceFn <- mkSequenceFn
+  pure [(Traversable.traverse, traverseFn), (Traversable.sequence, sequenceFn)]
+  where
+    traverseVar = mkRef Traversable.identTraverse
+    identityVar = mkRef Prelude.identIdentity
+    mapVar = mkRef Prelude.identMap
+    applyVar = mkRef Prelude.identApply
+    pureVar = mkRef Prelude.identPure
+
+    mkSequenceFn = do
+      t <- freshIdent "t"
+      pure $ lam t $ App (App traverseVar identityVar) (mkVar t)
+
+    mkTraverseFn ctors = do
+      f <- freshIdent "f"
+      t <- freshIdent "t"
+      let
+        fVar = mkVar f
+
+        buildExpr :: Expr -> [(Ident, Maybe (FftArg ()))] -> m Expr
+        buildExpr ctor ctorArgs = do
+          let
+            relevantArgs :: [(Ident, FftArg ())]
+            relevantArgs = mapMaybe sequence ctorArgs
+          traversedArgsList <- for relevantArgs $ \(ident, arg) -> do
+            traverseNormalArg fVar (mkVar ident) arg
+          case traversedArgsList >>= toList :: [Expr] of
+            [] ->
+              pure $ App pureVar $ foldl' (\acc -> App acc . mkVar . fst) ctor ctorArgs
+            h:tl -> do
+              genLamIdents ctorArgs $ \ctorArgs' -> do
+                let ctorExpr = rebuildCtorExpr ctor ctorArgs'
+                let lamExpr = foldr' (\ident body' -> lam ident body') ctorExpr $ foldMap extractIdents $ mapMaybe snd ctorArgs'
+                pure $ foldl' (\acc -> App (App applyVar acc)) (App (App mapVar lamExpr) h) tl
+
+      lam f . lamCase t <$> traverse (unaryMkCtorClauseWith mn buildExpr) ctors
+
+    genLamIdents :: [(Ident, Maybe (FftArg ()))] -> ([(Ident, Maybe (FftArg Ident))] -> m Expr) -> m Expr
+    genLamIdents ctorArgs useLamArgsCb = do
+      foldr'
+        (\arg cb argIdents -> do
+            arg' <- traverse (traverse genIdents) arg
+            cb $ arg' : argIdents
+        )
+        (\argIdents ->
+          useLamArgsCb $ reverse argIdents
+        )
+        ctorArgs
+        []
+
+    genIdents :: FftArg () -> m (FftArg Ident)
+    genIdents = traverse (const $ freshIdent "v")
+
+    extractIdents :: FftArg Ident -> [Ident]
+    extractIdents = foldMap (: [])
+
+    rebuildCtorExpr :: Expr -> [(Ident, Maybe (FftArg Ident))] -> Expr
+    rebuildCtorExpr ctorExpr args =
+      foldl' (\acc arg -> App acc $ foldTopArg arg) ctorExpr args
+      where
+        foldTopArg :: (Ident, Maybe (FftArg Ident)) -> Expr
+        foldTopArg (caseBinderIdent, arg) = case arg of
+          Nothing -> mkVar caseBinderIdent
+          Just tArg -> rebuildCtorArg (mkVar caseBinderIdent) tArg
+
+    rebuildCtorArg :: Expr -> FftArg Ident -> Expr
+    rebuildCtorArg identExpr = \case
+      FftBaseArg lamIdent ->
+        mkVar lamIdent
+      FftRecursiveArg lamIdent _ ->
+        mkVar lamIdent
+      FftRecordArg fields -> do
+        rebuildRecordArg identExpr fields
+
+    rebuildRecordArg :: Expr -> NonEmpty (PSString, FftArg Ident) -> Expr
+    rebuildRecordArg identExpr fields =
+      ObjectUpdate identExpr $ foldMap (\(lbl, arg) -> [(lbl, rebuildCtorArg (Accessor lbl identExpr) arg)]) fields
+
+    traverseNormalArg :: Expr -> Expr -> FftArg () -> m (NonEmpty Expr)
+    traverseNormalArg fVar accessorExpr = \case
+      FftBaseArg _ ->
+        pure $ App fVar accessorExpr :| []
+      FftRecursiveArg _ subArg -> do
+        fn <- traverseRecursiveArg fVar subArg
+        pure $ App (App traverseVar fn) accessorExpr :| []
+      FftRecordArg fields ->
+        map join $ for fields $ \(lbl, fieldArg) ->
+          traverseNormalArg fVar (Accessor lbl accessorExpr) fieldArg
+
+    traverseRecursiveArg :: Expr -> FftArg () -> m Expr
+    traverseRecursiveArg fVar = \case
+      FftBaseArg _ ->
+        pure fVar
+      FftRecursiveArg _ subArg -> do
+        fn <- traverseRecursiveArg fVar subArg
+        pure $ App traverseVar fn
+      FftRecordArg fields -> do
+        usingLamIdent $ \xIdent -> do
+          fieldArgs <- map join $ for fields $ \(lbl, fieldArg) -> do
+            traverseNormalArg fVar (Accessor lbl xIdent) fieldArg
+          genRecordFieldLamIdents fields $ \fieldsWithIdents -> do
+            let
+              ctorExpr = rebuildRecordArg xIdent fieldsWithIdents
+              lamExpr = foldr' (\ident body' -> lam ident body') ctorExpr $ foldMap (extractIdents . snd) fieldsWithIdents
+            pure $ foldl' (\acc -> App (App applyVar acc)) (App (App mapVar lamExpr) (NonEmpty.head fieldArgs)) (NonEmpty.tail fieldArgs)
+
+    genRecordFieldLamIdents :: NonEmpty (PSString, FftArg ()) -> (NonEmpty (PSString, FftArg Ident) -> m Expr) -> m Expr
+    genRecordFieldLamIdents recFields useLamArgsCb = do
+      foldr'
+        (\arg cb argIdents -> do
+          arg' <- traverse genIdents arg
+          cb $ arg' : argIdents
+        )
+        (\argIdents -> case nonEmpty argIdents of
+          Nothing ->
+            internalCompilerError "genRecordFieldLamIdents: Impossible. Backwards traverse over non-empty list produced empty list."
+          Just a ->
+            useLamArgsCb $ NonEmpty.reverse a
+        )
+        recFields
+        []

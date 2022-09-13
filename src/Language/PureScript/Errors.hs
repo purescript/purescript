@@ -188,6 +188,7 @@ data SimpleErrorMessage
   | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
+  | CannotDeriveInvalidConstructorArg Text SourceSpan
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -353,6 +354,7 @@ errorCode em = case unwrapErrorMessage em of
   UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
+  CannotDeriveInvalidConstructorArg{} -> "CannotDeriveInvalidConstructorArg"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1367,6 +1369,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
       line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
 
+    renderSimpleErrorMessage (CannotDeriveInvalidConstructorArg tyVarName ss) = 
+      paras
+        [ line $ "The type variable `" <> tyVarName <> "` must only be used as the last argument in a data type:"
+        , indent $ line $ displaySourceSpan relPath ss
+        ]
+
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
       let (row1Box, row2Box) = printRows t1 t2
@@ -1531,6 +1539,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "at " <> displaySourceSpan relPath (NEL.head srcSpan)
             , detail
             ]
+    renderHint (ErrorUnderLabel lbl) detail =
+      paras
+        [ detail
+        , line $ "under the label `" <> markCode (T.pack (decodeStringWithReplacement lbl)) <> "`"
+        ]
 
     printRow :: (Int -> Type a -> Box.Box) -> Type a -> Box.Box
     printRow f = markCodeBox . indent . f prettyDepth .
