@@ -1,0 +1,1 @@
+* Remove `purescript-cst` from Makefile
