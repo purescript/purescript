@@ -66,12 +66,6 @@ constructor = "constructor"
 identConstructor :: Qualified Ident
 identConstructor = Qualified (ByModuleName DataDebugType) (Ident constructor)
 
-opaque :: forall a. (IsString a) => a
-opaque = "opaque"
-
-identOpaque :: Qualified Ident
-identOpaque = Qualified (ByModuleName DataDebugType) (Ident opaque)
-
 opaque_ :: forall a. (IsString a) => a
 opaque_ = "opaque_"
 
