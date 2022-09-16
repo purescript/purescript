@@ -1,9 +1,9 @@
 module Main where
 
 import Prelude
+
 import Data.Debug.Type as D
 import Data.Debug (class Debug, debug)
-import Data.Eq (class Eq1)
 import Effect.Console (log)
 import Test.Assert
 
@@ -16,7 +16,6 @@ data M f a
   | M5 (f a)
   | M6 (f (f a))
 
-derive instance eqM :: (Eq1 f, Eq a) => Eq (M f a)
 derive instance (Debug (f (f a)), Debug (f a), Debug a) => Debug (M f a)
 
 type MA = M Array
@@ -43,7 +42,7 @@ m2' = D.constructor "M2"
       ]
   ]
 
-m3 = M3 { bar: { baz: 9 } }
+m3 = M3 { bar: { baz: 9 } } :: MA Int
 m3' = D.constructor "M3" 
   [ D.record
       [ { key: "bar" 
