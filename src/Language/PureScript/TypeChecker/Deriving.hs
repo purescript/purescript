@@ -24,6 +24,7 @@ import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
+import qualified Data.List.NonEmpty as NonEmpty
 
 -- | Extract the name of the newtype appearing in the last type argument of
 -- a derived newtype instance.
@@ -76,7 +77,7 @@ deriveInstance instType className strategy = do
         Prelude.Functor -> unaryClass deriveFunctor
         Prelude.Ord -> unaryClass deriveOrd
         Prelude.Ord1 -> unaryClass $ \_ _ -> deriveOrd1
-        Debug.Debug -> unaryClass deriveDebug
+        Debug.Debug -> rethrow (addHint (ErrorInInstance Debug.Debug tys)) $ unaryClass deriveDebug
         -- See L.P.Sugar.TypeClasses.Deriving for the classes that can be
         -- derived prior to type checking.
         _ -> throwError . errorMessage $ CannotDerive className tys
@@ -191,17 +192,32 @@ deriveDebug mn tyConNm = do
     mkDebugFunction :: [(ProperName 'ConstructorName, [SourceType])] -> m Expr
     mkDebugFunction ctors = do
       x <- freshIdent "x"
-      lamCase x <$> mapM mkCtorClause ctors
+      (ctorErrors, caseAlts) <- partitionEithers <$> mapM mkCtorClause ctors
+      case NonEmpty.nonEmpty ctorErrors of
+        Just errs ->
+          throwError $ fold $ do
+            (ctorName, spans) <- toList errs
+            ss <- sort $ toList spans
+            pure
+              $ addHint (ErrorInDataConstructor ctorName)
+              $ errorMessage $ CannotDeriveInvalidConstructorDebugArg ss
+        Nothing ->
+          pure $ lamCase x caseAlts
 
-    mkCtorClause :: (ProperName 'ConstructorName, [SourceType]) -> m CaseAlternative
+    mkCtorClause :: (ProperName 'ConstructorName, [SourceType]) -> m (Either (ProperName 'ConstructorName, NonEmpty SourceSpan) CaseAlternative)
     mkCtorClause (ctorName, tys) = do
       idents <- replicateM (length tys) (freshIdent "v")
       tys' <- mapM replaceAllTypeSynonyms tys
-      args <- zipWithM (toDebugExpr . mkVar) idents tys'
       let
-        ctorBinder = mkCtorBinder mn ctorName $ map mkBinder idents
-        argArray = mkLit $ ArrayLiteral args
-      return $ CaseAlternative [ctorBinder] (unguarded $ constructor ctorName argArray)
+        (errors, args) = partitionEithers $ zipWith (toDebugExpr . mkVar) idents tys'
+      case NonEmpty.nonEmpty $ errors >>= NonEmpty.toList of
+        Just allErrors ->
+          pure $ Left (ctorName, allErrors)
+        Nothing -> do
+          let
+            ctorBinder = mkCtorBinder mn ctorName $ map mkBinder idents
+            argArray = mkLit $ ArrayLiteral args
+          pure $ Right $ CaseAlternative [ctorBinder] (unguarded $ constructor ctorName argArray)
 
     mapVar = mkRef Prelude.identMap
     debugVar = mkRef Debug.identDebug
@@ -212,7 +228,7 @@ deriveDebug mn tyConNm = do
       constructorExpr = mkRef Debug.identConstructor
       ctor' = mkLit $ StringLiteral $ mkString $ runProperName ctorName
 
-    toDebugExpr :: Expr -> SourceType -> m Expr
+    toDebugExpr :: Expr -> SourceType -> Either (NonEmpty SourceSpan) Expr
     toDebugExpr argIdent = \case
       TypeConstructor _ Prim.Boolean ->
         pure $ App (mkRef Debug.identBoolean) argIdent
@@ -245,8 +261,17 @@ deriveDebug mn tyConNm = do
       TypeApp _ (TypeApp _ (TypeConstructor _ Prim.Function) _) _ ->
         pure $ App (mkRef Debug.identOpaque_) (mkLitString' "function")
 
-      -- TypeApp _ f a ->
-      --   pure $ App (mkRef Debug.identArray) $ App (App mapVar debugVar) argIdent
+      TypeVar _ _ ->
+        pure $ App debugVar argIdent
+
+      TypeApp _ _ _ ->
+        pure $ App debugVar argIdent
+
+      TypeWildcard _ _ ->
+        pure $ App debugVar argIdent
+
+      TypeOp _ _ ->
+        pure $ App debugVar argIdent
 
       ForAll _ _ _ ty _ ->
         toDebugExpr argIdent ty
@@ -254,8 +279,8 @@ deriveDebug mn tyConNm = do
       ConstrainedType _ _ ty ->
         toDebugExpr argIdent ty
       
-      _ ->
-        internalCompilerError "toDebugExpr: Cannot provide implementation for the given SourceType."
+      ty ->
+        Left $ fst (getAnnForType ty) :| []
 
       -- TypeVar a Text ->
       -- TypeLevelString a PSString ->

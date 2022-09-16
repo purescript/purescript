@@ -188,6 +188,7 @@ data SimpleErrorMessage
   | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
+  | CannotDeriveInvalidConstructorDebugArg SourceSpan
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -353,6 +354,7 @@ errorCode em = case unwrapErrorMessage em of
   UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
+  CannotDeriveInvalidConstructorDebugArg {} -> "CannotDeriveInvalidConstructorDebugArg"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1366,6 +1368,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
     renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
       line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
+
+    renderSimpleErrorMessage (CannotDeriveInvalidConstructorDebugArg ss) =
+      line $ markCode "Debug" <> " deriving failued due to arg at " <> displaySourceSpan relPath ss
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
