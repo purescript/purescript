@@ -252,7 +252,7 @@ deriveDebug mn tyConNm = do
         keyValuePairs <- for rows' $ \(lbl, valTy) -> do
           let lbl' = runLabel lbl
           val' <- toDebugExpr (Accessor lbl' argIdent) valTy
-          pure $ mkLit $ ObjectLiteral
+          pure $ mkLitObject
             [ (mkString "key", mkLitString lbl')
             , (mkString "value", val')
             ]
