@@ -5,6 +5,7 @@ import Protolude
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Types
+import Language.PureScript.PSString (PSString, mkString)
 
 lam :: Ident -> Expr -> Expr
 lam = Abs . mkBinder
@@ -29,6 +30,18 @@ mkBinder = VarBinder nullSourceSpan
 
 mkLit :: Literal Expr -> Expr
 mkLit = Literal nullSourceSpan
+
+mkLitString :: PSString -> Expr
+mkLitString = mkLit . StringLiteral
+
+mkLitString' :: Text -> Expr
+mkLitString' = mkLit . StringLiteral . mkString
+
+mkLitArray :: [Expr] -> Expr
+mkLitArray = mkLit . ArrayLiteral
+
+mkLitObject :: [(PSString, Expr)] -> Expr
+mkLitObject = mkLit . ObjectLiteral
 
 mkCtor :: ModuleName -> ProperName 'ConstructorName -> Expr
 mkCtor mn name = Constructor nullSourceSpan (Qualified (ByModuleName mn) name)

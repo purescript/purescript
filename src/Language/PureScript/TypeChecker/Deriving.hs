@@ -10,6 +10,7 @@ import qualified Data.Map as M
 import Control.Monad.Supply.Class
 import Language.PureScript.AST
 import Language.PureScript.AST.Utils
+import qualified Language.PureScript.Constants.Data.Debug as Debug
 import qualified Language.PureScript.Constants.Prelude as Prelude
 import qualified Language.PureScript.Constants.Prim as Prim
 import Language.PureScript.Crash
@@ -75,6 +76,7 @@ deriveInstance instType className strategy = do
         Prelude.Functor -> unaryClass deriveFunctor
         Prelude.Ord -> unaryClass deriveOrd
         Prelude.Ord1 -> unaryClass $ \_ _ -> deriveOrd1
+        Debug.Debug -> unaryClass deriveDebug
         -- See L.P.Sugar.TypeClasses.Deriving for the classes that can be
         -- derived prior to type checking.
         _ -> throwError . errorMessage $ CannotDerive className tys
@@ -172,6 +174,105 @@ deriveNewtypeInstance mn className tys tyConNm dkargs dargs = do
                 <=< toList . (M.lookup su <=< M.lookup (ByModuleName mn')))
             $ dicts
       in lookIn suModule || lookIn newtypeModule
+
+deriveDebug
+  :: forall m
+   . MonadError MultipleErrors m
+  => MonadState CheckState m
+  => MonadSupply m
+  => ModuleName
+  -> ProperName 'TypeName
+  -> m [(PSString, Expr)]
+deriveDebug mn tyConNm = do
+  (_, _, _, ctors) <- lookupTypeDecl mn tyConNm
+  debugFn <- mkDebugFunction ctors
+  pure [(Debug.debug, debugFn)]
+  where
+    mkDebugFunction :: [(ProperName 'ConstructorName, [SourceType])] -> m Expr
+    mkDebugFunction ctors = do
+      x <- freshIdent "x"
+      lamCase x <$> mapM mkCtorClause ctors
+
+    mkCtorClause :: (ProperName 'ConstructorName, [SourceType]) -> m CaseAlternative
+    mkCtorClause (ctorName, tys) = do
+      idents <- replicateM (length tys) (freshIdent "v")
+      tys' <- mapM replaceAllTypeSynonyms tys
+      args <- zipWithM (toDebugExpr . mkVar) idents tys'
+      let
+        ctorBinder = mkCtorBinder mn ctorName $ map mkBinder idents
+        argArray = mkLit $ ArrayLiteral args
+      return $ CaseAlternative [ctorBinder] (unguarded $ constructor ctorName argArray)
+
+    mapVar = mkRef Prelude.identMap
+    debugVar = mkRef Debug.identDebug
+
+    constructor :: ProperName 'ConstructorName -> Expr -> Expr
+    constructor ctorName argArray = App (App constructorExpr ctor') argArray
+      where
+      constructorExpr = mkRef Debug.identConstructor
+      ctor' = mkLit $ StringLiteral $ mkString $ runProperName ctorName
+
+    toDebugExpr :: Expr -> SourceType -> m Expr
+    toDebugExpr argIdent = \case
+      TypeConstructor _ Prim.Boolean ->
+        pure $ App (mkRef Debug.identBoolean) argIdent
+
+      TypeConstructor _ Prim.Int ->
+        pure $ App (mkRef Debug.identInt) argIdent
+
+      TypeConstructor _ Prim.Number ->
+        pure $ App (mkRef Debug.identNumber) argIdent
+
+      TypeConstructor _ Prim.Char ->
+        pure $ App (mkRef Debug.identChar) argIdent
+
+      TypeConstructor _ Prim.String ->
+        pure $ App (mkRef Debug.identString) argIdent
+
+      TypeApp _ (TypeConstructor _ Prim.Array) _ ->
+        pure $ App (mkRef Debug.identArray) $ App (App mapVar debugVar) argIdent
+
+      TypeApp _ (TypeConstructor _ Prim.Record) rows | Just rows' <- decomposeRec rows -> do
+        keyValuePairs <- for rows' $ \(lbl, valTy) -> do
+          let lbl' = runLabel lbl
+          val' <- toDebugExpr (Accessor lbl' argIdent) valTy
+          pure $ mkLit $ ObjectLiteral
+            [ (mkString "key", mkLitString lbl')
+            , (mkString "value", val')
+            ]
+        pure $ App (mkRef Debug.identRecord) $ mkLitArray keyValuePairs
+
+      TypeApp _ (TypeApp _ (TypeConstructor _ Prim.Function) _) _ ->
+        pure $ App (mkRef Debug.identOpaque_) (mkLitString' "function")
+
+      -- TypeApp _ f a ->
+      --   pure $ App (mkRef Debug.identArray) $ App (App mapVar debugVar) argIdent
+
+      ForAll _ _ _ ty _ ->
+        toDebugExpr argIdent ty
+
+      ConstrainedType _ _ ty ->
+        toDebugExpr argIdent ty
+      
+      _ ->
+        internalCompilerError "toDebugExpr: Cannot provide implementation for the given SourceType."
+
+      -- TypeVar a Text ->
+      -- TypeLevelString a PSString ->
+      -- TypeLevelInt a Integer ->
+      -- TypeWildcard a WildcardData ->
+      -- TypeConstructor a (Qualified (ProperName 'TypeName)) ->
+      -- TypeOp a (Qualified (OpName 'TypeOpName)) ->
+      -- TypeApp a (Type a) (Type a) ->
+      -- KindApp a (Type a) (Type a) ->
+      
+      -- Skolem a Text (Maybe (Type a)) Int SkolemScope ->
+      -- REmpty a ->
+      -- RCons a Label (Type a) (Type a) ->
+      -- KindedType a (Type a) (Type a) ->
+      -- BinaryNoParensType a (Type a) (Type a) (Type a) ->
+      -- ParensInType _ ty ->
+      --   toDebugExpr ident ty
 
 deriveEq
   :: forall m

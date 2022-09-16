@@ -35,6 +35,21 @@ pattern Array = Qualified (ByModuleName Prim) (ProperName "Array")
 pattern Row :: Qualified (ProperName 'TypeName)
 pattern Row = Qualified (ByModuleName Prim) (ProperName "Row")
 
+pattern Number :: Qualified (ProperName 'TypeName)
+pattern Number = Qualified (ByModuleName Prim) (ProperName "Number")
+
+pattern Int :: Qualified (ProperName 'TypeName)
+pattern Int = Qualified (ByModuleName Prim) (ProperName "Int")
+
+pattern String :: Qualified (ProperName 'TypeName)
+pattern String = Qualified (ByModuleName Prim) (ProperName "String")
+
+pattern Char :: Qualified (ProperName 'TypeName)
+pattern Char = Qualified (ByModuleName Prim) (ProperName "Char")
+
+pattern Boolean :: Qualified (ProperName 'TypeName)
+pattern Boolean = Qualified (ByModuleName Prim) (ProperName "Boolean")
+
 -- Prim.Boolean
 
 pattern PrimBoolean :: ModuleName
