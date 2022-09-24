@@ -367,77 +367,6 @@ decomposeRec' = sortOn fst . go
   where go (RCons _ str typ typs) = (str, typ) : go typs
         go _ = []
 
-deriveFunctor
-  :: forall m
-   . MonadError MultipleErrors m
-  => MonadState CheckState m
-  => MonadSupply m
-  => ModuleName
-  -> ProperName 'TypeName
-  -> m [(PSString, Expr)]
-deriveFunctor mn tyConNm = do
-  (_, _, tys, ctors) <- lookupTypeDecl mn tyConNm
-  mapFun <- mkMapFunction tys ctors
-  pure [(Prelude.map, mapFun)]
-  where
-    mkMapFunction :: [(Text, Maybe SourceType)] -> [(ProperName 'ConstructorName, [SourceType])] -> m Expr
-    mkMapFunction tys ctors = case reverse tys of
-      [] -> throwError . errorMessage $ KindsDoNotUnify (kindType -:> kindType) kindType
-      ((iTy, _) : _) -> do
-        f <- freshIdent "f"
-        m <- freshIdent "m"
-        lam f . lamCase m <$> mapM (mkCtorClause iTy f) ctors
-
-    mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [SourceType]) -> m CaseAlternative
-    mkCtorClause iTyName f (ctorName, ctorTys) = do
-      idents <- replicateM (length ctorTys) (freshIdent "v")
-      ctorTys' <- mapM replaceAllTypeSynonyms ctorTys
-      args <- zipWithM transformArg idents ctorTys'
-      let ctor = mkCtor mn ctorName
-          rebuilt = foldl' App ctor args
-          caseBinder = mkCtorBinder mn ctorName $ map mkBinder idents
-      return $ CaseAlternative [caseBinder] (unguarded rebuilt)
-      where
-        fVar = mkVar f
-        mapVar = mkRef Prelude.identMap
-
-        transformArg :: Ident -> SourceType -> m Expr
-        transformArg ident = fmap (foldr App (mkVar ident)) . goType where
-
-          goType :: SourceType -> m (Maybe Expr)
-          -- argument matches the index type
-          goType (TypeVar _ t) | t == iTyName = return (Just fVar)
-
-          -- records
-          goType recTy | Just row <- objectType recTy =
-              traverse buildUpdate (decomposeRec' row) >>= (traverse buildRecord . justUpdates)
-            where
-              justUpdates :: [Maybe (Label, Expr)] -> Maybe [(Label, Expr)]
-              justUpdates = foldMap (fmap return)
-
-              buildUpdate :: (Label, SourceType) -> m (Maybe (Label, Expr))
-              buildUpdate (lbl, ty) = do upd <- goType ty
-                                         return ((lbl,) <$> upd)
-
-              buildRecord :: [(Label, Expr)] -> m Expr
-              buildRecord updates = do
-                arg <- freshIdent "o"
-                let argVar = mkVar arg
-                    mkAssignment (Label l, x) = (l, App x (Accessor l argVar))
-                return (lam arg (ObjectUpdate argVar (mkAssignment <$> updates)))
-
-          -- quantifiers
-          goType (ForAll _ scopedVar _ t _) | scopedVar /= iTyName = goType t
-
-          -- constraints
-          goType (ConstrainedType _ _ t) = goType t
-
-          -- under a `* -> *`, just assume functor for now
-          goType (TypeApp _ _ t) = fmap (App mapVar) <$> goType t
-
-          -- otherwise do nothing - will fail type checking if type does actually contain index
-          goType _ = return Nothing
-
 data ParamUsage
   = IsParam
   | MentionsParam ParamUsage
@@ -559,6 +488,21 @@ mkTraversal mn recurseVar (TraversalOps @_ @f visitExpr extractExpr) ctors = do
         usingLamIdent $ extractExpr . traverseFields handleValue fields
 
   lam f <$> mkCasesForTraversal mn handleValue extractExpr ctors
+
+deriveFunctor
+  :: forall m
+   . MonadError MultipleErrors m
+  => MonadState CheckState m
+  => MonadSupply m
+  => ModuleName
+  -> ProperName 'TypeName
+  -> m [(PSString, Expr)]
+deriveFunctor mn tyConNm = do
+  ctors <- validateParamsInTypeConstructors mn tyConNm
+  mapFun <- mkTraversal mn mapVar (TraversalOps identity identity) ctors
+  pure [(Prelude.map, mapFun)]
+  where
+  mapVar = mkRef Prelude.identMap
 
 toConst :: forall f a b. Functor f => f a -> Const [f a] b
 toConst = Const . pure
