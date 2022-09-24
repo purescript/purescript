@@ -43,29 +43,6 @@
 -- @shouldFailWith CannotDeriveInvalidConstructorArg
 -- @shouldFailWith CannotDeriveInvalidConstructorArg
 -- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
 module FoldableInstance9 where
 
 import Prelude

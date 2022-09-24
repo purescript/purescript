@@ -387,7 +387,7 @@ validateParamsInTypeConstructors mn tyConNm = do
   ctors' <- traverse (traverse $ traverse replaceAllTypeSynonyms) ctors
   let (ctorUsages, errors) = runWriter $ traverse (addCtorHint . traverse . traverse $ typeToUsageOf param) ctors'
   unless (null errors) $
-    throwError . flip foldMap errors $ \(hints, ss) ->
+    throwError . flip foldMap (ordNub errors) $ \(hints, ss) ->
       addHints (either ErrorInDataConstructor ErrorUnderLabel <$> hints) $
         errorMessage $ CannotDeriveInvalidConstructorArg param ss
   pure ctorUsages

@@ -1,11 +1,11 @@
-Error 1 of 68:
+Error 1 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:83:14 - 83:15 (line 83, column 14 - line 83, column 15)
+      tests/purs/failing/FoldableInstance9.purs:60:14 - 60:15 (line 60, column 14 - line 60, column 15)
 
 
   in data constructor [33mTest1[0m
@@ -24,14 +24,14 @@ Error 1 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 2 of 68:
+Error 2 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:83:16 - 83:17 (line 83, column 16 - line 83, column 17)
+      tests/purs/failing/FoldableInstance9.purs:60:16 - 60:17 (line 60, column 16 - line 60, column 17)
 
 
   in data constructor [33mTest1[0m
@@ -50,14 +50,14 @@ Error 2 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 3 of 68:
+Error 3 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:83:28 - 83:29 (line 83, column 28 - line 83, column 29)
+      tests/purs/failing/FoldableInstance9.purs:60:28 - 60:29 (line 60, column 28 - line 60, column 29)
 
 
   in data constructor [33mTest1[0m
@@ -76,14 +76,14 @@ Error 3 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 4 of 68:
+Error 4 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:83:36 - 83:37 (line 83, column 36 - line 83, column 37)
+      tests/purs/failing/FoldableInstance9.purs:60:36 - 60:37 (line 60, column 36 - line 60, column 37)
 
 
   in data constructor [33mTest1[0m
@@ -102,14 +102,14 @@ Error 4 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 5 of 68:
+Error 5 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:83:38 - 83:39 (line 83, column 38 - line 83, column 39)
+      tests/purs/failing/FoldableInstance9.purs:60:38 - 60:39 (line 60, column 38 - line 60, column 39)
 
 
   in data constructor [33mTest1[0m
@@ -128,14 +128,14 @@ Error 5 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 6 of 68:
+Error 6 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:83:52 - 83:53 (line 83, column 52 - line 83, column 53)
+      tests/purs/failing/FoldableInstance9.purs:60:52 - 60:53 (line 60, column 52 - line 60, column 53)
 
 
   in data constructor [33mTest1[0m
@@ -154,14 +154,14 @@ Error 6 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 7 of 68:
+Error 7 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:84:22 - 84:23 (line 84, column 22 - line 84, column 23)
+      tests/purs/failing/FoldableInstance9.purs:61:22 - 61:23 (line 61, column 22 - line 61, column 23)
 
 
   under the label `[33mall[0m`
@@ -181,14 +181,14 @@ Error 7 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 8 of 68:
+Error 8 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:84:24 - 84:25 (line 84, column 24 - line 84, column 25)
+      tests/purs/failing/FoldableInstance9.purs:61:24 - 61:25 (line 61, column 24 - line 61, column 25)
 
 
   under the label `[33mall[0m`
@@ -208,14 +208,14 @@ Error 8 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 9 of 68:
+Error 9 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:86:24 - 86:25 (line 86, column 24 - line 86, column 25)
+      tests/purs/failing/FoldableInstance9.purs:63:24 - 63:25 (line 63, column 24 - line 63, column 25)
 
 
   under the label `[33mlefts[0m`
@@ -235,14 +235,14 @@ Error 9 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 10 of 68:
+Error 10 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:86:26 - 86:27 (line 86, column 26 - line 86, column 27)
+      tests/purs/failing/FoldableInstance9.purs:63:26 - 63:27 (line 63, column 26 - line 63, column 27)
 
 
   under the label `[33mlefts[0m`
@@ -262,14 +262,14 @@ Error 10 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 11 of 68:
+Error 11 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:87:29 - 87:30 (line 87, column 29 - line 87, column 30)
+      tests/purs/failing/FoldableInstance9.purs:64:29 - 64:30 (line 64, column 29 - line 64, column 30)
 
 
   under the label `[33mmiddle[0m`
@@ -289,14 +289,14 @@ Error 11 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 12 of 68:
+Error 12 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:85:29 - 85:30 (line 85, column 29 - line 85, column 30)
+      tests/purs/failing/FoldableInstance9.purs:62:29 - 62:30 (line 62, column 29 - line 62, column 30)
 
 
   under the label `[33mrights[0m`
@@ -316,14 +316,14 @@ Error 12 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 13 of 68:
+Error 13 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:91:24 - 91:25 (line 91, column 24 - line 91, column 25)
+      tests/purs/failing/FoldableInstance9.purs:68:24 - 68:25 (line 68, column 24 - line 68, column 25)
 
 
   in data constructor [33mTest3[0m
@@ -342,14 +342,14 @@ Error 13 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 14 of 68:
+Error 14 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:91:26 - 91:27 (line 91, column 26 - line 91, column 27)
+      tests/purs/failing/FoldableInstance9.purs:68:26 - 68:27 (line 68, column 26 - line 68, column 27)
 
 
   in data constructor [33mTest3[0m
@@ -368,14 +368,14 @@ Error 14 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 15 of 68:
+Error 15 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:91:28 - 91:29 (line 91, column 28 - line 91, column 29)
+      tests/purs/failing/FoldableInstance9.purs:68:28 - 68:29 (line 68, column 28 - line 68, column 29)
 
 
   in data constructor [33mTest3[0m
@@ -394,14 +394,14 @@ Error 15 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 16 of 68:
+Error 16 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:92:31 - 92:32 (line 92, column 31 - line 92, column 32)
+      tests/purs/failing/FoldableInstance9.purs:69:31 - 69:32 (line 69, column 31 - line 69, column 32)
 
 
   in data constructor [33mTest3[0m
@@ -420,14 +420,14 @@ Error 16 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 17 of 68:
+Error 17 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:92:33 - 92:34 (line 92, column 33 - line 92, column 34)
+      tests/purs/failing/FoldableInstance9.purs:69:33 - 69:34 (line 69, column 33 - line 69, column 34)
 
 
   in data constructor [33mTest3[0m
@@ -446,14 +446,14 @@ Error 17 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 18 of 68:
+Error 18 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:93:26 - 93:27 (line 93, column 26 - line 93, column 27)
+      tests/purs/failing/FoldableInstance9.purs:70:26 - 70:27 (line 70, column 26 - line 70, column 27)
 
 
   in data constructor [33mTest3[0m
@@ -472,14 +472,14 @@ Error 18 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 19 of 68:
+Error 19 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:93:28 - 93:29 (line 93, column 28 - line 93, column 29)
+      tests/purs/failing/FoldableInstance9.purs:70:28 - 70:29 (line 70, column 28 - line 70, column 29)
 
 
   in data constructor [33mTest3[0m
@@ -498,14 +498,14 @@ Error 19 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 20 of 68:
+Error 20 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:94:31 - 94:32 (line 94, column 31 - line 94, column 32)
+      tests/purs/failing/FoldableInstance9.purs:71:31 - 71:32 (line 71, column 31 - line 71, column 32)
 
 
   in data constructor [33mTest3[0m
@@ -524,14 +524,14 @@ Error 20 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 21 of 68:
+Error 21 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:100:28 - 100:29 (line 100, column 28 - line 100, column 29)
+      tests/purs/failing/FoldableInstance9.purs:77:28 - 77:29 (line 77, column 28 - line 77, column 29)
 
 
   in data constructor [33mTest4[0m
@@ -550,14 +550,14 @@ Error 21 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 22 of 68:
+Error 22 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:100:30 - 100:31 (line 100, column 30 - line 100, column 31)
+      tests/purs/failing/FoldableInstance9.purs:77:30 - 77:31 (line 77, column 30 - line 77, column 31)
 
 
   in data constructor [33mTest4[0m
@@ -576,14 +576,14 @@ Error 22 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 23 of 68:
+Error 23 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:100:32 - 100:33 (line 100, column 32 - line 100, column 33)
+      tests/purs/failing/FoldableInstance9.purs:77:32 - 77:33 (line 77, column 32 - line 77, column 33)
 
 
   in data constructor [33mTest4[0m
@@ -602,14 +602,14 @@ Error 23 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 24 of 68:
+Error 24 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:101:35 - 101:36 (line 101, column 35 - line 101, column 36)
+      tests/purs/failing/FoldableInstance9.purs:78:35 - 78:36 (line 78, column 35 - line 78, column 36)
 
 
   in data constructor [33mTest4[0m
@@ -628,14 +628,14 @@ Error 24 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 25 of 68:
+Error 25 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:101:37 - 101:38 (line 101, column 37 - line 101, column 38)
+      tests/purs/failing/FoldableInstance9.purs:78:37 - 78:38 (line 78, column 37 - line 78, column 38)
 
 
   in data constructor [33mTest4[0m
@@ -654,14 +654,14 @@ Error 25 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 26 of 68:
+Error 26 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:102:30 - 102:31 (line 102, column 30 - line 102, column 31)
+      tests/purs/failing/FoldableInstance9.purs:79:30 - 79:31 (line 79, column 30 - line 79, column 31)
 
 
   in data constructor [33mTest4[0m
@@ -680,14 +680,14 @@ Error 26 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 27 of 68:
+Error 27 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:102:32 - 102:33 (line 102, column 32 - line 102, column 33)
+      tests/purs/failing/FoldableInstance9.purs:79:32 - 79:33 (line 79, column 32 - line 79, column 33)
 
 
   in data constructor [33mTest4[0m
@@ -706,14 +706,14 @@ Error 27 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 28 of 68:
+Error 28 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:103:35 - 103:36 (line 103, column 35 - line 103, column 36)
+      tests/purs/failing/FoldableInstance9.purs:80:35 - 80:36 (line 80, column 35 - line 80, column 36)
 
 
   in data constructor [33mTest4[0m
@@ -732,14 +732,14 @@ Error 28 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 29 of 68:
+Error 29 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:108:30 - 108:31 (line 108, column 30 - line 108, column 31)
+      tests/purs/failing/FoldableInstance9.purs:85:30 - 85:31 (line 85, column 30 - line 85, column 31)
 
 
   in data constructor [33mTest4[0m
@@ -758,14 +758,14 @@ Error 29 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 30 of 68:
+Error 30 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:108:32 - 108:33 (line 108, column 32 - line 108, column 33)
+      tests/purs/failing/FoldableInstance9.purs:85:32 - 85:33 (line 85, column 32 - line 85, column 33)
 
 
   in data constructor [33mTest4[0m
@@ -784,14 +784,14 @@ Error 30 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 31 of 68:
+Error 31 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:108:34 - 108:35 (line 108, column 34 - line 108, column 35)
+      tests/purs/failing/FoldableInstance9.purs:85:34 - 85:35 (line 85, column 34 - line 85, column 35)
 
 
   in data constructor [33mTest4[0m
@@ -810,14 +810,14 @@ Error 31 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 32 of 68:
+Error 32 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:109:37 - 109:38 (line 109, column 37 - line 109, column 38)
+      tests/purs/failing/FoldableInstance9.purs:86:37 - 86:38 (line 86, column 37 - line 86, column 38)
 
 
   in data constructor [33mTest4[0m
@@ -836,14 +836,14 @@ Error 32 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 33 of 68:
+Error 33 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:109:39 - 109:40 (line 109, column 39 - line 109, column 40)
+      tests/purs/failing/FoldableInstance9.purs:86:39 - 86:40 (line 86, column 39 - line 86, column 40)
 
 
   in data constructor [33mTest4[0m
@@ -862,14 +862,14 @@ Error 33 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 34 of 68:
+Error 34 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:110:32 - 110:33 (line 110, column 32 - line 110, column 33)
+      tests/purs/failing/FoldableInstance9.purs:87:32 - 87:33 (line 87, column 32 - line 87, column 33)
 
 
   in data constructor [33mTest4[0m
@@ -888,14 +888,14 @@ Error 34 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 35 of 68:
+Error 35 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:110:34 - 110:35 (line 110, column 34 - line 110, column 35)
+      tests/purs/failing/FoldableInstance9.purs:87:34 - 87:35 (line 87, column 34 - line 87, column 35)
 
 
   in data constructor [33mTest4[0m
@@ -914,14 +914,14 @@ Error 35 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 36 of 68:
+Error 36 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:111:37 - 111:38 (line 111, column 37 - line 111, column 38)
+      tests/purs/failing/FoldableInstance9.purs:88:37 - 88:38 (line 88, column 37 - line 88, column 38)
 
 
   in data constructor [33mTest4[0m
@@ -940,14 +940,14 @@ Error 36 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 37 of 68:
+Error 37 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:114:19 - 114:20 (line 114, column 19 - line 114, column 20)
+      tests/purs/failing/FoldableInstance9.purs:91:19 - 91:20 (line 91, column 19 - line 91, column 20)
 
 
   in data constructor [33mTest4[0m
@@ -966,14 +966,14 @@ Error 37 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 38 of 68:
+Error 38 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:117:18 - 117:19 (line 117, column 18 - line 117, column 19)
+      tests/purs/failing/FoldableInstance9.purs:94:18 - 94:19 (line 94, column 18 - line 94, column 19)
 
 
   under the label `[33mall[0m`
@@ -993,41 +993,14 @@ Error 38 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 39 of 68:
+Error 39 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:117:18 - 117:19 (line 117, column 18 - line 117, column 19)
-
-
-  under the label `[33mall[0m`
-  in data constructor [33mTest5[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 40 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:117:18 - 117:19 (line 117, column 18 - line 117, column 19)
+      tests/purs/failing/FoldableInstance9.purs:94:18 - 94:19 (line 94, column 18 - line 94, column 19)
 
 
   under the label `[33mlefts[0m`
@@ -1047,41 +1020,14 @@ Error 40 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 41 of 68:
+Error 40 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:117:18 - 117:19 (line 117, column 18 - line 117, column 19)
-
-
-  under the label `[33mlefts[0m`
-  in data constructor [33mTest5[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 42 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:117:18 - 117:19 (line 117, column 18 - line 117, column 19)
+      tests/purs/failing/FoldableInstance9.purs:94:18 - 94:19 (line 94, column 18 - line 94, column 19)
 
 
   under the label `[33mmiddle[0m`
@@ -1101,14 +1047,14 @@ Error 42 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 43 of 68:
+Error 41 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:117:18 - 117:19 (line 117, column 18 - line 117, column 19)
+      tests/purs/failing/FoldableInstance9.purs:94:18 - 94:19 (line 94, column 18 - line 94, column 19)
 
 
   under the label `[33mrights[0m`
@@ -1128,14 +1074,14 @@ Error 43 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 44 of 68:
+Error 42 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:118:21 - 118:22 (line 118, column 21 - line 118, column 22)
+      tests/purs/failing/FoldableInstance9.purs:95:21 - 95:22 (line 95, column 21 - line 95, column 22)
 
 
   in data constructor [33mTest6[0m
@@ -1154,196 +1100,14 @@ Error 44 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 45 of 68:
+Error 43 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:118:21 - 118:22 (line 118, column 21 - line 118, column 22)
-
-
-  in data constructor [33mTest6[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 46 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:118:21 - 118:22 (line 118, column 21 - line 118, column 22)
-
-
-  in data constructor [33mTest6[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 47 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:118:21 - 118:22 (line 118, column 21 - line 118, column 22)
-
-
-  in data constructor [33mTest6[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 48 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:118:21 - 118:22 (line 118, column 21 - line 118, column 22)
-
-
-  in data constructor [33mTest6[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 49 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:118:21 - 118:22 (line 118, column 21 - line 118, column 22)
-
-
-  in data constructor [33mTest6[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 50 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:118:21 - 118:22 (line 118, column 21 - line 118, column 22)
-
-
-  in data constructor [33mTest6[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 51 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:118:21 - 118:22 (line 118, column 21 - line 118, column 22)
-
-
-  in data constructor [33mTest6[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 52 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:33 - 119:34 (line 119, column 33 - line 119, column 34)
+      tests/purs/failing/FoldableInstance9.purs:96:33 - 96:34 (line 96, column 33 - line 96, column 34)
 
 
   in data constructor [33mTest7[0m
@@ -1362,14 +1126,14 @@ Error 52 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 53 of 68:
+Error 44 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:119:33 - 119:34 (line 119, column 33 - line 119, column 34)
+      tests/purs/failing/FoldableInstance9.purs:96:56 - 96:57 (line 96, column 56 - line 96, column 57)
 
 
   in data constructor [33mTest7[0m
@@ -1388,378 +1152,14 @@ Error 53 of 68:
   See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
   or to contribute content related to this error.
 
-Error 54 of 68:
+Error 45 of 45:
 
   in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
+  at tests/purs/failing/FoldableInstance9.purs:97:1 - 97:38 (line 97, column 1 - line 97, column 38)
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:119:33 - 119:34 (line 119, column 33 - line 119, column 34)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 55 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:33 - 119:34 (line 119, column 33 - line 119, column 34)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 56 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:33 - 119:34 (line 119, column 33 - line 119, column 34)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 57 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:33 - 119:34 (line 119, column 33 - line 119, column 34)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 58 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:33 - 119:34 (line 119, column 33 - line 119, column 34)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 59 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:33 - 119:34 (line 119, column 33 - line 119, column 34)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 60 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:56 - 119:57 (line 119, column 56 - line 119, column 57)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 61 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:56 - 119:57 (line 119, column 56 - line 119, column 57)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 62 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:56 - 119:57 (line 119, column 56 - line 119, column 57)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 63 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:56 - 119:57 (line 119, column 56 - line 119, column 57)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 64 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:56 - 119:57 (line 119, column 56 - line 119, column 57)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 65 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:56 - 119:57 (line 119, column 56 - line 119, column 57)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 66 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:56 - 119:57 (line 119, column 56 - line 119, column 57)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 67 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:56 - 119:57 (line 119, column 56 - line 119, column 57)
-
-
-  in data constructor [33mTest7[0m
-  in type class instance
-  [33m                                        [0m
-  [33m  Data.Foldable.Foldable (Test f0 g1 h2)[0m
-  [33m                                        [0m
-
-  where [33mf0[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mg1[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-        [33mh2[0m is a rigid type variable
-          bound at (line 0, column 0 - line 0, column 0)
-
-  See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
-  or to contribute content related to this error.
-
-Error 68 of 68:
-
-  in module [33mFoldableInstance9[0m
-  at tests/purs/failing/FoldableInstance9.purs:120:1 - 120:38 (line 120, column 1 - line 120, column 38)
-
-    The type variable `a` must only be used as the last argument in a data type:
-
-      tests/purs/failing/FoldableInstance9.purs:119:59 - 119:60 (line 119, column 59 - line 119, column 60)
+      tests/purs/failing/FoldableInstance9.purs:96:59 - 96:60 (line 96, column 59 - line 96, column 60)
 
 
   in data constructor [33mTest7[0m
