@@ -255,7 +255,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     in (missed', ( if null approx
                      then liftA2 (&&) cond nec
                      else Left Incomplete
-                 , if either (const True) id cond
+                 , if and cond
                      then redundant
                      else caseAlternativeBinders ca : redundant
                  )
