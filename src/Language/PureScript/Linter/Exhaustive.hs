@@ -204,7 +204,7 @@ missingCasesMultiple env mn = go
 isExhaustiveGuard :: Environment -> ModuleName -> [GuardedExpr] -> Bool
 isExhaustiveGuard _ _ [MkUnguarded _] = True
 isExhaustiveGuard env moduleName gs   =
-  not . null $ filter (\(GuardedExpr grd _) -> isExhaustive grd) gs
+  any (\(GuardedExpr grd _) -> isExhaustive grd) gs
   where
     isExhaustive :: [Guard] -> Bool
     isExhaustive = all checkGuard
