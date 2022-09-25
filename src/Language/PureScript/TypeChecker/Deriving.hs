@@ -407,8 +407,8 @@ validateParamsInTypeConstructors mn tyConNm = do
       _ -> pure ()
 
     go = \case
-      ForAll _ name _ ty _ | name /= param ->
-        go ty
+      ForAll _ name _ ty _ ->
+        if name == param then pure Nothing else go ty
 
       ConstrainedType _ _ ty ->
         go ty
@@ -425,8 +425,8 @@ validateParamsInTypeConstructors mn tyConNm = do
       TypeVar _ name ->
         pure $ (name == param) `orEmpty` IsParam
 
-      _ ->
-        pure Nothing
+      ty ->
+        assertNoParamUsedIn ty $> Nothing
 
 usingLamIdent :: forall m. MonadSupply m => (Expr -> m Expr) -> m Expr
 usingLamIdent cb = do

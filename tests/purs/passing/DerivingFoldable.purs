@@ -19,7 +19,7 @@ type RecordFields f a =
 data M f a
   = M0
   | M1 a (Array a)
-  | M2 Int
+  | M2 Int (forall a. Array a -> Array a)
   | M3 (f a)
   | M4 (RecordFields f a)
   | M5 { nested :: RecordFields f a }
@@ -41,7 +41,7 @@ foldMapStr = foldMap identity
 
 m0 = M0 :: MArrStr
 m1 = M1 "a" ["b", "c"] :: MArrStr
-m2 = M2 0 :: MArrStr
+m2 = M2 0 identity :: MArrStr
 m3 = M3 ["a", "b", "c"] :: MArrStr
 m4 = M4 recordValue :: MArrStr
 m5 = M5 { nested: recordValue } :: MArrStr
