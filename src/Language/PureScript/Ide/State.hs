@@ -401,8 +401,7 @@ resolveOperatorsForModule modules = map (idaDeclaration %~ resolveOperator)
     getDeclarations :: P.ModuleName -> [IdeDeclaration]
     getDeclarations moduleName =
       Map.lookup moduleName modules
-      & fromMaybe []
-      & map discardAnn
+      & foldMap (map discardAnn)
 
     resolveOperator (IdeDeclValueOperator op)
       | (P.Qualified (P.ByModuleName mn) (Left ident)) <- op ^. ideValueOpAlias =
