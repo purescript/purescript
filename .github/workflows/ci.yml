@@ -166,7 +166,13 @@ jobs:
 
   lint:
     runs-on: "ubuntu-latest"
-    container: "ghcr.io/purescript/haskell:9.2.3-stretch@sha256:70fd2b6255deb5daa961e6983591a0e21e9ac1e793923bee54aa2cc62e01f867"
+    # At the moment, this is a different image from the image used for
+    # compilation, though the GHC versions match. This is because the
+    # compilation image uses an old version of glibc, which we want because it
+    # means our published binaries will work on the widest number of platforms.
+    # But the HLint binary downloaded by this job requires a newer glibc
+    # version.
+    container: "haskell:9.2.3-buster@sha256:51e250369e4671a15c247cdc5047397be88d7eb8e95b97b0fd9f417854a78bec"
 
     steps:
       - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
@@ -190,7 +196,7 @@ jobs:
 
       - run: "ci/fix-home ci/run-hlint.sh --git"
         env:
-          VERSION: "2.2.11"
+          VERSION: "3.5"
 
       # Note: the weeder version will need to be updated when we next update our version
       # of GHC.

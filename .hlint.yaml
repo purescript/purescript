@@ -18,6 +18,13 @@
 - ignore: {name: "Avoid lambda using `infix`"}
 - ignore: {name: "Fuse mapM/map"}
 - ignore: {name: "Eta reduce"} # This warning will often make suggestions that are no longer valid due to simplified subsumption
+- ignore: {name: "Redundant fmap"}
+- ignore: {name: "Redundant <$>"}
+- ignore: {name: "Use any"}
+- ignore: {name: "Use fromRight"}
+- ignore: {name: "Use maybe"}
+- ignore: {name: "Use unzip"}
+- ignore: {name: "Use <=<"}
 
 
 # Specify additional command line arguments
