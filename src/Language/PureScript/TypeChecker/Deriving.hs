@@ -505,7 +505,7 @@ deriveFunctor mn tyConNm = do
   where
   mapVar = mkRef Prelude.identMap
 
-toConst :: forall f a b. Functor f => f a -> Const [f a] b
+toConst :: forall f a b. f a -> Const [f a] b
 toConst = Const . pure
 
 consumeConst :: forall f a b c. Applicative f => ([a] -> b) -> Const [f a] c -> f b
