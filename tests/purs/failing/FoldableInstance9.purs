@@ -64,32 +64,32 @@ data Test f g h a
           , middle :: f Int a Int
           , none :: f Int Int Int
           }
-  | Test3 (g 
+  | Test3 (g
             { all :: f a a a
             , rights :: f Int a a
             , lefts :: f a a Int
             , middle :: f Int a Int
             , none :: f Int Int Int
-            } 
+            }
             a)
   | Test4 (h
-            { nested1 :: 
+            { nested1 ::
                 { all :: f a a a
                 , rights :: f Int a a
                 , lefts :: f a a Int
                 , middle :: f Int a Int
                 , none :: f Int Int Int
                 }
-            , nested2 :: 
-                g 
+            , nested2 ::
+                g
                   { all :: f a a a
                   , rights :: f Int a a
                   , lefts :: f a a Int
                   , middle :: f Int a Int
                   , none :: f Int Int Int
                   }
-                  a 
-            } 
+                  a
+            }
             a)
   | Test5 (Rec f a)
   | Test6 (g (Rec f a) a)

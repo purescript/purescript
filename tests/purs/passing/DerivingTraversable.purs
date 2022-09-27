@@ -30,7 +30,7 @@ data M f a
   | M7 (f (f { nested :: RecordFields f a }))
 
 -- Note: all 4 of these constraints are needed to compile this code
-derive instance 
+derive instance
   ( Eq1 f
   , Eq (f (f { nested :: RecordFields f a }))
   , Eq (f { nested :: RecordFields f a })

@@ -1369,7 +1369,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
       line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
 
-    renderSimpleErrorMessage (CannotDeriveInvalidConstructorArg tyVarName ss) = 
+    renderSimpleErrorMessage (CannotDeriveInvalidConstructorArg tyVarName ss) =
       paras
         [ line $ "The type variable `" <> tyVarName <> "` must only be used as the last argument in a data type:"
         , indent $ line $ displaySourceSpan relPath ss
