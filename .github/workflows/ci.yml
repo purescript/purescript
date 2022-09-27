@@ -84,7 +84,7 @@ jobs:
           path: |
             /root/.stack
             ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ runner.os }}-MdyPsf-${{ hashFiles('stack.yaml') }}"
+          key: "${{ runner.os }}-${{ job.container.id }}-MdyPsf-${{ hashFiles('stack.yaml') }}"
 
       - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
         # This ensures that the local GHC and MSYS binaries that Stack installs
@@ -192,7 +192,7 @@ jobs:
         with:
           path: |
             /root/.stack
-          key: "${{ runner.os }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
+          key: "${{ runner.os }}-${{ job.container.id }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
 
       - run: "ci/fix-home ci/run-hlint.sh --git"
         env:
