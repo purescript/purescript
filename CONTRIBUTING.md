@@ -23,11 +23,21 @@ If you would like to contribute, please consider the issues in the current miles
 
 When submitting a pull request, please follow the following guidelines:
 
-- Add at least a test to `tests/purs/passing/` and possibly to `tests/purs/failing/`.
+- Add tests according to the next section
 - Build the binaries and libraries with `stack build --fast`. The `--fast` flag is recommended but not required; it disables optimizations, which can speed things up quite a bit.
 - Make sure that all test suites are passing. Run the test suites with `stack test --fast`.
 - Please try to keep changes small and isolated: smaller pull requests which only address one issue are much easier to review.
 - For any code change, please append a copyright and licensing notice to the [CONTRIBUTORS.md](CONTRIBUTORS.md) file if your name is not in there already.
+
+### Writing Tests
+
+When writing tests, try to have at least one passing test and one failing test, if applicable.
+
+- Passing tests go in `tests/purs/passing/`
+- Failing tests go in `tests/purs/failing/`
+- Tests that check warnings go in `tests/purs/warning/`
+
+Passing tests may produce warnings. Tests in `tests/purs/warning/` can ensure no warning is emitted by having no annotations and an empty `.out` file. 
 
 ### Running Tests
 

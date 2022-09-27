@@ -44,6 +44,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@kleeneplus](https://github.com/dgendill) | Dominick Gendill | [MIT license](http://opensource.org/licenses/MIT) |
 | [@ealmansi](https://github.com/ealmansi) | Emilio Almansi | MIT license |
 | [@eamelink](https://github.com/eamelink) | Erik Bakker | MIT license |
+| [@EMattfolk](https://github.com/EMattfolk) | Erik Mattfolk | [MIT license](http://opensource.org/licenses/MIT) |
 | [@epost](https://github.com/epost) | Erik Post | MIT license |
 | [@erdeszt](https://github.com/erdeszt) | Tibor Erdesz | [MIT license](http://opensource.org/licenses/MIT) |
 | [@etrepum](https://github.com/etrepum) | Bob Ippolito | [MIT license](http://opensource.org/licenses/MIT) |
