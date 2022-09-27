@@ -225,7 +225,7 @@ entails SolverOptions{..} constraint context hints =
     ctorModules _ = Nothing
 
     findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> QualifiedBy -> [TypeClassDict]
-    findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (>>= M.lookup cn) . flip M.lookup ctx
+    findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (M.lookup cn <=< flip M.lookup ctx)
 
     valUndefined :: Expr
     valUndefined = Var nullSourceSpan (Qualified (ByModuleName C.Prim) (Ident C.undefined))

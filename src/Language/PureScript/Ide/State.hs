@@ -37,15 +37,15 @@ module Language.PureScript.Ide.State
   , resolveDataConstructorsForModule
   ) where
 
-import           Protolude hiding (moduleName)
+import           Protolude hiding (moduleName, unzip)
 
-import           Control.Arrow
 import           Control.Concurrent.STM
 import           Control.Lens                       hiding (anyOf, op, (&))
 import           "monad-logger" Control.Monad.Logger
 import           Data.IORef
 import qualified Data.Map.Lazy                      as Map
 import           Data.Time.Clock (UTCTime)
+import           Data.Zip (unzip)
 import qualified Language.PureScript                as P
 import           Language.PureScript.Docs.Convert.Single (convertComments)
 import           Language.PureScript.Externs
@@ -225,7 +225,7 @@ populateVolatileStateSTM ref = do
   -- through the repopulation
   rebuildCache <- vsCachedRebuild <$> getVolatileStateSTM ref
   let asts = map (extractAstInformation . fst) modules
-  let (moduleDeclarations, reexportRefs) = (map fst &&& map snd) (Map.map convertExterns externs)
+  let (moduleDeclarations, reexportRefs) = unzip (Map.map convertExterns externs)
       results =
         moduleDeclarations
         & map resolveDataConstructorsForModule
@@ -401,8 +401,7 @@ resolveOperatorsForModule modules = map (idaDeclaration %~ resolveOperator)
     getDeclarations :: P.ModuleName -> [IdeDeclaration]
     getDeclarations moduleName =
       Map.lookup moduleName modules
-      & fromMaybe []
-      & map discardAnn
+      & foldMap (map discardAnn)
 
     resolveOperator (IdeDeclValueOperator op)
       | (P.Qualified (P.ByModuleName mn) (Left ident)) <- op ^. ideValueOpAlias =

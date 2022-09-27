@@ -1,3 +1,4 @@
+{- HLINT ignore "Unused LANGUAGE pragma" -} -- HLint doesn't recognize that TypeApplications is used in a pattern
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeApplications #-}
 module Language.PureScript.TypeChecker.Deriving (deriveInstance) where
