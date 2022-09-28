@@ -215,10 +215,10 @@ Error 9 of 45:
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:63:24 - 63:25 (line 63, column 24 - line 63, column 25)
+      tests/purs/failing/FoldableInstance9.purs:62:29 - 62:30 (line 62, column 29 - line 62, column 30)
 
 
-  under the label `[33mlefts[0m`
+  under the label `[33mrights[0m`
   in data constructor [33mTest2[0m
   in type class instance
   [33m                                        [0m
@@ -242,7 +242,7 @@ Error 10 of 45:
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:63:26 - 63:27 (line 63, column 26 - line 63, column 27)
+      tests/purs/failing/FoldableInstance9.purs:63:24 - 63:25 (line 63, column 24 - line 63, column 25)
 
 
   under the label `[33mlefts[0m`
@@ -269,10 +269,10 @@ Error 11 of 45:
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:64:29 - 64:30 (line 64, column 29 - line 64, column 30)
+      tests/purs/failing/FoldableInstance9.purs:63:26 - 63:27 (line 63, column 26 - line 63, column 27)
 
 
-  under the label `[33mmiddle[0m`
+  under the label `[33mlefts[0m`
   in data constructor [33mTest2[0m
   in type class instance
   [33m                                        [0m
@@ -296,10 +296,10 @@ Error 12 of 45:
 
     The type variable `a` must only be used as the last argument in a data type:
 
-      tests/purs/failing/FoldableInstance9.purs:62:29 - 62:30 (line 62, column 29 - line 62, column 30)
+      tests/purs/failing/FoldableInstance9.purs:64:29 - 64:30 (line 64, column 29 - line 64, column 30)
 
 
-  under the label `[33mrights[0m`
+  under the label `[33mmiddle[0m`
   in data constructor [33mTest2[0m
   in type class instance
   [33m                                        [0m
