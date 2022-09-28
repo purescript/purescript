@@ -15,3 +15,11 @@ myInt1 = runSTFn1 mySTFn1 0
 
 myInt2 :: forall r. ST r Int
 myInt2 = runSTFn2 mySTFn2 0 1
+
+otherTest :: forall r. ST r Int
+otherTest = do
+  a <- runSTFn2 mySTFn2 0 1
+  b <- runSTFn1 mySTFn1 2
+  c <- myInt1
+  d <- myInt2
+  pure $ a + b + c + d
