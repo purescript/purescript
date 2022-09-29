@@ -26,3 +26,6 @@ type Supply = SupplyT Identity
 
 runSupply :: Integer -> Supply a -> (a, Integer)
 runSupply n = runIdentity . runSupplyT n
+
+evalSupply :: Integer -> Supply a -> a
+evalSupply n = runIdentity . evalSupplyT n

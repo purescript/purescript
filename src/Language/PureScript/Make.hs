@@ -105,13 +105,13 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
   -- desugar case declarations *after* type- and exhaustiveness checking
   -- since pattern guards introduces cases which the exhaustiveness checker
   -- reports as not-exhaustive.
-  deguarded <- evalSupplyT nextVar $ do
+  (deguarded, nextVar') <- runSupplyT nextVar $ do
     desugarCaseGuards elaborated
 
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ deguarded
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
-      (optimized, nextVar'') = runSupply nextVar' $ CF.optimizeCoreFn corefn
+      optimized = evalSupply nextVar' $ CF.optimizeCoreFn corefn
       (renamedIdents, renamed) = renameInModule optimized
       exts = moduleToExternsFile mod' env' renamedIdents
   ffiCodegen renamed
