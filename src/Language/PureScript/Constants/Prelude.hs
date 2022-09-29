@@ -169,6 +169,12 @@ mkEffectFn = "mkEffectFn"
 runEffectFn :: forall a. (IsString a) => a
 runEffectFn = "runEffectFn"
 
+mkSTFn :: forall a. (IsString a) => a
+mkSTFn = "mkSTFn"
+
+runSTFn :: forall a. (IsString a) => a
+runSTFn = "runSTFn"
+
 -- Type Class Dictionary Names
 
 data EffectDictionaries = EffectDictionaries
@@ -333,6 +339,9 @@ pattern ControlMonadEffUncurried = ModuleName "Control.Monad.Eff.Uncurried"
 
 pattern EffectUncurried :: ModuleName
 pattern EffectUncurried = ModuleName "Effect.Uncurried"
+
+pattern ControlMonadSTUncurried :: ModuleName
+pattern ControlMonadSTUncurried = ModuleName "Control.Monad.ST.Uncurried"
 
 pattern DataBounded :: ModuleName
 pattern DataBounded = ModuleName "Data.Bounded"
