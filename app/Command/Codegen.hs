@@ -41,20 +41,21 @@ codegen CodegenOptions{..} = do
       ]
     exitFailure
   mods <- traverse parseCoreFn inputFiles
+  let successMods = rights mods
+  let failedMods = lefts mods
 
   let
     filePathMap =
-      M.fromList $ map ((\m -> (CoreFn.moduleName m, Right $ CoreFn.modulePath m)) . snd) $ rights mods
+      M.fromList $ map ((\m -> (CoreFn.moduleName m, Right $ CoreFn.modulePath m)) . snd) successMods
 
-  unless (null (lefts mods)) $ do
-    traverse_ (hPutStr stderr . formatParseError) $ lefts mods
+  unless (null failedMods) $ do
+    traverse_ (hPutStr stderr . formatParseError) failedMods
     exitFailure
 
   foreigns <- P.inferForeignModules filePathMap
   (makeResult, makeWarnings) <-
     P.runMake purescriptOptions
-      $ traverse (P.codegenJS (makeActions foreigns filePathMap) codegenSourceMaps . snd)
-      $ rights mods
+      $ traverse (P.codegenJS (makeActions foreigns filePathMap) codegenSourceMaps . snd) successMods
   printWarningsAndErrors True codegenJSONErrors makeWarnings makeResult
   where
   formatParseError (file, _, e) =
