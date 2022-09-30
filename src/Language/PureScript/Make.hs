@@ -111,7 +111,7 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ deguarded
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
-      (optimized, nextVar'') = runSupply nextVar' $ CF.optimizeCoreFn corefn
+      optimized = evalSupply nextVar' $ CF.optimizeCoreFn corefn
       (renamedIdents, renamed) = renameInModule optimized
       exts = moduleToExternsFile mod' env' renamedIdents
   ffiCodegen renamed
@@ -129,7 +129,7 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
                  ++ "; details:\n" ++ prettyPrintMultipleErrors defaultPPEOptions errs
                Right d -> d
 
-  evalSupplyT nextVar'' $ codegen renamed docs exts
+  codegen renamed docs exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.cbor@ file.
