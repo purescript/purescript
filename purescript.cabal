@@ -212,8 +212,10 @@ library
     Language.PureScript.CodeGen.JS.Common
     Language.PureScript.CodeGen.JS.Printer
     Language.PureScript.Constants.Prelude
+    Language.PureScript.Constants.Data.Foldable
     Language.PureScript.Constants.Data.Generic.Rep
     Language.PureScript.Constants.Data.Newtype
+    Language.PureScript.Constants.Data.Traversable
     Language.PureScript.CoreFn
     Language.PureScript.CoreFn.Ann
     Language.PureScript.CoreFn.Binders
