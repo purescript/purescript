@@ -1,0 +1,21 @@
+Error found:
+in module [33mFoldableInstance6[0m
+at tests/purs/failing/FoldableInstance8.purs:8:1 - 8:34 (line 8, column 1 - line 8, column 34)
+
+  The type variable `a` must only be used as the last argument in a data type:
+
+    tests/purs/failing/FoldableInstance8.purs:7:25 - 7:26 (line 7, column 25 - line 7, column 26)
+
+
+in data constructor [33mTest[0m
+in type class instance
+[33m                                        [0m
+[33m  Data.Foldable.Foldable (Test @Type f0)[0m
+[33m                                        [0m
+
+where [33mf0[0m is a rigid type variable
+        bound at (line 0, column 0 - line 0, column 0)
+
+See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
+or to contribute content related to this error.
+
