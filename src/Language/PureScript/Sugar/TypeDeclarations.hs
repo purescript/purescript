@@ -51,8 +51,8 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
     where
     go (Let w ds' val') = Let w <$> desugarTypeDeclarations ds' <*> pure val'
     go other = return other
-  desugarTypeDeclarations (TypeInstanceDeclaration sa ch idx nm deps cls args (ExplicitInstance ds') : rest) =
-    (:) <$> (TypeInstanceDeclaration sa ch idx nm deps cls args . ExplicitInstance <$> desugarTypeDeclarations ds')
+  desugarTypeDeclarations (TypeInstanceDeclaration sa na ch idx nm deps cls args (ExplicitInstance ds') : rest) =
+    (:) <$> (TypeInstanceDeclaration sa na ch idx nm deps cls args . ExplicitInstance <$> desugarTypeDeclarations ds')
         <*> desugarTypeDeclarations rest
   desugarTypeDeclarations (d:rest) = (:) d <$> desugarTypeDeclarations rest
   desugarTypeDeclarations [] = return []

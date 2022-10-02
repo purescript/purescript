@@ -183,7 +183,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
         in
           (vars, errs')
 
-    goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
+    goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
     goDecl _ = mempty
 
     go :: Expr -> (S.Set Ident, MultipleErrors)

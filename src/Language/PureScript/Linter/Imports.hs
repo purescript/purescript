@@ -300,7 +300,7 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
   dtys
     :: ModuleName
     -> M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
-  dtys mn = maybe M.empty exportedTypes $ envModuleExports <$> mn `M.lookup` env
+  dtys mn = foldMap (exportedTypes . envModuleExports) $ mn `M.lookup` env
 
   dctorsForType
     :: ModuleName

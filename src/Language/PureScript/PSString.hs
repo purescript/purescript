@@ -17,6 +17,7 @@ import Control.Exception (try, evaluate)
 import Control.Applicative ((<|>))
 import qualified Data.Char as Char
 import Data.Bits (shiftR)
+import Data.Either (fromRight)
 import Data.List (unfoldr)
 import Data.Scientific (toBoundedInteger)
 import Data.String (IsString(..))
@@ -72,7 +73,7 @@ codePoints = map (either (Char.chr . fromIntegral) id) . decodeStringEither
 -- U+FFFD REPLACEMENT CHARACTER
 --
 decodeStringWithReplacement :: PSString -> String
-decodeStringWithReplacement = map (either (const '\xFFFD') id) . decodeStringEither
+decodeStringWithReplacement = map (fromRight '\xFFFD') . decodeStringEither
 
 -- |
 -- Decode a PSString as UTF-16. Lone surrogates in the input are represented in
