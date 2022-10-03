@@ -264,7 +264,7 @@ make ma@MakeActions{..} ms = do
 
   buildModule :: BuildPlan -> ModuleName -> Int -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> [ModuleName] -> m ()
   buildModule buildPlan moduleName cnt fp pwarnings mres deps directDeps = do
-    result <- flip catchError (return . BuildJobFailed) $ (do
+    result <- flip catchError (return . BuildJobFailed) $ do
       --------- DRATHIER BIG BLOB START
 
       -- We need to wait for dependencies to be built, before checking if the current
@@ -321,52 +321,51 @@ make ma@MakeActions{..} ms = do
           -- continue building
       --------- DRATHIER BIG BLOB END
       --------- DRATHIER BIG BLOB START2
-      let pwarnings' = CST.toMultipleWarnings fp pwarnings
-      tell pwarnings'
-      m <- CST.unwrapParserError fp mres
+          let pwarnings' = CST.toMultipleWarnings fp pwarnings
+          tell pwarnings'
+          m <- CST.unwrapParserError fp mres
 
 
-      let resultsWithModuleNames :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, DidPublicApiChange))] = traverse (\dep ->
-            do
-              res <- getResult buildPlan dep
-              pure ((dep,) <$> res)
-            ) deps
-      let results = fmap fmap fmap snd <$> resultsWithModuleNames
-      mexterns <- fmap unzip . fmap (fmap (\(a,b,_) -> (a,b))) . sequence <$> results
-      _ :: M.Map ModuleName DidPublicApiChange <-
-        fromMaybe M.empty . fmap M.fromList . fmap (fmap (\(mn, (_,_,c)) -> (mn, c))) . sequence <$> resultsWithModuleNames
+          let resultsWithModuleNames :: m [Maybe (ModuleName, (MultipleErrors, ExternsFile, DidPublicApiChange))] = traverse (\dep ->
+                do
+                  res <- getResult buildPlan dep
+                  pure ((dep,) <$> res)
+                ) deps
+          let results = fmap fmap fmap snd <$> resultsWithModuleNames
+          mexterns <- fmap unzip . fmap (fmap (\(a,b,_) -> (a,b))) . sequence <$> results
+          _ :: M.Map ModuleName DidPublicApiChange <-
+            fromMaybe M.empty . fmap M.fromList . fmap (fmap (\(mn, (_,_,c)) -> (mn, c))) . sequence <$> resultsWithModuleNames
 
       --------- DRATHIER BIG BLOB END2
 
-      let pwarnings' = CST.toMultipleWarnings fp pwarnings
-      tell pwarnings'
-      m <- CST.unwrapParserError fp mres
-      -- We need to wait for dependencies to be built, before checking if the current
-      -- module should be rebuilt, so the first thing to do is to wait on the
-      -- MVars for the module's dependencies.
-      mexterns <- fmap unzip . sequence <$> traverse (getResult buildPlan) deps
+          -- let pwarnings' = CST.toMultipleWarnings fp pwarnings
+          -- tell pwarnings'
+          -- m <- CST.unwrapParserError fp mres
+          -- We need to wait for dependencies to be built, before checking if the current
+          -- module should be rebuilt, so the first thing to do is to wait on the
+          -- MVars for the module's dependencies.
+          -- mexterns <- fmap unzip . sequence <$> traverse (getResult buildPlan) deps
 
-      (case mexterns of
-        Just (_, externs) -> do
-          -- We need to ensure that all dependencies have been included in Env
-          C.modifyMVar_ (bpEnv buildPlan) $ \env -> do
-            let
-              go :: Env -> ModuleName -> m Env
-              go e dep = case lookup dep (zip deps externs) of
-                Just exts
-                  | not (M.member dep e) -> externsEnv e exts
-                _ -> return e
-            foldM go env deps
-          env <- C.readMVar (bpEnv buildPlan)
-          idx <- C.takeMVar (bpIndex buildPlan)
-          C.putMVar (bpIndex buildPlan) (idx + 1)
-          (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
-          pure $ buildJobSucceeded ourDirtyCacheFile (pwarnings' <> warnings) exts
-        Nothing -> return BuildJobSkipped
-        )
+          case mexterns of
+            Just (_, externs) -> do
+              -- We need to ensure that all dependencies have been included in Env
+              C.modifyMVar_ (bpEnv buildPlan) $ \env -> do
+                let
+                  go :: Env -> ModuleName -> m Env
+                  go e dep = case lookup dep (zip deps externs) of
+                    Just exts
+                      | not (M.member dep e) -> externsEnv e exts
+                    _ -> return e
+                foldM go env deps
+              env <- C.readMVar (bpEnv buildPlan)
+              idx <- C.takeMVar (bpIndex buildPlan)
+              C.putMVar (bpIndex buildPlan) (idx + 1)
+              (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
+              pure $ buildJobSucceeded ourDirtyCacheFile (pwarnings' <> warnings) exts
+            Nothing -> return BuildJobSkipped
 
     BuildPlan.markComplete buildPlan moduleName result
-)
+
   onExceptionLifted :: m a -> m b -> m a
   onExceptionLifted l r = control $ \runInIO -> runInIO l `onException` runInIO r
 

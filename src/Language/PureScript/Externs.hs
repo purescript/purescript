@@ -494,7 +494,7 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
       f (TypeClassRef _ _) = []
       f (TypeOpRef _ _) = []
       -- type synonyms don't have ctors in ast but do effectively have a single exposed ctor, so keep it in
-      f (TypeRef _ tn _) | (Just (_, TypeSynonym)) <- Qualified (Just mn) tn `M.lookup` types env = [(tn, True)]
+      f (TypeRef _ tn _) | (Just (_, TypeSynonym)) <- Qualified (ByModuleName mn) tn `M.lookup` types env = [(tn, True)]
       -- data types with no public ctors are opaque to all other modules, so no need to expose its internal shapes
       f (TypeRef _ tn (Just [])) = [(tn, False)]
       -- if there are any exposed ctors, expose the type shape
@@ -534,13 +534,13 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
       , cts
         & M.mapWithKey (\k () ->
           case k of
-            Qualified Nothing _ ->
-              internalError "dsCacheShapesWithDetails: missing module name"
+            Qualified (BySourcePos _) _ ->
+              internalError "dsCacheShapesWithDetails: unexpected Qualified BySourcePos"
 
-            Qualified (Just km@(ModuleName kmn)) tn | "Prim" `T.isPrefixOf` kmn -> (PrimType km tn, CacheTypeDetails mempty)
-            Qualified (Just km) tn | "$" `T.isInfixOf` runProperName tn -> (TypeClassDictType km tn, CacheTypeDetails mempty)
-            Qualified (Just km) tn | km == mn -> (OwnModuleRef km tn, CacheTypeDetails mempty)
-            Qualified (Just km) tn ->
+            Qualified (ByModuleName km@(ModuleName kmn)) tn | "Prim" `T.isPrefixOf` kmn -> (PrimType km tn, CacheTypeDetails mempty)
+            Qualified (ByModuleName km) tn | "$" `T.isInfixOf` runProperName tn -> (TypeClassDictType km tn, CacheTypeDetails mempty)
+            Qualified (ByModuleName km) tn | km == mn -> (OwnModuleRef km tn, CacheTypeDetails mempty)
+            Qualified (ByModuleName km) tn ->
               let
                 moduExterns =
                   M.lookup km externsMap
@@ -553,7 +553,10 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
                 & fromMaybe (trace ("dsCacheShapesWithDetails: missing type in externsMap:" <> sShow (mn, km, tn, M.keys externsMap, moduExterns)) $ internalError "dsCacheShapesWithDetails: missing type in externsMap")
         )
         & M.toList
-        & fmap (\(Qualified (Just km) k, v) -> ((km,k), v))
+        & mapMaybe (\case
+          (Qualified (ByModuleName km) k, v) -> Just ((km,k), v)
+          (Qualified (BySourcePos pos) k, v) -> trace (show ("BcDeclShapesAll-Externs: skipping Qualified BySourcePos" :: String, pos, "k" :: String, k, "v" :: String, v)) Nothing
+          ) -- TODO partial
         & M.fromList
         & CacheTypeDetails
       )
@@ -789,6 +792,7 @@ typeToCacheTypeImpl t = case t of
   TUnknown _ a -> pure $ TUnknown () a
   TypeVar _ a -> pure $ TypeVar () a
   TypeLevelString _ a -> pure $ TypeLevelString () a
+  TypeLevelInt _ a -> pure $ TypeLevelInt () a
   TypeWildcard _ a -> pure $ TypeWildcard () a
   TypeConstructor _ a -> do
     modify (M.insert a ())

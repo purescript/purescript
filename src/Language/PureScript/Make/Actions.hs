@@ -44,7 +44,7 @@ import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Docs.Prim as Docs.Prim
 import qualified Language.PureScript.Docs.Types as Docs
 import           Language.PureScript.Errors
-import           Language.PureScript.Externs (ExternsFile, externsFileName, BuildCacheDb)
+import           Language.PureScript.Externs (ExternsFile, externsFileName)
 import           Language.PureScript.Make.Monad
 import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names

@@ -258,7 +258,7 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
   idx <- C.newMVar 1
   -- _ <- trace (show ("BuildPlan.construct 6 start" :: String, unsafePerformIO dt)) $ pure ()
   let res =
-        ( BuildPlan prebuilt buildJobs env
+        ( BuildPlan prebuilt buildJobs env idx
         , let
             update = flip $ \s ->
               M.alter (const (statusNewCacheInfo s)) (statusModuleName s)
