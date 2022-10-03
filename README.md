@@ -19,6 +19,15 @@ A small strongly typed programming language with expressive types that compiles 
 
 ## Help!
 
+### Community Spaces
+
+The following spaces are governed by the [PureScript Community Code of Conduct](https://github.com/purescript/governance/blob/master/CODE_OF_CONDUCT.md). The majority of PureScript users use these spaces to discuss and collaborate on PureScript-related topics:
 - [PureScript Discord](https://purescript.org/chat)
 - [PureScript Discourse](https://discourse.purescript.org/)
+
+### Unaffiliated Spaces
+
+Some PureScript users also collaborate in the below spaces. These do not fall under the code of conduct linked above. They may have no code of conduct or one very different than the one linked above.
+- [PureScript Matrix](https://matrix.to/#/#purescript:matrix.org)
 - [PureScript on StackOverflow](http://stackoverflow.com/questions/tagged/purescript)
+- [The `#purescript` channel on Libera.Chat](https://libera.chat/)

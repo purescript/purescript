@@ -44,6 +44,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@kleeneplus](https://github.com/dgendill) | Dominick Gendill | [MIT license](http://opensource.org/licenses/MIT) |
 | [@ealmansi](https://github.com/ealmansi) | Emilio Almansi | MIT license |
 | [@eamelink](https://github.com/eamelink) | Erik Bakker | MIT license |
+| [@EMattfolk](https://github.com/EMattfolk) | Erik Mattfolk | [MIT license](http://opensource.org/licenses/MIT) |
 | [@epost](https://github.com/epost) | Erik Post | MIT license |
 | [@erdeszt](https://github.com/erdeszt) | Tibor Erdesz | [MIT license](http://opensource.org/licenses/MIT) |
 | [@etrepum](https://github.com/etrepum) | Bob Ippolito | [MIT license](http://opensource.org/licenses/MIT) |
@@ -75,6 +76,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@matthewleon](https://github.com/matthewleon) | Matthew Leon | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mcoffin](https://github.com/mcoffin) | Matt Coffin | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mhcurylo](https://github.com/mhcurylo) | Mateusz Curylo | [MIT license](http://opensource.org/licenses/MIT) |
+| [@mikesol](https://github.com/mikesol) | Mike Solomon | [MIT license](http://opensource.org/licenses/MIT) |
 | [@MiracleBlue](https://github.com/MiracleBlue) | Nicholas Kircher | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mrkgnao](https://github.com/mrkgnao) | Soham Chowdhury | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mgmeier](https://github.com/mgmeier) | Michael Gilliland | [MIT license](http://opensource.org/licenses/MIT) |
@@ -86,6 +88,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@mrhania](https://github.com/mrhania) | Łukasz Hanuszczak | [MIT license](http://opensource.org/licenses/MIT) |
 | [@natefaubion](https://github.com/natefaubion) | Nathan Faubion | [MIT license](http://opensource.org/licenses/MIT) |
 | [@ncaq](https://github.com/ncaq) | ncaq | [MIT license](http://opensource.org/licenses/MIT) |
+| [@NickMolloy](https://github.com/NickMolloy) | Nick Molloy | [MIT license](http://opensource.org/licenses/MIT) |
 | [@nicodelpiano](https://github.com/nicodelpiano) | Nicolas Del Piano | [MIT license](http://opensource.org/licenses/MIT) |
 | [@noraesae](https://github.com/noraesae) | Hyunje Jun | [MIT license](http://opensource.org/licenses/MIT) |
 | [@nullobject](https://github.com/nullobject) | Josh Bassett | [MIT license](http://opensource.org/licenses/MIT) |
@@ -148,7 +151,15 @@ If you would prefer to use different terms, please use the section below instead
 | [@woody88](https://github.com/woody88) | Woodson Delhia | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mhmdanas](https://github.com/mhmdanas) | Mohammed Anas | [MIT license](http://opensource.org/licenses/MIT) |
 | [@kl0tl](https://github.com/kl0tl) | Cyril Sobierajewicz | [MIT license](http://opensource.org/licenses/MIT) |
-| [@PureFunctor](https://github.com/PureFunctor) | Justin Garcia | [MIT license](http://opensource.org/licenses/MIT) |
+| [@PureFunctor](https://github.com/PureFunctor), [@sjpgarcia](https://github.com/sjpgarcia) | Justin Garcia | [MIT license](http://opensource.org/licenses/MIT) |
+| [@xgrommx](https://github.com/xgrommx) | Denis Stoyanov | [MIT license](http://opensource.org/licenses/MIT) |
+| [@MonoidMusician](https://github.com/MonoidMusician) | Verity Scheel | [MIT license](http://opensource.org/licenses/MIT) |
+| [@thomashoneyman](https://github.com/thomashoneyman) | Thomas Honeyman | [MIT license](http://opensource.org/licenses/MIT) |
+| [@sigma-andex](https://github.com/sigma-andex) | Jan Schulte | [MIT license](http://opensource.org/licenses/MIT) |
+| [@i-am-the-slime](https://github.com/i-am-the-slime) | Mark Eibes | [MIT license](http://opensource.org/licenses/MIT) |
+| [@sd-yip](https://github.com/sd-yip) | Nicholas Yip | [MIT license](http://opensource.org/licenses/MIT) |
+| [@j-nava](https://github.com/j-nava) | Jesse Nava | [MIT license](http://opensource.org/licenses/MIT) |
+| [@imcotton](https://github.com/imcotton) | Cotton Hou | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 

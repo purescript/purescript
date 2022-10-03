@@ -1,0 +1,13 @@
+Error found:
+at tests/purs/failing/FFIDefaultCJSExport.purs:2:1 - 8:19 (line 2, column 1 - line 8, column 19)
+
+  A CommonJS foreign module implementation was provided for module [33mMain[0m:
+
+    tests/purs/failing/FFIDefaultCJSExport.js
+
+  CommonJS foreign modules are no longer supported. Use native JavaScript/ECMAScript module syntax instead.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/DeprecatedFFICommonJSModule.md for more information,
+or to contribute content related to this error.
+

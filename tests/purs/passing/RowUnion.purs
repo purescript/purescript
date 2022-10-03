@@ -19,10 +19,17 @@ solveUnionBackwardsCons = solve (Proxy  :: Proxy ( a :: Int )) (Proxy :: Proxy (
 solveUnionBackwardsDblCons :: Proxy _
 solveUnionBackwardsDblCons = solve (Proxy :: Proxy ( a :: Int, a :: String )) (Proxy :: Proxy ( a :: Boolean, a :: Int, a :: String ))
 
-foreign import merge
+merge
   :: forall r1 r2 r3
    . Union r1 r2 r3
   => Record r1
+  -> Record r2
+  -> Record r3
+merge = mergeImpl
+
+foreign import mergeImpl
+  :: forall r1 r2 r3
+   . Record r1
   -> Record r2
   -> Record r3
 
@@ -62,7 +69,7 @@ withDefaultsClosed p = merge p { y: 1, z: 1 }
 test4 = withDefaults { x: 1, y: 2 }
 
 -- r is a subrow of s if Union r t s for some t.
-class Subrow (r :: # Type) (s :: # Type)
+class Subrow (r :: Row Type) (s :: Row Type)
 instance subrow :: Union r t s => Subrow r s
 
 main :: Effect Unit

@@ -7,6 +7,7 @@
 --
 module Language.PureScript.Sugar.Operators
   ( desugarSignedLiterals
+  , RebracketCaller(..)
   , rebracket
   , rebracketFiltered
   , checkFixityExports
@@ -27,6 +28,7 @@ import Language.PureScript.Types
 
 import Control.Monad (unless, (<=<))
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class (MonadSupply)
 
 import Data.Either (partitionEithers)
 import Data.Foldable (for_, traverse_)
@@ -48,7 +50,7 @@ desugarSignedLiterals (Module ss coms mn ds exts) =
   Module ss coms mn (map f' ds) exts
   where
   (f', _, _) = everywhereOnValues id go id
-  go (UnaryMinus ss' val) = App (Var ss' (Qualified Nothing (Ident C.negate))) val
+  go (UnaryMinus ss' val) = App (Var ss' (Qualified ByNullSourcePos (Ident C.negate))) val
   go other = other
 
 -- |
@@ -67,11 +69,12 @@ type TypeFixityRecord = FixityRecord (OpName 'TypeOpName) (ProperName 'TypeName)
 rebracket
   :: forall m
    . MonadError MultipleErrors m
+  => MonadSupply m
   => [ExternsFile]
   -> Module
   -> m Module
 rebracket =
-  rebracketFiltered (const True)
+  rebracketFiltered CalledByCompile (const True)
 
 -- |
 -- A version of `rebracket` which allows you to choose which declarations
@@ -83,11 +86,13 @@ rebracket =
 rebracketFiltered
   :: forall m
    . MonadError MultipleErrors m
-  => (Declaration -> Bool)
+  => MonadSupply m
+  => RebracketCaller
+  -> (Declaration -> Bool)
   -> [ExternsFile]
   -> Module
   -> m Module
-rebracketFiltered pred_ externs m = do
+rebracketFiltered !caller pred_ externs m = do
   let (valueFixities, typeFixities) =
         partitionEithers
           $ concatMap externsFixities externs
@@ -101,7 +106,7 @@ rebracketFiltered pred_ externs m = do
   let typeOpTable = customOperatorTable' typeFixities
   let typeAliased = M.fromList (map makeLookupEntry typeFixities)
 
-  rebracketModule pred_ valueOpTable typeOpTable m >>=
+  rebracketModule caller pred_ valueOpTable typeOpTable m >>=
     renameAliasedOperators valueAliased typeAliased
 
   where
@@ -131,12 +136,13 @@ rebracketFiltered pred_ externs m = do
     Module ss coms mn <$> mapM (usingPredicate pred_ f') ds <*> pure exts
     where
     (goDecl', goExpr', goBinder') = updateTypes goType
-    (f', _, _, _, _) =
+    (f', _, _, _, _, _) =
       everywhereWithContextOnValuesM
         ss
         (\_ d -> (declSourceSpan d,) <$> goDecl' d)
         (\pos -> uncurry goExpr <=< goExpr' pos)
         (\pos -> uncurry goBinder <=< goBinder' pos)
+        defS
         defS
         defS
 
@@ -175,23 +181,52 @@ rebracketFiltered pred_ externs m = do
           throwError . errorMessage' pos $ UnknownName $ fmap TyOpName op
     goType _ other = return other
 
+-- | Indicates whether the `rebracketModule`
+-- is being called with the full desugar pass
+-- run via `purs compile` or whether
+-- only the partial desguar pass is run
+-- via `purs docs`.
+-- This indication is needed to prevent
+-- a `purs docs` error when using
+-- `case _ of` syntax in a type class instance.
+data RebracketCaller
+  = CalledByCompile
+  | CalledByDocs
+  deriving (Eq, Show)
+
 rebracketModule
   :: forall m
    . (MonadError MultipleErrors m)
-  => (Declaration -> Bool)
+  => MonadSupply m
+  => RebracketCaller
+  -> (Declaration -> Bool)
   -> [[(Qualified (OpName 'ValueOpName), Associativity)]]
   -> [[(Qualified (OpName 'TypeOpName), Associativity)]]
   -> Module
   -> m Module
-rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
+rebracketModule !caller pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
   Module ss coms mn <$> f' ds <*> pure exts
   where
   f' :: [Declaration] -> m [Declaration]
   f' =
     fmap (map (\d -> if pred_ d then removeParens d else d)) .
-    flip parU (usingPredicate pred_ f)
+    flip parU (usingPredicate pred_ h)
 
-  (f, _, _, _, _) =
+  -- | The AST will run through all the desugar passes when compiling
+  -- and only some of the desugar passes when generating docs.
+  -- When generating docs, `case _ of` syntax used in an instance declaration
+  -- can trigger the `IncorrectAnonymousArgument` error because it does not
+  -- run the same passes that the compile desguaring does. Since `purs docs`
+  -- will only succeed once `purs compile` succeeds, we can ignore this check
+  -- when running `purs docs`.
+  -- See https://github.com/purescript/purescript/issues/4274#issuecomment-1087730651=
+  -- for more info.
+  h :: Declaration -> m Declaration
+  h = case caller of
+    CalledByDocs -> f
+    CalledByCompile -> g <=< f
+
+  (f, _, _, _, _, _) =
       everywhereWithContextOnValuesM
         ss
         (\_ d -> (declSourceSpan d,) <$> goDecl d)
@@ -199,6 +234,9 @@ rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
         (\pos -> wrap (matchBinderOperators valueOpTable) <=< goBinder' pos)
         defS
         defS
+        defS
+
+  (g, _, _) = everywhereOnValuesTopDownM pure removeBinaryNoParens pure
 
   (goDecl, goExpr', goBinder') = updateTypes goType
 
@@ -207,6 +245,24 @@ rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
 
   wrap :: (a -> m a) -> (SourceSpan, a) -> m (SourceSpan, a)
   wrap go (ss', a) = (ss',) <$> go a
+
+removeBinaryNoParens :: (MonadError MultipleErrors m, MonadSupply m) => Expr -> m Expr
+removeBinaryNoParens u
+  | isAnonymousArgument u = case u of
+                              PositionedValue p _ _ -> rethrowWithPosition p err
+                              _ -> err
+                            where err = throwError . errorMessage $ IncorrectAnonymousArgument
+removeBinaryNoParens (Parens (stripPositionInfo -> BinaryNoParens op l r))
+  | isAnonymousArgument r = do arg <- freshIdent'
+                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op l) (Var nullSourceSpan (Qualified ByNullSourcePos arg))
+  | isAnonymousArgument l = do arg <- freshIdent'
+                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op (Var nullSourceSpan (Qualified ByNullSourcePos arg))) r
+removeBinaryNoParens (BinaryNoParens op l r) = return $ App (App op l) r
+removeBinaryNoParens e = return e
+
+stripPositionInfo :: Expr -> Expr
+stripPositionInfo (PositionedValue _ _ e) = stripPositionInfo e
+stripPositionInfo e = e
 
 removeParens :: Declaration -> Declaration
 removeParens = f
@@ -247,7 +303,7 @@ externsFixities ExternsFile{..} =
     -> Either ValueFixityRecord TypeFixityRecord
   fromFixity (ExternsFixity assoc prec op name) =
     Left
-      ( Qualified (Just efModuleName) op
+      ( Qualified (ByModuleName efModuleName) op
       , internalModuleSourceSpan ""
       , Fixity assoc prec
       , name
@@ -258,7 +314,7 @@ externsFixities ExternsFile{..} =
     -> Either ValueFixityRecord TypeFixityRecord
   fromTypeFixity (ExternsTypeFixity assoc prec op name) =
     Right
-      ( Qualified (Just efModuleName) op
+      ( Qualified (ByModuleName efModuleName) op
       , internalModuleSourceSpan ""
       , Fixity assoc prec
       , name
@@ -269,9 +325,9 @@ collectFixities (Module _ _ moduleName ds _) = concatMap collect ds
   where
   collect :: Declaration -> [Either ValueFixityRecord TypeFixityRecord]
   collect (ValueFixityDeclaration (ss, _) fixity name op) =
-    [Left (Qualified (Just moduleName) op, ss, fixity, name)]
+    [Left (Qualified (ByModuleName moduleName) op, ss, fixity, name)]
   collect (TypeFixityDeclaration (ss, _) fixity name op) =
-    [Right (Qualified (Just moduleName) op, ss, fixity, name)]
+    [Right (Qualified (ByModuleName moduleName) op, ss, fixity, name)]
   collect _ = []
 
 ensureNoDuplicates
@@ -283,7 +339,7 @@ ensureNoDuplicates toError m = go $ sortOn fst m
   where
   go [] = return ()
   go [_] = return ()
-  go ((x@(Qualified (Just mn) op), _) : (y, pos) : _) | x == y =
+  go ((x@(Qualified (ByModuleName mn) op), _) : (y, pos) : _) | x == y =
     rethrow (addHint (ErrorInModule mn)) $
       rethrowWithPosition pos $ throwError . errorMessage $ toError op
   go (_ : rest) = go rest
@@ -315,19 +371,23 @@ updateTypes goType = (goDecl, goExpr, goBinder)
 
   goDecl :: Declaration -> m Declaration
   goDecl (DataDeclaration sa@(ss, _) ddt name args dctors) =
-    DataDeclaration sa ddt name args
-      <$> traverse (traverseDataCtorFields (traverse (sndM (goType' ss)))) dctors
+    DataDeclaration sa ddt name
+      <$> traverse (traverse (traverse (goType' ss))) args
+      <*> traverse (traverseDataCtorFields (traverse (sndM (goType' ss)))) dctors
   goDecl (ExternDeclaration sa@(ss, _) name ty) =
     ExternDeclaration sa name <$> goType' ss ty
   goDecl (TypeClassDeclaration sa@(ss, _) name args implies deps decls) = do
     implies' <- traverse (overConstraintArgs (traverse (goType' ss))) implies
-    return $ TypeClassDeclaration sa name args implies' deps decls
-  goDecl (TypeInstanceDeclaration sa@(ss, _) ch idx name cs className tys impls) = do
+    args' <- traverse (traverse (traverse (goType' ss))) args
+    return $ TypeClassDeclaration sa name args' implies' deps decls
+  goDecl (TypeInstanceDeclaration sa@(ss, _) na ch idx name cs className tys impls) = do
     cs' <- traverse (overConstraintArgs (traverse (goType' ss))) cs
     tys' <- traverse (goType' ss) tys
-    return $ TypeInstanceDeclaration sa ch idx name cs' className tys' impls
+    return $ TypeInstanceDeclaration sa na ch idx name cs' className tys' impls
   goDecl (TypeSynonymDeclaration sa@(ss, _) name args ty) =
-    TypeSynonymDeclaration sa name args <$> goType' ss ty
+    TypeSynonymDeclaration sa name
+      <$> traverse (traverse (traverse (goType' ss))) args
+      <*> goType' ss ty
   goDecl (TypeDeclaration (TypeDeclarationData sa@(ss, _) expr ty)) =
     TypeDeclaration . TypeDeclarationData sa expr <$> goType' ss ty
   goDecl (KindDeclaration sa@(ss, _) sigFor name ty) =
@@ -401,7 +461,7 @@ checkFixityExports m@(Module ss _ mn ds (Just exps)) =
   getTypeOpAlias op =
     listToMaybe (mapMaybe (either (const Nothing) go <=< getFixityDecl) ds)
     where
-    go (TypeFixity _ (Qualified (Just mn') ident) op')
+    go (TypeFixity _ (Qualified (ByModuleName mn') ident) op')
       | mn == mn' && op == op' = Just ident
     go _ = Nothing
 
@@ -413,7 +473,7 @@ checkFixityExports m@(Module ss _ mn ds (Just exps)) =
   getValueOpAlias op =
     listToMaybe (mapMaybe (either go (const Nothing) <=< getFixityDecl) ds)
     where
-    go (ValueFixity _ (Qualified (Just mn') ident) op')
+    go (ValueFixity _ (Qualified (ByModuleName mn') ident) op')
       | mn == mn' && op == op' = Just ident
     go _ = Nothing
 

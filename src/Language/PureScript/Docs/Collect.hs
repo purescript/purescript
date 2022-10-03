@@ -9,9 +9,9 @@ import Control.Arrow ((&&&))
 import qualified Data.Aeson.BetterErrors as ABE
 import qualified Data.ByteString as BS
 import qualified Data.Map as Map
-import Data.String (String)
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import System.FilePath ((</>))
 import System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
 
@@ -96,16 +96,12 @@ compileForDocs outputDir inputFiles = do
       foreigns <- P.inferForeignModules filePathMap
       let makeActions =
             (P.buildMakeActions outputDir filePathMap foreigns False)
-              { P.progress = liftIO . putStrLn . renderProgressMessage
+              { P.progress = liftIO . TIO.hPutStr stdout . (<> "\n") . P.renderProgressMessage "Compiling documentation for "
               }
       P.make makeActions (map snd ms)
   either throwError return result
 
   where
-  renderProgressMessage :: P.ProgressMessage -> String
-  renderProgressMessage (P.CompilingModule mn) =
-    "Compiling documentation for " ++ T.unpack (P.runModuleName mn)
-
   testOptions :: P.Options
   testOptions = P.defaultOptions { P.optionsCodegenTargets = Set.singleton P.Docs }
 

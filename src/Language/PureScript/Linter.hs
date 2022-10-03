@@ -113,6 +113,7 @@ lint modl@(Module _ _ mn ds _) = do
       go unused (BinaryNoParensType _ t1 t2 t3) = go unused t1 `combine` go unused t2 `combine` go unused t3
       go unused TUnknown{} = (unused, mempty)
       go unused TypeLevelString{} = (unused, mempty)
+      go unused TypeLevelInt{} = (unused, mempty)
       go unused TypeWildcard{} = (unused, mempty)
       go unused TypeConstructor{} = (unused, mempty)
       go unused TypeOp{} = (unused, mempty)
@@ -182,11 +183,11 @@ lintUnused (Module modSS _ mn modDecls exports) =
         in
           (vars, errs')
 
-    goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
+    goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
     goDecl _ = mempty
 
     go :: Expr -> (S.Set Ident, MultipleErrors)
-    go (Var _ (Qualified Nothing v)) = (S.singleton v, mempty)
+    go (Var _ (Qualified (BySourcePos _) v)) = (S.singleton v, mempty)
     go (Var _ _) = (S.empty, mempty)
 
     go (Let _ ds e) = onDecls ds (go e)
@@ -234,6 +235,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go (Constructor _ _) = mempty
     go (TypeClassDictionary _ _ _) = mempty
     go (DeferredDictionary _ _) = mempty
+    go (DerivedInstancePlaceholder _ _) = mempty
     go AnonymousArgument = mempty
     go (Hole _) = mempty
 

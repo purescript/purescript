@@ -4,12 +4,13 @@ import Prelude (Unit)
 import Effect (Effect)
 import Effect.Console (log)
 import Record.Unsafe (unsafeGet)
-import Type.Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
+import Type.Data.Symbol (class IsSymbol, reflectSymbol)
 import Type.Row (class Cons) as Row
+import Type.Proxy (Proxy)
 
-newtype LBox row a = LBox (∀ r. (∀ lbl _1. Row.Cons lbl a _1 row ⇒ IsSymbol lbl ⇒ SProxy lbl → r) → r)
+newtype LBox row a = LBox (∀ r. (∀ lbl _1. Row.Cons lbl a _1 row ⇒ IsSymbol lbl ⇒ Proxy lbl → r) → r)
 
-unLBox ∷ ∀ row a r. (∀ lbl _1. Row.Cons lbl a _1 row ⇒ IsSymbol lbl ⇒ SProxy lbl → r) → LBox row a → r
+unLBox ∷ ∀ row a r. (∀ lbl _1. Row.Cons lbl a _1 row ⇒ IsSymbol lbl ⇒ Proxy lbl → r) → LBox row a → r
 unLBox g (LBox f) = f g
 
 -- Example 1
@@ -24,7 +25,7 @@ get
   :: forall r r' l a
    . IsSymbol l
   => Row.Cons l a r' r
-  => SProxy l
+  => Proxy l
   -> Record r
   -> a
 get l r = unsafeGet (reflectSymbol l) r

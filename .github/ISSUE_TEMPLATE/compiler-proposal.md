@@ -1,7 +1,7 @@
 ---
 name: Compiler proposal
 about: A concrete suggestion to change the PureScript compiler
-labels: enhancement
+labels: 'type: enhancement'
 assignees: ''
 
 ---

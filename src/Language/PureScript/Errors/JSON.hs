@@ -39,9 +39,9 @@ data JSONResult = JSONResult
   } deriving (Show, Eq)
 
 $(A.deriveJSON A.defaultOptions ''ErrorPosition)
+$(A.deriveJSON A.defaultOptions ''ErrorSuggestion)
 $(A.deriveJSON A.defaultOptions ''JSONError)
 $(A.deriveJSON A.defaultOptions ''JSONResult)
-$(A.deriveJSON A.defaultOptions ''ErrorSuggestion)
 
 toJSONErrors :: Bool -> P.Level -> P.MultipleErrors -> [JSONError]
 toJSONErrors verbose level = map (toJSONError verbose level) . P.runMultipleErrors

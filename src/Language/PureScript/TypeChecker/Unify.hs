@@ -22,6 +22,7 @@ import Control.Monad.State.Class (MonadState(..), gets, modify, state)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Foldable (traverse_)
+import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Text as T
 
@@ -131,6 +132,7 @@ unifyTypes t1 t2 = do
   unifyTypes' ty1@(TypeConstructor _ c1) ty2@(TypeConstructor _ c2) =
     guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
   unifyTypes' (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = return ()
+  unifyTypes' (TypeLevelInt    _ n1) (TypeLevelInt    _ n2) | n1 == n2 = return ()
   unifyTypes' (TypeApp _ t3 t4) (TypeApp _ t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
@@ -183,24 +185,37 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
 replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => SourceType -> m SourceType
 replaceTypeWildcards = everywhereOnTypesM replace
   where
-  replace (TypeWildcard ann name) = do
+  replace (TypeWildcard ann wdata) = do
     t <- freshType
     ctx <- getLocalContext
-    let err = maybe (WildcardInferredType t ctx) (\n -> HoleInferredType n t ctx Nothing) name
-    warnWithPosition (fst ann) $ tell $ errorMessage err
+    let err = case wdata of
+          HoleWildcard n -> Just $ HoleInferredType n t ctx Nothing
+          UnnamedWildcard -> Just $ WildcardInferredType t ctx
+          IgnoredWildcard -> Nothing
+    forM_ err $ warnWithPosition (fst ann) . tell . errorMessage
     return t
   replace other = return other
 
 -- |
 -- Replace outermost unsolved unification variables with named type variables
 --
-varIfUnknown :: [(Unknown, SourceType)] -> SourceType -> SourceType
-varIfUnknown unks ty =
-  mkForAll (toBinding <$> unks) $ go ty
+varIfUnknown :: forall m. (MonadState CheckState m) => [(Unknown, SourceType)] -> SourceType -> m SourceType
+varIfUnknown unks ty = do
+  bn' <- traverse toBinding unks
+  ty' <- go ty
+  pure $ mkForAll bn' ty'
   where
-  toName = T.cons 't' . T.pack .  show
-  toBinding (a, k) = (getAnnForType ty, (toName a, Just $ go k))
-  go = everywhereOnTypes $ \case
-    (TUnknown ann u)
-      | Just _ <- lookup u unks -> TypeVar ann (toName u)
-    t -> t
+  toName :: Unknown -> m T.Text
+  toName u = (<> T.pack (show u)) . fromMaybe "t" <$> lookupUnkName u
+
+  toBinding :: (Unknown, SourceType) -> m (SourceAnn, (T.Text, Maybe SourceType))
+  toBinding (u, k) = do
+    u' <- toName u
+    k' <- go k
+    pure (getAnnForType ty, (u', Just k'))
+
+  go :: SourceType -> m SourceType
+  go = everywhereOnTypesM $ \case
+    (TUnknown ann u) ->
+      TypeVar ann <$> toName u
+    t -> pure t

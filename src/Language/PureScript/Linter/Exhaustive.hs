@@ -15,12 +15,11 @@ import Control.Applicative
 import Control.Arrow (first, second)
 import Control.Monad (unless)
 import Control.Monad.Writer.Class
-import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
+import Control.Monad.Supply.Class (MonadSupply)
 
 import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST.Binders
@@ -51,7 +50,7 @@ qualifyName
   -> ModuleName
   -> Qualified (ProperName b)
   -> Qualified (ProperName a)
-qualifyName n defmn qn = Qualified (Just mn) n
+qualifyName n defmn qn = Qualified (ByModuleName mn) n
   where
   (mn, _) = qualify defmn qn
 
@@ -205,7 +204,7 @@ missingCasesMultiple env mn = go
 isExhaustiveGuard :: Environment -> ModuleName -> [GuardedExpr] -> Bool
 isExhaustiveGuard _ _ [MkUnguarded _] = True
 isExhaustiveGuard env moduleName gs   =
-  not . null $ filter (\(GuardedExpr grd _) -> isExhaustive grd) gs
+  any (\(GuardedExpr grd _) -> isExhaustive grd) gs
   where
     isExhaustive :: [Guard] -> Bool
     isExhaustive = all checkGuard
@@ -256,7 +255,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     in (missed', ( if null approx
                      then liftA2 (&&) cond nec
                      else Left Incomplete
-                 , if either (const True) id cond
+                 , if and cond
                      then redundant
                      else caseAlternativeBinders ca : redundant
                  )
@@ -268,49 +267,22 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
        case rr of
          Left Incomplete -> tellIncomplete
          _ -> return ()
-       if null bss
-         then return expr
+       return $ if null bss
+         then expr
          else addPartialConstraint (second null (splitAt 5 bss)) expr
     where
       tellRedundant = tell . errorMessage' ss . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
       tellIncomplete = tell . errorMessage' ss $ IncompleteExhaustivityCheck
 
-  -- | We add a Partial constraint by adding a call to the following identity function:
-  --
-  -- partial :: forall a. Partial => a -> a
+  -- | We add a Partial constraint by annotating the expression to have type `Partial => _`.
   --
   -- The binder information is provided so that it can be embedded in the constraint,
   -- and then included in the error message.
-  addPartialConstraint :: ([[Binder]], Bool) -> Expr -> m Expr
-  addPartialConstraint (bss, complete) e = do
-    tyVar <- ("p" <>) . T.pack . show <$> fresh
-    var <- freshName
-    return $
-      Let
-        FromLet
-        [ partial var tyVar ]
-        $ App (Var ss (Qualified Nothing UnusedIdent)) e
+  addPartialConstraint :: ([[Binder]], Bool) -> Expr -> Expr
+  addPartialConstraint (bss, complete) e =
+    TypedValue True e $
+      srcConstrainedType (srcConstraint C.Partial [] [] (Just constraintData)) $ TypeWildcard NullSourceAnn IgnoredWildcard
     where
-      partial :: Text -> Text -> Declaration
-      partial var tyVar =
-        ValueDecl (ss, []) UnusedIdent Private []
-        [MkUnguarded
-          (TypedValue
-           True
-           (Abs (VarBinder ss (Ident var)) (Var ss (Qualified Nothing (Ident var))))
-           (ty tyVar))
-        ]
-
-      ty :: Text -> SourceType
-      ty tyVar =
-        srcForAll tyVar
-          Nothing
-          ( srcConstrainedType
-              (srcConstraint C.Partial [] [] (Just constraintData))
-              $ srcTypeApp (srcTypeApp tyFunction (srcTypeVar tyVar)) (srcTypeVar tyVar)
-          )
-          Nothing
-
       constraintData :: ConstraintData
       constraintData =
         PartialConstraintData (map (map prettyPrintBinderAtom) bss) complete

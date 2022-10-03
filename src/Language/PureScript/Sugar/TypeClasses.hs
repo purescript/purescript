@@ -58,6 +58,7 @@ desugarTypeClasses externs = flip evalStateT initialState . desugarModule
       , M.mapKeys (qualify C.PrimRow) primRowClasses
       , M.mapKeys (qualify C.PrimRowList) primRowListClasses
       , M.mapKeys (qualify C.PrimSymbol) primSymbolClasses
+      , M.mapKeys (qualify C.PrimInt) primIntClasses
       , M.mapKeys (qualify C.PrimTypeError) primTypeErrorClasses
       , M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
       ]
@@ -99,7 +100,7 @@ desugarModule (Module ss coms name decls (Just exps)) = do
   constraintName (Constraint _ cName _ _ _) = cName
 
   classDeclName :: Declaration -> Qualified (ProperName 'ClassName)
-  classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (Just name) pn
+  classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (ByModuleName name) pn
   classDeclName _ = internalError "Expected TypeClassDeclaration"
 
 desugarModule _ = internalError "Exports should have been elaborated in name desugaring"
@@ -205,22 +206,27 @@ desugarDecl mn exps = go
   go d@(TypeClassDeclaration sa name args implies deps members) = do
     modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
-  go (TypeInstanceDeclaration _ _ _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
-  go (TypeInstanceDeclaration sa chainId idx name deps className tys (ExplicitInstance members))
-    | className == C.Coercible
-    = throwError . errorMessage' (fst sa) $ InvalidCoercibleInstanceDeclaration tys
-    | otherwise = do
-    desugared <- desugarCases members
+  go (TypeInstanceDeclaration sa na chainId idx name deps className tys body) = do
     name' <- desugarInstName name
-    dictDecl <- typeInstanceDictionaryDeclaration sa name' mn deps className tys desugared
-    let d = TypeInstanceDeclaration sa chainId idx (Right name') deps className tys (ExplicitInstance members)
+    let d = TypeInstanceDeclaration sa na chainId idx (Right name') deps className tys body
+    let explicitOrNot = case body of
+          DerivedInstance -> Left $ DerivedInstancePlaceholder className KnownClassStrategy
+          NewtypeInstance -> Left $ DerivedInstancePlaceholder className NewtypeStrategy
+          ExplicitInstance members -> Right members
+    dictDecl <- case explicitOrNot of
+      Right members
+        | className == C.Coercible ->
+          throwError . errorMessage' (fst sa) $ InvalidCoercibleInstanceDeclaration tys
+        | otherwise -> do
+          desugared <- desugarCases members
+          typeInstanceDictionaryDeclaration sa name' mn deps className tys desugared
+      Left dict ->
+        let
+          dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictTypeName) className)) tys
+          constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
+        in
+          return $ ValueDecl sa name' Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
     return (expRef name' className tys, [d, dictDecl])
-  go (TypeInstanceDeclaration sa chainId idx name deps className tys (NewtypeInstanceWithDictionary dict)) = do
-    name' <- desugarInstName name
-    let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictTypeName) className)) tys
-        constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
-        d = TypeInstanceDeclaration sa chainId idx (Right name') deps className tys (NewtypeInstanceWithDictionary dict)
-    return (expRef name' className tys, [d, ValueDecl sa name' Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
 
   -- |
@@ -244,7 +250,7 @@ desugarDecl mn exps = go
     :: (ProperName a -> [DeclarationRef] -> Bool)
     -> Qualified (ProperName a)
     -> Bool
-  isExported test (Qualified (Just mn') pn) = mn /= mn' || test pn exps
+  isExported test (Qualified (ByModuleName mn') pn) = mn /= mn' || test pn exps
   isExported _ _ = internalError "Names should have been qualified in name desugaring"
 
   matchesTypeRef :: ProperName 'TypeName -> DeclarationRef -> Bool
@@ -290,14 +296,14 @@ typeClassMemberToDictionaryAccessor
   -> Declaration
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa@(ss, _) ident ty)) =
-  let className = Qualified (Just mn) name
+  let className = Qualified (ByModuleName mn) name
       dictIdent = Ident "dict"
       dictObjIdent = Ident "v"
       ctor = ConstructorBinder ss (coerceProperName . dictTypeName <$> className) [VarBinder ss dictObjIdent]
-      acsr = Accessor (mkString $ runIdent ident) (Var ss (Qualified Nothing dictObjIdent))
+      acsr = Accessor (mkString $ runIdent ident) (Var ss (Qualified ByNullSourcePos dictObjIdent))
   in ValueDecl sa ident Private []
     [MkUnguarded (
-     TypedValue False (Abs (VarBinder ss dictIdent) (Case [Var ss $ Qualified Nothing dictIdent] [CaseAlternative [ctor] [MkUnguarded acsr]])) $
+     TypedValue False (Abs (VarBinder ss dictIdent) (Case [Var ss $ Qualified ByNullSourcePos dictIdent] [CaseAlternative [ctor] [MkUnguarded acsr]])) $
        moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty))
     )]
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"

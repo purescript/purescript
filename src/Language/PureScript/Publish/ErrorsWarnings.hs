@@ -31,6 +31,8 @@ import qualified Language.PureScript as P
 import Language.PureScript.Publish.BoxesHelpers
 
 import Web.Bower.PackageMeta (PackageName, runPackageName, showBowerError)
+import qualified Web.Bower.PackageMeta as Bower
+import Language.PureScript.Docs.Types (showManifestError)
 
 -- | An error which meant that it was not possible to retrieve metadata for a
 -- package.
@@ -48,8 +50,9 @@ data PackageWarning
 
 -- | An error that should be fixed by the user.
 data UserError
-  = PackageManifestNotFound
+  = PackageManifestNotFound FilePath
   | ResolutionsFileNotFound
+  | CouldntConvertPackageManifest Bower.BowerError
   | CouldntDecodePackageManifest (ParseError D.ManifestError)
   | TagMustBeCheckedOut
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
@@ -115,17 +118,26 @@ renderError err =
 
 displayUserError :: UserError -> Box
 displayUserError e = case e of
-  PackageManifestNotFound ->
-    para (
-      "The package manifest file was not found. Please create one, or run " ++
-      "`pulp init`."
-      )
+  PackageManifestNotFound path -> do
+    vcat
+      [ para "The package manifest file was not found:"
+      , indented (para path)
+      , spacer
+      , para "Please create either a bower.json or purs.json manifest file."
+      ]
   ResolutionsFileNotFound ->
     para "The resolutions file was not found."
+  CouldntConvertPackageManifest err ->
+    vcat
+      [ para "Unable to convert your package manifest file to the Bower format:"
+      , indented ((para . T.unpack) (showBowerError err))
+      , spacer
+      , para "Please ensure that your package manifest file is valid."
+      ]
   CouldntDecodePackageManifest err ->
     vcat
       [ para "There was a problem with your package manifest file:"
-      , indented (vcat (map (para . T.unpack) (displayError showBowerError err)))
+      , indented (vcat (map (para . T.unpack) (displayError showManifestError err)))
       , spacer
       , para "Please ensure that your package manifest file is valid."
       ]
@@ -234,16 +246,25 @@ displayRepositoryError err = case err of
   RepositoryFieldMissing giturl ->
     vcat
       [ para (concat
-         [ "The 'repository' field is not present in your package manifest file. "
+         [ "The 'repository' or 'location' field is not present in your package manifest file. "
          , "Without this information, Pursuit would not be able to generate "
          , "source links in your package's documentation. Please add one - like "
-         , "this, for example:"
+         , "this, if you are using the bower.json format:"
          ])
       , spacer
       , indented (vcat
           [ para "\"repository\": {"
           , indented (para "\"type\": \"git\",")
           , indented (para ("\"url\": \"" ++ T.unpack (fromMaybe "https://github.com/USER/REPO.git" giturl) ++ "\""))
+          , para "}"
+          ]
+        )
+      , para "or like this, if you are using the purs.json format:"
+      , spacer
+      , indented (vcat
+          [ para "\"location\": {"
+          , indented (para "\"githubOwner\": \"USER\",")
+          , indented (para "\"githubRepo\": \"REPO\",")
           , para "}"
           ]
         )
