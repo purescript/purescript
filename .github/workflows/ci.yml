@@ -38,7 +38,8 @@ jobs:
         include:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
             os: "ubuntu-latest"
-            image: "ghcr.io/purescript/haskell:9.2.3-stretch@sha256:70fd2b6255deb5daa961e6983591a0e21e9ac1e793923bee54aa2cc62e01f867"
+            # image: "ghcr.io/purescript/haskell:9.2.3-stretch@sha256:70fd2b6255deb5daa961e6983591a0e21e9ac1e793923bee54aa2cc62e01f867"
+            image: "haskell:9.2.3-buster@sha256:51e250369e4671a15c247cdc5047397be88d7eb8e95b97b0fd9f417854a78bec"
           - os: "macOS-11"
           - os: "windows-2019"
 
@@ -96,7 +97,7 @@ jobs:
           echo "local-programs-path: $STACK_ROOT/programs" > $STACK_ROOT/config.yaml
 
       - id: "build"
-        run: "ci/fix-home ci/build.sh || echo 0"
+        run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Build the entire package set"
         if: "${{ runner.os == 'Linux' }}"
