@@ -186,7 +186,8 @@ common defaults
     typed-process >=0.2.10.1 && <0.3,
     unordered-containers >=0.2.19.1 && <0.3,
     utf8-string >=1.0.2 && <1.1,
-    vector >=0.12.3.1 && <0.13
+    vector >=0.12.3.1 && <0.13,
+    witherable >=0.4.2 && <0.5
 
 library
   import: defaults

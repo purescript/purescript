@@ -88,7 +88,7 @@ data ErrorMessageHint
   | ErrorSolvingConstraint SourceConstraint
   | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   | PositionedError (NEL.NonEmpty SourceSpan)
-  | ErrorUnderLabel PSString
+  | RelatedPositions (NEL.NonEmpty SourceSpan)
   deriving (Show)
 
 -- | Categories of hints

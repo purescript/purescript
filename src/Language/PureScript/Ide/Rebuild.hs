@@ -55,7 +55,7 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   let fp' = fromMaybe fp actualFile
   (pwarnings, m) <- case sequence $ CST.parseFromFile fp' input of
     Left parseError ->
-      throwError $ RebuildError $ CST.toMultipleErrors fp' parseError
+      throwError $ RebuildError [(fp', input)] $ CST.toMultipleErrors fp' parseError
     Right m -> pure m
   let moduleName = P.getModuleName m
   -- Externs files must be sorted ahead of time, so that they get applied
@@ -75,7 +75,7 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
       pure newExterns
   case result of
     Left errors ->
-      throwError (RebuildError errors)
+      throwError (RebuildError [(fp', input)] errors)
     Right newExterns -> do
       insertModule (fromMaybe file actualFile, m)
       insertExterns newExterns
@@ -193,7 +193,7 @@ sortExterns m ex = do
            . M.delete (P.getModuleName m) $ ex
   case sorted' of
     Left err ->
-      throwError (RebuildError err)
+      throwError (RebuildError [] err)
     Right (sorted, graph) -> do
       let deps = fromJust (List.lookup (P.getModuleName m) graph)
       pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)

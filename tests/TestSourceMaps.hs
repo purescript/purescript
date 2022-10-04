@@ -52,9 +52,10 @@ assertCompilesToExpectedValidOutput support inputFiles = do
   let
     modulePath = getTestMain inputFiles
 
-  (result, _) <- compile' compilationOptions (Just (IsSourceMap modulePath)) support inputFiles
+  (fileContents, (result, _)) <- compile' compilationOptions (Just (IsSourceMap modulePath)) support inputFiles
+  let errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
   case result of
-    Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+    Left errs -> expectationFailure . P.prettyPrintMultipleErrors errorOptions $ errs
     Right actualSourceMapFile -> do
       let
         readAndDecode :: FilePath ->  IO (Maybe Json.Value)

@@ -6,7 +6,7 @@ module Language.PureScript.TypeChecker.Deriving (deriveInstance) where
 import Protolude hiding (Type)
 
 import Control.Monad.Trans.Writer (Writer, WriterT, runWriter, runWriterT)
-import Control.Monad.Writer.Class (MonadWriter(..), censor)
+import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Foldable (foldl1, foldr1)
 import Data.List (init, last, zipWith3, (!!))
 import qualified Data.Map as M
@@ -71,19 +71,20 @@ deriveInstance instType className strategy = do
                   let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
                   in lam UnusedIdent (DeferredDictionary superclass tyArgs)
             let superclasses = map mkString (superClassDictionaryNames typeClassSuperclasses) `zip` superclassesDicts
-            rethrow (addHint $ ErrorInInstance className tys) $
-              App (Constructor nullSourceSpan ctorName) . mkLit . ObjectLiteral . (++ superclasses) <$> f mn tyCon
+            App (Constructor nullSourceSpan ctorName) . mkLit . ObjectLiteral . (++ superclasses) <$> f mn tyCon
           _ -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
         _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
 
+      unaryClass' f = unaryClass (f className)
+
       in case className of
-        Foldable.Foldable -> unaryClass deriveFoldable
+        Foldable.Foldable -> unaryClass' deriveFoldable
         Prelude.Eq -> unaryClass deriveEq
         Prelude.Eq1 -> unaryClass $ \_ _ -> deriveEq1
-        Prelude.Functor -> unaryClass deriveFunctor
+        Prelude.Functor -> unaryClass' deriveFunctor
         Prelude.Ord -> unaryClass deriveOrd
         Prelude.Ord1 -> unaryClass $ \_ _ -> deriveOrd1
-        Traversable.Traversable -> unaryClass deriveTraversable
+        Traversable.Traversable -> unaryClass' deriveTraversable
         -- See L.P.Sugar.TypeClasses.Deriving for the classes that can be
         -- derived prior to type checking.
         _ -> throwError . errorMessage $ CannotDerive className tys
@@ -373,38 +374,29 @@ data ParamUsage
   | MentionsParam ParamUsage
   | IsRecord (NonEmpty (PSString, ParamUsage))
 
-type ParamErrorData = [([Either (ProperName 'ConstructorName) PSString], SourceSpan)]
-
 validateParamsInTypeConstructors
   :: forall m
    . MonadError MultipleErrors m
   => MonadState CheckState m
-  => ModuleName
+  => Qualified (ProperName 'ClassName)
+  -> ModuleName
   -> ProperName 'TypeName
   -> m [(ProperName 'ConstructorName, [Maybe ParamUsage])]
-validateParamsInTypeConstructors mn tyConNm = do
+validateParamsInTypeConstructors derivingClass mn tyConNm = do
   (_, _, tyArgNames, ctors) <- lookupTypeDecl mn tyConNm
   param <- note (errorMessage $ KindsDoNotUnify (kindType -:> kindType) kindType) . lastMay $ map fst tyArgNames
   ctors' <- traverse (traverse $ traverse replaceAllTypeSynonyms) ctors
-  let (ctorUsages, errors) = runWriter $ traverse (addCtorHint . traverse . traverse $ typeToUsageOf param) ctors'
-  unless (null errors) $
-    throwError . flip foldMap (sortOn snd $ ordNub errors) $ \(hints, ss) ->
-      addHints (either ErrorInDataConstructor ErrorUnderLabel <$> hints) $
-        errorMessage $ CannotDeriveInvalidConstructorArg param ss
+  let (ctorUsages, problemSpans) = runWriter $ traverse (traverse . traverse $ typeToUsageOf param) ctors'
+  for_ (nonEmpty $ ordNub problemSpans) $ \sss ->
+    throwError . addHint (RelatedPositions sss) . errorMessage $ CannotDeriveInvalidConstructorArg derivingClass
   pure ctorUsages
   where
-  consHintData :: a -> Writer [([a], b)] c -> Writer [([a], b)] c
-  consHintData a = censor (map $ first (a :))
-
-  addCtorHint :: ((ProperName 'ConstructorName, a) -> Writer ParamErrorData b) -> (ProperName 'ConstructorName, a) -> Writer ParamErrorData b
-  addCtorHint f ctor = consHintData (Left $ fst ctor) $ f ctor
-
-  typeToUsageOf :: Text -> SourceType -> Writer ParamErrorData (Maybe ParamUsage)
+  typeToUsageOf :: Text -> SourceType -> Writer [SourceSpan] (Maybe ParamUsage)
   typeToUsageOf param = go
     where
-    assertNoParamUsedIn :: SourceType -> Writer ParamErrorData ()
+    assertNoParamUsedIn :: SourceType -> Writer [SourceSpan] ()
     assertNoParamUsedIn = everythingOnTypes (*>) $ \case
-      TypeVar (ss, _) name | name == param -> tell [([], ss)]
+      TypeVar (ss, _) name | name == param -> tell [ss]
       _ -> pure ()
 
     go = \case
@@ -416,8 +408,7 @@ validateParamsInTypeConstructors mn tyConNm = do
 
       TypeApp _ (TypeConstructor _ Prim.Record) row ->
         fmap (fmap IsRecord . nonEmpty . catMaybes) . for (decomposeRec' row) $ \(Label lbl, ty) ->
-          consHintData (Right lbl) $
-            fmap (lbl, ) <$> go ty
+          fmap (lbl, ) <$> go ty
 
       TypeApp _ tyFn tyArg -> do
         assertNoParamUsedIn tyFn
@@ -495,11 +486,12 @@ deriveFunctor
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => MonadSupply m
-  => ModuleName
+  => Qualified (ProperName 'ClassName)
+  -> ModuleName
   -> ProperName 'TypeName
   -> m [(PSString, Expr)]
-deriveFunctor mn tyConNm = do
-  ctors <- validateParamsInTypeConstructors mn tyConNm
+deriveFunctor nm mn tyConNm = do
+  ctors <- validateParamsInTypeConstructors nm mn tyConNm
   mapFun <- mkTraversal mn mapVar (TraversalOps identity identity) ctors
   pure [(Prelude.map, mapFun)]
   where
@@ -519,11 +511,12 @@ deriveFoldable
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => MonadSupply m
-  => ModuleName
+  => Qualified (ProperName 'ClassName)
+  -> ModuleName
   -> ProperName 'TypeName
   -> m [(PSString, Expr)]
-deriveFoldable mn tyConNm = do
-  ctors <- validateParamsInTypeConstructors mn tyConNm
+deriveFoldable nm mn tyConNm = do
+  ctors <- validateParamsInTypeConstructors nm mn tyConNm
   foldlFun <- mkAsymmetricFoldFunction False foldlVar ctors
   foldrFun <- mkAsymmetricFoldFunction True foldrVar ctors
   foldMapFun <- mkTraversal mn foldMapVar foldMapOps ctors
@@ -583,11 +576,12 @@ deriveTraversable
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => MonadSupply m
-  => ModuleName
+  => Qualified (ProperName 'ClassName)
+  -> ModuleName
   -> ProperName 'TypeName
   -> m [(PSString, Expr)]
-deriveTraversable mn tyConNm = do
-  ctors <- validateParamsInTypeConstructors mn tyConNm
+deriveTraversable nm mn tyConNm = do
+  ctors <- validateParamsInTypeConstructors nm mn tyConNm
   traverseFun <- mkTraversal mn traverseVar traverseOps ctors
   sequenceFun <- usingLamIdent $ pure . App (App traverseVar identityVar)
   pure [(Traversable.traverse, traverseFun), (Traversable.sequence, sequenceFun)]

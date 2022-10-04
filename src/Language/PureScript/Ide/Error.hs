@@ -31,29 +31,29 @@ data IdeError
     | NotFound Text
     | ModuleNotFound ModuleIdent
     | ModuleFileNotFound ModuleIdent
-    | RebuildError P.MultipleErrors
+    | RebuildError [(FilePath, Text)] P.MultipleErrors
     deriving (Show)
 
 instance ToJSON IdeError where
-  toJSON (RebuildError errs) = object
+  toJSON (RebuildError files errs) = object
     [ "resultType" .= ("error" :: Text)
-    , "result" .= encodeRebuildErrors errs
+    , "result" .= encodeRebuildErrors files errs
     ]
   toJSON err = object
     [ "resultType" .= ("error" :: Text)
     , "result" .= textError err
     ]
 
-encodeRebuildErrors :: P.MultipleErrors -> Value
-encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
+encodeRebuildErrors :: [(FilePath, Text)] -> P.MultipleErrors -> Value
+encodeRebuildErrors files = toJSON . map encodeRebuildError . P.runMultipleErrors
   where
     encodeRebuildError err = case err of
       (P.ErrorMessage _
        ((P.HoleInferredType name _ _
          (Just P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields})))) ->
-        insertTSCompletions name idents (fromMaybe [] fields) (toJSON (toJSONError False P.Error err))
+        insertTSCompletions name idents (fromMaybe [] fields) (toJSON (toJSONError False P.Error files err))
       _ ->
-        (toJSON . toJSONError False P.Error) err
+        (toJSON . toJSONError False P.Error files) err
 
     insertTSCompletions name idents fields (Aeson.Object value) =
       Aeson.Object
@@ -91,7 +91,7 @@ textError (GeneralError msg)          = msg
 textError (NotFound ident)            = "Symbol '" <> ident <> "' not found."
 textError (ModuleNotFound ident)      = "Module '" <> ident <> "' not found."
 textError (ModuleFileNotFound ident)  = "Extern file for module " <> ident <>" could not be found"
-textError (RebuildError err)          = show err
+textError (RebuildError _ err)        = show err
 
 prettyPrintTypeSingleLine :: P.Type a -> Text
 prettyPrintTypeSingleLine = T.unwords . map T.strip . T.lines . T.pack . P.prettyPrintTypeWithUnicode maxBound
