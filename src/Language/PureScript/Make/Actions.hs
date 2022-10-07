@@ -88,7 +88,7 @@ renderProgressMessage infx (CompilingModule mn mi) =
     let start' = T.pack (show start)
         end' = T.pack (show end)
         preSpace = T.replicate (T.length end' - T.length start') " "
-    in "[" <> preSpace <> start' <> " of " <> end' <> "] X5"
+    in "[" <> preSpace <> start' <> " of " <> end' <> "] "
 
 -- | Actions that require implementations when running in "make" mode.
 --
@@ -343,7 +343,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   requiresForeign = not . null . CF.moduleForeign
 
   progress :: ProgressMessage -> Make ()
-  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage "Compiling "
+  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage "CompilingX5 "
 
   readCacheDb :: Make CacheDb
   readCacheDb = readCacheDb' outputDir
