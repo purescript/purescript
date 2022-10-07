@@ -1,5 +1,4 @@
 -- @shouldFailWith CannotDeriveInvalidConstructorArg
--- @shouldFailWith CannotDeriveInvalidConstructorArg
 module FoldableInstance10 where
 
 import Prelude
