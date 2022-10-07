@@ -8,7 +8,7 @@ module Language.PureScript.Sugar.TypeClasses
   , superClassDictionaryNames
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import           Control.Arrow (first, second)
 import           Control.Monad.Error.Class (MonadError(..))

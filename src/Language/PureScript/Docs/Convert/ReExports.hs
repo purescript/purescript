@@ -2,7 +2,7 @@ module Language.PureScript.Docs.Convert.ReExports
   ( updateReExports
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((&&&), first, second)
 import Control.Monad

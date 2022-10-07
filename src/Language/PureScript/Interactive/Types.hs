@@ -28,7 +28,7 @@ module Language.PureScript.Interactive.Types
   , Directive(..)
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import qualified Language.PureScript as P
 import qualified Data.Map as M

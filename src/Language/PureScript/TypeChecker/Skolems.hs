@@ -8,7 +8,7 @@ module Language.PureScript.TypeChecker.Skolems
   , skolemEscapeCheck
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)

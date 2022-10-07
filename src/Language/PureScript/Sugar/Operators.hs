@@ -13,7 +13,7 @@ module Language.PureScript.Sugar.Operators
   , checkFixityExports
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Language.PureScript.AST
 import Language.PureScript.Crash

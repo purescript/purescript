@@ -14,7 +14,7 @@ module Language.PureScript.TypeChecker.Unify
   , varIfUnknown
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))

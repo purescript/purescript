@@ -2,7 +2,7 @@
 
 module Language.PureScript.Errors.JSON where
 
-import Prelude.Compat
+import Prelude
 
 import qualified Data.Aeson.TH as A
 import qualified Data.List.NonEmpty as NEL

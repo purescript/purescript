@@ -3,7 +3,7 @@
 --
 module Control.Monad.Logger where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad (ap)
 import Control.Monad.Base (MonadBase(..))

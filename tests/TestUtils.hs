@@ -1,7 +1,6 @@
 module TestUtils where
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST

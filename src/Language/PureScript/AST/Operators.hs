@@ -3,7 +3,7 @@
 --
 module Language.PureScript.AST.Operators where
 
-import Prelude.Compat
+import Prelude
 
 import Codec.Serialise (Serialise)
 import GHC.Generics (Generic)

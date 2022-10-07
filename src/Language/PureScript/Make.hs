@@ -9,7 +9,7 @@ module Language.PureScript.Make
   , module Actions
   ) where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Concurrent.Lifted as C
 import           Control.Exception.Base (onException)

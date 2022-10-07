@@ -4,7 +4,7 @@
 --
 module Language.PureScript.Sugar.LetPattern (desugarLetPatternModule) where
 
-import Prelude.Compat
+import Prelude
 
 import Data.List (groupBy)
 import Data.Function (on)

@@ -1,6 +1,6 @@
 module Language.PureScript.Sugar.Operators.Expr where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.Except
 import Data.Functor.Identity

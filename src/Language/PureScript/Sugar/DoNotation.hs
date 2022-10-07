@@ -3,7 +3,7 @@
 
 module Language.PureScript.Sugar.DoNotation (desugarDoModule) where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Applicative ((<|>))
 import           Control.Monad.Error.Class (MonadError(..))

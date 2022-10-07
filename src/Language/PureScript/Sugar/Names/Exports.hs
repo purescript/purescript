@@ -3,7 +3,7 @@ module Language.PureScript.Sugar.Names.Exports
   , resolveExports
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad
 import Control.Monad.Writer.Class (MonadWriter(..))

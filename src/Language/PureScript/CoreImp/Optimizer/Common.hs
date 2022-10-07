@@ -1,7 +1,7 @@
 -- | Common functions used by the various optimizer phases
 module Language.PureScript.CoreImp.Optimizer.Common where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Text (Text)
 import Data.List (foldl')

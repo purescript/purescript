@@ -1,7 +1,6 @@
 module TestPsci.EvalTest where
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import           Control.Monad (forM_, foldM_)
 import           Control.Monad.IO.Class (liftIO)

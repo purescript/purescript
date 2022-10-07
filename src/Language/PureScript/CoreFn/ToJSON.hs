@@ -7,7 +7,7 @@ module Language.PureScript.CoreFn.ToJSON
   ( moduleToJSON
   ) where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Arrow ((***))
 import           Data.Either (isLeft)

@@ -6,7 +6,7 @@ module Language.PureScript.CodeGen.JS
   , moduleToJs
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Control.Applicative (liftA2)

@@ -1,6 +1,6 @@
 module Language.PureScript.Label (Label(..)) where
 
-import Prelude.Compat hiding (lex)
+import Prelude
 import GHC.Generics (Generic)
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)

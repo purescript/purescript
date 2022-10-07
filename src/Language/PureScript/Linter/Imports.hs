@@ -4,7 +4,7 @@ module Language.PureScript.Linter.Imports
   , UsedImports()
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Control.Monad (join, unless, foldM, (<=<))

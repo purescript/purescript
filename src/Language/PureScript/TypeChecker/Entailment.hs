@@ -9,7 +9,7 @@ module Language.PureScript.TypeChecker.Entailment
   , entails
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Control.Arrow (second, (&&&))

@@ -6,7 +6,7 @@
 --
 module Language.PureScript.AST.Declarations where
 
-import Prelude.Compat
+import Prelude
 import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)

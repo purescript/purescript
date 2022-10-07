@@ -3,8 +3,7 @@
 
 module Command.REPL (command) where
 
-import           Prelude ()
-import           Prelude.Compat
+import           Prelude
 import           Control.Applicative (many, (<|>))
 import           Control.Monad
 import           Control.Monad.Catch (MonadMask)
