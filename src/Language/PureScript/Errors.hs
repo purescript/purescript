@@ -196,6 +196,8 @@ data SimpleErrorMessage
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
   | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName))
+  | CannotSkipTypeApplication SourceType
+  | CannotApplyExpressionOfTypeOnType SourceType SourceType
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -364,6 +366,8 @@ errorCode em = case unwrapErrorMessage em of
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
   CannotDeriveInvalidConstructorArg{} -> "CannotDeriveInvalidConstructorArg"
+  CannotSkipTypeApplication{} -> "CannotSkipTypeApplication"
+  CannotApplyExpressionOfTypeOnType{} -> "CannotApplyExpressionOfTypeOnType"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1384,6 +1388,21 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
         [ line $ "One or more type variables are in positions that prevent " <> markCode (runProperName $ disqualify className) <> " from being derived."
         , line $ "To derive this class, make sure that these variables are only used as the final arguments to type constructors, "
           <> "and that those type constructors themselves have instances of " <> markCode (runProperName $ disqualify className) <> "."
+        ]
+
+    renderSimpleErrorMessage (CannotSkipTypeApplication tyFn) =
+      paras
+        [ "An expression of type:"
+        , markCodeBox $ indent $ prettyType tyFn
+        , "cannot be skipped."
+        ]
+
+    renderSimpleErrorMessage (CannotApplyExpressionOfTypeOnType tyFn tyAr) =
+      paras
+        [ "An expression of type:"
+        , markCodeBox $ indent $ prettyType tyFn
+        , "cannot be applied to:"
+        , markCodeBox $ indent $ prettyType tyAr
         ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box

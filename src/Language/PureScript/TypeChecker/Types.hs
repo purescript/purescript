@@ -466,7 +466,7 @@ infer' (VisibleTypeApp valFn (TypeWildcard _ _)) = do
     ForAll qAnn qName qKind qBody qSko _ -> do
       pure $ TypedValue' True valFn'' (ForAll qAnn qName qKind qBody qSko TypeVarInvisible)
     _ ->
-      internalError "Cannot skip."
+      throwError $ errorMessage $ CannotSkipTypeApplication valTy'
 infer' (VisibleTypeApp valFn tyArg) = do
   TypedValue' _ valFn' valTy <- infer valFn
   tyArg' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ tyArg
@@ -478,7 +478,7 @@ infer' (VisibleTypeApp valFn tyArg) = do
       (valFn''', resTy') <- instantiateConstraint valFn'' resTy
       pure $ TypedValue' True valFn''' resTy'
     _ ->
-      internalError $ "Invalid type application " <> debugType valTy'
+      throwError $ errorMessage $ CannotApplyExpressionOfTypeOnType valTy tyArg
 infer' (Var ss var) = do
   checkVisibility var
   ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable $ var
