@@ -1,6 +1,6 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub, orEmpty)
 
 import Control.Arrow (second)
@@ -213,7 +213,7 @@ findQualModules decls =
   in f `concatMap` decls
   where
   fqDecls :: A.Declaration -> [ModuleName]
-  fqDecls (A.TypeInstanceDeclaration _ _ _ _ _ q _ _) = getQual' q
+  fqDecls (A.TypeInstanceDeclaration _ _ _ _ _ _ q _ _) = getQual' q
   fqDecls (A.ValueFixityDeclaration _ _ q _) = getQual' q
   fqDecls (A.TypeFixityDeclaration _ _ q _) = getQual' q
   fqDecls _ = []

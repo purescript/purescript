@@ -8,7 +8,7 @@ module Language.PureScript.Sugar.TypeClasses
   , superClassDictionaryNames
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import           Control.Arrow (first, second)
 import           Control.Monad.Error.Class (MonadError(..))
@@ -206,9 +206,9 @@ desugarDecl mn exps = go
   go d@(TypeClassDeclaration sa name args implies deps members) = do
     modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
-  go (TypeInstanceDeclaration sa chainId idx name deps className tys body) = do
+  go (TypeInstanceDeclaration sa na chainId idx name deps className tys body) = do
     name' <- desugarInstName name
-    let d = TypeInstanceDeclaration sa chainId idx (Right name') deps className tys body
+    let d = TypeInstanceDeclaration sa na chainId idx (Right name') deps className tys body
     let explicitOrNot = case body of
           DerivedInstance -> Left $ DerivedInstancePlaceholder className KnownClassStrategy
           NewtypeInstance -> Left $ DerivedInstancePlaceholder className NewtypeStrategy

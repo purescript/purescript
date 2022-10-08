@@ -6,7 +6,7 @@ module Language.PureScript.Docs.Prim
   , primModules
   ) where
 
-import Prelude.Compat hiding (fail)
+import Prelude hiding (fail)
 import Data.Functor (($>))
 import Data.Text (Text)
 import qualified Data.Text as T

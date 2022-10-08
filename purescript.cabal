@@ -131,7 +131,6 @@ common defaults
     ansi-terminal >=0.11.3 && <0.12,
     array >=0.5.4.0 && <0.6,
     base >=4.16.2.0 && <4.17,
-    base-compat >=0.12.1 && <0.13,
     blaze-html >=0.9.1.2 && <0.10,
     bower-json >=1.1.0.0 && <1.2,
     boxes >=0.1.5 && <0.2,
@@ -186,7 +185,8 @@ common defaults
     typed-process >=0.2.10.1 && <0.3,
     unordered-containers >=0.2.19.1 && <0.3,
     utf8-string >=1.0.2 && <1.1,
-    vector >=0.12.3.1 && <0.13
+    vector >=0.12.3.1 && <0.13,
+    witherable >=0.4.2 && <0.5
 
 library
   import: defaults
@@ -212,8 +212,10 @@ library
     Language.PureScript.CodeGen.JS.Common
     Language.PureScript.CodeGen.JS.Printer
     Language.PureScript.Constants.Prelude
+    Language.PureScript.Constants.Data.Foldable
     Language.PureScript.Constants.Data.Generic.Rep
     Language.PureScript.Constants.Data.Newtype
+    Language.PureScript.Constants.Data.Traversable
     Language.PureScript.CoreFn
     Language.PureScript.CoreFn.Ann
     Language.PureScript.CoreFn.Binders

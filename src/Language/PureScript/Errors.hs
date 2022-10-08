@@ -3,10 +3,11 @@ module Language.PureScript.Errors
   , module Language.PureScript.Errors
   ) where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Arrow ((&&&))
 import           Control.Exception (displayException)
+import           Control.Lens (both, head1, over)
 import           Control.Monad
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.State.Lazy
@@ -14,18 +15,22 @@ import           Control.Monad.Writer
 import           Data.Bifunctor (first, second)
 import           Data.Bitraversable (bitraverse)
 import           Data.Char (isSpace)
+import           Data.Containers.ListUtils (nubOrdOn)
 import           Data.Either (partitionEithers)
 import           Data.Foldable (fold)
+import           Data.Function (on)
+import           Data.Functor (($>))
 import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn)
+import           Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn, uncons)
 import qualified Data.List.NonEmpty as NEL
 import           Data.List.NonEmpty (NonEmpty((:|)))
-import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
+import           Data.Maybe (maybeToList, fromMaybe, isJust, mapMaybe)
 import qualified Data.Map as M
 import           Data.Ord (Down(..))
 import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text (Text)
+import           Data.Traversable (for)
 import qualified GHC.Stack
 import           Language.PureScript.AST
 import qualified Language.PureScript.Bundle as Bundle
@@ -45,7 +50,9 @@ import           Language.PureScript.Traversals
 import           Language.PureScript.Types
 import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
 import qualified System.Console.ANSI as ANSI
+import           System.FilePath (makeRelative)
 import qualified Text.PrettyPrint.Boxes as Box
+import           Witherable (wither)
 
 -- | A type of error messages
 data SimpleErrorMessage
@@ -188,6 +195,7 @@ data SimpleErrorMessage
   | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
+  | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName))
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -199,10 +207,12 @@ newtype ErrorSuggestion = ErrorSuggestion Text
 
 -- | Get the source span for an error
 errorSpan :: ErrorMessage -> Maybe (NEL.NonEmpty SourceSpan)
-errorSpan = findHint matchSpan
+errorSpan = findHint matchPE <> findHint matchRP
   where
-  matchSpan (PositionedError ss) = Just ss
-  matchSpan _ = Nothing
+  matchPE (PositionedError sss) = Just sss
+  matchPE _ = Nothing
+  matchRP (RelatedPositions sss) = Just sss
+  matchRP _ = Nothing
 
 -- | Get the module name for an error
 errorModule :: ErrorMessage -> Maybe ModuleName
@@ -353,6 +363,7 @@ errorCode em = case unwrapErrorMessage em of
   UnsupportedRoleDeclaration {} -> "UnsupportedRoleDeclaration"
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
+  CannotDeriveInvalidConstructorArg{} -> "CannotDeriveInvalidConstructorArg"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -577,7 +588,6 @@ colorCodeBox codeColor b = case codeColor of
         , Box.vcat Box.top $ replicate (Box.rows b) $ Box.text ansiColorReset
         ]
 
-
 -- | Default color intensity and color for code
 defaultCodeColor :: (ANSI.ColorIntensity, ANSI.Color)
 defaultCodeColor = (ANSI.Dull, ANSI.Yellow)
@@ -589,6 +599,7 @@ data PPEOptions = PPEOptions
   , ppeLevel             :: Level -- ^ Should this report an error or a warning?
   , ppeShowDocs          :: Bool -- ^ Should show a link to error message's doc page?
   , ppeRelativeDirectory :: FilePath -- ^ FilePath to which the errors are relative
+  , ppeFileContents      :: [(FilePath, Text)] -- ^ Unparsed contents of source files
   }
 
 -- | Default options for PPEOptions
@@ -599,11 +610,12 @@ defaultPPEOptions = PPEOptions
   , ppeLevel             = Error
   , ppeShowDocs          = True
   , ppeRelativeDirectory = mempty
+  , ppeFileContents      = []
   }
 
 -- | Pretty print a single error, simplifying if necessary
 prettyPrintSingleError :: PPEOptions -> ErrorMessage -> Box.Box
-prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = flip evalState defaultUnknownMap $ do
+prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileContents) e = flip evalState defaultUnknownMap $ do
   em <- onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
   um <- get
   return (prettyPrintErrorMessage um em)
@@ -1367,6 +1379,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
       line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
 
+    renderSimpleErrorMessage (CannotDeriveInvalidConstructorArg className) =
+      paras
+        [ line $ "One or more type variables are in positions that prevent " <> markCode (runProperName $ disqualify className) <> " from being derived."
+        , line $ "To derive this class, make sure that these variables are only used as the final arguments to type constructors, "
+          <> "and that those type constructors themselves have instances of " <> markCode (runProperName $ disqualify className) <> "."
+        ]
+
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
       let (row1Box, row2Box) = printRows t1 t2
@@ -1531,6 +1550,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "at " <> displaySourceSpan relPath (NEL.head srcSpan)
             , detail
             ]
+    renderHint (RelatedPositions srcSpans) detail =
+      paras
+        [ detail
+        , Box.moveRight 2 $ showSourceSpansInContext srcSpans
+        ]
 
     printRow :: (Int -> Type a -> Box.Box) -> Type a -> Box.Box
     printRow f = markCodeBox . indent . f prettyDepth .
@@ -1635,7 +1659,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     Error -> "error"
     Warning -> "warning"
 
-  paras :: [Box.Box] -> Box.Box
+  paras :: forall f. Foldable f => f Box.Box -> Box.Box
   paras = Box.vcat Box.left
 
   -- | Simplify an error message
@@ -1725,6 +1749,94 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         Box.<> " "
         Box.<> (line . displayStartEndPos . fst $ getAnnForType ty)
     Qualified mn (Right inst) -> line . markCode . showQualified showIdent $ Qualified mn inst
+
+  -- | As of this writing, this function assumes that all provided SourceSpans
+  -- are non-overlapping (except for exact duplicates) and span no line breaks. A
+  -- more sophisticated implementation without this limitation would be possible
+  -- but isn't yet needed.
+  showSourceSpansInContext :: NonEmpty SourceSpan -> Box.Box
+  showSourceSpansInContext
+    = maybe Box.nullBox (paras . fmap renderFile . NEL.groupWith1 spanName . NEL.sort)
+    . NEL.nonEmpty
+    . NEL.filter ((> 0) . sourcePosLine . spanStart)
+    where
+    renderFile :: NonEmpty SourceSpan -> Box.Box
+    renderFile sss = maybe Box.nullBox (linesToBox . T.lines) $ lookup fileName fileContents
+      where
+      fileName = spanName $ NEL.head sss
+      header = lineS . (<> ":") . makeRelative relPath $ fileName
+      lineBlocks = makeLineBlocks $ NEL.groupWith1 (sourcePosLine . spanStart) sss
+
+      linesToBox fileLines = Box.moveUp 1 $ header Box.// body
+        where
+        body
+          = Box.punctuateV Box.left (lineNumberStyle "...")
+          . map (paras . fmap renderLine)
+          . flip evalState (fileLines, 1)
+          . traverse (wither (\(i, x) -> fmap (i, , x) <$> ascLookupInState i) . NEL.toList)
+          $ NEL.toList lineBlocks
+
+    makeLineBlocks :: NonEmpty (NonEmpty SourceSpan) -> NonEmpty (NonEmpty (Int, [SourceSpan]))
+    makeLineBlocks = startBlock
+      where
+      startBlock (h :| t) = over head1 (NEL.cons (pred $ headLineNumber h, [])) $ continueBlock h t
+
+      continueBlock :: NonEmpty SourceSpan -> [NonEmpty SourceSpan] -> NonEmpty (NonEmpty (Int, [SourceSpan]))
+      continueBlock lineGroup = \case
+        [] ->
+          endBlock lineGroup []
+        nextGroup : groups -> case pred $ ((-) `on` headLineNumber) nextGroup lineGroup of
+          n | n <= 3 ->
+            over head1 (appendExtraLines n lineGroup <>) $ continueBlock nextGroup groups
+          _ ->
+            endBlock lineGroup . NEL.toList . startBlock $ nextGroup :| groups
+
+      endBlock :: NonEmpty SourceSpan -> [NonEmpty (Int, [SourceSpan])] -> NonEmpty (NonEmpty (Int, [SourceSpan]))
+      endBlock h t = appendExtraLines 1 h :| t
+
+      headLineNumber = sourcePosLine . spanStart . NEL.head
+
+      appendExtraLines :: Int -> NonEmpty SourceSpan -> NonEmpty (Int, [SourceSpan])
+      appendExtraLines n lineGroup = (lineNum, NEL.toList lineGroup) :| [(lineNum + i, []) | i <- [1..n]]
+        where
+        lineNum = headLineNumber lineGroup
+
+    renderLine :: (Int, Text, [SourceSpan]) -> Box.Box
+    renderLine (lineNum, text, sss) = numBox Box.<+> lineBox
+      where
+      colSpans = nubOrdOn fst $ map (over both (pred . sourcePosColumn) . (spanStart &&& spanEnd)) sss
+      numBox = lineNumberStyle $ show lineNum
+      lineBox =
+        if isJust codeColor
+        then colorCodeBox codeColor $ line $ foldr highlightSpan text colSpans
+        else line text Box.// line (finishUnderline $ foldr underlineSpan (T.length text, "") colSpans)
+
+    highlightSpan :: (Int, Int) -> Text -> Text
+    highlightSpan (startCol, endCol) text
+       = prefix
+      <> T.pack (ANSI.setSGRCode [ANSI.SetSwapForegroundBackground True])
+      <> spanText
+      <> T.pack (ANSI.setSGRCode [ANSI.SetSwapForegroundBackground False])
+      <> suffix
+      where
+      (prefix, rest) = T.splitAt startCol text
+      (spanText, suffix) = T.splitAt (endCol - startCol) rest
+
+    underlineSpan :: (Int, Int) -> (Int, Text) -> (Int, Text)
+    underlineSpan (startCol, endCol) (len, accum) = (startCol, T.replicate (endCol - startCol) "^" <> T.replicate (len - endCol) " " <> accum)
+
+    finishUnderline :: (Int, Text) -> Text
+    finishUnderline (len, accum) = T.replicate len " " <> accum
+
+    lineNumberStyle :: String -> Box.Box
+    lineNumberStyle = colorCodeBox (codeColor $> (ANSI.Vivid, ANSI.Black)) . Box.alignHoriz Box.right 5 . lineS
+
+  -- | Lookup the nth element of a list, but without retraversing the list every
+  -- time, by instead keeping a tail of the list and the current element number
+  -- in State. Only works if the argument provided is strictly ascending over
+  -- the life of the State.
+  ascLookupInState :: forall a. Int -> State ([a], Int) (Maybe a)
+  ascLookupInState j = get >>= \(as, i) -> for (uncons $ drop (j - i) as) $ \(a, as') -> put (as', succ j) $> a
 
 -- Pretty print and export declaration
 prettyPrintExport :: DeclarationRef -> Text

@@ -12,7 +12,7 @@ module Language.PureScript.CoreImp.Optimizer.Inliner
   , evaluateIifes
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 
@@ -171,7 +171,8 @@ inlineCommonOperators expander = everywhereTopDown $ applyAll $
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ] ++
   [ fn | i <- [0..10], fn <- [ mkEffFn C.ControlMonadEffUncurried C.mkEffFn i, runEffFn C.ControlMonadEffUncurried C.runEffFn i ] ] ++
-  [ fn | i <- [0..10], fn <- [ mkEffFn C.EffectUncurried C.mkEffectFn i, runEffFn C.EffectUncurried C.runEffectFn i ] ]
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.EffectUncurried C.mkEffectFn i, runEffFn C.EffectUncurried C.runEffectFn i ] ] ++
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.ControlMonadSTUncurried C.mkSTFn i, runEffFn C.ControlMonadSTUncurried C.runSTFn i ] ]
   where
   binary :: (ModuleName, PSString) -> (ModuleName, PSString) -> BinaryOperator -> AST -> AST
   binary dict fns op = convert where

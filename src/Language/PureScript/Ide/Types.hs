@@ -287,7 +287,7 @@ instance ToJSON Success where
             ]
         ]
     ModuleList modules -> encodeSuccess modules
-    RebuildSuccess warnings -> encodeSuccess (P.toJSONErrors False P.Warning warnings)
+    RebuildSuccess warnings -> encodeSuccess (P.toJSONErrors False P.Warning [] warnings)
 
 encodeImport :: (P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName) -> Aeson.Value
 encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifier) = case importType of

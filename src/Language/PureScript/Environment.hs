@@ -1,21 +1,22 @@
 module Language.PureScript.Environment where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import Prelude
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
+import Control.Monad (unless)
 import Codec.Serialise (Serialise)
 import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
+import Data.Foldable (find, fold)
+import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe)
+import Data.Semigroup (First(..))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Tree (Tree, rootLabel)
-import qualified Data.Graph as G
-import Data.Foldable (toList)
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST.SourcePos
@@ -129,49 +130,87 @@ makeTypeClassData
   -> TypeClassData
 makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
   where
-    argumentIndices = [0 .. length args - 1]
+    ( determinedArgs, coveringSets ) = computeCoveringSets (length args) deps
 
-    -- each argument determines themselves
-    identities = (\i -> (i, [i])) <$> argumentIndices
+-- A moving frontier of sets to consider, along with the fundeps that can be
+-- applied in each case. At each stage, all sets in the frontier will be the
+-- same size, decreasing by 1 each time.
+type Frontier = M.Map IS.IntSet (First (IM.IntMap (NEL.NonEmpty IS.IntSet)))
+--                         ^                 ^          ^          ^
+--         when *these* parameters           |          |          |
+--         are still needed,                 |          |          |
+--                              *these* parameters      |          |
+--                              can be determined       |          |
+--                                         from a non-zero         |
+--                                         number of fundeps,      |
+--                                                      which accept *these*
+--                                                      parameters as inputs.
 
-    -- list all the edges in the graph: for each fundep an edge exists for each determiner to each determined
-    contributingDeps = M.fromListWith (++) $ identities ++ do
-      fd <- deps
-      src <- fdDeterminers fd
-      (src, fdDetermined fd) : map (, []) (fdDetermined fd)
+computeCoveringSets :: Int -> [FunctionalDependency] -> (S.Set Int, S.Set (S.Set Int))
+computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
+  where
+    argumentIndices = S.fromList [0 .. nargs - 1]
 
-    -- build a graph of which arguments determine other arguments
-    (depGraph, fromVertex, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, ordNub v)) <$> M.toList contributingDeps)
+    -- Compute all sets of arguments that determine the remaining arguments via
+    -- functional dependencies. This is done in stages, where each stage
+    -- considers sets of the same size to share work.
+    allCoveringSets :: S.Set (S.Set Int)
+    allCoveringSets = S.map (S.fromDistinctAscList . IS.toAscList) $ fst $ search $
+      -- The initial frontier consists of just the set of all parameters and all
+      -- fundeps organized into the map structure.
+      M.singleton
+        (IS.fromList [0 .. nargs - 1]) $
+          First $ IM.fromListWith (<>) $ do
+            fd <- deps
+            let srcs = pure (IS.fromList (fdDeterminers fd))
+            tgt <- fdDetermined fd
+            pure (tgt, srcs)
 
-    -- do there exist any arguments that contribute to `arg` that `arg` doesn't contribute to
-    isFunDepDetermined :: Int -> Bool
-    isFunDepDetermined arg = case fromKey arg of
-      Nothing -> internalError "Unknown argument index in makeTypeClassData"
-      Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
-                    varContributesTo = G.reachable depGraph v
-                in any (`notElem` varContributesTo) contributesToVar
+      where
 
-    -- find all the arguments that are determined
-    determinedArgs :: S.Set Int
-    determinedArgs = S.fromList $ filter isFunDepDetermined argumentIndices
+      -- Recursively advance the frontier until all frontiers are exhausted
+      -- and coverings sets found. The covering sets found during the process
+      -- are locally-minimal, in that none can be reduced by a fundep, but
+      -- there may be subsets found from other frontiers.
+      search :: Frontier -> (S.Set IS.IntSet, ())
+      search frontier = unless (null frontier) $ M.foldMapWithKey step frontier >>= search
 
-    argFromVertex :: G.Vertex -> Int
-    argFromVertex index = let (_, arg, _) = fromVertex index in arg
+      -- The input set from the frontier is known to cover all parameters, but
+      -- it may be able to be reduced by more fundeps.
+      step :: IS.IntSet -> First (IM.IntMap (NEL.NonEmpty IS.IntSet)) -> (S.Set IS.IntSet, Frontier)
+      step needed (First inEdges)
+        -- If there are no applicable fundeps, record it as a locally minimal
+        -- covering set. This has already been reduced to only applicable fundeps
+        | IM.null inEdges = (S.singleton needed, M.empty)
+        | otherwise       = (S.empty, foldMap removeParameter paramsToTry)
 
-    isVertexDetermined :: G.Vertex -> Bool
-    isVertexDetermined = isFunDepDetermined . argFromVertex
+          where
 
-    -- from an scc find the non-determined args
-    sccNonDetermined :: Tree G.Vertex -> Maybe [Int]
-    sccNonDetermined tree
-      -- if any arg in an scc is determined then all of them are
-      | isVertexDetermined (rootLabel tree) = Nothing
-      | otherwise = Just (argFromVertex <$> toList tree)
+          determined = IM.keys inEdges
+          -- If there is an acyclically determined functional dependency, prefer
+          -- it to reduce the number of cases to check. That is a dependency
+          -- that does not help determine other parameters.
+          acycDetermined = find (`IS.notMember` (IS.unions $ concatMap NEL.toList $ IM.elems inEdges)) determined
+          paramsToTry = maybe determined pure acycDetermined
 
-    -- find the covering sets
-    coveringSets :: S.Set (S.Set Int)
-    coveringSets = let funDepSets = sequence (mapMaybe sccNonDetermined (G.scc depGraph))
-                   in S.fromList (S.fromList <$> funDepSets)
+          -- For each parameter to be removed to build the next frontier,
+          -- delete the fundeps that determine it and filter out the fundeps
+          -- that make use of it. Of course, if it an acyclic fundep we already
+          -- found that there are none that use it.
+          removeParameter :: Int -> Frontier
+          removeParameter y =
+            M.singleton
+              (IS.delete y needed) $
+                case acycDetermined of
+                  Just _ -> First $ IM.delete y inEdges
+                  Nothing ->
+                    First $ IM.mapMaybe (NEL.nonEmpty . NEL.filter (y `IS.notMember`)) $ IM.delete y inEdges
+
+    -- Reduce to the inclusion-minimal sets
+    coveringSets = S.filter (\v -> not (any (\c -> c `S.isProperSubsetOf` v) allCoveringSets)) allCoveringSets
+
+    -- An argument is determined if it is in no covering set
+    determinedArgs = argumentIndices `S.difference` fold coveringSets
 
 -- | The visibility of a name in scope
 data NameVisibility

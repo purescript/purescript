@@ -1,0 +1,16 @@
+Error found:
+in module [33mFoldableInstance6[0m
+at tests/purs/failing/FoldableInstance6.purs:8:1 - 8:30 (line 8, column 1 - line 8, column 30)
+
+  One or more type variables are in positions that prevent [33mFoldable[0m from being derived.
+  To derive this class, make sure that these variables are only used as the final arguments to type constructors, and that those type constructors themselves have instances of [33mFoldable[0m.
+
+  tests/purs/failing/FoldableInstance6.purs:
+  [90m    6[0m [33m[0m
+  [90m    7[0m [33mdata Test a = Test ([7ma[27m -> Int)[0m
+  [90m    8[0m [33mderive instance Foldable Test[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
+or to contribute content related to this error.
+

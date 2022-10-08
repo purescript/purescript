@@ -5,7 +5,7 @@ module Language.PureScript.Docs.AsMarkdown
   , codeToString
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad (unless, zipWithM_)
 import Control.Monad.Writer (Writer, tell, execWriter)

@@ -33,11 +33,11 @@ data PSCMakeOptions = PSCMakeOptions
   }
 
 -- | Arguments: verbose, use JSON, warnings, errors
-printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
-printWarningsAndErrors verbose False warnings errors = do
+printWarningsAndErrors :: Bool -> Bool -> [(FilePath, T.Text)] -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
+printWarningsAndErrors verbose False files warnings errors = do
   pwd <- getCurrentDirectory
   cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stdout
-  let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd }
+  let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd, P.ppeFileContents = files }
   when (P.nonEmpty warnings) $
     putStrLn (P.prettyPrintMultipleWarnings ppeOpts warnings)
   case errors of
@@ -45,10 +45,10 @@ printWarningsAndErrors verbose False warnings errors = do
       putStrLn (P.prettyPrintMultipleErrors ppeOpts errs)
       exitFailure
     Right _ -> return ()
-printWarningsAndErrors verbose True warnings errors = do
+printWarningsAndErrors verbose True files warnings errors = do
   putStrLn . LBU8.toString . A.encode $
-    JSONResult (toJSONErrors verbose P.Warning warnings)
-               (either (toJSONErrors verbose P.Error) (const []) errors)
+    JSONResult (toJSONErrors verbose P.Warning files warnings)
+               (either (toJSONErrors verbose P.Error files) (const []) errors)
   either (const exitFailure) (const (return ())) errors
 
 compile :: PSCMakeOptions -> IO ()
@@ -66,7 +66,7 @@ compile PSCMakeOptions{..} = do
     foreigns <- inferForeignModules filePathMap
     let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
     P.make makeActions (map snd ms)
-  printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings makeErrors
+  printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors moduleFiles makeWarnings makeErrors
   exitSuccess
 
 warnFileTypeNotFound :: String -> IO ()

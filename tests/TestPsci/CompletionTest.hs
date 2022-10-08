@@ -1,7 +1,6 @@
 module TestPsci.CompletionTest where
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import Test.Hspec
 

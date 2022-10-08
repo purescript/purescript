@@ -13,7 +13,7 @@ module Language.PureScript.Sugar.Operators
   , checkFixityExports
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -380,10 +380,10 @@ updateTypes goType = (goDecl, goExpr, goBinder)
     implies' <- traverse (overConstraintArgs (traverse (goType' ss))) implies
     args' <- traverse (traverse (traverse (goType' ss))) args
     return $ TypeClassDeclaration sa name args' implies' deps decls
-  goDecl (TypeInstanceDeclaration sa@(ss, _) ch idx name cs className tys impls) = do
+  goDecl (TypeInstanceDeclaration sa@(ss, _) na ch idx name cs className tys impls) = do
     cs' <- traverse (overConstraintArgs (traverse (goType' ss))) cs
     tys' <- traverse (goType' ss) tys
-    return $ TypeInstanceDeclaration sa ch idx name cs' className tys' impls
+    return $ TypeInstanceDeclaration sa na ch idx name cs' className tys' impls
   goDecl (TypeSynonymDeclaration sa@(ss, _) name args ty) =
     TypeSynonymDeclaration sa name
       <$> traverse (traverse (traverse (goType' ss))) args

@@ -1,7 +1,6 @@
 module TestPsci.CommandTest where
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.RWS.Strict (get)

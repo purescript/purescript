@@ -1,6 +1,6 @@
 module Language.PureScript.Interactive.Printer where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Data.List (intersperse)
 import qualified Data.Map as M

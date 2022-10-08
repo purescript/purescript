@@ -16,7 +16,7 @@ module Language.PureScript.Bundle
   , Module
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.Error.Class
 

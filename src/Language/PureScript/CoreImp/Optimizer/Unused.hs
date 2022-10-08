@@ -5,7 +5,7 @@ module Language.PureScript.CoreImp.Optimizer.Unused
   , removeUnusedEffectFreeVars
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad (filterM)
 import Data.Monoid (Any(..))

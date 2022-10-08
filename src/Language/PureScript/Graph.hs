@@ -1,6 +1,6 @@
 module Language.PureScript.Graph (graph) where
 
-import Prelude.Compat
+import Prelude
 
 import qualified Data.Aeson as Json
 import qualified Data.Aeson.Key as Json.Key

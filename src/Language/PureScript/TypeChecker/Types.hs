@@ -23,7 +23,7 @@ module Language.PureScript.TypeChecker.Types
       Check a function of a given type returns a value of another type when applied to its arguments
 -}
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub, fold, atMay)
 
 import Control.Arrow (first, second, (***))
