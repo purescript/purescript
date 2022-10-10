@@ -1,1 +1,0 @@
-* Add a compiler optimization for `ST` functions with up to 10 arity, similar to `Effect` optimizations.
