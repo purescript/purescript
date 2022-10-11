@@ -452,7 +452,4 @@ ffiCodegen' foreigns codegenTargets makeOutputPath m = do
   requiresForeign = not . null . CF.moduleForeign
 
   copyForeign path mn =
-    case makeOutputPath of
-        Nothing -> pure ()
-        Just outputFilename ->
-          copyFile path (outputFilename mn "foreign.js")
+    for_ makeOutputPath (\outputFilename -> copyFile path (outputFilename mn "foreign.js"))
