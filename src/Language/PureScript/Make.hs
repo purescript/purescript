@@ -347,7 +347,7 @@ make ma@MakeActions{..} ms = do
               idx <- C.takeMVar (bpIndex buildPlan)
               C.putMVar (bpIndex buildPlan) (idx + 1)
               (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
-                  pure $ buildJobSucceeded ourDirtyCacheFile (pwarnings' <> warnings) exts
+              pure $ buildJobSucceeded ourDirtyCacheFile (pwarnings' <> warnings) exts
             Nothing -> return BuildJobSkipped
 
     BuildPlan.markComplete buildPlan moduleName result
