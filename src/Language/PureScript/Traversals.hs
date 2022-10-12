@@ -1,7 +1,7 @@
 -- | Common functions for implementing generic traversals
 module Language.PureScript.Traversals where
 
-import Prelude.Compat
+import Prelude
 
 sndM :: (Functor f) => (b -> f c) -> (a, b) -> f (a, c)
 sndM f (a, b) = (a, ) <$> f b

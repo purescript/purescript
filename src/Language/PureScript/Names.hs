@@ -5,7 +5,7 @@
 --
 module Language.PureScript.Names where
 
-import Prelude.Compat
+import Prelude
 
 import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))

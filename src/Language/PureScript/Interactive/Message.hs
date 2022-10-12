@@ -1,6 +1,6 @@
 module Language.PureScript.Interactive.Message where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Data.List (intercalate)
 import           Data.Version (showVersion)

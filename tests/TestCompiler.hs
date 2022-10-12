@@ -22,8 +22,7 @@ module TestCompiler where
 -- missing, and can be updated by setting the "HSPEC_ACCEPT" environment
 -- variable, e.g. by running `HSPEC_ACCEPT=true stack test`.
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import qualified Language.PureScript as P
 import Language.PureScript.Interactive.IO (readNodeProcessWithExitCode)
@@ -135,9 +134,10 @@ assertCompiles
   -> Handle
   -> Expectation
 assertCompiles support inputFiles outputFile = do
-  (result, _) <- compile (Just IsMain) support inputFiles
+  (fileContents, (result, _)) <- compile (Just IsMain) support inputFiles
+  let errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
   case result of
-    Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+    Left errs -> expectationFailure . P.prettyPrintMultipleErrors errorOptions $ errs
     Right _ -> do
       let entryPoint = modulesDir </> "index.js"
       writeFile entryPoint "import('./Main/index.js').then(({ main }) => main());"
@@ -157,15 +157,16 @@ assertCompilesWithWarnings
   -> [String]
   -> Expectation
 assertCompilesWithWarnings support inputFiles shouldWarnWith = do
-  result'@(result, warnings) <- compile Nothing support inputFiles
+  (fileContents, result'@(result, warnings)) <- compile Nothing support inputFiles
+  let errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
   case result of
     Left errs ->
-      expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+      expectationFailure . P.prettyPrintMultipleErrors errorOptions $ errs
     Right _ -> do
-      checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings P.defaultPPEOptions) warnings
+      checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings errorOptions) warnings
       goldenVsString
         (replaceExtension (getTestMain inputFiles) ".out")
-        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest result')
+        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest fileContents result')
 
 assertDoesNotCompile
   :: SupportModules
@@ -173,7 +174,8 @@ assertDoesNotCompile
   -> [String]
   -> Expectation
 assertDoesNotCompile support inputFiles shouldFailWith = do
-  result <- compile Nothing support inputFiles
+  (fileContents, result) <- compile Nothing support inputFiles
+  let errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
   case fst result of
     Left errs -> do
       when (null shouldFailWith)
@@ -181,10 +183,10 @@ assertDoesNotCompile support inputFiles shouldFailWith = do
           "shouldFailWith declaration is missing (errors were: "
           ++ show (map P.errorCode (P.runMultipleErrors errs))
           ++ ")")
-      checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors P.defaultPPEOptions) errs
+      checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors errorOptions) errs
       goldenVsString
         (replaceExtension (getTestMain inputFiles) ".out")
-        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest result)
+        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest fileContents result)
     Right _ ->
       expectationFailure "Should not have compiled"
 
@@ -193,9 +195,10 @@ assertCompilesToExpectedOutput
   -> [FilePath]
   -> Expectation
 assertCompilesToExpectedOutput support inputFiles = do
-  (result, _) <- compile Nothing support inputFiles
+  (fileContents, (result, _)) <- compile Nothing support inputFiles
+  let errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
   case result of
-    Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+    Left errs -> expectationFailure . P.prettyPrintMultipleErrors errorOptions $ errs
     Right _ ->
       goldenVsString
         (replaceExtension (getTestMain inputFiles) ".out.js")
@@ -203,14 +206,16 @@ assertCompilesToExpectedOutput support inputFiles = do
 
 -- Prints a set of diagnostics (i.e. errors or warnings) as a string, in order
 -- to compare it to the contents of a golden test file.
-printDiagnosticsForGoldenTest :: (Either P.MultipleErrors a, P.MultipleErrors) -> String
-printDiagnosticsForGoldenTest (result, warnings) =
+printDiagnosticsForGoldenTest :: [(FilePath, T.Text)] -> (Either P.MultipleErrors a, P.MultipleErrors) -> String
+printDiagnosticsForGoldenTest fileContents (result, warnings) =
   normalizePaths $ case result of
     Left errs ->
       -- TODO: should probably include warnings when failing?
-      P.prettyPrintMultipleErrors P.defaultPPEOptions errs
+      P.prettyPrintMultipleErrors errorOptions errs
     Right _ ->
-      P.prettyPrintMultipleWarnings P.defaultPPEOptions warnings
+      P.prettyPrintMultipleWarnings errorOptions warnings
+  where
+  errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
 
 -- Replaces Windows-style paths in an error or warning with POSIX paths
 normalizePaths :: String -> String

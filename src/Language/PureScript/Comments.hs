@@ -5,7 +5,7 @@
 --
 module Language.PureScript.Comments where
 
-import Prelude.Compat
+import Prelude
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Data.Text (Text)

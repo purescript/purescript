@@ -13,7 +13,7 @@ module Language.PureScript.TypeChecker.Entailment.Coercible
   , insoluble
   ) where
 
-import Prelude.Compat hiding (interact)
+import Prelude hiding (interact)
 
 import Control.Applicative ((<|>), empty)
 import Control.Arrow ((&&&))

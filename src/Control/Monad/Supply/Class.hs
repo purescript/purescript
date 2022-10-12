@@ -4,7 +4,7 @@
 
 module Control.Monad.Supply.Class where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.RWS
 import Control.Monad.State

@@ -1,6 +1,6 @@
 module System.IO.UTF8 where
 
-import Prelude.Compat
+import Prelude
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL

@@ -10,7 +10,7 @@ module Language.PureScript.TypeChecker.Synonyms
   , replaceAllTypeSynonymsM
   ) where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.State

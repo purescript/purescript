@@ -19,7 +19,7 @@
 --  * Inlining primitive JavaScript operators
 module Language.PureScript.CoreImp.Optimizer (optimize) where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Text (Text)
 

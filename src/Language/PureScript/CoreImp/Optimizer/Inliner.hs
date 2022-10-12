@@ -12,7 +12,7 @@ module Language.PureScript.CoreImp.Optimizer.Inliner
   , evaluateIifes
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 

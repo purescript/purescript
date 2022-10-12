@@ -2,7 +2,7 @@
 -- and bind for the Eff monad, as well as some of its actions.
 module Language.PureScript.CoreImp.Optimizer.MagicDo (magicDoEffect, magicDoEff, magicDoST, inlineST) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Data.Maybe (fromJust, isJust)

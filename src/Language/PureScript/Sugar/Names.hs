@@ -9,7 +9,7 @@ module Language.PureScript.Sugar.Names
   , Exports(..)
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub, sortOn, swap, foldl')
 
 import Control.Arrow (first, second)

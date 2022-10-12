@@ -3,7 +3,7 @@
 --
 module Language.PureScript.CoreFn.Expr where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((***))
 

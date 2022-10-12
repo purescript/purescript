@@ -7,7 +7,7 @@ module Language.PureScript.TypeChecker
   , checkNewtype
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (headMay, maybeToLeft, ordNub)
 
 import Control.Lens ((^..), _2)

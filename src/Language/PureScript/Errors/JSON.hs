@@ -2,7 +2,7 @@
 
 module Language.PureScript.Errors.JSON where
 
-import Prelude.Compat
+import Prelude
 
 import qualified Data.Aeson.TH as A
 import qualified Data.List.NonEmpty as NEL
@@ -43,13 +43,13 @@ $(A.deriveJSON A.defaultOptions ''ErrorSuggestion)
 $(A.deriveJSON A.defaultOptions ''JSONError)
 $(A.deriveJSON A.defaultOptions ''JSONResult)
 
-toJSONErrors :: Bool -> P.Level -> P.MultipleErrors -> [JSONError]
-toJSONErrors verbose level = map (toJSONError verbose level) . P.runMultipleErrors
+toJSONErrors :: Bool -> P.Level -> [(FilePath, Text)] -> P.MultipleErrors -> [JSONError]
+toJSONErrors verbose level files = map (toJSONError verbose level files) . P.runMultipleErrors
 
-toJSONError :: Bool -> P.Level -> P.ErrorMessage -> JSONError
-toJSONError verbose level e =
+toJSONError :: Bool -> P.Level -> [(FilePath, Text)] -> P.ErrorMessage -> JSONError
+toJSONError verbose level files e =
   JSONError (toErrorPosition <$> fmap NEL.head spans)
-            (P.renderBox (P.prettyPrintSingleError (P.PPEOptions Nothing verbose level False mempty) (P.stripModuleAndSpan e)))
+            (P.renderBox (P.prettyPrintSingleError (P.PPEOptions Nothing verbose level False mempty files) (P.stripModuleAndSpan e)))
             (P.errorCode e)
             (P.errorDocUri e)
             (P.spanName <$> fmap NEL.head spans)

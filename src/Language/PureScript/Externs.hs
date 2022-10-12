@@ -18,7 +18,7 @@ module Language.PureScript.Externs
   , externsFileName
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Codec.Serialise (Serialise, serialise)
 import Control.Monad (join)

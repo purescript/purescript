@@ -3,7 +3,7 @@ module Language.PureScript.AST.Exported
   , isExported
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (sortOn)
 
 import Control.Category ((>>>))
