@@ -12,13 +12,16 @@ import           Prelude.Compat
 import           Control.Arrow ((***))
 import           Data.Either (isLeft)
 import qualified Data.Map.Strict as M
-import           Data.Aeson
+import           Data.Aeson hiding ((.=))
+import qualified Data.Aeson
+import qualified Data.Aeson.Key
+import           Data.Aeson.Types (Pair)
 import           Data.Version (Version, showVersion)
 import           Data.Text (Text)
 import qualified Data.Text as T
 
 import           Language.PureScript.AST.Literals
-import           Language.PureScript.AST.SourcePos (SourceSpan(SourceSpan))
+import           Language.PureScript.AST.SourcePos (SourceSpan(..))
 import           Language.PureScript.CoreFn
 import           Language.PureScript.Names
 import           Language.PureScript.PSString (PSString)
@@ -27,64 +30,69 @@ constructorTypeToJSON :: ConstructorType -> Value
 constructorTypeToJSON ProductType = toJSON "ProductType"
 constructorTypeToJSON SumType = toJSON "SumType"
 
+infixr 8 .=
+(.=) :: ToJSON a => String -> a -> Pair
+key .= value = Data.Aeson.Key.fromString key Data.Aeson..= value
+
 metaToJSON :: Meta -> Value
 metaToJSON (IsConstructor t is)
   = object
-    [ T.pack "metaType"         .= "IsConstructor"
-    , T.pack "constructorType"  .= constructorTypeToJSON t
-    , T.pack "identifiers"      .= identToJSON `map` is
+    [ "metaType"         .= "IsConstructor"
+    , "constructorType"  .= constructorTypeToJSON t
+    , "identifiers"      .= identToJSON `map` is
     ]
-metaToJSON IsNewtype              = object [ T.pack "metaType"  .= "IsNewtype" ]
-metaToJSON IsTypeClassConstructor = object [ T.pack "metaType"  .= "IsTypeClassConstructor" ]
-metaToJSON IsForeign              = object [ T.pack "metaType"  .= "IsForeign" ]
-metaToJSON IsWhere                = object [ T.pack "metaType"  .= "IsWhere" ]
+metaToJSON IsNewtype              = object [ "metaType"  .= "IsNewtype" ]
+metaToJSON IsTypeClassConstructor = object [ "metaType"  .= "IsTypeClassConstructor" ]
+metaToJSON IsForeign              = object [ "metaType"  .= "IsForeign" ]
+metaToJSON IsWhere                = object [ "metaType"  .= "IsWhere" ]
+metaToJSON IsSyntheticApp         = object [ "metaType"  .= "IsSyntheticApp" ]
 
 sourceSpanToJSON :: SourceSpan -> Value
 sourceSpanToJSON (SourceSpan _ spanStart spanEnd) =
-  object [ T.pack "start" .= spanStart
-         , T.pack "end"   .= spanEnd
+  object [ "start" .= spanStart
+         , "end"   .= spanEnd
          ]
 
 annToJSON :: Ann -> Value
-annToJSON (ss, _, _, m) = object [ T.pack "sourceSpan"  .= sourceSpanToJSON ss
-                                 , T.pack "meta"        .= maybe Null metaToJSON m
+annToJSON (ss, _, _, m) = object [ "sourceSpan"  .= sourceSpanToJSON ss
+                                 , "meta"        .= maybe Null metaToJSON m
                                  ]
 
 literalToJSON :: (a -> Value) -> Literal a -> Value
 literalToJSON _ (NumericLiteral (Left n))
   = object
-    [ T.pack "literalType" .= "IntLiteral"
-    , T.pack "value"       .= n
+    [ "literalType" .= "IntLiteral"
+    , "value"       .= n
     ]
 literalToJSON _ (NumericLiteral (Right n))
   = object
-      [ T.pack "literalType"  .= "NumberLiteral"
-      , T.pack "value"        .= n
+      [ "literalType"  .= "NumberLiteral"
+      , "value"        .= n
       ]
 literalToJSON _ (StringLiteral s)
   = object
-    [ T.pack "literalType"  .= "StringLiteral"
-    , T.pack "value"        .= s
+    [ "literalType"  .= "StringLiteral"
+    , "value"        .= s
     ]
 literalToJSON _ (CharLiteral c)
   = object
-    [ T.pack "literalType"  .= "CharLiteral"
-    , T.pack "value"        .= c
+    [ "literalType"  .= "CharLiteral"
+    , "value"        .= c
     ]
 literalToJSON _ (BooleanLiteral b)
   = object
-    [ T.pack "literalType"  .= "BooleanLiteral"
-    , T.pack "value"        .= b
+    [ "literalType"  .= "BooleanLiteral"
+    , "value"        .= b
     ]
 literalToJSON t (ArrayLiteral xs)
   = object
-    [ T.pack "literalType"  .= "ArrayLiteral"
-    , T.pack "value"        .= map t xs
+    [ "literalType"  .= "ArrayLiteral"
+    , "value"        .= map t xs
     ]
 literalToJSON t (ObjectLiteral xs)
   = object
-    [ T.pack "literalType"    .= "ObjectLiteral"
-    , T.pack "value"          .= recordToJSON t xs
+    [ "literalType"    .= "ObjectLiteral"
+    , "value"          .= recordToJSON t xs
     ]
 
 identToJSON :: Ident -> Value
@@ -94,32 +102,38 @@ properNameToJSON :: ProperName a -> Value
 properNameToJSON = toJSON . runProperName
 
 qualifiedToJSON :: (a -> Text) -> Qualified a -> Value
-qualifiedToJSON f (Qualified mn a) = object
-  [ T.pack "moduleName"   .= maybe Null moduleNameToJSON mn
-  , T.pack "identifier"   .= toJSON (f a)
-  ]
+qualifiedToJSON f (Qualified qb a) =
+  case qb of
+    ByModuleName mn -> object
+      [ "moduleName" .= moduleNameToJSON mn
+      , "identifier" .= toJSON (f a)
+      ]
+    BySourcePos ss -> object
+      [ "sourcePos"  .= toJSON ss
+      , "identifier" .= toJSON (f a)
+      ]
 
 moduleNameToJSON :: ModuleName -> Value
 moduleNameToJSON (ModuleName name) = toJSON (T.splitOn (T.pack ".") name)
 
 moduleToJSON :: Version -> Module Ann -> Value
 moduleToJSON v m = object
-  [ T.pack "sourceSpan" .= sourceSpanToJSON (moduleSourceSpan m)
-  , T.pack "moduleName" .= moduleNameToJSON (moduleName m)
-  , T.pack "modulePath" .= toJSON (modulePath m)
-  , T.pack "imports"    .= map importToJSON (moduleImports m)
-  , T.pack "exports"    .= map identToJSON (moduleExports m)
-  , T.pack "reExports"  .= reExportsToJSON (moduleReExports m)
-  , T.pack "foreign"    .= map identToJSON (moduleForeign m)
-  , T.pack "decls"      .= map bindToJSON (moduleDecls m)
-  , T.pack "builtWith"  .= toJSON (showVersion v)
-  , T.pack "comments"   .= map toJSON (moduleComments m)
+  [ "sourceSpan" .= sourceSpanToJSON (moduleSourceSpan m)
+  , "moduleName" .= moduleNameToJSON (moduleName m)
+  , "modulePath" .= toJSON (modulePath m)
+  , "imports"    .= map importToJSON (moduleImports m)
+  , "exports"    .= map identToJSON (moduleExports m)
+  , "reExports"  .= reExportsToJSON (moduleReExports m)
+  , "foreign"    .= map identToJSON (moduleForeign m)
+  , "decls"      .= map bindToJSON (moduleDecls m)
+  , "builtWith"  .= toJSON (showVersion v)
+  , "comments"   .= map toJSON (moduleComments m)
   ]
 
   where
   importToJSON (ann,mn) = object
-    [ T.pack "annotation" .= annToJSON ann
-    , T.pack "moduleName" .= moduleNameToJSON mn
+    [ "annotation" .= annToJSON ann
+    , "moduleName" .= moduleNameToJSON mn
     ]
 
   reExportsToJSON :: M.Map ModuleName [Ident] -> Value
@@ -128,19 +142,19 @@ moduleToJSON v m = object
 bindToJSON :: Bind Ann -> Value
 bindToJSON (NonRec ann n e)
   = object
-    [ T.pack "bindType"   .= "NonRec"
-    , T.pack "annotation" .= annToJSON ann
-    , T.pack "identifier" .= identToJSON n
-    , T.pack "expression" .= exprToJSON e
+    [ "bindType"   .= "NonRec"
+    , "annotation" .= annToJSON ann
+    , "identifier" .= identToJSON n
+    , "expression" .= exprToJSON e
     ]
 bindToJSON (Rec bs)
   = object
-    [ T.pack "bindType"   .= "Rec"
-    , T.pack "binds"      .= map (\((ann, n), e)
+    [ "bindType"   .= "Rec"
+    , "binds"      .= map (\((ann, n), e)
                                   -> object
-                                      [ T.pack "identifier"  .= identToJSON n
-                                      , T.pack "annotation"   .= annToJSON ann
-                                      , T.pack "expression"   .= exprToJSON e
+                                      [ "identifier"  .= identToJSON n
+                                      , "annotation"   .= annToJSON ann
+                                      , "expression"   .= exprToJSON e
                                       ]) bs
     ]
 
@@ -148,86 +162,86 @@ recordToJSON :: (a -> Value) -> [(PSString, a)] -> Value
 recordToJSON f = toJSON . map (toJSON *** f)
 
 exprToJSON :: Expr Ann -> Value
-exprToJSON (Var ann i)              = object [ T.pack "type"        .= toJSON "Var"
-                                             , T.pack "annotation"  .= annToJSON ann
-                                             , T.pack "value"       .= qualifiedToJSON runIdent i
+exprToJSON (Var ann i)              = object [ "type"        .= toJSON "Var"
+                                             , "annotation"  .= annToJSON ann
+                                             , "value"       .= qualifiedToJSON runIdent i
                                              ]
-exprToJSON (Literal ann l)          = object [ T.pack "type"        .= "Literal"
-                                             , T.pack "annotation"  .= annToJSON ann
-                                             , T.pack "value"       .=  literalToJSON exprToJSON l
+exprToJSON (Literal ann l)          = object [ "type"        .= "Literal"
+                                             , "annotation"  .= annToJSON ann
+                                             , "value"       .=  literalToJSON exprToJSON l
                                              ]
-exprToJSON (Constructor ann d c is) = object [ T.pack "type"        .= "Constructor"
-                                             , T.pack "annotation"  .= annToJSON ann
-                                             , T.pack "typeName"    .= properNameToJSON d
-                                             , T.pack "constructorName" .= properNameToJSON c
-                                             , T.pack "fieldNames"  .= map identToJSON is
+exprToJSON (Constructor ann d c is) = object [ "type"        .= "Constructor"
+                                             , "annotation"  .= annToJSON ann
+                                             , "typeName"    .= properNameToJSON d
+                                             , "constructorName" .= properNameToJSON c
+                                             , "fieldNames"  .= map identToJSON is
                                              ]
-exprToJSON (Accessor ann f r)       = object [ T.pack "type"        .= "Accessor"
-                                             , T.pack "annotation"  .= annToJSON ann
-                                             , T.pack "fieldName"   .= f
-                                             , T.pack "expression"  .= exprToJSON r
+exprToJSON (Accessor ann f r)       = object [ "type"        .= "Accessor"
+                                             , "annotation"  .= annToJSON ann
+                                             , "fieldName"   .= f
+                                             , "expression"  .= exprToJSON r
                                              ]
-exprToJSON (ObjectUpdate ann r fs)  = object [ T.pack "type"        .= "ObjectUpdate"
-                                             , T.pack "annotation"  .= annToJSON ann
-                                             , T.pack "expression"  .= exprToJSON r
-                                             , T.pack "updates"     .= recordToJSON exprToJSON fs
+exprToJSON (ObjectUpdate ann r fs)  = object [ "type"        .= "ObjectUpdate"
+                                             , "annotation"  .= annToJSON ann
+                                             , "expression"  .= exprToJSON r
+                                             , "updates"     .= recordToJSON exprToJSON fs
                                              ]
-exprToJSON (Abs ann p b)            = object [ T.pack "type"        .= "Abs"
-                                             , T.pack "annotation"  .= annToJSON ann
-                                             , T.pack "argument"    .= identToJSON p
-                                             , T.pack "body"        .= exprToJSON b
+exprToJSON (Abs ann p b)            = object [ "type"        .= "Abs"
+                                             , "annotation"  .= annToJSON ann
+                                             , "argument"    .= identToJSON p
+                                             , "body"        .= exprToJSON b
                                              ]
-exprToJSON (App ann f x)            = object [ T.pack "type"        .= "App"
-                                             , T.pack "annotation"  .= annToJSON ann
-                                             , T.pack "abstraction" .= exprToJSON f
-                                             , T.pack "argument"    .= exprToJSON x
+exprToJSON (App ann f x)            = object [ "type"        .= "App"
+                                             , "annotation"  .= annToJSON ann
+                                             , "abstraction" .= exprToJSON f
+                                             , "argument"    .= exprToJSON x
                                              ]
-exprToJSON (Case ann ss cs)         = object [ T.pack "type"        .= "Case"
-                                             , T.pack "annotation"  .= annToJSON ann
-                                             , T.pack "caseExpressions"
+exprToJSON (Case ann ss cs)         = object [ "type"        .= "Case"
+                                             , "annotation"  .= annToJSON ann
+                                             , "caseExpressions"
                                                                     .= map exprToJSON ss
-                                             , T.pack "caseAlternatives"
+                                             , "caseAlternatives"
                                                                     .= map caseAlternativeToJSON cs
                                              ]
-exprToJSON (Let ann bs e)           = object [ T.pack "type"        .= "Let" 
-                                             , T.pack "annotation"  .= annToJSON ann
-                                             , T.pack "binds"       .= map bindToJSON bs
-                                             , T.pack "expression"  .= exprToJSON e
+exprToJSON (Let ann bs e)           = object [ "type"        .= "Let" 
+                                             , "annotation"  .= annToJSON ann
+                                             , "binds"       .= map bindToJSON bs
+                                             , "expression"  .= exprToJSON e
                                              ]
 
 caseAlternativeToJSON :: CaseAlternative Ann -> Value
 caseAlternativeToJSON (CaseAlternative bs r') =
   let isGuarded = isLeft r'
   in object
-      [ T.pack "binders"     .= toJSON (map binderToJSON bs)
-      , T.pack "isGuarded"   .= toJSON isGuarded
-      , T.pack (if isGuarded then "expressions" else "expression")
+      [ "binders"     .= toJSON (map binderToJSON bs)
+      , "isGuarded"   .= toJSON isGuarded
+      , (if isGuarded then "expressions" else "expression")
          .= case r' of
-             Left rs -> toJSON $ map (\(g, e) -> object [ T.pack "guard" .= exprToJSON g, T.pack "expression" .= exprToJSON e]) rs
+             Left rs -> toJSON $ map (\(g, e) -> object [ "guard" .= exprToJSON g, "expression" .= exprToJSON e]) rs
              Right r -> exprToJSON r
       ]
 
 binderToJSON :: Binder Ann -> Value
-binderToJSON (VarBinder ann v)              = object [ T.pack "binderType"  .= "VarBinder"
-                                                     , T.pack "annotation"  .= annToJSON ann
-                                                     , T.pack "identifier"  .= identToJSON v
+binderToJSON (VarBinder ann v)              = object [ "binderType"  .= "VarBinder"
+                                                     , "annotation"  .= annToJSON ann
+                                                     , "identifier"  .= identToJSON v
                                                      ]
-binderToJSON (NullBinder ann)               = object [ T.pack "binderType"  .= "NullBinder"
-                                                     , T.pack "annotation"  .= annToJSON ann
+binderToJSON (NullBinder ann)               = object [ "binderType"  .= "NullBinder"
+                                                     , "annotation"  .= annToJSON ann
                                                      ]
-binderToJSON (LiteralBinder ann l)          = object [ T.pack "binderType"  .= "LiteralBinder"
-                                                     , T.pack "annotation"  .= annToJSON ann
-                                                     , T.pack "literal"     .= literalToJSON binderToJSON l
+binderToJSON (LiteralBinder ann l)          = object [ "binderType"  .= "LiteralBinder"
+                                                     , "annotation"  .= annToJSON ann
+                                                     , "literal"     .= literalToJSON binderToJSON l
                                                      ]
-binderToJSON (ConstructorBinder ann d c bs) = object [ T.pack "binderType"  .= "ConstructorBinder"
-                                                     , T.pack "annotation"  .= annToJSON ann
-                                                     , T.pack "typeName"    .= qualifiedToJSON runProperName d
-                                                     , T.pack "constructorName"
+binderToJSON (ConstructorBinder ann d c bs) = object [ "binderType"  .= "ConstructorBinder"
+                                                     , "annotation"  .= annToJSON ann
+                                                     , "typeName"    .= qualifiedToJSON runProperName d
+                                                     , "constructorName"
                                                                             .= qualifiedToJSON runProperName c
-                                                     , T.pack "binders"     .= map binderToJSON bs
+                                                     , "binders"     .= map binderToJSON bs
                                                      ]
-binderToJSON (NamedBinder ann n b)          = object [ T.pack "binderType"  .= "NamedBinder"
-                                                     , T.pack "annotation"  .= annToJSON ann
-                                                     , T.pack "identifier"  .= identToJSON n
-                                                     , T.pack "binder"      .= binderToJSON b
+binderToJSON (NamedBinder ann n b)          = object [ "binderType"  .= "NamedBinder"
+                                                     , "annotation"  .= annToJSON ann
+                                                     , "identifier"  .= identToJSON n
+                                                     , "binder"      .= binderToJSON b
                                                      ]

@@ -5,7 +5,7 @@ import Prim.Row (class Lacks)
 
 data S (r :: Symbol) = S
 
-data R (r :: # Type) = R
+data R (r :: Row Type) = R
 
 union :: forall s r. Lacks s r => S s -> R r
 union S = R

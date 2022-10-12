@@ -31,6 +31,10 @@ data Meta
   -- The contained value is a where clause
   --
   | IsWhere
+  -- |
+  -- The contained function application was synthesized by the compiler
+  --
+  | IsSyntheticApp
   deriving (Show, Eq, Ord)
 
 -- |

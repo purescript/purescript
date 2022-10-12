@@ -1,6 +1,6 @@
 module PrimSubmodules (Lol(..), x, y, module O) where
 
-import Prim.Ordering (kind Ordering, LT, EQ, GT) as O
+import Prim.Ordering (Ordering, LT, EQ, GT) as O
 
 data Lol (a :: O.Ordering) = Lol Int
 

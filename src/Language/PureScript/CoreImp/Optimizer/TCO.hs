@@ -9,7 +9,6 @@ import Control.Monad.State (State, evalState, get, modify)
 import Data.Functor (($>), (<&>))
 import qualified Data.Set as S
 import Data.Text (Text, pack)
-import qualified Language.PureScript.Constants.Prim as C
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.AST.SourcePos (SourceSpan)
 import Safe (headDef, tailSafe)
@@ -34,9 +33,9 @@ tco = flip evalState 0 . everywhereTopDownM convert where
   tcoResult = "$tco_result"
 
   convert :: AST -> State Int AST
-  convert (VariableIntroduction ss name (Just fn@Function {}))
+  convert (VariableIntroduction ss name (Just (p, fn@Function {})))
       | Just trFns <- findTailRecursiveFns name arity body'
-      = VariableIntroduction ss name . Just . replace <$> toLoop trFns name arity outerArgs innerArgs body'
+      = VariableIntroduction ss name . Just . (p,) . replace <$> toLoop trFns name arity outerArgs innerArgs body'
     where
       innerArgs = headDef [] argss
       outerArgs = concat . reverse $ tailSafe argss
@@ -114,7 +113,7 @@ tco = flip evalState 0 . everywhereTopDownM convert where
       = pure S.empty
     allInTailPosition (VariableIntroduction _ _ Nothing)
       = pure S.empty
-    allInTailPosition (VariableIntroduction _ ident' (Just js1))
+    allInTailPosition (VariableIntroduction _ ident' (Just (_, js1)))
       | countSelfReferences js1 == 0 = pure S.empty
       | Function _ Nothing _ _ <- js1
       , (argss, body, _) <- innerCollectAllFunctionArgs [] id js1
@@ -122,7 +121,7 @@ tco = flip evalState 0 . everywhereTopDownM convert where
       | otherwise = empty
     allInTailPosition (Assignment _ _ js1)
       = guard (countSelfReferences js1 == 0) $> S.empty
-    allInTailPosition (Comment _ _ js1)
+    allInTailPosition (Comment _ js1)
       = allInTailPosition js1
     allInTailPosition _
       = empty
@@ -156,14 +155,14 @@ tco = flip evalState 0 . everywhereTopDownM convert where
       loopify (ForIn ss i js1 body) = ForIn ss i js1 (loopify body)
       loopify (IfElse ss cond body el) = IfElse ss cond (loopify body) (fmap loopify el)
       loopify (Block ss body) = Block ss (map loopify body)
-      loopify (VariableIntroduction ss f (Just fn@(Function _ Nothing _ _)))
+      loopify (VariableIntroduction ss f (Just (p, fn@(Function _ Nothing _ _))))
         | (_, body, replace) <- innerCollectAllFunctionArgs [] id fn
-        , f `S.member` trFns = VariableIntroduction ss f (Just (replace (loopify body)))
+        , f `S.member` trFns = VariableIntroduction ss f (Just (p, replace (loopify body)))
       loopify other = other
 
     pure $ Block rootSS $
-        map (\arg -> VariableIntroduction rootSS (tcoVar arg) (Just (Var rootSS (copyVar arg)))) outerArgs ++
-        [ VariableIntroduction rootSS tcoDone (Just (BooleanLiteral rootSS False))
+        map (\arg -> VariableIntroduction rootSS (tcoVar arg) (Just (UnknownEffects, Var rootSS (copyVar arg)))) outerArgs ++
+        [ VariableIntroduction rootSS tcoDone (Just (UnknownEffects, BooleanLiteral rootSS False))
         , VariableIntroduction rootSS tcoResult Nothing
         , Function rootSS (Just tcoLoop) (outerArgs ++ innerArgs) (Block rootSS [loopify js])
         , While rootSS (Unary rootSS Not (Var rootSS tcoDone))
@@ -175,9 +174,6 @@ tco = flip evalState 0 . everywhereTopDownM convert where
     rootSS = Nothing
 
     collectArgs :: [[AST]] -> AST -> [[AST]]
-    collectArgs acc (App _ fn []) =
-      -- count 0-argument applications as single-argument so we get the correct number of args
-      collectArgs ([Var Nothing C.undefined] : acc) fn
     collectArgs acc (App _ fn args') = collectArgs (args' : acc) fn
     collectArgs acc _ = acc
 

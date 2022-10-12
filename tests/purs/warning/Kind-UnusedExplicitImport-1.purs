@@ -3,7 +3,7 @@ module Main where
 
 import Prelude (Unit, unit, pure)
 import Effect (Effect)
-import Type.RowList (RLProxy, RowList)
+import Type.RowList (class ListToRow, RowList)
 
 class A (a :: RowList Type)
 

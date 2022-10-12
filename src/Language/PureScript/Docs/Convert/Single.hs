@@ -15,6 +15,7 @@ import qualified Language.PureScript.AST as P
 import qualified Language.PureScript.Comments as P
 import qualified Language.PureScript.Crash as P
 import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Roles as P
 import qualified Language.PureScript.Types as P
 
 -- |
@@ -73,6 +74,7 @@ type IntermediateDeclaration
 data DeclarationAugment
   = AugmentChild ChildDeclaration
   | AugmentKindSig KindSignatureInfo
+  | AugmentRole (Maybe Text) [P.Role]
 
 data KindSignatureInfo = KindSignatureInfo
   { ksiComments :: Maybe Text
@@ -101,11 +103,29 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
     d { declComments = mergeComments ksiComments $ declComments d
       , declKind = Just $ KindInfo { kiKeyword = ksiKeyword, kiKind = ksiKind }
       }
+  augmentWith (AugmentRole comms roles) d =
+    d { declComments = mergeComments (declComments d) comms
+      , declInfo = insertRoles
+      }
     where
-      mergeComments Nothing dc = dc
-      mergeComments kc Nothing = kc
-      mergeComments (Just kcoms) (Just dcoms) =
-        Just $ kcoms <> "\n" <> dcoms
+      insertRoles = case declInfo d of
+        DataDeclaration dataDeclType args [] ->
+          DataDeclaration dataDeclType args roles
+        DataDeclaration _ _ _ ->
+          P.internalError "augmentWith: could not add a second role declaration to a data declaration"
+
+        ExternDataDeclaration kind [] ->
+          ExternDataDeclaration kind roles
+        ExternDataDeclaration _ _ ->
+          P.internalError "augmentWith: could not add a second role declaration to an FFI declaration"
+
+        _ -> P.internalError "augmentWith: could not add role to declaration"
+
+  mergeComments :: Maybe Text -> Maybe Text -> Maybe Text
+  mergeComments Nothing bot = bot
+  mergeComments top Nothing = top
+  mergeComments (Just topComs) (Just bottomComs) =
+    Just $ topComs <> "\n" <> bottomComs
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
 getDeclarationTitle (P.ValueDeclaration vd) = Just (P.showIdent (P.valdeclIdent vd))
@@ -118,6 +138,7 @@ getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ name _ _ _ _) = Just $ eith
 getDeclarationTitle (P.TypeFixityDeclaration _ _ _ op) = Just ("type " <> P.showOp op)
 getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (P.showOp op)
 getDeclarationTitle (P.KindDeclaration _ _ n _) = Just (P.runProperName n)
+getDeclarationTitle (P.RoleDeclaration P.RoleDeclarationData{..}) = Just (P.runProperName rdeclIdent)
 getDeclarationTitle _ = Nothing
 
 -- | Create a basic Declaration value.
@@ -140,19 +161,20 @@ convertDeclaration (P.ValueDecl sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) 
 convertDeclaration (P.ValueDecl sa _ _ _ _) title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
-  basicDeclaration sa title (ValueDeclaration (P.TypeWildcard () Nothing))
+  basicDeclaration sa title (ValueDeclaration (P.TypeWildcard () P.UnnamedWildcard))
 convertDeclaration (P.ExternDeclaration sa _ ty) title =
   basicDeclaration sa title (ValueDeclaration (ty $> ()))
 convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
   Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
-  info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args)
+  info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args) []
   children = map convertCtor ctors
   convertCtor :: P.DataConstructorDeclaration -> ChildDeclaration
   convertCtor P.DataConstructorDeclaration{..} =
-    ChildDeclaration (P.runProperName dataCtorName) (convertComments $ snd dataCtorAnn) Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
+    let (sourceSpan, comments) = dataCtorAnn
+    in ChildDeclaration (P.runProperName dataCtorName) (convertComments comments) (Just sourceSpan) (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
 convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
-  basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
+  basicDeclaration sa title (ExternDataDeclaration (kind' $> ()) [])
 convertDeclaration (P.TypeSynonymDeclaration sa _ args ty) title =
   basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()))
 convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
@@ -186,6 +208,11 @@ convertDeclaration (P.KindDeclaration sa keyword _ kind) title =
   where
     comms = convertComments $ snd sa
     ksi = KindSignatureInfo { ksiComments = comms, ksiKeyword = keyword, ksiKind = kind $> () }
+convertDeclaration (P.RoleDeclaration P.RoleDeclarationData{..}) title =
+  Just $ Left ([(title, AugmentType)], AugmentRole comms rdeclRoles)
+  where
+    comms = convertComments $ snd rdeclSourceAnn
+
 convertDeclaration _ _ = Nothing
 
 convertComments :: [P.Comment] -> Maybe Text

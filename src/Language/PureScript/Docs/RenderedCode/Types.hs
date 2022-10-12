@@ -27,6 +27,7 @@ module Language.PureScript.Docs.RenderedCode.Types
  , typeCtor
  , typeOp
  , typeVar
+ , roleAnn
  , alias
  , aliasName
  ) where
@@ -116,8 +117,8 @@ maybeToContainingModule Nothing = ThisModule
 maybeToContainingModule (Just mn) = OtherModule mn
 
 fromQualified :: Qualified a -> (ContainingModule, a)
-fromQualified (Qualified mn x) =
-  (maybeToContainingModule mn, x)
+fromQualified (Qualified (ByModuleName mn) x) = (OtherModule mn, x)
+fromQualified (Qualified _ x) = (ThisModule, x)
 
 data Link
   = NoLink
@@ -173,6 +174,7 @@ data RenderedCodeElement
   -- namespace (value, type, or kind). Note that this is not related to the
   -- kind called Symbol for type-level strings.
   | Symbol Namespace Text Link
+  | Role Text
   deriving (Show, Eq, Ord)
 
 instance A.ToJSON RenderedCodeElement where
@@ -184,6 +186,8 @@ instance A.ToJSON RenderedCodeElement where
     A.toJSON ["space" :: Text]
   toJSON (Symbol ns str link) =
     A.toJSON ["symbol", A.toJSON ns, A.toJSON str, A.toJSON link]
+  toJSON (Role role) =
+    A.toJSON ["role", role]
 
 -- |
 -- A type representing a highly simplified version of PureScript code, intended
@@ -262,6 +266,14 @@ typeOp (fromQualified -> (mn, name)) =
 typeVar :: Text -> RenderedCode
 typeVar x = RC [Symbol TypeLevel x NoLink]
 
+roleAnn :: Maybe Text -> RenderedCode
+roleAnn = RC . maybe [] renderRole
+  where
+  renderRole = \case
+    "nominal" -> [Role "nominal"]
+    "phantom" -> [Role "phantom"]
+    _ -> []
+
 type FixityAlias = Qualified (Either (ProperName 'TypeName) (Either Ident (ProperName 'ConstructorName)))
 
 alias :: FixityAlias -> RenderedCode
@@ -284,9 +296,9 @@ aliasName for name' =
   in
     case ns of
       ValueLevel ->
-        ident (Qualified Nothing (Ident name))
+        ident (Qualified ByNullSourcePos (Ident name))
       TypeLevel ->
-        typeCtor (Qualified Nothing (ProperName name))
+        typeCtor (Qualified ByNullSourcePos (ProperName name))
 
 -- | Converts a FixityAlias into a different representation which is more
 -- useful to other functions in this module.

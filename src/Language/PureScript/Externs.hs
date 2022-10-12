@@ -219,13 +219,13 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDType pn kind tyKind) = env { types = M.insert (qual pn) (kind, tyKind) (types env) }
   applyDecl env (EDTypeSynonym pn args ty) = env { typeSynonyms = M.insert (qual pn) (args, ty) (typeSynonyms env) }
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
-  applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
+  applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (ByModuleName efModuleName) ident) (ty, External, Defined) (names env) }
   applyDecl env (EDClass pn args members cs deps tcIsEmpty) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps tcIsEmpty) (typeClasses env) }
   applyDecl env (EDInstance className ident vars kinds tys cs ch idx ns ss) =
     env { typeClassDictionaries =
             updateMap
               (updateMap (M.insertWith (<>) (qual ident) (pure dict)) className)
-              (Just efModuleName) (typeClassDictionaries env) }
+              (ByModuleName efModuleName) (typeClassDictionaries env) }
     where
     dict :: NamedDict
     dict = TypeClassDictionaryInScope ch idx (qual ident) [] className vars kinds tys cs instTy
@@ -239,7 +239,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
       UserNamed -> Nothing
 
   qual :: a -> Qualified a
-  qual = Qualified (Just efModuleName)
+  qual = Qualified (ByModuleName efModuleName)
 
 
 _efBuildCache :: ExternsFile -> BuildCacheFile
@@ -698,26 +698,26 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
 
   toExternsDeclaration :: DeclarationRef -> [ExternsDeclaration]
   toExternsDeclaration (TypeRef _ pn dctors) =
-    case Qualified (Just mn) pn `M.lookup` types env of
+    case Qualified (ByModuleName mn) pn `M.lookup` types env of
       Nothing -> internalError "toExternsDeclaration: no kind in toExternsDeclaration"
       Just (kind, TypeSynonym)
-        | Just (args, synTy) <- Qualified (Just mn) pn `M.lookup` typeSynonyms env -> [ EDType pn kind TypeSynonym, EDTypeSynonym pn args synTy ]
+        | Just (args, synTy) <- Qualified (ByModuleName mn) pn `M.lookup` typeSynonyms env -> [ EDType pn kind TypeSynonym, EDTypeSynonym pn args synTy ]
       Just (kind, ExternData rs) -> [ EDType pn kind (ExternData rs) ]
       Just (kind, tk@(DataType _ _ tys)) ->
         EDType pn kind tk : [ EDDataConstructor dctor dty pn ty args
                             | dctor <- fromMaybe (map fst tys) dctors
-                            , (dty, _, ty, args) <- maybeToList (Qualified (Just mn) dctor `M.lookup` dataConstructors env)
+                            , (dty, _, ty, args) <- maybeToList (Qualified (ByModuleName mn) dctor `M.lookup` dataConstructors env)
                             ]
       _ -> internalError "toExternsDeclaration: Invalid input"
   toExternsDeclaration (ValueRef _ ident)
-    | Just (ty, _, _) <- Qualified (Just mn) ident `M.lookup` names env
+    | Just (ty, _, _) <- Qualified (ByModuleName mn) ident `M.lookup` names env
     = [ EDValue (lookupRenamedIdent ident) ty ]
   toExternsDeclaration (TypeClassRef _ className)
     | let dictName = dictTypeName . coerceProperName $ className
-    , Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
-    , Just (kind, tk) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
-    , Just (dictKind, dictData@(DataType _ _ [(dctor, _)])) <- Qualified (Just mn) dictName `M.lookup` types env
-    , Just (dty, _, ty, args) <- Qualified (Just mn) dctor `M.lookup` dataConstructors env
+    , Just TypeClassData{..} <- Qualified (ByModuleName mn) className `M.lookup` typeClasses env
+    , Just (kind, tk) <- Qualified (ByModuleName mn) (coerceProperName className) `M.lookup` types env
+    , Just (dictKind, dictData@(DataType _ _ [(dctor, _)])) <- Qualified (ByModuleName mn) dictName `M.lookup` types env
+    , Just (dty, _, ty, args) <- Qualified (ByModuleName mn) dctor `M.lookup` dataConstructors env
     = [ EDType (coerceProperName className) kind tk
       , EDType dictName dictKind dictData
       , EDDataConstructor dctor dty dictName ty args
@@ -725,9 +725,9 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
       ]
   toExternsDeclaration (TypeInstanceRef ss' ident ns)
     = [ EDInstance tcdClassName (lookupRenamedIdent ident) tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex ns ss'
-      | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
+      | m1 <- maybeToList (M.lookup (ByModuleName mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
-      , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
+      , nel <- maybeToList (M.lookup (Qualified (ByModuleName mn) ident) m2)
       , TypeClassDictionaryInScope{..} <- NEL.toList nel
       ]
   toExternsDeclaration _ = []

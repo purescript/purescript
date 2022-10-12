@@ -30,7 +30,3 @@ writeUTF8FileT inFile text =
 readUTF8File :: FilePath -> IO String
 readUTF8File inFile =
   fmap (UTF8.toString . fixCRLF) (BS.readFile inFile)
-
-writeUTF8File :: FilePath -> String -> IO ()
-writeUTF8File inFile text =
-  BS.writeFile inFile (UTF8.fromString text)

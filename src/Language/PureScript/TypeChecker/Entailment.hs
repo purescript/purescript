@@ -18,16 +18,18 @@ import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
+import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (findIndices, minimumBy, groupBy, nubBy, sortOn, delete)
-import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
+import Data.List (delete, findIndices, minimumBy, nubBy, sortOn, tails)
+import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (for)
 import Data.Text (Text, stripPrefix, stripSuffix)
 import qualified Data.Text as T
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
@@ -36,6 +38,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Entailment.Coercible
+import Language.PureScript.TypeChecker.Entailment.IntCompare
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
@@ -55,8 +58,28 @@ data Evidence
   -- | Computed instances
   | WarnInstance SourceType -- ^ Warn type class with a user-defined warning message
   | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
+  | ReflectableInstance Reflectable -- ^ The Reflectable type class for a reflectable kind
   | EmptyClassInstance        -- ^ For any solved type class with no members
   deriving (Show, Eq)
+
+-- | Describes kinds that are reflectable to the term-level
+data Reflectable
+  = ReflectableInt Integer -- ^ For type-level numbers
+  | ReflectableString PSString -- ^ For type-level strings
+  | ReflectableBoolean Bool -- ^ For type-level booleans
+  | ReflectableOrdering Ordering -- ^ For type-level orderings
+  deriving (Show, Eq)
+
+-- | Reflect a reflectable type into an expression
+asExpression :: Reflectable -> Expr
+asExpression = \case
+  ReflectableInt n -> Literal NullSourceSpan $ NumericLiteral $ Left n
+  ReflectableString s -> Literal NullSourceSpan $ StringLiteral s
+  ReflectableBoolean b -> Literal NullSourceSpan $ BooleanLiteral b
+  ReflectableOrdering o -> Constructor NullSourceSpan $ case o of
+    LT -> C.LT
+    EQ -> C.EQ
+    GT -> C.GT
 
 -- | Extract the identifier of a named instance
 namedInstanceIdentifier :: Evidence -> Maybe (Qualified Ident)
@@ -67,9 +90,9 @@ namedInstanceIdentifier _ = Nothing
 type TypeClassDict = TypeClassDictionaryInScope Evidence
 
 -- | The 'InstanceContext' tracks those constraints which can be satisfied.
-type InstanceContext = M.Map (Maybe ModuleName)
+type InstanceContext = M.Map QualifiedBy
                          (M.Map (Qualified (ProperName 'ClassName))
-                           (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
+                           (M.Map (Qualified Ident) (NonEmpty NamedDict)))
 
 -- | A type substitution which makes an instance head match a list of types.
 --
@@ -175,32 +198,37 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ ctx cn@C.Warn _ [msg] =
       -- Prefer a warning dictionary in scope if there is one available.
       -- This allows us to defer a warning by propagating the constraint.
-      findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope Nothing 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing Nothing]
+      findDicts ctx cn ByNullSourcePos ++ [TypeClassDictionaryInScope Nothing 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing Nothing]
     forClassName _ _ C.IsSymbol _ args | Just dicts <- solveIsSymbol args = dicts
     forClassName _ _ C.SymbolCompare _ args | Just dicts <- solveSymbolCompare args = dicts
     forClassName _ _ C.SymbolAppend _ args | Just dicts <- solveSymbolAppend args = dicts
     forClassName _ _ C.SymbolCons _ args | Just dicts <- solveSymbolCons args = dicts
+    forClassName _ _ C.IntAdd _ args | Just dicts <- solveIntAdd args = dicts
+    forClassName _ ctx C.IntCompare _ args | Just dicts <- solveIntCompare ctx args = dicts
+    forClassName _ _ C.IntMul _ args | Just dicts <- solveIntMul args = dicts
+    forClassName _ _ C.IntToString _ args | Just dicts <- solveIntToString args = dicts
+    forClassName _ _ C.Reflectable _ args | Just dicts <- solveReflectable args = dicts
     forClassName _ _ C.RowUnion kinds args | Just dicts <- solveUnion kinds args = dicts
     forClassName _ _ C.RowNub kinds args | Just dicts <- solveNub kinds args = dicts
     forClassName _ _ C.RowLacks kinds args | Just dicts <- solveLacks kinds args = dicts
     forClassName _ _ C.RowCons kinds args | Just dicts <- solveRowCons kinds args = dicts
     forClassName _ _ C.RowToList kinds args | Just dicts <- solveRowToList kinds args = dicts
-    forClassName _ ctx cn@(Qualified (Just mn) _) _ tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
+    forClassName _ ctx cn@(Qualified (ByModuleName mn) _) _ tys = concatMap (findDicts ctx cn) (ordNub (ByNullSourcePos : ByModuleName mn : map ByModuleName (mapMaybe ctorModules tys)))
     forClassName _ _ _ _ _ = internalError "forClassName: expected qualified class name"
 
     ctorModules :: SourceType -> Maybe ModuleName
-    ctorModules (TypeConstructor _ (Qualified (Just mn) _)) = Just mn
-    ctorModules (TypeConstructor _ (Qualified Nothing _)) = internalError "ctorModules: unqualified type name"
+    ctorModules (TypeConstructor _ (Qualified (ByModuleName mn) _)) = Just mn
+    ctorModules (TypeConstructor _ (Qualified (BySourcePos _) _)) = internalError "ctorModules: unqualified type name"
     ctorModules (TypeApp _ ty _) = ctorModules ty
     ctorModules (KindApp _ ty _) = ctorModules ty
     ctorModules (KindedType _ ty _) = ctorModules ty
     ctorModules _ = Nothing
 
-    findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDict]
+    findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> QualifiedBy -> [TypeClassDict]
     findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (>>= M.lookup cn) . flip M.lookup ctx
 
     valUndefined :: Expr
-    valUndefined = Var nullSourceSpan (Qualified (Just C.Prim) (Ident C.undefined))
+    valUndefined = Var nullSourceSpan (Qualified (ByModuleName C.Prim) (Ident C.undefined))
 
     solve :: SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
     solve = go 0 hints
@@ -230,22 +258,24 @@ entails SolverOptions{..} constraint context hints =
 
             dicts <- lift . lift $ forClassNameM env (combineContexts context inferred) className' kinds'' tys''
 
-            let instances = do
-                  chain <- groupBy ((==) `on` tcdChain) $
+            let (catMaybes -> ambiguous, instances) = partitionEithers $ do
+                  chain :: NonEmpty TypeClassDict <-
+                           NEL.groupBy ((==) `on` tcdChain) $
                            sortOn (tcdChain &&& tcdIndex)
                            dicts
                   -- process instances in a chain in index order
-                  let found = for chain $ \tcd ->
+                  let found = for (tails1 chain) $ \(tcd :| tl) ->
                                 -- Make sure the type unifies with the type in the type instance definition
                                 case matches typeClassDependencies tcd tys'' of
-                                  Apart        -> Right ()                  -- keep searching
-                                  Match substs -> Left (Just (substs, tcd)) -- found a match
-                                  Unknown      -> Left Nothing              -- can't continue with this chain yet, need proof of apartness
-                  case found of
-                    Right _               -> []          -- all apart
-                    Left Nothing          -> []          -- last unknown
-                    Left (Just substsTcd) -> [substsTcd] -- found a match
-            solution <- lift . lift $ unique kinds'' tys'' instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
+                                  Apart        -> Right ()                   -- keep searching
+                                  Match substs -> Left (Right (substs, tcd)) -- found a match
+                                  Unknown ->
+                                    if null (tcdChain tcd) || null tl
+                                    then Right ()                                   -- need proof of apartness but this is either not in a chain or at the end
+                                    else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
+
+                  lefts [found]
+            solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
@@ -276,7 +306,7 @@ entails SolverOptions{..} constraint context hints =
               Unsolved unsolved -> do
                 -- Generate a fresh name for the unsolved constraint's new dictionary
                 ident <- freshIdent ("dict" <> runProperName (disqualify (constraintClass unsolved)))
-                let qident = Qualified Nothing ident
+                let qident = Qualified ByNullSourcePos ident
                 -- Store the new dictionary in the InstanceContext so that we can solve this goal in
                 -- future.
                 newDicts <- lift . lift $ newDictionaries [] qident unsolved
@@ -323,16 +353,16 @@ entails SolverOptions{..} constraint context hints =
                       (substituteType currentSubst . replaceAllTypeVars (M.toList subst) $ instKind)
                       (substituteType currentSubst tyKind)
 
-            unique :: [SourceType] -> [SourceType] -> [(a, TypeClassDict)] -> Bool -> m (EntailsResult a)
-            unique kindArgs tyArgs [] unks
+            unique :: [SourceType] -> [SourceType] -> [Qualified (Either SourceType Ident)] -> [(a, TypeClassDict)] -> Bool -> m (EntailsResult a)
+            unique kindArgs tyArgs ambiguous [] unks
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
               | solverShouldGeneralize && ((null kindArgs && null tyArgs) || any canBeGeneralized kindArgs || any canBeGeneralized tyArgs) =
                   return (Unsolved (srcConstraint className' kindArgs tyArgs conInfo))
-              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' kindArgs tyArgs conInfo) unks
-            unique _ _ [(a, dict)] _ = return $ Solved a dict
-            unique _ tyArgs tcds _
+              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' kindArgs tyArgs conInfo) ambiguous unks
+            unique _ _ _ [(a, dict)] _ = return $ Solved a dict
+            unique _ tyArgs _ tcds _
               | pairwiseAny overlapping (map snd tcds) =
                   throwError . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . tcdToInstanceDescription . snd))
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
@@ -341,7 +371,7 @@ entails SolverOptions{..} constraint context hints =
             tcdToInstanceDescription TypeClassDictionaryInScope{ tcdDescription, tcdValue } =
               let nii = namedInstanceIdentifier tcdValue
               in case tcdDescription of
-                Just ty -> flip Qualified (Left ty) <$> fmap getQual nii
+                Just ty -> flip Qualified (Left ty) <$> fmap (byMaybeModuleName . getQual) nii
                 Nothing -> fmap Right <$> nii
 
             canBeGeneralized :: Type a -> Bool
@@ -387,6 +417,9 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
               return $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.IsSymbol)) (Literal nullSourceSpan (ObjectLiteral fields))
+            mkDictionary (ReflectableInstance ref) _ =
+              let fields = [ ("reflectType", Abs (VarBinder nullSourceSpan UnusedIdent) (asExpression ref)) ] in
+              pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
             unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
             unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)
@@ -399,7 +432,7 @@ entails SolverOptions{..} constraint context hints =
 
     solveCoercible :: Environment -> InstanceContext -> [SourceType] -> [SourceType] -> m (Maybe [TypeClassDict])
     solveCoercible env ctx kinds [a, b] = do
-      let coercibleDictsInScope = findDicts ctx C.Coercible Nothing
+      let coercibleDictsInScope = findDicts ctx C.Coercible ByNullSourcePos
           givens = flip mapMaybe coercibleDictsInScope $ \case
             dict | [a', b'] <- tcdInstanceTypes dict -> Just (a', b')
                  | otherwise -> Nothing
@@ -474,6 +507,73 @@ entails SolverOptions{..} constraint context hints =
       guard (T.length h' == 1)
       pure (arg1, arg2, srcTypeLevelString (mkString $ h' <> t'))
     consSymbol _ _ _ = Nothing
+
+    solveIntToString :: [SourceType] -> Maybe [TypeClassDict]
+    solveIntToString [arg0, _] = do
+      (arg0', arg1') <- printIntToString arg0
+      let args' = [arg0', arg1']
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntToString [] [] args' Nothing Nothing]
+    solveIntToString _ = Nothing
+
+    printIntToString :: SourceType -> Maybe (SourceType, SourceType)
+    printIntToString arg0@(TypeLevelInt _ i) = do
+      pure (arg0, srcTypeLevelString $ mkString $ T.pack $ show i)
+    printIntToString _ = Nothing
+
+    solveReflectable :: [SourceType] -> Maybe [TypeClassDict]
+    solveReflectable [typeLevel, _] = do
+      (ref, typ) <- case typeLevel of
+        TypeLevelInt _ i -> pure (ReflectableInt i, tyInt)
+        TypeLevelString _ s -> pure (ReflectableString s, tyString)
+        TypeConstructor _ n
+          | n == C.booleanTrue -> pure (ReflectableBoolean True, tyBoolean)
+          | n == C.booleanFalse -> pure (ReflectableBoolean False, tyBoolean)
+          | n == C.orderingLT -> pure (ReflectableOrdering LT, srcTypeConstructor C.Ordering)
+          | n == C.orderingEQ -> pure (ReflectableOrdering EQ, srcTypeConstructor C.Ordering)
+          | n == C.orderingGT -> pure (ReflectableOrdering GT, srcTypeConstructor C.Ordering)
+        _ -> Nothing
+      pure [TypeClassDictionaryInScope Nothing 0 (ReflectableInstance ref) [] C.Reflectable [] [] [typeLevel, typ] Nothing Nothing]
+    solveReflectable _ = Nothing
+
+    solveIntAdd :: [SourceType] -> Maybe [TypeClassDict]
+    solveIntAdd [arg0, arg1, arg2] = do
+      (arg0', arg1', arg2') <- addInts arg0 arg1 arg2
+      let args' = [arg0', arg1', arg2']
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntAdd [] [] args' Nothing Nothing]
+    solveIntAdd _ = Nothing
+
+    addInts :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
+    -- | l r -> o, l + r = o
+    addInts arg0@(TypeLevelInt _ l) arg1@(TypeLevelInt _ r) _ = pure (arg0, arg1, srcTypeLevelInt (l + r))
+    -- | l o -> r, o - l = r
+    addInts arg0@(TypeLevelInt _ l) _ arg2@(TypeLevelInt _ o) = pure (arg0, srcTypeLevelInt (o - l), arg2)
+    -- | r o -> l, o - r = l
+    addInts _ arg1@(TypeLevelInt _ r) arg2@(TypeLevelInt _ o) = pure (srcTypeLevelInt (o - r), arg1, arg2)
+    addInts _ _ _                                             = Nothing
+
+    solveIntCompare :: InstanceContext -> [SourceType] -> Maybe [TypeClassDict]
+    solveIntCompare _ [arg0@(TypeLevelInt _ a), arg1@(TypeLevelInt _ b), _] =
+      let ordering = case compare a b of
+            EQ -> C.orderingEQ
+            LT -> C.orderingLT
+            GT -> C.orderingGT
+          args' = [arg0, arg1, srcTypeConstructor ordering]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] args' Nothing Nothing]
+    solveIntCompare ctx args@[a, b, _] = do
+      let compareDictsInScope = findDicts ctx C.IntCompare ByNullSourcePos
+          givens = flip mapMaybe compareDictsInScope $ \case
+            dict | [a', b', c'] <- tcdInstanceTypes dict -> mkRelation a' b' c'
+                 | otherwise -> Nothing
+          facts = mkFacts (args : (tcdInstanceTypes <$> compareDictsInScope))
+      c' <- solveRelation (givens <> facts) a b
+      pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] [a, b, srcTypeConstructor c'] Nothing Nothing]
+    solveIntCompare _ _ = Nothing
+
+    solveIntMul :: [SourceType] -> Maybe [TypeClassDict]
+    solveIntMul [arg0@(TypeLevelInt _ l), arg1@(TypeLevelInt _ r), _] =
+      let args' = [arg0, arg1, srcTypeLevelInt (l * r)]
+      in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntMul [] [] args' Nothing Nothing]
+    solveIntMul _ = Nothing
 
     solveUnion :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveUnion kinds [l, r, u] = do
@@ -641,6 +741,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
     typeHeadsAreEqual t                      (TypeVar _ v)                     = (Match (), M.singleton v [t])
     typeHeadsAreEqual (TypeConstructor _ c1) (TypeConstructor _ c2) | c1 == c2 = (Match (), M.empty)
     typeHeadsAreEqual (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = (Match (), M.empty)
+    typeHeadsAreEqual (TypeLevelInt _ n1)    (TypeLevelInt _ n2)    | n1 == n2 = (Match (), M.empty)
     typeHeadsAreEqual (TypeApp _ h1 t1)      (TypeApp _ h2 t2)                 =
       both (typeHeadsAreEqual h1 h2) (typeHeadsAreEqual t1 t2)
     typeHeadsAreEqual (KindApp _ h1 t1)      (KindApp _ h2 t2)                 =
@@ -663,6 +764,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
         go (sd, r)                 ([], TypeVar _ v)                   = (Match (), M.singleton v [rowFromList (sd, r)])
         go _ _                                                         = (Apart, M.empty)
     typeHeadsAreEqual (TUnknown _ _) _ = (Unknown, M.empty)
+    typeHeadsAreEqual Skolem{} _       = (Unknown, M.empty)
     typeHeadsAreEqual _ _ = (Apart, M.empty)
 
     both :: (Matched (), Matching [Type a]) -> (Matched (), Matching [Type a]) -> (Matched (), Matching [Type a])
@@ -680,11 +782,14 @@ matches deps TypeClassDictionaryInScope{..} tys =
       typesAreEqual (KindedType _ t1 _)    t2                     = typesAreEqual t1 t2
       typesAreEqual t1                     (KindedType _ t2 _)    = typesAreEqual t1 t2
       typesAreEqual (TUnknown _ u1)        (TUnknown _ u2)        | u1 == u2 = Match ()
-      typesAreEqual (Skolem _ _ _ s1 _)      (Skolem _ _ _ s2 _)      | s1 == s2 = Match ()
-      typesAreEqual (Skolem _ _ _ _ _)       _                      = Unknown
-      typesAreEqual _                      (Skolem _ _ _ _ _)       = Unknown
+      typesAreEqual (TUnknown _ u1)        t2                     = if t2 `containsUnknown` u1 then Apart else Unknown
+      typesAreEqual t1                     (TUnknown _ u2)        = if t1 `containsUnknown` u2 then Apart else Unknown
+      typesAreEqual (Skolem _ _ _ s1 _)    (Skolem _ _ _ s2 _)    | s1 == s2 = Match ()
+      typesAreEqual (Skolem _ _ _ s1 _)    t2                     = if t2 `containsSkolem` s1 then Apart else Unknown
+      typesAreEqual t1                     (Skolem _ _ _ s2 _)    = if t1 `containsSkolem` s2 then Apart else Unknown
       typesAreEqual (TypeVar _ v1)         (TypeVar _ v2)         | v1 == v2 = Match ()
       typesAreEqual (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = Match ()
+      typesAreEqual (TypeLevelInt _ n1)    (TypeLevelInt _ n2)    | n1 == n2 = Match ()
       typesAreEqual (TypeConstructor _ c1) (TypeConstructor _ c2) | c1 == c2 = Match ()
       typesAreEqual (TypeApp _ h1 t1)      (TypeApp _ h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2
       typesAreEqual (KindApp _ h1 t1)      (KindApp _ h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2
@@ -698,6 +803,8 @@ matches deps TypeClassDictionaryInScope{..} tys =
           go (l, t1)                (r, KindedType _ t2 _)            = go (l, t1) (r, t2)
           go ([], KindApp _ t1 k1)  ([], KindApp _ t2 k2)             = typesAreEqual t1 t2 <> typesAreEqual k1 k2
           go ([], TUnknown _ u1)    ([], TUnknown _ u2)    | u1 == u2 = Match ()
+          go ([], TUnknown _ _)     ([], _)                           = Unknown
+          go ([], _)                ([], TUnknown _ _)                = Unknown
           go ([], Skolem _ _ _ s1 _)  ([], Skolem _ _ _ s2 _)  | s1 == s2 = Match ()
           go ([], Skolem _ _ _ _ _)   _                               = Unknown
           go _                      ([], Skolem _ _ _ _ _)            = Unknown
@@ -709,6 +816,12 @@ matches deps TypeClassDictionaryInScope{..} tys =
       isRCons :: Type a -> Bool
       isRCons RCons{}    = True
       isRCons _          = False
+
+      containsSkolem :: Type a -> Int -> Bool
+      containsSkolem t s = everythingOnTypes (||) (\case Skolem _ _ _ s' _ -> s == s'; _ -> False) t
+
+      containsUnknown :: Type a -> Int -> Bool
+      containsUnknown t u = everythingOnTypes (||) (\case TUnknown _ u' -> u == u'; _ -> False) t
 
 -- | Add a dictionary for the constraint to the scope, and dictionaries
 -- for all implied superclass instances.
@@ -734,7 +847,7 @@ newDictionaries path name (Constraint _ className instanceKinds instanceTy _) = 
 
 mkContext :: [NamedDict] -> InstanceContext
 mkContext = foldr combineContexts M.empty . map fromDict where
-  fromDict d = M.singleton Nothing (M.singleton (tcdClassName d) (M.singleton (tcdValue d) (pure d)))
+  fromDict d = M.singleton ByNullSourcePos (M.singleton (tcdClassName d) (M.singleton (tcdValue d) (pure d)))
 
 -- | Check all pairs of values in a list match a predicate
 pairwiseAll :: Monoid m => (a -> a -> m) -> [a] -> m
@@ -752,3 +865,19 @@ pairwiseM :: Applicative m => (a -> a -> m ()) -> [a] -> m ()
 pairwiseM _ [] = pure ()
 pairwiseM _ [_] = pure ()
 pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs
+
+-- | Return all nonempty tails of a nonempty list. For example:
+--
+-- tails1 (fromList [1]) == fromList [fromList [1]]
+-- tails1 (fromList [1,2]) == fromList [fromList [1,2], fromList [2]]
+-- tails1 (fromList [1,2,3]) == fromList [fromList [1,2,3], fromList [2,3], fromList [3]]
+tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
+tails1 =
+  -- NEL.fromList is an unsafe function, but this usage should be safe, since:
+  -- * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
+  -- * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
+  --   list, since `head (tails xs) = xs`.
+  -- * The only empty element of `tails xs` is the last one (by the definition of `tails`)
+  -- * Therefore, if we take all but the last element of `tails xs` i.e.
+  --   `init (tails xs)`, we have a nonempty list of nonempty lists
+  NEL.fromList . map NEL.fromList . init . tails . NEL.toList

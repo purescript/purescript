@@ -1,6 +1,6 @@
 -- @shouldFailWith TransitiveExportError
 module Main (TestProxy(..)) where
 
-foreign import kind Test
+data Test
 
 data TestProxy (p :: Test) = TestProxy

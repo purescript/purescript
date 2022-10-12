@@ -9,17 +9,18 @@ import Effect
 import Effect.Console (log)
 import VendoredVariant
 import Data.Symbol
+import Type.Proxy (Proxy(..))
 
 type TestVariants =
-  ( foo :: FProxy Maybe
-  , bar :: FProxy (Tuple String)
+  ( foo :: Proxy Maybe
+  , bar :: Proxy (Tuple String)
   )
 
-_foo :: SProxy "foo"
-_foo = SProxy
+_foo :: Proxy "foo"
+_foo = Proxy
 
-_bar :: SProxy "bar"
-_bar = SProxy
+_bar :: Proxy "bar"
+_bar = Proxy
 
 main :: Effect Unit
 main = do
