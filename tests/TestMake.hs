@@ -31,7 +31,7 @@ import Test.Hspec
 utcMidnightOnDate :: Integer -> Int -> Int -> UTCTime
 utcMidnightOnDate year month day = UTCTime (fromGregorian year month day) (secondsToDiffTime 0)
 
--- [drathier]: we're assuming A < B < C < D in the tests below
+-- ASSUMPTION[drathier]: we're assuming A < B < C < D in the tests below
 timestampA, timestampB, timestampC, timestampD :: UTCTime
 timestampA = utcMidnightOnDate 2019 1 1
 timestampB = utcMidnightOnDate 2019 1 2

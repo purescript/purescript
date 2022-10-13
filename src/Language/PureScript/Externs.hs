@@ -681,7 +681,18 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
           underlyingTypev
         )
       ]
-  declToCacheShapeImpl _ = pure []
+  -- TODO[drathier]: fill these in, to track more changes
+  declToCacheShapeImpl (KindDeclaration _ _kindSignatureFor _tyName _srcType) = pure []
+  declToCacheShapeImpl (RoleDeclaration _roleDecls) = pure []
+  declToCacheShapeImpl (TypeDeclaration _typeDecls) = pure []
+  declToCacheShapeImpl (ValueDeclaration _valueDecls) = pure []
+  declToCacheShapeImpl (BoundValueDeclaration _ _binder _expr) = pure []
+  declToCacheShapeImpl (BindingGroupDeclaration _binders) = pure []
+  declToCacheShapeImpl (ExternDeclaration _ _ident _srcType) = pure []
+  declToCacheShapeImpl (FixityDeclaration _ _fixity) = pure []
+  declToCacheShapeImpl (ImportDeclaration _ _moduName _importDeclType _mModuName) = pure []
+  declToCacheShapeImpl (TypeClassDeclaration _ _className _targs _constraints _funDeps _decls) = pure []
+  declToCacheShapeImpl (TypeInstanceDeclaration _ _chainId _chainIdx _name _deps _className _instanceTypes _memberDecls) = pure []
 
   -----
 
