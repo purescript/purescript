@@ -44,7 +44,7 @@ test: ## Run the tests.
 	$(stack) test --fast $(package)
 
 test-ghci: ## Open GHCi with the test suite loaded.
-	$(stack) ghci $(package):test:$(package)-tests
+	$(stack) ghci $(package):test:tests
 
 # If you want to profile a particular test, such
 # as LargeSumType.purs, add -p to the test arguments like so:

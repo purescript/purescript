@@ -31,6 +31,7 @@ import Test.Hspec
 utcMidnightOnDate :: Integer -> Int -> Int -> UTCTime
 utcMidnightOnDate year month day = UTCTime (fromGregorian year month day) (secondsToDiffTime 0)
 
+-- [drathier]: we're assuming A < B < C < D in the tests below
 timestampA, timestampB, timestampC, timestampD :: UTCTime
 timestampA = utcMidnightOnDate 2019 1 1
 timestampB = utcMidnightOnDate 2019 1 2
@@ -102,7 +103,8 @@ spec = do
       removeFile moduleFFIPath
       compile [modulePath] `shouldReturn` moduleNames ["Module"]
 
-    it "recompiles downstream modules when a module is rebuilt" $ do
+    -- Modified data type constructor
+    it "recompiles downstream modules when a data type constructor changes" $ do
       let moduleAPath = sourcesDir </> "A.purs"
           moduleBPath = sourcesDir </> "B.purs"
           moduleAContent1 = "module A where\ndata Foo = Foo | Foo10\n"
@@ -116,7 +118,7 @@ spec = do
       writeFileWithTimestamp moduleAPath timestampC moduleAContent2
       compile [moduleAPath, moduleBPath] `shouldReturn` moduleNames ["A", "B"]
 
-    it "only recompiles downstream modules when a module is rebuilt" $ do
+    it "recompiles direct dependents but not transitive dependents when a data type constructor changes" $ do
       let moduleAPath = sourcesDir </> "A.purs"
           moduleBPath = sourcesDir </> "B.purs"
           moduleCPath = sourcesDir </> "C.purs"
@@ -134,7 +136,7 @@ spec = do
       writeFileWithTimestamp moduleAPath timestampD moduleAContent2
       compile modulePaths `shouldReturn` moduleNames ["A", "B"]
 
-    it "does not necessarily recompile modules which were not part of the previous batch" $ do
+    it "does not recompile anything when no source files changed" $ do
       let moduleAPath = sourcesDir </> "A.purs"
           moduleBPath = sourcesDir </> "B.purs"
           moduleCPath = sourcesDir </> "C.purs"
@@ -152,6 +154,131 @@ spec = do
 
       compile batch1 `shouldReturn` moduleNames []
       compile batch2 `shouldReturn` moduleNames []
+
+    it "only recompiles one module if it only differs in whitespace" $ do
+      -- not sure if it should recompile anything here, but it does, so this will let us know if anything changes
+      let moduleAPath = sourcesDir </> "A.purs"
+          moduleBPath = sourcesDir </> "B.purs"
+          moduleCPath = sourcesDir </> "C.purs"
+          modulePaths = [moduleAPath, moduleBPath, moduleCPath]
+          moduleAContent1 = "module A where\nfoo = 0\n"
+          moduleAContent2 = "module A where \nfoo = 0\n"
+          moduleBContent = "module B where\nimport A (foo)\nbar = foo\n"
+          moduleCContent = "module C where\nbaz = 3\n"
+
+      writeFileWithTimestamp moduleAPath timestampA moduleAContent1
+      writeFileWithTimestamp moduleBPath timestampB moduleBContent
+      writeFileWithTimestamp moduleCPath timestampC moduleCContent
+      compile modulePaths `shouldReturn` moduleNames ["A", "B", "C"]
+
+      -- no changes when rebuilding
+      compile modulePaths `shouldReturn` moduleNames []
+
+      -- and again with changes only in whitespace
+      writeFileWithTimestamp moduleAPath timestampA moduleAContent2
+      compile modulePaths `shouldReturn` moduleNames ["A"]
+
+    it "only recompiles one module if it only differs in timestamp" $ do
+      -- not sure if it should recompile anything here, but it does, so this will let us know if anything changes
+      let moduleAPath = sourcesDir </> "A.purs"
+          moduleBPath = sourcesDir </> "B.purs"
+          moduleCPath = sourcesDir </> "C.purs"
+          modulePaths = [moduleAPath, moduleBPath, moduleCPath]
+          moduleAContent = "module A where\nfoo = 0\n"
+          moduleBContent = "module B where\nimport A (foo)\nbar = foo\n"
+          moduleCContent = "module C where\nbaz = 3\n"
+
+      writeFileWithTimestamp moduleAPath timestampA moduleAContent
+      writeFileWithTimestamp moduleBPath timestampB moduleBContent
+      writeFileWithTimestamp moduleCPath timestampC moduleCContent
+      compile modulePaths `shouldReturn` moduleNames ["A", "B", "C"]
+
+      -- no changes when rebuilding
+      compile modulePaths `shouldReturn` moduleNames []
+
+      -- and again with changes only in timestamp
+      writeFileWithTimestamp moduleAPath timestampA moduleAContent
+      compile modulePaths `shouldReturn` moduleNames ["A"]
+
+    -- More complicated caching rules; transitive type aliases
+    it "transitively tracks the underlying type of type aliases" $ do
+      let moduleAPath = sourcesDir </> "A.purs"
+          moduleBPath = sourcesDir </> "B.purs"
+          moduleCPath = sourcesDir </> "C.purs"
+          modulePaths = [moduleAPath, moduleBPath, moduleCPath]
+          moduleAContent1 = "module A where\ntype TA = Int\n"
+          moduleAContent2 = "module A where\ntype TA = String\n"
+          moduleBContent = "module B where\nimport A\ntype TB = TA\n"
+          moduleCContent = "module C where\nimport B\ntype TC = TB\nthingy :: TC\nthingy = 42\n"
+
+      writeFileWithTimestamp moduleAPath timestampA moduleAContent1
+      writeFileWithTimestamp moduleBPath timestampB moduleBContent
+      writeFileWithTimestamp moduleCPath timestampC moduleCContent
+      compile modulePaths `shouldReturn` moduleNames ["A", "B", "C"]
+
+      -- no changes when rebuilding
+      compile modulePaths `shouldReturn` moduleNames []
+      -- type aliases need to be tracked transitively; otherwise the public api of B doesn't change after this compile, and the build succeeds, even though C.thingy = 42 now has a type annotation that says it's a String
+      writeFileWithTimestamp moduleAPath timestampA moduleAContent2
+      compile modulePaths `shouldReturn` moduleNames ["A", "B", "C"]
+      -- no changes when rebuilding
+      compile modulePaths `shouldReturn` moduleNames []
+
+    -- More complicated caching rules; transitive type classes
+    it "transitively tracks the underlying type class instance implementations of type classes; instance in same module as type class definition" $ do
+      -- first, type class without type arguments
+      let moduleAPath = sourcesDir </> "A.purs"
+          moduleBPath = sourcesDir </> "B.purs"
+          moduleCPath = sourcesDir </> "C.purs"
+          modulePaths = [moduleAPath, moduleBPath, moduleCPath]
+          moduleAContent1 = "module A where\nclass TC a where\n  tc :: a\ninstance TC Int where\n  tc = 42\n"
+          moduleAContent2 = "module A where\nclass TC a where\n  tc :: a\ninstance TC Int where\n  tc = 42+11\n"
+          moduleBContent = "module B where\nimport A\nthingy = tc\n"
+          moduleCContent = "module C where\nimport B\nasdf = thingy :: Int\n"
+
+      writeFileWithTimestamp moduleAPath timestampA moduleAContent1
+      writeFileWithTimestamp moduleBPath timestampB moduleBContent
+      writeFileWithTimestamp moduleCPath timestampC moduleCContent
+      compile modulePaths `shouldReturn` moduleNames ["A", "B", "C"]
+
+      -- no changes when rebuilding
+      compile modulePaths `shouldReturn` moduleNames []
+
+      -- type class defs need to be tracked transitively; otherwise the public api of B doesn't change after this compile, since C is now implicitly depending on A, via the type class implementation for TC Int, via B
+      writeFileWithTimestamp moduleAPath timestampA moduleAContent2
+      compile modulePaths `shouldReturn` moduleNames ["A", "B", "C"]
+      -- no changes when rebuilding
+      compile modulePaths `shouldReturn` moduleNames []
+
+    -- More complicated caching rules
+    it "transitively tracks the underlying type class instance implementations of type classes; instance in same module as data type definition" $ do
+      -- first, type class without type arguments
+      let moduleAPath = sourcesDir </> "A.purs"
+          moduleBPath = sourcesDir </> "B.purs"
+          moduleCPath = sourcesDir </> "C.purs"
+          moduleDPath = sourcesDir </> "D.purs"
+          modulePaths = [moduleAPath, moduleBPath, moduleCPath]
+          -- diamond shape
+          moduleAContent = "module A where\nclass TC a where\n  tc :: a\n"
+          moduleBContent1 = "module B where\nimport A\ndata BT = BT Int\ninstance TC BT where\n  tc = BT (42)\n"
+          moduleBContent2 = "module B where\nimport A\ndata BT = BT Int\ninstance TC BT where\n  tc = BT (42+11)\n"
+          moduleCContent = "module C where\nimport A\nthingy = tc\n"
+          moduleDContent = "module D where\nimport B\nimport C\nasdf = thingy :: BT\n"
+
+      writeFileWithTimestamp moduleAPath timestampA moduleAContent
+      writeFileWithTimestamp moduleBPath timestampB moduleBContent1
+      writeFileWithTimestamp moduleCPath timestampC moduleCContent
+      writeFileWithTimestamp moduleDPath timestampD moduleDContent
+      compile modulePaths `shouldReturn` moduleNames ["A", "B", "C", "D"]
+
+      -- no changes when rebuilding
+      compile modulePaths `shouldReturn` moduleNames []
+
+      -- type class defs need to be tracked transitively; otherwise the public api of B doesn't change after this compile, since C is now implicitly depending on A, via the type class implementation for TC Int, via B
+      writeFileWithTimestamp moduleBPath timestampB moduleBContent2
+      compile modulePaths `shouldReturn` moduleNames ["B", "D"]
+      -- no changes when rebuilding
+      compile modulePaths `shouldReturn` moduleNames []
 
     it "recompiles if a module fails to compile" $ do
       let modulePath = sourcesDir </> "Module.purs"
