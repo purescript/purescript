@@ -655,7 +655,7 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
           ctorsv
         )
       ]
-  -- TODO[drathier]: how do we handle mutually recursive data types?
+
   declToCacheShapeImpl (DataBindingGroupDeclaration things) = do
     -- e.g. the Void type lives here
     thingsv <- mapM declToCacheShapeImpl things
@@ -681,17 +681,21 @@ moduleToExternsFile externsMap (Module ss _ mn ds (Just exps)) env renamedIdents
           underlyingTypev
         )
       ]
+
+  -- these are handled elsewhere atm
+  -- TODO[drathier]: fold over all decls and build a record of Map String String for each kind of decl
+  declToCacheShapeImpl (ImportDeclaration _ _moduName _importDeclType _mModuName) = pure []
+  declToCacheShapeImpl (FixityDeclaration _ _fixity) = pure []
+  declToCacheShapeImpl (TypeClassDeclaration _ _className _targs _constraints _funDeps _decls) = pure []
   -- TODO[drathier]: fill these in, to track more changes
+  declToCacheShapeImpl (TypeDeclaration _typeDecls) = pure [] -- ASSUMPTION[drathier]: assuming TypeDeclaration can be left empty, as value declarations have their types tracked already
+  -- unhandled:
+  declToCacheShapeImpl (ValueDeclaration _valueDecls) = pure []
   declToCacheShapeImpl (KindDeclaration _ _kindSignatureFor _tyName _srcType) = pure []
   declToCacheShapeImpl (RoleDeclaration _roleDecls) = pure []
-  declToCacheShapeImpl (TypeDeclaration _typeDecls) = pure []
-  declToCacheShapeImpl (ValueDeclaration _valueDecls) = pure []
   declToCacheShapeImpl (BoundValueDeclaration _ _binder _expr) = pure []
   declToCacheShapeImpl (BindingGroupDeclaration _binders) = pure []
   declToCacheShapeImpl (ExternDeclaration _ _ident _srcType) = pure []
-  declToCacheShapeImpl (FixityDeclaration _ _fixity) = pure []
-  declToCacheShapeImpl (ImportDeclaration _ _moduName _importDeclType _mModuName) = pure []
-  declToCacheShapeImpl (TypeClassDeclaration _ _className _targs _constraints _funDeps _decls) = pure []
   declToCacheShapeImpl (TypeInstanceDeclaration _ _chainId _chainIdx _name _deps _className _instanceTypes _memberDecls) = pure []
 
   -----
