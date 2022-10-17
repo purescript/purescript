@@ -2,6 +2,25 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.6
+
+Bugfixes:
+
+* Make `FromJSON` instance for `Qualified` backwards compatible (#4403 by @ptrfrncsmrph)
+
+  Prior to #4293, `Qualified` was encoded to JSON such that
+
+  ```haskell
+  >>> encode $ Qualified Nothing "foo"
+  [null,"foo"]
+  >>> encode $ Qualified (Just $ ModuleName "A") "bar"
+  ["A","bar"]
+  ```
+
+  The type of `Qualified` has changed so that `null` no longer appears in JSON output, but for sake of backwards-compatibility with JSON that was produced prior to those changes (pre-`v0.15.2`), we need to accept `null`, which will be interpreted as `Qualified ByNullSourcePos`.
+
+* Fix extraneous qualifiers added to references to floated expressions (#4401 by @rhendric)
+
 ## 0.15.5
 
 New features:
