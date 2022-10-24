@@ -12,7 +12,7 @@ module Language.PureScript.Sugar.Names.Requalify
   ) where
 
 import Debug.Trace
-import Prelude.Compat
+import Prelude
 import Control.Monad
 import qualified Data.Map as M
 import Data.Maybe
@@ -24,7 +24,7 @@ import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Sugar.Names.Env
 
-type ReverseImportMap a = M.Map (ModuleName, a) (Maybe ModuleName)
+type ReverseImportMap a = M.Map (ModuleName, a) QualifiedBy
 
 -- | Like an Imports record, except this only contains type and type operator
 -- names, and is reversed - while an Imports record maps local names to fully
@@ -35,7 +35,7 @@ data ReverseImports = ReverseImports
   { reverseImportsTypes :: ReverseImportMap (ProperName 'TypeName)
   , reverseImportsTypeOps :: ReverseImportMap (OpName 'TypeOpName)
   }
-  deriving (Show, Read)
+  deriving (Show)
 
 buildReverseImports :: Imports -> ReverseImports
 buildReverseImports Imports { importedTypes, importedTypeOps } =
@@ -52,14 +52,13 @@ buildReverseImports Imports { importedTypes, importedTypeOps } =
             M.toList importedTypeOps
     }
 
-  preferShortest :: Maybe ModuleName -> Maybe ModuleName -> Maybe ModuleName
-  preferShortest mx my = do
-    x <- mx
-    y <- my
-    Just $
-      if T.length (runModuleName x) > T.length (runModuleName y)
+  preferShortest :: QualifiedBy -> QualifiedBy -> QualifiedBy
+  preferShortest (ByModuleName x) (ByModuleName y) = do
+    ByModuleName $
+      if T.length (runModuleName x) < T.length (runModuleName y)
         then x
         else y
+  preferShortest _ y = y
 
   -- | Given an entry from an ImportMap from an Imports (see Sugar.Names.Env)
   -- which maps a local name to a fully qualified name, produce an entry for
@@ -77,7 +76,7 @@ buildReverseImports Imports { importedTypes, importedTypeOps } =
   --
   -- We make exceptions for anything that has special cases in the type
   -- pretty-printer such as Record and Function
-  toReverseAssoc :: Ord a => Set (Qualified a) -> (Qualified a, [ImportRecord a]) -> Maybe ((ModuleName, a), Maybe ModuleName)
+  toReverseAssoc :: Ord a => Set (Qualified a) -> (Qualified a, [ImportRecord a]) -> Maybe ((ModuleName, a), QualifiedBy)
   toReverseAssoc exceptions (Qualified localModName name, importRecords) =
     case importRecords of
       [] ->
@@ -88,7 +87,7 @@ buildReverseImports Imports { importedTypes, importedTypeOps } =
         -- TODO need to check the whole list including provenance? eg in the
         -- case of two open imports with overlap and we're warning but it still
         -- compiles
-        fullModName <- mFullModName
+        fullModName <- toMaybeModuleName mFullModName
         pure ((fullModName, name), localModName)
 
   typeExceptions :: Set (Qualified (ProperName 'TypeName))
@@ -122,6 +121,6 @@ requalify ReverseImports { reverseImportsTypes, reverseImportsTypeOps } =
   where
   reverseLookup :: Ord a => ReverseImportMap a -> Qualified a -> Maybe (Qualified a)
   reverseLookup revMap (Qualified mFullModName name) = do
-    fullModName <- mFullModName
+    fullModName <- toMaybeModuleName mFullModName
     mLocalModName <- M.lookup (fullModName, name) revMap
     pure $ Qualified mLocalModName name
