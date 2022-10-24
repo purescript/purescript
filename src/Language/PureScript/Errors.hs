@@ -482,6 +482,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (MissingKindDeclaration sig nm ty) = MissingKindDeclaration sig nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple (InvalidCoercibleInstanceDeclaration tys) = InvalidCoercibleInstanceDeclaration <$> traverse f tys
+  gSimple other = pure other
 
   gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
   gHint (ErrorUnifyingTypes t1 t2) = ErrorUnifyingTypes <$> f t1 <*> f t2
@@ -491,6 +492,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintArgs (traverse f) con
+  gHint other = pure other
 
 errorDocUri :: ErrorMessage -> Text
 errorDocUri e = "https://github.com/purescript/documentation/blob/master/errors/" <> errorCode e <> ".md"
