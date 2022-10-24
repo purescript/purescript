@@ -157,6 +157,9 @@ data CSEEnvironment = CSEEnvironment
   { _depth :: Int
     -- ^ number of enclosing binding scopes (this includes not only Abs, but
     -- Let and CaseAlternative bindings)
+  , _deepestTopLevelScope :: Int
+    -- ^ number of enclosing binding scopes outside the first Abs; used to
+    -- decide whether to qualify floated identifiers
   , _bound :: M.Map Ident (Int, BindingType)
     -- ^ map from identifiers to depth in which they are bound and whether
     -- or not the binding is recursive
@@ -186,7 +189,7 @@ type HasCSEState = MonadState CSEState
 -- didn't end up needing to be floated.
 --
 runCSEMonad :: CSEMonad a -> Supply (a, M.Map Ident (Expr Ann))
-runCSEMonad x = second (^. toBeReinlined) <$> evalRWST x (CSEEnvironment 0 M.empty) IM.empty
+runCSEMonad x = second (^. toBeReinlined) <$> evalRWST x (CSEEnvironment 0 0 M.empty) IM.empty
 
 -- |
 -- Mark all expressions floated out of this computation as "plural". This pass
@@ -201,14 +204,20 @@ enterAbs = censor $ plurality %~ PluralityMap . fmap (const True) . getPlurality
 -- |
 -- Run the provided computation in a new scope.
 --
-newScope :: (HasCSEReader m, HasCSEWriter m) => (Int -> m a) -> m a
-newScope body = local (depth %~ succ) $ do
+newScope :: (HasCSEReader m, HasCSEWriter m) => Bool -> (Int -> m a) -> m a
+newScope isTopLevel body = local goDeeper $ do
   d <- view depth
   censor (filterToDepth d) (body d)
   where
   filterToDepth d
     = (scopesUsed %~ IS.filter (< d))
     . (noFloatWithin %~ find (< Min d))
+  goDeeper env@CSEEnvironment{..} =
+    if isTopLevel
+    then env{ _depth = depth', _deepestTopLevelScope = depth' }
+    else env{ _depth = depth' }
+    where 
+    depth' = succ _depth
 
 -- |
 -- Record a list of identifiers as being bound in the given scope.
@@ -220,8 +229,8 @@ withBoundIdents idents t = local (bound %~ flip (foldl' (flip (flip M.insert t))
 -- Run the provided computation in a new scope in which the provided
 -- identifiers are bound non-recursively.
 --
-newScopeWithIdents :: (HasCSEReader m, HasCSEWriter m) => [Ident] -> m a -> m a
-newScopeWithIdents idents = newScope . flip (withBoundIdents idents . (, NonRecursive))
+newScopeWithIdents :: (HasCSEReader m, HasCSEWriter m) => Bool -> [Ident] -> m a -> m a
+newScopeWithIdents isTopLevel idents = newScope isTopLevel . flip (withBoundIdents idents . (, NonRecursive))
 
 -- |
 -- Produce, or retrieve from the state, an identifier for referencing the given
@@ -261,7 +270,7 @@ nullAnn = (nullSourceSpan, [], Nothing, Nothing)
 replaceLocals :: M.Map Ident (Expr Ann) -> [Bind Ann] -> [Bind Ann]
 replaceLocals m = if M.null m then identity else map f' where
   (f', g', _) = everywhereOnValues identity f identity
-  f e@(Var _ (Qualified Nothing ident)) = maybe e g' $ ident `M.lookup` m
+  f e@(Var _ (Qualified _ ident)) = maybe e g' $ ident `M.lookup` m
   f e = e
 
 -- |
@@ -270,17 +279,20 @@ replaceLocals m = if M.null m then identity else map f' where
 -- replacement.
 --
 floatExpr
-  :: (HasCSEState m, MonadSupply m)
-  => (Expr Ann, CSESummary)
+  :: (HasCSEReader m, HasCSEState m, MonadSupply m)
+  => QualifiedBy
+  -> (Expr Ann, CSESummary)
   -> m (Expr Ann, CSESummary)
-floatExpr = \case
+floatExpr topLevelQB = \case
   (e, w@CSESummary{ _noFloatWithin = Nothing, .. }) -> do
     let deepestScope = if IS.null _scopesUsed then 0 else IS.findMax _scopesUsed
     (isNew, ident) <- generateIdentFor deepestScope (void e)
+    topLevel <- view deepestTopLevelScope
+    let qb = if deepestScope > topLevel then ByNullSourcePos else topLevelQB
     let w' = w
           & (if isNew then newBindings %~ addToScope deepestScope [(ident, (_plurality, e))] else identity)
           & plurality .~ PluralityMap (M.singleton ident False)
-    pure (Var nullAnn (Qualified Nothing ident), w')
+    pure (Var nullAnn (Qualified qb ident), w')
   (e, w) -> pure (e, w)
 
 -- |
@@ -331,7 +343,7 @@ summarizeName mn (Qualified mn' ident) = do
   m <- view bound
   let (s, bt) =
         fromMaybe (0, NonRecursive) $
-          guard (all (== mn) mn') *> ident `M.lookup` m
+          guard (all (== mn) (toMaybeModuleName mn')) *> ident `M.lookup` m
   tell $ mempty
        & scopesUsed .~ IS.singleton s
        & noFloatWithin .~ (guard (bt == Recursive) $> Min s)
@@ -366,7 +378,7 @@ optimizeCommonSubexpressions mn
   . fmap (uncurry (++))
   . getNewBinds
   . fmap fst
-  . handleBinds (pure ())
+  . handleBinds True (pure ())
 
   where
 
@@ -388,20 +400,22 @@ optimizeCommonSubexpressions mn
 
   (handleBind, handleExprDefault, handleBinder, _) = traverseCoreFn handleBind handleExpr handleBinder handleCaseAlternative
 
+  topLevelQB = ByModuleName mn
+
   handleExpr :: Expr Ann -> CSEMonad (Expr Ann)
-  handleExpr = discuss (ifM (shouldFloatExpr . fst) floatExpr pure) . \case
-    Abs a ident e   -> enterAbs $ Abs a ident <$> newScopeWithIdents [ident] (handleAndWrapExpr e)
+  handleExpr = discuss (ifM (shouldFloatExpr . fst) (floatExpr topLevelQB) pure) . \case
+    Abs a ident e   -> enterAbs $ Abs a ident <$> newScopeWithIdents False [ident] (handleAndWrapExpr e)
     v@(Var _ qname) -> summarizeName mn qname $> v
-    Let a bs e      -> uncurry (Let a) <$> handleBinds (handleExpr e) bs
+    Let a bs e      -> uncurry (Let a) <$> handleBinds False (handleExpr e) bs
     x               -> handleExprDefault x
 
   handleCaseAlternative :: CaseAlternative Ann -> CSEMonad (CaseAlternative Ann)
   handleCaseAlternative (CaseAlternative bs x) = CaseAlternative bs <$> do
-    newScopeWithIdents (identsFromBinders bs) $
+    newScopeWithIdents False (identsFromBinders bs) $
       bitraverse (traverse $ bitraverse handleAndWrapExpr handleAndWrapExpr) handleAndWrapExpr x
 
-  handleBinds :: forall a. CSEMonad a -> [Bind Ann] -> CSEMonad ([Bind Ann], a)
-  handleBinds = foldr go . fmap pure where
+  handleBinds :: forall a. Bool -> CSEMonad a -> [Bind Ann] -> CSEMonad ([Bind Ann], a)
+  handleBinds isTopLevel = foldr go . fmap pure where
     go :: Bind Ann -> CSEMonad ([Bind Ann], a) -> CSEMonad ([Bind Ann], a)
     go b inner = case b of
       -- For a NonRec Bind, traverse the bound expression in the current scope
@@ -409,14 +423,14 @@ optimizeCommonSubexpressions mn
       -- inner thing all these Binds are applied to.
       NonRec a ident e -> do
         e' <- handleExpr e
-        newScopeWithIdents [ident] $
+        newScopeWithIdents isTopLevel [ident] $
           prependToNewBindsFromInner $ NonRec a ident e'
       Rec es ->
         -- For a Rec Bind, the bound expressions need a new scope in which all
         -- these identifiers are bound recursively; then the remaining Binds
         -- and the inner thing can be traversed in the same scope with the same
         -- identifiers now bound non-recursively.
-        newScope $ \d -> do
+        newScope isTopLevel $ \d -> do
           let idents = map (snd . fst) es
           es' <- withBoundIdents idents (d, Recursive) $ traverse (traverse handleExpr) es
           withBoundIdents idents (d, NonRecursive) $

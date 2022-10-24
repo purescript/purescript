@@ -1,7 +1,7 @@
 -- | Data types for the imperative core AST
 module Language.PureScript.CoreImp.AST where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad ((>=>))
 import Control.Monad.Identity (Identity(..), runIdentity)

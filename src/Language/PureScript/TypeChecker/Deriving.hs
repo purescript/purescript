@@ -1,20 +1,26 @@
+{- HLINT ignore "Unused LANGUAGE pragma" -} -- HLint doesn't recognize that TypeApplications is used in a pattern
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeApplications #-}
 module Language.PureScript.TypeChecker.Deriving (deriveInstance) where
 
 import Protolude hiding (Type)
 
+import Control.Monad.Trans.Writer (Writer, WriterT, runWriter, runWriterT)
 import Control.Monad.Writer.Class (MonadWriter(..))
-import Data.Foldable (foldl1)
+import Data.Foldable (foldl1, foldr1)
 import Data.List (init, last, zipWith3, (!!))
 import qualified Data.Map as M
 
 import Control.Monad.Supply.Class
 import Language.PureScript.AST
 import Language.PureScript.AST.Utils
+import qualified Language.PureScript.Constants.Data.Foldable as Foldable
+import qualified Language.PureScript.Constants.Data.Traversable as Traversable
 import qualified Language.PureScript.Constants.Prelude as Prelude
 import qualified Language.PureScript.Constants.Prim as Prim
 import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Errors
+import Language.PureScript.Errors hiding (nonEmpty)
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.Names
 import Language.PureScript.PSString
@@ -60,7 +66,7 @@ deriveInstance instType className strategy = do
       unaryClass :: (ModuleName -> ProperName 'TypeName -> m [(PSString, Expr)]) -> m Expr
       unaryClass f = case tys of
         [ty] -> case unwrapTypeConstructor ty of
-          Just (Qualified (Just mn') tyCon, _, _) | mn == mn' -> do
+          Just (Qualified (ByModuleName mn') tyCon, _, _) | mn == mn' -> do
             let superclassesDicts = flip map typeClassSuperclasses $ \(Constraint _ superclass _ suTyArgs _) ->
                   let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
                   in lam UnusedIdent (DeferredDictionary superclass tyArgs)
@@ -69,19 +75,23 @@ deriveInstance instType className strategy = do
           _ -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
         _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
 
+      unaryClass' f = unaryClass (f className)
+
       in case className of
+        Foldable.Foldable -> unaryClass' deriveFoldable
         Prelude.Eq -> unaryClass deriveEq
         Prelude.Eq1 -> unaryClass $ \_ _ -> deriveEq1
-        Prelude.Functor -> unaryClass deriveFunctor
+        Prelude.Functor -> unaryClass' deriveFunctor
         Prelude.Ord -> unaryClass deriveOrd
         Prelude.Ord1 -> unaryClass $ \_ _ -> deriveOrd1
+        Traversable.Traversable -> unaryClass' deriveTraversable
         -- See L.P.Sugar.TypeClasses.Deriving for the classes that can be
         -- derived prior to type checking.
         _ -> throwError . errorMessage $ CannotDerive className tys
 
     NewtypeStrategy ->
       case tys of
-        _ : _ | Just (Qualified (Just mn') tyCon, kargs, args) <- unwrapTypeConstructor (last tys)
+        _ : _ | Just (Qualified (ByModuleName mn') tyCon, kargs, args) <- unwrapTypeConstructor (last tys)
               , mn == mn'
               -> deriveNewtypeInstance mn className tys tyCon kargs args
               | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys (last tys)
@@ -164,12 +174,12 @@ deriveNewtypeInstance mn className tys tyConNm dkargs dargs = do
     -- newtype-derived; see #3168. The whole verifySuperclasses feature
     -- is pretty sketchy, and could use a thorough review and probably rewrite.
     hasNewtypeSuperclassInstance (suModule, suClass) nt@(newtypeModule, _) dicts =
-      let su = Qualified (Just suModule) suClass
+      let su = Qualified (ByModuleName suModule) suClass
           lookIn mn'
             = elem nt
             . (toList . extractNewtypeName mn' . tcdInstanceTypes
                 <=< foldMap toList . M.elems
-                <=< toList . (M.lookup su <=< M.lookup (Just mn')))
+                <=< toList . (M.lookup su <=< M.lookup (ByModuleName mn')))
             $ dicts
       in lookIn suModule || lookIn newtypeModule
 
@@ -332,11 +342,11 @@ lookupTypeDecl
 lookupTypeDecl mn typeName = do
   env <- getEnv
   note (errorMessage $ CannotFindDerivingType typeName) $ do
-    (kind, DataType _ args dctors) <- Qualified (Just mn) typeName `M.lookup` types env
+    (kind, DataType _ args dctors) <- Qualified (ByModuleName mn) typeName `M.lookup` types env
     (kargs, _) <- completeBinderList kind
     let dtype = do
           (ctorName, _) <- headMay dctors
-          (a, _, _, _) <- Qualified (Just mn) ctorName `M.lookup` dataConstructors env
+          (a, _, _, _) <- Qualified (ByModuleName mn) ctorName `M.lookup` dataConstructors env
           pure a
     pure (dtype, fst . snd <$> kargs, map (\(v, k, _) -> (v, k)) args, dctors)
 
@@ -359,73 +369,242 @@ decomposeRec' = sortOn fst . go
   where go (RCons _ str typ typs) = (str, typ) : go typs
         go _ = []
 
+data ParamUsage
+  = IsParam
+  | MentionsParam ParamUsage
+  | IsRecord (NonEmpty (PSString, ParamUsage))
+
+validateParamsInTypeConstructors
+  :: forall m
+   . MonadError MultipleErrors m
+  => MonadState CheckState m
+  => Qualified (ProperName 'ClassName)
+  -> ModuleName
+  -> ProperName 'TypeName
+  -> m [(ProperName 'ConstructorName, [Maybe ParamUsage])]
+validateParamsInTypeConstructors derivingClass mn tyConNm = do
+  (_, _, tyArgNames, ctors) <- lookupTypeDecl mn tyConNm
+  param <- note (errorMessage $ KindsDoNotUnify (kindType -:> kindType) kindType) . lastMay $ map fst tyArgNames
+  ctors' <- traverse (traverse $ traverse replaceAllTypeSynonyms) ctors
+  let (ctorUsages, problemSpans) = runWriter $ traverse (traverse . traverse $ typeToUsageOf param) ctors'
+  for_ (nonEmpty $ ordNub problemSpans) $ \sss ->
+    throwError . addHint (RelatedPositions sss) . errorMessage $ CannotDeriveInvalidConstructorArg derivingClass
+  pure ctorUsages
+  where
+  typeToUsageOf :: Text -> SourceType -> Writer [SourceSpan] (Maybe ParamUsage)
+  typeToUsageOf param = go
+    where
+    assertNoParamUsedIn :: SourceType -> Writer [SourceSpan] ()
+    assertNoParamUsedIn = everythingOnTypes (*>) $ \case
+      TypeVar (ss, _) name | name == param -> tell [ss]
+      _ -> pure ()
+
+    go = \case
+      ForAll _ name _ ty _ ->
+        if name == param then pure Nothing else go ty
+
+      ConstrainedType _ _ ty ->
+        go ty
+
+      TypeApp _ (TypeConstructor _ Prim.Record) row ->
+        fmap (fmap IsRecord . nonEmpty . catMaybes) . for (decomposeRec' row) $ \(Label lbl, ty) ->
+          fmap (lbl, ) <$> go ty
+
+      TypeApp _ tyFn tyArg -> do
+        assertNoParamUsedIn tyFn
+        fmap MentionsParam <$> go tyArg
+
+      TypeVar _ name ->
+        pure $ (name == param) `orEmpty` IsParam
+
+      ty ->
+        assertNoParamUsedIn ty $> Nothing
+
+usingLamIdent :: forall m. MonadSupply m => (Expr -> m Expr) -> m Expr
+usingLamIdent cb = do
+  ident <- freshIdent "v"
+  lam ident <$> cb (mkVar ident)
+
+traverseFields :: forall f. Applicative f => (ParamUsage -> Expr -> f Expr) -> NonEmpty (PSString, ParamUsage) -> Expr -> f Expr
+traverseFields f fields r = fmap (ObjectUpdate r) . for (toList fields) $ \(lbl, usage) -> (lbl, ) <$> f usage (Accessor lbl r)
+
+unnestRecords :: forall f. Applicative f => (ParamUsage -> Expr -> f Expr) -> ParamUsage -> Expr -> f Expr
+unnestRecords f = fix $ \go -> \case
+  IsRecord fields -> traverseFields go fields
+  usage -> f usage
+
+mkCasesForTraversal
+  :: forall f m
+   . Applicative f -- this effect distinguishes the semantics of maps, folds, and traversals
+  => MonadSupply m
+  => ModuleName
+  -> (ParamUsage -> Expr -> f Expr) -- how to handle constructor arguments
+  -> (f Expr -> m Expr) -- resolve the applicative effect into an expression
+  -> [(ProperName 'ConstructorName, [Maybe ParamUsage])]
+  -> m Expr
+mkCasesForTraversal mn handleArg extractExpr ctors = do
+  m <- freshIdent "m"
+  fmap (lamCase m) . for ctors $ \(ctorName, ctorUsages) -> do
+    ctorArgs <- for ctorUsages $ \usage -> freshIdent "v" <&> (, usage)
+    let ctor = mkCtor mn ctorName
+    let caseBinder = mkCtorBinder mn ctorName $ map (mkBinder . fst) ctorArgs
+    fmap (CaseAlternative [caseBinder] . unguarded) . extractExpr $
+      fmap (foldl' App ctor) . for ctorArgs $ \(ident, mbUsage) -> maybe pure handleArg mbUsage $ mkVar ident
+
+data TraversalOps m = forall f. Applicative f => TraversalOps
+  { visitExpr :: m Expr -> f Expr -- lift an expression into the applicative effect defining the traversal
+  , extractExpr :: f Expr -> m Expr -- resolve the applicative effect into an expression
+  }
+
+mkTraversal
+  :: forall m
+   . MonadSupply m
+  => ModuleName
+  -> Expr -- a var representing map, foldMap, or traverse, for handling structured values
+  -> TraversalOps m
+  -> [(ProperName 'ConstructorName, [Maybe ParamUsage])]
+  -> m Expr
+mkTraversal mn recurseVar (TraversalOps @_ @f visitExpr extractExpr) ctors = do
+  f <- freshIdent "f"
+  let
+    handleValue :: ParamUsage -> Expr -> f Expr
+    handleValue = unnestRecords $ \usage inputExpr -> visitExpr $ flip App inputExpr <$> mkFnExprForValue usage
+
+    mkFnExprForValue :: ParamUsage -> m Expr
+    mkFnExprForValue = \case
+      IsParam ->
+        pure $ mkVar f
+      MentionsParam innerUsage ->
+        App recurseVar <$> mkFnExprForValue innerUsage
+      IsRecord fields ->
+        usingLamIdent $ extractExpr . traverseFields handleValue fields
+
+  lam f <$> mkCasesForTraversal mn handleValue extractExpr ctors
+
 deriveFunctor
   :: forall m
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => MonadSupply m
-  => ModuleName
+  => Qualified (ProperName 'ClassName)
+  -> ModuleName
   -> ProperName 'TypeName
   -> m [(PSString, Expr)]
-deriveFunctor mn tyConNm = do
-  (_, _, tys, ctors) <- lookupTypeDecl mn tyConNm
-  mapFun <- mkMapFunction tys ctors
+deriveFunctor nm mn tyConNm = do
+  ctors <- validateParamsInTypeConstructors nm mn tyConNm
+  mapFun <- mkTraversal mn mapVar (TraversalOps identity identity) ctors
   pure [(Prelude.map, mapFun)]
   where
-    mkMapFunction :: [(Text, Maybe SourceType)] -> [(ProperName 'ConstructorName, [SourceType])] -> m Expr
-    mkMapFunction tys ctors = case reverse tys of
-      [] -> throwError . errorMessage $ KindsDoNotUnify (kindType -:> kindType) kindType
-      ((iTy, _) : _) -> do
-        f <- freshIdent "f"
-        m <- freshIdent "m"
-        lam f . lamCase m <$> mapM (mkCtorClause iTy f) ctors
+  mapVar = mkRef Prelude.identMap
 
-    mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [SourceType]) -> m CaseAlternative
-    mkCtorClause iTyName f (ctorName, ctorTys) = do
-      idents <- replicateM (length ctorTys) (freshIdent "v")
-      ctorTys' <- mapM replaceAllTypeSynonyms ctorTys
-      args <- zipWithM transformArg idents ctorTys'
-      let ctor = mkCtor mn ctorName
-          rebuilt = foldl' App ctor args
-          caseBinder = mkCtorBinder mn ctorName $ map mkBinder idents
-      return $ CaseAlternative [caseBinder] (unguarded rebuilt)
-      where
-        fVar = mkVar f
-        mapVar = mkRef Prelude.identMap
+toConst :: forall f a b. f a -> Const [f a] b
+toConst = Const . pure
 
-        transformArg :: Ident -> SourceType -> m Expr
-        transformArg ident = fmap (foldr App (mkVar ident)) . goType where
+consumeConst :: forall f a b c. Applicative f => ([a] -> b) -> Const [f a] c -> f b
+consumeConst f = fmap f . sequenceA . getConst
 
-          goType :: SourceType -> m (Maybe Expr)
-          -- argument matches the index type
-          goType (TypeVar _ t) | t == iTyName = return (Just fVar)
+applyWhen :: forall a. Bool -> (a -> a) -> a -> a
+applyWhen cond f = if cond then f else identity
 
-          -- records
-          goType recTy | Just row <- objectType recTy =
-              traverse buildUpdate (decomposeRec' row) >>= (traverse buildRecord . justUpdates)
-            where
-              justUpdates :: [Maybe (Label, Expr)] -> Maybe [(Label, Expr)]
-              justUpdates = foldMap (fmap return)
+deriveFoldable
+  :: forall m
+   . MonadError MultipleErrors m
+  => MonadState CheckState m
+  => MonadSupply m
+  => Qualified (ProperName 'ClassName)
+  -> ModuleName
+  -> ProperName 'TypeName
+  -> m [(PSString, Expr)]
+deriveFoldable nm mn tyConNm = do
+  ctors <- validateParamsInTypeConstructors nm mn tyConNm
+  foldlFun <- mkAsymmetricFoldFunction False foldlVar ctors
+  foldrFun <- mkAsymmetricFoldFunction True foldrVar ctors
+  foldMapFun <- mkTraversal mn foldMapVar foldMapOps ctors
+  pure [(Foldable.foldl, foldlFun), (Foldable.foldr, foldrFun), (Foldable.foldMap, foldMapFun)]
+  where
+  foldlVar = mkRef Foldable.identFoldl
+  foldrVar = mkRef Foldable.identFoldr
+  foldMapVar = mkRef Foldable.identFoldMap
+  flipVar = mkRef Prelude.identFlip
 
-              buildUpdate :: (Label, SourceType) -> m (Maybe (Label, Expr))
-              buildUpdate (lbl, ty) = do upd <- goType ty
-                                         return ((lbl,) <$> upd)
+  mkAsymmetricFoldFunction :: Bool -> Expr -> [(ProperName 'ConstructorName, [Maybe ParamUsage])] -> m Expr
+  mkAsymmetricFoldFunction isRightFold recurseVar ctors = do
+    f <- freshIdent "f"
+    z <- freshIdent "z"
+    let
+      appCombiner :: (Bool, Expr) -> Expr -> Expr -> Expr
+      appCombiner (isFlipped, fn) = applyWhen (isFlipped == isRightFold) flip $ App . App fn
 
-              buildRecord :: [(Label, Expr)] -> m Expr
-              buildRecord updates = do
-                arg <- freshIdent "o"
-                let argVar = mkVar arg
-                    mkAssignment (Label l, x) = (l, App x (Accessor l argVar))
-                return (lam arg (ObjectUpdate argVar (mkAssignment <$> updates)))
+      mkCombinerExpr :: ParamUsage -> m Expr
+      mkCombinerExpr = fmap (uncurry $ \isFlipped -> applyWhen isFlipped $ App flipVar) . getCombiner
 
-          -- quantifiers
-          goType (ForAll _ scopedVar _ t _) | scopedVar /= iTyName = goType t
+      handleValue :: ParamUsage -> Expr -> Const [m (Expr -> Expr)] Expr
+      handleValue = unnestRecords $ \usage inputExpr -> toConst $ flip appCombiner inputExpr <$> getCombiner usage
 
-          -- constraints
-          goType (ConstrainedType _ _ t) = goType t
+      getCombiner :: ParamUsage -> m (Bool, Expr)
+      getCombiner = \case
+        IsParam ->
+          pure (False, mkVar f)
+        MentionsParam innerUsage ->
+          (isRightFold, ) . App recurseVar <$> mkCombinerExpr innerUsage
+        IsRecord fields -> do
+          let foldFieldsOf = traverseFields handleValue fields
+          fmap (False, ) . usingLamIdent $ \lVar ->
+            usingLamIdent $
+              if isRightFold
+              then flip extractExprStartingWith $ foldFieldsOf lVar
+              else extractExprStartingWith lVar . foldFieldsOf
 
-          -- under a `* -> *`, just assume functor for now
-          goType (TypeApp _ _ t) = fmap (App mapVar) <$> goType t
+      extractExprStartingWith :: Expr -> Const [m (Expr -> Expr)] Expr -> m Expr
+      extractExprStartingWith = consumeConst . if isRightFold then foldr ($) else foldl' (&)
 
-          -- otherwise do nothing - will fail type checking if type does actually contain index
-          goType _ = return Nothing
+    lam f . lam z <$> mkCasesForTraversal mn handleValue (extractExprStartingWith $ mkVar z) ctors
+
+foldMapOps :: forall m. Applicative m => TraversalOps m
+foldMapOps = TraversalOps { visitExpr = toConst, .. }
+  where
+  appendVar = mkRef Prelude.identAppend
+  memptyVar = mkRef Prelude.identMempty
+
+  extractExpr :: Const [m Expr] Expr -> m Expr
+  extractExpr = consumeConst $ \case
+    [] -> memptyVar
+    exprs -> foldr1 (App . App appendVar) exprs
+
+deriveTraversable
+  :: forall m
+   . MonadError MultipleErrors m
+  => MonadState CheckState m
+  => MonadSupply m
+  => Qualified (ProperName 'ClassName)
+  -> ModuleName
+  -> ProperName 'TypeName
+  -> m [(PSString, Expr)]
+deriveTraversable nm mn tyConNm = do
+  ctors <- validateParamsInTypeConstructors nm mn tyConNm
+  traverseFun <- mkTraversal mn traverseVar traverseOps ctors
+  sequenceFun <- usingLamIdent $ pure . App (App traverseVar identityVar)
+  pure [(Traversable.traverse, traverseFun), (Traversable.sequence, sequenceFun)]
+  where
+  traverseVar = mkRef Traversable.identTraverse
+  identityVar = mkRef Prelude.identIdentity
+
+traverseOps :: forall m. MonadSupply m => TraversalOps m
+traverseOps = TraversalOps { .. }
+  where
+  pureVar = mkRef Prelude.identPure
+  mapVar = mkRef Prelude.identMap
+  applyVar = mkRef Prelude.identApply
+
+  visitExpr :: m Expr -> WriterT [(Ident, m Expr)] m Expr
+  visitExpr traversedExpr = do
+    ident <- freshIdent "v"
+    tell [(ident, traversedExpr)] $> mkVar ident
+
+  extractExpr :: WriterT [(Ident, m Expr)] m Expr -> m Expr
+  extractExpr = runWriterT >=> \(result, unzip -> (ctx, args)) -> flip mkApps (foldr lam result ctx) <$> sequenceA args
+
+  mkApps :: [Expr] -> Expr -> Expr
+  mkApps = \case
+    [] -> App pureVar
+    h : t -> \l -> foldl' (App . App applyVar) (App (App mapVar l) h) t

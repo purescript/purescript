@@ -6,7 +6,7 @@ module Language.PureScript.Interactive.Completion
   , formatCompletions
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import           Control.Monad.IO.Class (MonadIO(..))

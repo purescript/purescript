@@ -3,7 +3,7 @@
 --
 module Control.Monad.Supply where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Applicative
 import Control.Monad.Error.Class (MonadError(..))

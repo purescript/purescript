@@ -17,6 +17,8 @@
 - ignore: {name: "Functor law"}
 - ignore: {name: "Avoid lambda using `infix`"}
 - ignore: {name: "Fuse mapM/map"}
+- ignore: {name: "Eta reduce"} # This warning will often make suggestions that are no longer valid due to simplified subsumption
+- ignore: {name: "Redundant <$>"}
 
 
 # Specify additional command line arguments

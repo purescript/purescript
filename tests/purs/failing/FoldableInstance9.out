@@ -1,0 +1,49 @@
+Error found:
+in module [33mFoldableInstance9[0m
+at tests/purs/failing/FoldableInstance9.purs:53:1 - 53:38 (line 53, column 1 - line 53, column 38)
+
+  One or more type variables are in positions that prevent [33mFoldable[0m from being derived.
+  To derive this class, make sure that these variables are only used as the final arguments to type constructors, and that those type constructors themselves have instances of [33mFoldable[0m.
+
+  tests/purs/failing/FoldableInstance9.purs:
+  [90m   15[0m [33mdata Test f g h a[0m
+  [90m   16[0m [33m  = Test1 (f [7ma[27m [7ma[27m a) (f Int [7ma[27m a) (f [7ma[27m [7ma[27m Int) (f Int [7ma[27m Int) (f Int Int Int)[0m
+  [90m   17[0m [33m  | Test2 { all :: f [7ma[27m [7ma[27m a[0m
+  [90m   18[0m [33m          , rights :: f Int [7ma[27m a[0m
+  [90m   19[0m [33m          , lefts :: f [7ma[27m [7ma[27m Int[0m
+  [90m   20[0m [33m          , middle :: f Int [7ma[27m Int[0m
+  [90m   21[0m [33m          , none :: f Int Int Int[0m
+  [90m   22[0m [33m          }[0m
+  [90m   23[0m [33m  | Test3 (g[0m
+  [90m   24[0m [33m            { all :: f [7ma[27m [7ma[27m [7ma[27m[0m
+  [90m   25[0m [33m            , rights :: f Int [7ma[27m [7ma[27m[0m
+  [90m   26[0m [33m            , lefts :: f [7ma[27m [7ma[27m Int[0m
+  [90m   27[0m [33m            , middle :: f Int [7ma[27m Int[0m
+  [90m   28[0m [33m            , none :: f Int Int Int[0m
+  [90m  ...[0m
+  [90m   32[0m [33m            { nested1 ::[0m
+  [90m   33[0m [33m                { all :: f [7ma[27m [7ma[27m [7ma[27m[0m
+  [90m   34[0m [33m                , rights :: f Int [7ma[27m [7ma[27m[0m
+  [90m   35[0m [33m                , lefts :: f [7ma[27m [7ma[27m Int[0m
+  [90m   36[0m [33m                , middle :: f Int [7ma[27m Int[0m
+  [90m   37[0m [33m                , none :: f Int Int Int[0m
+  [90m  ...[0m
+  [90m   40[0m [33m                g[0m
+  [90m   41[0m [33m                  { all :: f [7ma[27m [7ma[27m [7ma[27m[0m
+  [90m   42[0m [33m                  , rights :: f Int [7ma[27m [7ma[27m[0m
+  [90m   43[0m [33m                  , lefts :: f [7ma[27m [7ma[27m Int[0m
+  [90m   44[0m [33m                  , middle :: f Int [7ma[27m Int[0m
+  [90m   45[0m [33m                  , none :: f Int Int Int[0m
+  [90m   46[0m [33m                  }[0m
+  [90m   47[0m [33m                  [7ma[27m[0m
+  [90m   48[0m [33m            }[0m
+  [90m   49[0m [33m            a)[0m
+  [90m   50[0m [33m  | Test5 (Rec f [7ma[27m)[0m
+  [90m   51[0m [33m  | Test6 (g (Rec f [7ma[27m) a)[0m
+  [90m   52[0m [33m  | Test7 (h { nested1 :: Rec f [7ma[27m, nested2 :: g (Rec f [7ma[27m) [7ma[27m } a)[0m
+  [90m   53[0m [33mderive instance Foldable (Test f g h)[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
+or to contribute content related to this error.
+

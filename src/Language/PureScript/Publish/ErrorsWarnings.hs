@@ -12,7 +12,7 @@ module Language.PureScript.Publish.ErrorsWarnings
   , renderWarnings
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Exception (IOException)
 

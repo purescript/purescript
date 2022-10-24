@@ -1,6 +1,6 @@
 module Language.PureScript.Sugar.Operators.Binders where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.Except
 

@@ -6,7 +6,7 @@
 --
 module Language.PureScript.AST.Declarations where
 
-import Prelude.Compat
+import Prelude
 import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
@@ -88,6 +88,7 @@ data ErrorMessageHint
   | ErrorSolvingConstraint SourceConstraint
   | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   | PositionedError (NEL.NonEmpty SourceSpan)
+  | RelatedPositions (NEL.NonEmpty SourceSpan)
   deriving (Show)
 
 -- | Categories of hints
@@ -130,13 +131,15 @@ getModuleDeclarations (Module _ _ _ declarations _) = declarations
 addDefaultImport :: Qualified ModuleName -> Module -> Module
 addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps) =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit toImportAs : decls) exps
+  else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit toImportAs' : decls) exps
   where
+  toImportAs' = toMaybeModuleName toImportAs
+
   isExistingImport (ImportDeclaration _ mn' _ as')
     | mn' == toImport =
-        case toImportAs of
+        case toImportAs' of
           Nothing -> True
-          _ -> as' == toImportAs
+          _ -> as' == toImportAs'
   isExistingImport _ = False
 
 -- | Adds import declarations to a module for an implicit Prim import and Prim
@@ -146,8 +149,8 @@ importPrim =
   let
     primModName = C.Prim
   in
-    addDefaultImport (Qualified (Just primModName) primModName)
-      . addDefaultImport (Qualified Nothing primModName)
+    addDefaultImport (Qualified (ByModuleName primModName) primModName)
+      . addDefaultImport (Qualified ByNullSourcePos primModName)
 
 data NameSource = UserNamed | CompilerNamed
   deriving (Show, Generic, NFData, Serialise)
@@ -426,7 +429,10 @@ data Declaration
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
   --
-  | TypeInstanceDeclaration SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
+  -- The first @SourceAnn@ serves as the annotation for the entire
+  -- declaration, while the second @SourceAnn@ serves as the
+  -- annotation for the type class and its arguments.
+  | TypeInstanceDeclaration SourceAnn SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
   deriving (Show)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -489,7 +495,7 @@ declSourceAnn (ExternDataDeclaration sa _ _) = sa
 declSourceAnn (FixityDeclaration sa _) = sa
 declSourceAnn (ImportDeclaration sa _ _ _) = sa
 declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
-declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _) = sa
+declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
@@ -506,7 +512,7 @@ declName (ExternDataDeclaration _ n _) = Just (TyName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
-declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = IdentName <$> hush n
+declName (TypeInstanceDeclaration _ _ _ _ n _ _ _ _) = IdentName <$> hush n
 declName (RoleDeclaration RoleDeclarationData{..}) = Just (TyName rdeclIdent)
 declName ImportDeclaration{} = Nothing
 declName BindingGroupDeclaration{} = Nothing
@@ -720,7 +726,7 @@ data Expr
   -- instance type, and the type class dictionaries in scope.
   --
   | TypeClassDictionary SourceConstraint
-                        (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
+                        (M.Map QualifiedBy (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
                         [ErrorMessageHint]
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
@@ -828,14 +834,14 @@ newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
   deriving (Show, Eq, Ord, Foldable, Functor, Traversable)
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''NameSource)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)
 
 isTrueExpr :: Expr -> Bool
 isTrueExpr (Literal _ (BooleanLiteral True)) = True
-isTrueExpr (Var _ (Qualified (Just (ModuleName "Prelude")) (Ident "otherwise"))) = True
-isTrueExpr (Var _ (Qualified (Just (ModuleName "Data.Boolean")) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (ByModuleName (ModuleName "Prelude")) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (ByModuleName (ModuleName "Data.Boolean")) (Ident "otherwise"))) = True
 isTrueExpr (TypedValue _ e _) = isTrueExpr e
 isTrueExpr (PositionedValue _ _ e) = isTrueExpr e
 isTrueExpr _ = False

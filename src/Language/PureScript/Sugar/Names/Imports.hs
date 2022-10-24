@@ -5,7 +5,7 @@ module Language.PureScript.Sugar.Names.Imports
   , findImports
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
@@ -69,7 +69,7 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
   go ie' (ss, typ, impQual) = do
     modExports <-
       maybe
-        (throwError . errorMessage' ss . UnknownName . Qualified Nothing $ ModName mn)
+        (throwError . errorMessage' ss . UnknownName . Qualified ByNullSourcePos $ ModName mn)
         (return . envModuleExports)
         (mn `M.lookup` env)
     let impModules = importedModules ie'
@@ -221,9 +221,9 @@ resolveImport importModule exps imps impQual = resolveByType
   updateImports imps' exps' expName name ss prov =
     let
       src = maybe (internalError "Invalid state in updateImports") expName (name `M.lookup` exps')
-      rec = ImportRecord (Qualified (Just importModule) name) (exportSourceDefinedIn src) ss prov
+      rec = ImportRecord (Qualified (ByModuleName importModule) name) (exportSourceDefinedIn src) ss prov
     in
       M.alter
         (\currNames -> Just $ rec : fromMaybe [] currNames)
-        (Qualified impQual name)
+        (Qualified (byMaybeModuleName impQual) name)
         imps'

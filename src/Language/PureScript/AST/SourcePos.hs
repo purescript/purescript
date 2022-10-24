@@ -4,7 +4,7 @@
 --
 module Language.PureScript.AST.SourcePos where
 
-import Prelude.Compat
+import Prelude
 
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)

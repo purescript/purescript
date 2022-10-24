@@ -4,7 +4,7 @@ module Language.PureScript.Publish.BoxesHelpers
   , module Language.PureScript.Publish.BoxesHelpers
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Text (Text)
 import qualified Data.Text as T

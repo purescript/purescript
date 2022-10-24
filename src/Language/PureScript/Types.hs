@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Types where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Codec.Serialise (Serialise)
@@ -17,7 +17,7 @@ import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 import Data.Foldable (fold, foldl')
 import qualified Data.IntSet as IS
-import Data.List (sort, sortOn)
+import Data.List (sortOn)
 import Data.Maybe (fromMaybe, isJust)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -511,7 +511,7 @@ usedTypeVariables = ordNub . everythingOnTypes (++) go where
 
 -- | Collect all free type variables appearing in a type
 freeTypeVariables :: Type a -> [Text]
-freeTypeVariables = ordNub . fmap snd . sort . go 0 [] where
+freeTypeVariables = ordNub . fmap snd . sortOn fst . go 0 [] where
   -- Tracks kind levels so that variables appearing in kind annotations are listed first.
   go :: Int -> [Text] -> Type a -> [(Int, Text)]
   go lvl bound (TypeVar _ v) | v `notElem` bound = [(lvl, v)]

@@ -85,7 +85,7 @@ resolveReexports' modules refs =
       Nothing -> Left x
       Just decls' ->
         let
-          setExportedFrom = set (idaAnnotation.annExportedFrom) . Just
+          setExportedFrom = set (idaAnnotation . annExportedFrom) . Just
         in
           bimap (mn,) (map (setExportedFrom mn)) (resolveRef decls' r)
 

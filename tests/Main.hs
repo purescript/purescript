@@ -2,8 +2,7 @@
 
 module Main (main) where
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import Test.Hspec
 
@@ -17,6 +16,7 @@ import qualified TestPrimDocs
 import qualified TestPsci
 import qualified TestIde
 import qualified TestPscPublish
+import qualified TestSourceMaps
 -- import qualified TestBundle
 import qualified TestMake
 import qualified TestUtils
@@ -37,6 +37,7 @@ main = do
     describe "ide" TestIde.spec
     beforeAll TestUtils.setupSupportModules $ do
       describe "compiler" TestCompiler.spec
+      describe "sourcemaps" TestSourceMaps.spec
     describe "make" TestMake.spec
     describe "psci" TestPsci.spec
     describe "corefn" TestCoreFn.spec

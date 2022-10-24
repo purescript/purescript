@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Linter (lint, module L) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.Writer.Class
 
@@ -183,11 +183,11 @@ lintUnused (Module modSS _ mn modDecls exports) =
         in
           (vars, errs')
 
-    goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
+    goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
     goDecl _ = mempty
 
     go :: Expr -> (S.Set Ident, MultipleErrors)
-    go (Var _ (Qualified Nothing v)) = (S.singleton v, mempty)
+    go (Var _ (Qualified (BySourcePos _) v)) = (S.singleton v, mempty)
     go (Var _ _) = (S.empty, mempty)
 
     go (Let _ ds e) = onDecls ds (go e)

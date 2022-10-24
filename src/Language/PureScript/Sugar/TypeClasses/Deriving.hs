@@ -1,7 +1,7 @@
 -- | This module implements the generic deriving elaboration that takes place during desugaring.
 module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 
-import           Prelude.Compat
+import           Prelude
 import           Protolude (note)
 
 import           Control.Monad.Error.Class (MonadError(..))
@@ -46,15 +46,15 @@ deriveInstance
   -> m Declaration
 deriveInstance mn ds decl =
   case decl of
-    TypeInstanceDeclaration sa@(ss, _) ch idx nm deps className tys DerivedInstance -> let
+    TypeInstanceDeclaration sa@(ss, _) na ch idx nm deps className tys DerivedInstance -> let
       binaryWildcardClass :: (Declaration -> [SourceType] -> m ([Declaration], SourceType)) -> m Declaration
       binaryWildcardClass f = case tys of
         [ty1, ty2] -> case unwrapTypeConstructor ty1 of
-          Just (Qualified (Just mn') tyCon, _, args) | mn == mn' -> do
+          Just (Qualified (ByModuleName mn') tyCon, _, args) | mn == mn' -> do
             checkIsWildcard ss tyCon ty2
             tyConDecl <- findTypeDecl ss tyCon ds
             (members, ty2') <- f tyConDecl args
-            pure $ TypeInstanceDeclaration sa ch idx nm deps className [ty1, ty2'] (ExplicitInstance members)
+            pure $ TypeInstanceDeclaration sa na ch idx nm deps className [ty1, ty2'] (ExplicitInstance members)
           _ -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty1
         _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 2
 
@@ -84,13 +84,13 @@ deriveGenericRep ss mn tyCon tyConArgs =
                       lamCase x
                         [ CaseAlternative
                             [NullBinder]
-                            (unguarded (App (Var ss DataGenericRep.to) (Var ss' (Qualified Nothing x))))
+                            (unguarded (App (Var ss DataGenericRep.to) (Var ss' (Qualified ByNullSourcePos x))))
                         ]
                    , ValueDecl (ss', []) (Ident "from") Public [] $ unguarded $
                       lamCase x
                         [ CaseAlternative
                             [NullBinder]
-                            (unguarded (App (Var ss DataGenericRep.from) (Var ss' (Qualified Nothing x))))
+                            (unguarded (App (Var ss DataGenericRep.from) (Var ss' (Qualified ByNullSourcePos x))))
                         ]
                    ]
                | otherwise =
@@ -133,8 +133,8 @@ deriveGenericRep ss mn tyCon tyConArgs =
                                   (srcTypeLevelString $ mkString (runProperName ctorName)))
                          ctorTy
                , CaseAlternative [ ConstructorBinder ss DataGenericRep.Constructor [matchProduct] ]
-                                 (unguarded (foldl' App (Constructor ss (Qualified (Just mn) ctorName)) ctorArgs))
-               , CaseAlternative [ ConstructorBinder ss (Qualified (Just mn) ctorName) matchCtor ]
+                                 (unguarded (foldl' App (Constructor ss (Qualified (ByModuleName mn) ctorName)) ctorArgs))
+               , CaseAlternative [ ConstructorBinder ss (Qualified (ByModuleName mn) ctorName) matchCtor ]
                                  (unguarded (App (Constructor ss DataGenericRep.Constructor) mkProduct))
                )
 
@@ -157,9 +157,9 @@ deriveGenericRep ss mn tyCon tyConArgs =
       argName <- freshIdent "arg"
       pure ( srcTypeApp (srcTypeConstructor DataGenericRep.Argument) arg
            , ConstructorBinder ss DataGenericRep.Argument [ VarBinder ss argName ]
-           , Var ss (Qualified Nothing argName)
+           , Var ss (Qualified (BySourcePos $ spanStart ss) argName)
            , VarBinder ss argName
-           , App (Constructor ss DataGenericRep.Argument) (Var ss (Qualified Nothing argName))
+           , App (Constructor ss DataGenericRep.Argument) (Var ss (Qualified (BySourcePos $ spanStart ss) argName))
            )
 
     underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative
@@ -190,8 +190,7 @@ deriveNewtype tyCon tyConArgs =
     DataDeclaration (ss', _) Data name _ _ ->
       throwError . errorMessage' ss' $ CannotDeriveNewtypeForData name
     DataDeclaration _ Newtype name args dctors -> do
-      checkNewtype name dctors
-      let (DataConstructorDeclaration _ _ [(_, ty)]) = head dctors
+      (_, (_, ty)) <- checkNewtype name dctors
       let subst = zipWith ((,) . fst) args tyConArgs
       return ([], replaceAllTypeVars subst ty)
     _ -> internalError "deriveNewtype: expected DataDeclaration"

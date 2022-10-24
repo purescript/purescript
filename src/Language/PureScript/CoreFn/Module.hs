@@ -1,6 +1,6 @@
 module Language.PureScript.CoreFn.Module where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Map.Strict (Map)
 

@@ -3,7 +3,7 @@ module Language.PureScript.Sugar.ObjectWildcards
   , desugarDecl
   ) where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Monad (forM)
 import           Control.Monad.Error.Class (MonadError(..))
@@ -98,4 +98,4 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
     | otherwise = return Nothing
 
   argToExpr :: Ident -> Expr
-  argToExpr = Var nullSourceSpan . Qualified Nothing
+  argToExpr = Var nullSourceSpan . Qualified ByNullSourcePos

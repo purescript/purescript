@@ -9,7 +9,7 @@
 
 module Language.PureScript.Docs.Render where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Maybe (maybeToList)
 import Data.Text (Text)
@@ -123,10 +123,10 @@ renderConstraints constraints
                  (map renderConstraint constraints)
 
 notQualified :: Text -> P.Qualified (P.ProperName a)
-notQualified = P.Qualified Nothing . P.ProperName
+notQualified = P.Qualified P.ByNullSourcePos . P.ProperName
 
 ident' :: Text -> RenderedCode
-ident' = ident . P.Qualified Nothing . P.Ident
+ident' = ident . P.Qualified P.ByNullSourcePos . P.Ident
 
 dataCtor' :: Text -> RenderedCode
 dataCtor' = dataCtor . notQualified

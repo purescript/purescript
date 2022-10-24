@@ -9,8 +9,7 @@ module Language.PureScript.Interactive
   , runMake
   ) where
 
-import           Prelude ()
-import           Prelude.Compat
+import           Prelude
 import           Protolude (ordNub)
 
 import           Data.List (sort, find, foldl')
@@ -292,7 +291,7 @@ handleKindOf print' typ = do
   case e of
     Left errs -> printErrors errs
     Right (_, env') ->
-      case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
+      case M.lookup (P.Qualified (P.ByModuleName mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
               k   = check (snd <$> P.kindOf typ') chk
