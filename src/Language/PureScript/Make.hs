@@ -268,40 +268,40 @@ make ma@MakeActions{..} ms = do
   -- module with the same source is being compiled.
   pruneCache :: S.Set ModuleName -> Cache.CacheDb -> m Cache.CacheDb
   pruneCache modules cache =
-      let
-        inverseCache :: M.Map FilePath [ModuleName]
-        inverseCache = M.foldlWithKey
-            (\acc key e -> M.unionWith (++) acc $ foldl (\acc2 file -> M.insert file [key] acc2) M.empty (M.keys (Cache.unCacheInfo e)))
-            M.empty
-            cache
+    let
+      inverseCache :: M.Map FilePath [ModuleName]
+      inverseCache =
+        M.foldlWithKey
+          (\acc1 key e -> M.unionWith (++) acc1 $ foldl (\acc2 file -> M.insert file [key] acc2) M.empty (M.keys (Cache.unCacheInfo e)))
+          M.empty
+          cache
 
-        -- Set of modules that should be removed due to there being two or more modules with the same source
-        toRemove :: S.Set ModuleName
-        toRemove = M.foldl
-            (\acc e -> case e of
-                 -- This pattern will clean up duplicates over time.
-                 -- It will keep the cache in a good state if it was in a good state before.
-                m1 : m2 : _ ->
-                    let
-                        acc2 = if not $ S.member m1 modules then S.insert m1 acc else acc
-                        acc3 = if not $ S.member m2 modules then S.insert m2 acc2 else acc2
-                    in
-                    acc3
-                _ -> acc
-            )
-            S.empty
-            inverseCache
-       in
-       M.traverseMaybeWithKey (\moduleName files ->
-         if S.member moduleName toRemove then
+      -- Set of modules that should be removed due to there being two or more modules with the same source
+      toRemove :: S.Set ModuleName
+      toRemove =
+        M.foldl
+          (\acc1 e -> case e of
+            -- This pattern will clean up duplicates over time.
+            -- It will keep the cache in a good state if it was in a good state before.
+            m1 : m2 : _ ->
+              let
+                acc2 = if not $ S.member m1 modules then S.insert m1 acc1 else acc1
+                acc3 = if not $ S.member m2 modules then S.insert m2 acc2 else acc2
+              in
+              acc3
+            _ -> acc1
+          )
+          S.empty
+          inverseCache
+     in
+     M.traverseMaybeWithKey (\_ files ->
+       do
+         prunedFiles <- M.traverseMaybeWithKey (\name info -> fmap (fmap (const info)) (getTimestampMaybe name)) $ Cache.unCacheInfo files
+         if M.null prunedFiles then
            pure Nothing
-         else do
-           prunedFiles <- M.traverseMaybeWithKey (\name info -> fmap (fmap (const info)) (getTimestampMaybe name)) $ Cache.unCacheInfo files
-           if M.null prunedFiles then
-             pure Nothing
-            else
-             pure (Just $ Cache.CacheInfo prunedFiles)
-       ) cache
+         else
+           pure (Just $ Cache.CacheInfo prunedFiles)
+     ) $ Cache.removeModules toRemove cache
 
 -- | Infer the module name for a module by looking for the same filename with
 -- a .js extension.
