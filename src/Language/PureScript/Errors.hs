@@ -1425,6 +1425,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                                                    , markCodeBox $ typeAsBox prettyDepth t2
                                                    ]
             ]
+    renderHint (ErrorInRowLabel lb) detail =
+      paras [ detail -- I'm not happy with this error message, it can be formatted a lot better.
+            , line "while matching row label"
+            , indent $ markCodeBox $ line $ prettyPrintString (runLabel lb)
+            ]
     renderHint (ErrorInInstance nm ts) detail =
       paras [ detail
             , line "in type class instance"
