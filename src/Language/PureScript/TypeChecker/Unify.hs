@@ -130,7 +130,7 @@ unifyTypes t1 t2 = do
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
   unifyTypes' (TypeVar _ v1) (TypeVar _ v2) | v1 == v2 = return ()
   unifyTypes' ty1@(TypeConstructor _ c1) ty2@(TypeConstructor _ c2) =
-    guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
+    guardWith (errorMessage (mkTypesDoNotUnify ty1 ty2)) (c1 == c2)
   unifyTypes' (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = return ()
   unifyTypes' (TypeLevelInt    _ n1) (TypeLevelInt    _ n2) | n1 == n2 = return ()
   unifyTypes' (TypeApp _ t3 t4) (TypeApp _ t5 t6) = do
@@ -154,7 +154,7 @@ unifyTypes t1 t2 = do
     throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
   unifyTypes' t3 t4@ConstrainedType{} = unifyTypes' t4 t3
   unifyTypes' t3 t4 =
-    throwError . errorMessage $ TypesDoNotUnify t3 t4
+    throwError . errorMessage $ mkTypesDoNotUnify t3 t4
 
 -- | Unify two rows, updating the current substitution
 --
@@ -177,7 +177,7 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
     solveType u1 (rowFromList (sd2, rest'))
     solveType u2 (rowFromList (sd1, rest'))
   unifyTails _ _ =
-    throwError . errorMessage $ TypesDoNotUnify r1 r2
+    throwError . errorMessage $ mkTypesDoNotUnify r1 r2
 
 -- |
 -- Replace type wildcards with unknowns
