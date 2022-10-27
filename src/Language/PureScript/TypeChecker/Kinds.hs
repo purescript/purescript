@@ -444,7 +444,7 @@ unifyKindsWithFailure onFailure = go
       onFailure w1 w2
 
   unifyRows r1 r2 = do
-    let (matches, rest) = alignRowsWith go r1 r2
+    let (matches, rest) = alignRowsWith (\l t1 t2 -> withErrorMessageHint (ErrorInRowLabel l) $ go t1 t2) r1 r2
     sequence_ matches
     unifyTails rest
 

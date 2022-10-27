@@ -750,7 +750,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
     typeHeadsAreEqual r1@RCons{} r2@RCons{} =
         foldr both (uncurry go rest) common
       where
-        (common, rest) = alignRowsWith typeHeadsAreEqual r1 r2
+        (common, rest) = alignRowsWith (const typeHeadsAreEqual) r1 r2
 
         go :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Matched (), Matching [Type a])
         go (l,  KindedType _ t1 _) (r,  t2)                            = go (l, t1) (r, t2)
@@ -795,7 +795,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
       typesAreEqual (KindApp _ h1 t1)      (KindApp _ h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2
       typesAreEqual (REmpty _)             (REmpty _)             = Match ()
       typesAreEqual r1                     r2                     | isRCons r1 || isRCons r2 =
-          let (common, rest) = alignRowsWith typesAreEqual r1 r2
+          let (common, rest) = alignRowsWith (const typesAreEqual) r1 r2
           in fold common <> uncurry go rest
         where
           go :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> Matched ()

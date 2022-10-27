@@ -443,7 +443,7 @@ rowFromList (xs, r) = foldr (\(RowListItem ann name ty) -> RCons ann name ty) r 
 --
 -- Note: importantly, we preserve the order of the types with a given label.
 alignRowsWith
-  :: (Type a -> Type a -> r)
+  :: (Label -> Type a -> Type a -> r)
   -> Type a
   -> Type a
   -> ([r], (([RowListItem a], Type a), ([RowListItem a], Type a)))
@@ -456,7 +456,7 @@ alignRowsWith f ty1 ty2 = go s1 s2 where
   go lhs@(RowListItem a1 l1 t1 : r1) rhs@(RowListItem a2 l2 t2 : r2)
     | l1 < l2 = (second . first . first) (RowListItem a1 l1 t1 :) (go r1 rhs)
     | l2 < l1 = (second . second . first) (RowListItem a2 l2 t2 :) (go lhs r2)
-    | otherwise = first (f t1 t2 :) (go r1 r2)
+    | otherwise = first (f l1 t1 t2 :) (go r1 r2)
 
 -- | Check whether a type is a monotype
 isMonoType :: Type a -> Bool
