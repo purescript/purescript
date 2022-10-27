@@ -2,10 +2,10 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/ProgrammableTypeErrorsTypeString.purs:24:9 - 24:24 (line 24, column 9 - line 24, column 24)
 
-  No type class instance was found for
-  [33m                                                                                                             [0m
-  [33m  Prim.TypeError.Fail (Beside (Beside (Text "Don\'t want to show ") (Quote (MyType Int))) (Text " because."))[0m
-  [33m                                                                                                             [0m
+  A custom type error occurred while solving type class constraints:
+
+    Don't want to show MyType Int because.
+
 
 while solving type class constraint
 [33m                             [0m

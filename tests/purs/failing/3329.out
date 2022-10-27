@@ -3,10 +3,10 @@ in module [33mMain[0m
 at tests/purs/failing/3329.purs:24:8 - 24:11 (line 24, column 8 - line 24, column 11)
 
   No type class instance was found for
-  [33m                            [0m
-  [33m  Main.Inject g0            [0m
-  [33m              (Either f1 g0)[0m
-  [33m                            [0m
+  [33m                       [0m
+  [33m  Inject g0            [0m
+  [33m         (Either f1 g0)[0m
+  [33m                       [0m
   The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:
 
     [33mMain.injectLeft[0m

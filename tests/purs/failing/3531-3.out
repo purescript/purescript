@@ -3,15 +3,15 @@ in module [33mMain[0m
 at tests/purs/failing/3531-3.purs:22:11 - 22:22 (line 22, column 11 - line 22, column 22)
 
   No type class instance was found for
-  [33m                        [0m
-  [33m  Main.C (X             [0m
-  [33m            { foo :: Int[0m
-  [33m            | t1        [0m
-  [33m            }           [0m
-  [33m            { foo :: Int[0m
-  [33m            }           [0m
-  [33m         )              [0m
-  [33m                        [0m
+  [33m                   [0m
+  [33m  C (X             [0m
+  [33m       { foo :: Int[0m
+  [33m       | t1        [0m
+  [33m       }           [0m
+  [33m       { foo :: Int[0m
+  [33m       }           [0m
+  [33m    )              [0m
+  [33m                   [0m
   The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:
 
     [33mMain.cx[0m

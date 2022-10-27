@@ -2,10 +2,10 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/ProgrammablePolykindedTypeErrorsTypeString.purs:23:7 - 23:17 (line 23, column 7 - line 23, column 17)
 
-  No type class instance was found for
-  [33m                                                                                                              [0m
-  [33m  Prim.TypeError.Fail (Beside (Beside (Text "Don\'t want to show ") (Quote (Just String))) (Text " because."))[0m
-  [33m                                                                                                              [0m
+  A custom type error occurred while solving type class constraints:
+
+    Don't want to show Just @Type String because.
+
 
 while checking that type [33mFail (Beside (Beside (Text "Don\'t want to show ") (... ...)) (Text " because.")) => String[0m
   is at least as general as type [33mString[0m

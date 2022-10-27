@@ -3,9 +3,9 @@ in module [33mMain[0m
 at tests/purs/failing/4028.purs:29:12 - 29:37 (line 29, column 12 - line 29, column 37)
 
   No type class instance was found for
-  [33m                    [0m
-  [33m  Main.TLShow (S i2)[0m
-  [33m                    [0m
+  [33m               [0m
+  [33m  TLShow (S i2)[0m
+  [33m               [0m
   The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:
 
     [33mMain.tlShow2[0m

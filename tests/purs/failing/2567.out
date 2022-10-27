@@ -2,10 +2,10 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/2567.purs:7:8 - 7:67 (line 7, column 8 - line 7, column 67)
 
-  No type class instance was found for
-  [33m                                                                [0m
-  [33m  Prim.TypeError.Fail (Text "This constraint should be checked")[0m
-  [33m                                                                [0m
+  A custom type error occurred while solving type class constraints:
+
+    This constraint should be checked
+
 
 while checking that type [33mFail (Text "This constraint should be checked") => Int[0m
   is at least as general as type [33mInt[0m

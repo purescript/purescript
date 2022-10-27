@@ -3,10 +3,10 @@ in module [33mMain[0m
 at tests/purs/failing/CoercibleRepresentational3.purs:9:14 - 9:20 (line 9, column 14 - line 9, column 20)
 
   No type class instance was found for
-  [33m                              [0m
-  [33m  Prim.Coerce.Coercible Int   [0m
-  [33m                        String[0m
-  [33m                              [0m
+  [33m                                   [0m
+  [33m  Prim.Coerce.Coercible Prim.Int   [0m
+  [33m                        Prim.String[0m
+  [33m                                   [0m
 
 while solving type class constraint
 [33m                                     [0m

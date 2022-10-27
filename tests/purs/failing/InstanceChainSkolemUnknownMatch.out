@@ -3,11 +3,11 @@ in module [33mInstanceChainSkolemUnknownMatch[0m
 at tests/purs/failing/InstanceChainSkolemUnknownMatch.purs:13:13 - 13:36 (line 13, column 13 - line 13, column 36)
 
   No type class instance was found for
-  [33m                                                  [0m
-  [33m  InstanceChainSkolemUnknownMatch.Same (Proxy t3) [0m
-  [33m                                       (Proxy Int)[0m
-  [33m                                       t4         [0m
-  [33m                                                  [0m
+  [33m                  [0m
+  [33m  Same (Proxy t3) [0m
+  [33m       (Proxy Int)[0m
+  [33m       t4         [0m
+  [33m                  [0m
   The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:
 
     [33mInstanceChainSkolemUnknownMatch.sameY[0m
