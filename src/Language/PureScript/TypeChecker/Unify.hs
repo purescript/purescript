@@ -33,7 +33,6 @@ import Language.PureScript.TypeChecker.Kinds (elaborateKind, instantiateKind, un
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.Types
-import Debug.Trace
 
 -- | Generate a fresh type variable with an unknown kind. Avoid this if at all possible.
 freshType :: (MonadState CheckState m) => m SourceType
@@ -109,9 +108,7 @@ unknownsInType t = everythingOnTypes (.) go t []
 -- | Unify two types, updating the current substitution
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
 unifyTypes t1 t2 = do
-  let _ = trace ":(" (t1, t2)
   sub <- gets checkSubstitution
-  let _ = trace "!!!!!!!!!!!!!COMBINE!!!!!!!!!!!!" (t1, t2)
   withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
   where
   unifyTypes' (TUnknown _ u1) (TUnknown _ u2) | u1 == u2 = return ()
@@ -165,7 +162,7 @@ unifyTypes t1 t2 = do
 -- trailing row unification variable, if appropriate.
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
 unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
-  (matches, rest) = trace "ABC" $ alignRowsWith (\l t1 t2 -> withErrorMessageHint (ErrorInRowLabel l) $ unifyTypes t1 t2) r1 r2
+  (matches, rest) = alignRowsWith (\l t1 t2 -> withErrorMessageHint (ErrorInRowLabel l) $ unifyTypes t1 t2) r1 r2
 
   unifyTails :: ([RowListItem SourceAnn], SourceType) -> ([RowListItem SourceAnn], SourceType) -> m ()
   unifyTails ([], TUnknown _ u)    (sd, r)               = solveType u (rowFromList (sd, r))
