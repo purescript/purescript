@@ -288,19 +288,21 @@ inferForeignModules =
 -- with type Query@.
 requalifyTypesInErrors :: Imports -> MultipleErrors -> MultipleErrors
 requalifyTypesInErrors imports =
-  onErrorMessages $
-    onTypesInErrorMessage requal
-    -- \(ErrorMessage hints message) ->
-      -- ErrorMessage (requalifyHints hints) (requalifyMessage message)
+  onErrorMessages $ \e ->
+    case e of
+      ErrorMessage hints (NoInstanceFound con ambig unks) ->
+        ErrorMessage hints $ NoInstanceFound (requalifyConstraint revImports con) ambig unks
+      _ -> onTypesInErrorMessage requal e
 
   where
-  requal = requalify (buildReverseImports imports)
+  revImports = buildReverseImports imports
+  requal = requalify revImports
 
 --   requalifyMessage =
 --     TypesDoNotUnify ty1 ty2 -> TypesDoNotUnify (requal ty1) (requal ty2)
 --     KindsDoNotUnify ty1 ty2 -> KindsDoNotUnify (requal ty1) (requal ty2)
 --     other -> other
--- 
+--
 --   requalifyHints = map $ \case
 --     ErrorUnifyingTypes ty1 ty2 ->
 --       ErrorUnifyingTypes (requal ty1) (requal ty2)

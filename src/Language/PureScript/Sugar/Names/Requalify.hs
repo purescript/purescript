@@ -9,6 +9,8 @@ module Language.PureScript.Sugar.Names.Requalify
   ( ReverseImports(..)
   , buildReverseImports
   , requalify
+  , requalifyConstraint
+  , reverseLookup
   ) where
 
 import Debug.Trace
@@ -34,11 +36,12 @@ type ReverseImportMap a = M.Map (ModuleName, a) QualifiedBy
 data ReverseImports = ReverseImports
   { reverseImportsTypes :: ReverseImportMap (ProperName 'TypeName)
   , reverseImportsTypeOps :: ReverseImportMap (OpName 'TypeOpName)
+  , reverseImportsTypeClasses :: ReverseImportMap (ProperName 'ClassName)
   }
   deriving (Show)
 
 buildReverseImports :: Imports -> ReverseImports
-buildReverseImports Imports { importedTypes, importedTypeOps } =
+buildReverseImports (Imports { importedTypes, importedTypeOps, importedTypeClasses }) =
   trace (show revimps) revimps
   where
   revimps = ReverseImports
@@ -50,15 +53,20 @@ buildReverseImports Imports { importedTypes, importedTypeOps } =
         M.fromListWith preferShortest $
           mapMaybe (toReverseAssoc typeOpExceptions) $
             M.toList importedTypeOps
+    , reverseImportsTypeClasses =
+        M.fromListWith preferShortest $
+          mapMaybe (toReverseAssoc typeClassExceptions) $
+            M.toList importedTypeClasses
     }
 
   preferShortest :: QualifiedBy -> QualifiedBy -> QualifiedBy
+  preferShortest x@(BySourcePos _) _ = x
+  preferShortest _ y@(BySourcePos _) = y
   preferShortest (ByModuleName x) (ByModuleName y) = do
     ByModuleName $
       if T.length (runModuleName x) < T.length (runModuleName y)
         then x
         else y
-  preferShortest _ y = y
 
   -- | Given an entry from an ImportMap from an Imports (see Sugar.Names.Env)
   -- which maps a local name to a fully qualified name, produce an entry for
@@ -94,11 +102,16 @@ buildReverseImports Imports { importedTypes, importedTypeOps } =
   typeExceptions = Set.fromList
     [ Prim.Function
     , Prim.Record
-    , fmap coerceProperName Prim.Fail
     ]
 
   typeOpExceptions :: Set (Qualified (OpName 'TypeOpName))
   typeOpExceptions = Set.empty
+
+  typeClassExceptions :: Set (Qualified (ProperName 'ClassName))
+  typeClassExceptions = Set.fromList
+    [ Prim.Fail
+    , Prim.Partial
+    ]
 
 -- | This module provides functions for "re-qualifying" names in a type given
 -- an Imports record, so that they can be displayed unambiguously in
@@ -108,19 +121,32 @@ buildReverseImports Imports { importedTypes, importedTypeOps } =
 -- import for `X` from `Foo.Bar`, or alternatively if `Foo.Bar` is imported
 -- like `import Foo.Bar as F` then it produces `F.X`.
 requalify :: ReverseImports -> Type a -> Type a
-requalify ReverseImports { reverseImportsTypes, reverseImportsTypeOps } =
+requalify revMap =
   everywhereOnTypes $ \ty -> fromMaybe ty $ case ty of
     TypeConstructor ann fullyQualifiedName ->
-      fmap (TypeConstructor ann) $
-        reverseLookup reverseImportsTypes fullyQualifiedName
+      TypeConstructor ann
+        <$> reverseLookup (reverseImportsTypes revMap) fullyQualifiedName
     TypeOp ann fullyQualifiedName -> do
-      fmap (TypeOp ann) $
-        reverseLookup reverseImportsTypeOps fullyQualifiedName
+      TypeOp ann
+        <$> reverseLookup (reverseImportsTypeOps revMap) fullyQualifiedName
+    ConstrainedType ann fullyQualifiedConstraint ty' -> do
+      localConstraint <- reverseLookup (reverseImportsTypeClasses revMap) (constraintClass fullyQualifiedConstraint)
+      pure (ConstrainedType ann (fullyQualifiedConstraint { constraintClass = localConstraint }) ty')
     _ ->
       Nothing
-  where
-  reverseLookup :: Ord a => ReverseImportMap a -> Qualified a -> Maybe (Qualified a)
-  reverseLookup revMap (Qualified mFullModName name) = do
-    fullModName <- toMaybeModuleName mFullModName
-    mLocalModName <- M.lookup (fullModName, name) revMap
-    pure $ Qualified mLocalModName name
+
+requalifyConstraint :: ReverseImports -> Constraint a -> Constraint a
+requalifyConstraint revMap fullyQualifiedConstraint =
+  fromMaybe fullyQualifiedConstraint $ do
+    localConstraint <- reverseLookup (reverseImportsTypeClasses revMap) (constraintClass fullyQualifiedConstraint)
+    pure $ fullyQualifiedConstraint
+      { constraintClass = localConstraint
+      , constraintKindArgs = requalify revMap <$> constraintKindArgs fullyQualifiedConstraint
+      , constraintArgs = requalify revMap <$> constraintArgs fullyQualifiedConstraint
+      }
+
+reverseLookup :: Show a => Ord a => ReverseImportMap a -> Qualified a -> Maybe (Qualified a)
+reverseLookup revMap (Qualified mFullModName name) = do
+  fullModName <- toMaybeModuleName mFullModName
+  mLocalModName <- M.lookup (fullModName, name) revMap
+  pure $ Qualified mLocalModName name
