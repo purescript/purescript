@@ -1426,9 +1426,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                                                    ]
             ]
     renderHint (ErrorInRowLabel lb) detail =
-      paras [ detail -- I'm not happy with this error message, it can be formatted a lot better.
-            , line "while matching row label"
-            , indent $ markCodeBox $ line $ prettyPrintString (runLabel lb)
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while matching row label"
+                                 , markCodeBox $ line $ prettyPrintObjectKey (runLabel lb)
+                                 ]
             ]
     renderHint (ErrorInInstance nm ts) detail =
       paras [ detail
