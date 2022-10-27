@@ -6,10 +6,12 @@ at tests/purs/failing/QualifiedErrorsUnificationShadow.purs:9:15 - 9:18 (line 9,
   [33m                           [0m
   [33m  Data.List.Lazy.Types.List[0m
   [33m                           [0m
+  (defined in module [33mData.List.Lazy.Types[0m)
   with type
   [33m                           [0m
   [33m  Data.List.Lazy.Types.List[0m
   [33m                           [0m
+  (defined in module [33mData.List.Types[0m)
 
 while trying to match type [33mList t0[0m
   with type [33mList Unit[0m
@@ -19,6 +21,6 @@ in value declaration [33mwrongModule[0m
 
 where [33mt0[0m is an unknown type
 
-See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+See https://github.com/purescript/documentation/blob/master/errors/TypeConstructorsDoNotUnify.md for more information,
 or to contribute content related to this error.
 

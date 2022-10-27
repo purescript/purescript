@@ -1,4 +1,4 @@
--- @shouldFailWith TypesDoNotUnify
+-- @shouldFailWith TypeConstructorsDoNotUnify
 module X where
 
 class Foo where

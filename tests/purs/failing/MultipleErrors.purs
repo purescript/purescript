@@ -1,5 +1,5 @@
--- @shouldFailWith TypesDoNotUnify
--- @shouldFailWith TypesDoNotUnify
+-- @shouldFailWith TypeConstructorsDoNotUnify
+-- @shouldFailWith TypeConstructorsDoNotUnify
 module MultipleErrors where
 
 import Prelude
