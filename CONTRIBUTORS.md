@@ -160,6 +160,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@sd-yip](https://github.com/sd-yip) | Nicholas Yip | [MIT license](http://opensource.org/licenses/MIT) |
 | [@j-nava](https://github.com/j-nava) | Jesse Nava | [MIT license](http://opensource.org/licenses/MIT) |
 | [@imcotton](https://github.com/imcotton) | Cotton Hou | [MIT license](http://opensource.org/licenses/MIT) |
+| [@FredTheDino](https://github.com/FredTheDino) | Edvard Thörnros | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 
