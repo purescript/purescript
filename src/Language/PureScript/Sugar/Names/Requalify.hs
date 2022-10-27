@@ -11,6 +11,7 @@ module Language.PureScript.Sugar.Names.Requalify
   , requalify
   , requalifyConstraint
   , reverseLookup
+  , requalifyTypesInErrors
   ) where
 
 import Debug.Trace
@@ -22,6 +23,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Language.PureScript.Constants.Prim as Prim
+import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Sugar.Names.Env
@@ -150,3 +152,43 @@ reverseLookup revMap (Qualified mFullModName name) = do
   fullModName <- toMaybeModuleName mFullModName
   mLocalModName <- M.lookup (fullModName, name) revMap
   pure $ Qualified mLocalModName name
+
+
+-- | Convert fully qualified names in errors back to unqualified or locally
+-- qualified forms in certain hints and error messages, to make errors easier
+-- to understand and to avoid error messages like @Could not match type Query
+-- with type Query@.
+requalifyTypesInErrors :: Imports -> MultipleErrors -> MultipleErrors
+requalifyTypesInErrors imports =
+  onErrorMessages $ \e ->
+    case e of
+      ErrorMessage hints (NoInstanceFound con ambig unks) ->
+        ErrorMessage hints $ NoInstanceFound (requalifyConstraint revImports con) ambig unks
+      _ -> onTypesInErrorMessage requal e
+
+  where
+  revImports = buildReverseImports imports
+  requal = requalify revImports
+
+--   requalifyMessage =
+--     TypesDoNotUnify ty1 ty2 -> TypesDoNotUnify (requal ty1) (requal ty2)
+--     KindsDoNotUnify ty1 ty2 -> KindsDoNotUnify (requal ty1) (requal ty2)
+--     other -> other
+--
+--   requalifyHints = map $ \case
+--     ErrorUnifyingTypes ty1 ty2 ->
+--       ErrorUnifyingTypes (requal ty1) (requal ty2)
+--     ErrorInInstance clsName tys ->
+--       ErrorInInstance clsName (map requal tys)
+--     ErrorInSubsumption ty1 ty2 ->
+--       ErrorInSubsumption (requal ty1) (requal ty2)
+--     ErrorCheckingType expr ty ->
+--       ErrorCheckingType expr (requal ty)
+--     ErrorCheckingKind ty1 ty2 ->
+--       ErrorCheckingKind (requal ty1) (requal ty2)
+--     ErrorInferringKind ty ->
+--       ErrorInferringKind (requal ty)
+--     ErrorInApplication expr1 ty expr2 ->
+--       ErrorInApplication expr1 (requal ty) expr2
+--     other ->
+--       other
