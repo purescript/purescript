@@ -12,7 +12,6 @@ at tests/purs/failing/RecordLabelOnTypeError.purs:8:5 - 8:6 (line 8, column 5 - 
   [33m        [0m
 
 while matching row label [33mfield[0m
-
 while checking that type [33m{ field :: Int[0m
                          [33m}             [0m
   is at least as general as type [33m{ field :: String[0m
@@ -24,5 +23,4 @@ in value declaration [33mb[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
 or to contribute content related to this error.
-
 
