@@ -79,8 +79,8 @@ printWarningsAndErrors False warnings errors = do
 printWarningsAndErrors True warnings errors = do
   let verbose = True
   hPutStrLn stderr . LBU8.toString . Json.encode $
-    JSONResult (toJSONErrors verbose P.Warning warnings)
-               (either (toJSONErrors verbose P.Error) (const []) errors)
+    JSONResult (toJSONErrors verbose P.Warning [] warnings)
+               (either (toJSONErrors verbose P.Error []) (const []) errors)
   case errors of
     Left _errs -> exitFailure
     Right res -> pure res

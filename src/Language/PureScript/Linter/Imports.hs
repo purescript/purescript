@@ -4,7 +4,7 @@ module Language.PureScript.Linter.Imports
   , UsedImports()
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Control.Monad (join, unless, foldM, (<=<))
@@ -196,7 +196,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
             _ -> Nothing
       | isQualifiedWith k q =
           case importName (head is) of
-            Qualified (Just mn') name -> Just (mn', Qualified mnq (toName name))
+            Qualified (ByModuleName mn') name -> Just (mn', Qualified mnq (toName name))
             _ -> internalError "unqualified name in extractByQual"
     go _ = Nothing
 
@@ -300,7 +300,7 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
   dtys
     :: ModuleName
     -> M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
-  dtys mn = maybe M.empty exportedTypes $ envModuleExports <$> mn `M.lookup` env
+  dtys mn = foldMap (exportedTypes . envModuleExports) $ mn `M.lookup` env
 
   dctorsForType
     :: ModuleName

@@ -3,7 +3,7 @@
 --
 module Language.PureScript.AST.Literals where
 
-import Prelude.Compat
+import Prelude
 import Language.PureScript.PSString (PSString)
 
 -- |

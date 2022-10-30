@@ -8,7 +8,7 @@ module Language.PureScript.TypeChecker.Skolems
   , skolemEscapeCheck
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
@@ -56,7 +56,7 @@ skolemizeTypesInValue ann ident mbK sko scope =
     runIdentity . onExpr'
   where
     onExpr' :: Expr -> Identity Expr
-    (_, onExpr', _, _, _) = everywhereWithContextOnValuesM [] defS onExpr onBinder defS defS
+    (_, onExpr', _, _, _, _) = everywhereWithContextOnValuesM [] defS onExpr onBinder defS defS defS
 
     onExpr :: [Text] -> Expr -> Identity ([Text], Expr)
     onExpr sco (DeferredDictionary c ts)

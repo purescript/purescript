@@ -1,6 +1,6 @@
 module Language.PureScript.TypeClassDictionaries where
 
-import Prelude.Compat
+import Prelude
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)

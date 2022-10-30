@@ -6,7 +6,7 @@ module Language.PureScript.Docs.Prim
   , primModules
   ) where
 
-import Prelude.Compat hiding (fail)
+import Prelude hiding (fail)
 import Data.Functor (($>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -258,12 +258,22 @@ kindSymbol = primType "Symbol" $ T.unlines
   , ""
   , "Construct types of this kind using the same literal syntax as documented"
   , "for strings."
+  , ""
+  , "    type Hello :: Symbol"
+  , "    type Hello = \"Hello, world\""
+  , ""
   ]
 
 kindRow :: Declaration
 kindRow = primType "Row" $ T.unlines
   [ "`Row` is the kind constructor of label-indexed types which map type-level strings to other types."
-  , "For example, the kind of `Record` is `Row Type -> Type`, mapping field names to values."
+  , "The most common use of `Row` is `Row Type`, a row mapping labels to basic (of kind `Type`) types:"
+  , ""
+  , "    type ExampleRow :: Row Type"
+  , "    type ExampleRow = ( name :: String, values :: Array Int )"
+  , ""
+  , "This is the kind of `Row` expected by the `Record` type constructor."
+  , "More advanced row kinds like `Row (Type -> Type)` are used much less frequently."
   ]
 
 function :: Declaration
@@ -322,20 +332,46 @@ number :: Declaration
 number = primType "Number" $ T.unlines
   [ "A double precision floating point number (IEEE 754)."
   , ""
-  , "Construct values of this type with literals:"
+  , "Construct values of this type with literals."
+  , "Negative literals must be wrapped in parentheses if the negation sign could be mistaken"
+  , "for an infix operator:"
   , ""
-  , "    y = 35.23 :: Number"
-  , "    z = 1.224e6 :: Number"
+  , "    x = 35.23 :: Number"
+  , "    y = -1.224e6 :: Number"
+  , "    z = exp (-1.0) :: Number"
   ]
 
 int :: Declaration
 int = primType "Int" $ T.unlines
-  [ "A 32-bit signed integer. See the purescript-integers package for details"
+  [ "A 32-bit signed integer. See the `purescript-integers` package for details"
   , "of how this is accomplished when compiling to JavaScript."
   , ""
-  , "Construct values of this type with literals:"
+  , "Construct values of this type with literals. Hexadecimal syntax is supported."
+  , "Negative literals must be wrapped in parentheses if the negation sign could be mistaken"
+  , "for an infix operator:"
   , ""
-  , "    x = 23 :: Int"
+  , "    x = -23 :: Int"
+  , "    y = 0x17 :: Int"
+  , "    z = complement (-24) :: Int"
+  , ""
+  , "Integers used as types are considered to have kind `Int`."
+  , "Unlike value-level `Int`s, which must be representable as a 32-bit signed integer,"
+  , "type-level `Int`s are unbounded. Hexadecimal support is also supported at the type level."
+  , ""
+  , "    type One :: Int"
+  , "    type One = 1"
+  , "    "
+  , "    type Beyond32BitSignedInt :: Int"
+  , "    type Beyond32BitSignedInt = 2147483648"
+  , "    "
+  , "    type HexInt :: Int"
+  , "    type HexInt = 0x17"
+  , ""
+  , "Negative integer literals at the type level must be"
+  , "wrapped in parentheses if the negation sign could be mistaken for an infix operator."
+  , ""
+  , "    type NegativeOne = -1"
+  , "    foo :: Proxy (-1) -> ..."
   ]
 
 string :: Declaration
@@ -348,26 +384,37 @@ string = primType "String" $ T.unlines
   , ""
   , "    x = \"hello, world\" :: String"
   , ""
-  , "Multi-line string literals are also supported with triple quotes (`\"\"\"`)."
+  , "Multi-line string literals are also supported with triple quotes (`\"\"\"`):"
+  , ""
+  , "    x = \"\"\"multi"
+  , "       line\"\"\""
+  , ""
+  , "At the type level, string literals represent types with kind `Symbol`."
+  , "These types will have kind `String` in a future release:"
+  , ""
+  , "    type Hello :: Symbol"
+  , "    type Hello = \"Hello, world\""
   ]
 
 char :: Declaration
 char = primType "Char" $ T.unlines
-   [ "A single character (UTF-16 code unit). The JavaScript representation is a"
-   , "normal String, which is guaranteed to contain one code unit. This means"
-   , "that astral plane characters (i.e. those with code point values greater"
-   , "than 0xFFFF) cannot be represented as Char values."
-   , ""
-   , "Construct values of this type with literals, using single quotes `'`:"
-   , ""
-   , "    x = 'a' :: Char"
-   ]
+  [ "A single character (UTF-16 code unit). The JavaScript representation is a"
+  , "normal `String`, which is guaranteed to contain one code unit. This means"
+  , "that astral plane characters (i.e. those with code point values greater"
+  , "than `0xFFFF`) cannot be represented as `Char` values."
+  , ""
+  , "Construct values of this type with literals, using single quotes `'`:"
+  , ""
+  , "    x = 'a' :: Char"
+  ]
 
 boolean :: Declaration
 boolean = primType "Boolean" $ T.unlines
   [ "A JavaScript Boolean value."
   , ""
   , "Construct values of this type with the literals `true` and `false`."
+  , ""
+  , "The `True` and `False` types defined in `Prim.Boolean` have this type as their kind."
   ]
 
 partial :: Declaration

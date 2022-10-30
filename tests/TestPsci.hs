@@ -1,6 +1,5 @@
 module TestPsci where
 
-import Prelude ()
 
 import TestPsci.CommandTest (commandTests)
 import TestPsci.CompletionTest (completionTests)

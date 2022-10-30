@@ -1,6 +1,6 @@
 module Language.PureScript.Sugar.Operators.Types where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.Except
 import Language.PureScript.AST

@@ -32,7 +32,8 @@ module Language.PureScript.Ide.Imports
 
 import           Protolude hiding (moduleName)
 
-import           Data.List                          (findIndex, nubBy, partition)
+import           Control.Lens                       ((^.), (%~), ix, has)
+import           Data.List                          (nubBy, partition)
 import qualified Data.List.NonEmpty                 as NE
 import qualified Data.Map                           as Map
 import qualified Data.Text                          as T
@@ -46,7 +47,6 @@ import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Prim
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           Lens.Micro.Platform                ((^.), (%~), ix, has)
 import           System.IO.UTF8                     (writeUTF8FileT)
 
 data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)
@@ -93,7 +93,7 @@ data ImportParse = ImportParse
 
 parseModuleHeader :: Text -> Either (NE.NonEmpty CST.ParserError) ImportParse
 parseModuleHeader src = do
-  CST.PartialResult md _ <- CST.parseModule $ CST.lenient $ CST.lex src
+  CST.PartialResult md _ <- CST.parseModule $ CST.lenient $ CST.lexModule src
   let
     mn = CST.nameValue $ CST.modNamespace md
     decls = flip fmap (CST.modImports md) $ \decl -> do
@@ -256,13 +256,14 @@ addExplicitImport' decl moduleName qualifier imports =
 ideSpan :: P.SourceSpan
 ideSpan = P.internalModuleSourceSpan "<psc-ide>"
 
+-- | If none of the elements of the list satisfy the given predicate 'predicate', then prepend the default value 'def'
+-- to the given list. Otherwise, update the first element of the list that satisfies 'predicate' with the updating
+-- function 'update'.
 updateAtFirstOrPrepend :: (a -> Bool) -> (a -> a) -> a -> [a] -> [a]
-updateAtFirstOrPrepend p t d l =
-  case findIndex p l of
-    Nothing -> d : l
-    Just i ->
-      let (x, a : y) = splitAt i l
-      in x ++ [t a] ++ y
+updateAtFirstOrPrepend predicate update def xs =
+  case break predicate xs of
+    (before, []) -> def : before
+    (before, x : after) -> before ++ [update x] ++ after
 
 -- | Looks up the given identifier in the currently loaded modules.
 --

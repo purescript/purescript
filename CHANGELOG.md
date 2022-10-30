@@ -2,6 +2,309 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.6
+
+Bugfixes:
+
+* Make `FromJSON` instance for `Qualified` backwards compatible (#4403 by @ptrfrncsmrph)
+
+  Prior to #4293, `Qualified` was encoded to JSON such that
+
+  ```haskell
+  >>> encode $ Qualified Nothing "foo"
+  [null,"foo"]
+  >>> encode $ Qualified (Just $ ModuleName "A") "bar"
+  ["A","bar"]
+  ```
+
+  The type of `Qualified` has changed so that `null` no longer appears in JSON output, but for sake of backwards-compatibility with JSON that was produced prior to those changes (pre-`v0.15.2`), we need to accept `null`, which will be interpreted as `Qualified ByNullSourcePos`.
+
+* Fix extraneous qualifiers added to references to floated expressions (#4401 by @rhendric)
+
+## 0.15.5
+
+New features:
+
+* Increases the max number of typed holes displayed from 5 up to 30 (#4341 by @JordanMartinez)
+
+* Add a compiler optimization for `ST` functions with up to 10 arity, similar to `Effect` optimizations. (#4386 by @mikesol)
+
+* Enable the compiler to derive `Foldable` and `Traversable` instances (#4392 by @rhendric)
+
+  These instances follow the same rules as derived `Functor` instances.
+  For details, see [the PureScript language reference](https://github.com/purescript/documentation/blob/master/language/Type-Classes.md#functor-foldable-and-traversable).
+
+Bugfixes:
+
+* Qualify references to expressions floated to the top level of a module by the compiler (#4364 by @rhendric)
+
+* Fix replicated type hole suggestions due to malformed source spans (#4374 by @PureFunctor)
+
+  In PureScript `0.15.4`, the following code will produce multiple entries in
+  the type hole suggestions. This is due to malformed source spans that are
+  generated when desugaring value declarations into case expressions.
+
+  ```purs
+  module Main where
+
+  data F = X | Y
+
+  f :: forall a. F -> a -> a
+  f X b = ?help
+  f Y b = ?help
+  ```
+
+* Improve error spans for class and instance declarations (#4383 and #4391 by @PureFunctor and @rhendric)
+
+  This improves the error spans for class and instance
+  declarations. Instead of highlighting the entire class or instance
+  declaration when `UnknownName` is thrown, the compiler now
+  highlights the class name and its arguments.
+
+  Before:
+  ```purs
+  [1/2 UnknownName]
+
+    5  class G a <= F a
+       ^^^^^^^^^^^^^^^^
+
+    Unknown type class G
+
+  [2/2 UnknownName]
+
+    7  instance G a => F a
+       ^^^^^^^^^^^^^^^^^^^
+
+    Unknown type class G
+  ```
+
+  After:
+  ```purs
+  [1/2 UnknownName]
+
+    5  class G a <= F a
+             ^^^
+
+    Unknown type class G
+
+  [2/2 UnknownName]
+
+    7  instance G a => F a
+                ^^^
+
+    Unknown type class G
+  ```
+
+* Fix a bug where the compiler did not consider interactions of all functional dependencies in classes. (#4195 by @MonoidMusician)
+  In particular, combinations of multiple parameters determining other parameter(s) were not handled properly,
+  affecting overlapping instance checks and the selection of which parameters are fully determined.
+
+Other improvements:
+
+* Bump actions environment to `macOS-11` (#4372 by @PureFunctor)
+
+Internal:
+
+* Enable `OverloadedRecordDot` extension throughout codebase (#4355 by @JordanMartinez)
+
+* Ensure order of args remain unchanged in `freeTypeVariables` (#4369 by @JordanMartinez)
+
+* Bump HLint to version 3.5 and address most of the new hints (#4391 by @rhendric)
+
+* Remove `purescript-cst` from Makefile (#4389 by @ptrfrncsmrph)
+
+* Bump depend NPM purescript-installer to ^0.3.1 (#4353 by @imcotton)
+
+* Remove base-compat as a dependency (#4384 by @PureFunctor)
+
+## 0.15.4
+
+Bugfixes:
+
+* Fix name clash in guard clauses introduced in #4293 (#4385 by @PureFunctor)
+
+  As a consequence, a problem with the compiler not being able to see
+  imported names if they're shadowed by a guard binder is also solved.
+  ```purs
+  import Data.Foldable (fold)
+  import Data.Maybe (Maybe(..))
+  import Data.Monoid.Additive (Additive(..))
+
+  test :: Maybe Int -> Int
+  test = case _ of
+    m | Just fold <- m -> fold
+      -- Previously would complain about `fold` being undefined
+      | otherwise -> case fold [] of Additive x -> x
+  ```
+
+Internal:
+
+* Add `Guard` handler for the `everywhereWithContextOnValuesM` traversal. (#4385 by @PureFunctor)
+
+## 0.15.3
+
+New features:
+
+* Float compiler-synthesized function applications (#3915 by @rhendric)
+
+  This is a limited implementation of common subexpression elimination for
+  expressions created by the compiler in the process of creating and using
+  typeclass dictionaries. Users can expect code that heavily uses typeclasses
+  to produce JavaScript that is shorter, simpler, and faster.
+
+  Common subexpression elimination is not applied to any expressions explicitly
+  written by users. If you want those floated to a higher scope, you have to do
+  so manually.
+
+* Add support for optional shebang lines (#4214 by @colinwahl and @JordanMartinez)
+
+  One or more shebang line are only allowed as the first lines of a file
+
+  ```purs
+  #! a shebang line
+  #! another shebang line
+  -- | module doc comment
+  -- other comment
+  module MyModule where
+
+  #! Using a shebang here will fail to parse
+  foo :: String
+  foo = ""
+  ```
+
+Bugfixes:
+
+* Stop requiring `bower.json` `devDependencies` when publishing (#4332 by @JordanMartinez)
+
+* Stop emitting source spans with negative line/column numbers (#4343 by @j-nava and @JordanMartinez)
+
+Internal:
+
+* Accommodate internally-generated identifiers that start with digits (#4334 by @rhendric)
+
+* Enable `-Wincomplete-uni-patterns` and `-Wincomplete-record-updates` by default (#4336 by @hdgarrood)
+
+  Update `purescript.cabal` so that the PureScript compiler is built with the
+  flags `-Wincomplete-uni-patterns` and `-Wincomplete-record-updates`
+  enabled by default.
+
+* Setup infrastructure for testing source maps (#4335 by @JordanMartinez)
+
+* Removed a couple of unused `SimpleErrorMessage` constructors (#4344 by @hdgarrood)
+
+* Compare json files through `aeson` in tests (#4354 by @PureFunctor)
+
+  This fixes the tests for the graph and source map outputs, as the
+  ordering is inconsistent between `stack test` and `cabal test`.
+
+* Add version bounds to the test suite's `build-depends`. (#4354 by @PureFunctor)
+
+* Update GHC to 9.2.3 (#4351 by @hdgarrood and @JordanMartinez)
+
+* Add qualification for locally-bound names (#4293 by @PureFunctor)
+
+  This change makes it so that `Qualified` names can now be qualified by either
+  a `ModuleName` for module-level declarations or the starting `SourcePos` for
+  bindings introduced locally. This makes disambiguation between references to
+  local bindings much easier in AST-driven analysis.
+
+## 0.15.2
+
+New features:
+
+* Check for partially applied synonyms in kinds, ctors (#4169 by @rhendric)
+
+  This check doesn't prevent any programs from compiling; it just makes
+  sure that a more specific `PartiallyAppliedSynonym` error is raised
+  instead of a `KindsDoNotUnify` error, which could be interpreted as
+  implying that a partially applied synonym has a valid kind and would be
+  supported elsewhere if that kind is expected.
+
+* Support deriving instances for type synonyms (#4315 by @rhendric)
+
+Bugfixes:
+
+* Do not emit warnings about type wildcards used in binders (patterns). (#4309 by @fsoikin)
+
+  Type wildcards in the following examples no longer trigger a warning:
+
+  ```
+  f :: Int
+  f = 42 # \(x :: _) -> x
+
+  g :: Maybe Int
+  g = do
+    x :: _ <- getX
+    pure $ x + 5
+  ```
+
+* Fix issue with unnamed instances using type operators (#4311 by @rhendric)
+
+* Fix incorrect `Prim.Int (class Compare)` docs: `Int` & `Ordering`, not `Symbol` (#4313 by @JordanMartinez)
+
+* Fix bad interaction between module renaming and inliner (#4322 by @rhendric)
+
+  This bug was triggered when modules that the compiler handles specially
+  are shadowed by local constructors. For example, a constructor named
+  `Prim` could have caused references to `Prim_1["undefined"]` to be
+  produced in the compiled code, leading to a reference error at run time.
+  Less severely, a constructor named `Control_Bind` would have caused the
+  compiler not to inline known monadic functions, leading to slower and
+  less readable compiled code.
+
+* Update `Prim` docs for Boolean, Int, String/Symbol, Number, Record, and Row (#4317 by @JordanMartinez)
+
+* Fix crash caused by polykinded instances (#4325 by @rhendric)
+
+  A polykinded instance is a class instance where one or more of the type
+  parameters has an indeterminate kind. For example, the kind of `a` in
+
+  ```purs
+  instance SomeClass (Proxy a) where ...
+  ```
+
+  is indeterminate unless it's somehow used in a constraint or functional
+  dependency of the instance in a way that determines it.
+
+  The above instance would not have caused the crash; instead, instances needed
+  to be of the form
+
+  ```purs
+  instance SomeClass (f a) where ...
+  ```
+
+  in order to cause it.
+
+* Fix bad interaction between newtype deriving and type synonyms (#4315 by @rhendric)
+
+  See #3453.
+
+* Fix bad interaction between instance deriving and type synonyms (#4315 by @rhendric)
+
+  See #4105.
+
+* Fix spurious kind unification error triggered by newtype deriving, type synonyms, and polykinds (#4315 by @rhendric)
+
+  See #4200.
+
+Internal:
+
+* Deploy builds continuously to GitHub and npm (#4306 and #4324 by @rhendric)
+
+  (Builds triggered by changes that shouldn't affect the published package are
+  not deployed.)
+
+* Fix incomplete type traversals (#4155 by @rhendric)
+
+  This corrects oversights in some compiler internals that are not known to be
+  the cause of any user-facing issues.
+
+* Drop dependency on microlens libraries (#4327 by @rhendric)
+
+## 0.15.1
+
+Release skipped; use [0.15.2](#0152).
+
 ## 0.15.0
 
 Breaking changes:

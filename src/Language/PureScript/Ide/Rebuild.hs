@@ -14,9 +14,12 @@ import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Data.Time                       as Time
+import qualified Data.Text                       as Text
 import qualified Language.PureScript             as P
+import           Language.PureScript.Make (ffiCodegen')
 import           Language.PureScript.Make.Cache (CacheInfo(..), normaliseForCache)
 import qualified Language.PureScript.CST         as CST
+
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
@@ -51,11 +54,14 @@ rebuildFile
   -- ^ A runner for the second build with open exports
   -> m Success
 rebuildFile file actualFile codegenTargets runOpenBuild = do
-  (fp, input) <- ideReadFile file
+  (fp, input) <-
+    case List.stripPrefix "data:" file of
+      Just source -> pure ("", Text.pack source)
+      _ -> ideReadFile file
   let fp' = fromMaybe fp actualFile
   (pwarnings, m) <- case sequence $ CST.parseFromFile fp' input of
     Left parseError ->
-      throwError $ RebuildError $ CST.toMultipleErrors fp' parseError
+      throwError $ RebuildError [(fp', input)] $ CST.toMultipleErrors fp' parseError
     Right m -> pure m
   let moduleName = P.getModuleName m
   -- Externs files must be sorted ahead of time, so that they get applied
@@ -65,17 +71,22 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton moduleName (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules (M.singleton moduleName (Right file))
+  let pureRebuild = fp == ""
+  let modulePath = if pureRebuild then fp' else file
+  foreigns <- P.inferForeignModules (M.singleton moduleName (Right modulePath))
   let makeEnv = P.buildMakeActions outputDirectory filePathMap foreigns False
+        & (if pureRebuild then enableForeignCheck foreigns codegenTargets . shushCodegen else identity)
+        & shushProgress
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
     liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets }) do
-      newExterns <- P.rebuildModule (shushProgress makeEnv) externs m
-      updateCacheDb codegenTargets outputDirectory file actualFile moduleName
+      newExterns <- P.rebuildModule makeEnv externs m
+      unless pureRebuild
+        $ updateCacheDb codegenTargets outputDirectory file actualFile moduleName
       pure newExterns
   case result of
     Left errors ->
-      throwError (RebuildError errors)
+      throwError (RebuildError [(fp', input)] errors)
     Right newExterns -> do
       insertModule (fromMaybe file actualFile, m)
       insertExterns newExterns
@@ -176,6 +187,16 @@ shushCodegen ma =
      , P.ffiCodegen = \_ -> pure ()
      }
 
+-- | Enables foreign module check without actual codegen.
+enableForeignCheck
+  :: M.Map P.ModuleName FilePath
+  -> S.Set P.CodegenTarget
+  -> P.MakeActions P.Make
+  -> P.MakeActions P.Make
+enableForeignCheck foreigns codegenTargets ma =
+  ma { P.ffiCodegen = ffiCodegen' foreigns codegenTargets Nothing
+     }
+
 -- | Returns a topologically sorted list of dependent ExternsFiles for the given
 -- module. Throws an error if there is a cyclic dependency within the
 -- ExternsFiles
@@ -193,7 +214,7 @@ sortExterns m ex = do
            . M.delete (P.getModuleName m) $ ex
   case sorted' of
     Left err ->
-      throwError (RebuildError err)
+      throwError (RebuildError [] err)
     Right (sorted, graph) -> do
       let deps = fromJust (List.lookup (P.getModuleName m) graph)
       pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)

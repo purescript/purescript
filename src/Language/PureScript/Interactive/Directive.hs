@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Interactive.Directive where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Maybe (fromJust)
 import Data.List (isPrefixOf)

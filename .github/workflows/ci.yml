@@ -15,16 +15,19 @@ defaults:
 env:
   CI_PRERELEASE: "${{ github.event_name == 'push' }}"
   CI_RELEASE: "${{ github.event_name == 'release' }}"
-  STACK_VERSION: "2.7.3"
+  STACK_VERSION: "2.7.5"
 
 concurrency:
-  # We never want two releases or prereleases building at the same time, since
-  # they would likely both claim the same version number. Pull request builds
-  # can happen in parallel with anything else, since they don't mutate global
-  # state with a release. (GitHub Actions is either too cheap to give us `if`
-  # expressions or too lazy to document them, but we have untyped boolean
-  # operators to fall back on.)
-  group: "${{ github.event_name == 'pull_request' && github.run_id || 'continuous-deployment' }}"
+  # We never want two prereleases building at the same time, since they would
+  # likely both claim the same version number. Pull request builds can happen
+  # in parallel with anything else, since they don't mutate global state with a
+  # release. Release builds don't change their behavior based on published
+  # state, so they don't interfere with each other and there's no point in
+  # canceling a prerelease build if a release build starts; and we would never
+  # want a release build to be canceled by a prerelease build either. (GitHub
+  # Actions is either too cheap to give us `if` expressions or too lazy to
+  # document them, but we have untyped boolean operators to fall back on.)
+  group: "${{ github.event_name != 'push' && github.run_id || 'continuous-deployment' }}"
   cancel-in-progress: true
 
 jobs:
@@ -35,8 +38,8 @@ jobs:
         include:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
             os: "ubuntu-latest"
-            image: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
-          - os: "macOS-10.15"
+            image: "ghcr.io/purescript/haskell:9.2.3-stretch@sha256:70fd2b6255deb5daa961e6983591a0e21e9ac1e793923bee54aa2cc62e01f867"
+          - os: "macOS-11"
           - os: "windows-2019"
 
     runs-on: "${{ matrix.os }}"
@@ -81,7 +84,7 @@ jobs:
           path: |
             /root/.stack
             ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ runner.os }}-MdyPsf-${{ hashFiles('stack.yaml') }}"
+          key: "${{ runner.os }}-${{ job.container.id }}-MdyPsf-${{ hashFiles('stack.yaml') }}"
 
       - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
         # This ensures that the local GHC and MSYS binaries that Stack installs
@@ -116,9 +119,9 @@ jobs:
         if: runner.os == 'Linux'
         working-directory: "sdist-test"
         run: |
-          if [ $(ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
+          if [ $(ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
             echo "libtinfo detected"
-            ldd $(stack path --local-doc-root)/../bin/purs | grep 'libtinfo'
+            ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo'
             exit 1
           fi
 
@@ -163,7 +166,13 @@ jobs:
 
   lint:
     runs-on: "ubuntu-latest"
-    container: "haskell:8.10.7-stretch@sha256:100f8fb7d7d8d64adb5e106fe8136b8d4cbdc03aeb2cbd145a7597d74b69bafb"
+    # At the moment, this is a different image from the image used for
+    # compilation, though the GHC versions match. This is because the
+    # compilation image uses an old version of glibc, which we want because it
+    # means our published binaries will work on the widest number of platforms.
+    # But the HLint binary downloaded by this job requires a newer glibc
+    # version.
+    container: "haskell:9.2.3-buster@sha256:51e250369e4671a15c247cdc5047397be88d7eb8e95b97b0fd9f417854a78bec"
 
     steps:
       - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
@@ -183,11 +192,11 @@ jobs:
         with:
           path: |
             /root/.stack
-          key: "${{ runner.os }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
+          key: "${{ runner.os }}-${{ job.container.id }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
 
       - run: "ci/fix-home ci/run-hlint.sh --git"
         env:
-          VERSION: "2.2.11"
+          VERSION: "3.5"
 
       # Note: the weeder version will need to be updated when we next update our version
       # of GHC.
@@ -206,7 +215,7 @@ jobs:
           # `allow-newer: true` is needed so that weeder-2.2.0 can be
           # installed with the dependencies present in LTS-18.
           echo 'allow-newer: true' >> stack-weeder.yaml
-          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.2.0
+          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.4.0
 
       - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
 
@@ -230,7 +239,7 @@ jobs:
       - uses: "actions/download-artifact@v3"
       - uses: "ncipollo/release-action@v1.10.0"
         with:
-          tag: "${{ needs.build.outputs.version }}"
+          tag: "v${{ needs.build.outputs.version }}"
           artifacts: "*-bundle/*"
           prerelease: true
           body: "This is an automated preview release. Get the latest stable release [here](https://github.com/purescript/purescript/releases/latest)."
@@ -238,6 +247,7 @@ jobs:
       - uses: "actions/setup-node@v3"
         with:
           node-version: "16.x"
+          registry-url: "https://registry.npmjs.org"
       - name: "Publish npm package"
         working-directory: "npm-package"
         env:

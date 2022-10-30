@@ -13,7 +13,7 @@ module Language.PureScript.Sugar.Operators
   , checkFixityExports
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -50,7 +50,7 @@ desugarSignedLiterals (Module ss coms mn ds exts) =
   Module ss coms mn (map f' ds) exts
   where
   (f', _, _) = everywhereOnValues id go id
-  go (UnaryMinus ss' val) = App (Var ss' (Qualified Nothing (Ident C.negate))) val
+  go (UnaryMinus ss' val) = App (Var ss' (Qualified ByNullSourcePos (Ident C.negate))) val
   go other = other
 
 -- |
@@ -136,12 +136,13 @@ rebracketFiltered !caller pred_ externs m = do
     Module ss coms mn <$> mapM (usingPredicate pred_ f') ds <*> pure exts
     where
     (goDecl', goExpr', goBinder') = updateTypes goType
-    (f', _, _, _, _) =
+    (f', _, _, _, _, _) =
       everywhereWithContextOnValuesM
         ss
         (\_ d -> (declSourceSpan d,) <$> goDecl' d)
         (\pos -> uncurry goExpr <=< goExpr' pos)
         (\pos -> uncurry goBinder <=< goBinder' pos)
+        defS
         defS
         defS
 
@@ -225,12 +226,13 @@ rebracketModule !caller pred_ valueOpTable typeOpTable (Module ss coms mn ds ext
     CalledByDocs -> f
     CalledByCompile -> g <=< f
 
-  (f, _, _, _, _) =
+  (f, _, _, _, _, _) =
       everywhereWithContextOnValuesM
         ss
         (\_ d -> (declSourceSpan d,) <$> goDecl d)
         (\pos -> wrap (matchExprOperators valueOpTable) <=< goExpr' pos)
         (\pos -> wrap (matchBinderOperators valueOpTable) <=< goBinder' pos)
+        defS
         defS
         defS
 
@@ -252,9 +254,9 @@ removeBinaryNoParens u
                             where err = throwError . errorMessage $ IncorrectAnonymousArgument
 removeBinaryNoParens (Parens (stripPositionInfo -> BinaryNoParens op l r))
   | isAnonymousArgument r = do arg <- freshIdent'
-                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op l) (Var nullSourceSpan (Qualified Nothing arg))
+                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op l) (Var nullSourceSpan (Qualified ByNullSourcePos arg))
   | isAnonymousArgument l = do arg <- freshIdent'
-                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op (Var nullSourceSpan (Qualified Nothing arg))) r
+                               return $ Abs (VarBinder nullSourceSpan arg) $ App (App op (Var nullSourceSpan (Qualified ByNullSourcePos arg))) r
 removeBinaryNoParens (BinaryNoParens op l r) = return $ App (App op l) r
 removeBinaryNoParens e = return e
 
@@ -301,7 +303,7 @@ externsFixities ExternsFile{..} =
     -> Either ValueFixityRecord TypeFixityRecord
   fromFixity (ExternsFixity assoc prec op name) =
     Left
-      ( Qualified (Just efModuleName) op
+      ( Qualified (ByModuleName efModuleName) op
       , internalModuleSourceSpan ""
       , Fixity assoc prec
       , name
@@ -312,7 +314,7 @@ externsFixities ExternsFile{..} =
     -> Either ValueFixityRecord TypeFixityRecord
   fromTypeFixity (ExternsTypeFixity assoc prec op name) =
     Right
-      ( Qualified (Just efModuleName) op
+      ( Qualified (ByModuleName efModuleName) op
       , internalModuleSourceSpan ""
       , Fixity assoc prec
       , name
@@ -323,9 +325,9 @@ collectFixities (Module _ _ moduleName ds _) = concatMap collect ds
   where
   collect :: Declaration -> [Either ValueFixityRecord TypeFixityRecord]
   collect (ValueFixityDeclaration (ss, _) fixity name op) =
-    [Left (Qualified (Just moduleName) op, ss, fixity, name)]
+    [Left (Qualified (ByModuleName moduleName) op, ss, fixity, name)]
   collect (TypeFixityDeclaration (ss, _) fixity name op) =
-    [Right (Qualified (Just moduleName) op, ss, fixity, name)]
+    [Right (Qualified (ByModuleName moduleName) op, ss, fixity, name)]
   collect _ = []
 
 ensureNoDuplicates
@@ -337,7 +339,7 @@ ensureNoDuplicates toError m = go $ sortOn fst m
   where
   go [] = return ()
   go [_] = return ()
-  go ((x@(Qualified (Just mn) op), _) : (y, pos) : _) | x == y =
+  go ((x@(Qualified (ByModuleName mn) op), _) : (y, pos) : _) | x == y =
     rethrow (addHint (ErrorInModule mn)) $
       rethrowWithPosition pos $ throwError . errorMessage $ toError op
   go (_ : rest) = go rest
@@ -378,10 +380,10 @@ updateTypes goType = (goDecl, goExpr, goBinder)
     implies' <- traverse (overConstraintArgs (traverse (goType' ss))) implies
     args' <- traverse (traverse (traverse (goType' ss))) args
     return $ TypeClassDeclaration sa name args' implies' deps decls
-  goDecl (TypeInstanceDeclaration sa@(ss, _) ch idx name cs className tys impls) = do
+  goDecl (TypeInstanceDeclaration sa@(ss, _) na ch idx name cs className tys impls) = do
     cs' <- traverse (overConstraintArgs (traverse (goType' ss))) cs
     tys' <- traverse (goType' ss) tys
-    return $ TypeInstanceDeclaration sa ch idx name cs' className tys' impls
+    return $ TypeInstanceDeclaration sa na ch idx name cs' className tys' impls
   goDecl (TypeSynonymDeclaration sa@(ss, _) name args ty) =
     TypeSynonymDeclaration sa name
       <$> traverse (traverse (traverse (goType' ss))) args
@@ -459,7 +461,7 @@ checkFixityExports m@(Module ss _ mn ds (Just exps)) =
   getTypeOpAlias op =
     listToMaybe (mapMaybe (either (const Nothing) go <=< getFixityDecl) ds)
     where
-    go (TypeFixity _ (Qualified (Just mn') ident) op')
+    go (TypeFixity _ (Qualified (ByModuleName mn') ident) op')
       | mn == mn' && op == op' = Just ident
     go _ = Nothing
 
@@ -471,7 +473,7 @@ checkFixityExports m@(Module ss _ mn ds (Just exps)) =
   getValueOpAlias op =
     listToMaybe (mapMaybe (either go (const Nothing) <=< getFixityDecl) ds)
     where
-    go (ValueFixity _ (Qualified (Just mn') ident) op')
+    go (ValueFixity _ (Qualified (ByModuleName mn') ident) op')
       | mn == mn' && op == op' = Just ident
     go _ = Nothing
 

@@ -32,7 +32,7 @@ module Language.PureScript.Docs.RenderedCode.Types
  , aliasName
  ) where
 
-import Prelude.Compat
+import Prelude
 import GHC.Generics (Generic)
 
 import Control.DeepSeq (NFData)
@@ -117,8 +117,8 @@ maybeToContainingModule Nothing = ThisModule
 maybeToContainingModule (Just mn) = OtherModule mn
 
 fromQualified :: Qualified a -> (ContainingModule, a)
-fromQualified (Qualified mn x) =
-  (maybeToContainingModule mn, x)
+fromQualified (Qualified (ByModuleName mn) x) = (OtherModule mn, x)
+fromQualified (Qualified _ x) = (ThisModule, x)
 
 data Link
   = NoLink
@@ -296,9 +296,9 @@ aliasName for name' =
   in
     case ns of
       ValueLevel ->
-        ident (Qualified Nothing (Ident name))
+        ident (Qualified ByNullSourcePos (Ident name))
       TypeLevel ->
-        typeCtor (Qualified Nothing (ProperName name))
+        typeCtor (Qualified ByNullSourcePos (ProperName name))
 
 -- | Converts a FixityAlias into a different representation which is more
 -- useful to other functions in this module.

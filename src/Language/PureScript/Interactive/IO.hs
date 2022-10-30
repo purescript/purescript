@@ -2,7 +2,7 @@
 
 module Language.PureScript.Interactive.IO (findNodeProcess, readNodeProcessWithExitCode, getHistoryFilename) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad (msum, void)
 import Control.Monad.Error.Class (throwError)

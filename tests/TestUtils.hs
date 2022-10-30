@@ -1,7 +1,6 @@
 module TestUtils where
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
@@ -20,7 +19,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char (isSpace)
 import Data.Function (on)
-import Data.List (sort, sortBy, stripPrefix, groupBy)
+import Data.List (sort, sortBy, stripPrefix, groupBy, find)
 import qualified Data.Map as M
 import Data.Maybe (isJust)
 import qualified Data.Text as T
@@ -181,31 +180,58 @@ getTestFiles testDir = do
        then maybe fp reverse $ stripPrefix ext $ reverse fp
        else dir
 
+data ExpectedModuleName
+  = IsMain
+  | IsSourceMap FilePath
+
 compile
-  :: Bool
+  :: Maybe ExpectedModuleName
   -> SupportModules
   -> [FilePath]
-  -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile checkForMainModule SupportModules{..} inputFiles = runTest $ do
+  -> IO ([(FilePath, T.Text)], (Either P.MultipleErrors FilePath, P.MultipleErrors))
+compile = compile' P.defaultOptions
+
+compile'
+  :: P.Options
+  -> Maybe ExpectedModuleName
+  -> SupportModules
+  -> [FilePath]
+  -> IO ([(FilePath, T.Text)], (Either P.MultipleErrors FilePath, P.MultipleErrors))
+compile' options expectedModule SupportModules{..} inputFiles = do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
-  fs <- liftIO $ readInput (sort inputFiles)
-  msWithWarnings <- CST.parseFromFiles id fs
-  tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
-  let ms = fmap snd <$> msWithWarnings
-  foreigns <- inferForeignModules ms
-  let
-    actions = makeActions supportModules (foreigns `M.union` supportForeigns)
-    hasMainModule = (==) 1 $ length $ filter (== "Main") $ fmap getPsModuleName ms
-  case ms of
-    [singleModule] -> do
-      when (checkForMainModule && not hasMainModule) $ do
-        error $ "When testing a single PureScript file, the file's module's name must be 'Main' but got '"
-          <> T.unpack (getPsModuleName singleModule) <> "'."
-      pure <$> P.rebuildModule actions supportExterns (snd singleModule)
-    _ -> do
-      when (checkForMainModule && not hasMainModule) $ do
-        error "When testing multiple PureScript files, the main file's module's name must be 'Main'."
-      P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
+  fs <- readInput (sort inputFiles)
+  fmap (fs, ) . P.runMake options $ do
+    msWithWarnings <- CST.parseFromFiles id fs
+    tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
+    let ms = fmap snd <$> msWithWarnings
+    foreigns <- inferForeignModules ms
+    let
+      actions = makeActions supportModules (foreigns `M.union` supportForeigns)
+      (hasExpectedModuleName, expectedModuleName, compiledModulePath) = case expectedModule of
+        -- Check if there is one (and only one) module called "Main"
+        Just IsMain ->
+          let
+            moduleName = "Main"
+            compiledPath = modulesDir </> moduleName </> "index.js"
+          in ((==) 1 $ length $ filter (== moduleName) $ fmap (T.unpack . getPsModuleName) ms, moduleName, compiledPath)
+        -- Check if main sourcemap module starts with "SourceMaps." and matches its file name
+        Just (IsSourceMap modulePath) ->
+          let
+            moduleName = "SourceMaps." <> (dropExtensions . takeFileName $ modulePath)
+            compiledPath = modulesDir </> moduleName </> "index.js.map"
+          in (maybe False ((==) moduleName . T.unpack . getPsModuleName) (find ((==) modulePath . fst) ms), moduleName, compiledPath)
+        Nothing -> (True, mempty, mempty)
+
+    case ms of
+      [singleModule] -> do
+        unless hasExpectedModuleName $
+          error ("While testing a single PureScript file, the expected module name was '" <> expectedModuleName <>
+            "' but got '" <> T.unpack (getPsModuleName singleModule) <> "'.")
+        compiledModulePath <$ P.rebuildModule actions supportExterns (snd singleModule)
+      _ -> do
+        unless hasExpectedModuleName $
+          error $ "While testing multiple PureScript files, the expected main module was not found: '" <> expectedModuleName <> "'."
+        compiledModulePath <$ P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
 
 getPsModuleName :: (a, AST.Module) -> T.Text
 getPsModuleName psModule = case snd psModule of

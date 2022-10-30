@@ -9,7 +9,7 @@ module Language.PureScript.TypeChecker.Entailment
   , entails
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Control.Arrow (second, (&&&))
@@ -22,13 +22,14 @@ import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (delete, findIndices, groupBy, minimumBy, nubBy, sortOn, tails)
+import Data.List (delete, findIndices, minimumBy, nubBy, sortOn, tails)
 import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (for)
 import Data.Text (Text, stripPrefix, stripSuffix)
 import qualified Data.Text as T
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
@@ -89,9 +90,9 @@ namedInstanceIdentifier _ = Nothing
 type TypeClassDict = TypeClassDictionaryInScope Evidence
 
 -- | The 'InstanceContext' tracks those constraints which can be satisfied.
-type InstanceContext = M.Map (Maybe ModuleName)
+type InstanceContext = M.Map QualifiedBy
                          (M.Map (Qualified (ProperName 'ClassName))
-                           (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
+                           (M.Map (Qualified Ident) (NonEmpty NamedDict)))
 
 -- | A type substitution which makes an instance head match a list of types.
 --
@@ -197,7 +198,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ ctx cn@C.Warn _ [msg] =
       -- Prefer a warning dictionary in scope if there is one available.
       -- This allows us to defer a warning by propagating the constraint.
-      findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope Nothing 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing Nothing]
+      findDicts ctx cn ByNullSourcePos ++ [TypeClassDictionaryInScope Nothing 0 (WarnInstance msg) [] C.Warn [] [] [msg] Nothing Nothing]
     forClassName _ _ C.IsSymbol _ args | Just dicts <- solveIsSymbol args = dicts
     forClassName _ _ C.SymbolCompare _ args | Just dicts <- solveSymbolCompare args = dicts
     forClassName _ _ C.SymbolAppend _ args | Just dicts <- solveSymbolAppend args = dicts
@@ -212,22 +213,22 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ _ C.RowLacks kinds args | Just dicts <- solveLacks kinds args = dicts
     forClassName _ _ C.RowCons kinds args | Just dicts <- solveRowCons kinds args = dicts
     forClassName _ _ C.RowToList kinds args | Just dicts <- solveRowToList kinds args = dicts
-    forClassName _ ctx cn@(Qualified (Just mn) _) _ tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
+    forClassName _ ctx cn@(Qualified (ByModuleName mn) _) _ tys = concatMap (findDicts ctx cn) (ordNub (ByNullSourcePos : ByModuleName mn : map ByModuleName (mapMaybe ctorModules tys)))
     forClassName _ _ _ _ _ = internalError "forClassName: expected qualified class name"
 
     ctorModules :: SourceType -> Maybe ModuleName
-    ctorModules (TypeConstructor _ (Qualified (Just mn) _)) = Just mn
-    ctorModules (TypeConstructor _ (Qualified Nothing _)) = internalError "ctorModules: unqualified type name"
+    ctorModules (TypeConstructor _ (Qualified (ByModuleName mn) _)) = Just mn
+    ctorModules (TypeConstructor _ (Qualified (BySourcePos _) _)) = internalError "ctorModules: unqualified type name"
     ctorModules (TypeApp _ ty _) = ctorModules ty
     ctorModules (KindApp _ ty _) = ctorModules ty
     ctorModules (KindedType _ ty _) = ctorModules ty
     ctorModules _ = Nothing
 
-    findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDict]
-    findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (>>= M.lookup cn) . flip M.lookup ctx
+    findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> QualifiedBy -> [TypeClassDict]
+    findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (M.lookup cn <=< flip M.lookup ctx)
 
     valUndefined :: Expr
-    valUndefined = Var nullSourceSpan (Qualified (Just C.Prim) (Ident C.undefined))
+    valUndefined = Var nullSourceSpan (Qualified (ByModuleName C.Prim) (Ident C.undefined))
 
     solve :: SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
     solve = go 0 hints
@@ -258,11 +259,12 @@ entails SolverOptions{..} constraint context hints =
             dicts <- lift . lift $ forClassNameM env (combineContexts context inferred) className' kinds'' tys''
 
             let (catMaybes -> ambiguous, instances) = partitionEithers $ do
-                  chain <- groupBy ((==) `on` tcdChain) $
+                  chain :: NonEmpty TypeClassDict <-
+                           NEL.groupBy ((==) `on` tcdChain) $
                            sortOn (tcdChain &&& tcdIndex)
                            dicts
                   -- process instances in a chain in index order
-                  let found = for (init $ tails chain) $ \(tcd:tl) ->
+                  let found = for (tails1 chain) $ \(tcd :| tl) ->
                                 -- Make sure the type unifies with the type in the type instance definition
                                 case matches typeClassDependencies tcd tys'' of
                                   Apart        -> Right ()                   -- keep searching
@@ -304,7 +306,7 @@ entails SolverOptions{..} constraint context hints =
               Unsolved unsolved -> do
                 -- Generate a fresh name for the unsolved constraint's new dictionary
                 ident <- freshIdent ("dict" <> runProperName (disqualify (constraintClass unsolved)))
-                let qident = Qualified Nothing ident
+                let qident = Qualified ByNullSourcePos ident
                 -- Store the new dictionary in the InstanceContext so that we can solve this goal in
                 -- future.
                 newDicts <- lift . lift $ newDictionaries [] qident unsolved
@@ -369,7 +371,7 @@ entails SolverOptions{..} constraint context hints =
             tcdToInstanceDescription TypeClassDictionaryInScope{ tcdDescription, tcdValue } =
               let nii = namedInstanceIdentifier tcdValue
               in case tcdDescription of
-                Just ty -> flip Qualified (Left ty) <$> fmap getQual nii
+                Just ty -> flip Qualified (Left ty) <$> fmap (byMaybeModuleName . getQual) nii
                 Nothing -> fmap Right <$> nii
 
             canBeGeneralized :: Type a -> Bool
@@ -430,7 +432,7 @@ entails SolverOptions{..} constraint context hints =
 
     solveCoercible :: Environment -> InstanceContext -> [SourceType] -> [SourceType] -> m (Maybe [TypeClassDict])
     solveCoercible env ctx kinds [a, b] = do
-      let coercibleDictsInScope = findDicts ctx C.Coercible Nothing
+      let coercibleDictsInScope = findDicts ctx C.Coercible ByNullSourcePos
           givens = flip mapMaybe coercibleDictsInScope $ \case
             dict | [a', b'] <- tcdInstanceTypes dict -> Just (a', b')
                  | otherwise -> Nothing
@@ -558,7 +560,7 @@ entails SolverOptions{..} constraint context hints =
           args' = [arg0, arg1, srcTypeConstructor ordering]
       in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] args' Nothing Nothing]
     solveIntCompare ctx args@[a, b, _] = do
-      let compareDictsInScope = findDicts ctx C.IntCompare Nothing
+      let compareDictsInScope = findDicts ctx C.IntCompare ByNullSourcePos
           givens = flip mapMaybe compareDictsInScope $ \case
             dict | [a', b', c'] <- tcdInstanceTypes dict -> mkRelation a' b' c'
                  | otherwise -> Nothing
@@ -845,7 +847,7 @@ newDictionaries path name (Constraint _ className instanceKinds instanceTy _) = 
 
 mkContext :: [NamedDict] -> InstanceContext
 mkContext = foldr combineContexts M.empty . map fromDict where
-  fromDict d = M.singleton Nothing (M.singleton (tcdClassName d) (M.singleton (tcdValue d) (pure d)))
+  fromDict d = M.singleton ByNullSourcePos (M.singleton (tcdClassName d) (M.singleton (tcdValue d) (pure d)))
 
 -- | Check all pairs of values in a list match a predicate
 pairwiseAll :: Monoid m => (a -> a -> m) -> [a] -> m
@@ -863,3 +865,19 @@ pairwiseM :: Applicative m => (a -> a -> m ()) -> [a] -> m ()
 pairwiseM _ [] = pure ()
 pairwiseM _ [_] = pure ()
 pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs
+
+-- | Return all nonempty tails of a nonempty list. For example:
+--
+-- tails1 (fromList [1]) == fromList [fromList [1]]
+-- tails1 (fromList [1,2]) == fromList [fromList [1,2], fromList [2]]
+-- tails1 (fromList [1,2,3]) == fromList [fromList [1,2,3], fromList [2,3], fromList [3]]
+tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
+tails1 =
+  -- NEL.fromList is an unsafe function, but this usage should be safe, since:
+  -- * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
+  -- * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
+  --   list, since `head (tails xs) = xs`.
+  -- * The only empty element of `tails xs` is the last one (by the definition of `tails`)
+  -- * Therefore, if we take all but the last element of `tails xs` i.e.
+  --   `init (tails xs)`, we have a nonempty list of nonempty lists
+  NEL.fromList . map NEL.fromList . init . tails . NEL.toList

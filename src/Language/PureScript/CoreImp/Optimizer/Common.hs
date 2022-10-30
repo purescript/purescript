@@ -1,7 +1,7 @@
 -- | Common functions used by the various optimizer phases
 module Language.PureScript.CoreImp.Optimizer.Common where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Text (Text)
 import Data.List (foldl')
@@ -9,6 +9,7 @@ import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash
 import Language.PureScript.CoreImp.AST
+import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString)
 
 applyAll :: [a -> a] -> a -> a
@@ -59,10 +60,10 @@ removeFromBlock :: ([AST] -> [AST]) -> AST -> AST
 removeFromBlock go (Block ss sts) = Block ss (go sts)
 removeFromBlock _  js = js
 
-isDict :: (Text, PSString) -> AST -> Bool
-isDict (moduleName, dictName) (Indexer _ (StringLiteral _ x) (Var _ y)) =
-  x == dictName && y == moduleName
+isDict :: (ModuleName, PSString) -> AST -> Bool
+isDict (moduleName, dictName) (ModuleAccessor _ x y) =
+  x == moduleName && y == dictName
 isDict _ _ = False
 
-isDict' :: [(Text, PSString)] -> AST -> Bool
+isDict' :: [(ModuleName, PSString)] -> AST -> Bool
 isDict' xs js = any (`isDict` js) xs

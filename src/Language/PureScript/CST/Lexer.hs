@@ -1,5 +1,6 @@
 module Language.PureScript.CST.Lexer
   ( lenient
+  , lexModule
   , lex
   , lexTopLevel
   , lexWithState
@@ -37,10 +38,17 @@ lenient = go
       ann = TokenAnn (SourceRange pos pos) (lexLeading st) []
     [Right (SourceToken ann TokEof)]
 
+lexModule :: Text -> [LexResult]
+lexModule = lex' shebangThenComments
+
 -- | Lexes according to root layout rules.
 lex :: Text -> [LexResult]
-lex src = do
-  let (leading, src') = comments src
+lex = lex' comments
+
+lex' :: (Text -> ([Comment LineFeed], Text)) -> Text -> [LexResult]
+lex' lexComments src = do
+  let (leading, src') = lexComments src
+
   lexWithState $ LexState
     { lexPos = advanceLeading (SourcePos 1 1) leading
     , lexLeading = leading
@@ -143,6 +151,17 @@ restore p (Parser k) = Parser $ \inp kerr ksucc ->
 tokenAndComments :: Lexer (Token, ([Comment void], [Comment LineFeed]))
 tokenAndComments = (,) <$> token <*> breakComments
 
+shebangThenComments :: Text -> ([Comment LineFeed], Text)
+shebangThenComments src = do
+  let
+    (sb, (coms, src')) = comments <$> shebang src
+  (sb <> coms, src')
+
+shebang :: Text -> ([Comment LineFeed], Text)
+shebang = \src -> k src (\_ _ -> ([], src)) (\inp a -> (a, inp))
+  where
+  Parser k = breakShebang
+
 comments :: Text -> ([Comment LineFeed], Text)
 comments = \src -> k src (\_ _ -> ([], src)) (\inp (a, b) -> (a <> b, inp))
   where
@@ -206,10 +225,6 @@ breakComments = k0 []
     Just False -> Just <$> lineComment "--"
     Nothing    -> pure Nothing
 
-  lineComment acc = do
-    comm <- nextWhile (\c -> c /= '\r' && c /= '\n')
-    pure $ Comment (acc <> comm)
-
   blockComment acc = do
     chs <- nextWhile (/= '-')
     dashes <- nextWhile (== '-')
@@ -218,6 +233,57 @@ breakComments = k0 []
       else peek >>= \case
         Just '}' -> next $> Comment (acc <> chs <> dashes <> "}")
         _ -> blockComment (acc <> chs <> dashes)
+
+breakShebang :: ParserM ParserErrorType Text [Comment LineFeed]
+breakShebang = shebangComment >>= \case
+  Just comm -> k0 [comm]
+  Nothing -> pure []
+  where
+  k0 acc = lineFeedShebang >>= \case
+    Just (lf, sb) -> do
+      comm <- lineComment sb
+      k0 (comm : lf : acc)
+    Nothing ->
+      pure $ reverse acc
+
+  lineFeedShebang = Parser $ \inp _ ksucc ->
+    case unconsLineFeed inp of
+      Just (lf, inp2)
+        | Just (sb, inp3) <- unconsShebang inp2 ->
+            ksucc inp3 $ Just (lf, sb)
+      _ ->
+        ksucc inp Nothing
+
+  unconsLineFeed :: Text -> Maybe (Comment LineFeed, Text)
+  unconsLineFeed inp =
+    case Text.uncons inp of
+      Just ('\r', inp2) ->
+        case Text.uncons inp2 of
+          Just ('\n', inp3) ->
+            Just (Line CRLF, inp3)
+          _ ->
+            Just (Line CRLF, inp2)
+      Just ('\n', inp2) ->
+        Just (Line LF, inp2)
+      _ ->
+        Nothing
+
+  unconsShebang :: Text -> Maybe (Text, Text)
+  unconsShebang = fmap ("#!",) . Text.stripPrefix "#!"
+
+  shebangComment = isShebang >>= traverse lineComment
+
+  isShebang = Parser $ \inp _ ksucc ->
+    case unconsShebang inp of
+      Just (sb, inp3) ->
+        ksucc inp3 $ Just sb
+      _ ->
+        ksucc inp Nothing
+
+lineComment :: forall lf. Text -> ParserM ParserErrorType Text (Comment lf)
+lineComment acc = do
+  comm <- nextWhile (\c -> c /= '\r' && c /= '\n')
+  pure $ Comment (acc <> comm)
 
 token :: Lexer Token
 token = peek >>= maybe (pure TokEof) k0

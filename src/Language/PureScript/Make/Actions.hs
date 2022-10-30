@@ -8,6 +8,7 @@ module Language.PureScript.Make.Actions
   , cacheDbFile
   , readCacheDb'
   , writeCacheDb'
+  , ffiCodegen'
   ) where
 
 import           Prelude
@@ -54,7 +55,8 @@ import qualified Paths_purescript as Paths
 import           SourceMap
 import           SourceMap.Types
 import           System.Directory (getCurrentDirectory)
-import           System.FilePath ((</>), makeRelative, splitPath, normalise)
+import           System.FilePath ((</>), makeRelative, splitPath, normalise, splitDirectories)
+import qualified System.FilePath.Posix as Posix
 import           System.IO (stderr)
 
 -- | Determines when to rebuild a module
@@ -279,29 +281,13 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   ffiCodegen :: CF.Module CF.Ann -> Make ()
   ffiCodegen m = do
     codegenTargets <- asks optionsCodegenTargets
-    when (S.member JS codegenTargets) $ do
-      let mn = CF.moduleName m
-      case mn `M.lookup` foreigns of
-        Just path
-          | not $ requiresForeign m ->
-              tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
-          | otherwise -> do
-              checkResult <- checkForeignDecls m path
-              case checkResult of
-                Left _ -> copyFile path (outputFilename mn "foreign.js")
-                Right (ESModule, _) -> copyFile path (outputFilename mn "foreign.js")
-                Right (CJSModule, _) -> do
-                  throwError $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
-
-        Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
-                | otherwise -> return ()
-
+    ffiCodegen' foreigns codegenTargets (Just outputFilename) m
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
-    let pathToDir = iterate (".." </>) ".." !! length (splitPath $ normalise outputDir)
+    let pathToDir = iterate (".." Posix.</>) ".." !! length (splitPath $ normalise outputDir)
         sourceFile = case mappings of
-                      (SMap file _ _ : _) -> Just $ pathToDir </> makeRelative dir (T.unpack file)
+                      (SMap file _ _ : _) -> Just $ pathToDir Posix.</> normalizeSMPath (makeRelative dir (T.unpack file))
                       _ -> Nothing
     let rawMapping = SourceMapping { smFile = "index.js", smSourceRoot = Nothing, smMappings =
       map (\(SMap _ orig gen) -> Mapping {
@@ -320,6 +306,9 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     convertPos :: SourcePos -> Pos
     convertPos SourcePos { sourcePosLine = l, sourcePosColumn = c } =
       Pos { posLine = fromIntegral l, posColumn = fromIntegral c }
+
+    normalizeSMPath :: FilePath -> FilePath
+    normalizeSMPath = Posix.joinPath . splitDirectories
 
   requiresForeign :: CF.Module a -> Bool
   requiresForeign = not . null . CF.moduleForeign
@@ -354,7 +343,7 @@ checkForeignDecls m path = do
   modSS = CF.moduleSourceSpan m
 
   checkFFI :: JS.JSAST -> Make (ForeignModuleType, S.Set Ident)
-  checkFFI js = do 
+  checkFFI js = do
     (foreignModuleType, foreignIdentsStrs) <-
         case (,) <$> getForeignModuleExports js <*> getForeignModuleImports js of
           Left reason -> throwError $ errorParsingModule reason
@@ -434,3 +423,33 @@ checkForeignDecls m path = do
       . CST.runTokenParser CST.parseIdent
       . CST.lex
       $ T.pack str
+
+-- | FFI check and codegen action.
+-- If path maker is supplied copies foreign module to the output.
+ffiCodegen'
+  :: M.Map ModuleName FilePath
+  -> S.Set CodegenTarget
+  -> Maybe (ModuleName -> String -> FilePath)
+  -> CF.Module CF.Ann
+  -> Make ()
+ffiCodegen' foreigns codegenTargets makeOutputPath m = do
+  when (S.member JS codegenTargets) $ do
+    let mn = CF.moduleName m
+    case mn `M.lookup` foreigns of
+      Just path
+        | not $ requiresForeign m ->
+            tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
+        | otherwise -> do
+            checkResult <- checkForeignDecls m path
+            case checkResult of
+              Left _ -> copyForeign path mn
+              Right (ESModule, _) -> copyForeign path mn
+              Right (CJSModule, _) -> do
+                throwError $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
+      Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
+              | otherwise -> return ()
+  where
+  requiresForeign = not . null . CF.moduleForeign
+
+  copyForeign path mn =
+    for_ makeOutputPath (\outputFilename -> copyFile path (outputFilename mn "foreign.js"))

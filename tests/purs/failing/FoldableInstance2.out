@@ -1,0 +1,24 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/FoldableInstance2.purs:10:26 - 10:29 (line 10, column 26 - line 10, column 29)
+
+  Could not match kind
+  [33m      [0m
+  [33m  Type[0m
+  [33m      [0m
+  with kind
+  [33m              [0m
+  [33m  Type -> Type[0m
+  [33m              [0m
+
+while checking that type [33mFoo[0m
+  has kind [33mType -> Type[0m
+while inferring the kind of [33mFoldable Foo[0m
+in type class instance
+[33m                            [0m
+[33m  Data.Foldable.Foldable Foo[0m
+[33m                            [0m
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+
