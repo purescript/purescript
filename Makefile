@@ -19,10 +19,10 @@ help: ## Print documentation
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 ghcid: ## Run ghcid to quickly reload code on save.
-	ghcid --command "stack ghci purescript:exe:purs purescript:lib purescript:test:tests purescript-cst --main-is purescript:exe:purs --ghci-options -fno-code"
+	ghcid --command "stack ghci purescript:exe:purs purescript:lib purescript:test:tests --main-is purescript:exe:purs --ghci-options -fno-code"
 
 ghcid-test: ## Run ghcid to quickly reload code and run tests on save.
-	ghcid --command "stack ghci purescript:lib purescript:test:tests purescript-cst --ghci-options -fobject-code" \
+	ghcid --command "stack ghci purescript:lib purescript:test:tests --ghci-options -fobject-code" \
 	    --test "Main.main"
 
 build: ## Build the package.

@@ -9,7 +9,7 @@ module Language.PureScript.Sugar.Names
   , Exports(..)
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub, sortOn, swap, foldl')
 
 import Control.Arrow (first, second)
@@ -196,17 +196,17 @@ renameInModule imports (Module modSS coms mn decls exps) =
       TypeSynonymDeclaration sa name
         <$> updateTypeArguments ps
         <*> updateTypesEverywhere ty
-  updateDecl bound (TypeClassDeclaration sa@(ss, _) className args implies deps ds) =
+  updateDecl bound (TypeClassDeclaration sa className args implies deps ds) =
     fmap (bound,) $
       TypeClassDeclaration sa className
         <$> updateTypeArguments' args
-        <*> updateConstraints ss implies
+        <*> updateConstraints implies
         <*> pure deps
         <*> pure ds
-  updateDecl bound (TypeInstanceDeclaration sa@(ss, _) ch idx name cs cn ts ds) =
+  updateDecl bound (TypeInstanceDeclaration sa na@(ss, _) ch idx name cs cn ts ds) =
     fmap (bound,) $
-      TypeInstanceDeclaration sa ch idx name
-        <$> updateConstraints ss cs
+      TypeInstanceDeclaration sa na ch idx name
+        <$> updateConstraints cs
         <*> updateClassName cn ss
         <*> traverse updateTypesEverywhere ts
         <*> pure ds
@@ -361,8 +361,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     updateInConstraint (Constraint ann@(ss, _) name ks ts info) =
       Constraint ann <$> updateClassName name ss <*> pure ks <*> pure ts <*> pure info
 
-  updateConstraints :: SourceSpan -> [SourceConstraint] -> m [SourceConstraint]
-  updateConstraints pos = traverse $ \(Constraint ann name ks ts info) ->
+  updateConstraints :: [SourceConstraint] -> m [SourceConstraint]
+  updateConstraints = traverse $ \(Constraint ann@(pos, _) name ks ts info) ->
     Constraint ann
       <$> updateClassName name pos
       <*> traverse updateTypesEverywhere ks

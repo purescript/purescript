@@ -9,8 +9,7 @@ module Language.PureScript.Interactive
   , runMake
   ) where
 
-import           Prelude ()
-import           Prelude.Compat
+import           Prelude
 import           Protolude (ordNub)
 
 import           Data.List (sort, find, foldl')

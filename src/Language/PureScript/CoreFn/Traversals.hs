@@ -3,7 +3,7 @@
 --
 module Language.PureScript.CoreFn.Traversals where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow (second, (***), (+++))
 import Data.Bitraversable (bitraverse)

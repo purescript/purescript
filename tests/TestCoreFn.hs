@@ -2,8 +2,7 @@
 
 module TestCoreFn (spec) where
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import Data.Aeson
 import Data.Aeson.Types as Aeson

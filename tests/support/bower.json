@@ -27,7 +27,7 @@
     "purescript-psci-support": "^6.0.0",
     "purescript-refs": "^6.0.0",
     "purescript-safe-coerce": "^2.0.0",
-    "purescript-st": "^6.0.0",
+    "purescript-st": "^6.1.0",
     "purescript-strings": "^6.0.0",
     "purescript-tailrec": "^6.1.0",
     "purescript-tuples": "^7.0.0",

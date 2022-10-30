@@ -2,7 +2,7 @@ module Language.PureScript.Docs.Convert.ReExports
   ( updateReExports
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((&&&), first, second)
 import Control.Monad
@@ -12,9 +12,9 @@ import Control.Monad.Trans.Reader (runReaderT)
 import Control.Monad.Trans.State.Strict (execState)
 
 import Data.Either
-import Data.Foldable (traverse_)
+import Data.Foldable (fold, traverse_)
 import Data.Map (Map)
-import Data.Maybe (mapMaybe, fromMaybe)
+import Data.Maybe (mapMaybe)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -177,7 +177,7 @@ collectDeclarations reExports = do
       mapMaybe (\(exportSrc, ref) -> (,exportSrc) <$> f ref) reExports
 
   expCtors :: [P.ProperName 'P.ConstructorName]
-  expCtors = concatMap (fromMaybe [] . (>>= snd) . P.getTypeRef . snd) reExports
+  expCtors = concatMap (fold . (snd <=< P.getTypeRef . snd)) reExports
 
 lookupValueDeclaration ::
   forall m.

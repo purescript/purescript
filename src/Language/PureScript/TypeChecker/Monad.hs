@@ -5,7 +5,7 @@
 --
 module Language.PureScript.TypeChecker.Monad where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))

@@ -1,6 +1,6 @@
 module Language.PureScript.Publish.Utils where
 
-import Prelude.Compat
+import Prelude
 
 import System.Directory
 import System.FilePath.Glob (Pattern, compile, globDir1)

@@ -8,7 +8,7 @@ module Language.PureScript.Linter.Exhaustive
   ( checkExhaustiveExpr
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Control.Applicative
@@ -204,7 +204,7 @@ missingCasesMultiple env mn = go
 isExhaustiveGuard :: Environment -> ModuleName -> [GuardedExpr] -> Bool
 isExhaustiveGuard _ _ [MkUnguarded _] = True
 isExhaustiveGuard env moduleName gs   =
-  not . null $ filter (\(GuardedExpr grd _) -> isExhaustive grd) gs
+  any (\(GuardedExpr grd _) -> isExhaustive grd) gs
   where
     isExhaustive :: [Guard] -> Bool
     isExhaustive = all checkGuard
@@ -255,7 +255,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     in (missed', ( if null approx
                      then liftA2 (&&) cond nec
                      else Left Incomplete
-                 , if either (const True) id cond
+                 , if and cond
                      then redundant
                      else caseAlternativeBinders ca : redundant
                  )

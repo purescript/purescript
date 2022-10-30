@@ -1,7 +1,7 @@
 -- | This module implements the generic deriving elaboration that takes place during desugaring.
 module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 
-import           Prelude.Compat
+import           Prelude
 import           Protolude (note)
 
 import           Control.Monad.Error.Class (MonadError(..))
@@ -46,7 +46,7 @@ deriveInstance
   -> m Declaration
 deriveInstance mn ds decl =
   case decl of
-    TypeInstanceDeclaration sa@(ss, _) ch idx nm deps className tys DerivedInstance -> let
+    TypeInstanceDeclaration sa@(ss, _) na ch idx nm deps className tys DerivedInstance -> let
       binaryWildcardClass :: (Declaration -> [SourceType] -> m ([Declaration], SourceType)) -> m Declaration
       binaryWildcardClass f = case tys of
         [ty1, ty2] -> case unwrapTypeConstructor ty1 of
@@ -54,7 +54,7 @@ deriveInstance mn ds decl =
             checkIsWildcard ss tyCon ty2
             tyConDecl <- findTypeDecl ss tyCon ds
             (members, ty2') <- f tyConDecl args
-            pure $ TypeInstanceDeclaration sa ch idx nm deps className [ty1, ty2'] (ExplicitInstance members)
+            pure $ TypeInstanceDeclaration sa na ch idx nm deps className [ty1, ty2'] (ExplicitInstance members)
           _ -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty1
         _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 2
 

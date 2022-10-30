@@ -3,7 +3,7 @@ module Language.PureScript.Sugar.ObjectWildcards
   , desugarDecl
   ) where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Monad (forM)
 import           Control.Monad.Error.Class (MonadError(..))

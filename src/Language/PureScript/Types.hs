@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Types where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub, IsString)
 
 import Codec.Serialise (Serialise)

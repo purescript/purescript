@@ -1,6 +1,6 @@
 module Language.PureScript.Interactive.Printer where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Lens ((^.), _1)
 import           Data.List (intersperse)

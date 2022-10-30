@@ -16,6 +16,9 @@ applyFlipped = "applyFlipped"
 append :: forall a. (IsString a) => a
 append = "append"
 
+mempty :: forall a. (IsString a) => a
+mempty = "mempty"
+
 bind :: forall a. (IsString a) => a
 bind = "bind"
 
@@ -169,6 +172,12 @@ mkEffectFn = "mkEffectFn"
 runEffectFn :: forall a. (IsString a) => a
 runEffectFn = "runEffectFn"
 
+mkSTFn :: forall a. (IsString a) => a
+mkSTFn = "mkSTFn"
+
+runSTFn :: forall a. (IsString a) => a
+runSTFn = "runSTFn"
+
 -- Type Class Dictionary Names
 
 data EffectDictionaries = EffectDictionaries
@@ -316,8 +325,23 @@ pattern Effect = ModuleName "Effect"
 pattern ST :: ModuleName
 pattern ST = ModuleName "Control.Monad.ST.Internal"
 
+pattern ControlApply :: ModuleName
+pattern ControlApply = ModuleName "Control.Apply"
+
+pattern Apply :: Qualified (ProperName 'ClassName)
+pattern Apply = Qualified (ByModuleName ControlApply) (ProperName "Apply")
+
+identApply :: Qualified Ident
+identApply = Qualified (ByModuleName ControlApply) (Ident apply)
+
 pattern ControlApplicative :: ModuleName
 pattern ControlApplicative = ModuleName "Control.Applicative"
+
+pattern Applicative :: Qualified (ProperName 'ClassName)
+pattern Applicative = Qualified (ByModuleName ControlApplicative) (ProperName "Applicative")
+
+identPure :: Qualified Ident
+identPure = Qualified (ByModuleName ControlApplicative) (Ident pure')
 
 pattern ControlSemigroupoid :: ModuleName
 pattern ControlSemigroupoid = ModuleName "Control.Semigroupoid"
@@ -328,17 +352,35 @@ pattern ControlBind = ModuleName "Control.Bind"
 pattern ControlCategory :: ModuleName
 pattern ControlCategory = ModuleName "Control.Category"
 
+pattern Category :: Qualified (ProperName 'ClassName)
+pattern Category = Qualified (ByModuleName ControlCategory) (ProperName "Category")
+
+identIdentity :: Qualified Ident
+identIdentity = Qualified (ByModuleName ControlCategory) (Ident identity)
+
 pattern ControlMonadEffUncurried :: ModuleName
 pattern ControlMonadEffUncurried = ModuleName "Control.Monad.Eff.Uncurried"
 
 pattern EffectUncurried :: ModuleName
 pattern EffectUncurried = ModuleName "Effect.Uncurried"
 
+pattern ControlMonadSTUncurried :: ModuleName
+pattern ControlMonadSTUncurried = ModuleName "Control.Monad.ST.Uncurried"
+
 pattern DataBounded :: ModuleName
 pattern DataBounded = ModuleName "Data.Bounded"
 
 pattern DataSemigroup :: ModuleName
 pattern DataSemigroup = ModuleName "Data.Semigroup"
+
+identAppend :: Qualified Ident
+identAppend = Qualified (ByModuleName DataSemigroup) (Ident append)
+
+pattern DataMonoid :: ModuleName
+pattern DataMonoid = ModuleName "Data.Monoid"
+
+identMempty :: Qualified Ident
+identMempty = Qualified (ByModuleName DataMonoid) (Ident mempty)
 
 pattern DataHeytingAlgebra :: ModuleName
 pattern DataHeytingAlgebra = ModuleName "Data.HeytingAlgebra"
@@ -393,6 +435,12 @@ pattern DataEuclideanRing = ModuleName "Data.EuclideanRing"
 
 pattern DataFunction :: ModuleName
 pattern DataFunction = ModuleName "Data.Function"
+
+identFlip :: Qualified Ident
+identFlip = Qualified (ByModuleName DataFunction) (Ident flip)
+
+flip :: forall a. (IsString a) => a
+flip = "flip"
 
 pattern DataIntBits :: ModuleName
 pattern DataIntBits = ModuleName "Data.Int.Bits"

@@ -2,8 +2,7 @@
 
 module Main (main) where
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
 import Test.Hspec
 

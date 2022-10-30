@@ -8,7 +8,7 @@ module Language.PureScript.Sugar.BindingGroups
   , collapseBindingGroups
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Control.Monad ((<=<), guard)

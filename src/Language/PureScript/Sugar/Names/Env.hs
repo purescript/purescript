@@ -18,7 +18,7 @@ module Language.PureScript.Sugar.Names.Env
   , checkImportConflicts
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))

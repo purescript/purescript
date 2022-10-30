@@ -11,7 +11,7 @@ module Language.PureScript.TypeChecker.Roles
   , inferDataBindingGroupRoles
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((&&&))
 import Control.Monad (unless, when, zipWithM_)

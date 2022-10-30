@@ -12,7 +12,7 @@ module Language.PureScript.Docs.RenderedCode.RenderType
   , renderRow
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack)

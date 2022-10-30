@@ -6,7 +6,7 @@
 --
 module Language.PureScript.AST.Declarations where
 
-import Prelude.Compat
+import Prelude
 import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
@@ -88,6 +88,7 @@ data ErrorMessageHint
   | ErrorSolvingConstraint SourceConstraint
   | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   | PositionedError (NEL.NonEmpty SourceSpan)
+  | RelatedPositions (NEL.NonEmpty SourceSpan)
   deriving (Show)
 
 -- | Categories of hints
@@ -428,7 +429,10 @@ data Declaration
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
   --
-  | TypeInstanceDeclaration SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
+  -- The first @SourceAnn@ serves as the annotation for the entire
+  -- declaration, while the second @SourceAnn@ serves as the
+  -- annotation for the type class and its arguments.
+  | TypeInstanceDeclaration SourceAnn SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
   deriving (Show)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -491,7 +495,7 @@ declSourceAnn (ExternDataDeclaration sa _ _) = sa
 declSourceAnn (FixityDeclaration sa _) = sa
 declSourceAnn (ImportDeclaration sa _ _ _) = sa
 declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
-declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _) = sa
+declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
@@ -508,7 +512,7 @@ declName (ExternDataDeclaration _ n _) = Just (TyName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
-declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = IdentName <$> hush n
+declName (TypeInstanceDeclaration _ _ _ _ n _ _ _ _) = IdentName <$> hush n
 declName (RoleDeclaration RoleDeclarationData{..}) = Just (TyName rdeclIdent)
 declName ImportDeclaration{} = Nothing
 declName BindingGroupDeclaration{} = Nothing

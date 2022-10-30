@@ -1,6 +1,6 @@
 module Language.PureScript.Sugar.Names.Common (warnDuplicateRefs) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Control.Monad.Writer (MonadWriter(..))
