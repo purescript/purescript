@@ -1,1 +1,0 @@
-* Bump depend NPM purescript-installer to ^0.3.1

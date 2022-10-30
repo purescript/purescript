@@ -292,7 +292,7 @@ instance ToJSON a => ToJSON (Qualified a) where
     BySourcePos ss -> toJSON2 (ss, a)
 
 instance FromJSON a => FromJSON (Qualified a) where
-  parseJSON v = byModule <|> bySourcePos
+  parseJSON v = byModule <|> bySourcePos <|> byMaybeModuleName'
     where
     byModule = do
       (mn, a) <- parseJSON2 v
@@ -300,6 +300,9 @@ instance FromJSON a => FromJSON (Qualified a) where
     bySourcePos = do
       (ss, a) <- parseJSON2 v
       pure $ Qualified (BySourcePos ss) a
+    byMaybeModuleName' = do
+      (mn, a) <- parseJSON2 v
+      pure $ Qualified (byMaybeModuleName mn) a
 
 instance ToJSON ModuleName where
   toJSON (ModuleName name) = toJSON (T.splitOn "." name)
