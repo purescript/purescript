@@ -1427,7 +1427,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             ]
     renderHint (ErrorInRowLabel lb) detail =
       paras [ detail
-            , Box.hsep 1 Box.top [ line "while matching row label"
+            , Box.hsep 1 Box.top [ line "while matching label"
                                  , markCodeBox $ line $ prettyPrintObjectKey (runLabel lb)
                                  ]
             ]
