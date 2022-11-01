@@ -453,10 +453,11 @@ alignRowsWith f ty1 ty2 = go s1 s2 where
 
   go [] r = ([], (([], tail1), (r, tail2)))
   go r [] = ([], ((r, tail1), ([], tail2)))
-  go lhs@(RowListItem a1 l1 t1 : r1) rhs@(RowListItem a2 l2 t2 : r2)
-    | l1 < l2 = (second . first . first) (RowListItem a1 l1 t1 :) (go r1 rhs)
-    | l2 < l1 = (second . second . first) (RowListItem a2 l2 t2 :) (go lhs r2)
-    | otherwise = first (f l1 t1 t2 :) (go r1 r2)
+  go lhs@(RowListItem a1 l1 t1 : r1) rhs@(RowListItem a2 l2 t2 : r2) = 
+    case compare l1 l2 of
+      LT -> (second . first . first) (RowListItem a1 l1 t1 :) (go r1 rhs)
+      GT -> (second . second . first) (RowListItem a2 l2 t2 :) (go lhs r2)
+      EQ -> first (f l1 t1 t2 :) (go r1 r2)
 
 -- | Check whether a type is a monotype
 isMonoType :: Type a -> Bool
