@@ -419,6 +419,7 @@ unifyKindsWithFailure
   -> m ()
 unifyKindsWithFailure onFailure = go
   where
+  goWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ go t1 t2
   go = curry $ \case
     (TypeApp _ p1 p2, TypeApp _ p3 p4) -> do
       go p1 p3
@@ -444,7 +445,7 @@ unifyKindsWithFailure onFailure = go
       onFailure w1 w2
 
   unifyRows r1 r2 = do
-    let (matches, rest) = alignRowsWith (\l t1 t2 -> withErrorMessageHint (ErrorInRowLabel l) $ go t1 t2) r1 r2
+    let (matches, rest) = alignRowsWith goWithLabel r1 r2
     sequence_ matches
     unifyTails rest
 

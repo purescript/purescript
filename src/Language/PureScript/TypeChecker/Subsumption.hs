@@ -103,7 +103,8 @@ subsumes' SElaborate (ConstrainedType _ con ty1) ty2 = do
   let addDicts val = App val (TypeClassDictionary con dicts hints)
   return (elaborate . addDicts)
 subsumes' mode (TypeApp _ f1 r1) (TypeApp _ f2 r2) | eqType f1 tyRecord && eqType f2 tyRecord = do
-    let (common, ((ts1', r1'), (ts2', r2'))) = alignRowsWith (\l t1 t2 -> withErrorMessageHint (ErrorInRowLabel l) $ subsumes' SNoElaborate t1 t2) r1 r2
+    let goWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ subsumes' SNoElaborate t1 t2
+    let (common, ((ts1', r1'), (ts2', r2'))) = alignRowsWith goWithLabel r1 r2
     -- For { ts1 | r1 } to subsume { ts2 | r2 } when r1 is empty (= we're working with a closed row),
     -- every property in ts2 must appear in ts1. If not, then the candidate expression is missing a required property.
     -- Conversely, when r2 is empty, every property in ts1 must appear in ts2, or else the expression has

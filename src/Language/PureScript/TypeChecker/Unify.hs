@@ -162,7 +162,9 @@ unifyTypes t1 t2 = do
 -- trailing row unification variable, if appropriate.
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
 unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
-  (matches, rest) = alignRowsWith (\l t1 t2 -> withErrorMessageHint (ErrorInRowLabel l) $ unifyTypes t1 t2) r1 r2
+  unifyTypesWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ unifyTypes t1 t2
+
+  (matches, rest) = alignRowsWith unifyTypesWithLabel r1 r2
 
   unifyTails :: ([RowListItem SourceAnn], SourceType) -> ([RowListItem SourceAnn], SourceType) -> m ()
   unifyTails ([], TUnknown _ u)    (sd, r)               = solveType u (rowFromList (sd, r))
