@@ -79,7 +79,7 @@ data SimpleErrorMessage
   | OrphanKindDeclaration (ProperName 'TypeName)
   | OrphanRoleDeclaration (ProperName 'TypeName)
   | RedefinedIdent Ident
-  | OverlappingNamesInLet
+  | OverlappingNamesInLet Ident
   | UnknownName (Qualified Name)
   | UnknownImport ModuleName Name
   | UnknownImportDataConstructor ModuleName (ProperName 'TypeName) (ProperName 'ConstructorName)
@@ -258,7 +258,7 @@ errorCode em = case unwrapErrorMessage em of
   OrphanKindDeclaration{} -> "OrphanKindDeclaration"
   OrphanRoleDeclaration{} -> "OrphanRoleDeclaration"
   RedefinedIdent{} -> "RedefinedIdent"
-  OverlappingNamesInLet -> "OverlappingNamesInLet"
+  OverlappingNamesInLet{} -> "OverlappingNamesInLet"
   UnknownName{} -> "UnknownName"
   UnknownImport{} -> "UnknownImport"
   UnknownImportDataConstructor{} -> "UnknownImportDataConstructor"
@@ -731,8 +731,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       line "The last statement in a 'do' block must be an expression, but this block ends with a binder."
     renderSimpleErrorMessage InvalidDoLet =
       line "The last statement in a 'do' block must be an expression, but this block ends with a let binding."
-    renderSimpleErrorMessage OverlappingNamesInLet =
-      line "The same name was used more than once in a let binding."
+    renderSimpleErrorMessage (OverlappingNamesInLet name) =
+      line $ "The name " <> markCode (showIdent name) <> " was defined multiple times in a binding group"
     renderSimpleErrorMessage (InfiniteType ty) =
       paras [ line "An infinite type was inferred for an expression: "
             , markCodeBox $ indent $ prettyType ty

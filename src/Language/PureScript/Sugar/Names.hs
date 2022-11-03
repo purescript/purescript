@@ -10,14 +10,15 @@ module Language.PureScript.Sugar.Names
   ) where
 
 import Prelude
-import Protolude (ordNub, sortOn, swap, foldl')
+import Protolude (sortOn, swap, foldl')
 
-import Control.Arrow (first, second)
+import Control.Arrow (first, second, (&&&))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
 import Control.Monad.Writer (MonadWriter(..))
 
+import qualified Data.List.NonEmpty as NEL
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -253,9 +254,15 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateValue (pos, bound) (Abs (VarBinder ss arg) val') =
     return ((pos, M.insert arg (spanStart ss) bound), Abs (VarBinder ss arg) val')
   updateValue (pos, bound) (Let w ds val') = do
-    let args = mapMaybe letBoundVariable ds
-    unless (length (ordNub args) == length args) .
-      throwError . errorMessage' pos $ OverlappingNamesInLet
+    let
+      args = mapMaybe letBoundVariable ds
+      groupByFst = map (\ts -> (fst (NEL.head ts), snd <$> ts)) . NEL.groupAllWith fst
+      duplicateArgsErrs = foldMap mkArgError $ groupByFst args
+      mkArgError (ident, poses)
+        | NEL.length poses < 2 = mempty
+        | otherwise = errorMessage'' (NEL.reverse poses) (OverlappingNamesInLet ident)
+    when (nonEmpty duplicateArgsErrs) $
+      throwError duplicateArgsErrs
     return ((pos, declarationsToMap ds `M.union` bound), Let w ds val')
   updateValue (_, bound) (Var ss name'@(Qualified qualifiedBy ident)) =
     ((ss, bound), ) <$> case (M.lookup ident bound, qualifiedBy) of
@@ -324,8 +331,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     . fmap (second spanStart . swap)
     . binderNamesWithSpans
 
-  letBoundVariable :: Declaration -> Maybe Ident
-  letBoundVariable = fmap valdeclIdent . getValueDeclaration
+  letBoundVariable :: Declaration -> Maybe (Ident, SourceSpan)
+  letBoundVariable = fmap (valdeclIdent &&& (fst . valdeclSourceAnn)) . getValueDeclaration
 
   declarationsToMap :: [Declaration] -> M.Map Ident SourcePos
   declarationsToMap = foldl goDTM M.empty
