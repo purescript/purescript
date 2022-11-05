@@ -1,0 +1,1 @@
+* Fix various typos in documentation and source comments.
