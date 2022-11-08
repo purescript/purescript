@@ -9,6 +9,8 @@ at tests/purs/failing/Superclasses1.purs:12:1 - 13:17 (line 12, column 1 - line 
 
 while checking that expression [33m#dict Su[0m
   has type [33mSu$Dict t0[0m
+while matching label [33m"Su0"[0m
+while matching label [33mcl[0m
 in value declaration [33mclNumber[0m
 
 where [33mt0[0m is an unknown type

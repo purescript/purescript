@@ -12,6 +12,7 @@ while applying a function [33mfoldl[0m
   of type [33mFoldable t0 => (t1 -> t2 -> t1) -> t1 -> t0 t2 -> t1[0m
   to argument [33m$f1[0m
 while inferring the type of [33mfoldl $f1[0m
+while matching label [33mfoldl[0m
 
 where [33mt0[0m is an unknown type
       [33mt2[0m is an unknown type

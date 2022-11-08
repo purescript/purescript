@@ -4,6 +4,8 @@ at tests/purs/failing/ExtraRecordField.purs:9:13 - 9:54 (line 9, column 13 - lin
 
   Type of expression contains additional label [33mage[0m.
 
+while matching label [33mlast[0m
+while matching label [33mfirst[0m
 while checking that expression [33m{ first: "Jane"[0m
                                [33m, last: "Smith"[0m
                                [33m, age: 29      [0m
