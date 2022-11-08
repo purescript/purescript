@@ -90,9 +90,9 @@ addExplicitImport' decl moduleName qualifier imports =
           Import mn P.Implicit qualifier' -> mn == moduleName && qualifier == qualifier'
           _ -> False) imports
     isNotExplicitlyImportedFromPrim =
-      moduleName == C.Prim &&
+      moduleName == C.M_Prim &&
         not (any (\case
-          Import C.Prim (P.Explicit _) Nothing -> True
+          Import C.M_Prim (P.Explicit _) Nothing -> True
           _ -> False) imports)
     -- We can't import Modules from other modules
     isModule = has _IdeDeclModule decl

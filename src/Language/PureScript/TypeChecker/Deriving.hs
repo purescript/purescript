@@ -14,9 +14,7 @@ import qualified Data.Map as M
 import Control.Monad.Supply.Class
 import Language.PureScript.AST
 import Language.PureScript.AST.Utils
-import qualified Language.PureScript.Constants.Data.Foldable as Foldable
-import qualified Language.PureScript.Constants.Data.Traversable as Traversable
-import qualified Language.PureScript.Constants.Prelude as Prelude
+import qualified Language.PureScript.Constants.Libs as Libs
 import qualified Language.PureScript.Constants.Prim as Prim
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -78,13 +76,13 @@ deriveInstance instType className strategy = do
       unaryClass' f = unaryClass (f className)
 
       in case className of
-        Foldable.Foldable -> unaryClass' deriveFoldable
-        Prelude.Eq -> unaryClass deriveEq
-        Prelude.Eq1 -> unaryClass $ \_ _ -> deriveEq1
-        Prelude.Functor -> unaryClass' deriveFunctor
-        Prelude.Ord -> unaryClass deriveOrd
-        Prelude.Ord1 -> unaryClass $ \_ _ -> deriveOrd1
-        Traversable.Traversable -> unaryClass' deriveTraversable
+        Libs.Eq -> unaryClass deriveEq
+        Libs.Eq1 -> unaryClass $ \_ _ -> deriveEq1
+        Libs.Foldable -> unaryClass' deriveFoldable
+        Libs.Functor -> unaryClass' deriveFunctor
+        Libs.Ord -> unaryClass deriveOrd
+        Libs.Ord1 -> unaryClass $ \_ _ -> deriveOrd1
+        Libs.Traversable -> unaryClass' deriveTraversable
         -- See L.P.Sugar.TypeClasses.Deriving for the classes that can be
         -- derived prior to type checking.
         _ -> throwError . errorMessage $ CannotDerive className tys
@@ -194,7 +192,7 @@ deriveEq
 deriveEq mn tyConNm = do
   (_, _, _, ctors) <- lookupTypeDecl mn tyConNm
   eqFun <- mkEqFunction ctors
-  pure [(Prelude.eq, eqFun)]
+  pure [(Libs.S_eq, eqFun)]
   where
     mkEqFunction :: [(ProperName 'ConstructorName, [SourceType])] -> m Expr
     mkEqFunction ctors = do
@@ -203,13 +201,13 @@ deriveEq mn tyConNm = do
       lamCase2 x y . addCatch <$> mapM mkCtorClause ctors
 
     preludeConj :: Expr -> Expr -> Expr
-    preludeConj = App . App (mkVarMn (Just (ModuleName "Data.HeytingAlgebra")) (Ident Prelude.conj))
+    preludeConj = App . App (mkRef Libs.I_conj)
 
     preludeEq :: Expr -> Expr -> Expr
-    preludeEq = App . App (mkRef Prelude.identEq)
+    preludeEq = App . App (mkRef Libs.I_eq)
 
     preludeEq1 :: Expr -> Expr -> Expr
-    preludeEq1 = App . App (mkRef Prelude.identEq1)
+    preludeEq1 = App . App (mkRef Libs.I_eq1)
 
     addCatch :: [CaseAlternative] -> [CaseAlternative]
     addCatch xs
@@ -243,7 +241,7 @@ deriveEq mn tyConNm = do
       | otherwise = preludeEq l r
 
 deriveEq1 :: forall m. Applicative m => m [(PSString, Expr)]
-deriveEq1 = pure [(Prelude.eq1, mkRef Prelude.identEq)]
+deriveEq1 = pure [(Libs.S_eq1, mkRef Libs.I_eq)]
 
 deriveOrd
   :: forall m
@@ -256,7 +254,7 @@ deriveOrd
 deriveOrd mn tyConNm = do
   (_, _, _, ctors) <- lookupTypeDecl mn tyConNm
   compareFun <- mkCompareFunction ctors
-  pure [(Prelude.compare, compareFun)]
+  pure [(Libs.S_compare, compareFun)]
   where
     mkCompareFunction :: [(ProperName 'ConstructorName, [SourceType])] -> m Expr
     mkCompareFunction ctors = do
@@ -286,10 +284,10 @@ deriveOrd mn tyConNm = do
     orderingBinder name = mkCtorBinder orderingMod (ProperName name) []
 
     ordCompare :: Expr -> Expr -> Expr
-    ordCompare = App . App (mkRef Prelude.identCompare)
+    ordCompare = App . App (mkRef Libs.I_compare)
 
     ordCompare1 :: Expr -> Expr -> Expr
-    ordCompare1 = App . App (mkRef Prelude.identCompare1)
+    ordCompare1 = App . App (mkRef Libs.I_compare1)
 
     mkCtorClauses :: ((ProperName 'ConstructorName, [SourceType]), Bool) -> m [CaseAlternative]
     mkCtorClauses ((ctorName, tys), isLast) = do
@@ -330,7 +328,7 @@ deriveOrd mn tyConNm = do
       | otherwise = ordCompare l r
 
 deriveOrd1 :: forall m. Applicative m => m [(PSString, Expr)]
-deriveOrd1 = pure [(Prelude.compare1, mkRef Prelude.identCompare)]
+deriveOrd1 = pure [(Libs.S_compare1, mkRef Libs.I_compare)]
 
 lookupTypeDecl
   :: forall m
@@ -493,9 +491,9 @@ deriveFunctor
 deriveFunctor nm mn tyConNm = do
   ctors <- validateParamsInTypeConstructors nm mn tyConNm
   mapFun <- mkTraversal mn mapVar (TraversalOps identity identity) ctors
-  pure [(Prelude.map, mapFun)]
+  pure [(Libs.S_map, mapFun)]
   where
-  mapVar = mkRef Prelude.identMap
+  mapVar = mkRef Libs.I_map
 
 toConst :: forall f a b. f a -> Const [f a] b
 toConst = Const . pure
@@ -520,12 +518,12 @@ deriveFoldable nm mn tyConNm = do
   foldlFun <- mkAsymmetricFoldFunction False foldlVar ctors
   foldrFun <- mkAsymmetricFoldFunction True foldrVar ctors
   foldMapFun <- mkTraversal mn foldMapVar foldMapOps ctors
-  pure [(Foldable.foldl, foldlFun), (Foldable.foldr, foldrFun), (Foldable.foldMap, foldMapFun)]
+  pure [(Libs.S_foldl, foldlFun), (Libs.S_foldr, foldrFun), (Libs.S_foldMap, foldMapFun)]
   where
-  foldlVar = mkRef Foldable.identFoldl
-  foldrVar = mkRef Foldable.identFoldr
-  foldMapVar = mkRef Foldable.identFoldMap
-  flipVar = mkRef Prelude.identFlip
+  foldlVar = mkRef Libs.I_foldl
+  foldrVar = mkRef Libs.I_foldr
+  foldMapVar = mkRef Libs.I_foldMap
+  flipVar = mkRef Libs.I_flip
 
   mkAsymmetricFoldFunction :: Bool -> Expr -> [(ProperName 'ConstructorName, [Maybe ParamUsage])] -> m Expr
   mkAsymmetricFoldFunction isRightFold recurseVar ctors = do
@@ -563,8 +561,8 @@ deriveFoldable nm mn tyConNm = do
 foldMapOps :: forall m. Applicative m => TraversalOps m
 foldMapOps = TraversalOps { visitExpr = toConst, .. }
   where
-  appendVar = mkRef Prelude.identAppend
-  memptyVar = mkRef Prelude.identMempty
+  appendVar = mkRef Libs.I_append
+  memptyVar = mkRef Libs.I_mempty
 
   extractExpr :: Const [m Expr] Expr -> m Expr
   extractExpr = consumeConst $ \case
@@ -584,17 +582,17 @@ deriveTraversable nm mn tyConNm = do
   ctors <- validateParamsInTypeConstructors nm mn tyConNm
   traverseFun <- mkTraversal mn traverseVar traverseOps ctors
   sequenceFun <- usingLamIdent $ pure . App (App traverseVar identityVar)
-  pure [(Traversable.traverse, traverseFun), (Traversable.sequence, sequenceFun)]
+  pure [(Libs.S_traverse, traverseFun), (Libs.S_sequence, sequenceFun)]
   where
-  traverseVar = mkRef Traversable.identTraverse
-  identityVar = mkRef Prelude.identIdentity
+  traverseVar = mkRef Libs.I_traverse
+  identityVar = mkRef Libs.I_identity
 
 traverseOps :: forall m. MonadSupply m => TraversalOps m
 traverseOps = TraversalOps { .. }
   where
-  pureVar = mkRef Prelude.identPure
-  mapVar = mkRef Prelude.identMap
-  applyVar = mkRef Prelude.identApply
+  pureVar = mkRef Libs.I_pure
+  mapVar = mkRef Libs.I_map
+  applyVar = mkRef Libs.I_apply
 
   visitExpr :: m Expr -> WriterT [(Ident, m Expr)] m Expr
   visitExpr traversedExpr = do

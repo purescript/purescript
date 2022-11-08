@@ -21,6 +21,13 @@
   , "^Language\\.PureScript\\.Ide\\.Imports\\.parseImport$"
   , "^Language\\.PureScript\\.TypeChecker\\.Monad\\.debug"
 
+  -- These declarations are used by Template Haskell code.
+  , "^Language\\.PureScript\\.Constants\\.TH\\."
+
+  -- These declarations are produced by Template Haskell when generating
+  -- pattern synonyms; this confuses Weeder.
+  , "^Language\\.PureScript\\.Constants\\..*\\.\\$[bm]"
+
   -- These declarations are unprincipled exceptions that we don't mind
   -- supporting just in case they're used now or in the future.
   , "^Language\\.PureScript\\.CST\\.Parser\\.parseExpr$"
