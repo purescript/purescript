@@ -910,7 +910,7 @@ checkKindDeclaration _ ty = do
   checkQuantification finalTy
   checkValidKind finalTy
   where
-  -- When expanding type synoyms and generalizing, we need to generate more
+  -- When expanding type synonyms and generalizing, we need to generate more
   -- unique names so that they don't clash or shadow other names, or can
   -- be referenced (easily).
   freshVar arg = (arg <>) . T.pack . show <$> fresh
