@@ -1,6 +1,6 @@
 Error found:
 in module [33mNestedRecordLabelOnTypeError[0m
-at tests/purs/failing/RecordLabelOnTypeErrorImediate.purs:5:19 - 5:22 (line 5, column 19 - line 5, column 22)
+at tests/purs/failing/RecordLabelOnTypeErrorImediate.purs:5:15 - 5:18 (line 5, column 15 - line 5, column 18)
 
   Could not match type
   [33m        [0m
@@ -15,7 +15,6 @@ while checking that type [33mString[0m
   is at least as general as type [33mInt[0m
 while checking that expression [33m"a"[0m
   has type [33mInt[0m
-while matching label [33mfield[0m
 in value declaration [33mrecord[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
