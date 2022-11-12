@@ -839,16 +839,15 @@ checkProperties expr ps row lax = convert <$> go ps (toRowPair <$> ts') r' where
                       | otherwise = throwError . errorMessage $ PropertyIsMissing p
   go ((p,_):_) [] (REmptyKinded _ _) = throwError . errorMessage $ AdditionalProperty $ Label p
   go ((p,v):ps') ts r = 
-    withErrorMessageHint (ErrorInRowLabel (Label p))
-      $ case lookup (Label p) ts of
+      case lookup (Label p) ts of
           Nothing -> do
-            v'@(TypedValue' _ _ ty) <- infer v
+            v'@(TypedValue' _ _ ty) <- withErrorMessageHint (ErrorInRowLabel (Label p)) $ infer v
             rest <- freshTypeWithKind (kindRow kindType)
             unifyTypes r (srcRCons (Label p) ty rest)
             ps'' <- go ps' ts rest
             return $ (p, v') : ps''
           Just ty -> do
-            v' <- check v ty
+            v' <- withErrorMessageHint (ErrorInRowLabel (Label p)) $ check v ty
             ps'' <- go ps' (delete (Label p, ty) ts) r
             return $ (p, v') : ps''
   go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (srcTypeApp tyRecord row)
