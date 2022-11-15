@@ -1,6 +1,6 @@
 Error found:
 in module [33mNestedRecordLabelOnTypeError[0m
-at tests/purs/failing/RecordLabelOnTypeErrorImediate.purs:5:15 - 5:18 (line 5, column 15 - line 5, column 18)
+at tests/purs/failing/RecordLabelOnTypeErrorImmediate.purs:5:15 - 5:18 (line 5, column 15 - line 5, column 18)
 
   Could not match type
   [33m        [0m
