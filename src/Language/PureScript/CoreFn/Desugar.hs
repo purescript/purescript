@@ -109,7 +109,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       A.Unused{}             -> True
       _                      -> False
   exprToCoreFn ss com ty (A.Unused _) =
-    Var (ss, com, ty, Nothing) (Qualified (ByModuleName C.Prim) (Ident C.undefined))
+    Var (ss, com, ty, Nothing) C.I_undefined
   exprToCoreFn _ com ty (A.Var ss ident) =
     Var (ss, com, ty, getValueMeta ident) ident
   exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =

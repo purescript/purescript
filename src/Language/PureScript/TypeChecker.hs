@@ -29,8 +29,7 @@ import qualified Data.Text as T
 
 import Language.PureScript.AST
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
-import qualified Language.PureScript.Constants.Data.Generic.Rep as DataGenericRep
-import qualified Language.PureScript.Constants.Data.Newtype as DataNewtype
+import qualified Language.PureScript.Constants.Libs as Libs
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -789,8 +788,8 @@ typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
   checkDataConstructorsAreExported :: DeclarationRef -> m ()
   checkDataConstructorsAreExported dr@(TypeRef ss' name (fromMaybe [] -> exportedDataConstructorsNames))
     | null exportedDataConstructorsNames = for_
-      [ DataGenericRep.Generic
-      , DataNewtype.Newtype
+      [ Libs.Generic
+      , Libs.Newtype
       ] $ \className -> do
         env <- getEnv
         let dicts = foldMap (foldMap NEL.toList) $

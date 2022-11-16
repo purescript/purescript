@@ -34,12 +34,11 @@ import           Data.Traversable (for)
 import qualified GHC.Stack
 import           Language.PureScript.AST
 import qualified Language.PureScript.Bundle as Bundle
-import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Libs as C
 import qualified Language.PureScript.Constants.Prim as C
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST.Errors as CST
 import qualified Language.PureScript.CST.Print as CST
-import           Language.PureScript.Environment
 import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
 import           Language.PureScript.Pretty
@@ -753,10 +752,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       line $ "The role declaration for " <> markCode (runProperName nm) <> " should follow its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
-    renderSimpleErrorMessage (UnknownName name@(Qualified (BySourcePos _) (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
+    renderSimpleErrorMessage (UnknownName name@(Qualified (BySourcePos _) (IdentName (Ident i)))) | i `elem` [ C.S_bind, C.S_discard ] =
       line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode "bind" <> " and " <> markCode "discard" <> " functions. Please import " <> markCode i <> " from module " <> markCode "Prelude"
-    renderSimpleErrorMessage (UnknownName name@(Qualified (BySourcePos _) (IdentName (Ident i)))) | i == C.negate =
-      line $ "Unknown " <> printName name <> ". You're probably using numeric negation (the unary " <> markCode "-" <> " operator), which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
+    renderSimpleErrorMessage (UnknownName name@(Qualified (BySourcePos _) (IdentName (Ident C.S_negate)))) =
+      line $ "Unknown " <> printName name <> ". You're probably using numeric negation (the unary " <> markCode "-" <> " operator), which the compiler replaces with calls to the " <> markCode C.S_negate <> " function. Please import " <> markCode C.S_negate <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name) =
       line $ "Unknown " <> printName name
     renderSimpleErrorMessage (UnknownImport mn name) =
@@ -1026,7 +1025,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     renderSimpleErrorMessage (ExtraneousClassMember ident className) =
       line $ "" <> markCode (showIdent ident) <> " is not a member of type class " <> markCode (showQualified runProperName className)
     renderSimpleErrorMessage (ExpectedType ty kind) =
-      paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode C.typ <> "."
+      paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode (runProperName . disqualify $ C.Type) <> "."
             , line "The error arises from the type"
             , markCodeBox $ indent $ prettyType ty
             , line "having the kind"
@@ -1941,18 +1940,16 @@ renderBox = unlines
 toTypelevelString :: Type a -> Maybe Box.Box
 toTypelevelString (TypeLevelString _ s) =
   Just . Box.text $ decodeStringWithReplacement s
-toTypelevelString (TypeApp _ (TypeConstructor _ f) x)
-  | f == primSubName C.typeError "Text" = toTypelevelString x
-toTypelevelString (TypeApp _ (KindApp _ (TypeConstructor _ f) _) x)
-  | f == primSubName C.typeError "Quote" = Just (typeAsBox maxBound x)
-toTypelevelString (TypeApp _ (TypeConstructor _ f) (TypeLevelString _ x))
-  | f == primSubName C.typeError "QuoteLabel" = Just . line . prettyPrintLabel . Label $ x
-toTypelevelString (TypeApp _ (TypeApp _ (TypeConstructor _ f) x) ret)
-  | f == primSubName C.typeError "Beside" =
-    (Box.<>) <$> toTypelevelString x <*> toTypelevelString ret
-toTypelevelString (TypeApp _ (TypeApp _ (TypeConstructor _ f) x) ret)
-  | f == primSubName C.typeError "Above" =
-    (Box.//) <$> toTypelevelString x <*> toTypelevelString ret
+toTypelevelString (TypeApp _ (TypeConstructor _ C.Text) x) =
+  toTypelevelString x
+toTypelevelString (TypeApp _ (KindApp _ (TypeConstructor _ C.Quote) _) x) =
+  Just (typeAsBox maxBound x)
+toTypelevelString (TypeApp _ (TypeConstructor _ C.QuoteLabel) (TypeLevelString _ x)) =
+  Just . line . prettyPrintLabel . Label $ x
+toTypelevelString (TypeApp _ (TypeApp _ (TypeConstructor _ C.Beside) x) ret) =
+  (Box.<>) <$> toTypelevelString x <*> toTypelevelString ret
+toTypelevelString (TypeApp _ (TypeApp _ (TypeConstructor _ C.Above) x) ret) =
+  (Box.//) <$> toTypelevelString x <*> toTypelevelString ret
 toTypelevelString _ = Nothing
 
 -- | Rethrow an error with a more detailed error message in the case of failure

@@ -60,10 +60,13 @@ removeFromBlock :: ([AST] -> [AST]) -> AST -> AST
 removeFromBlock go (Block ss sts) = Block ss (go sts)
 removeFromBlock _  js = js
 
-isDict :: (ModuleName, PSString) -> AST -> Bool
-isDict (moduleName, dictName) (ModuleAccessor _ x y) =
-  x == moduleName && y == dictName
-isDict _ _ = False
+pattern Ref :: (ModuleName, PSString) -> AST
+pattern Ref pair <- (refPatternHelper -> Just pair)
+-- ideally: pattern Ref (moduleName, refName) <- ModuleAccessor _ moduleName refName
+-- but: https://gitlab.haskell.org/ghc/ghc/-/issues/12203
+--      https://github.com/ghc-proposals/ghc-proposals/pull/138
 
-isDict' :: [(ModuleName, PSString)] -> AST -> Bool
-isDict' xs js = any (`isDict` js) xs
+refPatternHelper :: AST -> Maybe (ModuleName, PSString)
+refPatternHelper = \case
+  ModuleAccessor _ moduleName refName -> Just (moduleName, refName)
+  _ -> Nothing

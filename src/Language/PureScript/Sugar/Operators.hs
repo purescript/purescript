@@ -40,7 +40,7 @@ import Data.Maybe (mapMaybe, listToMaybe)
 import qualified Data.Map as M
 import Data.Ord (Down(..))
 
-import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Libs as C
 
 -- |
 -- Removes unary negation operators and replaces them with calls to `negate`.
@@ -50,7 +50,7 @@ desugarSignedLiterals (Module ss coms mn ds exts) =
   Module ss coms mn (map f' ds) exts
   where
   (f', _, _) = everywhereOnValues id go id
-  go (UnaryMinus ss' val) = App (Var ss' (Qualified ByNullSourcePos (Ident C.negate))) val
+  go (UnaryMinus ss' val) = App (Var ss' (Qualified ByNullSourcePos (Ident C.S_negate))) val
   go other = other
 
 -- |

@@ -393,7 +393,7 @@ moduleBindToJs mn = bindToJs
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable that may have a qualified name.
   qualifiedToJS :: (a -> Ident) -> Qualified a -> AST
-  qualifiedToJS f (Qualified (ByModuleName C.Prim) a) = AST.Var Nothing . runIdent $ f a
+  qualifiedToJS f (Qualified (ByModuleName C.M_Prim) a) = AST.Var Nothing . runIdent $ f a
   qualifiedToJS f (Qualified (ByModuleName mn') a) | mn /= mn' = AST.ModuleAccessor Nothing mn' . mkString . T.concatMap identCharToText . runIdent $ f a
   qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToJs (f a)
 

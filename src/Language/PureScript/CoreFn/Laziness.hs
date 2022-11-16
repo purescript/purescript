@@ -17,7 +17,7 @@ import Data.Semigroup (Max(..))
 import qualified Data.Set as S
 
 import Language.PureScript.AST.SourcePos
-import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Libs as C
 import Language.PureScript.CoreFn
 import Language.PureScript.Crash
 import Language.PureScript.Names
@@ -128,8 +128,7 @@ onVarsWithDelayAndForce f = snd . go 0 $ Just 0
       Var a i -> f delay force a i
       Abs a i e -> Abs a i <$> snd (if force == Just 0 then go (succ delay) force else go delay $ fmap pred force) e
       -- A clumsy hack to preserve TCO in a particular idiom of unsafePartial once seen in Data.Map.Internal, possibly still used elsewhere.
-      App a1 e1@(Var _ (Qualified (ByModuleName C.PartialUnsafe) (Ident up))) (Abs a2 i e2) | up == C.unsafePartial
-        -> App a1 e1 . Abs a2 i <$> handleExpr' e2
+      App a1 e1@(Var _ C.I_unsafePartial) (Abs a2 i e2) -> App a1 e1 . Abs a2 i <$> handleExpr' e2
       App a e1 e2 ->
         -- `handleApp` is just to handle the constructor application exception
         -- somewhat gracefully (i.e., without requiring a deep inspection of
@@ -533,7 +532,7 @@ applyLazinessTransform mn rawItems = let
 
   nullAnn = ssAnn nullSourceSpan
   runtimeLazy = Var nullAnn . Qualified ByNullSourcePos $ InternalIdent RuntimeLazyFactory
-  runFn3 = Var nullAnn . Qualified (ByModuleName C.DataFunctionUncurried) . Ident $ C.runFn <> "3"
+  runFn3 = Var nullAnn . Qualified (ByModuleName C.M_Data_Function_Uncurried) . Ident $ C.S_runFn <> "3"
   strLit = Literal nullAnn . StringLiteral . mkString
 
   lazifyIdent = \case

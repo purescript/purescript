@@ -19,7 +19,7 @@ import Data.Semigroup.Generic (GenericSemigroupMonoid(..))
 
 import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos (nullSourceSpan)
-import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Libs as C
 import Language.PureScript.CoreFn.Ann (Ann)
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
