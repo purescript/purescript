@@ -7,6 +7,7 @@ module Language.PureScript.TypeChecker.Entailment
   , replaceTypeClassDictionaries
   , newDictionaries
   , entails
+  , findDicts
   ) where
 
 import Prelude
@@ -93,6 +94,9 @@ type TypeClassDict = TypeClassDictionaryInScope Evidence
 type InstanceContext = M.Map QualifiedBy
                          (M.Map (Qualified (ProperName 'ClassName))
                            (M.Map (Qualified Ident) (NonEmpty NamedDict)))
+
+findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> QualifiedBy -> [TypeClassDict]
+findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (M.lookup cn <=< flip M.lookup ctx)
 
 -- | A type substitution which makes an instance head match a list of types.
 --
@@ -223,9 +227,6 @@ entails SolverOptions{..} constraint context hints =
     ctorModules (KindApp _ ty _) = ctorModules ty
     ctorModules (KindedType _ ty _) = ctorModules ty
     ctorModules _ = Nothing
-
-    findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> QualifiedBy -> [TypeClassDict]
-    findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (M.lookup cn <=< flip M.lookup ctx)
 
     valUndefined :: Expr
     valUndefined = Var nullSourceSpan C.I_undefined
