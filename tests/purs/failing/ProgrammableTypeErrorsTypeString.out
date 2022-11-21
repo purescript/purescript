@@ -2,7 +2,7 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/ProgrammableTypeErrorsTypeString.purs:24:9 - 24:24 (line 24, column 9 - line 24, column 24)
 
-  A custom type error occurred while solving type class constraints:
+  Custom error:
 
     Don't want to show MyType Int because.
 

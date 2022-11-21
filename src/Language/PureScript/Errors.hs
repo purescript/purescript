@@ -883,7 +883,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _) _ _) | Just box <- toTypelevelString ty =
-      paras [ line "A custom type error occurred while solving type class constraints:"
+      paras [ line "Custom error:"
             , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Partial

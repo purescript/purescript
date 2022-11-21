@@ -2,7 +2,7 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/2567.purs:7:8 - 7:67 (line 7, column 8 - line 7, column 67)
 
-  A custom type error occurred while solving type class constraints:
+  Custom error:
 
     This constraint should be checked
 
