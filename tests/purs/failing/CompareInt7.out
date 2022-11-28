@@ -6,10 +6,12 @@ at tests/purs/failing/CompareInt7.purs:14:16 - 14:27 (line 14, column 16 - line 
   [33m    [0m
   [33m  LT[0m
   [33m    [0m
+  (defined in module [33mPrim.Ordering[0m)
   with type
   [33m    [0m
   [33m  EQ[0m
   [33m    [0m
+  (defined in module [33mPrim.Ordering[0m)
 
 while solving type class constraint
 [33m                     [0m
@@ -38,6 +40,6 @@ where [33ma0[0m is a rigid type variable
       [33mc1[0m is a rigid type variable
         bound at (line 0, column 0 - line 0, column 0)
 
-See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+See https://github.com/purescript/documentation/blob/master/errors/TypeConstructorsDoNotUnify.md for more information,
 or to contribute content related to this error.
 

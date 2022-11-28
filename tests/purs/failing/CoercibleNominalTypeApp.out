@@ -6,10 +6,12 @@ at tests/purs/failing/CoercibleNominalTypeApp.purs:13:8 - 13:14 (line 13, column
   [33m     [0m
   [33m  Int[0m
   [33m     [0m
+  (defined in module [33mPrim[0m)
   with type
   [33m        [0m
   [33m  String[0m
   [33m        [0m
+  (defined in module [33mPrim[0m)
 
 while solving type class constraint
 [33m                                              [0m
@@ -22,6 +24,6 @@ while checking that expression [33mcoerce[0m
   has type [33mG @Type Maybe Int -> G @Type Maybe String[0m
 in value declaration [33mgToG[0m
 
-See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+See https://github.com/purescript/documentation/blob/master/errors/TypeConstructorsDoNotUnify.md for more information,
 or to contribute content related to this error.
 

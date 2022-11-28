@@ -3,19 +3,19 @@ in module [33mInstanceChains.BothUnknownAndMatch[0m
 at tests/purs/failing/InstanceChainBothUnknownAndMatch.purs:15:13 - 15:53 (line 15, column 13 - line 15, column 53)
 
   No type class instance was found for
-  [33m                                                       [0m
-  [33m  InstanceChains.BothUnknownAndMatch.Same (Proxy       [0m
-  [33m                                             ( m :: Int[0m
-  [33m                                             , u :: t3 [0m
-  [33m                                             )         [0m
-  [33m                                          )            [0m
-  [33m                                          (Proxy       [0m
-  [33m                                             ( m :: Int[0m
-  [33m                                             , u :: Int[0m
-  [33m                                             )         [0m
-  [33m                                          )            [0m
-  [33m                                          t4           [0m
-  [33m                                                       [0m
+  [33m                    [0m
+  [33m  Same (Proxy       [0m
+  [33m          ( m :: Int[0m
+  [33m          , u :: t3 [0m
+  [33m          )         [0m
+  [33m       )            [0m
+  [33m       (Proxy       [0m
+  [33m          ( m :: Int[0m
+  [33m          , u :: Int[0m
+  [33m          )         [0m
+  [33m       )            [0m
+  [33m       t4           [0m
+  [33m                    [0m
   The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:
 
     [33mInstanceChains.BothUnknownAndMatch.sameY[0m

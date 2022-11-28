@@ -1,4 +1,4 @@
--- @shouldFailWith TypesDoNotUnify
+-- @shouldFailWith TypeConstructorsDoNotUnify
 module Main where
 
 import Safe.Coerce (coerce)

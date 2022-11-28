@@ -5,9 +5,9 @@ at tests/purs/warning/UnambiguousQuantifiedKind.purs:12:1 - 12:11 (line 12, colu
   No type declaration was provided for the top-level declaration of [33mtest2[0m.
   It is good practice to provide type declarations as a form of documentation.
   The inferred type of [33mtest2[0m was:
-  [33m     [0m
-  [33m  Int[0m
-  [33m     [0m
+  [33m          [0m
+  [33m  Prim.Int[0m
+  [33m          [0m
 
 in value declaration [33mtest2[0m
 

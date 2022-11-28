@@ -6,16 +6,18 @@ at tests/purs/failing/TypedBinders3.purs:8:4 - 8:15 (line 8, column 4 - line 8, 
   [33m     [0m
   [33m  Int[0m
   [33m     [0m
+  (defined in module [33mPrim[0m)
   with type
   [33m        [0m
   [33m  String[0m
   [33m        [0m
+  (defined in module [33mPrim[0m)
 
 while inferring the type of [33mcase 1 of   [0m
                             [33m  0 -> true [0m
                             [33m  _ -> false[0m
 in value declaration [33mtest[0m
 
-See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+See https://github.com/purescript/documentation/blob/master/errors/TypeConstructorsDoNotUnify.md for more information,
 or to contribute content related to this error.
 

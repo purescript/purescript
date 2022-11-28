@@ -3,10 +3,10 @@ in module [33mMain[0m
 at tests/purs/failing/3531-4.purs:21:7 - 21:27 (line 21, column 7 - line 21, column 27)
 
   No type class instance was found for
-  [33m           [0m
-  [33m  Main.C a4[0m
-  [33m         b5[0m
-  [33m           [0m
+  [33m      [0m
+  [33m  C a4[0m
+  [33m    b5[0m
+  [33m      [0m
   The following instances partially overlap the above constraint, which means the rest of their instance chains will not be considered:
 
     [33mMain.c1[0m

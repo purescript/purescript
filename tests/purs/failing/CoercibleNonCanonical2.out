@@ -3,10 +3,10 @@ in module [33mMain[0m
 at tests/purs/failing/CoercibleNonCanonical2.purs:10:27 - 10:33 (line 10, column 27 - line 10, column 33)
 
   No type class instance was found for
-  [33m                          [0m
-  [33m  Prim.Coerce.Coercible a0[0m
-  [33m                        b1[0m
-  [33m                          [0m
+  [33m              [0m
+  [33m  Coercible a0[0m
+  [33m            b1[0m
+  [33m              [0m
 
 while checking that type [33mforall (a :: Type) (b :: Type). Coercible @Type a b => a -> b[0m
   is at least as general as type [33ma0 -> b1[0m

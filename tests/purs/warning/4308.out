@@ -4,9 +4,9 @@ Warning 1 of 3:
   at tests/purs/warning/4308.purs:13:6 - 13:7 (line 13, column 6 - line 13, column 7)
 
     Wildcard type definition has the inferred type
-    [33m     [0m
-    [33m  Int[0m
-    [33m     [0m
+    [33m          [0m
+    [33m  Prim.Int[0m
+    [33m          [0m
 
   in value declaration [33mg[0m
 
@@ -19,9 +19,9 @@ Warning 2 of 3:
   at tests/purs/warning/4308.purs:14:13 - 14:14 (line 14, column 13 - line 14, column 14)
 
     Wildcard type definition has the inferred type
-    [33m     [0m
-    [33m  Int[0m
-    [33m     [0m
+    [33m          [0m
+    [33m  Prim.Int[0m
+    [33m          [0m
 
   in value declaration [33mg[0m
 
@@ -34,9 +34,9 @@ Warning 3 of 3:
   at tests/purs/warning/4308.purs:14:25 - 14:26 (line 14, column 25 - line 14, column 26)
 
     Wildcard type definition has the inferred type
-    [33m     [0m
-    [33m  Int[0m
-    [33m     [0m
+    [33m          [0m
+    [33m  Prim.Int[0m
+    [33m          [0m
     in the following context:
 
       y :: [33mInt[0m

@@ -5,13 +5,13 @@ at tests/purs/failing/3765-kinds.purs:7:28 - 7:29 (line 7, column 28 - line 7, c
   Could not match kind
   [33m            [0m
   [33m  ( a :: Int[0m
-  [33m  | t11     [0m
+  [33m  | t0      [0m
   [33m  )         [0m
   [33m            [0m
   with kind
   [33m            [0m
   [33m  ( b :: Int[0m
-  [33m  | t11     [0m
+  [33m  | t0      [0m
   [33m  )         [0m
   [33m            [0m
 

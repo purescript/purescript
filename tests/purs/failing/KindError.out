@@ -8,7 +8,7 @@ at tests/purs/failing/KindError.purs:6:35 - 6:36 (line 6, column 35 - line 6, co
   [33m      [0m
   with kind
   [33m          [0m
-  [33m  t8 -> t9[0m
+  [33m  t0 -> t1[0m
   [33m          [0m
 
 while checking that type [33mf[0m

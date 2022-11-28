@@ -41,6 +41,7 @@ import           Language.PureScript.ModuleDependencies
 import           Language.PureScript.Names
 import           Language.PureScript.Renamer
 import           Language.PureScript.Sugar
+import           Language.PureScript.Sugar.Names.Requalify
 import           Language.PureScript.TypeChecker
 import           Language.PureScript.Make.BuildPlan
 import qualified Language.PureScript.Make.BuildPlan as BuildPlan
@@ -87,13 +88,14 @@ rebuildModuleWithIndex
 rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) moduleIndex = do
   progress $ CompilingModule moduleName moduleIndex
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
-      withPrim = importPrim m
+      withPrim = importPrim m -- TODO: are we importing Prim twice
   lint withPrim
 
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     (desugared, (exEnv', usedImports)) <- runStateT (desugar externs withPrim) (exEnv, mempty)
     let modulesExports = (\(_, _, exports) -> exports) <$> exEnv'
-    (checked, CheckState{..}) <- runStateT (typeCheckModule modulesExports desugared) $ emptyCheckState env
+        localImports = maybe (internalError "no local imports") (\(_, imports, _) -> imports) $ M.lookup moduleName exEnv'
+    (checked, CheckState{..}) <- rethrow (requalifyTypesInErrors localImports) $ runStateT (typeCheckModule modulesExports desugared) $ emptyCheckState env
     let usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
           M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkConstructorImportsForCoercible
     -- Imports cannot be linted before type checking because we need to

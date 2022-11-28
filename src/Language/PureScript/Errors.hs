@@ -103,6 +103,7 @@ data SimpleErrorMessage
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
   | EscapedSkolem Text (Maybe SourceSpan) SourceType
+  | TypeConstructorsDoNotUnify ModuleName SourceType ModuleName SourceType
   | TypesDoNotUnify SourceType SourceType
   | KindsDoNotUnify SourceType SourceType
   | ConstrainedTypeUnified SourceType SourceType
@@ -282,6 +283,7 @@ errorCode em = case unwrapErrorMessage em of
   UndefinedTypeVariable{} -> "UndefinedTypeVariable"
   PartiallyAppliedSynonym{} -> "PartiallyAppliedSynonym"
   EscapedSkolem{} -> "EscapedSkolem"
+  TypeConstructorsDoNotUnify{} -> "TypeConstructorsDoNotUnify"
   TypesDoNotUnify{} -> "TypesDoNotUnify"
   KindsDoNotUnify{} -> "KindsDoNotUnify"
   ConstrainedTypeUnified{} -> "ConstrainedTypeUnified"
@@ -409,6 +411,13 @@ addHint hint = addHints [hint]
 addHints :: [ErrorMessageHint] -> MultipleErrors -> MultipleErrors
 addHints hints = onErrorMessages $ \(ErrorMessage hints' se) -> ErrorMessage (hints ++ hints') se
 
+mkTypesDoNotUnify :: SourceType -> SourceType -> SimpleErrorMessage
+mkTypesDoNotUnify
+  t1@(TypeConstructor _ (Qualified (ByModuleName mn1) _))
+  t2@(TypeConstructor _ (Qualified (ByModuleName mn2) _))
+  = TypeConstructorsDoNotUnify mn1 t1 mn2 t2
+mkTypesDoNotUnify t1 t2 = TypesDoNotUnify t1 t2
+
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
 data TypeMap = TypeMap
   { umSkolemMap   :: M.Map Int (String, Int, Maybe SourceSpan)
@@ -461,7 +470,9 @@ onTypesInErrorMessageM :: Applicative m => (SourceType -> m SourceType) -> Error
 onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse gHint hints <*> gSimple simple
   where
   gSimple (InfiniteType t) = InfiniteType <$> f t
+  gSimple (TypeConstructorsDoNotUnify mn1 t1 mn2 t2) = TypeConstructorsDoNotUnify mn1 <$> f t1 <*> pure mn2 <*> f t2
   gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
+  gSimple (KindsDoNotUnify t1 t2) = KindsDoNotUnify <$> f t1 <*> f t2
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
@@ -853,6 +864,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                  , row1Box
                  , line "with type"
                  , row2Box
+                 ]
+    renderSimpleErrorMessage (TypeConstructorsDoNotUnify mn1 u1 mn2 u2)
+      = let (row1Box, row2Box) = printRows u1 u2
+
+        in paras [ line "Could not match type"
+                 , row1Box
+                 , line $ "(defined in module " <> markCode (runModuleName mn1) <> ")"
+                 , line "with type"
+                 , row2Box
+                 , line $ "(defined in module " <> markCode (runModuleName mn2) <> ")"
                  ]
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
@@ -1563,14 +1584,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     -- If verbose print all rows else only print unique rows
     printRows :: Type a -> Type a -> (Box.Box, Box.Box)
     printRows r1 r2 = case (full, r1, r2) of
-      (True, _ , _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
+      (True, _ , _) -> (printRow prettyTypeWithDepth r1, printRow prettyTypeWithDepth r2)
 
       (_, RCons{}, RCons{}) ->
         let (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
         in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
 
-      (_, _, _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
-
+      (_, _, _) -> (printRow prettyTypeWithDepth r1, printRow prettyTypeWithDepth r2)
 
     -- Keep the unique labels only
     filterRows :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)
@@ -1645,13 +1665,15 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
 
   prettyTypeWithDepth :: Int -> Type a -> Box.Box
   prettyTypeWithDepth depth
-    | full = typeAsBox depth
-    | otherwise = typeAsBox depth . eraseForAllKindAnnotations . eraseKindApps
+    | full = typeAsBoxWith depth prettyOptions
+    | otherwise = typeAsBoxWith depth prettyOptions . eraseForAllKindAnnotations . eraseKindApps
 
   prettyTypeAtom :: Type a -> Box.Box
   prettyTypeAtom
-    | full = typeAtomAsBox prettyDepth
-    | otherwise = typeAtomAsBox prettyDepth . eraseForAllKindAnnotations . eraseKindApps
+    | full = typeAtomAsBoxWith prettyDepth prettyOptions
+    | otherwise = typeAtomAsBoxWith prettyDepth prettyOptions . eraseForAllKindAnnotations . eraseKindApps
+
+  prettyOptions = defaultTypeRenderOptions { troDisqualifyNames = False }
 
   levelText :: Text
   levelText = case level of
@@ -1683,6 +1705,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       where
       isCheckHint ErrorCheckingType{} = True
       isCheckHint _ = False
+    stripRedundantHints TypeConstructorsDoNotUnify{} = stripFirst isUnifyHint
+      where
+      isUnifyHint ErrorUnifyingTypes{} = True
+      isUnifyHint _ = False
     stripRedundantHints TypesDoNotUnify{} = stripFirst isUnifyHint
       where
       isUnifyHint ErrorUnifyingTypes{} = True

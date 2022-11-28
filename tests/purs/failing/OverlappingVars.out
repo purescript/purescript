@@ -3,9 +3,9 @@ in module [33mMain[0m
 at tests/purs/failing/OverlappingVars.purs:14:8 - 14:20 (line 14, column 8 - line 14, column 20)
 
   No type class instance was found for
-  [33m                                       [0m
-  [33m  Main.OverlappingVars (Foo String Int)[0m
-  [33m                                       [0m
+  [33m                                  [0m
+  [33m  OverlappingVars (Foo String Int)[0m
+  [33m                                  [0m
 
 while applying a function [33mf[0m
   of type [33mOverlappingVars t0 => t0 -> t0[0m

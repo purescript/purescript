@@ -3,9 +3,9 @@ in module [33mMain[0m
 at tests/purs/failing/ConstraintFailure.purs:12:8 - 12:12 (line 12, column 8 - line 12, column 12)
 
   No type class instance was found for
-  [33m                    [0m
-  [33m  Data.Show.Show Foo[0m
-  [33m                    [0m
+  [33m                         [0m
+  [33m  Data.Show.Show Main.Foo[0m
+  [33m                         [0m
 
 while checking that type [33mforall (a :: Type). Show a => a -> String[0m
   is at least as general as type [33mt0 t1 t2[0m

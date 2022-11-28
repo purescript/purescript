@@ -4,9 +4,9 @@ Warning 1 of 5:
   at tests/purs/warning/WildcardInferredType2.purs:10:6 - 10:7 (line 10, column 6 - line 10, column 7)
 
     Wildcard type definition has the inferred type
-    [33m     [0m
-    [33m  Int[0m
-    [33m     [0m
+    [33m          [0m
+    [33m  Prim.Int[0m
+    [33m          [0m
 
   in value declaration [33mx[0m
 
@@ -19,9 +19,9 @@ Warning 2 of 5:
   at tests/purs/warning/WildcardInferredType2.purs:51:9 - 51:10 (line 51, column 9 - line 51, column 10)
 
     Wildcard type definition has the inferred type
-    [33m     [0m
-    [33m  Int[0m
-    [33m     [0m
+    [33m          [0m
+    [33m  Prim.Int[0m
+    [33m          [0m
 
   in binding group foxtrot, echo
 
@@ -34,9 +34,9 @@ Warning 3 of 5:
   at tests/purs/warning/WildcardInferredType2.purs:54:8 - 54:9 (line 54, column 8 - line 54, column 9)
 
     Wildcard type definition has the inferred type
-    [33m     [0m
-    [33m  Int[0m
-    [33m     [0m
+    [33m          [0m
+    [33m  Prim.Int[0m
+    [33m          [0m
     in the following context:
 
       m :: [33mInt[0m
@@ -55,9 +55,9 @@ Warning 4 of 5:
     No type declaration was provided for the top-level declaration of [33mdelta[0m.
     It is good practice to provide type declarations as a form of documentation.
     The inferred type of [33mdelta[0m was:
-    [33m            [0m
-    [33m  Int -> Int[0m
-    [33m            [0m
+    [33m                      [0m
+    [33m  Prim.Int -> Prim.Int[0m
+    [33m                      [0m
 
   in binding group delta, charlie
 
@@ -72,9 +72,9 @@ Warning 5 of 5:
     No type declaration was provided for the top-level declaration of [33malpha[0m.
     It is good practice to provide type declarations as a form of documentation.
     The inferred type of [33malpha[0m was:
-    [33m     [0m
-    [33m  Int[0m
-    [33m     [0m
+    [33m          [0m
+    [33m  Prim.Int[0m
+    [33m          [0m
 
   in value declaration [33malpha[0m
 
