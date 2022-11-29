@@ -77,6 +77,7 @@ ef = P.ExternsFile
   --, efSourceSpan =
     (P.internalModuleSourceSpan "<tests>")
  -- }
+    (P.BuildCacheFile mempty (mn "InstanceModule") mempty mempty mempty mempty mempty)
 
 moduleMap :: ModuleMap [IdeDeclarationAnn]
 moduleMap = Map.singleton (mn "ClassModule") [ideTypeClass "MyClass" P.kindType []]

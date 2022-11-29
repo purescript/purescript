@@ -59,6 +59,8 @@ import           System.FilePath ((</>), makeRelative, splitPath, normalise, spl
 import qualified System.FilePath.Posix as Posix
 import           System.IO (stderr)
 
+-- import Debug.Trace
+
 -- | Determines when to rebuild a module
 data RebuildPolicy
   -- | Never rebuild this module
@@ -130,6 +132,17 @@ data MakeActions m = MakeActions
   , outputPrimDocs :: m ()
   -- ^ If generating docs, output the documentation for the Prim modules
   }
+
+{-
+Task: load less data from disk, to load it faster on cache hits, since deserializing cbor takes time
+
+These two are loaded in all BuildJob's but they're pretty much not needed there:
+- bjPrebuilt -- existance check, to figure out if src files changed,
+- bjDirtyExterns -- used to fetch module name and to get cached imports for caching, and can be lazy loaded on cache miss / recompile, where the whole thing is seemingly needed
+
+We might not need a BuildCacheDb file. We'll see.
+
+-}
 
 -- | Given the output directory, determines the location for the
 -- CacheDb file
@@ -236,6 +249,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   readExterns :: ModuleName -> Make (FilePath, Maybe ExternsFile)
   readExterns mn = do
+    -- _ <- trace (show ("readExterns" :: String, mn)) $ pure ()
     let path = outputDir </> T.unpack (runModuleName mn) </> externsFileName
     (path, ) <$> readExternsFile path
 
@@ -314,7 +328,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   requiresForeign = not . null . CF.moduleForeign
 
   progress :: ProgressMessage -> Make ()
-  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage "Compiling "
+  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage "CompilingX5 "
 
   readCacheDb :: Make CacheDb
   readCacheDb = readCacheDb' outputDir

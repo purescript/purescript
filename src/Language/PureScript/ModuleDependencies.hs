@@ -2,6 +2,7 @@
 module Language.PureScript.ModuleDependencies
   ( DependencyDepth(..)
   , sortModules
+  , sortModules3
   , ModuleGraph
   , ModuleSignature(..)
   , moduleSignature
@@ -40,21 +41,41 @@ sortModules
   -> (a -> ModuleSignature)
   -> [a]
   -> m ([a], ModuleGraph)
-sortModules dependencyDepth toSig ms = do
+sortModules dependencyDepth toSig ms =
+  (\(a,b,_) -> (a,b)) <$> sortModules3 dependencyDepth toSig ms
+
+-- | Sort a collection of modules based on module dependencies.
+--
+-- Reports an error if the module graph contains a cycle.
+sortModules3
+  :: forall m a
+   . MonadError MultipleErrors m
+  => DependencyDepth
+  -> (a -> ModuleSignature)
+  -> [a]
+  -> m ([a], ModuleGraph, ModuleGraph)
+sortModules3 dependencyDepth toSig ms = do
     let
       ms' = (\m -> (m, toSig m)) <$> ms
       mns = S.fromList $ map (sigModuleName . snd) ms'
     verts <- parU ms' (toGraphNode mns)
     ms'' <- parU (stronglyConnComp verts) toModule
     let (graph, fromVertex, toVertex) = graphFromEdges verts
-        moduleGraph = do (_, mn, _) <- verts
-                         let v       = fromMaybe (internalError "sortModules: vertex not found") (toVertex mn)
-                             deps    = case dependencyDepth of
-                                         Direct -> graph ! v
-                                         Transitive -> reachable graph v
-                             toKey i = case fromVertex i of (_, key, _) -> key
-                         return (mn, filter (/= mn) (map toKey deps))
-    return (fst <$> ms'', moduleGraph)
+        -- (moduleGraph, directDeps) :: (ModuleGraph, [ModuleName]) = do
+        moduleGraph3 :: [(ModuleName, [ModuleName], [ModuleName])] = do
+          (_, mn, _) <- verts
+          let v       = fromMaybe (internalError "sortModules: vertex not found") (toVertex mn)
+              deps    = case dependencyDepth of
+                          Direct -> graph ! v
+                          Transitive -> reachable graph v
+              toKey i = case fromVertex i of (_, key, _) -> key
+          -- (return :: _) ((mn, filter (/= mn) (map toKey deps)), map toKey (graph ! v))
+          return (mn, filter (/= mn) (map toKey deps), map toKey (graph ! v))
+          -- [(mn, filter (/= mn) (map toKey deps))]
+
+        moduleGraph = (\(a,b,_) -> (a,b)) <$> moduleGraph3
+        directDepsGraph = (\(a,_,c) -> (a,c)) <$> moduleGraph3
+    return (fst <$> ms'', moduleGraph, directDepsGraph)
   where
     toGraphNode :: S.Set ModuleName -> (a, ModuleSignature) -> m ((a, ModuleSignature), ModuleName, [ModuleName])
     toGraphNode mns m@(_, ModuleSignature _ mn deps) = do

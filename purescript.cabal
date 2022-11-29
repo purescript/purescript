@@ -367,6 +367,7 @@ library
     Language.PureScript.TypeChecker.Unify
     Language.PureScript.TypeClassDictionaries
     Language.PureScript.Types
+    PrettyPrint
     System.IO.UTF8
   other-modules:
     Data.Text.PureScript
