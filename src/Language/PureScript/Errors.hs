@@ -1567,12 +1567,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
 
       (_, RCons{}, RCons{}) ->
         let (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
-        in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
+            unique = onlyUniqueLabels (rowToList r1) (rowToList r2)
+        in (printRow (typeDiffAsBox unique) sorted1, printRow (typeDiffAsBox unique) sorted2)
 
       (_, _, _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
 
 
-    -- Keep the unique labels only
+    -- Keep the unique (label, type) tuples only
     filterRows :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)
     filterRows (s1, r1) (s2, r2) =
          let sort' = sortOn $ \(RowListItem _ name ty) -> (name, ty)
@@ -1586,13 +1587,19 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     -- the inputs to be sorted but ensures that the outputs remain sorted.
     diffSortedRowLists :: ([RowListItem a], [RowListItem a]) -> ([RowListItem a], [RowListItem a])
     diffSortedRowLists = go where
-      go = \case
-        (s1@(h1@(RowListItem _ name1 ty1) : t1), s2@(h2@(RowListItem _ name2 ty2) : t2)) ->
-          case (name1, ty1) `compare` (name2, ty2) of
+      go (s1@(h1@(RowListItem _ name1 ty1) : t1), s2@(h2@(RowListItem _ name2 ty2) : t2)) =
+        case (name1, ty1) `compare` (name2, ty2) of
             EQ ->                go (t1, t2)
             LT -> first  (h1:) $ go (t1, s2)
             GT -> second (h2:) $ go (s1, t2)
-        other -> other
+      go other = other
+
+    -- Keep the unique labels only
+    onlyUniqueLabels :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> S.Set Label
+    onlyUniqueLabels  (s1, _) (s2, _) =
+         let pick = map (\(RowListItem _ name _) -> name)
+             xor a b = (a `S.difference` b) `S.union` (b `S.difference` a)
+          in xor (S.fromList $ pick s1) (S.fromList $ pick s2)
 
     renderContext :: Context -> [Box.Box]
     renderContext [] = []
