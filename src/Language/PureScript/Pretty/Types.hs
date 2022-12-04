@@ -28,7 +28,6 @@ import Data.Bifunctor (first)
 import Data.Maybe (fromMaybe, catMaybes)
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Set as S
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -39,7 +38,6 @@ import Language.PureScript.PSString (PSString, prettyPrintString, decodeString)
 import Language.PureScript.Label (Label(..))
 
 import Text.PrettyPrint.Boxes hiding ((<+>))
-import qualified System.Console.ANSI as ANSI
 
 data PrettyPrintType
   = PPTUnknown Int
@@ -85,7 +83,7 @@ convertPrettyPrintType = go
   go d (KindedType _ ty k) = PPKindedType (go (d-1) ty) (go (d-1) k)
   go d (BinaryNoParensType _ ty1 ty2 ty3) = PPBinaryNoParensType (go (d-1) ty1) (go (d-1) ty2) (go (d-1) ty3)
   go d (ParensInType _ ty) = PPParensInType (go (d-1) ty)
-  go d ty@RCons{} = uncurry PPRow  (goRow d ty)
+  go d ty@RCons{} = uncurry PPRow (goRow d ty)
   go d (ForAll _ v mbK ty _) = goForAll d [(v, fmap (go (d-1)) mbK)] ty
   go d (TypeApp _ a b) = goTypeApp d a b
   go d (KindApp _ a b) = PPTypeApp (go (d-1) a) (PPKindArg (go (d-1) b))
@@ -136,14 +134,7 @@ prettyPrintRowWith tro open close labels rest =
 
   where
   nameAndTypeToPs :: Char -> Label -> PrettyPrintType -> Box
-  nameAndTypeToPs start name ty = 
-    let isSpecial = name `elem` troToHighlight tro
-        specialMarker = if isSpecial then "*" else " "
-        label = text (if isSpecial then ANSI.setSGRCode [ANSI.SetUnderlining ANSI.SingleUnderline] else "")
-                  <> text (T.unpack (prettyPrintLabel name))
-                  <> text (ANSI.setSGRCode [ANSI.SetUnderlining ANSI.NoUnderline])
-    in
-      text (start : specialMarker) <> label <> text (" " ++ doubleColon ++ " ") <> typeAsBox' ty
+  nameAndTypeToPs start name ty = text (start : ' ' : T.unpack (prettyPrintLabel name) ++ " " ++ doubleColon ++ " ") <> typeAsBox' ty
 
   doubleColon = if troUnicode tro then "∷" else "::"
 
@@ -265,27 +256,29 @@ typeAsBox' = typeAsBoxImpl defaultOptions
 typeAsBox :: Int -> Type a -> Box
 typeAsBox maxDepth = typeAsBox' . convertPrettyPrintType maxDepth
 
-typeDiffAsBox :: S.Set Label -> Int -> Type a -> Box
-typeDiffAsBox labelsToHighlight maxDepth = typeAsBoxImpl (diffOptions labelsToHighlight) . convertPrettyPrintType maxDepth
+typeDiffAsBox' :: PrettyPrintType -> Box
+typeDiffAsBox' = typeAsBoxImpl diffOptions
+
+typeDiffAsBox :: Int -> Type a -> Box
+typeDiffAsBox maxDepth = typeDiffAsBox' . convertPrettyPrintType maxDepth
 
 data TypeRenderOptions = TypeRenderOptions
   { troSuggesting :: Bool
   , troUnicode :: Bool
   , troRowAsDiff :: Bool
-  , troToHighlight :: S.Set Label
   }
 
 suggestingOptions :: TypeRenderOptions
-suggestingOptions = TypeRenderOptions True False False S.empty
+suggestingOptions = TypeRenderOptions True False False
 
 defaultOptions :: TypeRenderOptions
-defaultOptions = TypeRenderOptions False False False S.empty
+defaultOptions = TypeRenderOptions False False False
 
-diffOptions :: S.Set Label -> TypeRenderOptions
+diffOptions :: TypeRenderOptions
 diffOptions = TypeRenderOptions False False True
 
 unicodeOptions :: TypeRenderOptions
-unicodeOptions = TypeRenderOptions False True False S.empty
+unicodeOptions = TypeRenderOptions False True False
 
 typeAsBoxImpl :: TypeRenderOptions -> PrettyPrintType -> Box
 typeAsBoxImpl tro
