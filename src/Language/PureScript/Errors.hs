@@ -846,6 +846,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , line "has escaped its scope, appearing in the type"
             , markCodeBox $ indent $ prettyType ty
             ]
+
+    renderSimpleErrorMessage (TypesDoNotUnify (r1@RCons{}) (r2@RCons{}))
+      = paras [ line "Failed to match row type"
+              , printRowsAsDiff (rowToList r1) (rowToList r2)
+              ]
+
     renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
       = let (row1Box, row2Box) = printRows u1 u2
 
@@ -1559,6 +1565,26 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     printRow f = markCodeBox . indent . f prettyDepth .
       if full then id else eraseForAllKindAnnotations . eraseKindApps
 
+    -- NOTE: It might be hard to write anywhere that isn't top level, so keeping this a separate path for now.
+    printRowsAsDiff :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> Box.Box
+    printRowsAsDiff (r1, ty1) (r2, _) = 
+        printRow (rowsDiffAsInterlacedBox (mergeRows r1 r2)) ty1
+
+    mergeRows :: [RowListItem a] -> [RowListItem a] -> [(Label, Maybe (Type a), Maybe (Type a))]
+    mergeRows a b = merge (sort' a) (sort' b)
+      where
+      sort' = sortOn $ \(RowListItem _ name ty) -> (name, ty)
+
+      merge :: [RowListItem a] -> [RowListItem a] -> [(Label, Maybe (Type a), Maybe (Type a))]
+      merge s1@((RowListItem _ name1 ty1) : t1) s2@((RowListItem _ name2 ty2) : t2) = 
+          case name1 `compare` name2 of
+            EQ | ty1 == ty2 ->                  merge t1 t2
+            EQ -> (name1, Just ty1, Just ty2) : merge t1 t2
+            LT -> (name1, Just ty1, Nothing ) : merge t1 s2
+            GT -> (name2, Nothing , Just ty2) : merge s1 t2
+      merge _ _ = []
+      
+
     -- If both rows are not empty, print them as diffs
     -- If verbose print all rows else only print unique rows
     printRows :: Type a -> Type a -> (Box.Box, Box.Box)
@@ -1570,7 +1596,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
         in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
 
       (_, _, _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
-
 
     -- Keep the unique labels only
     filterRows :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)

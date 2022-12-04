@@ -17,6 +17,7 @@ module Language.PureScript.Pretty.Types
   , prettyPrintTypeAtom
   , prettyPrintLabel
   , prettyPrintObjectKey
+  , rowsDiffAsInterlacedBox 
   ) where
 
 import Prelude hiding ((<>))
@@ -144,6 +145,34 @@ prettyPrintRowWith tro open close labels rest =
   tailToPs Nothing = nullBox
   tailToPs (Just other) = text "| " <> typeAsBox' other
 
+prettyPrintRowDiffWith :: TypeRenderOptions -> Char -> Char -> [(Label, Maybe PrettyPrintType, Maybe PrettyPrintType)] -> Box
+prettyPrintRowDiffWith tro open close labels =
+  case labels of
+    [] | troRowAsDiff tro -> text [ open, ' ' ] <> text "..." <> text [ ' ', close ]
+    [] -> text [ open, close ]
+    _ ->
+      vcat left $
+        [ text [ open ] ]
+        ++ fmap (\(name, ty1, ty2) -> nameAndTypeToPs name ty1 ty2) labels
+        ++ catMaybes [ rowDiff, pure $ text [close] ]
+
+  where
+  nameAndTypeToPs :: Label -> Maybe PrettyPrintType -> Maybe PrettyPrintType -> Box
+  nameAndTypeToPs name maybeTy1 maybeTy2 =
+    let
+      format prefix ty = text ("," ++ prefix ++ T.unpack (prettyPrintLabel name) ++ " " ++ doubleColon ++ " ") <> typeAsBox' ty
+    in
+      vcat left $
+        [ fromMaybe (text "<no row>") $ fmap (format " ") maybeTy1
+        , fromMaybe (text "<no row>") $ fmap (format " ") maybeTy2
+        , text ""
+        ]
+      
+
+  doubleColon = if troUnicode tro then "∷" else "::"
+
+  rowDiff = if troRowAsDiff tro then Just (text "...") else Nothing
+
 typeApp :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
 typeApp = mkPattern match
   where
@@ -261,6 +290,12 @@ typeDiffAsBox' = typeAsBoxImpl diffOptions
 
 typeDiffAsBox :: Int -> Type a -> Box
 typeDiffAsBox maxDepth = typeDiffAsBox' . convertPrettyPrintType maxDepth
+
+rowsDiffAsInterlacedBox :: [(Label, Maybe (Type a), Maybe (Type a))] -> Int -> Type a -> Box
+rowsDiffAsInterlacedBox merged maxDepth _ = prettyPrintRowDiffWith diffOptions '(' ')' mergedPretty
+  where
+  mergedPretty = fmap (\(name, ty1, ty2) -> (name, fmap prettyType ty1, fmap prettyType ty2)) merged
+  prettyType = convertPrettyPrintType maxDepth 
 
 data TypeRenderOptions = TypeRenderOptions
   { troSuggesting :: Bool
