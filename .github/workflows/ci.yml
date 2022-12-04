@@ -15,7 +15,7 @@ defaults:
 env:
   CI_PRERELEASE: "${{ github.event_name == 'push' }}"
   CI_RELEASE: "${{ github.event_name == 'release' }}"
-  STACK_VERSION: "2.7.5"
+  STACK_VERSION: "2.9.1"
 
 concurrency:
   # We never want two prereleases building at the same time, since they would
