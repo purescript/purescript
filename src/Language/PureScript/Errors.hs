@@ -4,6 +4,7 @@ module Language.PureScript.Errors
   ) where
 
 import           Prelude
+import           Protolude (unsnoc)
 
 import           Control.Arrow ((&&&))
 import           Control.Exception (displayException)
@@ -194,7 +195,7 @@ data SimpleErrorMessage
   | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
-  | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName))
+  | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName)) [Qualified (ProperName 'ClassName)] Bool
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -586,6 +587,13 @@ colorCodeBox codeColor b = case codeColor of
         , b
         , Box.vcat Box.top $ replicate (Box.rows b) $ Box.text ansiColorReset
         ]
+
+commasAndConjunction :: Text -> [Text] -> Text
+commasAndConjunction conj = \case
+  [x] -> x
+  [x, y] -> x <> " " <> conj <> " " <> y
+  (unsnoc -> Just (rest, z)) -> foldMap (<> ", ") rest <> conj <> " " <> z
+  _ -> ""
 
 -- | Default color intensity and color for code
 defaultCodeColor :: (ANSI.ColorIntensity, ANSI.Color)
@@ -1378,11 +1386,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
       line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
 
-    renderSimpleErrorMessage (CannotDeriveInvalidConstructorArg className) =
+    renderSimpleErrorMessage (CannotDeriveInvalidConstructorArg className relatedClasses checkVariance) =
       paras
         [ line $ "One or more type variables are in positions that prevent " <> markCode (runProperName $ disqualify className) <> " from being derived."
         , line $ "To derive this class, make sure that these variables are only used as the final arguments to type constructors, "
-          <> "and that those type constructors themselves have instances of " <> markCode (runProperName $ disqualify className) <> "."
+          <> (if checkVariance then "that their variance matches the variance of " <> markCode (runProperName $ disqualify className) <> ", " else "")
+          <> "and that those type constructors themselves have instances of " <> commasAndConjunction "or" (markCode . showQualified runProperName <$> relatedClasses) <> "."
         ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
