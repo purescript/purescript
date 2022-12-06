@@ -15,7 +15,7 @@
     "purs": "purs.bin"
   },
   "dependencies": {
-    "purescript-installer": "^0.3.1"
+    "purescript-installer": "^0.3.3"
   },
   "homepage": "https://github.com/purescript/purescript",
   "repository": {
