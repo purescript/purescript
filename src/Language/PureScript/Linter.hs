@@ -19,7 +19,7 @@ import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHi
 import Language.PureScript.Linter.Exhaustive as L
 import Language.PureScript.Linter.Imports as L
 import Language.PureScript.Names (Ident(..), Qualified(..), QualifiedBy(..), getIdentName, runIdent)
-import Language.PureScript.Types (Constraint(..), SourceType, Type(..), everythingWithContextOnTypes)
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), everythingOnTypes, everythingWithContextOnTypes)
 import Language.PureScript.Constants.Libs qualified as C
 
 -- | Lint the PureScript AST.
@@ -222,7 +222,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
       in
       mconcat $ map go vs ++ map f alts
 
-    go (TypedValue _ v1 _) = go v1
+    go (TypedValue _ v1 ty) = go v1 <> goType ty
     go (Do _ es) = doElts es Nothing
     go (Ado _ es v1) = doElts es (Just v1)
 
@@ -240,6 +240,10 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go AnonymousArgument = mempty
     go (Hole _) = mempty
 
+    goType :: SourceType -> (S.Set Name, MultipleErrors)
+    goType = everythingOnTypes (<>) $ \case
+      TypeConstructor _ (Qualified (BySourcePos _) t) -> (S.singleton $ TyName t, mempty)
+      _ -> mempty
 
     doElts :: [DoNotationElement] -> Maybe Expr -> (S.Set Name, MultipleErrors)
     doElts (DoNotationValue e : rest) v = go e <> doElts rest v
@@ -257,6 +261,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
     declNames :: Declaration -> (S.Set (SourceSpan, Name), S.Set (SourceSpan, Name))
     declNames (ValueDecl (ss,_) ident _ _ _) = (S.empty, S.singleton (ss, IdentName ident))
     declNames (BoundValueDeclaration _ binders _) = (S.fromList $ binderNamesWithSpans' binders, S.empty)
+    declNames (TypeSynonymDeclaration (ss,_) ty _ _) = (S.singleton (ss, TyName ty), S.empty)
     declNames _ = (S.empty, S.empty)
 
     onDecls :: [ Declaration ] -> (S.Set Name, MultipleErrors) -> (S.Set Name, MultipleErrors)
@@ -280,6 +285,8 @@ lintUnused (Module modSS _ mn modDecls exports) =
           removeAndWarn bindNewNames $ foldr1 (<>) $ map go allExprs
     -- let {x} = e  -- no binding to check inside e
     underDecl (BoundValueDeclaration _ _ expr) = go expr
+    -- let f :: t   -- check t
+    underDecl (TypeDeclaration TypeDeclarationData{..}) = goType tydeclType
     underDecl _ = (mempty, mempty)
 
     unguard (GuardedExpr guards expr) = map unguard' guards ++ [expr]

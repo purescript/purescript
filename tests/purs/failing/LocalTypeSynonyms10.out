@@ -1,0 +1,22 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/LocalTypeSynonyms10.purs:9:13 - 9:18 (line 9, column 13 - line 9, column 18)
+
+  Could not match kind
+  [33m      [0m
+  [33m  Type[0m
+  [33m      [0m
+  with kind
+  [33m                     [0m
+  [33m  forall k. k -> Type[0m
+  [33m                     [0m
+
+in type synonym [33mA[0m
+while checking that expression [33m0      [0m
+                               [33m  where[0m
+  has type [33mInt[0m
+in value declaration [33mtest[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

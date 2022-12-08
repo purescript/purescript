@@ -202,6 +202,7 @@ usedTypeNames moduleName = go
 
   usedNames :: SourceType -> [ProperName 'TypeName]
   usedNames (ConstrainedType _ con _) = usedConstraint con
+  usedNames (TypeConstructor _ (Qualified (BySourcePos _) name)) = [name]
   usedNames (TypeConstructor _ (Qualified (ByModuleName moduleName') name))
     | moduleName == moduleName' = [name]
   usedNames _ = []

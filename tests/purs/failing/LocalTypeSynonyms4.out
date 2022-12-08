@@ -1,0 +1,30 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/LocalTypeSynonyms4.purs:8:13 - 8:14 (line 8, column 13 - line 8, column 14)
+
+  Could not match kind
+  [33m      [0m
+  [33m  Type[0m
+  [33m      [0m
+  with kind
+  [33m          [0m
+  [33m  Row Type[0m
+  [33m          [0m
+
+while checking that type [33ma0[0m
+  has kind [33mRow Type[0m
+while inferring the kind of [33mT a0[0m
+while checking that expression [33mresult                   [0m
+                               [33m  where                  [0m
+                               [33m  result = { wrapped: ...[0m
+                               [33m           }             [0m
+  has type [33m{ wrapped :: a0[0m
+           [33m}              [0m
+in value declaration [33mwrap[0m
+
+where [33ma0[0m is a rigid type variable
+        bound at (line 0, column 0 - line 0, column 0)
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

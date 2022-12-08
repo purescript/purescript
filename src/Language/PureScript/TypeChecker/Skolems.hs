@@ -12,11 +12,12 @@ import Prelude
 
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
+import Data.Bifunctor (second)
 import Data.Foldable (traverse_)
 import Data.Functor.Identity (Identity(), runIdentity)
 import Data.Set (Set, fromList, notMember)
 import Data.Text (Text)
-import Language.PureScript.AST (Binder(..), ErrorMessageHint(..), Expr(..), SourceAnn, SourceSpan, everythingWithContextOnValues, everywhereWithContextOnValuesM, nonEmptySpan)
+import Language.PureScript.AST (Binder(..), Declaration(..), ErrorMessageHint(..), Expr(..), SourceAnn, SourceSpan, everythingWithContextOnValues, everywhereWithContextOnValuesM, nonEmptySpan)
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), positionedError, singleError)
 import Language.PureScript.Traversals (defS)
@@ -56,25 +57,40 @@ skolemizeTypesInValue ann ident mbK sko scope =
     runIdentity . onExpr'
   where
     onExpr' :: Expr -> Identity Expr
-    (_, onExpr', _, _, _, _) = everywhereWithContextOnValuesM [] defS onExpr onBinder defS defS defS
+    (_, onExpr', _, _, _, _) = everywhereWithContextOnValuesM [] onDecl onExpr onBinder defS defS defS
+
+    onDecl :: [Text] -> Declaration -> Identity ([Text], Declaration)
+    onDecl sco decl@(TypeSynonymDeclaration sa name args ty)
+      | ident `notElem` sco = return (sco ++ argNames, decl')
+      where
+        argNames = map fst args
+        decl' =
+          if ident `elem` argNames
+          then decl
+          else TypeSynonymDeclaration sa name (map (second . fmap $ skolemizeInner) args) (skolemizeInner ty)
+    onDecl sco (KindDeclaration sa kindFor name ty) = return (sco, KindDeclaration sa kindFor name (skolemizeInner ty))
+    onDecl sco other = return (sco, other)
 
     onExpr :: [Text] -> Expr -> Identity ([Text], Expr)
     onExpr sco (DeferredDictionary c ts)
-      | ident `notElem` sco = return (sco, DeferredDictionary c (map (skolemize ann ident mbK sko scope) ts))
+      | ident `notElem` sco = return (sco, DeferredDictionary c (map skolemizeInner ts))
     onExpr sco (TypedValue check val ty)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ann ident mbK sko scope ty))
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemizeInner ty))
     onExpr sco (VisibleTypeApp val ty)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, VisibleTypeApp val (skolemize ann ident mbK sko scope ty))
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, VisibleTypeApp val (skolemizeInner ty))
     onExpr sco other = return (sco, other)
 
     onBinder :: [Text] -> Binder -> Identity ([Text], Binder)
     onBinder sco (TypedBinder ty b)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ann ident mbK sko scope ty) b)
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemizeInner ty) b)
     onBinder sco other = return (sco, other)
 
     peelTypeVars :: SourceType -> [Text]
     peelTypeVars (ForAll _ _ i _ ty _) = i : peelTypeVars ty
     peelTypeVars _ = []
+
+    skolemizeInner :: SourceType -> SourceType
+    skolemizeInner = skolemize ann ident mbK sko scope
 
 -- | Ensure skolem variables do not escape their scope
 --
