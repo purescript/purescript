@@ -28,7 +28,7 @@ import Language.PureScript.AST
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (NameKind)
 import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors(..), SimpleErrorMessage(..), errorMessage', parU, positionedError)
-import Language.PureScript.Names (pattern ByNullSourcePos, Ident, ModuleName, ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident, ModuleName, Name(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName)
 import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), everythingOnTypes)
 
 data VertexType
@@ -171,11 +171,11 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression
 
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
-  usedNamesE :: S.Set ScopedIdent -> Expr -> [Ident]
+  usedNamesE :: S.Set ScopedName -> Expr -> [Ident]
   usedNamesE scope (Var _ (Qualified (BySourcePos _) name))
-    | LocalIdent name `S.notMember` scope = [name]
+    | LocalName (IdentName name) `S.notMember` scope = [name]
   usedNamesE scope (Var _ (Qualified (ByModuleName moduleName') name))
-    | moduleName == moduleName' && ToplevelIdent name `S.notMember` scope = [name]
+    | moduleName == moduleName' && ToplevelName (IdentName name) `S.notMember` scope = [name]
   usedNamesE _ _ = []
 
 usedImmediateIdents :: ModuleName -> Declaration -> [Ident]
