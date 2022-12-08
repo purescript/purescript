@@ -12,7 +12,7 @@ module Language.PureScript.Sugar.Names
 import Prelude
 import Protolude (sortOn, swap, foldl')
 
-import Control.Arrow (first, second, (&&&))
+import Control.Arrow (first, second)
 import Control.Monad (foldM, when, (>=>))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy (MonadState, StateT(..), gets, modify)
@@ -184,9 +184,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
       updateGuard
 
   updateDecl
-    :: M.Map Ident SourcePos
+    :: M.Map Name SourcePos
     -> Declaration
-    -> m (M.Map Ident SourcePos, Declaration)
+    -> m (M.Map Name SourcePos, Declaration)
   updateDecl bound (DataDeclaration sa dtype name args dctors) =
     fmap (bound,) $
       DataDeclaration sa dtype name
@@ -220,7 +220,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
       TypeDeclaration . TypeDeclarationData sa name
         <$> updateTypesEverywhere ty
   updateDecl bound (ExternDeclaration sa name ty) =
-    fmap (M.insert name (spanStart $ fst sa) bound,) $
+    fmap (M.insert (IdentName name) (spanStart $ fst sa) bound,) $
       ExternDeclaration sa name
         <$> updateTypesEverywhere ty
   updateDecl bound (ExternDataDeclaration sa name ki) =
@@ -246,26 +246,26 @@ renameInModule imports (Module modSS coms mn decls exps) =
     return (b, d)
 
   updateValue
-    :: (SourceSpan, M.Map Ident SourcePos)
+    :: (SourceSpan, M.Map Name SourcePos)
     -> Expr
-    -> m ((SourceSpan, M.Map Ident SourcePos), Expr)
+    -> m ((SourceSpan, M.Map Name SourcePos), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _ _) =
     return ((pos', bound), v)
   updateValue (pos, bound) (Abs (VarBinder ss arg) val') =
-    return ((pos, M.insert arg (spanStart ss) bound), Abs (VarBinder ss arg) val')
+    return ((pos, M.insert (IdentName arg) (spanStart ss) bound), Abs (VarBinder ss arg) val')
   updateValue (pos, bound) (Let w ds val') = do
     let
-      args = mapMaybe letBoundVariable ds
+      names = mapMaybe letBoundName ds
       groupByFst = map (\ts -> (fst (NEL.head ts), snd <$> ts)) . NEL.groupAllWith fst
-      duplicateArgsErrs = foldMap mkArgError $ groupByFst args
-      mkArgError (ident, poses)
+      duplicateNameErrs = foldMap mkNameError $ groupByFst names
+      mkNameError (name, poses)
         | NEL.length poses < 2 = mempty
-        | otherwise = errorMessage'' (NEL.reverse poses) (OverlappingNamesInLet ident)
-    when (nonEmpty duplicateArgsErrs) $
-      throwError duplicateArgsErrs
+        | otherwise = errorMessage'' (NEL.reverse poses) (OverlappingNamesInLet name)
+    when (nonEmpty duplicateNameErrs) $
+      throwError duplicateNameErrs
     return ((pos, declarationsToMap ds `M.union` bound), Let w ds val')
   updateValue (_, bound) (Var ss name'@(Qualified qualifiedBy ident)) =
-    ((ss, bound), ) <$> case (M.lookup ident bound, qualifiedBy) of
+    ((ss, bound), ) <$> case (M.lookup (IdentName ident) bound, qualifiedBy) of
       -- bound idents that have yet to be locally qualified.
       (Just sourcePos, ByNullSourcePos) ->
         pure $ Var ss (Qualified (BySourcePos sourcePos) ident)
@@ -294,9 +294,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateValue s v = return (s, v)
 
   updateBinder
-    :: (SourceSpan, M.Map Ident SourcePos)
+    :: (SourceSpan, M.Map Name SourcePos)
     -> Binder
-    -> m ((SourceSpan, M.Map Ident SourcePos), Binder)
+    -> m ((SourceSpan, M.Map Name SourcePos), Binder)
   updateBinder (_, bound) v@(PositionedBinder pos _ _) =
     return ((pos, bound), v)
   updateBinder (_, bound) (ConstructorBinder ss name b) =
@@ -310,22 +310,22 @@ renameInModule imports (Module modSS coms mn decls exps) =
     return (s, v)
 
   updateCase
-    :: (SourceSpan, M.Map Ident SourcePos)
+    :: (SourceSpan, M.Map Name SourcePos)
     -> CaseAlternative
-    -> m ((SourceSpan, M.Map Ident SourcePos), CaseAlternative)
+    -> m ((SourceSpan, M.Map Name SourcePos), CaseAlternative)
   updateCase (pos, bound) c@(CaseAlternative bs _) =
-    return ((pos, rUnionMap binderNamesWithSpans' bs `M.union` bound), c)
+    return ((pos, M.mapKeysMonotonic IdentName (rUnionMap binderNamesWithSpans' bs) `M.union` bound), c)
     where
     rUnionMap f = foldl' (flip (M.union . f)) M.empty
 
   updateGuard
-    :: (SourceSpan, M.Map Ident SourcePos)
+    :: (SourceSpan, M.Map Name SourcePos)
     -> Guard
-    -> m ((SourceSpan, M.Map Ident SourcePos), Guard)
+    -> m ((SourceSpan, M.Map Name SourcePos), Guard)
   updateGuard (pos, bound) g@(ConditionGuard _) =
     return ((pos, bound), g)
   updateGuard (pos, bound) g@(PatternGuard b _) =
-    return ((pos, binderNamesWithSpans' b `M.union` bound), g)
+    return ((pos, M.mapKeysMonotonic IdentName (binderNamesWithSpans' b) `M.union` bound), g)
 
   binderNamesWithSpans' :: Binder -> M.Map Ident SourcePos
   binderNamesWithSpans'
@@ -333,14 +333,14 @@ renameInModule imports (Module modSS coms mn decls exps) =
     . fmap (second spanStart . swap)
     . binderNamesWithSpans
 
-  letBoundVariable :: Declaration -> Maybe (Ident, SourceSpan)
-  letBoundVariable = fmap (valdeclIdent &&& (fst . valdeclSourceAnn)) . getValueDeclaration
+  letBoundName :: Declaration -> Maybe (Name, SourceSpan)
+  letBoundName d = (, declSourceSpan d) <$> declName d
 
-  declarationsToMap :: [Declaration] -> M.Map Ident SourcePos
+  declarationsToMap :: [Declaration] -> M.Map Name SourcePos
   declarationsToMap = foldl goDTM M.empty
     where
       goDTM a (ValueDeclaration ValueDeclarationData {..}) =
-        M.insert valdeclIdent (spanStart $ fst valdeclSourceAnn) a
+        M.insert (IdentName valdeclIdent) (spanStart $ fst valdeclSourceAnn) a
       goDTM a _ =
         a
 

@@ -7,6 +7,7 @@ import Prelude
 
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
+import Data.Bifunctor (second)
 import Data.Maybe (mapMaybe)
 import Data.Set qualified as S
 import Data.Text (Text)
@@ -30,11 +31,8 @@ lint modl@(Module _ _ mn ds _) = do
   censor (addHint (ErrorInModule mn)) $ mapM_ lintDeclaration ds
 
   where
-  moduleNames :: S.Set ScopedIdent
-  moduleNames = S.fromList (map ToplevelIdent (mapMaybe getDeclIdent ds))
-
-  getDeclIdent :: Declaration -> Maybe Ident
-  getDeclIdent = getIdentName <=< declName
+  moduleNames :: S.Set ScopedName
+  moduleNames = S.fromList (map ToplevelName (mapMaybe declName ds))
 
   lintDeclaration :: Declaration -> m ()
   lintDeclaration = tell . f
@@ -52,29 +50,29 @@ lint modl@(Module _ _ mn ds _) = do
       addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars ss s (tydeclType td))
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 
-    stepE :: S.Set ScopedIdent -> Expr -> MultipleErrors
-    stepE s (Abs (VarBinder ss name) _) | name `inScope` s = errorMessage' ss (ShadowedName name)
+    stepE :: S.Set ScopedName -> Expr -> MultipleErrors
+    stepE s (Abs (VarBinder ss name) _) | name `inScope` s = errorMessage' ss (ShadowedName $ IdentName name)
     stepE s (Let _ ds' _) = foldMap go ds'
       where
-      go d | Just i <- getDeclIdent d
-           , inScope i s = errorMessage' (declSourceSpan d) (ShadowedName i)
+      go d | Just n <- declName d
+           , inScope' n s = errorMessage' (declSourceSpan d) (ShadowedName n)
            | otherwise = mempty
     stepE _ _ = mempty
 
-    stepB :: S.Set ScopedIdent -> Binder -> MultipleErrors
+    stepB :: S.Set ScopedName -> Binder -> MultipleErrors
     stepB s (VarBinder ss name)
       | name `inScope` s
-      = errorMessage' ss (ShadowedName name)
+      = errorMessage' ss (ShadowedName $ IdentName name)
     stepB s (NamedBinder ss name _)
       | inScope name s
-      = errorMessage' ss (ShadowedName name)
+      = errorMessage' ss (ShadowedName $ IdentName name)
     stepB _ _ = mempty
 
-    stepDo :: S.Set ScopedIdent -> DoNotationElement -> MultipleErrors
+    stepDo :: S.Set ScopedName -> DoNotationElement -> MultipleErrors
     stepDo s (DoNotationLet ds') = foldMap go ds'
       where
       go d
-        | Just i <- getDeclIdent d, i `inScope` s = errorMessage' (declSourceSpan d) (ShadowedName i)
+        | Just n <- declName d, n `inScope'` s = errorMessage' (declSourceSpan d) (ShadowedName n)
         | otherwise = mempty
     stepDo _ _ = mempty
 
@@ -177,25 +175,25 @@ lintUnused (Module modSS _ mn modDecls exports) =
     goDecl :: Declaration -> (S.Set Ident, MultipleErrors)
     goDecl (ValueDeclaration vd) =
         let allExprs = concatMap unguard $ valdeclExpression vd
-            bindNewNames = S.fromList (concatMap binderNamesWithSpans $ valdeclBinders vd)
+            bindNewNames = S.fromList (concatMap binderNamesWithSpans' $ valdeclBinders vd)
             (vars, errs) = removeAndWarn bindNewNames $ mconcat $ map go allExprs
             errs' = addHint (ErrorInValueDeclaration $ valdeclIdent vd) errs
         in
-          (vars, errs')
+          (S.fromDistinctAscList . mapMaybe getIdentName $ S.toAscList vars, errs')
 
     goDecl (ValueFixityDeclaration _ _ (Qualified _ (Left v)) _) = (S.singleton v, mempty)
 
     goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
     goDecl _ = mempty
 
-    go :: Expr -> (S.Set Ident, MultipleErrors)
-    go (Var _ (Qualified (BySourcePos _) v)) = (S.singleton v, mempty)
+    go :: Expr -> (S.Set Name, MultipleErrors)
+    go (Var _ (Qualified (BySourcePos _) v)) = (S.singleton $ IdentName v, mempty)
     go (Var _ _) = (S.empty, mempty)
 
     go (Let _ ds e) = onDecls ds (go e)
 
     go (Abs binder v1) =
-      let newNames = S.fromList (binderNamesWithSpans binder)
+      let newNames = S.fromList (binderNamesWithSpans' binder)
       in
       removeAndWarn newNames $ go v1
 
@@ -217,7 +215,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go (IfThenElse v1 v2 v3) = go v1 <> go v2 <> go v3
     go (Case vs alts) =
       let f (CaseAlternative binders gexprs) =
-            let bindNewNames = S.fromList (concatMap binderNamesWithSpans binders)
+            let bindNewNames = S.fromList (concatMap binderNamesWithSpans' binders)
                 allExprs = concatMap unguard gexprs
             in
                 removeAndWarn bindNewNames $ mconcat $ map go allExprs
@@ -243,29 +241,29 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go (Hole _) = mempty
 
 
-    doElts :: [DoNotationElement] -> Maybe Expr -> (S.Set Ident, MultipleErrors)
+    doElts :: [DoNotationElement] -> Maybe Expr -> (S.Set Name, MultipleErrors)
     doElts (DoNotationValue e : rest) v = go e <> doElts rest v
     doElts (DoNotationBind binder e : rest) v =
-      let bindNewNames = S.fromList (binderNamesWithSpans binder)
+      let bindNewNames = S.fromList (binderNamesWithSpans' binder)
       in go e <> removeAndWarn bindNewNames (doElts rest v)
 
     doElts (DoNotationLet ds : rest) v = onDecls ds (doElts rest v)
 
     doElts (PositionedDoNotationElement _ _ e : rest) v = doElts (e : rest) v
-    doElts [] (Just e) = go e <> (rebindable, mempty)
-    doElts [] Nothing = (rebindable, mempty)
+    doElts [] (Just e) = go e <> (S.mapMonotonic IdentName rebindable, mempty)
+    doElts [] Nothing = (S.mapMonotonic IdentName rebindable, mempty)
 
-    -- (non-recursively, recursively) bound idents in decl
-    declIdents :: Declaration -> (S.Set (SourceSpan, Ident), S.Set (SourceSpan, Ident))
-    declIdents (ValueDecl (ss,_) ident _ _ _) = (S.empty, S.singleton (ss, ident))
-    declIdents (BoundValueDeclaration _ binders _) = (S.fromList $ binderNamesWithSpans binders, S.empty)
-    declIdents _ = (S.empty, S.empty)
+    -- (non-recursively, recursively) bound names in decl
+    declNames :: Declaration -> (S.Set (SourceSpan, Name), S.Set (SourceSpan, Name))
+    declNames (ValueDecl (ss,_) ident _ _ _) = (S.empty, S.singleton (ss, IdentName ident))
+    declNames (BoundValueDeclaration _ binders _) = (S.fromList $ binderNamesWithSpans' binders, S.empty)
+    declNames _ = (S.empty, S.empty)
 
-    onDecls :: [ Declaration ] -> (S.Set Ident, MultipleErrors) -> (S.Set Ident, MultipleErrors)
+    onDecls :: [ Declaration ] -> (S.Set Name, MultipleErrors) -> (S.Set Name, MultipleErrors)
     onDecls ds errs = 
       let 
         onDecl d (accErrs, accLetNamesRec) = 
-            let (letNames, recNames) = declIdents d
+            let (letNames, recNames) = declNames d
                 dErrs = underDecl d
                 errs' = dErrs <> removeAndWarn letNames accErrs
             in
@@ -276,7 +274,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
 
     -- let f x = e  -- check the x in e (but not the f)
     underDecl (ValueDecl _ _ _ binders gexprs) =
-      let bindNewNames = S.fromList (concatMap binderNamesWithSpans binders)
+      let bindNewNames = S.fromList (concatMap binderNamesWithSpans' binders)
           allExprs = concatMap unguard gexprs
       in
           removeAndWarn bindNewNames $ foldr1 (<>) $ map go allExprs
@@ -288,12 +286,20 @@ lintUnused (Module modSS _ mn modDecls exports) =
     unguard' (ConditionGuard ee) = ee
     unguard' (PatternGuard _ ee) = ee
 
-    removeAndWarn :: S.Set (SourceSpan, Ident) -> (S.Set Ident, MultipleErrors) -> (S.Set Ident, MultipleErrors)
+    shouldWarnForName :: Name -> Bool
+    shouldWarnForName = \case
+      IdentName nm -> not . Text.isPrefixOf "_" $ runIdent nm
+      _ -> True
+
+    removeAndWarn :: S.Set (SourceSpan, Name) -> (S.Set Name, MultipleErrors) -> (S.Set Name, MultipleErrors)
     removeAndWarn newNamesWithSpans (used, errors) =
       let newNames = S.map snd newNamesWithSpans
           filteredUsed = used `S.difference` newNames
-          warnUnused = S.filter (not . Text.isPrefixOf "_" . runIdent) (newNames `S.difference` used)
-          warnUnusedSpans = S.filter (\(_,ident) -> ident `elem` warnUnused) newNamesWithSpans 
-          combinedErrors = if not $ S.null warnUnusedSpans then errors <> mconcat (map (\(ss,ident) -> errorMessage' ss $ UnusedName ident) $ S.toList warnUnusedSpans) else errors
+          warnUnused = S.filter shouldWarnForName (newNames `S.difference` used)
+          warnUnusedSpans = S.filter (\(_,name) -> name `elem` warnUnused) newNamesWithSpans
+          combinedErrors = if not $ S.null warnUnusedSpans then errors <> mconcat (map (\(ss,name) -> errorMessage' ss $ UnusedName name) $ S.toList warnUnusedSpans) else errors
       in
         (filteredUsed, combinedErrors)
+
+    binderNamesWithSpans' :: Binder -> [(SourceSpan, Name)]
+    binderNamesWithSpans' = map (second IdentName) . binderNamesWithSpans

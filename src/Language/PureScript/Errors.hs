@@ -81,7 +81,7 @@ data SimpleErrorMessage
   | OrphanKindDeclaration (ProperName 'TypeName)
   | OrphanRoleDeclaration (ProperName 'TypeName)
   | RedefinedIdent Ident
-  | OverlappingNamesInLet Ident
+  | OverlappingNamesInLet Name
   | UnknownName (Qualified Name)
   | UnknownImport ModuleName Name
   | UnknownImportDataConstructor ModuleName (ProperName 'TypeName) (ProperName 'ConstructorName)
@@ -143,10 +143,10 @@ data SimpleErrorMessage
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | TransitiveDctorExportError DeclarationRef [ProperName 'ConstructorName]
   | HiddenConstructors DeclarationRef (Qualified (ProperName 'ClassName))
-  | ShadowedName Ident
+  | ShadowedName Name
   | ShadowedTypeVar Text
   | UnusedTypeVar Text
-  | UnusedName Ident
+  | UnusedName Name
   | UnusedDeclaration Ident
   | WildcardInferredType SourceType Context
   | HoleInferredType Text SourceType Context (Maybe TypeSearch)
@@ -744,7 +744,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     renderSimpleErrorMessage InvalidDoLet =
       line "The last statement in a 'do' block must be an expression, but this block ends with a let binding."
     renderSimpleErrorMessage (OverlappingNamesInLet name) =
-      line $ "The name " <> markCode (showIdent name) <> " was defined multiple times in a binding group"
+      line $ "The " <> printName (Qualified ByNullSourcePos name) <> " was defined multiple times in a binding group"
     renderSimpleErrorMessage (InfiniteType ty) =
       paras [ line "An infinite type was inferred for an expression: "
             , markCodeBox $ indent $ prettyType ty
@@ -1122,11 +1122,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , line "Such instance allows to match and construct values of this type, effectively making the constructors public."
             ]
     renderSimpleErrorMessage (ShadowedName nm) =
-      line $ "Name " <> markCode (showIdent nm) <> " was shadowed."
+      line $ "The " <> printName (Qualified ByNullSourcePos nm) <> " was shadowed."
     renderSimpleErrorMessage (ShadowedTypeVar tv) =
       line $ "Type variable " <> markCode tv <> " was shadowed."
     renderSimpleErrorMessage (UnusedName nm) =
-      line $ "Name " <> markCode (showIdent nm) <> " was introduced but not used."
+      line $ "The " <> printName (Qualified ByNullSourcePos nm) <> " was introduced but not used."
     renderSimpleErrorMessage (UnusedDeclaration nm) =
       line $ "Declaration " <> markCode (showIdent nm) <> " was not used, and is not exported."
     renderSimpleErrorMessage (UnusedTypeVar tv) =
