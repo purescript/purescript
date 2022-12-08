@@ -1,0 +1,23 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/LocalTypeSynonyms6.purs:24:14 - 24:34 (line 24, column 14 - line 24, column 34)
+
+  Could not match type
+  [33m        [0m
+  [33m  Record[0m
+  [33m        [0m
+  with type
+  [33m         [0m
+  [33m  Wrapped[0m
+  [33m         [0m
+
+while trying to match type [33m{ wrapped :: Int[0m
+                           [33m}               [0m
+  with type [33mWrapped Int[0m
+while checking that expression [33mintentionallyUntyped[0m
+  has type [33mWrapped Int[0m
+in value declaration [33mfoo[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+or to contribute content related to this error.
+

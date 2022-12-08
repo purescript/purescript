@@ -1,10 +1,10 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/failing/SkolemEscapeKinds.purs:8:10 - 8:17 (line 8, column 10 - line 8, column 17)
+at tests/purs/failing/LocalTypeSynonyms8.purs:11:12 - 11:19 (line 11, column 12 - line 11, column 19)
 
   The type variable [33mk[0m, bound at
 
-    tests/purs/failing/SkolemEscapeKinds.purs:8:16 - 8:17 (line 8, column 16 - line 8, column 17)
+    tests/purs/failing/LocalTypeSynonyms8.purs:11:18 - 11:19 (line 11, column 18 - line 11, column 19)
 
   has escaped its scope, appearing in the type
   [33m         [0m
@@ -12,6 +12,10 @@ at tests/purs/failing/SkolemEscapeKinds.purs:8:10 - 8:17 (line 8, column 10 - li
   [33m         [0m
 
 in type synonym [33mB[0m
+while checking that expression [33m0      [0m
+                               [33m  where[0m
+  has type [33mInt[0m
+in value declaration [33mtest[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/EscapedSkolem.md for more information,
 or to contribute content related to this error.
