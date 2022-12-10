@@ -11,21 +11,27 @@ New features:
   This allows IDE clients to typecheck the module the user is currently typing in without modifying the output.
   This allows for faster feedback cycles in editors and avoids producing a broken `/output` before the user actually saves the file.
 
-```markdown (#4412 by @nwolverson)
 * Add `purs ide` dependency/imports filter (#4412 by @nwolverson)
 
   This allows IDE tooling to filter type searches according to the imports of a given module,
   restricting to identifiers in scope.
-```
 
-* Shorten the prefix for custom user defined error (#4418 by @i-am-the-slime)
-  messages to improve clarity and get to the relevant information
-  more quickly
+* Shorten custom user-defined error message's prefix (#4418 by @i-am-the-slime)
+  
+  Improves clarity and gets to the relevant information faster.
 
-* The compiler can now derive instances of `Bifunctor`, `Bifoldable`, (#4420 by @rhendric)
-  `Bitraversable`, `Contravariant`, and `Profunctor`, as well as use those
-  classes when deriving `Functor`, `Foldable`, and `Traversable`, enabling more
-  instances to be derived.
+* The compiler can now derive instances for more types and type classes (#4420 by @rhendric)
+  
+  New type classes that the compiler can derive: 
+  - `Bifunctor`
+  - `Bifoldable`
+  - `Bitraversable`
+  - `Contravariant`
+  - `Profunctor`
+  
+  Moreover, the compiler can also use these classes when deriving
+  `Functor`, `Foldable`, and `Traversable`, enabling more instances to be derived
+  whereas before such instances would need to be written manually.
 
 Bugfixes:
 
@@ -3235,14 +3241,14 @@ The way names are resolved has now been updated in a way that may result in some
 
 Some examples:
 
-| Import statement | Exposed members |
-| --- | --- |
-| `import X` | `A`, `f` |
-| `import X as Y` | `Y.A` `Y.f` |
-| `import X (A)` | `A` |
-| `import X (A) as Y` | `Y.A` |
-| `import X hiding (f)` | `A` |
-| `import Y hiding (f) as Y` | `Y.A` |
+| Import statement           | Exposed members |
+| -------------------------- | --------------- |
+| `import X`                 | `A`, `f`        |
+| `import X as Y`            | `Y.A` `Y.f`     |
+| `import X (A)`             | `A`             |
+| `import X (A) as Y`        | `Y.A`           |
+| `import X hiding (f)`      | `A`             |
+| `import Y hiding (f) as Y` | `Y.A`           |
 
 Qualified references like `Control.Monad.Eff.Console.log` will no longer resolve unless there is a corresponding `import Control.Monad.Eff.Console as Control.Monad.Eff.Console`. Importing a module unqualified does not allow you to reference it with qualification, so `import X` does not allow references to `X.A` unless there is also an `import X as X`.
 
