@@ -1,1 +1,0 @@
-* Update installer to `0.3.3` to fix a few installation issues
