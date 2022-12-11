@@ -40,7 +40,7 @@ warnDuplicateRefs pos toError refs = do
   -- but that requires additional changes in how warnings are printed.
   -- Example of keeping all duplicates (not what this code currently does):
   --  removeUnique [1,2,2,3,3,3,4] == [2,2,3,3,3]
-  removeUnique :: Eq a => Ord a => [a] -> [a]
+  removeUnique :: Ord a => [a] -> [a]
   removeUnique = concatMap (drop 1) . group . sort
 
   -- Deletes the constructor information from TypeRefs so that only the

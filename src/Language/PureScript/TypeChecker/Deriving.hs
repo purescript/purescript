@@ -109,7 +109,6 @@ deriveNewtypeInstance
   :: forall m
    . MonadError MultipleErrors m
   => MonadState CheckState m
-  => MonadSupply m
   => MonadWriter MultipleErrors m
   => ModuleName
   -> Qualified (ProperName 'ClassName)

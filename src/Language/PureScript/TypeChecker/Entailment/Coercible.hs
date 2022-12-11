@@ -779,7 +779,6 @@ decompose env tyName axs bxs = do
 -- @D@ is not a newtype, yield constraints on their arguments.
 canonDecomposition
   :: MonadError MultipleErrors m
-  => MonadState CheckState m
   => Environment
   -> SourceType
   -> SourceType
@@ -797,7 +796,6 @@ canonDecomposition env a b
 -- newtypes, are insoluble.
 canonDecompositionFailure
   :: MonadError MultipleErrors m
-  => MonadState CheckState m
   => Environment
   -> SourceType
   -> SourceType
@@ -847,7 +845,6 @@ canonDecompositionFailure env k a b
 -- to discharge it with the given.
 canonNewtypeDecomposition
   :: MonadError MultipleErrors m
-  => MonadState CheckState m
   => Environment
   -> Maybe [(SourceType, SourceType, SourceType)]
   -> SourceType
