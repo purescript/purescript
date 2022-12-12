@@ -49,6 +49,8 @@ Internal:
 
 * Organize the compiler's internal constants files (#4406 by @rhendric)
 
+* Enable more GHC warnings (#4429 by @rhendric)
+
 ## 0.15.6
 
 Bugfixes:
