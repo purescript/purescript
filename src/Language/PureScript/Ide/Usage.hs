@@ -25,7 +25,7 @@ import           Language.PureScript.Ide.Util
 -- module.
 -- 3. Apply the collected search specifications and collect the results
 findUsages
-  :: (MonadIO m, Ide m)
+  :: Ide m
   => IdeDeclaration
   -> P.ModuleName
   -> m (ModuleMap (NonEmpty P.SourceSpan))

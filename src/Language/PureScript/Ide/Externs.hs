@@ -69,14 +69,14 @@ resolveSynonymsAndClasses trs decls = foldr go decls trs
           Nothing ->
             acc
           Just tyDecl -> IdeDeclTypeClass
-            (IdeTypeClass tcn (tyDecl^.ideTypeKind) [])
+            (IdeTypeClass tcn (tyDecl ^. ideTypeKind) [])
             : filter (not . anyOf (_IdeDeclType . ideTypeName) (== P.coerceProperName tcn)) acc
       SynonymToResolve tn ty ->
         case findType tn acc of
           Nothing ->
             acc
           Just tyDecl ->
-            IdeDeclTypeSynonym (IdeTypeSynonym tn ty (tyDecl^.ideTypeKind))
+            IdeDeclTypeSynonym (IdeTypeSynonym tn ty (tyDecl ^. ideTypeKind))
             : filter (not . anyOf (_IdeDeclType . ideTypeName) (== tn)) acc
 
 findType :: P.ProperName 'P.TypeName -> [IdeDeclaration] -> Maybe IdeType
@@ -103,14 +103,14 @@ convertDecl ed = case ed of
   -- because those are typechecker internal definitions that shouldn't
   -- be user facing
   P.EDType{..} -> Right do
-    guard (isNothing (Text.find (== '$') (edTypeName^.properNameT)))
+    guard (isNothing (Text.find (== '$') (edTypeName ^. properNameT)))
     Just (IdeDeclType (IdeType edTypeName edTypeKind []))
   P.EDTypeSynonym{..} ->
-    if isNothing (Text.find (== '$') (edTypeSynonymName^.properNameT))
+    if isNothing (Text.find (== '$') (edTypeSynonymName ^. properNameT))
       then Left (SynonymToResolve edTypeSynonymName edTypeSynonymType)
       else Right Nothing
   P.EDDataConstructor{..} -> Right do
-    guard (isNothing (Text.find (== '$') (edDataCtorName^.properNameT)))
+    guard (isNothing (Text.find (== '$') (edDataCtorName ^. properNameT)))
     Just
       (IdeDeclDataConstructor
         (IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType))

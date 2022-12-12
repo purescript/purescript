@@ -293,7 +293,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       map (\(SMap _ orig gen) -> Mapping {
           mapOriginal = Just $ convertPos $ add 0 (-1) orig
         , mapSourceFile = sourceFile
-        , mapGenerated = convertPos $ add (extraLines+1) 0 gen
+        , mapGenerated = convertPos $ add (extraLines + 1) 0 gen
         , mapName = Nothing
         }) mappings
     }
@@ -301,7 +301,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     writeJSONFile mapFile mapping
     where
     add :: Int -> Int -> SourcePos -> SourcePos
-    add n m (SourcePos n' m') = SourcePos (n+n') (m+m')
+    add n m (SourcePos n' m') = SourcePos (n + n') (m + m')
 
     convertPos :: SourcePos -> Pos
     convertPos SourcePos { sourcePosLine = l, sourcePosColumn = c } =
