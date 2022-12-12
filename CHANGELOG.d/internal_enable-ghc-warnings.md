@@ -1,0 +1,1 @@
+* Enable more GHC warnings

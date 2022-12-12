@@ -56,7 +56,7 @@ import           System.FilePath (replaceExtension)
 -- This function is used for fast-rebuild workflows (PSCi and psc-ide are examples).
 rebuildModule
   :: forall m
-   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> [ExternsFile]
   -> Module
@@ -67,7 +67,7 @@ rebuildModule actions externs m = do
 
 rebuildModule'
   :: forall m
-   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> Env
   -> [ExternsFile]
@@ -77,7 +77,7 @@ rebuildModule' act env ext mdl = rebuildModuleWithIndex act env ext mdl Nothing
 
 rebuildModuleWithIndex
   :: forall m
-   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> Env
   -> [ExternsFile]
@@ -136,7 +136,7 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
 --
 -- If timestamps or hashes have not changed, existing externs files can be used to provide upstream modules' types without
 -- having to typecheck those modules again.
-make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [CST.PartialResult Module]
      -> m [ExternsFile]

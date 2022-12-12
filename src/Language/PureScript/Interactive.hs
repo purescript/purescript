@@ -178,7 +178,7 @@ handleDecls ds = do
 
 -- | Show actual loaded modules in psci.
 handleShowLoadedModules
-  :: (MonadState PSCiState m, MonadIO m)
+  :: MonadState PSCiState m
   => (String -> m ())
   -> m ()
 handleShowLoadedModules print' = do
@@ -189,7 +189,7 @@ handleShowLoadedModules print' = do
 
 -- | Show the imported modules in psci.
 handleShowImportedModules
-  :: (MonadState PSCiState m, MonadIO m)
+  :: MonadState PSCiState m
   => (String -> m ())
   -> m ()
 handleShowImportedModules print' = do
@@ -230,7 +230,7 @@ handleShowImportedModules print' = do
   commaList = T.intercalate ", "
 
 handleShowPrint
-  :: (MonadState PSCiState m, MonadIO m)
+  :: MonadState PSCiState m
   => (String -> m ())
   -> m ()
 handleShowPrint print' = do
@@ -305,7 +305,7 @@ handleKindOf print' typ = do
 
 -- | Browse a module and displays its signature
 handleBrowse
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m)
   => (String -> m ())
   -> P.ModuleName
   -> m ()

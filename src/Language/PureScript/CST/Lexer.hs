@@ -201,7 +201,7 @@ breakComments = k0 []
   goWs a _ = a
 
   goSpace a !n (' ' : ls) = goSpace a (n + 1) ls
-  goSpace a !n ls = goWs (Space n : a) ls
+  goSpace a n ls = goWs (Space n : a) ls
 
   isBlockComment = Parser $ \inp _ ksucc ->
     case Text.uncons inp of
@@ -725,7 +725,7 @@ digitsToScientific :: String -> String -> (Integer, Int)
 digitsToScientific = go 0 . reverse
   where
   go !exp is [] = (digitsToInteger (reverse is), exp)
-  go !exp is (f : fs) = go (exp - 1) (f : is) fs
+  go exp is (f : fs) = go (exp - 1) (f : is) fs
 
 isSymbolChar :: Char -> Bool
 isSymbolChar c = (c `elem` (":!#$%&*+./<=>?@\\^|-~" :: String)) || (not (Char.isAscii c) && Char.isSymbol c)

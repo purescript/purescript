@@ -52,7 +52,7 @@ import System.FilePath.Posix ((</>))
 -- module.
 moduleToJs
   :: forall m
-   . (Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
+   . (MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
   => Module Ann
   -> Maybe PSString
   -> m AST.Module
@@ -232,7 +232,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
 
 moduleBindToJs
   :: forall m
-   . (Monad m, MonadReader Options m, MonadSupply m, MonadWriter Any m, MonadError MultipleErrors m)
+   . (MonadReader Options m, MonadSupply m, MonadWriter Any m, MonadError MultipleErrors m)
   => ModuleName
   -> Bind Ann
   -> m [AST]

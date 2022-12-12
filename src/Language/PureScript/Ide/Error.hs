@@ -90,7 +90,7 @@ textError :: IdeError -> Text
 textError (GeneralError msg)          = msg
 textError (NotFound ident)            = "Symbol '" <> ident <> "' not found."
 textError (ModuleNotFound ident)      = "Module '" <> ident <> "' not found."
-textError (ModuleFileNotFound ident)  = "Extern file for module " <> ident <>" could not be found"
+textError (ModuleFileNotFound ident)  = "Extern file for module " <> ident <> " could not be found"
 textError (RebuildError _ err)        = show err
 
 prettyPrintTypeSingleLine :: P.Type a -> Text
