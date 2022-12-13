@@ -373,8 +373,8 @@ interactDiffTyVar env (_, tv1, ty1) (tv2, ty2)
 
 -- | A canonical constraint of the form @Coercible tv1 ty1@ can rewrite the
 -- right hand side of an irreducible constraint of the form @Coercible tv2 ty2@
--- by substituting @ty1@ for every occurence of @tv1@ at representational and
--- phantom role in @ty2@. Nominal occurences are left untouched.
+-- by substituting @ty1@ for every occurrence of @tv1@ at representational and
+-- phantom role in @ty2@. Nominal occurrences are left untouched.
 rewrite :: Environment -> (SourceType, SourceType) -> SourceType -> Writer Any SourceType
 rewrite env (Skolem _ _ _ s1 _, ty1) | not $ occurs s1 ty1 = go where
   go (Skolem _ _ _ s2 _) | s1 == s2 = tell (Any True) $> ty1
@@ -506,7 +506,7 @@ canon env givens k a b =
     --
     -- yield the wanted @Coercible (N Maybe a) (N Maybe b)@ which we cannot
     -- decompose because the second parameter of @N@ is nominal. On the other
-    -- hand, unwraping on both sides yields @Coercible (Maybe a) (Maybe b)@
+    -- hand, unwrapping on both sides yields @Coercible (Maybe a) (Maybe b)@
     -- which we can then decompose to @Coercible a b@ and discharge with the
     -- given.
     <|> canonNewtypeLeft env a b
@@ -601,7 +601,7 @@ canonRow a b
           throwError . errorMessage $ TypesDoNotUnify (rowFromList rl1) (rowFromList rl2)
   | otherwise = empty
 
--- | Unwraping a newtype can fails in two ways:
+-- | Unwrapping a newtype can fails in two ways:
 data UnwrapNewtypeError
   = CannotUnwrapInfiniteNewtypeChain
   -- ^ The newtype might wrap an infinite newtype chain. We may think that this
@@ -620,7 +620,7 @@ data UnwrapNewtypeError
   --
   -- yield a wanted @Coercible (N a) (N b)@ that we can decompose to
   -- @Coercible a b@ then discharge with the given if the newtype
-  -- unwraping rules do not apply.
+  -- unwrapping rules do not apply.
   | CannotUnwrapConstructor
   -- ^ The constructor may not be in scope or may not belong to a newtype.
 
@@ -709,7 +709,7 @@ lookupNewtypeConstructorInScope env currentModuleName currentModuleImports quali
     _ -> False
 
 -- | Constraints of the form @Coercible (N a_0 .. a_n) b@ yield a constraint
--- @Coercible a b@ if unwraping the newtype yields @a@.
+-- @Coercible a b@ if unwrapping the newtype yields @a@.
 canonNewtypeLeft
   :: MonadState CheckState m
   => MonadWriter [ErrorMessageHint] m
@@ -724,7 +724,7 @@ canonNewtypeLeft env a b =
     Right a' -> pure . Canonicalized $ S.singleton (a', b)
 
 -- | Constraints of the form @Coercible a (N b_0 .. b_n)@ yield a constraint
--- @Coercible a b@ if unwraping the newtype yields @b@.
+-- @Coercible a b@ if unwrapping the newtype yields @b@.
 canonNewtypeRight
   :: MonadState CheckState m
   => MonadWriter [ErrorMessageHint] m
@@ -779,7 +779,6 @@ decompose env tyName axs bxs = do
 -- @D@ is not a newtype, yield constraints on their arguments.
 canonDecomposition
   :: MonadError MultipleErrors m
-  => MonadState CheckState m
   => Environment
   -> SourceType
   -> SourceType
@@ -797,7 +796,6 @@ canonDecomposition env a b
 -- newtypes, are insoluble.
 canonDecompositionFailure
   :: MonadError MultipleErrors m
-  => MonadState CheckState m
   => Environment
   -> SourceType
   -> SourceType
@@ -829,7 +827,7 @@ canonDecompositionFailure env k a b
 -- Decomposing a given @Coercible (Const a a) (Const a b)@ constraint to
 -- @Coercible a b@ when @MkConst@ is out of scope would let us coerce arbitrary
 -- types in modules where @MkConst@ is imported, because the given is easily
--- satisfied with the newtype unwraping rules.
+-- satisfied with the newtype unwrapping rules.
 --
 -- Moreover we do not decompose wanted constraints if they could be discharged
 -- by a given constraint.
@@ -847,7 +845,6 @@ canonDecompositionFailure env k a b
 -- to discharge it with the given.
 canonNewtypeDecomposition
   :: MonadError MultipleErrors m
-  => MonadState CheckState m
   => Environment
   -> Maybe [(SourceType, SourceType, SourceType)]
   -> SourceType

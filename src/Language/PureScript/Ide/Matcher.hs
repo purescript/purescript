@@ -94,7 +94,7 @@ flexRate p c = do
 -- Borrowed from: http://cdewaka.com/2013/06/fuzzy-pattern-matching-in-haskell/
 --
 -- By string =~ pattern we'll get the start of the match and the length of
--- the matchas a (start, length) tuple if there's a match.
+-- the matches a (start, length) tuple if there's a match.
 -- If match fails then it would be (-1,0)
 flexScore :: Text -> Text -> Maybe Double
 flexScore pat str =

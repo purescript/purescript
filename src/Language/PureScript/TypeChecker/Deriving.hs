@@ -5,18 +5,20 @@ module Language.PureScript.TypeChecker.Deriving (deriveInstance) where
 
 import Protolude hiding (Type)
 
+import Control.Lens (both, over)
+import Control.Monad.Error.Class (liftEither)
 import Control.Monad.Trans.Writer (Writer, WriterT, runWriter, runWriterT)
 import Control.Monad.Writer.Class (MonadWriter(..))
+import Data.Align (align, unalign)
 import Data.Foldable (foldl1, foldr1)
 import Data.List (init, last, zipWith3, (!!))
 import qualified Data.Map as M
+import Data.These (These(..), mergeTheseWith, these)
 
 import Control.Monad.Supply.Class
 import Language.PureScript.AST
 import Language.PureScript.AST.Utils
-import qualified Language.PureScript.Constants.Data.Foldable as Foldable
-import qualified Language.PureScript.Constants.Data.Traversable as Traversable
-import qualified Language.PureScript.Constants.Prelude as Prelude
+import qualified Language.PureScript.Constants.Libs as Libs
 import qualified Language.PureScript.Constants.Prim as Prim
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -25,6 +27,7 @@ import Language.PureScript.Label (Label(..))
 import Language.PureScript.Names
 import Language.PureScript.PSString
 import Language.PureScript.Sugar.TypeClasses
+import Language.PureScript.TypeChecker.Entailment
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeClassDictionaries
@@ -78,13 +81,18 @@ deriveInstance instType className strategy = do
       unaryClass' f = unaryClass (f className)
 
       in case className of
-        Foldable.Foldable -> unaryClass' deriveFoldable
-        Prelude.Eq -> unaryClass deriveEq
-        Prelude.Eq1 -> unaryClass $ \_ _ -> deriveEq1
-        Prelude.Functor -> unaryClass' deriveFunctor
-        Prelude.Ord -> unaryClass deriveOrd
-        Prelude.Ord1 -> unaryClass $ \_ _ -> deriveOrd1
-        Traversable.Traversable -> unaryClass' deriveTraversable
+        Libs.Bifoldable -> unaryClass' $ deriveFoldable True
+        Libs.Bifunctor -> unaryClass' $ deriveFunctor (Just False) False Libs.S_bimap
+        Libs.Bitraversable -> unaryClass' $ deriveTraversable True
+        Libs.Contravariant -> unaryClass' $ deriveFunctor Nothing True Libs.S_cmap
+        Libs.Eq -> unaryClass deriveEq
+        Libs.Eq1 -> unaryClass $ \_ _ -> deriveEq1
+        Libs.Foldable -> unaryClass' $ deriveFoldable False
+        Libs.Functor -> unaryClass' $ deriveFunctor Nothing False Libs.S_map
+        Libs.Ord -> unaryClass deriveOrd
+        Libs.Ord1 -> unaryClass $ \_ _ -> deriveOrd1
+        Libs.Profunctor -> unaryClass' $ deriveFunctor (Just True) False Libs.S_dimap
+        Libs.Traversable -> unaryClass' $ deriveTraversable False
         -- See L.P.Sugar.TypeClasses.Deriving for the classes that can be
         -- derived prior to type checking.
         _ -> throwError . errorMessage $ CannotDerive className tys
@@ -101,7 +109,6 @@ deriveNewtypeInstance
   :: forall m
    . MonadError MultipleErrors m
   => MonadState CheckState m
-  => MonadSupply m
   => MonadWriter MultipleErrors m
   => ModuleName
   -> Qualified (ProperName 'ClassName)
@@ -194,7 +201,7 @@ deriveEq
 deriveEq mn tyConNm = do
   (_, _, _, ctors) <- lookupTypeDecl mn tyConNm
   eqFun <- mkEqFunction ctors
-  pure [(Prelude.eq, eqFun)]
+  pure [(Libs.S_eq, eqFun)]
   where
     mkEqFunction :: [(ProperName 'ConstructorName, [SourceType])] -> m Expr
     mkEqFunction ctors = do
@@ -203,13 +210,13 @@ deriveEq mn tyConNm = do
       lamCase2 x y . addCatch <$> mapM mkCtorClause ctors
 
     preludeConj :: Expr -> Expr -> Expr
-    preludeConj = App . App (mkVarMn (Just (ModuleName "Data.HeytingAlgebra")) (Ident Prelude.conj))
+    preludeConj = App . App (mkRef Libs.I_conj)
 
     preludeEq :: Expr -> Expr -> Expr
-    preludeEq = App . App (mkRef Prelude.identEq)
+    preludeEq = App . App (mkRef Libs.I_eq)
 
     preludeEq1 :: Expr -> Expr -> Expr
-    preludeEq1 = App . App (mkRef Prelude.identEq1)
+    preludeEq1 = App . App (mkRef Libs.I_eq1)
 
     addCatch :: [CaseAlternative] -> [CaseAlternative]
     addCatch xs
@@ -243,7 +250,7 @@ deriveEq mn tyConNm = do
       | otherwise = preludeEq l r
 
 deriveEq1 :: forall m. Applicative m => m [(PSString, Expr)]
-deriveEq1 = pure [(Prelude.eq1, mkRef Prelude.identEq)]
+deriveEq1 = pure [(Libs.S_eq1, mkRef Libs.I_eq)]
 
 deriveOrd
   :: forall m
@@ -256,7 +263,7 @@ deriveOrd
 deriveOrd mn tyConNm = do
   (_, _, _, ctors) <- lookupTypeDecl mn tyConNm
   compareFun <- mkCompareFunction ctors
-  pure [(Prelude.compare, compareFun)]
+  pure [(Libs.S_compare, compareFun)]
   where
     mkCompareFunction :: [(ProperName 'ConstructorName, [SourceType])] -> m Expr
     mkCompareFunction ctors = do
@@ -286,10 +293,10 @@ deriveOrd mn tyConNm = do
     orderingBinder name = mkCtorBinder orderingMod (ProperName name) []
 
     ordCompare :: Expr -> Expr -> Expr
-    ordCompare = App . App (mkRef Prelude.identCompare)
+    ordCompare = App . App (mkRef Libs.I_compare)
 
     ordCompare1 :: Expr -> Expr -> Expr
-    ordCompare1 = App . App (mkRef Prelude.identCompare1)
+    ordCompare1 = App . App (mkRef Libs.I_compare1)
 
     mkCtorClauses :: ((ProperName 'ConstructorName, [SourceType]), Bool) -> m [CaseAlternative]
     mkCtorClauses ((ctorName, tys), isLast) = do
@@ -330,7 +337,7 @@ deriveOrd mn tyConNm = do
       | otherwise = ordCompare l r
 
 deriveOrd1 :: forall m. Applicative m => m [(PSString, Expr)]
-deriveOrd1 = pure [(Prelude.compare1, mkRef Prelude.identCompare)]
+deriveOrd1 = pure [(Libs.S_compare1, mkRef Libs.I_compare)]
 
 lookupTypeDecl
   :: forall m
@@ -369,78 +376,183 @@ decomposeRec' = sortOn fst . go
   where go (RCons _ str typ typs) = (str, typ) : go typs
         go _ = []
 
-data ParamUsage
+-- | The parameter `c` is used to allow or forbid contravariance for different
+-- type classes. When deriving a type class that is a variation on Functor, a
+-- witness for `c` will be provided; when deriving a type class that is a
+-- variation on Foldable or Traversable, `c` will be Void and the contravariant
+-- ParamUsage constructor can be skipped in pattern matching.
+data ParamUsage c
   = IsParam
-  | MentionsParam ParamUsage
-  | IsRecord (NonEmpty (PSString, ParamUsage))
+  | IsLParam
+    -- ^ enables biparametric classes (of any variance) to be derived
+  | MentionsParam (ParamUsage c)
+    -- ^ enables monoparametric classes to be used in a derivation
+  | MentionsParamBi (These (ParamUsage c) (ParamUsage c))
+    -- ^ enables biparametric classes to be used in a derivation
+  | MentionsParamContravariantly !c (ContravariantParamUsage c)
+    -- ^ enables contravariant classes (of either parametricity) to be used in a derivation
+  | IsRecord (NonEmpty (PSString, ParamUsage c))
+
+data ContravariantParamUsage c
+  = MentionsParamContra (ParamUsage c)
+    -- ^ enables Contravariant to be used in a derivation
+  | MentionsParamPro (These (ParamUsage c) (ParamUsage c))
+    -- ^ enables Profunctor to be used in a derivation
+
+data CovariantClasses = CovariantClasses
+  { monoClass :: Qualified (ProperName 'ClassName)
+  , biClass :: Qualified (ProperName 'ClassName)
+  }
+
+data ContravariantClasses = ContravariantClasses
+  { contraClass :: Qualified (ProperName 'ClassName)
+  , proClass :: Qualified (ProperName 'ClassName)
+  }
+
+data ContravarianceSupport c = ContravarianceSupport
+  { contravarianceWitness :: c
+  , paramIsContravariant :: Bool
+  , lparamIsContravariant :: Bool
+  , contravariantClasses :: ContravariantClasses
+  }
+
+-- | Return, if possible, a These the contents of which each satisfy the
+-- predicate.
+filterThese :: forall a. (a -> Bool) -> These a a -> Maybe (These a a)
+filterThese p = uncurry align . over both (mfilter p) . unalign . Just
 
 validateParamsInTypeConstructors
-  :: forall m
+  :: forall c m
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => Qualified (ProperName 'ClassName)
   -> ModuleName
   -> ProperName 'TypeName
-  -> m [(ProperName 'ConstructorName, [Maybe ParamUsage])]
-validateParamsInTypeConstructors derivingClass mn tyConNm = do
+  -> Bool
+  -> CovariantClasses
+  -> Maybe (ContravarianceSupport c)
+  -> m [(ProperName 'ConstructorName, [Maybe (ParamUsage c)])]
+validateParamsInTypeConstructors derivingClass mn tyConNm isBi CovariantClasses{..} contravarianceSupport = do
   (_, _, tyArgNames, ctors) <- lookupTypeDecl mn tyConNm
-  param <- note (errorMessage $ KindsDoNotUnify (kindType -:> kindType) kindType) . lastMay $ map fst tyArgNames
+  (mbLParam, param) <- liftEither . first (errorMessage . flip KindsDoNotUnify kindType . (kindType -:>)) $
+    case (isBi, reverse $ map fst tyArgNames) of
+      (False, x : _)    -> Right (Nothing, x)
+      (False, _)        -> Left kindType
+      (True, y : x : _) -> Right (Just x, y)
+      (True, _ : _)     -> Left kindType
+      (True, _)         -> Left $ kindType -:> kindType
   ctors' <- traverse (traverse $ traverse replaceAllTypeSynonyms) ctors
-  let (ctorUsages, problemSpans) = runWriter $ traverse (traverse . traverse $ typeToUsageOf param) ctors'
+  tcds <- getTypeClassDictionaries
+  let (ctorUsages, problemSpans) = runWriter $ traverse (traverse . traverse $ typeToUsageOf tcds (maybe That These mbLParam param) False) ctors'
+  let relatedClasses = [monoClass, biClass] ++ ([contraClass, proClass] <*> (contravariantClasses <$> toList contravarianceSupport))
   for_ (nonEmpty $ ordNub problemSpans) $ \sss ->
-    throwError . addHint (RelatedPositions sss) . errorMessage $ CannotDeriveInvalidConstructorArg derivingClass
+    throwError . addHint (RelatedPositions sss) . errorMessage $ CannotDeriveInvalidConstructorArg derivingClass relatedClasses (isJust contravarianceSupport)
   pure ctorUsages
+
   where
-  typeToUsageOf :: Text -> SourceType -> Writer [SourceSpan] (Maybe ParamUsage)
-  typeToUsageOf param = go
-    where
+  typeToUsageOf :: InstanceContext -> These Text Text -> Bool -> SourceType -> Writer [SourceSpan] (Maybe (ParamUsage c))
+  typeToUsageOf tcds = fix $ \go params isNegative -> let
+    goCo = go params isNegative
+    goContra = go params $ not isNegative
+
     assertNoParamUsedIn :: SourceType -> Writer [SourceSpan] ()
-    assertNoParamUsedIn = everythingOnTypes (*>) $ \case
+    assertNoParamUsedIn ty = void $ both (flip assertParamNotUsedIn ty) params
+
+    assertParamNotUsedIn :: Text -> SourceType -> Writer [SourceSpan] ()
+    assertParamNotUsedIn param = everythingOnTypes (*>) $ \case
       TypeVar (ss, _) name | name == param -> tell [ss]
       _ -> pure ()
 
-    go = \case
+    tryBiClasses ht tyLArg tyArg
+      | hasInstance tcds ht biClass
+        = goCo tyLArg >>= preferMonoClass MentionsParamBi
+      | Just (ContravarianceSupport c _ _ ContravariantClasses{..}) <- contravarianceSupport, hasInstance tcds ht proClass
+        = goContra tyLArg >>= preferMonoClass (MentionsParamContravariantly c . MentionsParamPro)
+      | otherwise
+        = assertNoParamUsedIn tyLArg *> tryMonoClasses ht tyArg
+      where
+      preferMonoClass f lUsage =
+        (if isNothing lUsage && hasInstance tcds ht monoClass then fmap MentionsParam else fmap f . align lUsage) <$> goCo tyArg
+
+    tryMonoClasses ht tyArg
+      | hasInstance tcds ht monoClass
+        = fmap MentionsParam <$> goCo tyArg
+      | Just (ContravarianceSupport c _ _ ContravariantClasses{..}) <- contravarianceSupport, hasInstance tcds ht contraClass
+        = fmap (MentionsParamContravariantly c . MentionsParamContra) <$> goContra tyArg
+      | otherwise
+        = assertNoParamUsedIn tyArg $> Nothing
+
+    in \case
       ForAll _ name _ ty _ ->
-        if name == param then pure Nothing else go ty
+        fmap join . traverse (\params' -> go params' isNegative ty) $ filterThese (/= name) params
 
       ConstrainedType _ _ ty ->
-        go ty
+        goCo ty
 
       TypeApp _ (TypeConstructor _ Prim.Record) row ->
         fmap (fmap IsRecord . nonEmpty . catMaybes) . for (decomposeRec' row) $ \(Label lbl, ty) ->
-          fmap (lbl, ) <$> go ty
+          fmap (lbl, ) <$> goCo ty
 
-      TypeApp _ tyFn tyArg -> do
-        assertNoParamUsedIn tyFn
-        fmap MentionsParam <$> go tyArg
+      TypeApp _ (TypeApp _ tyFn tyLArg) tyArg ->
+        assertNoParamUsedIn tyFn *> tryBiClasses (headOfType tyFn) tyLArg tyArg
 
-      TypeVar _ name ->
-        pure $ (name == param) `orEmpty` IsParam
+      TypeApp _ tyFn tyArg ->
+        assertNoParamUsedIn tyFn *> tryMonoClasses (headOfType tyFn) tyArg
+
+      TypeVar (ss, _) name -> mergeTheseWith (checkName lparamIsContra IsLParam) (checkName paramIsContra IsParam) (liftA2 (<|>)) params
+        where
+        checkName thisParamIsContra usage param
+          | name == param = when (thisParamIsContra /= isNegative) (tell [ss]) $> Just usage
+          | otherwise = pure Nothing
 
       ty ->
         assertNoParamUsedIn ty $> Nothing
+
+  paramIsContra = any paramIsContravariant contravarianceSupport
+  lparamIsContra = any lparamIsContravariant contravarianceSupport
+
+  hasInstance :: InstanceContext -> Qualified (Either Text (ProperName 'TypeName)) -> Qualified (ProperName 'ClassName) -> Bool
+  hasInstance tcds ht@(Qualified qb _) cn@(Qualified cqb _) =
+    any tcdAppliesToType $ concatMap (findDicts tcds cn) (ordNub [ByNullSourcePos, cqb, qb])
+    where
+    tcdAppliesToType tcd = case tcdInstanceTypes tcd of
+      [headOfType -> ht'] -> ht == ht'
+      -- ^ It's possible that, if ht and ht' are Lefts, this might require
+      -- verifying that the name isn't shadowed by something in tcdForAll. I
+      -- can't devise a legal program that causes this issue, but if in the
+      -- future it seems like a good idea, it probably is.
+      _ -> False
+
+  headOfType :: SourceType -> Qualified (Either Text (ProperName 'TypeName))
+  headOfType = fix $ \go -> \case
+    TypeApp _ ty _ -> go ty
+    KindApp _ ty _ -> go ty
+    TypeVar _ nm -> Qualified ByNullSourcePos (Left nm)
+    Skolem _ nm _ _ _ -> Qualified ByNullSourcePos (Left nm)
+    TypeConstructor _ (Qualified qb nm) -> Qualified qb (Right nm)
+    ty -> internalError $ "headOfType missing a case: " <> show (void ty)
 
 usingLamIdent :: forall m. MonadSupply m => (Expr -> m Expr) -> m Expr
 usingLamIdent cb = do
   ident <- freshIdent "v"
   lam ident <$> cb (mkVar ident)
 
-traverseFields :: forall f. Applicative f => (ParamUsage -> Expr -> f Expr) -> NonEmpty (PSString, ParamUsage) -> Expr -> f Expr
+traverseFields :: forall c f. Applicative f => (ParamUsage c -> Expr -> f Expr) -> NonEmpty (PSString, ParamUsage c) -> Expr -> f Expr
 traverseFields f fields r = fmap (ObjectUpdate r) . for (toList fields) $ \(lbl, usage) -> (lbl, ) <$> f usage (Accessor lbl r)
 
-unnestRecords :: forall f. Applicative f => (ParamUsage -> Expr -> f Expr) -> ParamUsage -> Expr -> f Expr
+unnestRecords :: forall c f. Applicative f => (ParamUsage c -> Expr -> f Expr) -> ParamUsage c -> Expr -> f Expr
 unnestRecords f = fix $ \go -> \case
   IsRecord fields -> traverseFields go fields
   usage -> f usage
 
 mkCasesForTraversal
-  :: forall f m
+  :: forall c f m
    . Applicative f -- this effect distinguishes the semantics of maps, folds, and traversals
   => MonadSupply m
   => ModuleName
-  -> (ParamUsage -> Expr -> f Expr) -- how to handle constructor arguments
+  -> (ParamUsage c -> Expr -> f Expr) -- how to handle constructor arguments
   -> (f Expr -> m Expr) -- resolve the applicative effect into an expression
-  -> [(ProperName 'ConstructorName, [Maybe ParamUsage])]
+  -> [(ProperName 'ConstructorName, [Maybe (ParamUsage c)])]
   -> m Expr
 mkCasesForTraversal mn handleArg extractExpr ctors = do
   m <- freshIdent "m"
@@ -451,51 +563,107 @@ mkCasesForTraversal mn handleArg extractExpr ctors = do
     fmap (CaseAlternative [caseBinder] . unguarded) . extractExpr $
       fmap (foldl' App ctor) . for ctorArgs $ \(ident, mbUsage) -> maybe pure handleArg mbUsage $ mkVar ident
 
+data TraversalExprs = TraversalExprs
+  { recurseVar :: Expr -- a var representing map, foldMap, or traverse, for handling structured values
+  , birecurseVar :: Expr -- same, but bimap, bifoldMap, or bitraverse
+  , lrecurseExpr :: Expr -- same, but lmap or ltraverse (there is no lfoldMap, but we can use `flip bifoldMap mempty`)
+  , rrecurseExpr :: Expr -- same, but rmap or rtraverse etc., which conceptually should be the same as recurseVar but the bi classes aren't subclasses of the mono classes
+  }
+
+data ContraversalExprs = ContraversalExprs
+  { crecurseVar :: Expr
+  , direcurseVar :: Expr
+  , lcrecurseVar :: Expr
+  , rprorecurseVar :: Expr
+  }
+
+appBirecurseExprs :: TraversalExprs -> These Expr Expr -> Expr
+appBirecurseExprs TraversalExprs{..} = these (App lrecurseExpr) (App rrecurseExpr) (App . App birecurseVar)
+
+appDirecurseExprs :: ContraversalExprs -> These Expr Expr -> Expr
+appDirecurseExprs ContraversalExprs{..} = these (App lcrecurseVar) (App rprorecurseVar) (App . App direcurseVar)
+
 data TraversalOps m = forall f. Applicative f => TraversalOps
   { visitExpr :: m Expr -> f Expr -- lift an expression into the applicative effect defining the traversal
   , extractExpr :: f Expr -> m Expr -- resolve the applicative effect into an expression
   }
 
 mkTraversal
-  :: forall m
+  :: forall c m
    . MonadSupply m
   => ModuleName
-  -> Expr -- a var representing map, foldMap, or traverse, for handling structured values
+  -> Bool
+  -> TraversalExprs
+  -> (c -> ContraversalExprs)
   -> TraversalOps m
-  -> [(ProperName 'ConstructorName, [Maybe ParamUsage])]
+  -> [(ProperName 'ConstructorName, [Maybe (ParamUsage c)])]
   -> m Expr
-mkTraversal mn recurseVar (TraversalOps @_ @f visitExpr extractExpr) ctors = do
+mkTraversal mn isBi te@TraversalExprs{..} getContraversalExprs (TraversalOps @_ @f visitExpr extractExpr) ctors = do
   f <- freshIdent "f"
+  g <- if isBi then freshIdent "g" else pure f
   let
-    handleValue :: ParamUsage -> Expr -> f Expr
+    handleValue :: ParamUsage c -> Expr -> f Expr
     handleValue = unnestRecords $ \usage inputExpr -> visitExpr $ flip App inputExpr <$> mkFnExprForValue usage
 
-    mkFnExprForValue :: ParamUsage -> m Expr
+    mkFnExprForValue :: ParamUsage c -> m Expr
     mkFnExprForValue = \case
       IsParam ->
+        pure $ mkVar g
+      IsLParam ->
         pure $ mkVar f
       MentionsParam innerUsage ->
         App recurseVar <$> mkFnExprForValue innerUsage
+      MentionsParamBi theseInnerUsages ->
+        appBirecurseExprs te <$> both mkFnExprForValue theseInnerUsages
+      MentionsParamContravariantly c contraUsage -> do
+        let ce@ContraversalExprs{..} = getContraversalExprs c
+        case contraUsage of
+          MentionsParamContra innerUsage ->
+            App crecurseVar <$> mkFnExprForValue innerUsage
+          MentionsParamPro theseInnerUsages ->
+            appDirecurseExprs ce <$> both mkFnExprForValue theseInnerUsages
       IsRecord fields ->
         usingLamIdent $ extractExpr . traverseFields handleValue fields
 
-  lam f <$> mkCasesForTraversal mn handleValue extractExpr ctors
+  lam f . applyWhen isBi (lam g) <$> mkCasesForTraversal mn handleValue extractExpr ctors
 
 deriveFunctor
   :: forall m
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => MonadSupply m
-  => Qualified (ProperName 'ClassName)
+  => Maybe Bool -- does left parameter exist, and is it contravariant?
+  -> Bool -- is the (right) parameter contravariant?
+  -> PSString -- name of the map function for this functor type
+  -> Qualified (ProperName 'ClassName)
   -> ModuleName
   -> ProperName 'TypeName
   -> m [(PSString, Expr)]
-deriveFunctor nm mn tyConNm = do
-  ctors <- validateParamsInTypeConstructors nm mn tyConNm
-  mapFun <- mkTraversal mn mapVar (TraversalOps identity identity) ctors
-  pure [(Prelude.map, mapFun)]
+deriveFunctor mbLParamIsContravariant paramIsContravariant mapName nm mn tyConNm = do
+  ctors <- validateParamsInTypeConstructors nm mn tyConNm isBi functorClasses $ Just $ ContravarianceSupport
+    { contravarianceWitness = ()
+    , paramIsContravariant
+    , lparamIsContravariant = or mbLParamIsContravariant
+    , contravariantClasses
+    }
+  mapFun <- mkTraversal mn isBi mapExprs (const cmapExprs) (TraversalOps identity identity) ctors
+  pure [(mapName, mapFun)]
   where
-  mapVar = mkRef Prelude.identMap
+  isBi = isJust mbLParamIsContravariant
+  mapExprs = TraversalExprs
+    { recurseVar = mkRef Libs.I_map
+    , birecurseVar = mkRef Libs.I_bimap
+    , lrecurseExpr = mkRef Libs.I_lmap
+    , rrecurseExpr = mkRef Libs.I_rmap
+    }
+  cmapExprs = ContraversalExprs
+    { crecurseVar = mkRef Libs.I_cmap
+    , direcurseVar = mkRef Libs.I_dimap
+    , lcrecurseVar = mkRef Libs.I_lcmap
+    , rprorecurseVar = mkRef Libs.I_profunctorRmap
+    }
+  functorClasses = CovariantClasses Libs.Functor Libs.Bifunctor
+  contravariantClasses = ContravariantClasses Libs.Contravariant Libs.Profunctor
 
 toConst :: forall f a b. f a -> Const [f a] b
 toConst = Const . pure
@@ -511,42 +679,74 @@ deriveFoldable
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => MonadSupply m
-  => Qualified (ProperName 'ClassName)
+  => Bool -- is there a left parameter (are we deriving Bifoldable)?
+  -> Qualified (ProperName 'ClassName)
   -> ModuleName
   -> ProperName 'TypeName
   -> m [(PSString, Expr)]
-deriveFoldable nm mn tyConNm = do
-  ctors <- validateParamsInTypeConstructors nm mn tyConNm
-  foldlFun <- mkAsymmetricFoldFunction False foldlVar ctors
-  foldrFun <- mkAsymmetricFoldFunction True foldrVar ctors
-  foldMapFun <- mkTraversal mn foldMapVar foldMapOps ctors
-  pure [(Foldable.foldl, foldlFun), (Foldable.foldr, foldrFun), (Foldable.foldMap, foldMapFun)]
+deriveFoldable isBi nm mn tyConNm = do
+  ctors <- validateParamsInTypeConstructors nm mn tyConNm isBi foldableClasses Nothing
+  foldlFun <- mkAsymmetricFoldFunction False foldlExprs ctors
+  foldrFun <- mkAsymmetricFoldFunction True foldrExprs ctors
+  foldMapFun <- mkTraversal mn isBi foldMapExprs absurd foldMapOps ctors
+  pure
+    [ (if isBi then Libs.S_bifoldl else Libs.S_foldl, foldlFun)
+    , (if isBi then Libs.S_bifoldr else Libs.S_foldr, foldrFun)
+    , (if isBi then Libs.S_bifoldMap else Libs.S_foldMap, foldMapFun)
+    ]
   where
-  foldlVar = mkRef Foldable.identFoldl
-  foldrVar = mkRef Foldable.identFoldr
-  foldMapVar = mkRef Foldable.identFoldMap
-  flipVar = mkRef Prelude.identFlip
+  foldableClasses = CovariantClasses Libs.Foldable Libs.Bifoldable
+  foldlExprs = TraversalExprs
+    { recurseVar = mkRef Libs.I_foldl
+    , birecurseVar = bifoldlVar
+    , lrecurseExpr = App (App flipVar bifoldlVar) constVar
+    , rrecurseExpr = App bifoldlVar constVar
+    }
+  foldrExprs = TraversalExprs
+    { recurseVar = mkRef Libs.I_foldr
+    , birecurseVar = bifoldrVar
+    , lrecurseExpr = App (App flipVar bifoldrVar) (App constVar identityVar)
+    , rrecurseExpr = App bifoldrVar (App constVar identityVar)
+    }
+  foldMapExprs = TraversalExprs
+    { recurseVar = mkRef Libs.I_foldMap
+    , birecurseVar = bifoldMapVar
+    , lrecurseExpr = App (App flipVar bifoldMapVar) memptyVar
+    , rrecurseExpr = App bifoldMapVar memptyVar
+    }
+  bifoldlVar = mkRef Libs.I_bifoldl
+  bifoldrVar = mkRef Libs.I_bifoldr
+  bifoldMapVar = mkRef Libs.I_bifoldMap
+  constVar = mkRef Libs.I_const
+  flipVar = mkRef Libs.I_flip
+  identityVar = mkRef Libs.I_identity
+  memptyVar = mkRef Libs.I_mempty
 
-  mkAsymmetricFoldFunction :: Bool -> Expr -> [(ProperName 'ConstructorName, [Maybe ParamUsage])] -> m Expr
-  mkAsymmetricFoldFunction isRightFold recurseVar ctors = do
+  mkAsymmetricFoldFunction :: Bool -> TraversalExprs -> [(ProperName 'ConstructorName, [Maybe (ParamUsage Void)])] -> m Expr
+  mkAsymmetricFoldFunction isRightFold te@TraversalExprs{..} ctors = do
     f <- freshIdent "f"
+    g <- if isBi then freshIdent "g" else pure f
     z <- freshIdent "z"
     let
       appCombiner :: (Bool, Expr) -> Expr -> Expr -> Expr
       appCombiner (isFlipped, fn) = applyWhen (isFlipped == isRightFold) flip $ App . App fn
 
-      mkCombinerExpr :: ParamUsage -> m Expr
+      mkCombinerExpr :: ParamUsage Void -> m Expr
       mkCombinerExpr = fmap (uncurry $ \isFlipped -> applyWhen isFlipped $ App flipVar) . getCombiner
 
-      handleValue :: ParamUsage -> Expr -> Const [m (Expr -> Expr)] Expr
+      handleValue :: ParamUsage Void -> Expr -> Const [m (Expr -> Expr)] Expr
       handleValue = unnestRecords $ \usage inputExpr -> toConst $ flip appCombiner inputExpr <$> getCombiner usage
 
-      getCombiner :: ParamUsage -> m (Bool, Expr)
+      getCombiner :: ParamUsage Void -> m (Bool, Expr)
       getCombiner = \case
         IsParam ->
+          pure (False, mkVar g)
+        IsLParam ->
           pure (False, mkVar f)
         MentionsParam innerUsage ->
           (isRightFold, ) . App recurseVar <$> mkCombinerExpr innerUsage
+        MentionsParamBi theseInnerUsages ->
+          (isRightFold, ) . appBirecurseExprs te <$> both mkCombinerExpr theseInnerUsages
         IsRecord fields -> do
           let foldFieldsOf = traverseFields handleValue fields
           fmap (False, ) . usingLamIdent $ \lVar ->
@@ -558,13 +758,13 @@ deriveFoldable nm mn tyConNm = do
       extractExprStartingWith :: Expr -> Const [m (Expr -> Expr)] Expr -> m Expr
       extractExprStartingWith = consumeConst . if isRightFold then foldr ($) else foldl' (&)
 
-    lam f . lam z <$> mkCasesForTraversal mn handleValue (extractExprStartingWith $ mkVar z) ctors
+    lam f . applyWhen isBi (lam g) . lam z <$> mkCasesForTraversal mn handleValue (extractExprStartingWith $ mkVar z) ctors
 
 foldMapOps :: forall m. Applicative m => TraversalOps m
 foldMapOps = TraversalOps { visitExpr = toConst, .. }
   where
-  appendVar = mkRef Prelude.identAppend
-  memptyVar = mkRef Prelude.identMempty
+  appendVar = mkRef Libs.I_append
+  memptyVar = mkRef Libs.I_mempty
 
   extractExpr :: Const [m Expr] Expr -> m Expr
   extractExpr = consumeConst $ \case
@@ -576,25 +776,37 @@ deriveTraversable
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => MonadSupply m
-  => Qualified (ProperName 'ClassName)
+  => Bool -- is there a left parameter (are we deriving Bitraversable)?
+  -> Qualified (ProperName 'ClassName)
   -> ModuleName
   -> ProperName 'TypeName
   -> m [(PSString, Expr)]
-deriveTraversable nm mn tyConNm = do
-  ctors <- validateParamsInTypeConstructors nm mn tyConNm
-  traverseFun <- mkTraversal mn traverseVar traverseOps ctors
-  sequenceFun <- usingLamIdent $ pure . App (App traverseVar identityVar)
-  pure [(Traversable.traverse, traverseFun), (Traversable.sequence, sequenceFun)]
+deriveTraversable isBi nm mn tyConNm = do
+  ctors <- validateParamsInTypeConstructors nm mn tyConNm isBi traversableClasses Nothing
+  traverseFun <- mkTraversal mn isBi traverseExprs absurd traverseOps ctors
+  sequenceFun <- usingLamIdent $ pure . App (App (if isBi then App bitraverseVar identityVar else traverseVar) identityVar)
+  pure
+    [ (if isBi then Libs.S_bitraverse else Libs.S_traverse, traverseFun)
+    , (if isBi then Libs.S_bisequence else Libs.S_sequence, sequenceFun)
+    ]
   where
-  traverseVar = mkRef Traversable.identTraverse
-  identityVar = mkRef Prelude.identIdentity
+  traversableClasses = CovariantClasses Libs.Traversable Libs.Bitraversable
+  traverseExprs = TraversalExprs
+    { recurseVar = traverseVar
+    , birecurseVar = bitraverseVar
+    , lrecurseExpr = mkRef Libs.I_ltraverse
+    , rrecurseExpr = mkRef Libs.I_rtraverse
+    }
+  traverseVar = mkRef Libs.I_traverse
+  bitraverseVar = mkRef Libs.I_bitraverse
+  identityVar = mkRef Libs.I_identity
 
 traverseOps :: forall m. MonadSupply m => TraversalOps m
 traverseOps = TraversalOps { .. }
   where
-  pureVar = mkRef Prelude.identPure
-  mapVar = mkRef Prelude.identMap
-  applyVar = mkRef Prelude.identApply
+  pureVar = mkRef Libs.I_pure
+  mapVar = mkRef Libs.I_map
+  applyVar = mkRef Libs.I_apply
 
   visitExpr :: m Expr -> WriterT [(Ident, m Expr)] m Expr
   visitExpr traversedExpr = do

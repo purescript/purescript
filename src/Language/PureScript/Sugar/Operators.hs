@@ -40,7 +40,7 @@ import Data.Maybe (mapMaybe, listToMaybe)
 import qualified Data.Map as M
 import Data.Ord (Down(..))
 
-import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Libs as C
 
 -- |
 -- Removes unary negation operators and replaces them with calls to `negate`.
@@ -50,7 +50,7 @@ desugarSignedLiterals (Module ss coms mn ds exts) =
   Module ss coms mn (map f' ds) exts
   where
   (f', _, _) = everywhereOnValues id go id
-  go (UnaryMinus ss' val) = App (Var ss' (Qualified ByNullSourcePos (Ident C.negate))) val
+  go (UnaryMinus ss' val) = App (Var ss' (Qualified ByNullSourcePos (Ident C.S_negate))) val
   go other = other
 
 -- |
@@ -184,7 +184,7 @@ rebracketFiltered !caller pred_ externs m = do
 -- | Indicates whether the `rebracketModule`
 -- is being called with the full desugar pass
 -- run via `purs compile` or whether
--- only the partial desguar pass is run
+-- only the partial desugar pass is run
 -- via `purs docs`.
 -- This indication is needed to prevent
 -- a `purs docs` error when using
@@ -216,7 +216,7 @@ rebracketModule !caller pred_ valueOpTable typeOpTable (Module ss coms mn ds ext
   -- and only some of the desugar passes when generating docs.
   -- When generating docs, `case _ of` syntax used in an instance declaration
   -- can trigger the `IncorrectAnonymousArgument` error because it does not
-  -- run the same passes that the compile desguaring does. Since `purs docs`
+  -- run the same passes that the compile desugaring does. Since `purs docs`
   -- will only succeed once `purs compile` succeeds, we can ignore this check
   -- when running `purs docs`.
   -- See https://github.com/purescript/purescript/issues/4274#issuecomment-1087730651=

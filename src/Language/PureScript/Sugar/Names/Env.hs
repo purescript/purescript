@@ -247,31 +247,31 @@ mkPrimExports ts cs =
 -- | Environment which only contains the Prim modules.
 primEnv :: Env
 primEnv = M.fromList
-  [ ( C.Prim
+  [ ( C.M_Prim
     , (internalModuleSourceSpan "<Prim>", nullImports, primExports)
     )
-  , ( C.PrimBoolean
+  , ( C.M_Prim_Boolean
     , (internalModuleSourceSpan "<Prim.Boolean>", nullImports, primBooleanExports)
     )
-  , ( C.PrimCoerce
+  , ( C.M_Prim_Coerce
     , (internalModuleSourceSpan "<Prim.Coerce>", nullImports, primCoerceExports)
     )
-  , ( C.PrimOrdering
+  , ( C.M_Prim_Ordering
     , (internalModuleSourceSpan "<Prim.Ordering>", nullImports, primOrderingExports)
     )
-  , ( C.PrimRow
+  , ( C.M_Prim_Row
     , (internalModuleSourceSpan "<Prim.Row>", nullImports, primRowExports)
     )
-  , ( C.PrimRowList
+  , ( C.M_Prim_RowList
     , (internalModuleSourceSpan "<Prim.RowList>", nullImports, primRowListExports)
     )
-  , ( C.PrimSymbol
+  , ( C.M_Prim_Symbol
     , (internalModuleSourceSpan "<Prim.Symbol>", nullImports, primSymbolExports)
     )
-  , ( C.PrimInt
+  , ( C.M_Prim_Int
     , (internalModuleSourceSpan "<Prim.Int>", nullImports, primIntExports)
     )
-  , ( C.PrimTypeError
+  , ( C.M_Prim_TypeError
     , (internalModuleSourceSpan "<Prim.TypeError>", nullImports, primTypeErrorExports)
     )
   ]

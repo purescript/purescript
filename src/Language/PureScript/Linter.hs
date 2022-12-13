@@ -19,7 +19,7 @@ import Language.PureScript.Linter.Exhaustive as L
 import Language.PureScript.Linter.Imports as L
 import Language.PureScript.Names
 import Language.PureScript.Types
-import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Libs as C
 
 -- | Lint the PureScript AST.
 -- |
@@ -162,7 +162,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
   thisModuleRef _ = False
 
   rebindable :: S.Set Ident
-  rebindable = S.fromList [ Ident C.bind, Ident C.discard ]
+  rebindable = S.fromList [ Ident C.S_bind, Ident C.S_discard ]
 
   getDeclIdent :: Declaration -> Maybe Ident
   getDeclIdent = getIdentName <=< declName

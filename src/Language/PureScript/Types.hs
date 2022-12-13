@@ -365,7 +365,7 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
     "ParensInType" -> do
       b <- contents
       ParensInType a <$> go b
-    -- Backwards compatability for kinds
+    -- Backwards compatibility for kinds
     "KUnknown" ->
       TUnknown a <$> contents
     "Row" ->
