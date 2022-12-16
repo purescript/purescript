@@ -161,7 +161,7 @@ unifyTypes t1 t2 = do
 -- Common labels are identified and unified. Remaining labels and types are unified with a
 -- trailing row unification variable, if appropriate.
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
-unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
+unifyRows r1 r2 = parU matches id *> uncurry unifyTails rest where
   (matches, rest) = alignRowsWith unifyTypes r1 r2
 
   unifyTails :: ([RowListItem SourceAnn], SourceType) -> ([RowListItem SourceAnn], SourceType) -> m ()
