@@ -1,0 +1,25 @@
+Error found:
+in module [33mA[0m
+at tests/purs/failing/RowOneMissingLabel.purs:6:23 - 6:24 (line 6, column 23 - line 6, column 24)
+
+  Type of expression lacks required label [33mc[0m.
+
+while checking that type [33m{ a :: Int[0m
+                         [33m, b :: Int[0m
+                         [33m}         [0m
+  is at least as general as type [33m{ a :: Int[0m
+                                 [33m, b :: Int[0m
+                                 [33m, c :: Int[0m
+                                 [33m, d :: Int[0m
+                                 [33m}         [0m
+while checking that expression [33mz[0m
+  has type [33m{ a :: Int[0m
+           [33m, b :: Int[0m
+           [33m, c :: Int[0m
+           [33m, d :: Int[0m
+           [33m}         [0m
+in binding group doStuff
+
+See https://github.com/purescript/documentation/blob/master/errors/PropertyIsMissing.md for more information,
+or to contribute content related to this error.
+
