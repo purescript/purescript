@@ -42,7 +42,7 @@ import Language.PureScript.Types
 -- we just match the newtype name.
 extractNewtypeName :: ModuleName -> [SourceType] -> Maybe (ModuleName, ProperName 'TypeName)
 extractNewtypeName mn
-  = fmap (\(n, _, _) -> qualify mn n)
+  = fmap (qualify mn . utcQTyCon)
   . (unwrapTypeConstructor <=< lastMay)
 
 deriveInstance
@@ -58,7 +58,8 @@ deriveInstance
 deriveInstance instType className strategy = do
   mn <- unsafeCheckCurrentModule
   env <- getEnv
-  (fmap coerceProperName -> ctorName, _, tys) <- maybe (internalCompilerError "invalid instance type") pure $ unwrapTypeConstructor instType
+  instUtc@UnwrappedTypeConstructor{ utcArgs = tys } <- maybe (internalCompilerError "invalid instance type") pure $ unwrapTypeConstructor instType
+  let ctorName = coerceProperName <$> utcQTyCon instUtc
 
   TypeClassData{..} <-
     note (errorMessage . UnknownName $ fmap TyClassName className) $
@@ -66,15 +67,15 @@ deriveInstance instType className strategy = do
 
   case strategy of
     KnownClassStrategy -> let
-      unaryClass :: (ModuleName -> ProperName 'TypeName -> m [(PSString, Expr)]) -> m Expr
+      unaryClass :: (UnwrappedTypeConstructor -> m [(PSString, Expr)]) -> m Expr
       unaryClass f = case tys of
         [ty] -> case unwrapTypeConstructor ty of
-          Just (Qualified (ByModuleName mn') tyCon, _, _) | mn == mn' -> do
+          Just utc | mn == utcModuleName utc -> do
             let superclassesDicts = flip map typeClassSuperclasses $ \(Constraint _ superclass _ suTyArgs _) ->
                   let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
                   in lam UnusedIdent (DeferredDictionary superclass tyArgs)
             let superclasses = map mkString (superClassDictionaryNames typeClassSuperclasses) `zip` superclassesDicts
-            App (Constructor nullSourceSpan ctorName) . mkLit . ObjectLiteral . (++ superclasses) <$> f mn tyCon
+            App (Constructor nullSourceSpan ctorName) . mkLit . ObjectLiteral . (++ superclasses) <$> f utc
           _ -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
         _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
 
@@ -86,11 +87,11 @@ deriveInstance instType className strategy = do
         Libs.Bitraversable -> unaryClass' $ deriveTraversable True
         Libs.Contravariant -> unaryClass' $ deriveFunctor Nothing True Libs.S_cmap
         Libs.Eq -> unaryClass deriveEq
-        Libs.Eq1 -> unaryClass $ \_ _ -> deriveEq1
+        Libs.Eq1 -> unaryClass $ const deriveEq1
         Libs.Foldable -> unaryClass' $ deriveFoldable False
         Libs.Functor -> unaryClass' $ deriveFunctor Nothing False Libs.S_map
         Libs.Ord -> unaryClass deriveOrd
-        Libs.Ord1 -> unaryClass $ \_ _ -> deriveOrd1
+        Libs.Ord1 -> unaryClass $ const deriveOrd1
         Libs.Profunctor -> unaryClass' $ deriveFunctor (Just True) False Libs.S_dimap
         Libs.Traversable -> unaryClass' $ deriveTraversable False
         -- See L.P.Sugar.TypeClasses.Deriving for the classes that can be
@@ -99,9 +100,9 @@ deriveInstance instType className strategy = do
 
     NewtypeStrategy ->
       case tys of
-        _ : _ | Just (Qualified (ByModuleName mn') tyCon, kargs, args) <- unwrapTypeConstructor (last tys)
-              , mn == mn'
-              -> deriveNewtypeInstance mn className tys tyCon kargs args
+        _ : _ | Just utc <- unwrapTypeConstructor (last tys)
+              , mn == utcModuleName utc
+              -> deriveNewtypeInstance className tys utc
               | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys (last tys)
         _ -> throwError . errorMessage $ InvalidNewtypeInstance className tys
 
@@ -110,14 +111,11 @@ deriveNewtypeInstance
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => MonadWriter MultipleErrors m
-  => ModuleName
-  -> Qualified (ProperName 'ClassName)
+  => Qualified (ProperName 'ClassName)
   -> [SourceType]
-  -> ProperName 'TypeName
-  -> [SourceType]
-  -> [SourceType]
+  -> UnwrappedTypeConstructor
   -> m Expr
-deriveNewtypeInstance mn className tys tyConNm dkargs dargs = do
+deriveNewtypeInstance className tys (UnwrappedTypeConstructor mn tyConNm dkargs dargs) = do
     verifySuperclasses
     (dtype, tyKindNames, tyArgNames, ctors) <- lookupTypeDecl mn tyConNm
     go dtype tyKindNames tyArgNames ctors
@@ -190,17 +188,33 @@ deriveNewtypeInstance mn className tys tyConNm dkargs dargs = do
             $ dicts
       in lookIn suModule || lookIn newtypeModule
 
+data TypeInfo = TypeInfo
+  { tiTypeParams :: [Text]
+  , tiCtors :: [(ProperName 'ConstructorName, [SourceType])]
+  , tiArgSubst :: [(Text, SourceType)]
+  }
+
+lookupTypeInfo
+  :: forall m
+   . MonadError MultipleErrors m
+  => MonadState CheckState m
+  => UnwrappedTypeConstructor
+  -> m TypeInfo
+lookupTypeInfo UnwrappedTypeConstructor{..} = do
+  (_, kindParams, map fst -> tiTypeParams, tiCtors) <- lookupTypeDecl utcModuleName utcTyCon
+  let tiArgSubst = zip tiTypeParams utcArgs <> zip kindParams utcKindArgs
+  pure TypeInfo{..}
+
 deriveEq
   :: forall m
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => MonadSupply m
-  => ModuleName
-  -> ProperName 'TypeName
+  => UnwrappedTypeConstructor
   -> m [(PSString, Expr)]
-deriveEq mn tyConNm = do
-  (_, _, _, ctors) <- lookupTypeDecl mn tyConNm
-  eqFun <- mkEqFunction ctors
+deriveEq utc = do
+  TypeInfo{..} <- lookupTypeInfo utc
+  eqFun <- mkEqFunction tiCtors
   pure [(Libs.S_eq, eqFun)]
   where
     mkEqFunction :: [(ProperName 'ConstructorName, [SourceType])] -> m Expr
@@ -233,7 +247,7 @@ deriveEq mn tyConNm = do
       let tests = zipWith3 toEqTest (map mkVar identsL) (map mkVar identsR) tys'
       return $ CaseAlternative [caseBinder identsL, caseBinder identsR] (unguarded (conjAll tests))
       where
-      caseBinder idents = mkCtorBinder mn ctorName $ map mkBinder idents
+      caseBinder idents = mkCtorBinder (utcModuleName utc) ctorName $ map mkBinder idents
 
     conjAll :: [Expr] -> Expr
     conjAll = \case
@@ -257,12 +271,11 @@ deriveOrd
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => MonadSupply m
-  => ModuleName
-  -> ProperName 'TypeName
+  => UnwrappedTypeConstructor
   -> m [(PSString, Expr)]
-deriveOrd mn tyConNm = do
-  (_, _, _, ctors) <- lookupTypeDecl mn tyConNm
-  compareFun <- mkCompareFunction ctors
+deriveOrd utc = do
+  TypeInfo{..} <- lookupTypeInfo utc
+  compareFun <- mkCompareFunction tiCtors
   pure [(Libs.S_compare, compareFun)]
   where
     mkCompareFunction :: [(ProperName 'ConstructorName, [SourceType])] -> m Expr
@@ -315,6 +328,7 @@ deriveOrd mn tyConNm = do
              : extras
 
       where
+      mn = utcModuleName utc
       caseBinder idents = mkCtorBinder mn ctorName $ map mkBinder idents
       nullCaseBinder = mkCtorBinder mn ctorName $ replicate (length tys) NullBinder
 
@@ -426,32 +440,31 @@ validateParamsInTypeConstructors
    . MonadError MultipleErrors m
   => MonadState CheckState m
   => Qualified (ProperName 'ClassName)
-  -> ModuleName
-  -> ProperName 'TypeName
+  -> UnwrappedTypeConstructor
   -> Bool
   -> CovariantClasses
   -> Maybe (ContravarianceSupport c)
   -> m [(ProperName 'ConstructorName, [Maybe (ParamUsage c)])]
-validateParamsInTypeConstructors derivingClass mn tyConNm isBi CovariantClasses{..} contravarianceSupport = do
-  (_, _, tyArgNames, ctors) <- lookupTypeDecl mn tyConNm
+validateParamsInTypeConstructors derivingClass utc isBi CovariantClasses{..} contravarianceSupport = do
+  TypeInfo{..} <- lookupTypeInfo utc
   (mbLParam, param) <- liftEither . first (errorMessage . flip KindsDoNotUnify kindType . (kindType -:>)) $
-    case (isBi, reverse $ map fst tyArgNames) of
+    case (isBi, reverse tiTypeParams) of
       (False, x : _)    -> Right (Nothing, x)
       (False, _)        -> Left kindType
       (True, y : x : _) -> Right (Just x, y)
       (True, _ : _)     -> Left kindType
       (True, _)         -> Left $ kindType -:> kindType
-  ctors' <- traverse (traverse $ traverse replaceAllTypeSynonyms) ctors
+  ctors <- traverse (traverse $ traverse replaceAllTypeSynonyms) tiCtors
   tcds <- getTypeClassDictionaries
-  let (ctorUsages, problemSpans) = runWriter $ traverse (traverse . traverse $ typeToUsageOf tcds (maybe That These mbLParam param) False) ctors'
+  let (ctorUsages, problemSpans) = runWriter $ traverse (traverse . traverse $ typeToUsageOf tcds tiArgSubst (maybe That These mbLParam param) False) ctors
   let relatedClasses = [monoClass, biClass] ++ ([contraClass, proClass] <*> (contravariantClasses <$> toList contravarianceSupport))
   for_ (nonEmpty $ ordNub problemSpans) $ \sss ->
     throwError . addHint (RelatedPositions sss) . errorMessage $ CannotDeriveInvalidConstructorArg derivingClass relatedClasses (isJust contravarianceSupport)
   pure ctorUsages
 
   where
-  typeToUsageOf :: InstanceContext -> These Text Text -> Bool -> SourceType -> Writer [SourceSpan] (Maybe (ParamUsage c))
-  typeToUsageOf tcds = fix $ \go params isNegative -> let
+  typeToUsageOf :: InstanceContext -> [(Text, SourceType)] -> These Text Text -> Bool -> SourceType -> Writer [SourceSpan] (Maybe (ParamUsage c))
+  typeToUsageOf tcds subst = fix $ \go params isNegative -> let
     goCo = go params isNegative
     goContra = go params $ not isNegative
 
@@ -482,6 +495,9 @@ validateParamsInTypeConstructors derivingClass mn tyConNm isBi CovariantClasses{
       | otherwise
         = assertNoParamUsedIn tyArg $> Nothing
 
+    headOfTypeWithSubst :: SourceType -> Qualified (Either Text (ProperName 'TypeName))
+    headOfTypeWithSubst = headOfType . replaceAllTypeVars subst
+
     in \case
       ForAll _ name _ ty _ ->
         fmap join . traverse (\params' -> go params' isNegative ty) $ filterThese (/= name) params
@@ -494,10 +510,10 @@ validateParamsInTypeConstructors derivingClass mn tyConNm isBi CovariantClasses{
           fmap (lbl, ) <$> goCo ty
 
       TypeApp _ (TypeApp _ tyFn tyLArg) tyArg ->
-        assertNoParamUsedIn tyFn *> tryBiClasses (headOfType tyFn) tyLArg tyArg
+        assertNoParamUsedIn tyFn *> tryBiClasses (headOfTypeWithSubst tyFn) tyLArg tyArg
 
       TypeApp _ tyFn tyArg ->
-        assertNoParamUsedIn tyFn *> tryMonoClasses (headOfType tyFn) tyArg
+        assertNoParamUsedIn tyFn *> tryMonoClasses (headOfTypeWithSubst tyFn) tyArg
 
       TypeVar (ss, _) name -> mergeTheseWith (checkName lparamIsContra IsLParam) (checkName paramIsContra IsParam) (liftA2 (<|>)) params
         where
@@ -636,17 +652,16 @@ deriveFunctor
   -> Bool -- is the (right) parameter contravariant?
   -> PSString -- name of the map function for this functor type
   -> Qualified (ProperName 'ClassName)
-  -> ModuleName
-  -> ProperName 'TypeName
+  -> UnwrappedTypeConstructor
   -> m [(PSString, Expr)]
-deriveFunctor mbLParamIsContravariant paramIsContravariant mapName nm mn tyConNm = do
-  ctors <- validateParamsInTypeConstructors nm mn tyConNm isBi functorClasses $ Just $ ContravarianceSupport
+deriveFunctor mbLParamIsContravariant paramIsContravariant mapName nm utc = do
+  ctors <- validateParamsInTypeConstructors nm utc isBi functorClasses $ Just $ ContravarianceSupport
     { contravarianceWitness = ()
     , paramIsContravariant
     , lparamIsContravariant = or mbLParamIsContravariant
     , contravariantClasses
     }
-  mapFun <- mkTraversal mn isBi mapExprs (const cmapExprs) (TraversalOps identity identity) ctors
+  mapFun <- mkTraversal (utcModuleName utc) isBi mapExprs (const cmapExprs) (TraversalOps identity identity) ctors
   pure [(mapName, mapFun)]
   where
   isBi = isJust mbLParamIsContravariant
@@ -681,11 +696,10 @@ deriveFoldable
   => MonadSupply m
   => Bool -- is there a left parameter (are we deriving Bifoldable)?
   -> Qualified (ProperName 'ClassName)
-  -> ModuleName
-  -> ProperName 'TypeName
+  -> UnwrappedTypeConstructor
   -> m [(PSString, Expr)]
-deriveFoldable isBi nm mn tyConNm = do
-  ctors <- validateParamsInTypeConstructors nm mn tyConNm isBi foldableClasses Nothing
+deriveFoldable isBi nm utc = do
+  ctors <- validateParamsInTypeConstructors nm utc isBi foldableClasses Nothing
   foldlFun <- mkAsymmetricFoldFunction False foldlExprs ctors
   foldrFun <- mkAsymmetricFoldFunction True foldrExprs ctors
   foldMapFun <- mkTraversal mn isBi foldMapExprs absurd foldMapOps ctors
@@ -695,6 +709,7 @@ deriveFoldable isBi nm mn tyConNm = do
     , (if isBi then Libs.S_bifoldMap else Libs.S_foldMap, foldMapFun)
     ]
   where
+  mn = utcModuleName utc
   foldableClasses = CovariantClasses Libs.Foldable Libs.Bifoldable
   foldlExprs = TraversalExprs
     { recurseVar = mkRef Libs.I_foldl
@@ -778,12 +793,11 @@ deriveTraversable
   => MonadSupply m
   => Bool -- is there a left parameter (are we deriving Bitraversable)?
   -> Qualified (ProperName 'ClassName)
-  -> ModuleName
-  -> ProperName 'TypeName
+  -> UnwrappedTypeConstructor
   -> m [(PSString, Expr)]
-deriveTraversable isBi nm mn tyConNm = do
-  ctors <- validateParamsInTypeConstructors nm mn tyConNm isBi traversableClasses Nothing
-  traverseFun <- mkTraversal mn isBi traverseExprs absurd traverseOps ctors
+deriveTraversable isBi nm utc = do
+  ctors <- validateParamsInTypeConstructors nm utc isBi traversableClasses Nothing
+  traverseFun <- mkTraversal (utcModuleName utc) isBi traverseExprs absurd traverseOps ctors
   sequenceFun <- usingLamIdent $ pure . App (App (if isBi then App bitraverseVar identityVar else traverseVar) identityVar)
   pure
     [ (if isBi then Libs.S_bitraverse else Libs.S_traverse, traverseFun)
