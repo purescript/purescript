@@ -204,10 +204,7 @@ spec = do
       writeFileWithTimestamp modulePath timestampA "module Module where\nfoo = 0\n"
       compile [modulePath] `shouldReturn` moduleNames ["Module"]
 
-      cache <- readCacheDb
-      if M.keysSet cache == moduleNames ["Module"]
-        then return ()
-        else fail "Module not in cacheDb"
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames ["Module"]
 
     it "removes old entry from cache when module is renamed" $ do
       let modulePath = sourcesDir </> "Module.purs"
@@ -215,18 +212,12 @@ spec = do
       writeFileWithTimestamp modulePath timestampA "module Module where\nfoo = 0\n"
       compile [modulePath] `shouldReturn` moduleNames ["Module"]
 
-      cache1 <- readCacheDb
-      if M.keysSet cache1 == moduleNames ["Module"]
-        then return ()
-        else fail "Module not in cacheDb"
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames ["Module"]
 
       writeFileWithTimestamp modulePath timestampA "module Module2 where\nfoo = 0\n"
       compile [modulePath] `shouldReturn` moduleNames ["Module2"]
 
-      cache2 <- readCacheDb
-      if M.keysSet cache2 == moduleNames ["Module2"]
-        then return ()
-        else fail "Module2 not in cacheDb"
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames ["Module2"]
 
     it "removes old entry from cache when file and module is renamed" $ do
       let modulePath1 = sourcesDir </> "Module1.purs"
@@ -234,10 +225,7 @@ spec = do
       writeFileWithTimestamp modulePath1 timestampA "module Module1 where\nfoo = 0\n"
       compile [modulePath1] `shouldReturn` moduleNames ["Module1"]
 
-      cache1 <- readCacheDb
-      if M.keysSet cache1 == moduleNames ["Module1"]
-        then return ()
-        else fail "Module1 not in cacheDb"
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames ["Module1"]
 
       removeFile modulePath1
       let modulePath2 = sourcesDir </> "Module2.purs"
@@ -245,10 +233,7 @@ spec = do
       writeFileWithTimestamp modulePath2 timestampA "module Module2 where\nfoo = 0\n"
       compile [modulePath2] `shouldReturn` moduleNames ["Module2"]
 
-      cache2 <- readCacheDb
-      if M.keysSet cache2 == moduleNames ["Module2"]
-        then return ()
-        else fail "Module2 not in cacheDb"
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames  ["Module2"]
 
     it "removes old entry from cache when file is deleted" $ do
       let modulePath = sourcesDir </> "Module.purs"
@@ -256,19 +241,13 @@ spec = do
       writeFileWithTimestamp modulePath timestampA "module Module where\nfoo = 0\n"
       compile [modulePath] `shouldReturn` moduleNames ["Module"]
 
-      cache1 <- readCacheDb
-      if M.keysSet cache1 == moduleNames ["Module"]
-        then return ()
-        else fail "Module not in cacheDb"
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames ["Module"]
 
       removeFile modulePath
 
       compile [] `shouldReturn` moduleNames []
 
-      cache2 <- readCacheDb
-      if M.null cache2
-        then return ()
-        else fail "Modules were not removed from cacheDb"
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames []
 
 -- Note [Sleeping to avoid flaky tests]
 --
