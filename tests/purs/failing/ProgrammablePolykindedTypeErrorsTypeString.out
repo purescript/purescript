@@ -2,7 +2,7 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/ProgrammablePolykindedTypeErrorsTypeString.purs:23:7 - 23:17 (line 23, column 7 - line 23, column 17)
 
-  A custom type error occurred while solving type class constraints:
+  Custom error:
 
     Don't want to show Just @Type String because.
 

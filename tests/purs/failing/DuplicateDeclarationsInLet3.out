@@ -1,0 +1,22 @@
+Error 1 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/failing/DuplicateDeclarationsInLet3.purs:9:3 - 9:11 (line 9, column 3 - line 9, column 11)
+
+    The name [33ma[0m was defined multiple times in a binding group
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/OverlappingNamesInLet.md for more information,
+  or to contribute content related to this error.
+
+Error 2 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/failing/DuplicateDeclarationsInLet3.purs:16:3 - 16:24 (line 16, column 3 - line 16, column 24)
+
+    The name [33minterrupted[0m was defined multiple times in a binding group
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/OverlappingNamesInLet.md for more information,
+  or to contribute content related to this error.
+

@@ -2,7 +2,7 @@
 
 Communication with `purs ide server` is via a JSON protocol over a TCP connection:
 the server listens on a particular (configurable) port, and will accept a single line
-of JSON input in the format described below, terminated by a newline, before giving 
+of JSON input in the format described below, terminated by a newline, before giving
 a JSON response and closing the connection.
 
 The `purs ide client` command can be used as a wrapper for the TCP connection, but
@@ -80,7 +80,7 @@ The `complete` command looks up possible completions/corrections.
   If no matcher is given every candidate, that passes the filters, is returned
   in no particular order.
 
- - `currentModule :: (optional) String`: The current modules name. Allows you 
+ - `currentModule :: (optional) String`: The current modules name. Allows you
    to see module-private functions after a successful rebuild. If it matches
    with the rebuild cache non-exported modules will also be completed. You can
    fill the rebuild cache by using the "Rebuild" command.
@@ -371,7 +371,8 @@ loaded. A successful rebuild will be stored to allow for completions of private
 identifiers.
 
 Arguments:
-  - `file :: String` the path to the module to rebuild
+  - `file :: String` the path to the module to rebuild **or** the complete
+    source code of the module to be compiled prefixed with `data:`
   - `actualFile :: Maybe String` Specifies the path to be used for location
     information and parse errors. This is useful in case a temp file is used as
     the source for a rebuild.
@@ -576,14 +577,22 @@ The Module filter only keeps identifiers that appear in the listed modules.
 ```
 
 ### Dependency filter
-The Dependency filter only keeps identifiers that appear in the listed modules
-and in any of their dependencies/imports.
+The Dependency filter only keeps identifiers that appear in the listed module or
+are brought into scope by any of its imports.
+
+The module text is provided, though only the portion up until the end of the import section
+need be provided.
+
+Parameters:
+- `moduleText :: String`
+- `qualifier :: String` (optional)
 
 ```json
 {
   "filter": "dependencies",
   "params": {
-    "modules": ["My.Module"]
+    "moduleText": "module My.Module where\nimport Foo as F\n",
+    "qualifier": "F"
   }
 }
 ```

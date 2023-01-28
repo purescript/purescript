@@ -168,7 +168,7 @@ spec = do
           moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
           optsWithDocs = P.defaultOptions { P.optionsCodegenTargets = Set.fromList [P.JS, P.Docs] }
           go opts = compileWithOptions opts [modulePath] >>= assertSuccess
-          oneSecond = 10^(6::Int) -- microseconds.
+          oneSecond = 10 ^ (6::Int) -- microseconds.
 
       writeFileWithTimestamp modulePath timestampA moduleContent1
       go optsWithDocs `shouldReturn` moduleNames ["Module"]
@@ -186,7 +186,7 @@ spec = do
           moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
           optsCorefnOnly = P.defaultOptions { P.optionsCodegenTargets = Set.singleton P.CoreFn }
           go opts = compileWithOptions opts [modulePath] >>= assertSuccess
-          oneSecond = 10^(6::Int) -- microseconds.
+          oneSecond = 10 ^ (6::Int) -- microseconds.
 
       writeFileWithTimestamp modulePath timestampA moduleContent1
       go optsCorefnOnly `shouldReturn` moduleNames ["Module"]

@@ -52,7 +52,7 @@ import System.FilePath.Posix ((</>))
 -- module.
 moduleToJs
   :: forall m
-   . (Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
+   . (MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
   => Module Ann
   -> Maybe PSString
   -> m AST.Module
@@ -232,7 +232,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
 
 moduleBindToJs
   :: forall m
-   . (Monad m, MonadReader Options m, MonadSupply m, MonadWriter Any m, MonadError MultipleErrors m)
+   . (MonadReader Options m, MonadSupply m, MonadWriter Any m, MonadError MultipleErrors m)
   => ModuleName
   -> Bind Ann
   -> m [AST]
@@ -393,7 +393,7 @@ moduleBindToJs mn = bindToJs
   -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable that may have a qualified name.
   qualifiedToJS :: (a -> Ident) -> Qualified a -> AST
-  qualifiedToJS f (Qualified (ByModuleName C.Prim) a) = AST.Var Nothing . runIdent $ f a
+  qualifiedToJS f (Qualified (ByModuleName C.M_Prim) a) = AST.Var Nothing . runIdent $ f a
   qualifiedToJS f (Qualified (ByModuleName mn') a) | mn /= mn' = AST.ModuleAccessor Nothing mn' . mkString . T.concatMap identCharToText . runIdent $ f a
   qualifiedToJS f (Qualified _ a) = AST.Var Nothing $ identToJs (f a)
 

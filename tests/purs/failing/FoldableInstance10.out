@@ -3,7 +3,7 @@ in module [33mFoldableInstance10[0m
 at tests/purs/failing/FoldableInstance10.purs:11:1 - 11:30 (line 11, column 1 - line 11, column 30)
 
   One or more type variables are in positions that prevent [33mFoldable[0m from being derived.
-  To derive this class, make sure that these variables are only used as the final arguments to type constructors, and that those type constructors themselves have instances of [33mFoldable[0m.
+  To derive this class, make sure that these variables are only used as the final arguments to type constructors, and that those type constructors themselves have instances of [33mData.Foldable.Foldable[0m or [33mData.Bifoldable.Bifoldable[0m.
 
   tests/purs/failing/FoldableInstance10.purs:
   [90m    9[0m [33m[0m

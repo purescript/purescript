@@ -8,6 +8,7 @@ module Language.PureScript.Make.Actions
   , cacheDbFile
   , readCacheDb'
   , writeCacheDb'
+  , ffiCodegen'
   ) where
 
 import           Prelude
@@ -280,23 +281,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   ffiCodegen :: CF.Module CF.Ann -> Make ()
   ffiCodegen m = do
     codegenTargets <- asks optionsCodegenTargets
-    when (S.member JS codegenTargets) $ do
-      let mn = CF.moduleName m
-      case mn `M.lookup` foreigns of
-        Just path
-          | not $ requiresForeign m ->
-              tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
-          | otherwise -> do
-              checkResult <- checkForeignDecls m path
-              case checkResult of
-                Left _ -> copyFile path (outputFilename mn "foreign.js")
-                Right (ESModule, _) -> copyFile path (outputFilename mn "foreign.js")
-                Right (CJSModule, _) -> do
-                  throwError $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
-
-        Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
-                | otherwise -> return ()
-
+    ffiCodegen' foreigns codegenTargets (Just outputFilename) m
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
@@ -308,7 +293,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       map (\(SMap _ orig gen) -> Mapping {
           mapOriginal = Just $ convertPos $ add 0 (-1) orig
         , mapSourceFile = sourceFile
-        , mapGenerated = convertPos $ add (extraLines+1) 0 gen
+        , mapGenerated = convertPos $ add (extraLines + 1) 0 gen
         , mapName = Nothing
         }) mappings
     }
@@ -316,7 +301,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     writeJSONFile mapFile mapping
     where
     add :: Int -> Int -> SourcePos -> SourcePos
-    add n m (SourcePos n' m') = SourcePos (n+n') (m+m')
+    add n m (SourcePos n' m') = SourcePos (n + n') (m + m')
 
     convertPos :: SourcePos -> Pos
     convertPos SourcePos { sourcePosLine = l, sourcePosColumn = c } =
@@ -358,7 +343,7 @@ checkForeignDecls m path = do
   modSS = CF.moduleSourceSpan m
 
   checkFFI :: JS.JSAST -> Make (ForeignModuleType, S.Set Ident)
-  checkFFI js = do 
+  checkFFI js = do
     (foreignModuleType, foreignIdentsStrs) <-
         case (,) <$> getForeignModuleExports js <*> getForeignModuleImports js of
           Left reason -> throwError $ errorParsingModule reason
@@ -438,3 +423,33 @@ checkForeignDecls m path = do
       . CST.runTokenParser CST.parseIdent
       . CST.lex
       $ T.pack str
+
+-- | FFI check and codegen action.
+-- If path maker is supplied copies foreign module to the output.
+ffiCodegen'
+  :: M.Map ModuleName FilePath
+  -> S.Set CodegenTarget
+  -> Maybe (ModuleName -> String -> FilePath)
+  -> CF.Module CF.Ann
+  -> Make ()
+ffiCodegen' foreigns codegenTargets makeOutputPath m = do
+  when (S.member JS codegenTargets) $ do
+    let mn = CF.moduleName m
+    case mn `M.lookup` foreigns of
+      Just path
+        | not $ requiresForeign m ->
+            tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
+        | otherwise -> do
+            checkResult <- checkForeignDecls m path
+            case checkResult of
+              Left _ -> copyForeign path mn
+              Right (ESModule, _) -> copyForeign path mn
+              Right (CJSModule, _) -> do
+                throwError $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
+      Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
+              | otherwise -> return ()
+  where
+  requiresForeign = not . null . CF.moduleForeign
+
+  copyForeign path mn =
+    for_ makeOutputPath (\outputFilename -> copyFile path (outputFilename mn "foreign.js"))

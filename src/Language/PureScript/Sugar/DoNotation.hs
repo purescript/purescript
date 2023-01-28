@@ -14,7 +14,7 @@ import           Language.PureScript.AST
 import           Language.PureScript.Crash
 import           Language.PureScript.Errors
 import           Language.PureScript.Names
-import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Libs as C
 
 -- | Replace all @DoNotationBind@ and @DoNotationValue@ constructors with
 -- applications of the bind function in scope, and all @DoNotationLet@
@@ -30,10 +30,10 @@ desugarDo d =
   in rethrowWithPosition ss $ f d
   where
   bind :: SourceSpan -> Maybe ModuleName -> Expr
-  bind ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.bind))
+  bind ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.S_bind))
 
   discard :: SourceSpan -> Maybe ModuleName -> Expr
-  discard ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.discard))
+  discard ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.S_discard))
 
   replace :: SourceSpan -> Expr -> m Expr
   replace pos (Do m els) = go pos m els
@@ -57,7 +57,7 @@ desugarDo d =
   go _ _ (DoNotationBind b _ : _) | First (Just ident) <- foldMap fromIdent (binderNames b) =
       throwError . errorMessage $ CannotUseBindWithDo (Ident ident)
     where
-      fromIdent (Ident i) | i `elem` [ C.bind, C.discard ] = First (Just i)
+      fromIdent (Ident i) | i `elem` [ C.S_bind, C.S_discard ] = First (Just i)
       fromIdent _ = mempty
   go pos m (DoNotationBind binder val : rest) = do
     rest' <- go pos m rest
@@ -75,7 +75,7 @@ desugarDo d =
   go pos m (DoNotationLet ds : rest) = do
     let checkBind :: Declaration -> m ()
         checkBind (ValueDecl (ss, _) i@(Ident name) _ _ _)
-          | name `elem` [ C.bind, C.discard ] = throwError . errorMessage' ss $ CannotUseBindWithDo i
+          | name `elem` [ C.S_bind, C.S_discard ] = throwError . errorMessage' ss $ CannotUseBindWithDo i
         checkBind _ = pure ()
     mapM_ checkBind ds
     rest' <- go pos m rest

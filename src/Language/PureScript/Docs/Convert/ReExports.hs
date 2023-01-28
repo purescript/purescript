@@ -147,8 +147,7 @@ collectDeclarations reExports = do
   where
 
   collect
-    :: (Eq a, Show a)
-    => (P.ModuleName -> a -> m (P.ModuleName, [b]))
+    :: (P.ModuleName -> a -> m (P.ModuleName, [b]))
     -> Map a P.ExportSource
     -> m (Map P.ModuleName [b])
   collect lookup' exps = do

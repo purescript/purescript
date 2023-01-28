@@ -207,7 +207,7 @@ populateVolatileStateSync = do
     (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
     (Map.filter reexportHasFailures results)
 
-populateVolatileState :: (Ide m, MonadLogger m) => m (Async ())
+populateVolatileState :: Ide m => m (Async ())
 populateVolatileState = do
   env <- ask
   let ll = confLogLevel (ideConfiguration env)

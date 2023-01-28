@@ -127,7 +127,7 @@ getResult buildPlan moduleName =
 -- The given MakeActions are used to collect various timestamps in order to
 -- determine whether a module needs rebuilding.
 construct
-  :: forall m. (Monad m, MonadBaseControl IO m)
+  :: forall m. MonadBaseControl IO m
   => MakeActions m
   -> CacheDb
   -> ([CST.PartialResult Module], [(ModuleName, [ModuleName])])

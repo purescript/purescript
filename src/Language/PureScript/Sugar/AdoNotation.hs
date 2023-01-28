@@ -12,7 +12,7 @@ import           Data.List (foldl')
 import           Language.PureScript.AST
 import           Language.PureScript.Errors
 import           Language.PureScript.Names
-import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Libs as C
 
 -- | Replace all @AdoNotationBind@ and @AdoNotationValue@ constructors with
 -- applications of the pure and apply functions in scope, and all @AdoNotationLet@
@@ -28,13 +28,13 @@ desugarAdo d =
   in rethrowWithPosition ss $ f d
   where
   pure' :: SourceSpan -> Maybe ModuleName -> Expr
-  pure' ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.pure'))
+  pure' ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.S_pure))
 
   map' :: SourceSpan -> Maybe ModuleName -> Expr
-  map' ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.map))
+  map' ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.S_map))
 
   apply :: SourceSpan -> Maybe ModuleName -> Expr
-  apply ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.apply))
+  apply ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.S_apply))
 
   replace :: SourceSpan -> Expr -> m Expr
   replace pos (Ado m els yield) = do

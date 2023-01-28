@@ -8,6 +8,7 @@ import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Command as Command
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Imports
+import           Language.PureScript.Ide.Imports.Actions
 import           Language.PureScript.Ide.Filter (moduleFilter)
 import qualified Language.PureScript.Ide.Test as Test
 import           Language.PureScript.Ide.Types
