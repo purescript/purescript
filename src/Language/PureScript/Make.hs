@@ -177,9 +177,10 @@ make ma@MakeActions{..} ms = do
       M.mapEither splitResults <$> BuildPlan.collectResults buildPlan
 
   -- Write the updated build cache database to disk
+  let moduleSet = S.fromList $ map (getModuleName . CST.resPartial) sorted
   writeCacheDb
     =<< Cache.removeModules (M.keysSet failures)
-    <$> pruneCache (S.fromList $ map (getModuleName . CST.resPartial) sorted) newCacheDb
+    <$> pruneMissingFiles (pruneMissingModules moduleSet newCacheDb)
 
   writePackageJson
 
@@ -263,45 +264,24 @@ make ma@MakeActions{..} ms = do
   onExceptionLifted :: m a -> m b -> m a
   onExceptionLifted l r = control $ \runInIO -> runInIO l `onException` runInIO r
 
-  -- Remove missing and duplicate files from the cache.
-  -- This action removes modules if their source does not exist or if another
-  -- module with the same source is being compiled.
-  pruneCache :: S.Set ModuleName -> Cache.CacheDb -> m Cache.CacheDb
-  pruneCache modules cache =
-    let
-      inverseCache :: M.Map FilePath [ModuleName]
-      inverseCache =
-        M.foldlWithKey
-          (\acc1 key e -> M.unionWith (++) acc1 $ foldl (\acc2 file -> M.insert file [key] acc2) M.empty (M.keys (Cache.unCacheInfo e)))
-          M.empty
-          cache
+  -- Remove missing files from the cache.
+  -- Will remove modules without files.
+  pruneMissingFiles :: Cache.CacheDb -> m Cache.CacheDb
+  pruneMissingFiles cache =
+     M.filter (not . null . Cache.unCacheInfo)
+       <$> traverse (
+           fmap Cache.CacheInfo
+             . fmap M.fromList
+             . filterM (\(name, _) -> (/= Nothing) <$> getTimestampMaybe name)
+             . M.toList
+             . Cache.unCacheInfo
+       ) cache
 
-      -- Set of modules that should be removed due to there being two or more modules with the same source
-      toRemove :: S.Set ModuleName
-      toRemove =
-        M.foldl
-          (\acc1 e -> case e of
-            -- This pattern will clean up duplicates over time.
-            -- It will keep the cache in a good state if it was in a good state before.
-            m1 : m2 : _ ->
-              let
-                acc2 = if not $ S.member m1 modules then S.insert m1 acc1 else acc1
-                acc3 = if not $ S.member m2 modules then S.insert m2 acc2 else acc2
-              in
-              acc3
-            _ -> acc1
-          )
-          S.empty
-          inverseCache
-     in
-     M.traverseMaybeWithKey (\_ files ->
-       do
-         prunedFiles <- M.traverseMaybeWithKey (\name info -> fmap (fmap (const info)) (getTimestampMaybe name)) $ Cache.unCacheInfo files
-         if M.null prunedFiles then
-           pure Nothing
-         else
-           pure (Just $ Cache.CacheInfo prunedFiles)
-     ) $ Cache.removeModules toRemove cache
+  -- Remove modules which are currently not being compiled.
+  pruneMissingModules :: S.Set ModuleName -> Cache.CacheDb -> Cache.CacheDb
+  pruneMissingModules modules cache =
+    let missingModules = S.difference (S.fromList (M.keys cache)) modules
+     in Cache.removeModules missingModules cache
 
 -- | Infer the module name for a module by looking for the same filename with
 -- a .js extension.
