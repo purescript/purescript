@@ -438,7 +438,7 @@ test-suite tests
   build-depends:
     purescript,
     generic-random >=1.5.0.1 && <1.6,
-    hspec ==2.9.2,
+    hspec >= 2.10.7 && < 3,
     HUnit >=1.6.2.0 && <1.7,
     newtype >=0.2.2.0 && <0.3,
     QuickCheck >=2.14.2 && <2.15,
