@@ -12,6 +12,7 @@ Error 1 of 2:
     [33m  Int[0m
     [33m     [0m
 
+  while matching label [33ma[0m
   while trying to match type [33m               [0m
                              [33m  ( a :: String[0m
                              [33m  , b :: String[0m
@@ -50,6 +51,7 @@ Error 2 of 2:
     [33m  Int[0m
     [33m     [0m
 
+  while matching label [33mb[0m
   while trying to match type [33m               [0m
                              [33m  ( a :: String[0m
                              [33m  , b :: String[0m
