@@ -18,8 +18,6 @@ extra-deps:
 - process-1.6.13.1
 # The Cabal library is not in Stackage
 - Cabal-3.6.3.0
-# Protolude is not yet in resolver snapshot
-- protolude-0.3.1
 # hspec@2.9.3 is the first version that starts depending on ghc
 # ghc depends on terminfo by default, but that can be ignored
 # if one uses the '-terminfo' flag.
