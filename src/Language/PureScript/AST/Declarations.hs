@@ -66,6 +66,7 @@ data ErrorMessageHint
   | ErrorInModule ModuleName
   | ErrorInInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | ErrorInSubsumption SourceType SourceType
+  | ErrorInRowLabel Label
   | ErrorCheckingAccessor Expr PSString
   | ErrorCheckingType Expr SourceType
   | ErrorCheckingKind SourceType SourceType

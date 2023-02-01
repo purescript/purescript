@@ -584,7 +584,7 @@ canonRow
   -> MaybeT m Canonicalized
 canonRow a b
   | RCons{} <- a =
-      case alignRowsWith (,) a b of
+      case alignRowsWith (const (,)) a b of
         -- We throw early when a bare unknown remains on either side after
         -- aligning the rows because we don't know how to canonicalize them yet
         -- and the unification error thrown when the rows are misaligned should
