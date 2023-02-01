@@ -148,7 +148,7 @@ instance FromJSON Filter where
         search <- params .: "search"
         pure (exactFilter search)
       "prefix" -> do
-        params <- o.: "params"
+        params <- o .: "params"
         search <- params .: "search"
         pure (prefixFilter search)
       "namespace" -> do
@@ -156,10 +156,10 @@ instance FromJSON Filter where
         namespaces <- params .: "namespaces"
         pure (namespaceFilter (Set.fromList namespaces))
       "declarations" -> do
-        declarations <- o.: "params"
+        declarations <- o .: "params"
         pure (declarationTypeFilter (Set.fromList declarations))
       "dependencies" -> do
-        params <- o.: "params"
+        params <- o .: "params"
         moduleText <- params .: "moduleText"
         qualifier <- fmap P.moduleNameFromString <$> params .:? "qualifier"
         case sliceImportSection (T.lines moduleText) of

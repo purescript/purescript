@@ -91,8 +91,8 @@ splitTypeConstructor = go []
 prettyCtor :: WildcardAnnotations -> Constructor -> Text
 prettyCtor _ (ctorName, []) = P.runProperName ctorName
 prettyCtor wsa (ctorName, ctorArgs) =
-  "("<> P.runProperName ctorName <> " "
-  <> T.unwords (map (prettyPrintWildcard wsa) ctorArgs) <>")"
+  "(" <> P.runProperName ctorName <> " "
+  <> T.unwords (map (prettyPrintWildcard wsa) ctorArgs) <> ")"
 
 prettyPrintWildcard :: WildcardAnnotations -> P.Type a -> Text
 prettyPrintWildcard (WildcardAnnotations True) = prettyWildcard

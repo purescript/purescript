@@ -89,7 +89,7 @@ groupCompletionReexports initial =
   where
     go (Match (moduleName, d@(IdeDeclarationAnn ann decl))) =
       let
-        origin = fromMaybe moduleName (ann^.annExportedFrom)
+        origin = fromMaybe moduleName (ann ^. annExportedFrom)
       in
         Map.alter
         (insertDeclaration moduleName origin d)

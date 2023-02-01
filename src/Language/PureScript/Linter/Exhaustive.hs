@@ -15,7 +15,6 @@ import Control.Applicative
 import Control.Arrow (first, second)
 import Control.Monad (unless)
 import Control.Monad.Writer.Class
-import Control.Monad.Supply.Class (MonadSupply)
 
 import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe)
@@ -237,7 +236,7 @@ missingAlternative env mn ca uncovered
 --
 checkExhaustive
   :: forall m
-   . (MonadWriter MultipleErrors m, MonadSupply m)
+   . MonadWriter MultipleErrors m
    => SourceSpan
    -> Environment
    -> ModuleName
@@ -292,7 +291,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
 --
 checkExhaustiveExpr
   :: forall m
-   . (MonadWriter MultipleErrors m, MonadSupply m)
+   . MonadWriter MultipleErrors m
    => SourceSpan
    -> Environment
    -> ModuleName

@@ -104,8 +104,10 @@ $(TH.declare do
       TH.var "euclideanRingNumber"
 
   TH.mod "Data.Function" do
-    TH.prefixWith "function" do TH.asIdent do TH.vars ["apply", "applyFlipped"]
-    TH.asIdent do TH.var "flip"
+    TH.asIdent do
+      TH.prefixWith "function" do TH.vars ["apply", "applyFlipped"]
+      TH.var "const"
+      TH.var "flip"
 
   TH.mod "Data.Functor" do
     TH.cls "Functor" ; TH.asIdent do TH.asString do TH.var "map"
@@ -170,6 +172,17 @@ $(TH.declare do
   TH.mod "Data.Array" do
     TH.asPair do TH.var "unsafeIndex"
 
+  -- purescript-bifunctors
+
+  TH.mod "Data.Bifunctor" do
+    TH.cls "Bifunctor" ; TH.asIdent do TH.asString do TH.var "bimap"
+    TH.asIdent do TH.vars ["lmap", "rmap"]
+
+  -- purescript-contravariant
+
+  TH.mod "Data.Functor.Contravariant" do
+    TH.cls "Contravariant" ; TH.asIdent do TH.asString do TH.var "cmap"
+
   -- purescript-eff
 
   TH.mod "Control.Monad.Eff" (P.pure ())
@@ -185,6 +198,14 @@ $(TH.declare do
     TH.asPair do TH.vars ["mkEffectFn", "runEffectFn"]
 
   -- purescript-foldable-traversable
+
+  TH.mod "Data.Bifoldable" do
+    TH.cls "Bifoldable" ; TH.asIdent do TH.asString do TH.vars ["bifoldMap", "bifoldl", "bifoldr"]
+
+  TH.mod "Data.Bitraversable" do
+    TH.cls "Bitraversable" ; TH.asString do TH.asIdent (TH.var "bitraverse"); TH.var "bisequence"
+    TH.asIdent do
+      TH.vars ["ltraverse", "rtraverse"]
 
   TH.mod "Data.Foldable" do
     TH.cls "Foldable" ; TH.asIdent do TH.asString do TH.vars ["foldMap", "foldl", "foldr"]
@@ -218,6 +239,14 @@ $(TH.declare do
 
   TH.mod "Partial.Unsafe" do
     TH.asIdent do TH.asPair do TH.var "unsafePartial"
+
+  -- purescript-profunctor
+
+  TH.mod "Data.Profunctor" do
+    TH.cls "Profunctor" ; TH.asIdent do TH.asString do TH.var "dimap"
+    TH.asIdent do
+      TH.var "lcmap"
+      TH.prefixWith "profunctor" do TH.var "rmap"
 
   -- purescript-st
 

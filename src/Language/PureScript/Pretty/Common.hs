@@ -96,8 +96,8 @@ bumpPos :: SourcePos -> SMap -> SMap
 bumpPos p (SMap f s g) = SMap f s $ p `addPos` g
 
 addPos :: SourcePos -> SourcePos -> SourcePos
-addPos (SourcePos n m) (SourcePos 0 m') = SourcePos n (m+m')
-addPos (SourcePos n _) (SourcePos n' m') = SourcePos (n+n') m'
+addPos (SourcePos n m) (SourcePos 0 m') = SourcePos n (m + m')
+addPos (SourcePos n _) (SourcePos n' m') = SourcePos (n + n') m'
 
 
 data PrinterState = PrinterState { indent :: Int }

@@ -1,4 +1,4 @@
--- @shouldFailWith NoInstanceFound
+-- @shouldFailWith CannotDeriveInvalidConstructorArg
 module FoldableInstance4 where
 
 import Prelude
