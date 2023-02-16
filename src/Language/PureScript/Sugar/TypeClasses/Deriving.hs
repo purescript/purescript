@@ -9,8 +9,7 @@ import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.List (foldl', find, unzip5)
 import           Language.PureScript.AST
 import           Language.PureScript.AST.Utils
-import qualified Language.PureScript.Constants.Data.Generic.Rep as DataGenericRep
-import qualified Language.PureScript.Constants.Data.Newtype as DataNewtype
+import qualified Language.PureScript.Constants.Libs as Libs
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
@@ -50,17 +49,17 @@ deriveInstance mn ds decl =
       binaryWildcardClass :: (Declaration -> [SourceType] -> m ([Declaration], SourceType)) -> m Declaration
       binaryWildcardClass f = case tys of
         [ty1, ty2] -> case unwrapTypeConstructor ty1 of
-          Just (Qualified (ByModuleName mn') tyCon, _, args) | mn == mn' -> do
-            checkIsWildcard ss tyCon ty2
-            tyConDecl <- findTypeDecl ss tyCon ds
-            (members, ty2') <- f tyConDecl args
+          Just UnwrappedTypeConstructor{..} | mn == utcModuleName -> do
+            checkIsWildcard ss utcTyCon ty2
+            tyConDecl <- findTypeDecl ss utcTyCon ds
+            (members, ty2') <- f tyConDecl utcArgs
             pure $ TypeInstanceDeclaration sa na ch idx nm deps className [ty1, ty2'] (ExplicitInstance members)
           _ -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty1
         _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 2
 
       in case className of
-        DataNewtype.Newtype -> binaryWildcardClass deriveNewtype
-        DataGenericRep.Generic -> binaryWildcardClass (deriveGenericRep ss mn)
+        Libs.Generic -> binaryWildcardClass (deriveGenericRep ss mn)
+        Libs.Newtype -> binaryWildcardClass deriveNewtype
         _ -> pure decl
     _ -> pure decl
 
@@ -84,13 +83,13 @@ deriveGenericRep ss mn tyCon tyConArgs =
                       lamCase x
                         [ CaseAlternative
                             [NullBinder]
-                            (unguarded (App (Var ss DataGenericRep.to) (Var ss' (Qualified ByNullSourcePos x))))
+                            (unguarded (App (Var ss Libs.I_to) (Var ss' (Qualified ByNullSourcePos x))))
                         ]
                    , ValueDecl (ss', []) (Ident "from") Public [] $ unguarded $
                       lamCase x
                         [ CaseAlternative
                             [NullBinder]
-                            (unguarded (App (Var ss DataGenericRep.from) (Var ss' (Qualified ByNullSourcePos x))))
+                            (unguarded (App (Var ss Libs.I_from) (Var ss' (Qualified ByNullSourcePos x))))
                         ]
                    ]
                | otherwise =
@@ -112,12 +111,12 @@ deriveGenericRep ss mn tyCon tyConArgs =
     select l r n = take (n - 1) (iterate (r .) l) ++ [compN (n - 1) r]
 
     sumBinders :: Int -> [Binder -> Binder]
-    sumBinders = select (ConstructorBinder ss DataGenericRep.Inl . pure)
-                        (ConstructorBinder ss DataGenericRep.Inr . pure)
+    sumBinders = select (ConstructorBinder ss Libs.C_Inl . pure)
+                        (ConstructorBinder ss Libs.C_Inr . pure)
 
     sumExprs :: Int -> [Expr -> Expr]
-    sumExprs = select (App (Constructor ss DataGenericRep.Inl))
-                      (App (Constructor ss DataGenericRep.Inr))
+    sumExprs = select (App (Constructor ss Libs.C_Inl))
+                      (App (Constructor ss Libs.C_Inr))
 
     compN :: Int -> (a -> a) -> a -> a
     compN 0 _ = id
@@ -129,37 +128,37 @@ deriveGenericRep ss mn tyCon tyConArgs =
     makeInst (DataConstructorDeclaration _ ctorName args) = do
         let args' = map snd args
         (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct args'
-        return ( srcTypeApp (srcTypeApp (srcTypeConstructor DataGenericRep.Constructor)
+        return ( srcTypeApp (srcTypeApp (srcTypeConstructor Libs.Constructor)
                                   (srcTypeLevelString $ mkString (runProperName ctorName)))
                          ctorTy
-               , CaseAlternative [ ConstructorBinder ss DataGenericRep.Constructor [matchProduct] ]
+               , CaseAlternative [ ConstructorBinder ss Libs.C_Constructor [matchProduct] ]
                                  (unguarded (foldl' App (Constructor ss (Qualified (ByModuleName mn) ctorName)) ctorArgs))
                , CaseAlternative [ ConstructorBinder ss (Qualified (ByModuleName mn) ctorName) matchCtor ]
-                                 (unguarded (App (Constructor ss DataGenericRep.Constructor) mkProduct))
+                                 (unguarded (App (Constructor ss Libs.C_Constructor) mkProduct))
                )
 
     makeProduct
       :: [SourceType]
       -> m (SourceType, Binder, [Expr], [Binder], Expr)
     makeProduct [] =
-      pure (srcTypeConstructor DataGenericRep.NoArguments, NullBinder, [], [], Constructor ss DataGenericRep.NoArguments)
+      pure (srcTypeConstructor Libs.NoArguments, NullBinder, [], [], Constructor ss Libs.C_NoArguments)
     makeProduct args = do
       (tys, bs1, es1, bs2, es2) <- unzip5 <$> traverse makeArg args
-      pure ( foldr1 (\f -> srcTypeApp (srcTypeApp (srcTypeConstructor DataGenericRep.Product) f)) tys
-           , foldr1 (\b1 b2 -> ConstructorBinder ss DataGenericRep.Product [b1, b2]) bs1
+      pure ( foldr1 (\f -> srcTypeApp (srcTypeApp (srcTypeConstructor Libs.Product) f)) tys
+           , foldr1 (\b1 b2 -> ConstructorBinder ss Libs.C_Product [b1, b2]) bs1
            , es1
            , bs2
-           , foldr1 (\e1 -> App (App (Constructor ss DataGenericRep.Product) e1)) es2
+           , foldr1 (\e1 -> App (App (Constructor ss Libs.C_Product) e1)) es2
            )
 
     makeArg :: SourceType -> m (SourceType, Binder, Expr, Binder, Expr)
     makeArg arg = do
       argName <- freshIdent "arg"
-      pure ( srcTypeApp (srcTypeConstructor DataGenericRep.Argument) arg
-           , ConstructorBinder ss DataGenericRep.Argument [ VarBinder ss argName ]
+      pure ( srcTypeApp (srcTypeConstructor Libs.Argument) arg
+           , ConstructorBinder ss Libs.C_Argument [ VarBinder ss argName ]
            , Var ss (Qualified (BySourcePos $ spanStart ss) argName)
            , VarBinder ss argName
-           , App (Constructor ss DataGenericRep.Argument) (Var ss (Qualified (BySourcePos $ spanStart ss) argName))
+           , App (Constructor ss Libs.C_Argument) (Var ss (Qualified (BySourcePos $ spanStart ss) argName))
            )
 
     underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative
@@ -170,9 +169,9 @@ deriveGenericRep ss mn tyCon tyConArgs =
     underExpr _ _ = internalError "underExpr: expected unguarded alternative"
 
     toRepTy :: [SourceType] -> SourceType
-    toRepTy [] = srcTypeConstructor DataGenericRep.NoConstructors
+    toRepTy [] = srcTypeConstructor Libs.NoConstructors
     toRepTy [only] = only
-    toRepTy ctors = foldr1 (\f -> srcTypeApp (srcTypeApp (srcTypeConstructor DataGenericRep.Sum) f)) ctors
+    toRepTy ctors = foldr1 (\f -> srcTypeApp (srcTypeApp (srcTypeConstructor Libs.Sum) f)) ctors
 
 checkIsWildcard :: MonadError MultipleErrors m => SourceSpan -> ProperName 'TypeName -> SourceType -> m ()
 checkIsWildcard _ _ (TypeWildcard _ UnnamedWildcard) = return ()

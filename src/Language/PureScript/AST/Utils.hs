@@ -39,11 +39,21 @@ mkCtorBinder mn name = ConstructorBinder nullSourceSpan (Qualified (ByModuleName
 unguarded :: Expr -> [GuardedExpr]
 unguarded e = [MkUnguarded e]
 
-unwrapTypeConstructor :: SourceType -> Maybe (Qualified (ProperName 'TypeName), [SourceType], [SourceType])
+data UnwrappedTypeConstructor = UnwrappedTypeConstructor
+  { utcModuleName :: ModuleName
+  , utcTyCon :: ProperName 'TypeName
+  , utcKindArgs :: [SourceType]
+  , utcArgs :: [SourceType]
+  }
+
+utcQTyCon :: UnwrappedTypeConstructor -> Qualified (ProperName 'TypeName)
+utcQTyCon UnwrappedTypeConstructor{..} = Qualified (ByModuleName utcModuleName) utcTyCon
+
+unwrapTypeConstructor :: SourceType -> Maybe UnwrappedTypeConstructor
 unwrapTypeConstructor = go [] []
   where
   go kargs args = \case
-    TypeConstructor _ tyCon -> Just (tyCon, kargs, args)
+    TypeConstructor _ (Qualified (ByModuleName mn) tyCon) -> Just (UnwrappedTypeConstructor mn tyCon kargs args)
     TypeApp _ ty arg -> go kargs (arg : args) ty
     KindApp _ ty karg -> go (karg : kargs) args ty
     _ -> Nothing

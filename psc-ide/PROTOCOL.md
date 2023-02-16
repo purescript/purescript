@@ -577,14 +577,22 @@ The Module filter only keeps identifiers that appear in the listed modules.
 ```
 
 ### Dependency filter
-The Dependency filter only keeps identifiers that appear in the listed modules
-and in any of their dependencies/imports.
+The Dependency filter only keeps identifiers that appear in the listed module or
+are brought into scope by any of its imports.
+
+The module text is provided, though only the portion up until the end of the import section
+need be provided.
+
+Parameters:
+- `moduleText :: String`
+- `qualifier :: String` (optional)
 
 ```json
 {
   "filter": "dependencies",
   "params": {
-    "modules": ["My.Module"]
+    "moduleText": "module My.Module where\nimport Foo as F\n",
+    "qualifier": "F"
   }
 }
 ```

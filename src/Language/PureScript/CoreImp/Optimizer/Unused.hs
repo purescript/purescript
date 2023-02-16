@@ -32,7 +32,7 @@ removeCodeAfterReturnStatements = everywhere (removeFromBlock go)
 removeUndefinedApp :: AST -> AST
 removeUndefinedApp = everywhere convert
   where
-  convert (App ss fn [Var _ arg]) | arg == C.undefined = App ss fn []
+  convert (App ss fn [Var _ C.S_undefined]) = App ss fn []
   convert js = js
 
 removeUnusedEffectFreeVars :: [Text] -> [[AST]] -> [[AST]]

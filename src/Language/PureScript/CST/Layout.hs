@@ -82,7 +82,7 @@
 --    ] of
 -- @
 --
--- Which of the above 13 commas function as the separaters between the
+-- Which of the above 13 commas function as the separators between the
 -- case binders (e.g. @one@) in the outermost @case ... of@ context?
 --
 -- ### The Solution

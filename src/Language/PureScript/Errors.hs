@@ -4,6 +4,7 @@ module Language.PureScript.Errors
   ) where
 
 import           Prelude
+import           Protolude (unsnoc)
 
 import           Control.Arrow ((&&&))
 import           Control.Exception (displayException)
@@ -34,12 +35,11 @@ import           Data.Traversable (for)
 import qualified GHC.Stack
 import           Language.PureScript.AST
 import qualified Language.PureScript.Bundle as Bundle
-import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Libs as C
 import qualified Language.PureScript.Constants.Prim as C
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST.Errors as CST
 import qualified Language.PureScript.CST.Print as CST
-import           Language.PureScript.Environment
 import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
 import           Language.PureScript.Pretty
@@ -79,7 +79,7 @@ data SimpleErrorMessage
   | OrphanKindDeclaration (ProperName 'TypeName)
   | OrphanRoleDeclaration (ProperName 'TypeName)
   | RedefinedIdent Ident
-  | OverlappingNamesInLet
+  | OverlappingNamesInLet Ident
   | UnknownName (Qualified Name)
   | UnknownImport ModuleName Name
   | UnknownImportDataConstructor ModuleName (ProperName 'TypeName) (ProperName 'ConstructorName)
@@ -195,7 +195,7 @@ data SimpleErrorMessage
   | UnsupportedRoleDeclaration
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
-  | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName))
+  | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName)) [Qualified (ProperName 'ClassName)] Bool
   | CannotSkipTypeApplication SourceType
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
   deriving (Show)
@@ -260,7 +260,7 @@ errorCode em = case unwrapErrorMessage em of
   OrphanKindDeclaration{} -> "OrphanKindDeclaration"
   OrphanRoleDeclaration{} -> "OrphanRoleDeclaration"
   RedefinedIdent{} -> "RedefinedIdent"
-  OverlappingNamesInLet -> "OverlappingNamesInLet"
+  OverlappingNamesInLet{} -> "OverlappingNamesInLet"
   UnknownName{} -> "UnknownName"
   UnknownImport{} -> "UnknownImport"
   UnknownImportDataConstructor{} -> "UnknownImportDataConstructor"
@@ -592,6 +592,13 @@ colorCodeBox codeColor b = case codeColor of
         , Box.vcat Box.top $ replicate (Box.rows b) $ Box.text ansiColorReset
         ]
 
+commasAndConjunction :: Text -> [Text] -> Text
+commasAndConjunction conj = \case
+  [x] -> x
+  [x, y] -> x <> " " <> conj <> " " <> y
+  (unsnoc -> Just (rest, z)) -> foldMap (<> ", ") rest <> conj <> " " <> z
+  _ -> ""
+
 -- | Default color intensity and color for code
 defaultCodeColor :: (ANSI.ColorIntensity, ANSI.Color)
 defaultCodeColor = (ANSI.Dull, ANSI.Yellow)
@@ -735,8 +742,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       line "The last statement in a 'do' block must be an expression, but this block ends with a binder."
     renderSimpleErrorMessage InvalidDoLet =
       line "The last statement in a 'do' block must be an expression, but this block ends with a let binding."
-    renderSimpleErrorMessage OverlappingNamesInLet =
-      line "The same name was used more than once in a let binding."
+    renderSimpleErrorMessage (OverlappingNamesInLet name) =
+      line $ "The name " <> markCode (showIdent name) <> " was defined multiple times in a binding group"
     renderSimpleErrorMessage (InfiniteType ty) =
       paras [ line "An infinite type was inferred for an expression: "
             , markCodeBox $ indent $ prettyType ty
@@ -757,10 +764,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       line $ "The role declaration for " <> markCode (runProperName nm) <> " should follow its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
-    renderSimpleErrorMessage (UnknownName name@(Qualified (BySourcePos _) (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
+    renderSimpleErrorMessage (UnknownName name@(Qualified (BySourcePos _) (IdentName (Ident i)))) | i `elem` [ C.S_bind, C.S_discard ] =
       line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode "bind" <> " and " <> markCode "discard" <> " functions. Please import " <> markCode i <> " from module " <> markCode "Prelude"
-    renderSimpleErrorMessage (UnknownName name@(Qualified (BySourcePos _) (IdentName (Ident i)))) | i == C.negate =
-      line $ "Unknown " <> printName name <> ". You're probably using numeric negation (the unary " <> markCode "-" <> " operator), which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
+    renderSimpleErrorMessage (UnknownName name@(Qualified (BySourcePos _) (IdentName (Ident C.S_negate)))) =
+      line $ "Unknown " <> printName name <> ". You're probably using numeric negation (the unary " <> markCode "-" <> " operator), which the compiler replaces with calls to the " <> markCode C.S_negate <> " function. Please import " <> markCode C.S_negate <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name) =
       line $ "Unknown " <> printName name
     renderSimpleErrorMessage (UnknownImport mn name) =
@@ -888,7 +895,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _) _ _) | Just box <- toTypelevelString ty =
-      paras [ line "A custom type error occurred while solving type class constraints:"
+      paras [ line "Custom error:"
             , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Partial
@@ -1030,7 +1037,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     renderSimpleErrorMessage (ExtraneousClassMember ident className) =
       line $ "" <> markCode (showIdent ident) <> " is not a member of type class " <> markCode (showQualified runProperName className)
     renderSimpleErrorMessage (ExpectedType ty kind) =
-      paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode C.typ <> "."
+      paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode (runProperName . disqualify $ C.Type) <> "."
             , line "The error arises from the type"
             , markCodeBox $ indent $ prettyType ty
             , line "having the kind"
@@ -1383,11 +1390,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     renderSimpleErrorMessage (DuplicateRoleDeclaration name) =
       line $ "Duplicate role declaration for " <> markCode (runProperName name) <> "."
 
-    renderSimpleErrorMessage (CannotDeriveInvalidConstructorArg className) =
+    renderSimpleErrorMessage (CannotDeriveInvalidConstructorArg className relatedClasses checkVariance) =
       paras
         [ line $ "One or more type variables are in positions that prevent " <> markCode (runProperName $ disqualify className) <> " from being derived."
         , line $ "To derive this class, make sure that these variables are only used as the final arguments to type constructors, "
-          <> "and that those type constructors themselves have instances of " <> markCode (runProperName $ disqualify className) <> "."
+          <> (if checkVariance then "that their variance matches the variance of " <> markCode (runProperName $ disqualify className) <> ", " else "")
+          <> "and that those type constructors themselves have instances of " <> commasAndConjunction "or" (markCode . showQualified runProperName <$> relatedClasses) <> "."
         ]
 
     renderSimpleErrorMessage (CannotSkipTypeApplication tyFn) =
@@ -1443,6 +1451,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "is at least as general as type"
                                                    , markCodeBox $ typeAsBox prettyDepth t2
                                                    ]
+            ]
+    renderHint (ErrorInRowLabel lb) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while matching label"
+                                 , markCodeBox $ line $ prettyPrintObjectKey (runLabel lb)
+                                 ]
             ]
     renderHint (ErrorInInstance nm ts) detail =
       paras [ detail
@@ -1960,18 +1974,16 @@ renderBox = unlines
 toTypelevelString :: Type a -> Maybe Box.Box
 toTypelevelString (TypeLevelString _ s) =
   Just . Box.text $ decodeStringWithReplacement s
-toTypelevelString (TypeApp _ (TypeConstructor _ f) x)
-  | f == primSubName C.typeError "Text" = toTypelevelString x
-toTypelevelString (TypeApp _ (KindApp _ (TypeConstructor _ f) _) x)
-  | f == primSubName C.typeError "Quote" = Just (typeAsBox maxBound x)
-toTypelevelString (TypeApp _ (TypeConstructor _ f) (TypeLevelString _ x))
-  | f == primSubName C.typeError "QuoteLabel" = Just . line . prettyPrintLabel . Label $ x
-toTypelevelString (TypeApp _ (TypeApp _ (TypeConstructor _ f) x) ret)
-  | f == primSubName C.typeError "Beside" =
-    (Box.<>) <$> toTypelevelString x <*> toTypelevelString ret
-toTypelevelString (TypeApp _ (TypeApp _ (TypeConstructor _ f) x) ret)
-  | f == primSubName C.typeError "Above" =
-    (Box.//) <$> toTypelevelString x <*> toTypelevelString ret
+toTypelevelString (TypeApp _ (TypeConstructor _ C.Text) x) =
+  toTypelevelString x
+toTypelevelString (TypeApp _ (KindApp _ (TypeConstructor _ C.Quote) _) x) =
+  Just (typeAsBox maxBound x)
+toTypelevelString (TypeApp _ (TypeConstructor _ C.QuoteLabel) (TypeLevelString _ x)) =
+  Just . line . prettyPrintLabel . Label $ x
+toTypelevelString (TypeApp _ (TypeApp _ (TypeConstructor _ C.Beside) x) ret) =
+  (Box.<>) <$> toTypelevelString x <*> toTypelevelString ret
+toTypelevelString (TypeApp _ (TypeApp _ (TypeConstructor _ C.Above) x) ret) =
+  (Box.//) <$> toTypelevelString x <*> toTypelevelString ret
 toTypelevelString _ = Nothing
 
 -- | Rethrow an error with a more detailed error message in the case of failure

@@ -66,6 +66,7 @@ data ErrorMessageHint
   | ErrorInModule ModuleName
   | ErrorInInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | ErrorInSubsumption SourceType SourceType
+  | ErrorInRowLabel Label
   | ErrorCheckingAccessor Expr PSString
   | ErrorCheckingType Expr SourceType
   | ErrorCheckingKind SourceType SourceType
@@ -147,7 +148,7 @@ addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps
 importPrim :: Module -> Module
 importPrim =
   let
-    primModName = C.Prim
+    primModName = C.M_Prim
   in
     addDefaultImport (Qualified (ByModuleName primModName) primModName)
       . addDefaultImport (Qualified ByNullSourcePos primModName)
