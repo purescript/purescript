@@ -1,0 +1,22 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/4408Acyclic.purs:16:9 - 16:14 (line 16, column 9 - line 16, column 14)
+
+  Hole '[33mhelp[0m' has the inferred type
+  [33m          [0m
+  [33m  Int -> K[0m
+  [33m          [0m
+  You could substitute the hole with one of these values:
+  [33m                                                                    [0m
+  [33m  Main.aRinku                 :: Int -> K                           [0m
+  [33m  Main.cMuni                  :: Int -> K                           [0m
+  [33m  Safe.Coerce.coerce          :: forall a b. Coercible a b => a -> b[0m
+  [33m  Unsafe.Coerce.unsafeCoerce  :: forall a b. a -> b                 [0m
+  [33m  Main.K                      :: Int -> K                           [0m
+  [33m                                                                    [0m
+
+in value declaration [33mbMaho[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/HoleInferredType.md for more information,
+or to contribute content related to this error.
+

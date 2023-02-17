@@ -9,7 +9,7 @@ module Language.PureScript.Sugar.BindingGroups
   ) where
 
 import Prelude
-import Protolude (ordNub)
+import Protolude (ordNub, swap)
 
 import Control.Monad ((<=<), guard)
 import Control.Monad.Error.Class (MonadError(..))
@@ -29,6 +29,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors hiding (nonEmpty)
 import Language.PureScript.Names
 import Language.PureScript.Types
+import qualified Data.Map as M
 
 data VertexType
   = VertexDefinition
@@ -103,9 +104,17 @@ createBindingGroups moduleName = mapM f <=< handleDecls
           in (d, (name, vty), self ++ deps)
         dataVerts = fmap mkVert allDecls
     dataBindingGroupDecls <- parU (stronglyConnCompR dataVerts) toDataBindingGroup
-    let allIdents = fmap valdeclIdent values
-        valueVerts = fmap (\d -> (d, valdeclIdent d, usedIdents moduleName d `intersect` allIdents)) values
-    bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
+    let 
+      makeValueDeclarationKey = (,) <$> exprHasNoTypeHole . valdeclExpression <*> valdeclIdent
+      valueDeclarationKeys = makeValueDeclarationKey <$> values
+
+      valueDeclarationInfo = M.fromList $ swap <$> valueDeclarationKeys
+      computeValueDependencies = (`intersect` valueDeclarationKeys) . usedIdents valueDeclarationInfo moduleName 
+  
+      makeValueDeclarationVert = (,,) <$> id <*> makeValueDeclarationKey <*> computeValueDependencies
+      valueDeclarationVerts = makeValueDeclarationVert <$> values
+
+    bindingGroupDecls <- parU (stronglyConnComp valueDeclarationVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
              dataBindingGroupDecls ++
              filter isTypeClassInstanceDecl ds ++
@@ -115,6 +124,19 @@ createBindingGroups moduleName = mapM f <=< handleDecls
     where
       extractGuardedExpr [MkUnguarded expr] = expr
       extractGuardedExpr _ = internalError "Expected Guards to have been desugared in handleDecls."
+
+      exprHasNoTypeHole :: Expr -> Bool
+      exprHasNoTypeHole = not . exprHasTypeHole
+        where
+        exprHasTypeHole :: Expr -> Bool
+        (_, exprHasTypeHole, _, _, _) = everythingOnValues (||) goDefault goExpr goDefault goDefault goDefault
+          where
+          goExpr :: Expr -> Bool
+          goExpr (Hole _) = True
+          goExpr _ = False
+
+          goDefault :: forall a. a -> Bool
+          goDefault = const False
 
 -- |
 -- Collapse all binding groups to individual declarations
@@ -137,18 +159,21 @@ flattenBindingGroups = concatMap go
       ValueDecl sa ident nameKind [] [MkUnguarded val]) ds
   go other = [other]
 
-usedIdents :: ModuleName -> ValueDeclarationData Expr -> [Ident]
-usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression
+usedIdents :: M.Map Ident Bool -> ModuleName -> ValueDeclarationData Expr -> [(Bool, Ident)]
+usedIdents identInfo moduleName = ordNub . usedIdents' S.empty . valdeclExpression
   where
   def _ _ = []
 
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
-  usedNamesE :: S.Set ScopedIdent -> Expr -> [Ident]
+  findInfo :: Ident -> Bool
+  findInfo name = M.findWithDefault False name identInfo
+
+  usedNamesE :: S.Set ScopedIdent -> Expr -> [(Bool, Ident)]
   usedNamesE scope (Var _ (Qualified (BySourcePos _) name))
-    | LocalIdent name `S.notMember` scope = [name]
+    | LocalIdent name `S.notMember` scope = [(findInfo name, name)]
   usedNamesE scope (Var _ (Qualified (ByModuleName moduleName') name))
-    | moduleName == moduleName' && ToplevelIdent name `S.notMember` scope = [name]
+    | moduleName == moduleName' && ToplevelIdent name `S.notMember` scope = [(findInfo name, name)]
   usedNamesE _ _ = []
 
 usedImmediateIdents :: ModuleName -> Declaration -> [Ident]
