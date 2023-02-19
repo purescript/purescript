@@ -21,6 +21,7 @@ import Data.Foldable (find)
 import Data.Functor (($>))
 import Data.Maybe (isJust, mapMaybe)
 import qualified Data.List.NonEmpty as NEL
+import qualified Data.Map as M
 import qualified Data.Set as S
 
 import Language.PureScript.AST
@@ -29,7 +30,6 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors hiding (nonEmpty)
 import Language.PureScript.Names
 import Language.PureScript.Types
-import qualified Data.Map as M
 
 data VertexType
   = VertexDefinition
@@ -109,7 +109,8 @@ createBindingGroups moduleName = mapM f <=< handleDecls
       valueDeclarationKeys = makeValueDeclarationKey <$> values
 
       valueDeclarationInfo = M.fromList $ swap <$> valueDeclarationKeys
-      computeValueDependencies = (`intersect` valueDeclarationKeys) . usedIdents valueDeclarationInfo moduleName 
+      findDeclarationInfo i = (M.findWithDefault False i valueDeclarationInfo, i)
+      computeValueDependencies = (`intersect` valueDeclarationKeys) . fmap findDeclarationInfo . usedIdents moduleName 
   
       makeValueDeclarationVert = (,,) <$> id <*> makeValueDeclarationKey <*> computeValueDependencies
       valueDeclarationVerts = makeValueDeclarationVert <$> values
@@ -159,21 +160,18 @@ flattenBindingGroups = concatMap go
       ValueDecl sa ident nameKind [] [MkUnguarded val]) ds
   go other = [other]
 
-usedIdents :: M.Map Ident Bool -> ModuleName -> ValueDeclarationData Expr -> [(Bool, Ident)]
-usedIdents identInfo moduleName = ordNub . usedIdents' S.empty . valdeclExpression
+usedIdents :: ModuleName -> ValueDeclarationData Expr -> [Ident]
+usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression
   where
   def _ _ = []
 
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
-  findInfo :: Ident -> Bool
-  findInfo name = M.findWithDefault False name identInfo
-
-  usedNamesE :: S.Set ScopedIdent -> Expr -> [(Bool, Ident)]
+  usedNamesE :: S.Set ScopedIdent -> Expr -> [Ident]
   usedNamesE scope (Var _ (Qualified (BySourcePos _) name))
-    | LocalIdent name `S.notMember` scope = [(findInfo name, name)]
+    | LocalIdent name `S.notMember` scope = [name]
   usedNamesE scope (Var _ (Qualified (ByModuleName moduleName') name))
-    | moduleName == moduleName' && ToplevelIdent name `S.notMember` scope = [(findInfo name, name)]
+    | moduleName == moduleName' && ToplevelIdent name `S.notMember` scope = [name]
   usedNamesE _ _ = []
 
 usedImmediateIdents :: ModuleName -> Declaration -> [Ident]
