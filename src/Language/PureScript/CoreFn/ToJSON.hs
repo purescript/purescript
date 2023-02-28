@@ -54,9 +54,12 @@ sourceSpanToJSON (SourceSpan _ spanStart spanEnd) =
          ]
 
 annToJSON :: Ann -> Value
-annToJSON (ss, _, _, m) = object [ "sourceSpan"  .= sourceSpanToJSON ss
-                                 , "meta"        .= maybe Null metaToJSON m
-                                 ]
+annToJSON (ss, comments, _, m) = 
+  object
+    [ "sourceSpan"  .= sourceSpanToJSON ss
+    , "meta"        .= maybe Null metaToJSON m
+    , "comments"    .= map toJSON comments
+    ]
 
 literalToJSON :: (a -> Value) -> Literal a -> Value
 literalToJSON _ (NumericLiteral (Left n))
