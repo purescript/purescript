@@ -499,8 +499,8 @@ ol li {
 }
 @media (prefers-color-scheme: dark) {
   .decl__signature {
-    border-top: 1px solid #43434e;
-    border-bottom: 1px solid #43434e;
+    border-top-color: #43434e;
+    border-bottom-color: #43434e;
   }
 }
 .decl__signature code {
@@ -884,6 +884,11 @@ ol li {
   color: #777;
   border-left: 0.25em solid #ddd;
 }
+@media (prefers-color-scheme: dark) {
+  .markdown-body blockquote {
+    border-left-color: #444;
+  }
+}
 .markdown-body blockquote > :first-child {
   margin-top: 0;
 }
@@ -897,6 +902,11 @@ ol li {
 .markdown-body .pl-k {
   /* Keyword */
   color: #a0a0a0;
+}
+@media (prefers-color-scheme: dark) {
+  .markdown-body .pl-k {
+    color: #676767;
+  }
 }
 .markdown-body .pl-c1,
 .markdown-body .pl-en {

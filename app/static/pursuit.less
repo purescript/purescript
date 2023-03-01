@@ -576,8 +576,8 @@ ol li {
   padding: 0;
 
   @media (prefers-color-scheme: dark) {
-    border-top: 1px solid lighten(@dark_background, 20%);
-    border-bottom: 1px solid lighten(@dark_background, 20%);
+    border-top-color: lighten(@dark_background, 20%);
+    border-bottom-color: lighten(@dark_background, 20%);
   }
 }
 
@@ -1020,6 +1020,10 @@ ol li {
   padding: 0 1em;
   color: #777;
   border-left: 0.25em solid #ddd;
+
+  @media (prefers-color-scheme: dark) {
+    border-left-color: #444;
+  }
 }
 
 .markdown-body blockquote>:first-child {
@@ -1038,6 +1042,10 @@ ol li {
 .markdown-body .pl-k {
   /* Keyword */
   color: #a0a0a0;
+
+  @media (prefers-color-scheme: dark) {
+    color: #676767;
+  }
 }
 
 .markdown-body .pl-c1,
