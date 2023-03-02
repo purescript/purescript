@@ -146,6 +146,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@sigma-andex](https://github.com/sigma-andex) | Jan Schulte | [MIT license] |
 | [@simonyangme](https://github.com/simonyangme) | Simon Yang | [MIT license] |
 | [@sloosch](https://github.com/sloosch) | Simon Looschen | [MIT license] |
+| [@sometimes-i-send-pull-requests](https://github.com/sometimes-i-send-pull-requests) | Alexander Kirchhoff | [MIT license] |
 | [@soupi](https://github.com/soupi) | Gil Mizrahi | [MIT license] |
 | [@stefanholzmueller](https://github.com/stefanholzmueller) | Stefan Holzmüller | [MIT license] |
 | [@sztupi](https://github.com/sztupi) | Attila Sztupak | [MIT license] |
