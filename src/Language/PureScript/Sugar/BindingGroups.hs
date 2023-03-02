@@ -104,7 +104,13 @@ createBindingGroups moduleName = mapM f <=< handleDecls
           in (d, (name, vty), self ++ deps)
         dataVerts = fmap mkVert allDecls
     dataBindingGroupDecls <- parU (stronglyConnCompR dataVerts) toDataBindingGroup
-    let 
+    let
+      -- #4437
+      --
+      -- The idea here is to create a `Graph` whose `key` is a tuple: `(Bool, Ident)`,
+      -- where the `Bool` encodes the absence of a type hole. This relies on an implementation
+      -- detail for `stronglyConnComp` which allows identifiers with no type holes to "float"
+      -- and get checked before those that do, while preserving reverse topological sorting.
       makeValueDeclarationKey = (,) <$> exprHasNoTypeHole . valdeclExpression <*> valdeclIdent
       valueDeclarationKeys = makeValueDeclarationKey <$> values
 
