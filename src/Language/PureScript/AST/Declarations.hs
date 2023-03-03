@@ -676,7 +676,7 @@ data Expr
   --
   | App Expr Expr
   -- |
-  -- A type application
+  -- A type application (e.g. `f @Int`)
   --
   | VisibleTypeApp Expr SourceType
   -- |
