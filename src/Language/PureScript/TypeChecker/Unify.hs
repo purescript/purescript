@@ -114,7 +114,7 @@ unifyTypes t1 t2 = do
   unifyTypes' (TUnknown _ u1) (TUnknown _ u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown _ u) t = solveType u t
   unifyTypes' t (TUnknown _ u) = solveType u t
-  unifyTypes' (ForAll ann1 ident1 mbK1 ty1 sc1 _) (ForAll ann2 ident2 mbK2 ty2 sc2 _) =
+  unifyTypes' (ForAll ann1 _ ident1 mbK1 ty1 sc1) (ForAll ann2 _ ident2 mbK2 ty2 sc2) =
     case (sc1, sc2) of
       (Just sc1', Just sc2') -> do
         sko <- newSkolemConstant
@@ -122,7 +122,7 @@ unifyTypes t1 t2 = do
         let sk2 = skolemize ann2 ident2 mbK2 sko sc2' ty2
         sk1 `unifyTypes` sk2
       _ -> internalError "unifyTypes: unspecified skolem scope"
-  unifyTypes' (ForAll ann ident mbK ty1 (Just sc) _) ty2 = do
+  unifyTypes' (ForAll ann _ ident mbK ty1 (Just sc)) ty2 = do
     sko <- newSkolemConstant
     let sk = skolemize ann ident mbK sko sc ty1
     sk `unifyTypes` ty2

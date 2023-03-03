@@ -149,7 +149,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
-forall_ :: Pattern () PrettyPrintType ([(Text, Maybe PrettyPrintType, TypeVarVisibility)], PrettyPrintType)
+forall_ :: Pattern () PrettyPrintType ([(TypeVarVisibility, Text, Maybe PrettyPrintType)], PrettyPrintType)
 forall_ = mkPattern match
   where
   match (PPForAll mbKindedIdents ty) = Just (mbKindedIdents, ty)
@@ -235,11 +235,11 @@ renderType'
   = fromMaybe (internalError "Incomplete pattern")
   . PA.pattern matchType ()
 
-renderTypeVars :: [(Text, Maybe PrettyPrintType, TypeVarVisibility)] -> RenderedCode
+renderTypeVars :: [(TypeVarVisibility, Text, Maybe PrettyPrintType)] -> RenderedCode
 renderTypeVars tyVars = mintersperse sp (map renderTypeVar tyVars)
 
-renderTypeVar :: (Text, Maybe PrettyPrintType, TypeVarVisibility) -> RenderedCode
-renderTypeVar (v, mbK, vis) = case mbK of
+renderTypeVar :: (TypeVarVisibility, Text, Maybe PrettyPrintType) -> RenderedCode
+renderTypeVar (vis, v, mbK) = case mbK of
   Nothing -> syntax (typeVarVisibilityPrefix vis) <> typeVar v
   Just k -> mintersperse sp [ mconcat [syntax "(", syntax $ typeVarVisibilityPrefix vis, typeVar v], syntax "::", mconcat [renderType' k, syntax ")"] ]
 

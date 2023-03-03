@@ -325,7 +325,7 @@ instantiatePolyTypeWithUnknowns
   => Expr
   -> SourceType
   -> m (Expr, SourceType)
-instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _ _) = do
+instantiatePolyTypeWithUnknowns val (ForAll _ _ ident mbK ty _) = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   insertUnkName' u ident
   instantiatePolyTypeWithUnknowns val $ replaceTypeVars ident u ty
@@ -340,7 +340,7 @@ instantiatePolyTypeWithUnknownsUntilVisible
   => Expr
   -> SourceType
   -> m (Expr, SourceType)
-instantiatePolyTypeWithUnknownsUntilVisible val (ForAll _ ident mbK ty _ TypeVarInvisible) = do
+instantiatePolyTypeWithUnknownsUntilVisible val (ForAll _ TypeVarInvisible ident mbK ty _) = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   insertUnkName' u ident
   instantiatePolyTypeWithUnknownsUntilVisible val $ replaceTypeVars ident u ty
@@ -463,8 +463,8 @@ infer' (VisibleTypeApp valFn (TypeWildcard _ _)) = do
   TypedValue' _ valFn' valTy <- infer valFn
   (valFn'', valTy') <- instantiatePolyTypeWithUnknownsUntilVisible valFn' valTy
   case valTy' of
-    ForAll qAnn qName qKind qBody qSko _ -> do
-      pure $ TypedValue' True valFn'' (ForAll qAnn qName qKind qBody qSko TypeVarInvisible)
+    ForAll qAnn _ qName qKind qBody qSko -> do
+      pure $ TypedValue' True valFn'' (ForAll qAnn TypeVarInvisible qName qKind qBody qSko)
     _ ->
       throwError $ errorMessage $ CannotSkipTypeApplication valTy'
 infer' (VisibleTypeApp valFn tyArg) = do
@@ -472,7 +472,7 @@ infer' (VisibleTypeApp valFn tyArg) = do
   tyArg' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ tyArg
   (valFn'', valTy') <- instantiatePolyTypeWithUnknownsUntilVisible valFn' valTy
   case valTy' of
-    ForAll _ qName (Just qKind) qBody _ _ -> do
+    ForAll _ _ qName (Just qKind) qBody _ -> do
       tyArg'' <- replaceAllTypeSynonyms <=< checkKind tyArg' $ qKind
       let resTy = replaceTypeVars qName tyArg'' qBody
       (valFn''', resTy') <- instantiateConstraint valFn'' resTy
@@ -766,7 +766,7 @@ check'
   => Expr
   -> SourceType
   -> m TypedValue'
-check' val (ForAll ann ident mbK ty _ vis) = do
+check' val (ForAll ann vis ident mbK ty _) = do
   env <- getEnv
   mn <- gets checkCurrentModule
   scope <- newSkolemScope
@@ -784,7 +784,7 @@ check' val (ForAll ann ident mbK ty _ vis) = do
             skolemizeTypesInValue ss ident mbK sko scope val
         | otherwise = val
   val' <- tvToExpr <$> check skVal sk
-  return $ TypedValue' True val' (ForAll ann ident mbK ty (Just scope) vis)
+  return $ TypedValue' True val' (ForAll ann vis ident mbK ty (Just scope))
 check' val t@(ConstrainedType _ con@(Constraint _ cls@(Qualified _ (ProperName className)) _ _ _) ty) = do
   TypeClassData{ typeClassIsEmpty } <- lookupTypeClass cls
   -- An empty class dictionary is never used; see code in `TypeChecker.Entailment`
@@ -988,7 +988,7 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   unifyTypes tyFunction' tyFunction
   arg' <- tvToExpr <$> check arg argTy
   return (retTy, App fn arg')
-checkFunctionApplication' fn (ForAll _ ident mbK ty _ _) arg = do
+checkFunctionApplication' fn (ForAll _ _ ident mbK ty _) arg = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   insertUnkName' u ident
   let replaced = replaceTypeVars ident u ty
