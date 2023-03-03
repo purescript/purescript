@@ -1406,12 +1406,23 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
         ]
 
     renderSimpleErrorMessage (CannotApplyExpressionOfTypeOnType tyFn tyAr) =
-      paras
-        [ "An expression of type:"
-        , markCodeBox $ indent $ prettyType tyFn
+      paras $ infoLine <>
+        [ markCodeBox $ indent $ prettyType tyFn
         , "cannot be applied to:"
         , markCodeBox $ indent $ prettyType tyAr
         ]
+      where
+      infoLine =
+        if isMonoType tyFn then
+          [ "An expression of monomorphic type:" ]
+        else
+          [ "An expression of polymorphic type"
+          , line $ "with the invisible type variable " <> markCode typeVariable <> ":"
+          ]
+
+      typeVariable = case tyFn of
+        ForAll _ _ v _ _ _ -> v
+        _ -> internalError "renderSimpleErrorMessage: Impossible!"
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
