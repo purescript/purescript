@@ -151,7 +151,7 @@ flattenExpr = \case
   ExprRecordAccessor _ a -> flattenRecordAccessor a
   ExprRecordUpdate _ a b -> flattenExpr a <> flattenWrapped (flattenSeparated flattenRecordUpdate) b
   ExprApp _ a b -> flattenExpr a <> flattenExpr b
-  ExprVisibleTypeApp  _ a _ b -> flattenExpr a <> flattenType b
+  ExprVisibleTypeApp  _ a b c -> flattenExpr a <> pure b <> flattenType c
   ExprLambda _ a -> flattenLambda a
   ExprIf _ a -> flattenIfThenElse a
   ExprCase _ a -> flattenCaseOf a
