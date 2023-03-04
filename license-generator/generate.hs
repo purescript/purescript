@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver lts-13.12 script
+-- stack --resolver lts-20.9 script
 
 {-# LANGUAGE TupleSections #-}
 -- |
