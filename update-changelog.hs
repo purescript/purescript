@@ -50,7 +50,7 @@ import qualified Protolude
 
 import           Control.Monad.Fail (fail)
 import qualified Data.Aeson as JSON
-import qualified Data.Aeson.KeyMap as HM
+import qualified Data.Aeson.KeyMap as KM
 import           Data.Attoparsec.ByteString (maybeResult, parse)
 import "bifunctors"
                  Data.Bifunctor.Flip (Flip(..))
@@ -162,7 +162,7 @@ lookupPRAuthor prNum =
                         , ghData = []
                         }
     >>= \case
-      JSON.Object (HM.lookup "user" -> Just (JSON.Object (HM.lookup "login" -> Just (JSON.String name)))) -> pure name
+      JSON.Object (KM.lookup "user" -> Just (JSON.Object (KM.lookup "login" -> Just (JSON.String name)))) -> pure name
       _ -> fail "error accessing GitHub API"
 
 commaSeparate :: [Text] -> Text
@@ -175,7 +175,7 @@ commaSeparate = \case
 getVersion :: (MonadFail m, MonadIO m) => m Text
 getVersion =
   (liftIO . BS.readFile) ("npm-package" </> "package.json") >>= \case
-    (maybeResult . parse JSON.json -> Just (JSON.Object (HM.lookup "version" -> Just (JSON.String v)))) -> pure v
+    (maybeResult . parse JSON.json -> Just (JSON.Object (KM.lookup "version" -> Just (JSON.String v)))) -> pure v
     _ -> fail "could not read version from npm-package/package.json"
 
 conditionalSection :: Text -> [ChangelogEntry] -> Text
