@@ -1,0 +1,26 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/4408CyclicTail.purs:22:11 - 22:16 (line 22, column 11 - line 22, column 16)
+
+  Hole '[33mhelp[0m' has the inferred type
+  [33m          [0m
+  [33m  Int -> K[0m
+  [33m          [0m
+  You could substitute the hole with one of these values:
+  [33m                                                                    [0m
+  [33m  Main.aKyoko                 :: Int -> K                           [0m
+  [33m  Main.bShinobu               :: forall a. a -> K                   [0m
+  [33m  Main.cEsora                 :: forall a. a -> K                   [0m
+  [33m  Main.dYuka                  :: Int -> K                           [0m
+  [33m  Main.eShinobu               :: forall a. a -> K                   [0m
+  [33m  Main.fEsora                 :: forall a. a -> K                   [0m
+  [33m  Safe.Coerce.coerce          :: forall a b. Coercible a b => a -> b[0m
+  [33m  Unsafe.Coerce.unsafeCoerce  :: forall a b. a -> b                 [0m
+  [33m  Main.K                      :: Int -> K                           [0m
+  [33m                                                                    [0m
+
+in value declaration [33mdYuka[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/HoleInferredType.md for more information,
+or to contribute content related to this error.
+
