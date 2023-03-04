@@ -1,5 +1,18 @@
 #!/usr/bin/env stack
--- stack --resolver lts-17.6 script
+{- stack
+  --resolver lts-20.9 script
+  --package bytestring
+  --package filepath
+  --package text
+  --package github-rest
+  --package directory
+  --package simple-cmd
+  --package time
+  --package bifunctors
+  --package attoparsec
+  --package aeson
+  --package protolude
+-}
 {-# LANGUAGE
     DeriveFoldable
   , DeriveFunctor
@@ -37,11 +50,11 @@ import qualified Protolude
 
 import           Control.Monad.Fail (fail)
 import qualified Data.Aeson as JSON
+import qualified Data.Aeson.KeyMap as HM
 import           Data.Attoparsec.ByteString (maybeResult, parse)
 import "bifunctors"
                  Data.Bifunctor.Flip (Flip(..))
 import qualified Data.ByteString as BS
-import qualified Data.HashMap.Lazy as HM
 import qualified Data.List.NonEmpty as NEL
 import           Data.String (String)
 import qualified Data.String as String
@@ -49,12 +62,12 @@ import qualified Data.Text as T
 import           Data.Time.Clock (UTCTime)
 import           Data.Time.Format.ISO8601 (iso8601ParseM)
 import           Data.Time.LocalTime (zonedTimeToUTC)
-import           GitHub.REST (GHEndpoint(..), GitHubState(..), KeyValue(..), MonadGitHubREST, StdMethod(..), queryGitHub, runGitHubT)
+import           GitHub.REST (GHEndpoint(..), GitHubSettings(..), KeyValue(..), MonadGitHubREST, StdMethod(..), queryGitHub, runGitHubT)
 import qualified SimpleCmd.Git as IOGit
 import           System.Directory (setCurrentDirectory)
 import           System.FilePath (normalise, takeFileName, (</>))
 
-main = runGitHubT gitHubState $ do
+main = runGitHubT gitHubSettings $ do
   git "rev-parse" ["--show-toplevel"] >>= liftIO . setCurrentDirectory
   entries <- String.lines <$> git "ls-tree" ["--name-only", "HEAD", "CHANGELOG.d/"]
 
@@ -87,8 +100,8 @@ main = runGitHubT gitHubState $ do
     git_ "add" ["CHANGELOG.md"]
     git_ "rm" $ "-q" : entryFiles
 
-gitHubState :: GitHubState
-gitHubState = GitHubState Nothing "purescript/purescript update-changelog.hs" "v3"
+gitHubSettings :: GitHubSettings
+gitHubSettings = GitHubSettings Nothing "purescript/purescript update-changelog.hs" "v3"
 
 processEntriesStartingWith :: (MonadFail m, MonadGitHubREST m, MonadIO m) => String -> [String] -> m [ChangelogEntry]
 processEntriesStartingWith prefix
@@ -126,8 +139,8 @@ updateEntry file = do
 
 parsePRNumber :: Text -> Maybe (CommitType, Int)
 parsePRNumber = liftA2 (<|>)
-  (fmap (MergeCommit, ) . readMaybe . toS . fst . T.breakOn " " <=< T.stripPrefix "Merge pull request #")
-  (fmap (SquashCommit, ) . readMaybe . toS <=< T.stripSuffix ")" . snd . T.breakOnEnd "(#")
+  (fmap (MergeCommit, ) . readMaybe . (toS :: T.Text -> String) . fst . T.breakOn " " <=< T.stripPrefix "Merge pull request #")
+  (fmap (SquashCommit, ) . readMaybe . (toS :: T.Text -> String) <=< T.stripSuffix ")" . snd . T.breakOnEnd "(#")
 
 -- |
 -- This function helps us exclude PRs that are just fixups of changelog
