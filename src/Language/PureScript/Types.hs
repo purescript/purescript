@@ -366,15 +366,19 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
       KindApp a <$> go b <*> go c
     "ForAll" -> do
       let
+        -- ["x", "Type", 0]
         withoutMbKind = do
           (b, c, d) <- contents
           ForAll a TypeVarInvisible b Nothing <$> go c <*> pure d
+        -- ["@", "x", "Type", 0]
         withoutMbKind' = do
           (b, c, d, e) <- contents
           ForAll a <$> typeVarVisFromJSON b <*> pure c <*> pure Nothing <*> go d <*> pure e
+        -- ["x", "Kind?", "Type", 0]
         withMbKind = do
           (b, c, d, e) <- contents
           ForAll a TypeVarInvisible b <$> (Just <$> go c) <*> go d <*> pure e
+        -- ["@", "x", "Kind?", "Type", 0]
         withMbKind' = do
           (b, c, d, e, f) <- contents
           ForAll a <$> typeVarVisFromJSON b <*> pure c <*> (Just <$> go d) <*> go e <*> pure f
