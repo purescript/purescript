@@ -1,5 +1,13 @@
 #!/usr/bin/env stack
--- stack --resolver lts-20.9 script
+{- stack
+  --resolver lts-20.9 script
+  --package bytestring
+  --package http-client-tls
+  --package http-client
+  --package http-types
+  --package text
+  --package split
+-}
 
 {-# LANGUAGE TupleSections #-}
 -- |
