@@ -1,0 +1,1 @@
+* Fix instance deriving regression
