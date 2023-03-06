@@ -2,6 +2,80 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.8
+
+New features:
+
+* Generated documentation now supports dark mode (#4438 by @sometimes-i-send-pull-requests)
+
+  PureScript documentation has a new dark theme available. It will
+  automatically be used based on your browser or system's color scheme
+  preferences.
+
+Bugfixes:
+
+* Fix instance deriving regression (#4432 by @rhendric)
+
+* Outputs what label the type-error occurred on when types don't match (#4411 by @FredTheDino)
+
+* Account for typed holes when checking value declarations (#4437 by @purefunctor)
+
+  The compiler now takes into account typed holes when ordering value declarations
+  for type checking, allowing more top-level values to be suggested instead of
+  being limited by reverse lexicographical ordering.
+
+  Given:
+  ```purescript
+  module Main where
+
+  newtype K = K Int
+
+  aRinku :: Int -> K
+  aRinku = K
+
+  bMaho :: K
+  bMaho = ?help 0
+
+  cMuni :: Int -> K
+  cMuni = K
+
+  dRei :: Int -> K
+  dRei _ = bMaho
+  ```
+
+  Before:
+  ```
+    Hole 'help' has the inferred type
+            
+      Int -> K
+            
+    You could substitute the hole with one of these values:
+                           
+      Main.cMuni  :: Int -> K
+      Main.K      :: Int -> K
+  ```
+
+  After:
+  ```
+    Hole 'help' has the inferred type
+            
+      Int -> K
+            
+    You could substitute the hole with one of these values:
+                            
+      Main.aRinku  :: Int -> K
+      Main.cMuni   :: Int -> K
+      Main.K       :: Int -> K
+  ```
+
+Other improvements:
+
+* Bump Stackage snapshot to lts-20.9 and GHC to 9.2.5 (#4422, #4428, and #4433 by @purefunctor, @JordanMartinez, and @andys8)
+
+Internal:
+
+* Update license/changelog scrips to latest Stack resolver (#4445 by @JordanMartinez)
+
 ## 0.15.7
 
 New features:
