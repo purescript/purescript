@@ -13,12 +13,14 @@ import Control.Monad
 import Control.Exception (tryJust)
 import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent.MVar (readMVar, newMVar, modifyMVar_)
+import qualified Data.Aeson as Aeson
 import Data.Time.Calendar
 import Data.Time.Clock
 import qualified Data.Text as T
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Map as M
+import Language.PureScript.Make.Cache (CacheDb)
 
 import System.FilePath
 import System.Directory
@@ -196,6 +198,57 @@ spec = do
       -- recompiled.
       go optsCorefnOnly `shouldReturn` moduleNames ["Module"]
 
+    it "writes cache-db.json" $ do
+      let modulePath = sourcesDir </> "Module.purs"
+
+      writeFileWithTimestamp modulePath timestampA "module Module where\nfoo = 0\n"
+      compile [modulePath] `shouldReturn` moduleNames ["Module"]
+
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames ["Module"]
+
+    it "removes old entry from cache when module is renamed" $ do
+      let modulePath = sourcesDir </> "Module.purs"
+
+      writeFileWithTimestamp modulePath timestampA "module Module where\nfoo = 0\n"
+      compile [modulePath] `shouldReturn` moduleNames ["Module"]
+
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames ["Module"]
+
+      writeFileWithTimestamp modulePath timestampA "module Module2 where\nfoo = 0\n"
+      compile [modulePath] `shouldReturn` moduleNames ["Module2"]
+
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames ["Module2"]
+
+    it "removes old entry from cache when file and module is renamed" $ do
+      let modulePath1 = sourcesDir </> "Module1.purs"
+
+      writeFileWithTimestamp modulePath1 timestampA "module Module1 where\nfoo = 0\n"
+      compile [modulePath1] `shouldReturn` moduleNames ["Module1"]
+
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames ["Module1"]
+
+      removeFile modulePath1
+      let modulePath2 = sourcesDir </> "Module2.purs"
+
+      writeFileWithTimestamp modulePath2 timestampA "module Module2 where\nfoo = 0\n"
+      compile [modulePath2] `shouldReturn` moduleNames ["Module2"]
+
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames  ["Module2"]
+
+    it "removes old entry from cache when file is deleted" $ do
+      let modulePath = sourcesDir </> "Module.purs"
+
+      writeFileWithTimestamp modulePath timestampA "module Module where\nfoo = 0\n"
+      compile [modulePath] `shouldReturn` moduleNames ["Module"]
+
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames ["Module"]
+
+      removeFile modulePath
+
+      compile [] `shouldReturn` moduleNames []
+
+      M.keysSet <$> readCacheDb `shouldReturn` moduleNames []
+
 -- Note [Sleeping to avoid flaky tests]
 --
 -- One of the things we want to test here is that all requested output files
@@ -269,8 +322,15 @@ writeFileWithTimestamp path mtime contents = do
   writeUTF8FileT path contents
   setModificationTime path mtime
 
+readCacheDb :: IO CacheDb
+readCacheDb = do
+  let cachePath = modulesDir </> "cache-db.json"
+  maybeCache :: Maybe CacheDb <- Aeson.decodeFileStrict' cachePath
+  case maybeCache of
+    Just cache -> return cache
+    Nothing -> fail "CacheDb could not be read"
+
 -- | Use a different output directory to ensure that we don't get interference
 -- from other test results
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "make"
-

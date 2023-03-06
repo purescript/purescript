@@ -136,7 +136,7 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
 --
 -- If timestamps or hashes have not changed, existing externs files can be used to provide upstream modules' types without
 -- having to typecheck those modules again.
-make :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadIO m)
      => MakeActions m
      -> [CST.PartialResult Module]
      -> m [ExternsFile]
@@ -177,7 +177,10 @@ make ma@MakeActions{..} ms = do
       M.mapEither splitResults <$> BuildPlan.collectResults buildPlan
 
   -- Write the updated build cache database to disk
-  writeCacheDb $ Cache.removeModules (M.keysSet failures) newCacheDb
+  let moduleSet = S.fromList $ map (getModuleName . CST.resPartial) sorted
+  writeCacheDb
+    =<< Cache.removeModules (M.keysSet failures)
+    <$> pruneMissingFiles (pruneMissingModules moduleSet newCacheDb)
 
   writePackageJson
 
@@ -260,6 +263,25 @@ make ma@MakeActions{..} ms = do
 
   onExceptionLifted :: m a -> m b -> m a
   onExceptionLifted l r = control $ \runInIO -> runInIO l `onException` runInIO r
+
+  -- Remove missing files from the cache.
+  -- Will remove modules without files.
+  pruneMissingFiles :: Cache.CacheDb -> m Cache.CacheDb
+  pruneMissingFiles cache =
+     M.filter (not . null . Cache.unCacheInfo)
+       <$> traverse (
+           fmap Cache.CacheInfo
+             . fmap M.fromList
+             . filterM (\(name, _) -> (/= Nothing) <$> getTimestampMaybe name)
+             . M.toList
+             . Cache.unCacheInfo
+       ) cache
+
+  -- Remove modules which are currently not being compiled.
+  pruneMissingModules :: S.Set ModuleName -> Cache.CacheDb -> Cache.CacheDb
+  pruneMissingModules modules cache =
+    let missingModules = S.difference (S.fromList (M.keys cache)) modules
+     in Cache.removeModules missingModules cache
 
 -- | Infer the module name for a module by looking for the same filename with
 -- a .js extension.
