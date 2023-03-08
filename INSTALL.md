@@ -4,12 +4,12 @@ If you are having difficulty installing the PureScript compiler, feel free to as
 
 ## Requirements
 
-The PureScript compiler is built using GHC 9.2.5, and should be able to run on any operating system supported by GHC 9.2.5. In particular:
+The PureScript compiler is built using GHC 9.2.7, and should be able to run on any operating system supported by GHC 9.2.7. In particular:
 
-* for Windows users, versions predating Vista are not officially supported,
-* for macOS / OS X users, versions predating Mac OS X 10.7 (Lion) are not officially supported.
+- for Windows users, versions predating Vista are not officially supported,
+- for macOS / OS X users, versions predating Mac OS X 10.7 (Lion) are not officially supported.
 
-See also <https://www.haskell.org/ghc/download_ghc_9_2_5.html> for more details about the operating systems which GHC 9.2.5 supports.
+See also <https://www.haskell.org/ghc/download_ghc_9_2_7.html> for more details about the operating systems which GHC 9.2.7 supports.
 
 ## Official prebuilt binaries
 
@@ -21,10 +21,10 @@ To install a binary bundle, simply extract it and place the `purs` executable so
 
 There are several other distributions of the PureScript compiler available, which may be more convenient to use in certain setups. This is by no means an exhaustive list, and is presented in no particular order. Many of these distributions are provided and maintained by the community, and may not be immediately up to date following a new release.
 
-* NPM: `npm install -g purescript`
-* Homebrew (for macOS): `brew install purescript`
-* FreeBSD binary packages: `pkg install hs-purescript`
-* GNU Guix: `guix install purescript`
+- NPM: `npm install -g purescript`
+- Homebrew (for macOS): `brew install purescript`
+- FreeBSD binary packages: `pkg install hs-purescript`
+- GNU Guix: `guix install purescript`
 
 ## Compiling from source
 
@@ -47,12 +47,14 @@ Prior to version v0.14.2, the PureScript REPL depends on the `curses` library
 by default (via the Haskell package `terminfo`). If you are having difficulty
 running the compiler, it may be because the `curses` library is missing. This
 problem may appear as a `libtinfo` error:
+
 ```
 error while loading shared libraries: libtinfo.so.5: cannot open shared object file: No such file or directory
 ```
 
 On Linux, you will probably need to install `ncurses` manually. On Ubuntu, for
 example, this can be done by running:
+
 ```
 $ sudo apt install libtinfo5 libncurses5-dev
 ```
@@ -66,6 +68,7 @@ example, by providing better editing of long input lines.
 ## EACCES error
 
 If you encounter this error while trying to install via `npm`:
+
 ```
 Error: EACCES: permission denied
 ```

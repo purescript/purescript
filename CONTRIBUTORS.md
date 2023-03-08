@@ -158,6 +158,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@thoradam](https://github.com/thoradam) | Thor Adam | [MIT license] |
 | [@tmcgilchrist](https://github.com/tmcgilchrist) | Tim McGilchrist | [MIT license] |
 | [@trofi](https://github.com/trofi) | Sergei Trofimovich | [MIT license] |
+| [@unisay](https://github.com/Unisay) | Yura Lazaryev | [MIT license] |
 | [@utkarshkukreti](https://github.com/utkarshkukreti) | Utkarsh Kukreti | [MIT license] |
 | [@vkorablin](https://github.com/vkorablin) | Vladimir Korablin | [MIT license] |
 | [@vladciobanu](https://github.com/vladciobanu) | Vladimir Ciobanu | [MIT license] |
