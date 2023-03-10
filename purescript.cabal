@@ -118,6 +118,7 @@ common defaults
     TupleSections
     TypeFamilies
     ViewPatterns
+    ImportQualifiedPost
   build-tool-depends:
     happy:happy ==1.20.0
   build-depends:
