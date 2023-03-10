@@ -41,7 +41,7 @@ import Protolude hiding (moduleName, unzip)
 
 import Control.Concurrent.STM
 import Control.Lens                       hiding (anyOf, op, (&))
-import           "monad-logger" Control.Monad.Logger
+import "monad-logger" Control.Monad.Logger
 import Data.IORef
 import Data.Map.Lazy qualified as Map
 import Data.Time.Clock (UTCTime)

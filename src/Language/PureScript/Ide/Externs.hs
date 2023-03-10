@@ -9,7 +9,7 @@ import Protolude hiding (to, from, (&))
 
 import Codec.CBOR.Term as Term
 import Control.Lens hiding (anyOf)
-import           "monad-logger" Control.Monad.Logger
+import "monad-logger" Control.Monad.Logger
 import Data.Version (showVersion)
 import Data.Text qualified as Text
 import Language.PureScript qualified as P

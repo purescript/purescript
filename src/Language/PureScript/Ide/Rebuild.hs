@@ -8,7 +8,7 @@ module Language.PureScript.Ide.Rebuild
 
 import Protolude hiding (moduleName)
 
-import           "monad-logger" Control.Monad.Logger
+import "monad-logger" Control.Monad.Logger
 import Data.List qualified as List
 import Data.Map.Lazy qualified as M
 import Data.Maybe                      (fromJust)
