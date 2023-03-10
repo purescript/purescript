@@ -37,7 +37,7 @@ import qualified Network.Socket                    as Network
 import qualified Options.Applicative               as Opts
 import           System.Directory
 import           System.FilePath
-import           System.IO                         hiding (putStrLn, print)
+import System.IO hiding (putStrLn, print)
 import           System.IO.Error                   (isEOFError)
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
