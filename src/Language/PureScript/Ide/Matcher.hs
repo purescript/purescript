@@ -23,8 +23,8 @@ import Protolude
 
 import Control.Monad.Fail (fail)
 import Data.Aeson
-import Data.Text qualified                     as T
-import Data.Text.Encoding qualified            as TE
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as TE
 import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Util
 import Text.EditDistance

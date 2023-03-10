@@ -23,9 +23,9 @@ module Language.PureScript.Ide.SourceFile
 import Protolude
 
 import Control.Parallel.Strategies (withStrategy, parList, rseq)
-import Data.Map qualified                      as Map
-import Language.PureScript qualified           as P
-import Language.PureScript.CST qualified       as CST
+import Data.Map qualified as Map
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
 import Language.PureScript.Ide.Error
 import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Util

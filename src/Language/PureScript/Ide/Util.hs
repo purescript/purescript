@@ -34,10 +34,10 @@ import Protolude                           hiding (decodeUtf8,
 
 import Control.Lens                        hiding (op, (&))
 import Data.Aeson
-import Data.Text qualified                           as T
-import Data.Text.Lazy qualified                      as TL
+import Data.Text qualified as T
+import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding             as TLE
-import Language.PureScript qualified                 as P
+import Language.PureScript qualified as P
 import Language.PureScript.Ide.Error       (IdeError(..))
 import Language.PureScript.Ide.Logging
 import Language.PureScript.Ide.Types

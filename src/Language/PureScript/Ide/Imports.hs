@@ -28,10 +28,10 @@ import Protolude hiding (moduleName)
 
 import Control.Lens                       ((^.), (%~), ix)
 import Data.List                          (partition)
-import Data.List.NonEmpty qualified                 as NE
-import Data.Text qualified                          as T
-import Language.PureScript qualified                as P
-import Language.PureScript.CST qualified            as CST
+import Data.List.NonEmpty qualified as NE
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
 import Language.PureScript.Ide.Error
 import Language.PureScript.Ide.Util
 

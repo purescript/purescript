@@ -25,8 +25,8 @@ module Language.PureScript.Ide.Reexports
 import Protolude hiding (moduleName)
 
 import Control.Lens                  hiding (anyOf, (&))
-import Data.Map qualified                      as Map
-import Language.PureScript qualified           as P
+import Data.Map qualified as Map
+import Language.PureScript qualified as P
 import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Util
 
