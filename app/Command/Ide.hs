@@ -26,7 +26,7 @@ import Data.IORef
 import qualified Data.Text.IO                      as T
 import qualified Data.ByteString.Char8             as BS8
 import qualified Data.ByteString.Lazy.Char8        as BSL8
-import GHC.IO.Exception                  (IOErrorType(..), IOException(..))
+import GHC.IO.Exception (IOErrorType(..), IOException(..))
 import Language.PureScript.Ide
 import Language.PureScript.Ide.Command
 import Language.PureScript.Ide.Util
@@ -38,7 +38,7 @@ import qualified Options.Applicative               as Opts
 import System.Directory
 import System.FilePath
 import System.IO hiding (putStrLn, print)
-import System.IO.Error                   (isEOFError)
+import System.IO.Error (isEOFError)
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
 listenOnLocalhost port = do
