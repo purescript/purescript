@@ -51,7 +51,7 @@ import Language.PureScript.Make.Cache
 import Language.PureScript.Names
 import Language.PureScript.Options hiding (codegenTargets)
 import Language.PureScript.Pretty.Common (SMap(..))
-import Paths qualified_purescript as Paths
+import Paths_purescript qualified as Paths
 import SourceMap
 import SourceMap.Types
 import System.Directory (getCurrentDirectory)
