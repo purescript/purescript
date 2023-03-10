@@ -3,24 +3,24 @@ module Command.Docs (command, infoModList) where
 
 import Prelude
 
-import           Command.Docs.Html
-import           Command.Docs.Markdown
-import           Control.Applicative
-import           Control.Monad.Writer
-import           Control.Monad.Trans.Except (runExceptT)
-import           Data.Maybe (fromMaybe)
+import Command.Docs.Html
+import Command.Docs.Markdown
+import Control.Applicative
+import Control.Monad.Writer
+import Control.Monad.Trans.Except (runExceptT)
+import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.Docs qualified as D
-import           Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
+import Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import Options.Applicative qualified as Opts
 import Text.PrettyPrint.ANSI.Leijen qualified as PP
-import           System.Directory (getCurrentDirectory, createDirectoryIfMissing, removeFile)
-import           System.Exit (exitFailure)
-import           System.FilePath ((</>))
-import           System.FilePath.Glob (compile, glob, globDir1)
-import           System.IO (hPutStrLn, stderr)
-import           System.IO.UTF8 (writeUTF8FileT)
+import System.Directory (getCurrentDirectory, createDirectoryIfMissing, removeFile)
+import System.Exit (exitFailure)
+import System.FilePath ((</>))
+import System.FilePath.Glob (compile, glob, globDir1)
+import System.IO (hPutStrLn, stderr)
+import System.IO.UTF8 (writeUTF8FileT)
 
 -- | Available output formats
 data Format

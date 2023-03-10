@@ -2,20 +2,20 @@ module Command.Graph (command) where
 
 import Prelude
 
-import           Control.Applicative (many)
-import           Control.Monad (unless, when)
+import Control.Applicative (many)
+import Control.Monad (unless, when)
 import Data.Aeson qualified as Json
-import           Data.Bool (bool)
+import Data.Bool (bool)
 import Data.ByteString.Lazy qualified as LB
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
 import Language.PureScript qualified as P
-import           Language.PureScript.Errors.JSON
+import Language.PureScript.Errors.JSON
 import Options.Applicative qualified as Opts
 import System.Console.ANSI qualified as ANSI
-import           System.Exit (exitFailure)
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath.Glob (glob)
-import           System.IO (hPutStr, hPutStrLn, stderr)
+import System.Exit (exitFailure)
+import System.Directory (getCurrentDirectory)
+import System.FilePath.Glob (glob)
+import System.IO (hPutStr, hPutStrLn, stderr)
 
 data GraphOptions = GraphOptions
   { graphInput      :: [FilePath]

@@ -3,8 +3,8 @@ module Command.Bundle (command) where
 
 import Prelude
 
-import           System.Exit (exitFailure)
-import           System.IO (stderr, hPutStrLn)
+import System.Exit (exitFailure)
+import System.IO (stderr, hPutStrLn)
 import Options.Applicative qualified as Opts
 
 app :: IO ()

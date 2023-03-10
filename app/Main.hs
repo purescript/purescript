@@ -10,13 +10,13 @@ import Command.Hierarchy qualified as Hierarchy
 import Command.Ide qualified as Ide
 import Command.Publish qualified as Publish
 import Command.REPL qualified as REPL
-import           Control.Monad (join)
-import           Data.Foldable (fold)
+import Control.Monad (join)
+import Data.Foldable (fold)
 import Options.Applicative qualified as Opts
-import           System.Environment (getArgs)
+import System.Environment (getArgs)
 import System.IO qualified as IO
 import Text.PrettyPrint.ANSI.Leijen qualified as Doc
-import           Version (versionString)
+import Version (versionString)
 
 
 main :: IO ()
