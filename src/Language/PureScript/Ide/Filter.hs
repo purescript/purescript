@@ -23,17 +23,17 @@ module Language.PureScript.Ide.Filter
        , applyFilters
        ) where
 
-import           Protolude                     hiding (isPrefixOf, Prefix)
+import Protolude                     hiding (isPrefixOf, Prefix)
 
-import           Control.Monad.Fail (fail)
-import           Data.Aeson
-import           Data.Text (isPrefixOf)
+import Control.Monad.Fail (fail)
+import Data.Aeson
+import Data.Text (isPrefixOf)
 import Data.Set qualified as Set
 import Data.Map qualified as Map
-import           Language.PureScript.Ide.Filter.Declaration (DeclarationType)
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Imports
-import           Language.PureScript.Ide.Util
+import Language.PureScript.Ide.Filter.Declaration (DeclarationType)
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Imports
+import Language.PureScript.Ide.Util
 
 import Language.PureScript qualified           as P
 import Data.Text qualified as T

@@ -1,13 +1,13 @@
 module Language.PureScript.Ide.Prim (idePrimDeclarations) where
 
-import           Protolude
+import Protolude
 
 import Data.Text qualified as T
 import Data.Map qualified as Map
 import Language.PureScript qualified as P
 import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.Environment qualified as PEnv
-import           Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Types
 
 idePrimDeclarations :: ModuleMap [IdeDeclarationAnn]
 idePrimDeclarations = Map.fromList

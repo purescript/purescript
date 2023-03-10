@@ -6,9 +6,9 @@ module Language.PureScript.Docs.Tags
 
 import Prelude
 
-import           Control.Arrow (first)
-import           Data.List (sort)
-import           Data.Maybe (mapMaybe)
+import Control.Arrow (first)
+import Data.List (sort)
+import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
 import Language.PureScript.AST (SourceSpan, sourcePosLine, spanStart)
 import Language.PureScript.Docs.Types

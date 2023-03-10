@@ -5,19 +5,19 @@
 
 module Language.PureScript.Ide.Types where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
-import           Control.Concurrent.STM (TVar)
-import           Control.Lens hiding (op, (.=))
-import           Control.Monad.Fail (fail)
-import           Data.Aeson (ToJSON, FromJSON, (.=))
+import Control.Concurrent.STM (TVar)
+import Control.Lens hiding (op, (.=))
+import Control.Monad.Fail (fail)
+import Data.Aeson (ToJSON, FromJSON, (.=))
 import Data.Aeson qualified as Aeson
-import           Data.IORef (IORef)
-import           Data.Time.Clock (UTCTime)
+import Data.IORef (IORef)
+import Data.Time.Clock (UTCTime)
 import Data.Map.Lazy qualified as M
 import Language.PureScript qualified as P
 import Language.PureScript.Errors.JSON qualified as P
-import           Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
+import Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a

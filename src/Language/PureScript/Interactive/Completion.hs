@@ -9,17 +9,17 @@ module Language.PureScript.Interactive.Completion
 import Prelude
 import Protolude (ordNub)
 
-import           Control.Monad.IO.Class (MonadIO(..))
-import           Control.Monad.State.Class (MonadState(..))
-import           Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
-import           Data.List (nub, isPrefixOf, isInfixOf, isSuffixOf, sortBy, stripPrefix)
-import           Data.Map (keys)
-import           Data.Maybe (mapMaybe)
+import Control.Monad.IO.Class (MonadIO(..))
+import Control.Monad.State.Class (MonadState(..))
+import Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
+import Data.List (nub, isPrefixOf, isInfixOf, isSuffixOf, sortBy, stripPrefix)
+import Data.Map (keys)
+import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.Interactive.Directive qualified as D
-import           Language.PureScript.Interactive.Types
-import           System.Console.Haskeline
+import Language.PureScript.Interactive.Types
+import System.Console.Haskeline
 
 -- Completions may read the state, but not modify it.
 type CompletionM = ReaderT PSCiState IO

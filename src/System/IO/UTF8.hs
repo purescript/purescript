@@ -6,9 +6,9 @@ import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BSL
 import Data.ByteString.Search qualified as BSS
 import Data.ByteString.UTF8 qualified as UTF8
-import           Data.Text (Text)
+import Data.Text (Text)
 import Data.Text.Encoding qualified as TE
-import           Protolude (ordNub)
+import Protolude (ordNub)
 
 -- | Unfortunately ByteString's readFile does not convert line endings on
 -- Windows, so we have to do it ourselves

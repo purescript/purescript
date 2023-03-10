@@ -1,7 +1,7 @@
 module Language.PureScript.Ide.Filter.Imports where
 
 
-import           Protolude                     hiding (isPrefixOf)
+import Protolude                     hiding (isPrefixOf)
 
 import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Imports

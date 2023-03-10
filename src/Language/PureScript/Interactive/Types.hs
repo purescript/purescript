@@ -32,12 +32,12 @@ import Prelude
 
 import Language.PureScript qualified as P
 import Data.Map qualified as M
-import           Data.List (foldl')
-import           Language.PureScript.Sugar.Names.Env (nullImports, primExports)
-import           Control.Monad (foldM)
-import           Control.Monad.Trans.Except (runExceptT)
-import           Control.Monad.Trans.State (execStateT)
-import           Control.Monad.Writer.Strict (runWriterT)
+import Data.List (foldl')
+import Language.PureScript.Sugar.Names.Env (nullImports, primExports)
+import Control.Monad (foldM)
+import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Trans.State (execStateT)
+import Control.Monad.Writer.Strict (runWriterT)
 
 
 -- | The PSCI configuration.

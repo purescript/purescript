@@ -15,10 +15,10 @@
 
 module Language.PureScript.Hierarchy where
 
-import           Prelude
-import           Protolude (ordNub)
+import Prelude
+import Protolude (ordNub)
 
-import           Data.List (sort)
+import Data.List (sort)
 import Data.Text qualified as T
 import Language.PureScript qualified as P
 

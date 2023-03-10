@@ -1,22 +1,22 @@
 -- | This module implements the generic deriving elaboration that takes place during desugaring.
 module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 
-import           Prelude
-import           Protolude (note)
+import Prelude
+import Protolude (note)
 
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Supply.Class (MonadSupply)
-import           Data.List (foldl', find, unzip5)
-import           Language.PureScript.AST
-import           Language.PureScript.AST.Utils
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class (MonadSupply)
+import Data.List (foldl', find, unzip5)
+import Language.PureScript.AST
+import Language.PureScript.AST.Utils
 import Language.PureScript.Constants.Libs qualified as Libs
-import           Language.PureScript.Crash
-import           Language.PureScript.Environment
-import           Language.PureScript.Errors
-import           Language.PureScript.Names
-import           Language.PureScript.PSString (mkString)
-import           Language.PureScript.Types
-import           Language.PureScript.TypeChecker (checkNewtype)
+import Language.PureScript.Crash
+import Language.PureScript.Environment
+import Language.PureScript.Errors
+import Language.PureScript.Names
+import Language.PureScript.PSString (mkString)
+import Language.PureScript.Types
+import Language.PureScript.TypeChecker (checkNewtype)
 
 -- | Elaborates deriving instance declarations by code generation.
 deriveInstances

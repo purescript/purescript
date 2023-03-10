@@ -3,19 +3,19 @@ module Language.PureScript.Sugar.ObjectWildcards
   , desugarDecl
   ) where
 
-import           Prelude
+import Prelude
 
-import           Control.Monad (forM)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Supply.Class
-import           Data.Foldable (toList)
-import           Data.List (foldl')
-import           Data.Maybe (catMaybes)
-import           Language.PureScript.AST
-import           Language.PureScript.Environment (NameKind(..))
-import           Language.PureScript.Errors
-import           Language.PureScript.Names
-import           Language.PureScript.PSString (PSString)
+import Control.Monad (forM)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class
+import Data.Foldable (toList)
+import Data.List (foldl')
+import Data.Maybe (catMaybes)
+import Language.PureScript.AST
+import Language.PureScript.Environment (NameKind(..))
+import Language.PureScript.Errors
+import Language.PureScript.Names
+import Language.PureScript.PSString (PSString)
 
 
 desugarObjectConstructors

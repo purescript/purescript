@@ -1,12 +1,12 @@
 module Language.PureScript.Interactive.Printer where
 
-import           Prelude
+import Prelude
 
-import           Data.List (intersperse)
+import Data.List (intersperse)
 import Data.Map qualified as M
-import           Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
-import           Data.Text (Text)
+import Data.Text (Text)
 import Language.PureScript qualified as P
 import Text.PrettyPrint.Boxes qualified as Box
 

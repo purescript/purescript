@@ -21,7 +21,7 @@ module Language.PureScript.Ide.CaseSplit
        , caseSplit
        ) where
 
-import           Protolude                     hiding (Constructor)
+import Protolude                     hiding (Constructor)
 
 import Data.List.NonEmpty qualified            as NE
 import Data.Map qualified                      as M
@@ -29,10 +29,10 @@ import Data.Text qualified                     as T
 import Language.PureScript qualified           as P
 import Language.PureScript.CST qualified       as CST
 
-import           Language.PureScript.Externs
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Types
+import Language.PureScript.Externs
+import Language.PureScript.Ide.Error
+import Language.PureScript.Ide.State
+import Language.PureScript.Ide.Types
 
 type Constructor = (P.ProperName 'P.ConstructorName, [P.SourceType])
 

@@ -6,15 +6,15 @@ module Language.PureScript.Ide.Usage
   , findUsages
   ) where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
-import           Control.Lens (preview)
+import Control.Lens (preview)
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Language.PureScript qualified as P
-import           Language.PureScript.Ide.State (getAllModules, getFileState)
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
+import Language.PureScript.Ide.State (getAllModules, getFileState)
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util
 
 -- |
 -- How we find usages, given an IdeDeclaration and the module it was defined in:

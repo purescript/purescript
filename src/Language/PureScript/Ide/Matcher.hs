@@ -19,16 +19,16 @@ module Language.PureScript.Ide.Matcher
        , flexMatcher
        ) where
 
-import           Protolude
+import Protolude
 
-import           Control.Monad.Fail (fail)
-import           Data.Aeson
+import Control.Monad.Fail (fail)
+import Data.Aeson
 import Data.Text qualified                     as T
 import Data.Text.Encoding qualified            as TE
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           Text.EditDistance
-import           Text.Regex.TDFA               ((=~))
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util
+import Text.EditDistance
+import Text.Regex.TDFA               ((=~))
 
 
 type ScoredMatch a = (Match a, Double)

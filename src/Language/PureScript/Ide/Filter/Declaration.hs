@@ -2,10 +2,10 @@ module Language.PureScript.Ide.Filter.Declaration
        ( DeclarationType(..)
        ) where
 
-import           Protolude                     hiding (isPrefixOf)
+import Protolude                     hiding (isPrefixOf)
 
-import           Control.Monad.Fail (fail)
-import           Data.Aeson
+import Control.Monad.Fail (fail)
+import Data.Aeson
 
 data DeclarationType
   = Value

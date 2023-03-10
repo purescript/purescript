@@ -18,31 +18,31 @@ module Language.PureScript.Ide
        ( handleCommand
        ) where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
 import           "monad-logger" Control.Monad.Logger
 import Data.Map qualified                           as Map
 import Data.Text qualified                          as T
 import Language.PureScript qualified                as P
 import Language.PureScript.Ide.CaseSplit qualified  as CS
-import           Language.PureScript.Ide.Command
-import           Language.PureScript.Ide.Completion
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Externs
-import           Language.PureScript.Ide.Filter
-import           Language.PureScript.Ide.Imports hiding (Import)
-import           Language.PureScript.Ide.Imports.Actions
-import           Language.PureScript.Ide.Matcher
-import           Language.PureScript.Ide.Prim
-import           Language.PureScript.Ide.Rebuild
-import           Language.PureScript.Ide.SourceFile
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           Language.PureScript.Ide.Usage (findUsages)
-import           System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
-import           System.FilePath ((</>), normalise)
-import           System.FilePath.Glob (glob)
+import Language.PureScript.Ide.Command
+import Language.PureScript.Ide.Completion
+import Language.PureScript.Ide.Error
+import Language.PureScript.Ide.Externs
+import Language.PureScript.Ide.Filter
+import Language.PureScript.Ide.Imports hiding (Import)
+import Language.PureScript.Ide.Imports.Actions
+import Language.PureScript.Ide.Matcher
+import Language.PureScript.Ide.Prim
+import Language.PureScript.Ide.Rebuild
+import Language.PureScript.Ide.SourceFile
+import Language.PureScript.Ide.State
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util
+import Language.PureScript.Ide.Usage (findUsages)
+import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
+import System.FilePath ((</>), normalise)
+import System.FilePath.Glob (glob)
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.

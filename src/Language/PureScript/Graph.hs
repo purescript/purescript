@@ -7,13 +7,13 @@ import Data.Aeson.Key qualified as Json.Key
 import Data.Aeson.KeyMap qualified as Json.Map
 import Data.Map qualified as Map
 
-import           Control.Monad (forM)
-import           Data.Aeson ((.=))
-import           Data.Foldable (foldl')
-import           Data.Map (Map)
-import           Data.Maybe (fromMaybe)
-import           Data.Text (Text)
-import           System.IO.UTF8 (readUTF8FileT)
+import Control.Monad (forM)
+import Data.Aeson ((.=))
+import Data.Foldable (foldl')
+import Data.Map (Map)
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import System.IO.UTF8 (readUTF8FileT)
 
 import Language.PureScript.Crash qualified as Crash
 import Language.PureScript.CST qualified as CST
@@ -21,8 +21,8 @@ import Language.PureScript.Make qualified as Make
 import Language.PureScript.ModuleDependencies qualified as Dependencies
 import Language.PureScript.Options qualified as Options
 
-import           Language.PureScript.Errors (MultipleErrors)
-import           Language.PureScript.Names (ModuleName, runModuleName)
+import Language.PureScript.Errors (MultipleErrors)
+import Language.PureScript.Names (ModuleName, runModuleName)
 
 
 -- | Given a set of filepaths, try to build the dependency graph and return

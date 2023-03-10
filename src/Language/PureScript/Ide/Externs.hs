@@ -5,18 +5,18 @@ module Language.PureScript.Ide.Externs
   , convertExterns
   ) where
 
-import           Protolude hiding (to, from, (&))
+import Protolude hiding (to, from, (&))
 
-import           Codec.CBOR.Term as Term
-import           Control.Lens hiding (anyOf)
+import Codec.CBOR.Term as Term
+import Control.Lens hiding (anyOf)
 import           "monad-logger" Control.Monad.Logger
-import           Data.Version (showVersion)
+import Data.Version (showVersion)
 import Data.Text qualified as Text
 import Language.PureScript qualified as P
 import Language.PureScript.Make.Monad qualified as Make
-import           Language.PureScript.Ide.Error (IdeError (..))
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util (properNameT)
+import Language.PureScript.Ide.Error (IdeError (..))
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util (properNameT)
 
 readExternFile
   :: (MonadIO m, MonadError IdeError m, MonadLogger m)

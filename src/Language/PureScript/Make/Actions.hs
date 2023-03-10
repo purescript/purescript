@@ -11,53 +11,53 @@ module Language.PureScript.Make.Actions
   , ffiCodegen'
   ) where
 
-import           Prelude
+import Prelude
 
-import           Control.Monad hiding (sequence)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.IO.Class
-import           Control.Monad.Reader (asks)
-import           Control.Monad.Supply
-import           Control.Monad.Trans.Class (MonadTrans(..))
-import           Control.Monad.Writer.Class (MonadWriter(..))
-import           Data.Aeson (Value(String), (.=), object)
-import           Data.Bifunctor (bimap, first)
-import           Data.Either (partitionEithers)
-import           Data.Foldable (for_)
+import Control.Monad hiding (sequence)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.IO.Class
+import Control.Monad.Reader (asks)
+import Control.Monad.Supply
+import Control.Monad.Trans.Class (MonadTrans(..))
+import Control.Monad.Writer.Class (MonadWriter(..))
+import Data.Aeson (Value(String), (.=), object)
+import Data.Bifunctor (bimap, first)
+import Data.Either (partitionEithers)
+import Data.Foldable (for_)
 import Data.List.NonEmpty qualified as NEL
 import Data.Map qualified as M
-import           Data.Maybe (fromMaybe, maybeToList)
+import Data.Maybe (fromMaybe, maybeToList)
 import Data.Set qualified as S
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Text.Encoding qualified as TE
-import           Data.Time.Clock (UTCTime)
-import           Data.Version (showVersion)
+import Data.Time.Clock (UTCTime)
+import Data.Version (showVersion)
 import Language.JavaScript.Parser qualified as JS
-import           Language.PureScript.AST
+import Language.PureScript.AST
 import Language.PureScript.Bundle qualified as Bundle
 import Language.PureScript.CodeGen.JS qualified as J
-import           Language.PureScript.CodeGen.JS.Printer
+import Language.PureScript.CodeGen.JS.Printer
 import Language.PureScript.CoreFn qualified as CF
 import Language.PureScript.CoreFn.ToJSON qualified as CFJ
-import           Language.PureScript.Crash
+import Language.PureScript.Crash
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Docs.Prim qualified as Docs.Prim
 import Language.PureScript.Docs.Types qualified as Docs
-import           Language.PureScript.Errors
-import           Language.PureScript.Externs (ExternsFile, externsFileName)
-import           Language.PureScript.Make.Monad
-import           Language.PureScript.Make.Cache
-import           Language.PureScript.Names
-import           Language.PureScript.Options hiding (codegenTargets)
-import           Language.PureScript.Pretty.Common (SMap(..))
+import Language.PureScript.Errors
+import Language.PureScript.Externs (ExternsFile, externsFileName)
+import Language.PureScript.Make.Monad
+import Language.PureScript.Make.Cache
+import Language.PureScript.Names
+import Language.PureScript.Options hiding (codegenTargets)
+import Language.PureScript.Pretty.Common (SMap(..))
 import Paths qualified_purescript as Paths
-import           SourceMap
-import           SourceMap.Types
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath ((</>), makeRelative, splitPath, normalise, splitDirectories)
+import SourceMap
+import SourceMap.Types
+import System.Directory (getCurrentDirectory)
+import System.FilePath ((</>), makeRelative, splitPath, normalise, splitDirectories)
 import System.FilePath.Posix qualified as Posix
-import           System.IO (stderr)
+import System.IO (stderr)
 
 -- | Determines when to rebuild a module
 data RebuildPolicy

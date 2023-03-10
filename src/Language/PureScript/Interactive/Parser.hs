@@ -6,19 +6,19 @@ module Language.PureScript.Interactive.Parser
   , parseCommand
   ) where
 
-import           Prelude
+import Prelude
 
-import           Control.Monad (join)
-import           Data.Bifunctor (bimap)
-import           Data.Char (isSpace)
-import           Data.List (intercalate)
+import Control.Monad (join)
+import Data.Bifunctor (bimap)
+import Data.Char (isSpace)
+import Data.List (intercalate)
 import Data.List.NonEmpty qualified as NE
 import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.CST.Monad qualified as CSTM
 import Language.PureScript.Interactive.Directive qualified as D
-import           Language.PureScript.Interactive.Types
+import Language.PureScript.Interactive.Types
 
 -- |
 -- Parses a limited set of commands from from .purs-repl

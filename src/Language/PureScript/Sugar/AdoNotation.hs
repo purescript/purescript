@@ -3,15 +3,15 @@
 
 module Language.PureScript.Sugar.AdoNotation (desugarAdoModule) where
 
-import           Prelude hiding (abs)
+import Prelude hiding (abs)
 
-import           Control.Monad (foldM)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Supply.Class
-import           Data.List (foldl')
-import           Language.PureScript.AST
-import           Language.PureScript.Errors
-import           Language.PureScript.Names
+import Control.Monad (foldM)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class
+import Data.List (foldl')
+import Language.PureScript.AST
+import Language.PureScript.Errors
+import Language.PureScript.Names
 import Language.PureScript.Constants.Libs qualified as C
 
 -- | Replace all @AdoNotationBind@ and @AdoNotationValue@ constructors with

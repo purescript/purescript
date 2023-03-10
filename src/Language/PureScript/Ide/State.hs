@@ -37,25 +37,25 @@ module Language.PureScript.Ide.State
   , resolveDataConstructorsForModule
   ) where
 
-import           Protolude hiding (moduleName, unzip)
+import Protolude hiding (moduleName, unzip)
 
-import           Control.Concurrent.STM
-import           Control.Lens                       hiding (anyOf, op, (&))
+import Control.Concurrent.STM
+import Control.Lens                       hiding (anyOf, op, (&))
 import           "monad-logger" Control.Monad.Logger
-import           Data.IORef
+import Data.IORef
 import Data.Map.Lazy qualified                      as Map
-import           Data.Time.Clock (UTCTime)
-import           Data.Zip (unzip)
+import Data.Time.Clock (UTCTime)
+import Data.Zip (unzip)
 import Language.PureScript qualified                as P
-import           Language.PureScript.Docs.Convert.Single (convertComments)
-import           Language.PureScript.Externs
-import           Language.PureScript.Make.Actions (cacheDbFile)
-import           Language.PureScript.Ide.Externs
-import           Language.PureScript.Ide.Reexports
-import           Language.PureScript.Ide.SourceFile
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           System.Directory (getModificationTime)
+import Language.PureScript.Docs.Convert.Single (convertComments)
+import Language.PureScript.Externs
+import Language.PureScript.Make.Actions (cacheDbFile)
+import Language.PureScript.Ide.Externs
+import Language.PureScript.Ide.Reexports
+import Language.PureScript.Ide.SourceFile
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util
+import System.Directory (getModificationTime)
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()

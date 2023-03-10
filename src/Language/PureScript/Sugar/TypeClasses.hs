@@ -10,30 +10,30 @@ module Language.PureScript.Sugar.TypeClasses
 
 import Prelude
 
-import           Control.Arrow (first, second)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.State
-import           Control.Monad.Supply.Class
-import           Data.Graph
-import           Data.List (find, partition)
-import           Data.List.NonEmpty (nonEmpty)
+import Control.Arrow (first, second)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State
+import Control.Monad.Supply.Class
+import Data.Graph
+import Data.List (find, partition)
+import Data.List.NonEmpty (nonEmpty)
 import Data.Map qualified as M
-import           Data.Maybe (catMaybes, mapMaybe, isJust)
+import Data.Maybe (catMaybes, mapMaybe, isJust)
 import Data.List.NonEmpty qualified as NEL
 import Data.Set qualified as S
-import           Data.Text (Text)
-import           Data.Traversable (for)
+import Data.Text (Text)
+import Data.Traversable (for)
 import Language.PureScript.Constants.Prim qualified as C
-import           Language.PureScript.Crash
-import           Language.PureScript.Environment
-import           Language.PureScript.Errors hiding (isExported, nonEmpty)
-import           Language.PureScript.Externs
-import           Language.PureScript.Label (Label(..))
-import           Language.PureScript.Names
-import           Language.PureScript.PSString (mkString)
-import           Language.PureScript.Sugar.CaseDeclarations
-import           Language.PureScript.TypeClassDictionaries (superclassName)
-import           Language.PureScript.Types
+import Language.PureScript.Crash
+import Language.PureScript.Environment
+import Language.PureScript.Errors hiding (isExported, nonEmpty)
+import Language.PureScript.Externs
+import Language.PureScript.Label (Label(..))
+import Language.PureScript.Names
+import Language.PureScript.PSString (mkString)
+import Language.PureScript.Sugar.CaseDeclarations
+import Language.PureScript.TypeClassDictionaries (superclassName)
+import Language.PureScript.Types
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
 
