@@ -4,14 +4,14 @@ import Prelude
 
 import           Control.Applicative (many)
 import           Control.Monad (unless, when)
-import qualified Data.Aeson as Json
+import Data.Aeson qualified as Json
 import           Data.Bool (bool)
-import qualified Data.ByteString.Lazy as LB
-import qualified Data.ByteString.Lazy.UTF8 as LBU8
-import qualified Language.PureScript as P
+import Data.ByteString.Lazy qualified as LB
+import Data.ByteString.Lazy.UTF8 qualified as LBU8
+import Language.PureScript qualified as P
 import           Language.PureScript.Errors.JSON
-import qualified Options.Applicative as Opts
-import qualified System.Console.ANSI as ANSI
+import Options.Applicative qualified as Opts
+import System.Console.ANSI qualified as ANSI
 import           System.Exit (exitFailure)
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath.Glob (glob)

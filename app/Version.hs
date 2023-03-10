@@ -9,7 +9,7 @@ import Data.Version (showVersion)
 import Paths_purescript as Paths
 
 #ifndef RELEASE
-import qualified Development.GitRev as GitRev
+import Development.GitRev qualified as GitRev
 #endif
 
 -- Unfortunately, Cabal doesn't support prerelease identifiers on versions. To

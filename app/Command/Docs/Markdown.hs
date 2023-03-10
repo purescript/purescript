@@ -6,10 +6,10 @@ module Command.Docs.Markdown
 import Prelude
 
 import           Data.Text (Text)
-import qualified Data.Text as T
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Docs as D
-import qualified Language.PureScript.Docs.AsMarkdown as D
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.Docs qualified as D
+import Language.PureScript.Docs.AsMarkdown qualified as D
 import           System.IO.UTF8 (writeUTF8FileT)
 
 asMarkdown :: D.Module -> (P.ModuleName, Text)

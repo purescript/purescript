@@ -13,14 +13,14 @@ import           Control.Monad.Writer
 import           Data.List (sort)
 import           Data.Text (Text)
 import           Data.Text.Lazy (toStrict)
-import qualified Data.Text as T
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Docs as D
-import qualified Language.PureScript.Docs.AsHtml as D
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.Docs qualified as D
+import Language.PureScript.Docs.AsHtml qualified as D
 import           Text.Blaze.Html5 (Html, (!), toMarkup)
-import qualified Text.Blaze.Html5 as H
-import qualified Text.Blaze.Html5.Attributes as A
-import qualified Text.Blaze.Html.Renderer.Text as Blaze
+import Text.Blaze.Html5 qualified as H
+import Text.Blaze.Html5.Attributes qualified as A
+import Text.Blaze.Html.Renderer.Text qualified as Blaze
 import           System.IO.UTF8 (writeUTF8FileT)
 import           Version (versionString)
 

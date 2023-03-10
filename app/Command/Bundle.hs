@@ -5,7 +5,7 @@ import Prelude
 
 import           System.Exit (exitFailure)
 import           System.IO (stderr, hPutStrLn)
-import qualified Options.Applicative as Opts
+import Options.Applicative qualified as Opts
 
 app :: IO ()
 app = do
