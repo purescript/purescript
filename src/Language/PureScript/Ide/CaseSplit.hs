@@ -23,11 +23,11 @@ module Language.PureScript.Ide.CaseSplit
 
 import           Protolude                     hiding (Constructor)
 
-import qualified Data.List.NonEmpty            as NE
-import qualified Data.Map                      as M
-import qualified Data.Text                     as T
-import qualified Language.PureScript           as P
-import qualified Language.PureScript.CST       as CST
+import Data.List.NonEmpty qualified            as NE
+import Data.Map qualified                      as M
+import Data.Text qualified                     as T
+import Language.PureScript qualified           as P
+import Language.PureScript.CST qualified       as CST
 
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Error

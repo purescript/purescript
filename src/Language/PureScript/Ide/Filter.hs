@@ -35,7 +35,7 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Imports
 import           Language.PureScript.Ide.Util
 
-import qualified Language.PureScript           as P
+import Language.PureScript qualified           as P
 import Data.Text qualified as T
 
 import Language.PureScript.Ide.Filter.Imports 

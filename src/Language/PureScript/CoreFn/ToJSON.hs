@@ -13,8 +13,8 @@ import           Control.Arrow ((***))
 import           Data.Either (isLeft)
 import Data.Map.Strict qualified as M
 import           Data.Aeson hiding ((.=))
-import qualified Data.Aeson
-import qualified Data.Aeson.Key
+import Data.Aeson qualified
+import Data.Aeson.Key qualified
 import           Data.Aeson.Types (Pair)
 import           Data.Version (Version, showVersion)
 import           Data.Text (Text)

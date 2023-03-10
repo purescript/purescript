@@ -43,10 +43,10 @@ import           Control.Concurrent.STM
 import           Control.Lens                       hiding (anyOf, op, (&))
 import           "monad-logger" Control.Monad.Logger
 import           Data.IORef
-import qualified Data.Map.Lazy                      as Map
+import Data.Map.Lazy qualified                      as Map
 import           Data.Time.Clock (UTCTime)
 import           Data.Zip (unzip)
-import qualified Language.PureScript                as P
+import Language.PureScript qualified                as P
 import           Language.PureScript.Docs.Convert.Single (convertComments)
 import           Language.PureScript.Externs
 import           Language.PureScript.Make.Actions (cacheDbFile)

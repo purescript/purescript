@@ -21,10 +21,10 @@ module Language.PureScript.Ide
 import           Protolude hiding (moduleName)
 
 import           "monad-logger" Control.Monad.Logger
-import qualified Data.Map                           as Map
-import qualified Data.Text                          as T
-import qualified Language.PureScript                as P
-import qualified Language.PureScript.Ide.CaseSplit  as CS
+import Data.Map qualified                           as Map
+import Data.Text qualified                          as T
+import Language.PureScript qualified                as P
+import Language.PureScript.Ide.CaseSplit qualified  as CS
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error

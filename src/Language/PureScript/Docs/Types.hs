@@ -31,7 +31,7 @@ import Language.PureScript.Environment qualified as P
 import Language.PureScript.Names qualified as P
 import Language.PureScript.Roles qualified as P
 import Language.PureScript.Types qualified as P
-import qualified Paths_purescript as Paths
+import Paths qualified_purescript as Paths
 
 import Web.Bower.PackageMeta hiding (Version, displayError)
 

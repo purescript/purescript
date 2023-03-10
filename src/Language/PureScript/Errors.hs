@@ -32,7 +32,7 @@ import Data.Set qualified as S
 import Data.Text qualified as T
 import           Data.Text (Text)
 import           Data.Traversable (for)
-import qualified GHC.Stack
+import GHC.Stack qualified
 import           Language.PureScript.AST
 import Language.PureScript.Bundle qualified as Bundle
 import Language.PureScript.Constants.Libs qualified as C

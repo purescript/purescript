@@ -9,16 +9,16 @@ module Language.PureScript.Ide.Rebuild
 import           Protolude hiding (moduleName)
 
 import           "monad-logger" Control.Monad.Logger
-import qualified Data.List                       as List
-import qualified Data.Map.Lazy                   as M
+import Data.List qualified                       as List
+import Data.Map.Lazy qualified                   as M
 import           Data.Maybe                      (fromJust)
-import qualified Data.Set                        as S
-import qualified Data.Time                       as Time
-import qualified Data.Text                       as Text
-import qualified Language.PureScript             as P
+import Data.Set qualified                        as S
+import Data.Time qualified                       as Time
+import Data.Text qualified                       as Text
+import Language.PureScript qualified             as P
 import           Language.PureScript.Make (ffiCodegen')
 import           Language.PureScript.Make.Cache (CacheInfo(..), normaliseForCache)
-import qualified Language.PureScript.CST         as CST
+import Language.PureScript.CST qualified         as CST
 
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging

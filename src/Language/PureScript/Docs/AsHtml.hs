@@ -29,7 +29,7 @@ import Data.Text qualified as T
 
 import Text.Blaze.Html5 as H hiding (map)
 import Text.Blaze.Html5.Attributes qualified as A
-import qualified Cheapskate
+import Cheapskate qualified
 
 import Language.PureScript qualified as P
 

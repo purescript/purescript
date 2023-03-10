@@ -5,10 +5,10 @@ module Language.PureScript.TypeChecker.TypeSearch
 import           Protolude
 
 import           Control.Monad.Writer (WriterT, runWriterT)
-import qualified Data.Map                                    as Map
-import qualified Language.PureScript.TypeChecker.Entailment  as Entailment
+import Data.Map qualified                                    as Map
+import Language.PureScript.TypeChecker.Entailment qualified  as Entailment
 
-import qualified Language.PureScript.TypeChecker.Monad       as TC
+import Language.PureScript.TypeChecker.Monad qualified       as TC
 import           Language.PureScript.TypeChecker.Subsumption
 import           Language.PureScript.TypeChecker.Unify       as P
 

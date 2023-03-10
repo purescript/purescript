@@ -20,7 +20,7 @@ import           Control.Monad.Fail (fail)
 import           Data.Aeson
 import Data.Map qualified as Map
 import Data.Set qualified as Set
-import qualified Language.PureScript               as P
+import Language.PureScript qualified               as P
 import           Language.PureScript.Ide.CaseSplit
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Filter
