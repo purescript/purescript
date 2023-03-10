@@ -86,7 +86,6 @@ common defaults
     -Wno-missing-export-lists
     -Wno-missing-kind-signatures
     -Wno-partial-fields
-    -Wno-prepositive-qualified-module
   default-language: Haskell2010
   default-extensions:
     BangPatterns
