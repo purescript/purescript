@@ -38,11 +38,11 @@ import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding             as TLE
 import Language.PureScript qualified as P
-import Language.PureScript.Ide.Error       (IdeError(..))
+import Language.PureScript.Ide.Error (IdeError(..))
 import Language.PureScript.Ide.Logging
 import Language.PureScript.Ide.Types
-import System.IO.UTF8                      (readUTF8FileT)
-import System.Directory                    (makeAbsolute)
+import System.IO.UTF8 (readUTF8FileT)
+import System.Directory (makeAbsolute)
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of

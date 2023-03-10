@@ -23,7 +23,7 @@ import Data.Aeson.KeyMap qualified as KM
 import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.Errors.JSON
-import Language.PureScript.Ide.Types   (ModuleIdent, Completion(..))
+import Language.PureScript.Ide.Types (ModuleIdent, Completion(..))
 import Protolude
 
 data IdeError

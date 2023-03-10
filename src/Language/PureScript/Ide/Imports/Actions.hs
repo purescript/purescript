@@ -13,8 +13,8 @@ where
 
 import Protolude hiding (moduleName)
 
-import Control.Lens                       ((^.), has)
-import Data.List                          (nubBy)
+import Control.Lens ((^.), has)
+import Data.List (nubBy)
 import Data.Map qualified as Map
 import Data.Text qualified as T
 import Language.PureScript qualified as P
@@ -27,7 +27,7 @@ import Language.PureScript.Ide.State
 import Language.PureScript.Ide.Prim
 import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Util
-import System.IO.UTF8                     (writeUTF8FileT)
+import System.IO.UTF8 (writeUTF8FileT)
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
 addImplicitImport
