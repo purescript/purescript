@@ -8,8 +8,8 @@ import Control.Arrow (second)
 import Data.Function (on)
 import Data.Maybe (mapMaybe)
 import Data.Tuple (swap)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Map as M
+import Data.List.NonEmpty qualified as NEL
+import Data.Map qualified as M
 
 import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
@@ -24,8 +24,8 @@ import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Types
-import qualified Language.PureScript.AST as A
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.AST qualified as A
+import Language.PureScript.Constants.Prim qualified as C
 
 -- | Desugars a module from AST to CoreFn representation.
 moduleToCoreFn :: Environment -> A.Module -> Module Ann

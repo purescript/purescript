@@ -1,7 +1,7 @@
 module Language.PureScript.CoreImp.Module where
 
 import Protolude
-import qualified Data.List.NonEmpty as NEL (NonEmpty)
+import Data.List.NonEmpty qualified as NEL (NonEmpty)
 
 import Language.PureScript.Comments
 import Language.PureScript.CoreImp.AST

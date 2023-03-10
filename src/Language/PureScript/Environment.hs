@@ -7,18 +7,18 @@ import Control.DeepSeq (NFData)
 import Control.Monad (unless)
 import Codec.Serialise (Serialise)
 import Data.Aeson ((.=), (.:))
-import qualified Data.Aeson as A
+import Data.Aeson qualified as A
 import Data.Foldable (find, fold)
 import Data.Functor ((<&>))
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.IntMap qualified as IM
+import Data.IntSet qualified as IS
+import Data.Map qualified as M
+import Data.Set qualified as S
 import Data.Maybe (fromMaybe)
 import Data.Semigroup (First(..))
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.List.NonEmpty as NEL
+import Data.Text qualified as T
+import Data.List.NonEmpty qualified as NEL
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Crash
@@ -26,7 +26,7 @@ import Language.PureScript.Names
 import Language.PureScript.Roles
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Prim qualified as C
 
 -- | The @Environment@ defines all values and types which are currently in scope:
 data Environment = Environment

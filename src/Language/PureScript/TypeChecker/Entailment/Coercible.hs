@@ -32,8 +32,8 @@ import Data.Maybe (fromMaybe, isJust)
 import Data.Monoid (Any(..))
 import Data.Text (Text)
 
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -46,7 +46,7 @@ import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Roles
 import Language.PureScript.Types
-import qualified Language.PureScript.Constants.Prim as Prim
+import Language.PureScript.Constants.Prim qualified as Prim
 
 -- | State of the given constraints solver.
 data GivenSolverState =

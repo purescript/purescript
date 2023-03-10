@@ -13,9 +13,9 @@ import           Protolude hiding ((<&>), moduleName)
 
 import           Control.Lens hiding (op, (&))
 import           Data.Aeson
-import qualified Data.Map as Map
-import qualified Data.Text as T
-import qualified Language.PureScript as P
+import Data.Map qualified as Map
+import Data.Text qualified as T
+import Language.PureScript qualified as P
 import           Language.PureScript.Ide.Error (prettyPrintTypeSingleLine)
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher

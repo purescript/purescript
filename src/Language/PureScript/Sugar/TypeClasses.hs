@@ -17,13 +17,13 @@ import           Control.Monad.Supply.Class
 import           Data.Graph
 import           Data.List (find, partition)
 import           Data.List.NonEmpty (nonEmpty)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import           Data.Maybe (catMaybes, mapMaybe, isJust)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Set as S
+import Data.List.NonEmpty qualified as NEL
+import Data.Set qualified as S
 import           Data.Text (Text)
 import           Data.Traversable (for)
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Prim qualified as C
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors hiding (isExported, nonEmpty)

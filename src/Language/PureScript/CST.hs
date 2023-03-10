@@ -22,10 +22,10 @@ import Prelude hiding (lex)
 
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Parallel.Strategies (withStrategy, parList, evalTuple2, r0, rseq)
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Data.Text (Text)
-import qualified Language.PureScript.AST as AST
-import qualified Language.PureScript.Errors as E
+import Language.PureScript.AST qualified as AST
+import Language.PureScript.Errors qualified as E
 import Language.PureScript.CST.Convert
 import Language.PureScript.CST.Errors
 import Language.PureScript.CST.Lexer

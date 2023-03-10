@@ -22,14 +22,14 @@ import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import Data.Either (partitionEithers)
 import Data.Text (Text)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.Text as T
+import Data.List.NonEmpty qualified as NEL
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text qualified as T
 
 import Language.PureScript.AST
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
-import qualified Language.PureScript.Constants.Libs as Libs
+import Language.PureScript.Constants.Libs qualified as Libs
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors

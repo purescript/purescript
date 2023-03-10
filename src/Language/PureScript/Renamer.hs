@@ -10,9 +10,9 @@ import Control.Monad.State
 import Data.Functor ((<&>))
 import Data.List (find)
 import Data.Maybe (fromJust, fromMaybe)
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.Text as T
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text qualified as T
 
 import Language.PureScript.CoreFn
 import Language.PureScript.Names

@@ -23,29 +23,29 @@ import Control.Arrow ((***))
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
-import qualified Data.ByteString.Lazy as BL
+import Data.ByteString.Lazy qualified as BL
 import Data.String (String, lines)
 import Data.List (stripPrefix, (\\))
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.Time.Clock (UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Version
-import qualified Distribution.SPDX as SPDX
-import qualified Distribution.Parsec as CabalParsec
+import Distribution.SPDX qualified as SPDX
+import Distribution.Parsec qualified as CabalParsec
 
 import System.Directory (doesFileExist)
 import System.FilePath.Glob (globDir1)
 import System.Process (readProcess)
 
 import Web.Bower.PackageMeta (PackageMeta(..), PackageName, Repository(..))
-import qualified Web.Bower.PackageMeta as Bower
+import Web.Bower.PackageMeta qualified as Bower
 
 import Language.PureScript.Publish.ErrorsWarnings
 import Language.PureScript.Publish.Registry.Compat
 import Language.PureScript.Publish.Utils
-import qualified Language.PureScript as P (version, ModuleName)
-import qualified Language.PureScript.CoreFn.FromJSON as P
-import qualified Language.PureScript.Docs as D
+import Language.PureScript qualified as P (version, ModuleName)
+import Language.PureScript.CoreFn.FromJSON qualified as P
+import Language.PureScript.Docs qualified as D
 import Data.Aeson.BetterErrors (Parse, withString, eachInObjectWithKey, asString, key, keyMay, parse, mapError)
 import Language.PureScript.Docs.Types (ManifestError(BowerManifest, PursManifest))
 

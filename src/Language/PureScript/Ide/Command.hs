@@ -18,8 +18,8 @@ import           Protolude
 
 import           Control.Monad.Fail (fail)
 import           Data.Aeson
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import Data.Map qualified as Map
+import Data.Set qualified as Set
 import qualified Language.PureScript               as P
 import           Language.PureScript.Ide.CaseSplit
 import           Language.PureScript.Ide.Completion

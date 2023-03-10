@@ -8,9 +8,9 @@ import Prelude
 import Control.Monad.Writer.Class
 
 import Data.Maybe (mapMaybe)
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 import Control.Monad ((<=<))
 
 import Language.PureScript.AST
@@ -19,7 +19,7 @@ import Language.PureScript.Linter.Exhaustive as L
 import Language.PureScript.Linter.Imports as L
 import Language.PureScript.Names
 import Language.PureScript.Types
-import qualified Language.PureScript.Constants.Libs as C
+import Language.PureScript.Constants.Libs qualified as C
 
 -- | Lint the PureScript AST.
 -- |

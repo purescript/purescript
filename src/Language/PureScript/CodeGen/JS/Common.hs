@@ -5,7 +5,7 @@ import Prelude
 
 import Data.Char
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.Crash
 import Language.PureScript.Names

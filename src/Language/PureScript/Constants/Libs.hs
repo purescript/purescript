@@ -3,11 +3,11 @@
 -- | Various constants which refer to things in the Prelude and other core libraries
 module Language.PureScript.Constants.Libs where
 
-import qualified Protolude as P
+import Protolude qualified as P
 
 import Data.String (IsString)
 import Language.PureScript.PSString (PSString)
-import qualified Language.PureScript.Constants.TH as TH
+import Language.PureScript.Constants.TH qualified as TH
 
 -- Core lib values
 

@@ -12,8 +12,8 @@ import Prelude
 
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
-import qualified Data.Aeson as A
-import qualified Data.Aeson.TH as A
+import Data.Aeson qualified as A
+import Data.Aeson.TH qualified as A
 import Data.Text (Text)
 import GHC.Generics (Generic)
 

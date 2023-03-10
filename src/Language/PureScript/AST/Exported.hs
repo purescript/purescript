@@ -10,7 +10,7 @@ import Control.Category ((>>>))
 import Control.Applicative ((<|>))
 
 import Data.Maybe (mapMaybe)
-import qualified Data.Map as M
+import Data.Map qualified as M
 
 import Language.PureScript.AST.Declarations
 import Language.PureScript.Types

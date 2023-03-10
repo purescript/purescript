@@ -37,10 +37,10 @@ import Data.Functor (($>))
 import Data.Functor.Identity (Identity(..), runIdentity)
 import Data.List (groupBy, sortOn)
 import Data.Maybe (mapMaybe, listToMaybe)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Ord (Down(..))
 
-import qualified Language.PureScript.Constants.Libs as C
+import Language.PureScript.Constants.Libs qualified as C
 
 -- |
 -- Removes unary negation operators and replaces them with calls to `negate`.

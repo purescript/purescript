@@ -6,7 +6,7 @@ import           Protolude                     hiding (isPrefixOf)
 import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Imports
 
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 
 matchImport :: Maybe P.ModuleName -> P.ModuleName -> IdeDeclarationAnn -> Import -> Bool
 matchImport matchQualifier declMod (IdeDeclarationAnn _ decl) (Import importMod declTy qualifier) | declMod == importMod && matchQualifier == qualifier =

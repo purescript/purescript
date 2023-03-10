@@ -18,8 +18,8 @@ import Control.Monad.Writer.Class
 
 import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe)
-import qualified Data.Map as M
-import qualified Data.Text as T
+import Data.Map qualified as M
+import Data.Text qualified as T
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Declarations
@@ -31,7 +31,7 @@ import Language.PureScript.Names as P
 import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)
 import Language.PureScript.Traversals
 import Language.PureScript.Types as P
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Prim qualified as C
 
 -- | There are two modes of failure for the redundancy check:
 --

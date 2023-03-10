@@ -12,14 +12,14 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Align (align, unalign)
 import Data.Foldable (foldl1, foldr1)
 import Data.List (init, last, zipWith3, (!!))
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.These (These(..), mergeTheseWith, these)
 
 import Control.Monad.Supply.Class
 import Language.PureScript.AST
 import Language.PureScript.AST.Utils
-import qualified Language.PureScript.Constants.Libs as Libs
-import qualified Language.PureScript.Constants.Prim as Prim
+import Language.PureScript.Constants.Libs qualified as Libs
+import Language.PureScript.Constants.Prim qualified as Prim
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors hiding (nonEmpty)

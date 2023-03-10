@@ -12,7 +12,7 @@ import           Data.List (foldl')
 import           Language.PureScript.AST
 import           Language.PureScript.Errors
 import           Language.PureScript.Names
-import qualified Language.PureScript.Constants.Libs as C
+import Language.PureScript.Constants.Libs qualified as C
 
 -- | Replace all @AdoNotationBind@ and @AdoNotationValue@ constructors with
 -- applications of the pure and apply functions in scope, and all @AdoNotationLet@

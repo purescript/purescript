@@ -24,15 +24,15 @@ import           Control.Monad.Writer.Strict (runWriterT)
 import           Data.Function (on)
 import           Data.Foldable (fold, for_)
 import           Data.List (foldl', sortOn)
-import qualified Data.List.NonEmpty as NEL
+import Data.List.NonEmpty qualified as NEL
 import           Data.Maybe (fromMaybe)
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.Text as T
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text qualified as T
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
-import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.Docs.Convert as Docs
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Docs.Convert qualified as Docs
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs
@@ -43,11 +43,11 @@ import           Language.PureScript.Renamer
 import           Language.PureScript.Sugar
 import           Language.PureScript.TypeChecker
 import           Language.PureScript.Make.BuildPlan
-import qualified Language.PureScript.Make.BuildPlan as BuildPlan
-import qualified Language.PureScript.Make.Cache as Cache
+import Language.PureScript.Make.BuildPlan qualified as BuildPlan
+import Language.PureScript.Make.Cache qualified as Cache
 import           Language.PureScript.Make.Actions as Actions
 import           Language.PureScript.Make.Monad as Monad
-import qualified Language.PureScript.CoreFn as CF
+import Language.PureScript.CoreFn qualified as CF
 import           System.Directory (doesFileExist)
 import           System.FilePath (replaceExtension)
 

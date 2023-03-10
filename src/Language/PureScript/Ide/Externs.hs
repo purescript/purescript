@@ -11,9 +11,9 @@ import           Codec.CBOR.Term as Term
 import           Control.Lens hiding (anyOf)
 import           "monad-logger" Control.Monad.Logger
 import           Data.Version (showVersion)
-import qualified Data.Text as Text
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Make.Monad as Make
+import Data.Text qualified as Text
+import Language.PureScript qualified as P
+import Language.PureScript.Make.Monad qualified as Make
 import           Language.PureScript.Ide.Error (IdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util (properNameT)

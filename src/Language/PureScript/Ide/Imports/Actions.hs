@@ -18,7 +18,7 @@ import           Data.List                          (nubBy)
 import qualified Data.Map                           as Map
 import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Prim qualified as C
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Filter

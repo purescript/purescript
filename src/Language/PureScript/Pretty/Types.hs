@@ -27,7 +27,7 @@ import Control.PatternArrows as PA
 import Data.Bifunctor (first)
 import Data.Maybe (fromMaybe, catMaybes)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment

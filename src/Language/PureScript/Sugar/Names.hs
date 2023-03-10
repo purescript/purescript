@@ -18,10 +18,10 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
 import Control.Monad.Writer (MonadWriter(..))
 
-import qualified Data.List.NonEmpty as NEL
+import Data.List.NonEmpty qualified as NEL
 import Data.Maybe (fromMaybe, mapMaybe)
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 
 import Language.PureScript.AST
 import Language.PureScript.Crash

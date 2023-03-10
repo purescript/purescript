@@ -18,12 +18,12 @@ import           Control.Monad hiding (sequence)
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import           Data.Foldable (foldl')
-import qualified Data.Map as M
+import Data.Map qualified as M
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Time.Clock (UTCTime)
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
-import qualified Language.PureScript.CST as CST
+import Language.PureScript.CST qualified as CST
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs
 import           Language.PureScript.Make.Actions as Actions

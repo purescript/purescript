@@ -9,12 +9,12 @@ import Data.Either (rights)
 import Data.Functor.Identity
 import Data.List (sortOn)
 import Data.Maybe (mapMaybe, fromJust)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Map as M
+import Data.List.NonEmpty qualified as NEL
+import Data.Map qualified as M
 
-import qualified Text.Parsec as P
-import qualified Text.Parsec.Pos as P
-import qualified Text.Parsec.Expr as P
+import Text.Parsec qualified as P
+import Text.Parsec.Pos qualified as P
+import Text.Parsec.Expr qualified as P
 
 import Language.PureScript.AST
 import Language.PureScript.Crash

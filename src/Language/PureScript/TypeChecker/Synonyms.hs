@@ -15,7 +15,7 @@ import           Prelude
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.State
 import           Data.Maybe (fromMaybe)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import           Data.Text (Text)
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors

@@ -9,13 +9,13 @@ import Control.Monad.State (StateT, modify, get)
 
 import Data.List (elemIndices, intersperse)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..), nullSourceSpan)
 import Language.PureScript.CST.Lexer (isUnquotedKey)
 
 import Text.PrettyPrint.Boxes hiding ((<>))
-import qualified Text.PrettyPrint.Boxes as Box
+import Text.PrettyPrint.Boxes qualified as Box
 
 parensT :: Text -> Text
 parensT s = "(" <> s <> ")"

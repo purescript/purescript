@@ -9,9 +9,9 @@ module Language.PureScript.Ide.Usage
 import           Protolude hiding (moduleName)
 
 import           Control.Lens (preview)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Language.PureScript as P
+import Data.Map qualified as Map
+import Data.Set qualified as Set
+import Language.PureScript qualified as P
 import           Language.PureScript.Ide.State (getAllModules, getFileState)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util

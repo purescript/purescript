@@ -18,10 +18,10 @@ module Language.PureScript.Ide.Error
        ) where
 
 import           Data.Aeson
-import qualified Data.Aeson.Types as Aeson
-import qualified Data.Aeson.KeyMap as KM
-import qualified Data.Text as T
-import qualified Language.PureScript as P
+import Data.Aeson.Types qualified as Aeson
+import Data.Aeson.KeyMap qualified as KM
+import Data.Text qualified as T
+import Language.PureScript qualified as P
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Types   (ModuleIdent, Completion(..))
 import           Protolude

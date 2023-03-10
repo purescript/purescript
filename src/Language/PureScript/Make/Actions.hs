@@ -24,26 +24,26 @@ import           Data.Aeson (Value(String), (.=), object)
 import           Data.Bifunctor (bimap, first)
 import           Data.Either (partitionEithers)
 import           Data.Foldable (for_)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Map as M
+import Data.List.NonEmpty qualified as NEL
+import Data.Map qualified as M
 import           Data.Maybe (fromMaybe, maybeToList)
-import qualified Data.Set as S
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-import qualified Data.Text.Encoding as TE
+import Data.Set qualified as S
+import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
+import Data.Text.Encoding qualified as TE
 import           Data.Time.Clock (UTCTime)
 import           Data.Version (showVersion)
-import qualified Language.JavaScript.Parser as JS
+import Language.JavaScript.Parser qualified as JS
 import           Language.PureScript.AST
-import qualified Language.PureScript.Bundle as Bundle
-import qualified Language.PureScript.CodeGen.JS as J
+import Language.PureScript.Bundle qualified as Bundle
+import Language.PureScript.CodeGen.JS qualified as J
 import           Language.PureScript.CodeGen.JS.Printer
-import qualified Language.PureScript.CoreFn as CF
-import qualified Language.PureScript.CoreFn.ToJSON as CFJ
+import Language.PureScript.CoreFn qualified as CF
+import Language.PureScript.CoreFn.ToJSON qualified as CFJ
 import           Language.PureScript.Crash
-import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.Docs.Prim as Docs.Prim
-import qualified Language.PureScript.Docs.Types as Docs
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Docs.Prim qualified as Docs.Prim
+import Language.PureScript.Docs.Types qualified as Docs
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs (ExternsFile, externsFileName)
 import           Language.PureScript.Make.Monad
@@ -56,7 +56,7 @@ import           SourceMap
 import           SourceMap.Types
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath ((</>), makeRelative, splitPath, normalise, splitDirectories)
-import qualified System.FilePath.Posix as Posix
+import System.FilePath.Posix qualified as Posix
 import           System.IO (stderr)
 
 -- | Determines when to rebuild a module

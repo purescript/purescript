@@ -171,7 +171,7 @@ module Language.PureScript.CST.Layout where
 import Prelude
 
 import Data.DList (snoc)
-import qualified Data.DList as DList
+import Data.DList qualified as DList
 import Data.Foldable (find)
 import Data.Function ((&))
 import Language.PureScript.CST.Types

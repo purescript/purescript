@@ -2,11 +2,11 @@ module Language.PureScript.Ide.Prim (idePrimDeclarations) where
 
 import           Protolude
 
-import qualified Data.Text as T
-import qualified Data.Map as Map
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Constants.Prim as C
-import qualified Language.PureScript.Environment as PEnv
+import Data.Text qualified as T
+import Data.Map qualified as Map
+import Language.PureScript qualified as P
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Environment qualified as PEnv
 import           Language.PureScript.Ide.Types
 
 idePrimDeclarations :: ModuleMap [IdeDeclarationAnn]

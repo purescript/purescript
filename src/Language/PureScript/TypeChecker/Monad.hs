@@ -13,10 +13,10 @@ import Control.Monad.State
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Maybe
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 import Data.Text (Text, isPrefixOf, unpack)
-import qualified Data.List.NonEmpty as NEL
+import Data.List.NonEmpty qualified as NEL
 
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment

@@ -9,7 +9,7 @@ import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.List (foldl', find, unzip5)
 import           Language.PureScript.AST
 import           Language.PureScript.AST.Utils
-import qualified Language.PureScript.Constants.Libs as Libs
+import Language.PureScript.Constants.Libs qualified as Libs
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors

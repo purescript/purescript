@@ -28,15 +28,15 @@ import           Protolude                     hiding (isPrefixOf, Prefix)
 import           Control.Monad.Fail (fail)
 import           Data.Aeson
 import           Data.Text (isPrefixOf)
-import qualified Data.Set as Set
-import qualified Data.Map as Map
+import Data.Set qualified as Set
+import Data.Map qualified as Map
 import           Language.PureScript.Ide.Filter.Declaration (DeclarationType)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Imports
 import           Language.PureScript.Ide.Util
 
 import qualified Language.PureScript           as P
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.Ide.Filter.Imports 
 

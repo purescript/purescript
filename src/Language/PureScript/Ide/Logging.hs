@@ -10,7 +10,7 @@ module Language.PureScript.Ide.Logging
 import           Protolude
 
 import           "monad-logger" Control.Monad.Logger
-import qualified Data.Text as T
+import Data.Text qualified as T
 import           Language.PureScript.Ide.Types
 import           System.Clock
 import           Text.Printf

@@ -13,7 +13,7 @@ import Data.Function (on)
 import Data.Foldable (traverse_)
 import Data.List (intersect, groupBy, sortOn)
 import Data.Maybe (fromMaybe, mapMaybe)
-import qualified Data.Map as M
+import Data.Map qualified as M
 
 import Language.PureScript.AST
 import Language.PureScript.Crash

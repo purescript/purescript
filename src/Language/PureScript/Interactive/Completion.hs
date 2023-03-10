@@ -15,9 +15,9 @@ import           Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
 import           Data.List (nub, isPrefixOf, isInfixOf, isSuffixOf, sortBy, stripPrefix)
 import           Data.Map (keys)
 import           Data.Maybe (mapMaybe)
-import qualified Data.Text as T
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Interactive.Directive as D
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.Interactive.Directive qualified as D
 import           Language.PureScript.Interactive.Types
 import           System.Console.Haskeline
 

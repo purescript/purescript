@@ -13,10 +13,10 @@ import           Control.Applicative ((<|>))
 
 import           Data.Aeson
 import           Data.Aeson.Types (Parser, listParser)
-import qualified Data.Map.Strict as M
+import Data.Map.Strict qualified as M
 import           Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Vector as V
+import Data.Text qualified as T
+import Data.Vector qualified as V
 import           Data.Version (Version, parseVersion)
 
 import           Language.PureScript.AST.SourcePos (SourceSpan(..))

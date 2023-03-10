@@ -12,9 +12,9 @@ import Prelude hiding ((<>))
 import Control.Arrow (second)
 
 import Data.Text (Text)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Monoid as Monoid ((<>))
-import qualified Data.Text as T
+import Data.List.NonEmpty qualified as NEL
+import Data.Monoid qualified as Monoid ((<>))
+import Data.Text qualified as T
 
 import Language.PureScript.AST
 import Language.PureScript.Crash

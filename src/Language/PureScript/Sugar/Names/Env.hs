@@ -29,10 +29,10 @@ import Data.Foldable (find)
 import Data.List (groupBy, sortOn, delete)
 import Data.Maybe (mapMaybe)
 import Safe (headMay)
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment

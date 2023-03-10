@@ -11,14 +11,14 @@ import           Prelude
 
 import           Control.Arrow ((***))
 import           Data.Either (isLeft)
-import qualified Data.Map.Strict as M
+import Data.Map.Strict qualified as M
 import           Data.Aeson hiding ((.=))
 import qualified Data.Aeson
 import qualified Data.Aeson.Key
 import           Data.Aeson.Types (Pair)
 import           Data.Version (Version, showVersion)
 import           Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import           Language.PureScript.AST.Literals
 import           Language.PureScript.AST.SourcePos (SourceSpan(..))

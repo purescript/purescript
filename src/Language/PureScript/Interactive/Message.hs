@@ -5,7 +5,7 @@ import           Prelude
 import           Data.List (intercalate)
 import           Data.Version (showVersion)
 import qualified Paths_purescript as Paths
-import qualified Language.PureScript.Interactive.Directive as D
+import Language.PureScript.Interactive.Directive qualified as D
 import           Language.PureScript.Interactive.Types
 
 -- Messages

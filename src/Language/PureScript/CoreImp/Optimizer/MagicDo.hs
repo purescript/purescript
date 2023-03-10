@@ -11,7 +11,7 @@ import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (mkString)
-import qualified Language.PureScript.Constants.Libs as C
+import Language.PureScript.Constants.Libs qualified as C
 
 -- | Inline type class dictionaries for >>= and return for the Eff monad
 --
