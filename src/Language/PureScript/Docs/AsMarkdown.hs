@@ -15,30 +15,21 @@ import Data.List (partition)
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.Docs.RenderedCode.Types
-    ( outputWith,
-      RenderedCode,
-      RenderedCodeElement(Role, Syntax, Keyword, Space, Symbol) )
-import Language.PureScript.Docs.Types
-    ( ignorePackage,
-      ChildDeclaration(..),
-      ChildDeclarationInfo(ChildInstance, ChildDataConstructor,
-                           ChildTypeClassMember),
-      Declaration(..),
-      Module(..) )
-import Language.PureScript.Names qualified as P ( runModuleName )
+import Language.PureScript.Docs.RenderedCode.Types ( outputWith, RenderedCode, RenderedCodeElement(Role, Syntax, Keyword, Space, Symbol) )
+import Language.PureScript.Docs.Types ( ignorePackage, ChildDeclaration(..), ChildDeclarationInfo(ChildInstance, ChildDataConstructor, ChildTypeClassMember), Declaration(..), Module(..) )
+import Language.PureScript.Names qualified as PN
 import Language.PureScript.Docs.Render qualified as Render
 
 moduleAsMarkdown :: Module -> Docs
 moduleAsMarkdown Module{..} = do
-  headerLevel 2 $ "Module " <> P.runModuleName modName
+  headerLevel 2 $ "Module " <> PN.runModuleName modName
   spacer
   for_ modComments tell'
   mapM_ declAsMarkdown modDeclarations
   spacer
   for_ modReExports $ \(mn', decls) -> do
     let mn = ignorePackage mn'
-    headerLevel 3 $ "Re-exported from " <> P.runModuleName mn <> ":"
+    headerLevel 3 $ "Re-exported from " <> PN.runModuleName mn <> ":"
     spacer
     mapM_ declAsMarkdown decls
 
