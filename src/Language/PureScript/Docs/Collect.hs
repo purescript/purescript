@@ -17,20 +17,16 @@ import System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
 
 import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Prim (primModules)
-import Language.PureScript.Docs.Types
-    ( asModule,
-      displayPackageError,
-      ignorePackage,
-      InPackage(..),
-      Module(modName) )
+import Language.PureScript.Docs.Types ( asModule, displayPackageError, ignorePackage, InPackage(..), Module(modName) )
 
-import Language.PureScript.CST qualified as P
-import Language.PureScript.Crash qualified as P
-import Language.PureScript.Errors qualified as P
-import Language.PureScript.Externs qualified as P
-import Language.PureScript.Make qualified as P
-import Language.PureScript.Names qualified as P
-import Language.PureScript.Options qualified as P
+import Language.PureScript.AST.Declarations qualified as ASTD
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors)
+import Language.PureScript.Externs ( ExternsFile ) 
+import Language.PureScript.Make ( runMake, buildMakeActions, renderProgressMessage, MakeActions(progress), inferForeignModules, make )
+import Language.PureScript.Names qualified as PN
+import Language.PureScript.Options qualified as POpt
 
 import Web.Bower.PackageMeta (PackageName)
 
@@ -46,11 +42,11 @@ import Web.Bower.PackageMeta (PackageName)
 --
 collectDocs ::
   forall m.
-  (MonadError P.MultipleErrors m, MonadIO m) =>
+  (MonadError MultipleErrors m, MonadIO m) =>
   FilePath ->
   [FilePath] ->
   [(PackageName, FilePath)] ->
-  m ([(FilePath, Module)], Map P.ModuleName PackageName)
+  m ([(FilePath, Module)], Map PN.ModuleName PackageName)
 collectDocs outputDir inputFiles depsFiles = do
   (modulePaths, modulesDeps) <- getModulePackageInfo inputFiles depsFiles
   externs <- compileForDocs outputDir (map fst modulePaths)
@@ -68,15 +64,15 @@ collectDocs outputDir inputFiles depsFiles = do
   where
   packageDiscriminators modulesDeps =
     let
-      shouldKeep mn = isLocal mn && not (P.isBuiltinModuleName mn)
+      shouldKeep mn = isLocal mn && not (PN.isBuiltinModuleName mn)
 
-      withPackage :: P.ModuleName -> InPackage P.ModuleName
+      withPackage :: PN.ModuleName -> InPackage PN.ModuleName
       withPackage mn =
         case Map.lookup mn modulesDeps of
           Just pkgName -> FromDep pkgName mn
           Nothing -> Local mn
 
-      isLocal :: P.ModuleName -> Bool
+      isLocal :: PN.ModuleName -> Bool
       isLocal = not . flip Map.member modulesDeps
     in
       (withPackage, shouldKeep)
@@ -87,45 +83,45 @@ collectDocs outputDir inputFiles depsFiles = do
 --
 compileForDocs ::
   forall m.
-  (MonadError P.MultipleErrors m, MonadIO m) =>
+  (MonadError MultipleErrors m, MonadIO m) =>
   FilePath ->
   [FilePath] ->
-  m [P.ExternsFile]
+  m [ExternsFile]
 compileForDocs outputDir inputFiles = do
   result <- liftIO $ do
     moduleFiles <- readUTF8FilesT inputFiles
-    fmap fst $ P.runMake testOptions $ do
-      ms <- P.parseModulesFromFiles identity moduleFiles
-      let filePathMap = Map.fromList $ map (\(fp, pm) -> (P.getModuleName $ P.resPartial pm, Right fp)) ms
-      foreigns <- P.inferForeignModules filePathMap
+    fmap fst $ runMake testOptions $ do
+      ms <- CST.parseModulesFromFiles identity moduleFiles
+      let filePathMap = Map.fromList $ map (\(fp, pm) -> (ASTD.getModuleName $ CST.resPartial pm, Right fp)) ms
+      foreigns <- inferForeignModules filePathMap
       let makeActions =
-            (P.buildMakeActions outputDir filePathMap foreigns False)
-              { P.progress = liftIO . TIO.hPutStr stdout . (<> "\n") . P.renderProgressMessage "Compiling documentation for "
+            (buildMakeActions outputDir filePathMap foreigns False)
+              { progress = liftIO . TIO.hPutStr stdout . (<> "\n") . renderProgressMessage "Compiling documentation for "
               }
-      P.make makeActions (map snd ms)
+      make makeActions (map snd ms)
   either throwError return result
 
   where
-  testOptions :: P.Options
-  testOptions = P.defaultOptions { P.optionsCodegenTargets = Set.singleton P.Docs }
+  testOptions :: POpt.Options
+  testOptions = POpt.defaultOptions { POpt.optionsCodegenTargets = Set.singleton POpt.Docs }
 
-parseDocsJsonFile :: FilePath -> P.ModuleName -> IO Module
+parseDocsJsonFile :: FilePath -> PN.ModuleName -> IO Module
 parseDocsJsonFile outputDir mn =
   let
-    filePath = outputDir </> T.unpack (P.runModuleName mn) </> "docs.json"
+    filePath = outputDir </> T.unpack (PN.runModuleName mn) </> "docs.json"
   in do
     str <- BS.readFile filePath
     case ABE.parseStrict asModule str of
       Right m -> pure m
-      Left err -> P.internalError $
+      Left err -> internalError $
         "Failed to decode: " ++ filePath ++
         intercalate "\n" (map T.unpack (ABE.displayError displayPackageError err))
 
 addReExports ::
-  (MonadError P.MultipleErrors m) =>
-  (P.ModuleName -> InPackage P.ModuleName) ->
+  (MonadError MultipleErrors m) =>
+  (PN.ModuleName -> InPackage PN.ModuleName) ->
   [Module] ->
-  [P.ExternsFile] ->
+  [ExternsFile] ->
   m [Module]
 addReExports withPackage docsModules externs = do
   -- We add the Prim docs modules here, so that docs generation is still
@@ -167,7 +163,7 @@ operateAndRetag keyA keyB operation input =
   findTag key =
     case Map.lookup key tags of
       Just tag -> tag
-      Nothing -> P.internalError ("Missing tag for: " ++ show key)
+      Nothing -> internalError ("Missing tag for: " ++ show key)
 
   retag :: b -> (tag, b)
   retag b = (findTag (keyB b), b)
@@ -191,10 +187,10 @@ operateAndRetag keyA keyB operation input =
 --      safely be
 --      assumed to be local.
 getModulePackageInfo ::
-  (MonadError P.MultipleErrors m, MonadIO m) =>
+  (MonadError MultipleErrors m, MonadIO m) =>
   [FilePath]
   -> [(PackageName, FilePath)]
-  -> m ([(FilePath, P.ModuleName)], Map P.ModuleName PackageName)
+  -> m ([(FilePath, PN.ModuleName)], Map PN.ModuleName PackageName)
 getModulePackageInfo inputFiles depsFiles = do
   inputFiles' <- traverse (readFileAs . Local) inputFiles
   depsFiles'  <- traverse (readFileAs . uncurry FromDep) depsFiles
@@ -209,13 +205,13 @@ getModulePackageInfo inputFiles depsFiles = do
 
   where
   getModuleNames ::
-    (MonadError P.MultipleErrors m) =>
+    (MonadError MultipleErrors m) =>
     [(InPackage FilePath, Text)]
-    -> m [(InPackage FilePath, P.ModuleName)]
+    -> m [(InPackage FilePath, PN.ModuleName)]
   getModuleNames =
-    fmap (map (second (P.getModuleName . P.resPartial)))
+    fmap (map (second (ASTD.getModuleName . CST.resPartial)))
     . either throwError return
-    . P.parseModulesFromFiles ignorePackage
+    . CST.parseModulesFromFiles ignorePackage
 
   getPkgName = \case
     Local _ -> Nothing
