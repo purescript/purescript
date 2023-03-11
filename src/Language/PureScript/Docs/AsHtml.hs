@@ -13,7 +13,8 @@ module Language.PureScript.Docs.AsHtml (
   renderMarkdown
 ) where
 
-import Prelude
+import Prelude hiding (lex)
+
 import Control.Category ((>>>))
 import Control.Monad (unless)
 import Data.Bifunctor (bimap)
@@ -31,18 +32,18 @@ import Text.Blaze.Html5 as H hiding (map)
 import Text.Blaze.Html5.Attributes qualified as A
 import Cheapskate qualified
 
-import Language.PureScript.AST.Operators qualified as P ( Associativity(Infix, Infixl, Infixr), Fixity(..) )
-import Language.PureScript.AST.SourcePos qualified as P ( SourceSpan )
-import Language.PureScript.Crash qualified as P ( internalError )
-import Language.PureScript.Names qualified as P ( runIdent, runModuleName, showQualified, ModuleName, ProperName(runProperName) )
+import Language.PureScript.AST.Operators qualified as ASTO
+import Language.PureScript.AST.SourcePos ( SourceSpan )
+import Language.PureScript.Crash ( internalError )
+import Language.PureScript.Names qualified as P
 
 import Language.PureScript.Docs.Types ( ContainingModule, FixityAlias, Namespace(..), RenderedCode, RenderedCodeElement(Role, Syntax, Keyword, Space, Symbol), childDeclInfoNamespace, declInfoNamespace, ChildDeclaration(cdeclInfo, cdeclComments, cdeclTitle), ChildDeclarationInfo(ChildTypeClassMember, ChildInstance, ChildDataConstructor), Declaration(..), DeclarationInfo(AliasDeclaration), DocLink(..), InPackage(Local), LinkLocation(BuiltinModule, LocalModule, DepsModule), Module(..), Package(..) )
 import Language.PureScript.Docs.RenderedCode.Types ( outputWith, Link(NoLink, Link) )
 import Language.PureScript.Docs.Render qualified as Render
-import Language.PureScript.CST.Errors qualified as CST ( prettyPrintError )
-import Language.PureScript.CST.Lexer qualified as CST ( lex )
-import Language.PureScript.CST.Monad qualified as CST ( runTokenParser, Parser )
-import Language.PureScript.CST.Parser qualified as CST ( parseOperator )
+import Language.PureScript.CST.Errors ( prettyPrintError )
+import Language.PureScript.CST.Lexer ( lex )
+import Language.PureScript.CST.Monad ( runTokenParser, Parser )
+import Language.PureScript.CST.Parser ( parseOperator )
 
 data HtmlOutput a = HtmlOutput
   { htmlIndex     :: [(Maybe Char, a)]
@@ -59,7 +60,7 @@ data HtmlOutputModule a = HtmlOutputModule
 data HtmlRenderContext = HtmlRenderContext
   { buildDocLink :: Namespace -> Text -> ContainingModule -> Maybe DocLink
   , renderDocLink :: DocLink -> Text
-  , renderSourceLink :: P.SourceSpan -> Maybe Text
+  , renderSourceLink :: SourceSpan -> Maybe Text
   }
 
 -- |
@@ -170,7 +171,7 @@ declAsHtml r d@Declaration{..} = do
         h4 "Instances"
         renderChildren r instances
   where
-    linkToSource :: HtmlRenderContext -> P.SourceSpan -> Html
+    linkToSource :: HtmlRenderContext -> SourceSpan -> Html
     linkToSource ctx srcspan =
       maybe (return ()) go (renderSourceLink ctx srcspan)
       where
@@ -225,7 +226,7 @@ codeAsHtml r = outputWith elemAsHtml
         -- representational is intentionally not rendered
         "representational" -> toHtml ("" :: Text)
 
-        x -> P.internalError $ "codeAsHtml: unknown value for role annotation: '" <> T.unpack x <> "'"
+        x -> internalError $ "codeAsHtml: unknown value for role annotation: '" <> T.unpack x <> "'"
       where
         renderRole hoverTextContent className =
           H.a ! A.href (v docRepoRolePage) ! A.target (v "_blank") ! A.class_ "decl__role" $ do
@@ -246,13 +247,13 @@ codeAsHtml r = outputWith elemAsHtml
   startsWithUpper :: Text -> Bool
   startsWithUpper str = not (T.null str) && isUpper (T.index str 0)
 
-  isOp = isRight . runParser CST.parseOperator
+  isOp = isRight . runParser parseOperator
 
-  runParser :: CST.Parser a -> Text -> Either String a
+  runParser :: Parser a -> Text -> Either String a
   runParser p' =
-    bimap (CST.prettyPrintError . NE.head) snd
-      . CST.runTokenParser p'
-      . CST.lex
+    bimap (prettyPrintError . NE.head) snd
+      . runTokenParser p'
+      . lex
 
 renderLink :: HtmlRenderContext -> DocLink -> Html -> Html
 renderLink r link_@DocLink{..} =
@@ -290,8 +291,8 @@ linkToDeclaration ::
 linkToDeclaration r ns target containMn =
   maybe id (renderLink r) (buildDocLink r ns target containMn)
 
-renderAlias :: P.Fixity -> FixityAlias -> Html
-renderAlias (P.Fixity associativity precedence) alias_ =
+renderAlias :: ASTO.Fixity -> FixityAlias -> Html
+renderAlias (ASTO.Fixity associativity precedence) alias_ =
   p $ do
     -- TODO: Render a link
     toHtml $ "Operator alias for " <> P.showQualified showAliasName alias_ <> " "
@@ -303,9 +304,9 @@ renderAlias (P.Fixity associativity precedence) alias_ =
     (Left identifier)  -> P.runIdent identifier
     (Right properName) -> P.runProperName properName
   associativityStr = case associativity of
-    P.Infixl -> "left-associative"
-    P.Infixr -> "right-associative"
-    P.Infix  -> "non-associative"
+    ASTO.Infixl -> "left-associative"
+    ASTO.Infixr -> "right-associative"
+    ASTO.Infix  -> "non-associative"
 
 -- | Render Markdown to HTML. Safe for untrusted input. Relative links are
 -- | removed.
