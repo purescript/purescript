@@ -14,11 +14,11 @@ import Language.PureScript.Docs.Types ( convertFundepsToStrings, isType, isTypeC
 import Language.PureScript.AST.Declarations qualified as P ( pattern MkUnguarded, pattern TypeFixityDeclaration, pattern ValueDecl, pattern ValueFixityDeclaration, DataConstructorDeclaration(..), Declaration(RoleDeclaration, ValueDeclaration, ExternDeclaration, DataDeclaration, ExternDataDeclaration, TypeSynonymDeclaration, TypeClassDeclaration, TypeDeclaration, TypeInstanceDeclaration, KindDeclaration), Expr(TypedValue), KindSignatureFor, Module(..), RoleDeclarationData(RoleDeclarationData, rdeclSourceAnn, rdeclRoles, rdeclIdent), TypeDeclarationData(TypeDeclarationData), ValueDeclarationData(valdeclIdent) )
 import Language.PureScript.AST.Exported qualified as P ( exportedDeclarations )
 import Language.PureScript.AST.SourcePos qualified as P ( SourceAnn )
-import Language.PureScript.Comments qualified as P
-import Language.PureScript.Crash qualified as P
-import Language.PureScript.Names qualified as P
-import Language.PureScript.Roles qualified as P
-import Language.PureScript.Types qualified as P
+import Language.PureScript.Comments as P ( Comment(..) )
+import Language.PureScript.Crash as P ( internalError )
+import Language.PureScript.Names as P ( coerceProperName, showIdent, showOp, ProperName(runProperName), Qualified(Qualified) )
+import Language.PureScript.Roles as P ( Role )
+import Language.PureScript.Types as P ( everythingOnTypes, srcTypeApp, srcTypeConstructor, Type(TypeConstructor, TypeWildcard), WildcardData(UnnamedWildcard) )
 
 -- |
 -- Convert a single Module, but ignore re-exports; any re-exported types or
