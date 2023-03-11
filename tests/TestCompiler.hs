@@ -24,7 +24,19 @@ module TestCompiler where
 
 import Prelude
 
-import Language.PureScript qualified as P
+import Language.PureScript.AST.SourcePos qualified as P
+    ( SourcePos(SourcePos), SourceSpan(SourceSpan) )
+import Language.PureScript.Errors qualified as P
+    ( defaultPPEOptions,
+      errorCode,
+      errorSpan,
+      prettyPrintMultipleErrors,
+      prettyPrintMultipleWarnings,
+      prettyPrintSingleError,
+      renderBox,
+      ErrorMessage,
+      MultipleErrors(runMultipleErrors),
+      PPEOptions(ppeFileContents) )
 import Language.PureScript.Interactive.IO (readNodeProcessWithExitCode)
 
 import Control.Arrow ((>>>))
@@ -36,18 +48,35 @@ import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 
 
-import Control.Monad
+import Control.Monad ( forM_, when )
 
-import System.Exit
+import System.Exit ( ExitCode(ExitFailure, ExitSuccess) )
 import System.FilePath
-import System.IO
+    ( pathSeparator, (</>), replaceExtension, takeFileName )
+import System.IO ( Handle, hPutStr, hPutStrLn )
 import System.IO.UTF8 (readUTF8File)
 
 import Text.Regex.Base
+    ( RegexContext(match), RegexMaker(makeRegex) )
 import Text.Regex.TDFA (Regex)
 
 import TestUtils
+    ( ExpectedModuleName(IsMain),
+      SupportModules,
+      createOutputFile,
+      getTestFiles,
+      compile,
+      trim,
+      modulesDir,
+      goldenVsString )
 import Test.Hspec
+    ( it,
+      describe,
+      SpecWith,
+      Expectation,
+      beforeAllWith,
+      runIO,
+      expectationFailure )
 
 spec :: SpecWith SupportModules
 spec = do

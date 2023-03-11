@@ -8,8 +8,17 @@ import Control.Monad.Trans.State.Strict (evalStateT)
 import Data.Functor ((<&>))
 import Data.List (sort)
 import Data.Text qualified as T
-import Language.PureScript qualified as P
-import Language.PureScript.Interactive
+import Language.PureScript.AST.Declarations qualified as P
+    ( DeclarationRef(TypeRef, ValueRef),
+      ImportDeclarationType(Explicit, Implicit, Hiding) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( internalModuleSourceSpan )
+import Language.PureScript.Names qualified as P
+    ( moduleNameFromString, Ident(Ident), ProperName(ProperName) )
+import Language.PureScript.Interactive.Completion
+    ( completion', formatCompletions, liftCompletionM, CompletionM )
+import Language.PureScript.Interactive.Types
+    ( updateImportedModules, PSCiState )
 import TestPsci.TestEnv (initTestPSCiEnv)
 import TestUtils (getSupportModuleNames)
 

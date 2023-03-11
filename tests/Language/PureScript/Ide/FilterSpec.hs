@@ -4,12 +4,41 @@ import Protolude
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Language.PureScript.Ide.Filter
+    ( applyFilters,
+      declarationTypeFilter,
+      dependencyFilter,
+      exactFilter,
+      moduleFilter,
+      namespaceFilter,
+      prefixFilter )
 import Language.PureScript.Ide.Filter.Declaration as D
+    ( DeclarationType(ValueOperator, Type, DataConstructor, TypeClass,
+                      TypeOperator, Synonym, Value) )
 import Language.PureScript.Ide.Types
+    ( IdeDeclarationAnn,
+      IdeNamespace(IdeNSType, IdeNSValue),
+      ModuleMap )
 import Language.PureScript.Ide.Imports
+    ( sliceImportSection, Import )
 import Language.PureScript.Ide.Test as T
-import Language.PureScript qualified as P
-import Test.Hspec
+    ( ideType,
+      annLoc,
+      ideValue,
+      ideSynonym,
+      ideTypeClass,
+      ideDtor,
+      ideValueOp,
+      ideTypeOp,
+      synonymSS )
+import Language.PureScript.Environment qualified as P
+    ( kindType, tyString )
+import Language.PureScript.Names qualified as P
+    ( pattern ByNullSourcePos,
+      moduleNameFromString,
+      ModuleName(..),
+      ProperName(ProperName),
+      Qualified(Qualified) )
+import Test.Hspec ( shouldBe, it, describe, Spec )
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 

@@ -7,8 +7,21 @@ import Control.Exception (evaluate)
 import Control.DeepSeq (force)
 import Data.Map qualified as Map
 import Data.Text qualified as Text
-import Language.PureScript qualified as P
-import Language.PureScript.Docs qualified as D
+import Language.PureScript.Environment qualified as P
+    ( primBooleanTypes,
+      primCoerceTypes,
+      primIntTypes,
+      primOrderingTypes,
+      primRowListTypes,
+      primRowTypes,
+      primSymbolTypes,
+      primTypeErrorTypes,
+      primTypes )
+import Language.PureScript.Names qualified as P
+    ( disqualify, ProperName(runProperName) )
+import Language.PureScript.Docs.Prim qualified as D ( primModules )
+import Language.PureScript.Docs.Types qualified as D
+    ( Declaration(declTitle), Module(modDeclarations) )
 
 import Test.Hspec
 

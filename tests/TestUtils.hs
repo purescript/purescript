@@ -2,19 +2,42 @@ module TestUtils where
 
 import Prelude
 
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( getModuleName, Module )
+import Language.PureScript.Crash qualified as P ( internalError )
+import Language.PureScript.Errors qualified as P
+    ( defaultPPEOptions,
+      prettyPrintMultipleErrors,
+      MultipleErrors )
+import Language.PureScript.Externs qualified as P ( ExternsFile )
+import Language.PureScript.Make qualified as P
+    ( runMake,
+      Make,
+      buildMakeActions,
+      MakeActions(progress, getInputTimestampsAndHashes,
+                  getOutputTimestamp),
+      RebuildPolicy(..),
+      inferForeignModules,
+      make,
+      rebuildModule )
+import Language.PureScript.Names qualified as P
+    ( runModuleName, ModuleName )
+import Language.PureScript.Options qualified as P
+    ( defaultOptions, Options )
 import Language.PureScript.CST qualified as CST
-import Language.PureScript.AST qualified as AST
+import Language.PureScript.AST.Declarations qualified as AST
+    ( Module(..) )
 import Language.PureScript.Names qualified as N
 import Language.PureScript.Interactive.IO (findNodeProcess)
 
 import Control.Arrow ((***), (>>>))
-import Control.Monad
 import Control.Monad.Reader
-import Control.Monad.Trans.Except
-import Control.Monad.Trans.Maybe
+    ( guard, unless, forM, MonadIO(..), MonadTrans(lift) )
+import Control.Monad.Trans.Except ( ExceptT(ExceptT), runExceptT )
+import Control.Monad.Trans.Maybe ( MaybeT(MaybeT, runMaybeT) )
 import Control.Monad.Writer.Class (tell)
 import Control.Exception
+    ( catch, throwIO, IOException, try, tryJust, throw )
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.Char (isSpace)
@@ -27,15 +50,31 @@ import Data.Text.Encoding qualified as T
 import Data.Time.Clock (UTCTime(), diffUTCTime, getCurrentTime, nominalDay)
 import Data.Tuple (swap)
 import System.Directory
+    ( createDirectoryIfMissing,
+      doesDirectoryExist,
+      getCurrentDirectory,
+      getModificationTime,
+      getTemporaryDirectory,
+      listDirectory,
+      setCurrentDirectory,
+      withCurrentDirectory )
 import System.Exit (exitFailure)
 import System.Environment (lookupEnv)
 import System.FilePath
+    ( makeRelative,
+      (</>),
+      dropExtensions,
+      takeDirectory,
+      takeExtensions,
+      takeFileName )
 import System.IO.Error (isDoesNotExistError)
 import System.IO.UTF8 (readUTF8FileT)
-import System.Process hiding (cwd)
+import System.Process ( callCommand, callProcess )
 import System.FilePath.Glob qualified as Glob
 import System.IO
+    ( Handle, openFile, stderr, IOMode(WriteMode), hPutStrLn )
 import Test.Hspec
+    ( HasCallStack, Expectation, pendingWith, expectationFailure )
 
 -- |
 -- Fetches code necessary to run the tests with. The resulting support code

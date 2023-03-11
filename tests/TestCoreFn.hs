@@ -4,21 +4,44 @@ module TestCoreFn (spec) where
 
 import Prelude
 
-import Data.Aeson
-import Data.Aeson.Types as Aeson
-import Data.Map as M
-import Data.Version
+import Data.Aeson ( Value, Result(Error) )
+import Data.Aeson.Types as Aeson ( Result(Success), parse )
+import Data.Map as M ( empty, singleton )
+import Data.Version ( Version(Version) )
 
 import Language.PureScript.AST.Literals
+    ( Literal(CharLiteral, ArrayLiteral, NumericLiteral, ObjectLiteral,
+              StringLiteral, BooleanLiteral) )
 import Language.PureScript.AST.SourcePos
+    ( SourcePos(SourcePos), SourceSpan(SourceSpan) )
 import Language.PureScript.Comments
-import Language.PureScript.CoreFn
-import Language.PureScript.CoreFn.FromJSON
-import Language.PureScript.CoreFn.ToJSON
+    ( Comment(BlockComment, LineComment) )
+import Language.PureScript.CoreFn.Ann ( ssAnn, Ann )
+import Language.PureScript.CoreFn.Binders
+    ( Binder(VarBinder, NullBinder, LiteralBinder, ConstructorBinder,
+             NamedBinder) )
+import Language.PureScript.CoreFn.Expr
+    ( Bind(NonRec, Rec),
+      CaseAlternative(CaseAlternative),
+      Expr(Literal, Constructor, Accessor, ObjectUpdate, App, Abs, Let,
+           Case, Var) )
+import Language.PureScript.CoreFn.Meta
+    ( ConstructorType(SumType, ProductType),
+      Meta(IsForeign, IsConstructor, IsNewtype, IsTypeClassConstructor) )
+import Language.PureScript.CoreFn.Module ( Module(..) )
+import Language.PureScript.CoreFn.FromJSON ( moduleFromJSON )
+import Language.PureScript.CoreFn.ToJSON ( moduleToJSON )
 import Language.PureScript.Names
-import Language.PureScript.PSString
+    ( pattern ByNullSourcePos,
+      Ident(Ident, UnusedIdent),
+      ModuleName(ModuleName),
+      ProperName(ProperName),
+      Qualified(Qualified),
+      QualifiedBy(ByModuleName) )
+import Language.PureScript.PSString ( mkString )
 
 import Test.Hspec
+    ( shouldSatisfy, shouldBe, Spec, context, specify )
 
 parseModule :: Value -> Result (Version, Module Ann)
 parseModule = parse moduleFromJSON

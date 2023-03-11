@@ -9,11 +9,28 @@ import Control.Monad.Trans.RWS.Strict (evalRWST, asks, local, RWST)
 import Data.Foldable (traverse_)
 import Data.List (isSuffixOf)
 import Data.Text qualified as T
-import Language.PureScript qualified as P
+import Language.PureScript.Errors qualified as P
+    ( defaultPPEOptions, prettyPrintMultipleErrors )
+import Language.PureScript.Names qualified as P
+    ( runModuleName, ModuleName )
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Interactive
+    ( readNodeProcessWithExitCode,
+      initialPSCiState,
+      updateLoadedExterns,
+      Command(ReloadState),
+      PSCiConfig(..),
+      PSCiState,
+      parseCommand,
+      indexFile,
+      loadAllModules,
+      modulesDir,
+      handleCommand,
+      make,
+      runMake )
 import System.Directory (getCurrentDirectory, doesPathExist, removeFile)
 import System.Exit
+    ( ExitCode(ExitFailure, ExitSuccess), exitFailure )
 import System.FilePath ((</>), pathSeparator)
 import System.FilePath.Glob qualified as Glob
 import Test.Hspec (shouldBe, Expectation)

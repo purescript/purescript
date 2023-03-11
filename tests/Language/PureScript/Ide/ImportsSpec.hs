@@ -4,16 +4,32 @@ import Protolude hiding (moduleName)
 import Data.Maybe (fromJust)
 import Data.Set qualified as Set
 
-import Language.PureScript qualified as P
+import Language.PureScript.Environment qualified as P ( kindType )
+import Language.PureScript.Names qualified as P
+    ( byMaybeModuleName,
+      moduleNameFromString,
+      ModuleName,
+      Qualified(Qualified) )
 import Language.PureScript.Ide.Command as Command
-import Language.PureScript.Ide.Error
+    ( Command(LoadSync, Import),
+      ImportCommand(AddImportForIdentifier, AddImplicitImport) )
+import Language.PureScript.Ide.Error ( IdeError )
 import Language.PureScript.Ide.Imports
+    ( parseImport,
+      prettyPrintImport',
+      prettyPrintImportSection,
+      sliceImportSection,
+      Import )
 import Language.PureScript.Ide.Imports.Actions
+    ( addExplicitImport', addImplicitImport', addQualifiedImport' )
 import Language.PureScript.Ide.Filter (moduleFilter)
 import Language.PureScript.Ide.Test qualified as Test
 import Language.PureScript.Ide.Types
-import System.FilePath
+    ( IdeDeclarationAnn(_idaDeclaration),
+      Success(MultilineTextResult) )
+import System.FilePath ( (</>) )
 import Test.Hspec
+    ( shouldSatisfy, shouldBe, it, describe, Expectation, Spec )
 
 noImportsFile :: [Text]
 noImportsFile =

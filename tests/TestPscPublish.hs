@@ -8,20 +8,22 @@ import Control.Monad.IO.Class (liftIO)
 import Data.ByteString.Lazy (ByteString)
 import Data.Time.Clock (getCurrentTime)
 import Data.Aeson qualified as A
-import Data.Version
+import Data.Version ( Version(Version) )
 import Data.Foldable (forM_)
 import Text.PrettyPrint.Boxes qualified as Boxes
 import System.Directory (listDirectory, removeDirectoryRecursive)
 import System.FilePath ((</>))
 import System.IO.Error (isDoesNotExistError)
 
-import Language.PureScript.Docs
+import Language.PureScript.Docs.Types
+    ( UploadedPackage, VerifiedPackage )
 import Language.PureScript.Publish (PublishOptions(..), defaultPublishOptions)
 import Language.PureScript.Publish qualified as Publish
 import Language.PureScript.Publish.ErrorsWarnings qualified as Publish
 
 import Test.Hspec
-import TestUtils hiding (inferForeignModules, makeActions)
+    ( it, Expectation, Spec, context, runIO, expectationFailure )
+import TestUtils ( pushd )
 
 spec :: Spec
 spec = do

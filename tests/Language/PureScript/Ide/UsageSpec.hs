@@ -4,12 +4,17 @@ import Protolude
 
 import Data.Text qualified as Text
 import Language.PureScript.Ide.Command
+    ( Command(FindUsages, LoadSync) )
 import Language.PureScript.Ide.Types
+    ( IdeNamespace(IdeNSValue), Success(UsagesResult) )
 import Language.PureScript.Ide.Test qualified as Test
-import Language.PureScript qualified as P
-import Test.Hspec
+import Language.PureScript.AST.SourcePos qualified as P
+    ( SourcePos(sourcePosColumn, sourcePosLine),
+      SourceSpan(spanEnd, spanName, spanStart) )
+import Language.PureScript.Names qualified as P ( ModuleName )
+import Test.Hspec ( shouldBe, it, describe, Expectation, Spec )
 import Data.Text.Read (decimal)
-import System.FilePath
+import System.FilePath ( (</>) )
 
 load :: [Text] -> Command
 load = LoadSync . map Test.mn

@@ -4,17 +4,65 @@ import Prelude
 
 import Data.Bifunctor (first)
 import Data.List (findIndex)
-import Data.Foldable
+import Data.Foldable ( forM_, find )
 import Safe (headMay)
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isNothing, mapMaybe)
-import Data.Monoid
+import Data.Monoid ( Any(Any, getAny), First(First, getFirst) )
 import Data.Text (Text)
 import Data.Text qualified as T
 import Text.PrettyPrint.Boxes qualified as Boxes
 
-import Language.PureScript qualified as P
-import Language.PureScript.Docs qualified as Docs
+import Language.PureScript.Environment qualified as P
+    ( tyInt, tyNumber )
+import Language.PureScript.Names qualified as P
+    ( disqualify,
+      moduleNameFromString,
+      runModuleName,
+      ModuleName,
+      ProperName(runProperName) )
+import Language.PureScript.Pretty.Types qualified as P
+    ( prettyPrintType )
+import Language.PureScript.Roles qualified as P
+    ( displayRole, Role(..) )
+import Language.PureScript.Types qualified as P
+    ( eqType,
+      everythingOnTypes,
+      Constraint(constraintClass),
+      Type(TypeVar, ConstrainedType, ForAll) )
+import Language.PureScript.Docs.Render qualified as Docs
+    ( renderDeclaration, renderKindSig )
+import Language.PureScript.Docs.RenderedCode.RenderType qualified as Docs
+    ( renderType )
+import Language.PureScript.Docs.RenderedCode.Types qualified as Docs
+    ( outputWith,
+      Link(Link),
+      Namespace(TypeLevel),
+      RenderedCode,
+      RenderedCodeElement(Symbol) )
+import Language.PureScript.Docs.Tags qualified as Docs ( tags )
+import Language.PureScript.Docs.Types qualified as Docs
+    ( declInfoToString,
+      getLink,
+      getLinksContext,
+      ignorePackage,
+      ChildDeclaration(ChildDeclaration, cdeclTitle, cdeclSourceSpan,
+                       cdeclComments, cdeclInfo),
+      ChildDeclarationInfo(ChildInstance),
+      Declaration(Declaration, declTitle, declKind, declInfo,
+                  declChildren, declSourceSpan, declComments),
+      DeclarationInfo(TypeSynonymDeclaration, DataDeclaration,
+                      TypeClassDeclaration, ValueDeclaration),
+      DocLink(linkLocation),
+      InPackage(..),
+      KindInfo(KindInfo, kiKind, kiKeyword),
+      LinkLocation(BuiltinModule),
+      LinksContext,
+      Module(..),
+      Package(Package, pkgMeta, pkgCompilerVersion, pkgUploader,
+              pkgGithub, pkgResolvedDependencies, pkgModuleMap, pkgModules,
+              pkgTagTime, pkgVersionTag, pkgVersion),
+      Type' )
 import Language.PureScript.Docs.AsMarkdown (codeToString)
 import Language.PureScript.Publish.ErrorsWarnings qualified as Publish
 
@@ -23,6 +71,7 @@ import Web.Bower.PackageMeta (parsePackageName, runPackageName)
 import TestPscPublish (preparePackage)
 
 import Test.Hspec
+    ( it, Spec, beforeAll, context, expectationFailure )
 
 spec :: Spec
 spec = beforeAll (handleDocPrepFailure <$> preparePackage "tests/purs/docs" "purs.json" "resolutions.json") $

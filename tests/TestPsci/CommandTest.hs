@@ -4,12 +4,21 @@ import Prelude
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.RWS.Strict (get)
-import Language.PureScript (moduleNameFromString)
-import Language.PureScript.Interactive
+import Language.PureScript.Names ( moduleNameFromString )
+import Language.PureScript.Interactive.Types
+    ( psciImportedModules, psciInteractivePrint )
 import System.FilePath ((</>))
 import System.Directory (getCurrentDirectory)
 import Test.Hspec
+    ( Spec, context, specify, shouldContain, shouldNotContain )
 import TestPsci.TestEnv
+    ( TestPSCi,
+      execTestPSCi,
+      run,
+      equalsTo,
+      prints,
+      printed,
+      simulateModuleEdit )
 
 specPSCi :: String -> TestPSCi () -> Spec
 specPSCi label = specify label . execTestPSCi

@@ -3,16 +3,22 @@ module Language.PureScript.Ide.RebuildSpec where
 import Protolude
 
 import Data.Set qualified as Set
-import Language.PureScript qualified as P
+import Language.PureScript.Options qualified as P
+    ( CodegenTarget(CoreFn, JS) )
 import Language.PureScript.AST.SourcePos (spanName)
 import Language.PureScript.Ide.Command
+    ( Command(RebuildSync, LoadSync, Rebuild, Complete) )
 import Language.PureScript.Ide.Completion
-import Language.PureScript.Ide.Matcher
+    ( defaultCompletionOptions )
+import Language.PureScript.Ide.Matcher ( flexMatcher )
 import Language.PureScript.Ide.Types
+    ( emptyIdeState,
+      Completion(complLocation, complIdentifier),
+      Success(CompletionResult) )
 import Language.PureScript.Ide.Test qualified as Test
-import System.FilePath
+import System.FilePath ( (</>) )
 import System.Directory (doesFileExist, removePathForcibly)
-import Test.Hspec
+import Test.Hspec ( shouldSatisfy, shouldBe, it, describe, Spec )
 
 defaultTarget :: Set P.CodegenTarget
 defaultTarget = Set.singleton P.JS

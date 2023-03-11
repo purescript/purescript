@@ -8,14 +8,27 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
 import Data.Text.IO qualified as Text
-import Test.Hspec
+import Test.Hspec ( it, describe, Spec, specify, runIO )
 import Test.QuickCheck
-import TestUtils
+    ( Arbitrary(arbitrary),
+      Gen,
+      oneof,
+      Testable(property),
+      arbitrarySizedNatural,
+      arbitraryUnicodeChar,
+      discard,
+      elements,
+      frequency,
+      listOf,
+      listOf1,
+      resize )
+import TestUtils ( getTestFiles, goldenVsString )
 import Text.Read (readMaybe)
-import Language.PureScript.CST.Errors as CST
-import Language.PureScript.CST.Lexer as CST
-import Language.PureScript.CST.Print as CST
+import Language.PureScript.CST.Errors as CST ( prettyPrintError )
+import Language.PureScript.CST.Lexer as CST ( lex )
+import Language.PureScript.CST.Print as CST ( printTokens )
 import Language.PureScript.CST.Types
+    ( SourceToken(SourceToken), Token(TokNumber, TokInt) )
 import System.FilePath (takeBaseName, replaceExtension)
 
 spec :: Spec

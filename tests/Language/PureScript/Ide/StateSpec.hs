@@ -1,12 +1,44 @@
 module Language.PureScript.Ide.StateSpec where
 
 import Protolude
-import Control.Lens hiding (anyOf, (&))
+import Control.Lens ( folded, Ixed(ix) )
 import Language.PureScript.Ide.Types
+    ( _IdeDeclTypeClass,
+      anyOf,
+      idaDeclaration,
+      ideTCInstances,
+      IdeDeclarationAnn,
+      IdeInstance(IdeInstance),
+      ModuleMap )
 import Language.PureScript.Ide.State
+    ( resolveDataConstructorsForModule,
+      resolveInstances,
+      resolveOperatorsForModule )
 import Language.PureScript.Ide.Test
-import Language.PureScript qualified as P
-import Test.Hspec
+    ( ideType,
+      mn,
+      ideValue,
+      ideTypeClass,
+      ideDtor,
+      ideValueOp,
+      ideTypeOp )
+import Language.PureScript.AST.Declarations qualified as P
+    ( NameSource(UserNamed) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( pattern NullSourceSpan, internalModuleSourceSpan )
+import Language.PureScript.Environment qualified as P
+    ( kindType, tyString )
+import Language.PureScript.Externs qualified as P
+    ( ExternsDeclaration(EDInstance), ExternsFile(ExternsFile) )
+import Language.PureScript.Names qualified as P
+    ( Ident(Ident),
+      ModuleName,
+      ProperName(ProperName),
+      Qualified(Qualified),
+      QualifiedBy(ByModuleName) )
+import Language.PureScript.Types qualified as P
+    ( srcREmpty, SourceType )
+import Test.Hspec ( shouldSatisfy, it, describe, Spec )
 import Data.Map qualified as Map
 
 valueOperator :: Maybe P.SourceType -> IdeDeclarationAnn

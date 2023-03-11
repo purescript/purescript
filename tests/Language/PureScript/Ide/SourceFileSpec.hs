@@ -2,12 +2,58 @@ module Language.PureScript.Ide.SourceFileSpec where
 
 import Protolude
 
-import Language.PureScript qualified as P
-import Language.PureScript.Ide.Command
+import Language.PureScript.AST.Declarations qualified as P
+    ( pattern TypeFixityDeclaration,
+      pattern ValueDecl,
+      pattern ValueFixityDeclaration,
+      DataConstructorDeclaration(DataConstructorDeclaration),
+      Declaration(TypeDeclaration, TypeSynonymDeclaration,
+                  TypeClassDeclaration, DataDeclaration, ExternDeclaration,
+                  ExternDataDeclaration),
+      TypeDeclarationData(TypeDeclarationData) )
+import Language.PureScript.AST.Operators qualified as P
+    ( Associativity(Infix), Fixity(Fixity) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( SourceAnn, SourcePos(SourcePos), SourceSpan(SourceSpan) )
+import Language.PureScript.Environment qualified as P
+    ( kindType, DataDeclType(Data, Newtype), NameKind(Public) )
+import Language.PureScript.Names qualified as P
+    ( pattern ByNullSourcePos,
+      Ident(Ident),
+      OpName(OpName),
+      ProperName(ProperName),
+      Qualified(Qualified) )
+import Language.PureScript.Types qualified as P ( srcREmpty )
+import Language.PureScript.Ide.Command ( Command(Type) )
 import Language.PureScript.Ide.SourceFile
+    ( extractSpans, extractTypeAnnotations )
 import Language.PureScript.Ide.Types
+    ( emptyIdeState,
+      Completion(complLocation),
+      IdeNamespace(IdeNSType, IdeNSValue),
+      IdeNamespaced(IdeNamespaced),
+      Success(CompletionResult) )
 import Language.PureScript.Ide.Test
-import Test.Hspec
+    ( ideType,
+      defConfig,
+      runIde',
+      volatileState,
+      annLoc,
+      ideValue,
+      ideSynonym,
+      ideTypeClass,
+      ideDtor,
+      ideValueOp,
+      ideTypeOp,
+      ideModule,
+      moduleSS,
+      valueSS,
+      synonymSS,
+      typeSS,
+      classSS,
+      valueOpSS,
+      typeOpSS )
+import Test.Hspec ( shouldBe, it, describe, Spec )
 
 span1, span2 :: P.SourceSpan
 span1 = P.SourceSpan "" (P.SourcePos 1 1) (P.SourcePos 2 2)

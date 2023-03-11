@@ -3,10 +3,24 @@ module TestSourceMaps where
 import Prelude
 
 import Control.Monad (void, forM_)
-import Data.Aeson as Json
+import Data.Aeson as Json ( Value, decode )
 import Test.Hspec
+    ( shouldBe,
+      it,
+      describe,
+      SpecWith,
+      Expectation,
+      runIO,
+      expectationFailure )
 import System.FilePath (replaceExtension, takeFileName, (</>), (<.>))
-import Language.PureScript qualified as P
+import Language.PureScript.Errors qualified as P
+    ( defaultPPEOptions,
+      prettyPrintMultipleErrors,
+      PPEOptions(ppeFileContents) )
+import Language.PureScript.Options qualified as P
+    ( defaultOptions,
+      CodegenTarget(JSSourceMap, JS),
+      Options(optionsCodegenTargets) )
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as LBS
 import Data.Foldable (fold)

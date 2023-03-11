@@ -2,13 +2,23 @@ module Language.PureScript.Ide.CompletionSpec where
 
 import Protolude
 
-import Language.PureScript qualified as P
+import Language.PureScript.Names qualified as P ( ModuleName )
 import Language.PureScript.Ide.Test as Test
+    ( runIde, inProject, ideType, annExp, ideKind, mn )
 import Language.PureScript.Ide.Command as Command
+    ( Command(LoadSync, Type) )
 import Language.PureScript.Ide.Completion
+    ( applyCompletionOptions,
+      defaultCompletionOptions,
+      CompletionOptions(coGroupReexports, coMaxResults) )
 import Language.PureScript.Ide.Filter.Declaration qualified as DeclarationType
 import Language.PureScript.Ide.Types
+    ( Completion(complDeclarationType, complDocumentation),
+      IdeDeclarationAnn,
+      Match(..),
+      Success(CompletionResult) )
 import Test.Hspec
+    ( shouldSatisfy, shouldBe, shouldMatchList, it, describe, Spec )
 
 reexportMatches :: [Match IdeDeclarationAnn]
 reexportMatches =

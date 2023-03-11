@@ -3,7 +3,22 @@ module TestHierarchy where
 import Prelude
 
 import Language.PureScript.Hierarchy
-import Language.PureScript qualified as P
+    ( prettyPrint,
+      typeClassGraph,
+      Digraph(Digraph),
+      Graph(Graph),
+      GraphName(GraphName),
+      SuperMap(SuperMap) )
+import Language.PureScript.AST.Declarations qualified as P
+    ( Declaration(TypeClassDeclaration), Module(Module) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( internalModuleSourceSpan )
+import Language.PureScript.Names qualified as P
+    ( pattern ByNullSourcePos,
+      ModuleName(ModuleName),
+      ProperName(ProperName),
+      Qualified(Qualified) )
+import Language.PureScript.Types qualified as P ( srcConstraint )
 
 import Test.Hspec
 

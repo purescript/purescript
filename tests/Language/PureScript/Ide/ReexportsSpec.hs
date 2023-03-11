@@ -4,10 +4,28 @@ import Protolude
 
 import Data.Map qualified as Map
 import Language.PureScript.Ide.Reexports
+    ( reexportHasFailures,
+      resolveReexports',
+      ReexportResult(reFailed, reResolved) )
 import Language.PureScript.Ide.Types
+    ( IdeDeclarationAnn, ModuleMap )
 import Language.PureScript.Ide.Test
-import Language.PureScript qualified as P
-import Test.Hspec
+    ( ideType,
+      annExp,
+      ideKind,
+      mn,
+      ideValue,
+      ideSynonym,
+      ideTypeClass,
+      ideDtor )
+import Language.PureScript.AST.Declarations qualified as P
+    ( DeclarationRef(TypeClassRef, ValueRef, TypeRef) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( internalModuleSourceSpan, SourceSpan )
+import Language.PureScript.Environment qualified as P ( kindType )
+import Language.PureScript.Names qualified as P
+    ( Ident(Ident), ModuleName, ProperName(ProperName) )
+import Test.Hspec ( shouldSatisfy, shouldBe, it, describe, Spec )
 
 valueA, typeA, synonymA, classA, dtorA1, dtorA2, kindA :: IdeDeclarationAnn
 valueA = ideValue "valueA" Nothing

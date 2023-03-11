@@ -2,11 +2,11 @@ module TestGraph where
 
 import Prelude
 
-import Test.Hspec
+import Test.Hspec ( shouldSatisfy, shouldBe, it, Spec )
 import Data.Either (isLeft)
 
 import Data.Aeson qualified as Json
-import Language.PureScript qualified as P
+import Language.PureScript.Graph qualified as P ( graph )
 
 spec :: Spec
 spec = do

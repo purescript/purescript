@@ -11,8 +11,9 @@ import System.Exit (exitFailure)
 import System.FilePath ((</>), takeFileName)
 import System.FilePath.Glob qualified as Glob
 import System.IO.UTF8 (readUTF8File)
-import Test.Hspec
+import Test.Hspec ( Spec, context, specify, runIO )
 import TestPsci.TestEnv
+    ( TestPSCi, execTestPSCi, run, evaluatesTo )
 
 evalTests :: Spec
 evalTests = context "evalTests" $ do

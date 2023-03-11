@@ -2,11 +2,17 @@ module Language.PureScript.Ide.MatcherSpec where
 
 import Protolude
 
-import Language.PureScript qualified as P
-import Language.PureScript.Ide.Matcher
+import Language.PureScript.Names qualified as P
+    ( moduleNameFromString, Ident(Ident) )
+import Language.PureScript.Types qualified as P ( srcREmpty )
+import Language.PureScript.Ide.Matcher ( flexMatcher, runMatcher )
 import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Util
-import Test.Hspec
+    ( IdeDeclaration(IdeDeclValue),
+      IdeDeclarationAnn,
+      IdeValue(IdeValue),
+      Match(..) )
+import Language.PureScript.Ide.Util ( withEmptyAnn )
+import Test.Hspec ( shouldBe, it, describe, Spec )
 
 value :: Text -> IdeDeclarationAnn
 value s = withEmptyAnn (IdeDeclValue (IdeValue (P.Ident (toS s)) P.srcREmpty))
