@@ -12,7 +12,7 @@ import "monad-logger" Control.Monad.Logger
     ( MonadLogger, LoggingT, logDebug )
 import Data.List qualified as List
 import Data.Map.Lazy qualified as M
-import Data.Maybe                      (fromJust)
+import Data.Maybe (fromJust)
 import Data.Set qualified as S
 import Data.Time qualified as Time
 import Data.Text qualified as Text

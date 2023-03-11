@@ -13,8 +13,8 @@ where
 
 import Protolude hiding (moduleName)
 
-import Control.Lens                       ((^.), has)
-import Data.List                          (nubBy)
+import Control.Lens ((^.), has)
+import Data.List (nubBy)
 import Data.Map qualified as Map
 import Data.Text qualified as T
 import Language.PureScript.AST.Declarations qualified as P

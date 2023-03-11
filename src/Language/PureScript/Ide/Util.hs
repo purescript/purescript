@@ -29,8 +29,7 @@ module Language.PureScript.Ide.Util
   , module Language.PureScript.Ide.Logging
   ) where
 
-import Protolude                           hiding (decodeUtf8,
-                                                      encodeUtf8, to)
+import Protolude hiding (decodeUtf8, encodeUtf8, to)
 
 import Control.Lens ( (^.), to, Getting )
 import Data.Aeson ( FromJSON, ToJSON, eitherDecode, encode )
@@ -46,7 +45,7 @@ import Language.PureScript.Names qualified as P
       ProperName(runProperName),
       ProperNameType(ConstructorName, TypeName),
       Qualified )
-import Language.PureScript.Ide.Error       (IdeError(..))
+import Language.PureScript.Ide.Error (IdeError(..))
 import Language.PureScript.Ide.Logging
 import Language.PureScript.Ide.Types
     ( emptyAnn,
@@ -61,8 +60,8 @@ import Language.PureScript.Ide.Types
       IdeDeclarationAnn(IdeDeclarationAnn),
       IdeNamespace(..),
       Match(..) )
-import System.IO.UTF8                      (readUTF8FileT)
-import System.Directory                    (makeAbsolute)
+import System.IO.UTF8 (readUTF8FileT)
+import System.Directory (makeAbsolute)
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of
