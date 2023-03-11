@@ -13,11 +13,7 @@ import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Data.Functor.Identity ( Identity(Identity, runIdentity) )
 
-import Data.Aeson.TH
-    ( defaultOptions,
-      Options(sumEncoding),
-      SumEncoding(ObjectWithSingleField),
-      deriveJSON )
+import Data.Aeson.TH ( defaultOptions, Options(sumEncoding), SumEncoding(ObjectWithSingleField), deriveJSON )
 import Data.Map qualified as M
 import Data.Text (Text)
 import Data.List.NonEmpty qualified as NEL
@@ -31,23 +27,11 @@ import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Types ( SourceConstraint, SourceType )
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Label (Label)
-import Language.PureScript.Names
-    ( pattern ByNullSourcePos,
-      toMaybeModuleName,
-      Ident(Ident),
-      ModuleName(..),
-      Name(TyName, ModName, ValOpName, TyOpName, TyClassName, IdentName),
-      OpName,
-      OpNameType(TypeOpName, ValueOpName),
-      ProperName,
-      ProperNameType(ConstructorName, ClassName, TypeName),
-      Qualified(..),
-      QualifiedBy(ByModuleName) )
+import Language.PureScript.Names ( pattern ByNullSourcePos, toMaybeModuleName, Ident(Ident), ModuleName(..), Name(TyName, ModName, ValOpName, TyOpName, TyClassName, IdentName), OpName, OpNameType(TypeOpName, ValueOpName), ProperName, ProperNameType(ConstructorName, ClassName, TypeName), Qualified(..), QualifiedBy(ByModuleName) )
 import Language.PureScript.Roles ( Role )
 import Language.PureScript.TypeClassDictionaries ( NamedDict )
 import Language.PureScript.Comments ( Comment )
-import Language.PureScript.Environment
-    ( DataDeclType, Environment, FunctionalDependency, NameKind )
+import Language.PureScript.Environment ( DataDeclType, Environment, FunctionalDependency, NameKind )
 import Language.PureScript.Constants.Prim qualified as C
 
 -- | A map of locally-bound names in scope.
@@ -443,8 +427,7 @@ data Declaration
   --
   | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceType)] [SourceConstraint] [FunctionalDependency] [Declaration]
   -- |
-  -- A type instance declaration (instance chain, chain index, name,
-  -- dependencies, class name, instance types, member declarations)
+  -- A type instance declaration (instance chain, chain index, name, -- dependencies, class name, instance types, member declarations)
   --
   -- The first @SourceAnn@ serves as the annotation for the entire
   -- declaration, while the second @SourceAnn@ serves as the

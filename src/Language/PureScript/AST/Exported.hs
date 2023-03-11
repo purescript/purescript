@@ -12,29 +12,9 @@ import Control.Applicative ((<|>))
 import Data.Maybe (mapMaybe)
 import Data.Map qualified as M
 
-import Language.PureScript.AST.Declarations
-    ( declName,
-      declRefName,
-      flattenDecls,
-      DataConstructorDeclaration(dataCtorName),
-      Declaration(KindDeclaration, DataDeclaration,
-                  TypeInstanceDeclaration),
-      DeclarationRef(TypeRef, TypeClassRef),
-      Module(..) )
-import Language.PureScript.Types
-    ( everythingOnTypes,
-      Constraint(constraintArgs, constraintClass),
-      Type(ConstrainedType, TypeConstructor) )
-import Language.PureScript.Names
-    ( coerceProperName,
-      disqualify,
-      isQualified,
-      isQualifiedWith,
-      ModuleName,
-      Name(TyClassName, TyName),
-      ProperName,
-      ProperNameType(ClassName, ConstructorName, TypeName),
-      Qualified )
+import Language.PureScript.AST.Declarations ( declName, declRefName, flattenDecls, DataConstructorDeclaration(dataCtorName), Declaration(KindDeclaration, DataDeclaration, TypeInstanceDeclaration), DeclarationRef(TypeRef, TypeClassRef), Module(..) )
+import Language.PureScript.Types ( everythingOnTypes, Constraint(constraintArgs, constraintClass), Type(ConstrainedType, TypeConstructor) )
+import Language.PureScript.Names ( coerceProperName, disqualify, isQualified, isQualifiedWith, ModuleName, Name(TyClassName, TyName), ProperName, ProperNameType(ClassName, ConstructorName, TypeName), Qualified )
 
 -- |
 -- Return a list of all declarations which are exported from a module.
@@ -97,8 +77,7 @@ filterInstances mn (Just exps) =
   -- classes, returns whether the supplied Qualified ProperName is visible
   -- outside this module. This is true if one of the following hold:
   --
-  --  * the name is defined in the same module and is exported,
-  --  * the name is defined in a different module (and must be exported from
+  --  * the name is defined in the same module and is exported, --  * the name is defined in a different module (and must be exported from
   --    that module; the code would fail to compile otherwise).
   visibleOutside
     :: [Either (ProperName 'ClassName) (ProperName 'TypeName)]

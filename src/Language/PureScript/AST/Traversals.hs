@@ -17,40 +17,13 @@ import Data.List.NonEmpty qualified as NEL
 import Data.Map qualified as M
 import Data.Set qualified as S
 
-import Language.PureScript.AST.Binders
-    ( binderNames,
-      Binder(TypedBinder, LiteralBinder, ConstructorBinder,
-             BinaryNoParensBinder, ParensInBinder, NamedBinder,
-             PositionedBinder) )
-import Language.PureScript.AST.Declarations
-    ( pattern ValueDecl,
-      mapTypeInstanceBody,
-      traverseTypeInstanceBody,
-      CaseAlternative(..),
-      DataConstructorDeclaration(dataCtorFields),
-      Declaration(BoundValueDeclaration, TypeDeclaration,
-                  DataBindingGroupDeclaration, BindingGroupDeclaration,
-                  ValueDeclaration, DataDeclaration, ExternDataDeclaration,
-                  ExternDeclaration, TypeClassDeclaration, TypeInstanceDeclaration,
-                  TypeSynonymDeclaration, KindDeclaration),
-      DoNotationElement(..),
-      Expr(Literal, UnaryMinus, BinaryNoParens, Parens, Accessor,
-           ObjectUpdate, ObjectUpdateNested, Abs, App, Unused, IfThenElse,
-           Case, Let, Do, Ado, PositionedValue, DeferredDictionary,
-           TypeClassDictionary, TypedValue),
-      Guard(..),
-      GuardedExpr(..),
-      TypeDeclarationData(tydeclType, tydeclIdent),
-      TypeInstanceBody(ExplicitInstance),
-      ValueDeclarationData(valdeclIdent, valdeclBinders,
-                           valdeclExpression) )
-import Language.PureScript.AST.Literals
-    ( Literal(ObjectLiteral, ArrayLiteral) )
+import Language.PureScript.AST.Binders ( binderNames, Binder(TypedBinder, LiteralBinder, ConstructorBinder, BinaryNoParensBinder, ParensInBinder, NamedBinder, PositionedBinder) )
+import Language.PureScript.AST.Declarations ( pattern ValueDecl, mapTypeInstanceBody, traverseTypeInstanceBody, CaseAlternative(..), DataConstructorDeclaration(dataCtorFields), Declaration(BoundValueDeclaration, TypeDeclaration, DataBindingGroupDeclaration, BindingGroupDeclaration, ValueDeclaration, DataDeclaration, ExternDataDeclaration, ExternDeclaration, TypeClassDeclaration, TypeInstanceDeclaration, TypeSynonymDeclaration, KindDeclaration), DoNotationElement(..), Expr(Literal, UnaryMinus, BinaryNoParens, Parens, Accessor, ObjectUpdate, ObjectUpdateNested, Abs, App, Unused, IfThenElse, Case, Let, Do, Ado, PositionedValue, DeferredDictionary, TypeClassDictionary, TypedValue), Guard(..), GuardedExpr(..), TypeDeclarationData(tydeclType, tydeclIdent), TypeInstanceBody(ExplicitInstance), ValueDeclarationData(valdeclIdent, valdeclBinders, valdeclExpression) )
+import Language.PureScript.AST.Literals ( Literal(ObjectLiteral, ArrayLiteral) )
 import Language.PureScript.Names ( pattern ByNullSourcePos, Ident )
 import Language.PureScript.Traversals ( sndM, sndM', thirdM )
 import Language.PureScript.TypeClassDictionaries (TypeClassDictionaryInScope(..))
-import Language.PureScript.Types
-    ( mapConstraintArgs, Constraint(constraintArgs), SourceType )
+import Language.PureScript.Types ( mapConstraintArgs, Constraint(constraintArgs), SourceType )
 
 guardedExprM :: Applicative m
              => (Guard -> m Guard)

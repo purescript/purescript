@@ -6,15 +6,8 @@ module Language.PureScript.AST.Binders where
 import Prelude
 
 import Language.PureScript.AST.SourcePos ( SourceSpan )
-import Language.PureScript.AST.Literals
-    ( Literal(ArrayLiteral, ObjectLiteral) )
-import Language.PureScript.Names
-    ( Ident,
-      OpName,
-      OpNameType(ValueOpName),
-      ProperName,
-      ProperNameType(ConstructorName),
-      Qualified )
+import Language.PureScript.AST.Literals ( Literal(ArrayLiteral, ObjectLiteral) )
+import Language.PureScript.Names ( Ident, OpName, OpNameType(ValueOpName), ProperName, ProperNameType(ConstructorName), Qualified )
 import Language.PureScript.Comments ( Comment )
 import Language.PureScript.Types ( SourceType )
 

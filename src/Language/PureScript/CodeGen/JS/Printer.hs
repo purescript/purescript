@@ -9,13 +9,7 @@ import Prelude
 import Control.Arrow ((<+>))
 import Control.Monad (forM, mzero)
 import Control.Monad.State (StateT, evalStateT)
-import Control.PatternArrows
-    ( Pattern(runPattern),
-      buildPrettyPrinter,
-      mkPattern,
-      mkPattern',
-      Operator(AssocR, AssocL, Wrap),
-      OperatorTable(OperatorTable) )
+import Control.PatternArrows ( Pattern(runPattern), buildPrettyPrinter, mkPattern, mkPattern', Operator(AssocR, AssocL, Wrap), OperatorTable(OperatorTable) )
 import Control.Arrow qualified as A
 
 import Data.Maybe (fromMaybe)
@@ -24,35 +18,12 @@ import Data.Text qualified as T
 import Data.List.NonEmpty qualified as NEL (toList)
 
 import Language.PureScript.AST.SourcePos ( SourceSpan(..) )
-import Language.PureScript.CodeGen.JS.Common
-    ( identCharToText,
-      isValidJsIdentifier,
-      nameIsJsBuiltIn,
-      nameIsJsReserved )
-import Language.PureScript.CoreImp.AST
-    ( getSourceSpan,
-      AST(NumericLiteral, BooleanLiteral, ArrayLiteral, ObjectLiteral,
-          Block, Var, VariableIntroduction, Assignment, While, For, ForIn,
-          IfElse, Return, ReturnNoResult, Throw, Comment, StringLiteral,
-          Indexer, Function, App, InstanceOf, Unary, Binary),
-      BinaryOperator(..),
-      CIComments(PureAnnotation, SourceComments),
-      UnaryOperator(..) )
-import Language.PureScript.CoreImp.Module
-    ( Export(..), Import(..), Module(..) )
+import Language.PureScript.CodeGen.JS.Common ( identCharToText, isValidJsIdentifier, nameIsJsBuiltIn, nameIsJsReserved )
+import Language.PureScript.CoreImp.AST ( getSourceSpan, AST(NumericLiteral, BooleanLiteral, ArrayLiteral, ObjectLiteral, Block, Var, VariableIntroduction, Assignment, While, For, ForIn, IfElse, Return, ReturnNoResult, Throw, Comment, StringLiteral, Indexer, Function, App, InstanceOf, Unary, Binary), BinaryOperator(..), CIComments(PureAnnotation, SourceComments), UnaryOperator(..) )
+import Language.PureScript.CoreImp.Module ( Export(..), Import(..), Module(..) )
 import Language.PureScript.Comments ( Comment(..) )
 import Language.PureScript.Crash ( internalError )
-import Language.PureScript.Pretty.Common
-    ( addMapping',
-      currentIndent,
-      intercalate,
-      parensPos,
-      runPlainString,
-      withIndent,
-      Emit(emit),
-      PrinterState(PrinterState),
-      SMap,
-      StrPos(StrPos) )
+import Language.PureScript.Pretty.Common ( addMapping', currentIndent, intercalate, parensPos, runPlainString, withIndent, Emit(emit), PrinterState(PrinterState), SMap, StrPos(StrPos) )
 import Language.PureScript.PSString (PSString, decodeString, prettyPrintStringJS)
 
 -- TODO (Christoph): Get rid of T.unpack / pack

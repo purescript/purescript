@@ -9,11 +9,8 @@ import Control.Monad (ap)
 import Control.Monad.Base (MonadBase(..))
 import Control.Monad.IO.Class ( MonadIO(..) )
 import Control.Monad.Trans.Control (MonadBaseControl(..))
-import Control.Monad.Writer.Class
-    ( MonadWriter(tell, pass, listen) )
-
-import Data.IORef
-    ( IORef, atomicModifyIORef', newIORef, readIORef )
+import Control.Monad.Writer.Class ( MonadWriter(tell, pass, listen) )
+import Data.IORef ( IORef, atomicModifyIORef', newIORef, readIORef )
 
 -- | A replacement for WriterT IO which uses mutable references.
 newtype Logger w a = Logger { runLogger :: IORef w -> IO a }

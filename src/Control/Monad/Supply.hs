@@ -10,7 +10,6 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader ( MonadPlus, MonadReader, MonadTrans )
 import Control.Monad.State ( StateT(..) )
 import Control.Monad.Writer ( MonadWriter )
-
 import Data.Functor.Identity ( Identity(runIdentity) )
 
 newtype SupplyT m a = SupplyT { unSupplyT :: StateT Integer m a }
