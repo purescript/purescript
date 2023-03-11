@@ -24,16 +24,16 @@ module TestCompiler where
 
 import Prelude
 
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 import Language.PureScript.Interactive.IO (readNodeProcessWithExitCode)
 
 import Control.Arrow ((>>>))
-import qualified Data.ByteString as BS
+import Data.ByteString qualified as BS
 import Data.Function (on)
 import Data.List (sort, stripPrefix, minimumBy)
 import Data.Maybe (mapMaybe)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as T
 
 
 import Control.Monad

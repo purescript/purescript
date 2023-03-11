@@ -5,9 +5,9 @@ import           Control.Lens hiding (anyOf, (&))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Test
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 import           Test.Hspec
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 
 valueOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 valueOperator =

@@ -3,7 +3,7 @@ module TestHierarchy where
 import Prelude
 
 import Language.PureScript.Hierarchy
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 
 import Test.Hspec
 

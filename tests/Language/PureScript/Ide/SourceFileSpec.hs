@@ -2,7 +2,7 @@ module Language.PureScript.Ide.SourceFileSpec where
 
 import           Protolude
 
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types

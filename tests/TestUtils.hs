@@ -2,10 +2,10 @@ module TestUtils where
 
 import Prelude
 
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.AST as AST
-import qualified Language.PureScript.Names as N
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.AST qualified as AST
+import Language.PureScript.Names qualified as N
 import Language.PureScript.Interactive.IO (findNodeProcess)
 
 import Control.Arrow ((***), (>>>))
@@ -16,14 +16,14 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Writer.Class (tell)
 import Control.Exception
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
+import Data.ByteString qualified as BS
 import Data.Char (isSpace)
 import Data.Function (on)
 import Data.List (sort, sortBy, stripPrefix, groupBy, find)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Maybe (isJust)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as T
 import Data.Time.Clock (UTCTime(), diffUTCTime, getCurrentTime, nominalDay)
 import Data.Tuple (swap)
 import System.Directory
@@ -33,7 +33,7 @@ import System.FilePath
 import System.IO.Error (isDoesNotExistError)
 import System.IO.UTF8 (readUTF8FileT)
 import System.Process hiding (cwd)
-import qualified System.FilePath.Glob as Glob
+import System.FilePath.Glob qualified as Glob
 import System.IO
 import Test.Hspec
 

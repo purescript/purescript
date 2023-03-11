@@ -2,11 +2,11 @@ module Language.PureScript.Ide.ReexportsSpec where
 
 import           Protolude
 
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Test
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 import           Test.Hspec
 
 valueA, typeA, synonymA, classA, dtorA1, dtorA2, kindA :: IdeDeclarationAnn

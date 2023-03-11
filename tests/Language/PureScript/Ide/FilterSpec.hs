@@ -1,14 +1,14 @@
 module Language.PureScript.Ide.FilterSpec where
 
 import           Protolude
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import Data.Map qualified as Map
+import Data.Set qualified as Set
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Filter.Declaration as D
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Imports
 import           Language.PureScript.Ide.Test as T
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 import           Test.Hspec
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])

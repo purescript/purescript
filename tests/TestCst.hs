@@ -5,9 +5,9 @@ import Prelude
 import Control.Monad (when, forM_)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import qualified Data.Text.IO as Text
+import Data.Text qualified as Text
+import Data.Text.Encoding qualified as Text
+import Data.Text.IO qualified as Text
 import Test.Hspec
 import Test.QuickCheck
 import TestUtils
