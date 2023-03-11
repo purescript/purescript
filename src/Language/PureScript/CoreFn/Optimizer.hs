@@ -4,15 +4,19 @@ import Protolude hiding (Type, moduleName)
 
 import Control.Monad.Supply (Supply)
 import Data.List (lookup)
-import Language.PureScript.AST.Literals
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.CoreFn.Ann
+import Language.PureScript.AST.Literals ( Literal(ObjectLiteral) )
+import Language.PureScript.AST.SourcePos ( nullSourceSpan )
+import Language.PureScript.CoreFn.Ann ( Ann )
 import Language.PureScript.CoreFn.CSE
+    ( optimizeCommonSubexpressions )
 import Language.PureScript.CoreFn.Expr
+    ( Bind, Expr(App, ObjectUpdate, Accessor, Literal, Var) )
 import Language.PureScript.CoreFn.Module
-import Language.PureScript.CoreFn.Traversals
-import Language.PureScript.Label
+    ( Module(moduleDecls, moduleName) )
+import Language.PureScript.CoreFn.Traversals ( everywhereOnValues )
+import Language.PureScript.Label ( Label(Label) )
 import Language.PureScript.Types
+    ( pattern REmptyKinded, Type(TypeApp, TypeConstructor, RCons) )
 import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.Constants.Prim qualified as C
 

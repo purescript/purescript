@@ -21,24 +21,61 @@ module Language.PureScript.Ide
 import Protolude hiding (moduleName)
 
 import "monad-logger" Control.Monad.Logger
+    ( MonadLogger, logWarnN )
 import Data.Map qualified as Map
 import Data.Text qualified as T
-import Language.PureScript qualified as P
+import Language.PureScript.Externs qualified as P
+    ( externsFileName )
+import Language.PureScript.Names qualified as P
+    ( moduleNameFromString, runModuleName, ModuleName )
 import Language.PureScript.Ide.CaseSplit qualified as CS
 import Language.PureScript.Ide.Command
+    ( Command(Quit, Load, LoadSync, Type, Complete, List, CaseSplit,
+              AddClause, FindUsages, Import, Rebuild, RebuildSync, Cwd, Reset),
+      ImportCommand(AddImportForIdentifier, AddImplicitImport,
+                    AddQualifiedImport),
+      ListType(Imports, LoadedModules, AvailableModules) )
 import Language.PureScript.Ide.Completion
-import Language.PureScript.Ide.Error
-import Language.PureScript.Ide.Externs
-import Language.PureScript.Ide.Filter
-import Language.PureScript.Ide.Imports hiding (Import)
+    ( completionFromMatch,
+      getCompletions,
+      getExactCompletions,
+      simpleExport,
+      CompletionOptions )
+import Language.PureScript.Ide.Error ( IdeError(GeneralError) )
+import Language.PureScript.Ide.Externs ( readExternFile )
+import Language.PureScript.Ide.Filter ( Filter )
+import Language.PureScript.Ide.Imports ( parseImportsFromFile )
 import Language.PureScript.Ide.Imports.Actions
-import Language.PureScript.Ide.Matcher
-import Language.PureScript.Ide.Prim
+    ( addImplicitImport,
+      addImportForIdentifier,
+      addQualifiedImport,
+      answerRequest )
+import Language.PureScript.Ide.Matcher ( Matcher )
+import Language.PureScript.Ide.Prim ( idePrimDeclarations )
 import Language.PureScript.Ide.Rebuild
-import Language.PureScript.Ide.SourceFile
+    ( rebuildFileAsync, rebuildFileSync )
+import Language.PureScript.Ide.SourceFile ( parseModulesFromFiles )
 import Language.PureScript.Ide.State
+    ( getAllModules,
+      getLoadedModulenames,
+      insertExterns,
+      insertModule,
+      populateVolatileState,
+      populateVolatileStateSync,
+      resetIdeState )
 import Language.PureScript.Ide.Types
+    ( Annotation(_annExportedFrom),
+      Ide,
+      IdeConfiguration(confGlobs, confOutputPath),
+      IdeDeclarationAnn(_idaAnnotation),
+      IdeEnvironment(ideConfiguration),
+      Success(TextResult, ImportList, UsagesResult, CompletionResult,
+              ModuleList, MultilineTextResult) )
 import Language.PureScript.Ide.Util
+    ( discardAnn,
+      identifierFromIdeDeclaration,
+      namespaceForDeclaration,
+      withEmptyAnn )
 import Language.PureScript.Ide.Usage (findUsages)
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
 import System.FilePath ((</>), normalise)

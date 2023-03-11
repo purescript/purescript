@@ -24,7 +24,45 @@ import Data.Functor (($>))
 import Data.List.NonEmpty qualified as NE
 import Data.Maybe (isJust, fromJust, mapMaybe)
 import Data.Text qualified as Text
-import Language.PureScript.AST qualified as AST
+import Language.PureScript.AST.Binders qualified as AST
+    ( Binder(..) )
+import Language.PureScript.AST.Declarations qualified as AST
+    ( AssocList(AssocList),
+      CaseAlternative(CaseAlternative),
+      DataConstructorDeclaration(DataConstructorDeclaration),
+      Declaration(ImportDeclaration, BoundValueDeclaration,
+                  TypeSynonymDeclaration, TypeClassDeclaration,
+                  TypeInstanceDeclaration, KindDeclaration, FixityDeclaration,
+                  ExternDeclaration, ExternDataDeclaration, DataDeclaration,
+                  RoleDeclaration, TypeDeclaration, ValueDeclaration),
+      DeclarationRef(ModuleRef, ValueRef, ValueOpRef, TypeRef, TypeOpRef,
+                     TypeClassRef),
+      DoNotationElement(DoNotationBind, DoNotationLet, DoNotationValue,
+                        PositionedDoNotationElement),
+      Expr(Ado, PositionedValue, Hole, AnonymousArgument, Var,
+           Constructor, Literal, Parens, TypedValue, BinaryNoParens, Op,
+           UnaryMinus, Accessor, ObjectUpdateNested, App, Abs, IfThenElse,
+           Case, Let, Do),
+      Guard(PatternGuard, ConditionGuard),
+      GuardedExpr(..),
+      ImportDeclarationType(..),
+      KindSignatureFor(ClassSig, DataSig, NewtypeSig, TypeSynonymSig),
+      Module(..),
+      PathNode(Branch, Leaf),
+      PathTree(PathTree),
+      RoleDeclarationData(RoleDeclarationData),
+      TypeDeclarationData(TypeDeclarationData),
+      TypeFixity(TypeFixity),
+      TypeInstanceBody(DerivedInstance, ExplicitInstance,
+                       NewtypeInstance),
+      ValueDeclarationData(ValueDeclarationData),
+      ValueFixity(ValueFixity),
+      WhereProvenance(FromLet, FromWhere) )
+import Language.PureScript.AST.Literals qualified as AST
+    ( Literal(ObjectLiteral, BooleanLiteral, CharLiteral,
+              StringLiteral, NumericLiteral, ArrayLiteral) )
+import Language.PureScript.AST.Operators qualified as AST
+    ( Associativity(Infixl, Infix, Infixr), Fixity(Fixity) )
 import Language.PureScript.AST.Declarations.ChainId (mkChainId)
 import Language.PureScript.AST.SourcePos qualified as Pos
 import Language.PureScript.Comments qualified as C
@@ -35,8 +73,76 @@ import Language.PureScript.Names qualified as N
 import Language.PureScript.PSString (mkString, prettyPrintStringJS)
 import Language.PureScript.Types qualified as T
 import Language.PureScript.CST.Positions
+    ( binderRange,
+      constraintRange,
+      declRange,
+      doStatementRange,
+      exportRange,
+      exprRange,
+      importDeclRange,
+      importRange,
+      instanceBindingRange,
+      instanceRange,
+      letBindingRange,
+      moduleRange,
+      qualRange,
+      toSourceRange,
+      typeRange )
 import Language.PureScript.CST.Print (printToken)
 import Language.PureScript.CST.Types
+    ( AdoBlock(AdoBlock),
+      Binder(..),
+      CaseOf(CaseOf),
+      ClassFundep(FundepDetermines, FundepDetermined),
+      ClassHead(ClassHead),
+      Comment(Comment),
+      Constraint(..),
+      DataCtor(DataCtor),
+      DataHead(DataHead),
+      DataMembers(DataEnumerated, DataAll),
+      Declaration(..),
+      DoBlock(DoBlock),
+      DoStatement(DoBind, DoLet, DoDiscard),
+      Export(..),
+      Expr(..),
+      Fixity(Infixl, Infix, Infixr),
+      FixityFields(FixityFields),
+      FixityOp(FixityType, FixityValue),
+      Foreign(ForeignKind, ForeignValue, ForeignData),
+      Guarded(..),
+      GuardedExpr(GuardedExpr),
+      Ident(getIdent),
+      IfThenElse(IfThenElse),
+      Import(..),
+      ImportDecl(ImportDecl),
+      Instance(Instance, instHead),
+      InstanceBinding(InstanceBindingName, InstanceBindingSignature),
+      InstanceHead(InstanceHead, instKeyword),
+      Label(lblName, lblTok),
+      Labeled(Labeled),
+      Lambda(Lambda),
+      LetBinding(..),
+      LetIn(LetIn),
+      Module(Module),
+      Name(nameValue, nameTok),
+      PatternGuard(PatternGuard),
+      QualifiedName(..),
+      RecordAccessor(RecordAccessor),
+      RecordLabeled(RecordField, RecordPun),
+      RecordUpdate(RecordUpdateBranch, RecordUpdateLeaf),
+      Role(roleValue),
+      Row(Row),
+      Separated(Separated, sepHead),
+      SourcePos(SourcePos),
+      SourceRange(..),
+      SourceToken(..),
+      Token(TokLowerName, TokUpperName, TokSymbolName, TokOperator),
+      TokenAnn(tokRange, tokLeadingComments),
+      Type(..),
+      TypeVarBinding(TypeVarName, TypeVarKinded),
+      ValueBindingFields(ValueBindingFields),
+      Where(Where),
+      Wrapped(Wrapped, wrpValue) )
 
 comment :: Comment a -> Maybe C.Comment
 comment = \case

@@ -12,6 +12,12 @@ import Prelude
 import Control.Applicative ((<|>))
 
 import Data.Aeson
+    ( FromJSON(parseJSON),
+      (.:),
+      withObject,
+      withText,
+      Object,
+      Value(Null) )
 import Data.Aeson.Types (Parser, listParser)
 import Data.Map.Strict qualified as M
 import Data.Text (Text)
@@ -20,10 +26,21 @@ import Data.Vector qualified as V
 import Data.Version (Version, parseVersion)
 
 import Language.PureScript.AST.SourcePos (SourceSpan(..))
-import Language.PureScript.AST.Literals
-import Language.PureScript.CoreFn.Ann
-import Language.PureScript.CoreFn
+import Language.PureScript.AST.Literals ( Literal(..) )
+import Language.PureScript.CoreFn.Ann ( Ann )
+import Language.PureScript.CoreFn.Binders ( Binder(..) )
+import Language.PureScript.CoreFn.Expr
+    ( Bind(..), CaseAlternative(CaseAlternative), Expr(..), Guard )
+import Language.PureScript.CoreFn.Meta
+    ( ConstructorType(..), Meta(..) )
+import Language.PureScript.CoreFn.Module ( Module(..) )
 import Language.PureScript.Names
+    ( unusedIdent,
+      Ident(UnusedIdent, Ident),
+      ModuleName(..),
+      ProperName(ProperName),
+      Qualified(..),
+      QualifiedBy(BySourcePos, ByModuleName) )
 import Language.PureScript.PSString (PSString)
 
 import Text.ParserCombinators.ReadP (readP_to_S)

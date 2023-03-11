@@ -18,15 +18,30 @@ import Data.Semigroup (Min(..))
 import Data.Semigroup.Generic (GenericSemigroupMonoid(..))
 
 import Language.PureScript.AST.Literals
+    ( Literal(StringLiteral, ArrayLiteral, ObjectLiteral,
+              BooleanLiteral, CharLiteral, NumericLiteral) )
 import Language.PureScript.AST.SourcePos (nullSourceSpan)
 import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.CoreFn.Ann (Ann)
-import Language.PureScript.CoreFn.Binders
+import Language.PureScript.CoreFn.Binders ( Binder(..) )
 import Language.PureScript.CoreFn.Expr
+    ( Bind(..),
+      CaseAlternative(CaseAlternative),
+      Expr(Literal, Let, App, Accessor, Abs, Var) )
 import Language.PureScript.CoreFn.Meta (Meta(IsSyntheticApp))
 import Language.PureScript.CoreFn.Traversals
+    ( everywhereOnValues, traverseCoreFn )
 import Language.PureScript.Environment (dictTypeName)
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      freshIdent,
+      runIdent,
+      toMaybeModuleName,
+      Ident(GenIdent, Ident),
+      ModuleName,
+      ProperName(ProperName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.PSString (decodeString)
 
 -- |

@@ -16,15 +16,37 @@ import Data.List.NonEmpty qualified as NEL
 import Data.Monoid qualified as Monoid ((<>))
 import Data.Text qualified as T
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Binders ( Binder(..) )
+import Language.PureScript.AST.Declarations
+    ( pattern ValueDecl,
+      AssocList(runAssocList),
+      CaseAlternative(CaseAlternative),
+      Declaration(BindingGroupDeclaration, TypeDeclaration),
+      DoNotationElement(..),
+      Expr(..),
+      Guard(PatternGuard, ConditionGuard),
+      GuardedExpr(..),
+      PathNode(Branch, Leaf),
+      PathTree(PathTree),
+      TypeDeclarationData(tydeclType, tydeclIdent),
+      WhereProvenance(FromLet, FromWhere) )
+import Language.PureScript.AST.Literals ( Literal(..) )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Names
+    ( disqualify,
+      runModuleName,
+      showIdent,
+      OpName(runOpName),
+      ProperName(runProperName),
+      Qualified(Qualified) )
 import Language.PureScript.Pretty.Common
+    ( before, beforeWithSpace, parensT )
 import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox, prettyPrintObjectKey)
 import Language.PureScript.Types (Constraint(..))
 import Language.PureScript.PSString (PSString, prettyPrintString)
 
 import Text.PrettyPrint.Boxes
+    ( Box, (//), (<>), left, moveRight, text, vcat, vsep )
 
 -- TODO(Christoph): remove T.unpack s
 

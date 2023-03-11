@@ -11,10 +11,48 @@ import Protolude hiding (moduleName)
 import Control.Lens (preview)
 import Data.Map qualified as Map
 import Data.Set qualified as Set
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Binders qualified as P
+    ( Binder(OpBinder, ConstructorBinder) )
+import Language.PureScript.AST.Declarations qualified as P
+    ( getModuleDeclarations,
+      Declaration(ImportDeclaration),
+      DeclarationRef(ModuleRef, ValueRef, TypeRef, TypeClassRef,
+                     ValueOpRef, TypeOpRef),
+      Expr(Op, Var, Constructor),
+      ImportDeclarationType(Hiding, Implicit, Explicit),
+      Module )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( SourceSpan )
+import Language.PureScript.AST.Traversals qualified as P
+    ( everythingWithScope, ScopedIdent(LocalIdent) )
+import Language.PureScript.Names qualified as P
+    ( pattern ByNullSourcePos,
+      byMaybeModuleName,
+      disqualify,
+      isQualified,
+      runIdent,
+      ModuleName,
+      Qualified(..) )
 import Language.PureScript.Ide.State (getAllModules, getFileState)
 import Language.PureScript.Ide.Types
+    ( _IdeDeclDataConstructor,
+      _IdeDeclValue,
+      _IdeDeclValueOperator,
+      Annotation(_annExportedFrom),
+      Ide,
+      IdeDataConstructor(_ideDtorName, _ideDtorTypeName),
+      IdeDeclaration(..),
+      IdeDeclarationAnn(_idaDeclaration, _idaAnnotation),
+      IdeFileState(fsModules),
+      IdeType(_ideTypeName),
+      IdeTypeClass(_ideTCName),
+      IdeTypeOperator(_ideTypeOpName),
+      IdeTypeSynonym(_ideSynonymName),
+      IdeValue(_ideValueIdent),
+      IdeValueOperator(_ideValueOpName),
+      ModuleMap )
 import Language.PureScript.Ide.Util
+    ( identifierFromIdeDeclaration, namespaceForDeclaration )
 
 -- |
 -- How we find usages, given an IdeDeclaration and the module it was defined in:

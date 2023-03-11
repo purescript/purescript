@@ -8,5 +8,18 @@
 module Language.PureScript.Pretty (module P) where
 
 import Language.PureScript.Pretty.Types as P
+    ( convertPrettyPrintType,
+      prettyPrintLabel,
+      prettyPrintObjectKey,
+      prettyPrintSuggestedType,
+      prettyPrintType,
+      prettyPrintTypeAtom,
+      prettyPrintTypeWithUnicode,
+      typeAsBox,
+      typeAtomAsBox,
+      typeDiffAsBox,
+      PrettyPrintConstraint,
+      PrettyPrintType(..) )
 import Language.PureScript.Pretty.Values as P
+    ( prettyPrintBinder, prettyPrintBinderAtom, prettyPrintValue )
 import Language.PureScript.PSString as P (prettyPrintString)

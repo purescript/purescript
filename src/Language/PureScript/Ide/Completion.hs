@@ -11,16 +11,50 @@ module Language.PureScript.Ide.Completion
 
 import Protolude hiding ((<&>), moduleName)
 
-import Control.Lens hiding (op, (&))
-import Data.Aeson
+import Control.Lens ( (<&>), (^.), (.~) )
+import Data.Aeson ( FromJSON(parseJSON), (.!=), (.:?), withObject )
 import Data.Map qualified as Map
 import Data.Text qualified as T
-import Language.PureScript qualified as P
+import Language.PureScript.AST qualified as P
+    ( Associativity(Infixr, Infix, Infixl) )
+import Language.PureScript.Names qualified as P
+    ( runModuleName, ModuleName, OpName(runOpName) )
 import Language.PureScript.Ide.Error (prettyPrintTypeSingleLine)
 import Language.PureScript.Ide.Filter
-import Language.PureScript.Ide.Matcher
+    ( applyFilters, exactFilter, Filter )
+import Language.PureScript.Ide.Matcher ( runMatcher, Matcher )
 import Language.PureScript.Ide.Types
+    ( annExportedFrom,
+      declarationType,
+      idaAnnotation,
+      ideDtorName,
+      ideDtorType,
+      ideSynonymName,
+      ideSynonymType,
+      ideTCKind,
+      ideTCName,
+      ideTypeKind,
+      ideTypeName,
+      ideValueIdent,
+      ideValueType,
+      Annotation(_annDocumentation, _annTypeAnnotation, _annLocation),
+      Completion(..),
+      IdeDeclaration(IdeDeclModule, IdeDeclValue, IdeDeclType,
+                     IdeDeclTypeSynonym, IdeDeclDataConstructor, IdeDeclTypeClass,
+                     IdeDeclValueOperator, IdeDeclTypeOperator),
+      IdeDeclarationAnn(IdeDeclarationAnn),
+      IdeNamespace,
+      IdeTypeOperator(IdeTypeOperator),
+      IdeValueOperator(IdeValueOperator),
+      Match(..),
+      ModuleMap )
 import Language.PureScript.Ide.Util
+    ( identT,
+      identifierFromIdeDeclaration,
+      namespaceForDeclaration,
+      properNameT,
+      typeOperatorAliasT,
+      valueOperatorAliasT )
 
 -- | Applies the CompletionFilters and the Matcher to the given Modules
 --   and sorts the found Completions according to the Matching Score

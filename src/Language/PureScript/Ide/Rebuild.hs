@@ -9,22 +9,62 @@ module Language.PureScript.Ide.Rebuild
 import Protolude hiding (moduleName)
 
 import "monad-logger" Control.Monad.Logger
+    ( MonadLogger, LoggingT, logDebug )
 import Data.List qualified as List
 import Data.Map.Lazy qualified as M
-import Data.Maybe (fromJust)
+import Data.Maybe                      (fromJust)
 import Data.Set qualified as S
 import Data.Time qualified as Time
 import Data.Text qualified as Text
-import Language.PureScript qualified as P
-import Language.PureScript.Make (ffiCodegen')
+import Language.PureScript.AST.Declarations qualified as P
+    ( getModuleName, Declaration(ImportDeclaration), Module(..) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( internalModuleSourceSpan )
+import Language.PureScript.Errors qualified as P
+    ( MultipleErrors )
+import Language.PureScript.Externs qualified as P
+    ( ExternsFile(..), ExternsImport(ExternsImport) )
+import Language.PureScript.Make qualified as P
+    ( hashFile,
+      runMake,
+      Make,
+      buildMakeActions,
+      readCacheDb',
+      writeCacheDb',
+      MakeActions(ffiCodegen, progress, codegen),
+      RebuildPolicy(RebuildAlways),
+      inferForeignModules,
+      rebuildModule )
+import Language.PureScript.ModuleDependencies qualified as P
+    ( moduleSignature, sortModules, DependencyDepth(Transitive) )
+import Language.PureScript.Names qualified as P
+    ( runModuleName, ModuleName )
+import Language.PureScript.Options qualified as P
+    ( defaultOptions,
+      CodegenTarget(JS),
+      Options(optionsCodegenTargets) )
+import Language.PureScript.Make.Actions ( ffiCodegen' )
 import Language.PureScript.Make.Cache (CacheInfo(..), normaliseForCache)
 import Language.PureScript.CST qualified as CST
 
 import Language.PureScript.Ide.Error
+    ( IdeError(RebuildError, GeneralError) )
 import Language.PureScript.Ide.Logging
+    ( labelTimespec, logPerf, runLogger )
 import Language.PureScript.Ide.State
+    ( cacheRebuild,
+      getExternFiles,
+      insertExterns,
+      insertModule,
+      populateVolatileState,
+      updateCacheTimestamp )
 import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Util
+    ( Ide,
+      IdeConfiguration(confLogLevel, confOutputPath),
+      IdeEnvironment(ideConfiguration),
+      ModuleMap,
+      Success(RebuildSuccess) )
+import Language.PureScript.Ide.Util ( ideReadFile )
 import System.Directory (getCurrentDirectory)
 
 -- | Given a filepath performs the following steps:

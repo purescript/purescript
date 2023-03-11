@@ -15,11 +15,41 @@ import Data.Maybe (maybeToList)
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.Docs.RenderedCode
+import Language.PureScript.Docs.RenderedCode.RenderType
+    ( renderType, renderTypeAtom, renderTypeWithRole )
+import Language.PureScript.Docs.RenderedCode.Types
+    ( alias,
+      aliasName,
+      dataCtor,
+      ident,
+      keyword,
+      keywordAs,
+      keywordClass,
+      keywordData,
+      keywordFixity,
+      keywordType,
+      keywordWhere,
+      sp,
+      syntax,
+      typeVar,
+      RenderedCode )
 import Language.PureScript.Docs.Types
-import Language.PureScript.Docs.Utils.MonoidExtras
+    ( isTypeClassMember,
+      kindSignatureForKeyword,
+      ChildDeclaration(..),
+      ChildDeclarationInfo(ChildTypeClassMember, ChildInstance,
+                           ChildDataConstructor),
+      Constraint',
+      Declaration(..),
+      DeclarationInfo(AliasDeclaration, ValueDeclaration,
+                      DataDeclaration, ExternDataDeclaration, TypeSynonymDeclaration,
+                      TypeClassDeclaration),
+      KindInfo(..),
+      Type' )
+import Language.PureScript.Docs.Utils.MonoidExtras ( mintersperse )
 
-import Language.PureScript.AST qualified as P
+import Language.PureScript.AST.Operators qualified as P
+    ( Fixity(Fixity) )
 import Language.PureScript.Environment qualified as P
 import Language.PureScript.Names qualified as P
 import Language.PureScript.Types qualified as P

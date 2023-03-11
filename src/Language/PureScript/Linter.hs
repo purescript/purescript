@@ -5,7 +5,7 @@ module Language.PureScript.Linter (lint, module L) where
 
 import Prelude
 
-import Control.Monad.Writer.Class
+import Control.Monad.Writer.Class ( MonadWriter(tell), censor )
 
 import Data.Maybe (mapMaybe)
 import Data.Set qualified as S
@@ -13,12 +13,64 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Control.Monad ((<=<))
 
-import Language.PureScript.AST
+import Language.PureScript.AST.Binders
+    ( binderNamesWithSpans, Binder(NamedBinder, VarBinder) )
+import Language.PureScript.AST.Declarations
+    ( pattern ValueDecl,
+      declName,
+      declSourceSpan,
+      getValueRef,
+      isValueDecl,
+      AssocList(runAssocList),
+      CaseAlternative(CaseAlternative),
+      Declaration(TypeClassDeclaration, TypeDeclaration,
+                  BoundValueDeclaration, ValueDeclaration, TypeInstanceDeclaration),
+      DeclarationRef(ModuleRef),
+      DoNotationElement(..),
+      ErrorMessageHint(ErrorInModule, ErrorInTypeClassDeclaration,
+                       ErrorInTypeDeclaration, ErrorInValueDeclaration),
+      Expr(..),
+      Guard(PatternGuard, ConditionGuard),
+      GuardedExpr(GuardedExpr),
+      Module(..),
+      PathNode(Branch, Leaf),
+      PathTree(PathTree),
+      TypeDeclarationData(TypeDeclarationData, tydeclType, tydeclIdent),
+      TypeInstanceBody(ExplicitInstance),
+      ValueDeclarationData(valdeclIdent, valdeclExpression,
+                           valdeclBinders) )
+import Language.PureScript.AST.Literals
+    ( Literal(ObjectLiteral, ArrayLiteral) )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
+import Language.PureScript.AST.Traversals
+    ( accumTypes,
+      everythingWithScope,
+      inScope,
+      ScopedIdent(ToplevelIdent) )
 import Language.PureScript.Errors
+    ( addHint,
+      errorMessage',
+      MultipleErrors,
+      SimpleErrorMessage(UnusedName, ShadowedName, ShadowedTypeVar,
+                         UnusedTypeVar, UnusedDeclaration) )
 import Language.PureScript.Linter.Exhaustive as L
+    ( checkExhaustiveExpr )
 import Language.PureScript.Linter.Imports as L
+    ( Name(..), lintImports, UsedImports )
 import Language.PureScript.Names
+    ( getIdentName,
+      runIdent,
+      Ident(Ident),
+      Qualified(Qualified),
+      QualifiedBy(BySourcePos) )
 import Language.PureScript.Types
+    ( everythingWithContextOnTypes,
+      Constraint(constraintArgs),
+      SourceType,
+      Type(REmpty, TypeVar, ForAll, TypeApp, KindApp, ConstrainedType,
+           RCons, KindedType, ParensInType, BinaryNoParensType, TUnknown,
+           TypeLevelString, TypeLevelInt, TypeWildcard, TypeConstructor,
+           TypeOp, Skolem) )
 import Language.PureScript.Constants.Libs qualified as C
 
 -- | Lint the PureScript AST.

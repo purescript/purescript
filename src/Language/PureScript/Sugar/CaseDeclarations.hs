@@ -16,13 +16,49 @@ import Data.Maybe (catMaybes, mapMaybe)
 
 import Control.Monad ((<=<), forM, replicateM, join, unless)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class ( MonadSupply )
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Binders
+    ( isIrrefutable,
+      Binder(LiteralBinder, NullBinder, TypedBinder, VarBinder,
+             PositionedBinder) )
+import Language.PureScript.AST.Declarations
+    ( pattern MkUnguarded,
+      pattern ValueDecl,
+      declSourceSpan,
+      isTrueExpr,
+      traverseTypeInstanceBody,
+      CaseAlternative(CaseAlternative, caseAlternativeBinders),
+      Declaration(ValueDeclaration, TypeInstanceDeclaration),
+      ErrorMessageHint(ErrorInModule),
+      Expr(Accessor, Parens, Literal, App, TypedValue, PositionedValue,
+           Case, Let, Var, Abs),
+      Guard(..),
+      GuardedExpr(..),
+      Module(..),
+      ValueDeclarationData(valdeclIdent),
+      WhereProvenance(FromLet) )
+import Language.PureScript.AST.Literals ( Literal(BooleanLiteral) )
+import Language.PureScript.AST.SourcePos
+    ( nullSourceSpan, SourceSpan(SourceSpan) )
+import Language.PureScript.AST.Traversals
+    ( everywhereOnValuesM, everywhereOnValuesTopDownM )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment
+    ( NameKind(Public, Private) )
 import Language.PureScript.Errors
+    ( addHint,
+      errorMessage',
+      parU,
+      rethrow,
+      withPosition,
+      ErrorMessage(..),
+      MultipleErrors(MultipleErrors),
+      SimpleErrorMessage(DuplicateValueDeclaration,
+                         CaseBinderLengthDiffers, OverlappingArgNames,
+                         ArgListLengthsDiffer) )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos, freshIdent', Ident, Qualified(Qualified) )
 import Language.PureScript.TypeChecker.Monad (guardWith)
 
 -- |

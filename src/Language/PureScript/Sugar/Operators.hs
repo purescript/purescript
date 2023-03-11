@@ -15,16 +15,77 @@ module Language.PureScript.Sugar.Operators
 
 import Prelude
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Binders
+    ( Binder(OpBinder, ConstructorBinder, BinaryNoParensBinder,
+             VarBinder, ParensInBinder, TypedBinder, PositionedBinder) )
+import Language.PureScript.AST.Declarations
+    ( pattern TypeFixityDeclaration,
+      pattern ValueFixityDeclaration,
+      declSourceSpan,
+      getFixityDecl,
+      getTypeRef,
+      isAnonymousArgument,
+      traverseDataCtorFields,
+      Declaration(ExternDataDeclaration, DataDeclaration,
+                  ExternDeclaration, TypeClassDeclaration, TypeInstanceDeclaration,
+                  TypeSynonymDeclaration, TypeDeclaration, KindDeclaration),
+      DeclarationRef(TypeRef, ValueOpRef, ValueRef, TypeOpRef),
+      ErrorMessageHint(ErrorInModule),
+      Expr(UnaryMinus, Op, Constructor, Abs, Var, BinaryNoParens, App,
+           Parens, TypedValue, PositionedValue, TypeClassDictionary,
+           DeferredDictionary),
+      Module(..),
+      TypeDeclarationData(TypeDeclarationData),
+      TypeFixity(TypeFixity),
+      ValueFixity(ValueFixity) )
+import Language.PureScript.AST.Operators
+    ( Associativity, Fixity(..) )
+import Language.PureScript.AST.SourcePos
+    ( internalModuleSourceSpan, nullSourceSpan, SourceSpan )
+import Language.PureScript.AST.Traversals
+    ( everywhereOnValues,
+      everywhereOnValuesTopDownM,
+      everywhereWithContextOnValuesM )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Errors
+    ( addHint,
+      errorMessage,
+      errorMessage',
+      parU,
+      rethrow,
+      rethrowWithPosition,
+      MultipleErrors,
+      SimpleErrorMessage(TransitiveExportError, InvalidOperatorInBinder,
+                         UnknownName, MultipleValueOpFixities, MultipleTypeOpFixities,
+                         IncorrectAnonymousArgument, TransitiveDctorExportError) )
 import Language.PureScript.Externs
+    ( ExternsFile(..),
+      ExternsFixity(ExternsFixity),
+      ExternsTypeFixity(ExternsTypeFixity) )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      freshIdent',
+      Ident(Ident),
+      Name(TyOpName, ValOpName),
+      OpName,
+      OpNameType(ValueOpName, TypeOpName),
+      ProperName,
+      ProperNameType(ConstructorName, TypeName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.Sugar.Operators.Binders
+    ( matchBinderOperators )
 import Language.PureScript.Sugar.Operators.Expr
+    ( matchExprOperators )
 import Language.PureScript.Sugar.Operators.Types
+    ( matchTypeOperators )
 import Language.PureScript.Traversals (defS, sndM)
 import Language.PureScript.Types
+    ( everywhereOnTypesTopDownM,
+      overConstraintArgs,
+      Constraint(Constraint),
+      SourceType,
+      Type(TypeOp, TypeConstructor, ParensInType) )
 
 import Control.Monad (unless, (<=<))
 import Control.Monad.Error.Class (MonadError(..))

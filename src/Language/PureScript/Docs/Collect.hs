@@ -18,8 +18,12 @@ import System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
 import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Prim (primModules)
 import Language.PureScript.Docs.Types
+    ( asModule,
+      displayPackageError,
+      ignorePackage,
+      InPackage(..),
+      Module(modName) )
 
-import Language.PureScript.AST qualified as P
 import Language.PureScript.CST qualified as P
 import Language.PureScript.Crash qualified as P
 import Language.PureScript.Errors qualified as P

@@ -7,14 +7,34 @@ import Prelude
 
 import Control.Monad (forM)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class ( MonadSupply )
 import Data.Foldable (toList)
 import Data.List (foldl')
 import Data.Maybe (catMaybes)
-import Language.PureScript.AST
+import Language.PureScript.AST.Binders ( Binder(VarBinder) )
+import Language.PureScript.AST.Declarations
+    ( pattern MkUnguarded,
+      pattern ValueDecl,
+      declSourceSpan,
+      isAnonymousArgument,
+      AssocList(AssocList, runAssocList),
+      Declaration,
+      Expr(Literal, ObjectUpdateNested, Case, IfThenElse, Let,
+           ObjectUpdate, Var, Abs, Accessor, PositionedValue,
+           AnonymousArgument),
+      Module(..),
+      PathNode(..),
+      PathTree(..),
+      WhereProvenance(FromLet) )
+import Language.PureScript.AST.Literals ( Literal(ObjectLiteral) )
+import Language.PureScript.AST.SourcePos ( nullSourceSpan )
+import Language.PureScript.AST.Traversals
+    ( everywhereOnValuesTopDownM )
 import Language.PureScript.Environment (NameKind(..))
 import Language.PureScript.Errors
+    ( rethrowWithPosition, MultipleErrors )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos, freshIdent', Ident, Qualified(Qualified) )
 import Language.PureScript.PSString (PSString)
 
 

@@ -8,14 +8,39 @@ module Language.PureScript.Ide.Types where
 import Protolude hiding (moduleName)
 
 import Control.Concurrent.STM (TVar)
-import Control.Lens hiding (op, (.=))
+import Control.Lens ( makeLenses, Getting, Traversal' )
 import Control.Monad.Fail (fail)
 import Data.Aeson (ToJSON, FromJSON, (.=))
 import Data.Aeson qualified as Aeson
 import Data.IORef (IORef)
 import Data.Time.Clock (UTCTime)
 import Data.Map.Lazy qualified as M
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( DeclarationRef(TypeOpRef, TypeRef, ValueRef, TypeClassRef,
+                     ValueOpRef),
+      ImportDeclarationType(..),
+      Module )
+import Language.PureScript.AST.Operators qualified as P
+    ( Associativity, Precedence )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( SourceSpan )
+import Language.PureScript.Errors qualified as P
+    ( Level(Warning),
+      MultipleErrors )
+import Language.PureScript.Externs qualified as P ( ExternsFile )
+import Language.PureScript.Names qualified as P
+    ( runIdent,
+      runModuleName,
+      showOp,
+      Ident,
+      ModuleName,
+      OpName,
+      OpNameType(ValueOpName, TypeOpName),
+      ProperName(runProperName),
+      ProperNameType(ConstructorName, ClassName, TypeName),
+      Qualified )
+import Language.PureScript.Types qualified as P
+    ( SourceConstraint, SourceType )
 import Language.PureScript.Errors.JSON qualified as P
 import Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
 

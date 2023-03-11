@@ -6,7 +6,7 @@ import Data.List (intercalate)
 import Data.Version (showVersion)
 import Paths_purescript qualified as Paths
 import Language.PureScript.Interactive.Directive qualified as D
-import Language.PureScript.Interactive.Types
+import Language.PureScript.Interactive.Types ( Directive )
 
 -- Messages
 

@@ -18,14 +18,21 @@ import Protolude
 
 import Control.Monad.Fail (fail)
 import Data.Aeson
+    ( FromJSON(parseJSON), (.!=), (.:), (.:?), withObject )
 import Data.Map qualified as Map
 import Data.Set qualified as Set
-import Language.PureScript qualified as P
+import Language.PureScript.Names qualified as P
+    ( moduleNameFromString, ModuleName )
+import Language.PureScript.Options qualified as P
+    ( codegenTargets, CodegenTarget )
 import Language.PureScript.Ide.CaseSplit
+    ( explicitAnnotations, noAnnotations, WildcardAnnotations )
 import Language.PureScript.Ide.Completion
-import Language.PureScript.Ide.Filter
-import Language.PureScript.Ide.Matcher
+    ( defaultCompletionOptions, CompletionOptions )
+import Language.PureScript.Ide.Filter ( Filter )
+import Language.PureScript.Ide.Matcher ( Matcher )
 import Language.PureScript.Ide.Types
+    ( IdeDeclarationAnn, IdeNamespace )
 
 data Command
     = Load [P.ModuleName]

@@ -24,11 +24,35 @@ import Protolude
 
 import Control.Parallel.Strategies (withStrategy, parList, rseq)
 import Data.Map qualified as Map
-import Language.PureScript qualified as P
+import Language.PureScript.AST qualified as P
+    ( SourceSpan,
+      pattern ValueDecl,
+      getTypeDeclaration,
+      unwrapTypeDeclaration,
+      DataConstructorDeclaration(DataConstructorDeclaration, dataCtorAnn,
+                                 dataCtorName),
+      Declaration(ExternDataDeclaration, TypeDeclaration,
+                  TypeSynonymDeclaration, TypeClassDeclaration, DataDeclaration,
+                  FixityDeclaration, ExternDeclaration),
+      Module(..),
+      TypeDeclarationData(TypeDeclarationData),
+      TypeFixity(TypeFixity),
+      ValueFixity(ValueFixity) )
+import Language.PureScript.Names qualified as P
+    ( runIdent,
+      runModuleName,
+      Ident,
+      OpName(runOpName),
+      ProperName(runProperName) )
+import Language.PureScript.Types qualified as P ( SourceType )
 import Language.PureScript.CST qualified as CST
-import Language.PureScript.Ide.Error
+import Language.PureScript.Ide.Error ( IdeError )
 import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Util
+    ( DefinitionSites,
+      IdeNamespace(IdeNSType, IdeNSModule, IdeNSValue),
+      IdeNamespaced(..),
+      TypeAnnotations )
+import Language.PureScript.Ide.Util ( ideReadFile )
 
 parseModule :: FilePath -> Text -> Either FilePath (FilePath, P.Module)
 parseModule path file =

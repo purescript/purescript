@@ -30,7 +30,24 @@ module Language.PureScript.Interactive.Types
 
 import Prelude
 
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( Declaration(ImportDeclaration),
+      Expr,
+      ImportDeclarationType(Implicit),
+      Module(..) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( internalModuleSourceSpan, SourceSpan )
+import Language.PureScript.Environment qualified as P
+    ( initEnvironment, Environment )
+import Language.PureScript.Errors qualified as P
+    ( MultipleErrors )
+import Language.PureScript.Externs qualified as P
+    ( applyExternsFileToEnvironment, ExternsFile )
+import Language.PureScript.Names qualified as P
+    ( moduleNameFromString, Ident(Ident), ModuleName(..) )
+import Language.PureScript.Sugar.Names qualified as P
+    ( primEnv, Env, Exports, Imports, desugarImports, externsEnv )
+import Language.PureScript.Types qualified as P ( SourceType )
 import Data.Map qualified as M
 import Data.List (foldl')
 import Language.PureScript.Sugar.Names.Env (nullImports, primExports)

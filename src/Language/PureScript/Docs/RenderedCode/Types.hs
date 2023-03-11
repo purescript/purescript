@@ -46,7 +46,19 @@ import Data.ByteString.Lazy qualified as BS
 import Data.Text.Encoding qualified as TE
 
 import Language.PureScript.Names
-import Language.PureScript.AST (Associativity(..))
+    ( pattern ByNullSourcePos,
+      moduleNameFromString,
+      runIdent,
+      runModuleName,
+      Ident(Ident),
+      ModuleName,
+      OpName(runOpName),
+      OpNameType(TypeOpName),
+      ProperName(..),
+      ProperNameType(ConstructorName, TypeName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
+import Language.PureScript.AST.Operators ( Associativity(..) )
 
 -- | Given a list of actions, attempt them all, returning the first success.
 -- If all the actions fail, 'tryAll' returns the first argument.

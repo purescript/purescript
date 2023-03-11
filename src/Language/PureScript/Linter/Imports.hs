@@ -8,7 +8,7 @@ import Prelude
 import Protolude (ordNub)
 
 import Control.Monad (join, unless, foldM, (<=<))
-import Control.Monad.Writer.Class
+import Control.Monad.Writer.Class ( MonadWriter(tell) )
 
 import Data.Function (on)
 import Data.Foldable (for_)
@@ -20,13 +20,53 @@ import Data.Text qualified as T
 import Data.Map qualified as M
 
 import Language.PureScript.AST.Declarations
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Crash
+    ( getTypeRef,
+      isExplicit,
+      Declaration(ImportDeclaration),
+      DeclarationRef(ModuleRef, TypeClassRef, ValueRef, ValueOpRef,
+                     TypeRef, TypeOpRef),
+      ExportSource,
+      ImportDeclarationType(..),
+      Module(..) )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Errors
+    ( errorMessage',
+      MultipleErrors,
+      SimpleErrorMessage(ImplicitQualifiedImport,
+                         DuplicateSelectiveImport, DuplicateImportRef,
+                         ImplicitQualifiedImportReExport, DuplicateImport,
+                         UnusedExplicitImport, UnusedDctorImport, UnusedDctorExplicitImport,
+                         UnusedImport, ImplicitImport, HidingImport) )
 import Language.PureScript.Names
+    ( disqualifyFor,
+      getClassName,
+      getDctorName,
+      getIdentName,
+      getQual,
+      getTypeName,
+      getTypeOpName,
+      getValOpName,
+      isQualifiedWith,
+      isUnqualified,
+      runModuleName,
+      ModuleName,
+      Name(..),
+      ProperName(runProperName),
+      ProperNameType(TypeName, ConstructorName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.Sugar.Names.Common (warnDuplicateRefs)
 import Language.PureScript.Sugar.Names.Env
+    ( envModuleExports,
+      nullImports,
+      Env,
+      Exports(exportedTypes),
+      ImportRecord(importName),
+      Imports(importedValueOps, importedTypeClasses, importedTypeOps,
+              importedTypes, importedDataConstructors, importedValues) )
 import Language.PureScript.Sugar.Names.Imports
+    ( findImports, ImportDef )
 import Language.PureScript.Constants.Prim qualified as C
 
 -- |

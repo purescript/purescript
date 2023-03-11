@@ -9,10 +9,12 @@ import Protolude (unsnoc)
 import Control.Arrow ((&&&))
 import Control.Exception (displayException)
 import Control.Lens (both, head1, over)
-import Control.Monad
+import Control.Monad ( unless, forM )
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.State.Lazy
+    ( evalState, State, get, put )
 import Control.Monad.Writer
+    ( Last(Last, getLast), MonadWriter(tell, listen), censor )
 import Data.Bifunctor (first, second)
 import Data.Bitraversable (bitraverse)
 import Data.Char (isSpace)
@@ -37,17 +39,59 @@ import Language.PureScript.AST
 import Language.PureScript.Bundle qualified as Bundle
 import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.Constants.Prim qualified as C
-import Language.PureScript.Crash
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.CST.Errors qualified as CST
 import Language.PureScript.CST.Print qualified as CST
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.Names
-import Language.PureScript.Pretty
+    ( pattern ByNullSourcePos,
+      disqualify,
+      isBuiltinModuleName,
+      isPlainIdent,
+      moduleNameFromString,
+      runIdent,
+      runModuleName,
+      showIdent,
+      showOp,
+      showQualified,
+      Ident(Ident),
+      ModuleName,
+      Name(..),
+      OpName,
+      OpNameType(AnyOpName, TypeOpName, ValueOpName),
+      ProperName(runProperName),
+      ProperNameType(ClassName, ConstructorName, TypeName),
+      Qualified(..),
+      QualifiedBy(ByModuleName, BySourcePos) )
+import Language.PureScript.Pretty.Types
+    ( prettyPrintLabel,
+      prettyPrintObjectKey,
+      prettyPrintSuggestedType,
+      typeAsBox,
+      typeAtomAsBox,
+      typeDiffAsBox )
+import Language.PureScript.Pretty.Values
+    ( prettyPrintBinderAtom, prettyPrintValue )
 import Language.PureScript.Pretty.Common (endWith)
 import Language.PureScript.PSString (decodeStringWithReplacement)
-import Language.PureScript.Roles
-import Language.PureScript.Traversals
+import Language.PureScript.Roles ( displayRole, Role )
+import Language.PureScript.Traversals ( sndM )
 import Language.PureScript.Types
+    ( eraseForAllKindAnnotations,
+      eraseKindApps,
+      everywhereOnTypesTopDownM,
+      getAnnForType,
+      overConstraintArgs,
+      rowFromList,
+      rowToList,
+      srcTUnknown,
+      Constraint(Constraint),
+      ConstraintData(PartialConstraintData),
+      RowListItem(RowListItem),
+      SourceConstraint,
+      SourceType,
+      Type(TUnknown, Skolem, TypeConstructor, RCons, KindApp,
+           TypeLevelString, TypeApp) )
 import Language.PureScript.Publish.BoxesHelpers qualified as BoxHelpers
 import System.Console.ANSI qualified as ANSI
 import System.FilePath (makeRelative)

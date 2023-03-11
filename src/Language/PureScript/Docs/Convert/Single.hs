@@ -10,8 +10,39 @@ import Control.Category ((>>>))
 import Data.Text qualified as T
 
 import Language.PureScript.Docs.Types
+    ( convertFundepsToStrings,
+      isType,
+      isTypeClass,
+      ChildDeclaration(ChildDeclaration),
+      ChildDeclarationInfo(ChildInstance, ChildDataConstructor,
+                           ChildTypeClassMember),
+      Declaration(..),
+      DeclarationInfo(..),
+      KindInfo(KindInfo, kiKind, kiKeyword),
+      Module(Module),
+      Type' )
 
-import Language.PureScript.AST qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( pattern MkUnguarded,
+      pattern TypeFixityDeclaration,
+      pattern ValueDecl,
+      pattern ValueFixityDeclaration,
+      DataConstructorDeclaration(..),
+      Declaration(RoleDeclaration, ValueDeclaration, ExternDeclaration,
+                  DataDeclaration, ExternDataDeclaration, TypeSynonymDeclaration,
+                  TypeClassDeclaration, TypeDeclaration, TypeInstanceDeclaration,
+                  KindDeclaration),
+      Expr(TypedValue),
+      KindSignatureFor,
+      Module(..),
+      RoleDeclarationData(RoleDeclarationData, rdeclSourceAnn,
+                          rdeclRoles, rdeclIdent),
+      TypeDeclarationData(TypeDeclarationData),
+      ValueDeclarationData(valdeclIdent) )
+import Language.PureScript.AST.Exported qualified as P
+    ( exportedDeclarations )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( SourceAnn )
 import Language.PureScript.Comments qualified as P
 import Language.PureScript.Crash qualified as P
 import Language.PureScript.Names qualified as P

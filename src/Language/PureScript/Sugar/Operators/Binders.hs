@@ -2,12 +2,17 @@ module Language.PureScript.Sugar.Operators.Binders where
 
 import Prelude
 
-import Control.Monad.Except
+import Control.Monad.Except ( MonadError )
 
-import Language.PureScript.AST
-import Language.PureScript.Errors
+import Language.PureScript.AST.Binders
+    ( Binder(OpBinder, BinaryNoParensBinder) )
+import Language.PureScript.AST.Operators ( Associativity )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
+import Language.PureScript.Errors ( MultipleErrors )
 import Language.PureScript.Names
+    ( OpName(OpName), OpNameType(ValueOpName), Qualified(..) )
 import Language.PureScript.Sugar.Operators.Common
+    ( matchOperators )
 
 matchBinderOperators
   :: MonadError MultipleErrors m

@@ -9,8 +9,17 @@ import Prelude
 import Data.List (groupBy)
 import Data.Function (on)
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Binders ( Binder )
+import Language.PureScript.AST.Declarations
+    ( pattern MkUnguarded,
+      CaseAlternative(CaseAlternative),
+      Declaration(BoundValueDeclaration),
+      Expr(Let, PositionedValue, Case),
+      Module(..),
+      WhereProvenance )
+import Language.PureScript.AST.SourcePos ( SourceAnn )
+import Language.PureScript.AST.Traversals ( everywhereOnValues )
+import Language.PureScript.Crash ( internalError )
 
 -- | Replace every @BoundValueDeclaration@ in @Let@ expressions with @Case@
 -- expressions.

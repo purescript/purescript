@@ -13,9 +13,10 @@ import Prelude
 import Protolude (sortOn, swap, foldl')
 
 import Control.Arrow (first, second, (&&&))
-import Control.Monad
+import Control.Monad ( (>=>), foldM, when )
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
+    ( StateT(runStateT), MonadState, gets, modify )
 import Control.Monad.Writer (MonadWriter(..))
 
 import Data.List.NonEmpty qualified as NEL
@@ -23,17 +24,87 @@ import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Map qualified as M
 import Data.Set qualified as S
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Binders
+    ( binderNamesWithSpans,
+      Binder(TypedBinder, VarBinder, PositionedBinder, ConstructorBinder,
+             OpBinder) )
+import Language.PureScript.AST.Declarations
+    ( pattern TypeFixityDeclaration,
+      pattern ValueFixityDeclaration,
+      declName,
+      declRefName,
+      declSourceSpan,
+      getTypeClassRef,
+      getTypeOpRef,
+      getValueDeclaration,
+      getValueOpRef,
+      getValueRef,
+      isModuleRef,
+      traverseDataCtorFields,
+      CaseAlternative(CaseAlternative),
+      Declaration(ValueDeclaration, DataDeclaration,
+                  TypeSynonymDeclaration, TypeClassDeclaration,
+                  TypeInstanceDeclaration, KindDeclaration, TypeDeclaration,
+                  ExternDeclaration, ExternDataDeclaration),
+      DeclarationRef(ValueOpRef, TypeRef, ReExportRef, TypeOpRef,
+                     TypeClassRef, ValueRef),
+      ErrorMessageHint(ErrorInModule),
+      ExportSource(..),
+      Expr(TypedValue, PositionedValue, Abs, Let, Var, Op, Constructor),
+      Guard(..),
+      Module(..),
+      TypeDeclarationData(TypeDeclarationData),
+      ValueDeclarationData(ValueDeclarationData, valdeclSourceAnn,
+                           valdeclExpression, valdeclBinders, valdeclName, valdeclIdent) )
+import Language.PureScript.AST.SourcePos
+    ( SourcePos, SourceSpan(spanStart) )
+import Language.PureScript.AST.Traversals
+    ( everywhereWithContextOnValuesM )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Errors
+    ( addHint,
+      errorMessage,
+      errorMessage'',
+      nonEmpty,
+      parU,
+      warnAndRethrow,
+      warnAndRethrowWithPosition,
+      MultipleErrors,
+      SimpleErrorMessage(UnknownName, OverlappingNamesInLet) )
 import Language.PureScript.Externs
-import Language.PureScript.Linter.Imports
+    ( ExternsDeclaration(EDDataConstructor),
+      ExternsFile(..),
+      ExternsImport(ExternsImport) )
+import Language.PureScript.Linter.Imports ( Name(..), UsedImports )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      Ident,
+      OpName,
+      OpNameType(ValueOpName, TypeOpName),
+      ProperName,
+      ProperNameType(ClassName, TypeName, ConstructorName),
+      Qualified(..),
+      QualifiedBy(ByModuleName, BySourcePos) )
 import Language.PureScript.Sugar.Names.Env
+    ( checkImportConflicts,
+      nullImports,
+      primEnv,
+      Env,
+      Exports(..),
+      ImportProvenance(..),
+      ImportRecord(..),
+      Imports(..) )
 import Language.PureScript.Sugar.Names.Exports
+    ( findExportable, resolveExports )
 import Language.PureScript.Sugar.Names.Imports
-import Language.PureScript.Traversals
+    ( resolveImports, resolveModuleImport )
+import Language.PureScript.Traversals ( defS, sndM )
 import Language.PureScript.Types
+    ( everywhereOnTypesM,
+      Constraint(Constraint),
+      SourceConstraint,
+      SourceType,
+      Type(ConstrainedType, TypeOp, TypeConstructor) )
 
 -- |
 -- Replaces all local names with qualified names.

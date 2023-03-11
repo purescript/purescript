@@ -14,7 +14,7 @@ import Protolude (ordNub, swap)
 import Control.Monad ((<=<), guard)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Data.Graph
+import Data.Graph ( stronglyConnComp, stronglyConnCompR, SCC(..) )
 import Data.List (intersect, (\\))
 import Data.List.NonEmpty (NonEmpty((:|)), nonEmpty)
 import Data.Foldable (find)
@@ -24,12 +24,64 @@ import Data.List.NonEmpty qualified as NEL
 import Data.Map qualified as M
 import Data.Set qualified as S
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors hiding (nonEmpty)
+import Language.PureScript.AST.Declarations
+    ( pattern MkUnguarded,
+      pattern ValueDecl,
+      declSourceSpan,
+      getValueDeclaration,
+      isDataDecl,
+      isExternDataDecl,
+      isExternDecl,
+      isFixityDecl,
+      isImportDecl,
+      isKindDecl,
+      isRoleDecl,
+      isTypeClassDecl,
+      isTypeClassInstanceDecl,
+      isTypeSynonymDecl,
+      Declaration(ValueDeclaration, DataDeclaration,
+                  TypeClassDeclaration, RoleDeclaration, BindingGroupDeclaration,
+                  KindDeclaration, ExternDataDeclaration,
+                  DataBindingGroupDeclaration, TypeSynonymDeclaration),
+      Expr(Hole, Let, Var, Abs),
+      Module(..),
+      RoleDeclarationData(RoleDeclarationData),
+      ValueDeclarationData(ValueDeclarationData, valdeclExpression,
+                           valdeclIdent) )
+import Language.PureScript.AST.SourcePos ( SourceAnn )
+import Language.PureScript.AST.Traversals
+    ( accumTypes,
+      everythingOnValues,
+      everythingWithContextOnValues,
+      everythingWithScope,
+      everywhereOnValues,
+      everywhereOnValuesTopDownM,
+      ScopedIdent(..) )
+import Language.PureScript.Crash ( internalError )
+import Language.PureScript.Environment ( NameKind )
+import Language.PureScript.Errors
+    ( errorMessage',
+      parU,
+      positionedError,
+      ErrorMessage(ErrorMessage),
+      MultipleErrors(MultipleErrors),
+      SimpleErrorMessage(CycleInTypeSynonym, CycleInDeclaration,
+                         CycleInKindDeclaration) )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      coerceProperName,
+      Ident,
+      ModuleName,
+      ProperName,
+      ProperNameType(TypeName),
+      Qualified(Qualified),
+      QualifiedBy(ByModuleName, BySourcePos) )
 import Language.PureScript.Types
+    ( everythingOnTypes,
+      Constraint(Constraint),
+      SourceConstraint,
+      SourceType,
+      Type(TypeConstructor, ConstrainedType) )
 
 data VertexType
   = VertexDefinition

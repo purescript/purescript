@@ -4,10 +4,18 @@ import Protolude
 
 import Data.Text qualified as T
 import Data.Map qualified as Map
-import Language.PureScript qualified as P
+import Language.PureScript.Environment qualified as P ( kindType )
+import Language.PureScript.Names qualified as P
+    ( coerceProperName, disqualify, ProperName(runProperName) )
 import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.Environment qualified as PEnv
 import Language.PureScript.Ide.Types
+    ( emptyAnn,
+      IdeDeclaration(IdeDeclTypeClass, IdeDeclType),
+      IdeDeclarationAnn(IdeDeclarationAnn),
+      IdeType(IdeType),
+      IdeTypeClass(IdeTypeClass),
+      ModuleMap )
 
 idePrimDeclarations :: ModuleMap [IdeDeclarationAnn]
 idePrimDeclarations = Map.fromList

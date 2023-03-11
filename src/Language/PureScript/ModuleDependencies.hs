@@ -11,12 +11,23 @@ import Protolude hiding (head)
 
 import Data.Array ((!))
 import Data.Graph
+    ( graphFromEdges, reachable, stronglyConnComp, SCC(..) )
 import Data.Set qualified as S
-import Language.PureScript.AST
+import Language.PureScript.AST.Declarations
+    ( Declaration(ImportDeclaration),
+      ErrorMessageHint(ErrorInModule),
+      Module(..) )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
 import Language.PureScript.Constants.Prim qualified as C
-import Language.PureScript.Crash
-import Language.PureScript.Errors hiding (nonEmpty)
-import Language.PureScript.Names
+import Language.PureScript.Crash ( internalError )
+import Language.PureScript.Errors
+    ( addHint,
+      errorMessage',
+      errorMessage'',
+      parU,
+      MultipleErrors,
+      SimpleErrorMessage(CycleInModules, ModuleNotFound) )
+import Language.PureScript.Names ( ModuleName )
 
 -- | A list of modules with their transitive dependencies
 type ModuleGraph = [(ModuleName, [ModuleName])]

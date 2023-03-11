@@ -31,12 +31,44 @@ import Text.Blaze.Html5 as H hiding (map)
 import Text.Blaze.Html5.Attributes qualified as A
 import Cheapskate qualified
 
-import Language.PureScript qualified as P
+import Language.PureScript.AST qualified as P
+    ( Associativity(Infix, Infixl, Infixr), Fixity(..), SourceSpan )
+import Language.PureScript.Crash qualified as P ( internalError )
+import Language.PureScript.Names qualified as P
+    ( runIdent,
+      runModuleName,
+      showQualified,
+      ModuleName,
+      ProperName(runProperName) )
 
 import Language.PureScript.Docs.Types
-import Language.PureScript.Docs.RenderedCode hiding (sp)
+    ( ContainingModule,
+      FixityAlias,
+      Namespace(..),
+      RenderedCode,
+      RenderedCodeElement(Role, Syntax, Keyword, Space, Symbol),
+      childDeclInfoNamespace,
+      declInfoNamespace,
+      ChildDeclaration(cdeclInfo, cdeclComments, cdeclTitle),
+      ChildDeclarationInfo(ChildTypeClassMember, ChildInstance,
+                           ChildDataConstructor),
+      Declaration(..),
+      DeclarationInfo(AliasDeclaration),
+      DocLink(..),
+      InPackage(Local),
+      LinkLocation(BuiltinModule, LocalModule, DepsModule),
+      Module(..),
+      Package(..) )
+import Language.PureScript.Docs.RenderedCode.Types
+    ( outputWith, Link(NoLink, Link) )
 import Language.PureScript.Docs.Render qualified as Render
-import Language.PureScript.CST qualified as CST
+import Language.PureScript.CST.Errors qualified as CST
+    ( prettyPrintError )
+import Language.PureScript.CST.Lexer qualified as CST ( lex )
+import Language.PureScript.CST.Monad qualified as CST
+    ( runTokenParser, Parser )
+import Language.PureScript.CST.Parser qualified as CST
+    ( parseOperator )
 
 data HtmlOutput a = HtmlOutput
   { htmlIndex     :: [(Maybe Char, a)]

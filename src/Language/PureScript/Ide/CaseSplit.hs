@@ -26,13 +26,41 @@ import Protolude                     hiding (Constructor)
 import Data.List.NonEmpty qualified as NE
 import Data.Map qualified as M
 import Data.Text qualified as T
-import Language.PureScript qualified as P
-import Language.PureScript.CST qualified as CST
+import Language.PureScript.AST.Declarations qualified as P
+    ( unwrapTypeDeclaration, Declaration(TypeDeclaration) )
+import Language.PureScript.Environment qualified as P
+    ( tyFunction, TypeKind(DataType) )
+import Language.PureScript.Names qualified as P
+    ( disqualify,
+      runIdent,
+      Ident,
+      ProperName(runProperName),
+      ProperNameType(TypeName, ConstructorName) )
+import Language.PureScript.Pretty.Types qualified as P
+    ( prettyPrintTypeAtom )
+import Language.PureScript.Roles qualified as P ( Role )
+import Language.PureScript.Types qualified as P
+    ( eqType,
+      everywhereOnTypes,
+      replaceAllTypeVars,
+      SourceType,
+      Type(TypeApp, TypeConstructor, ForAll, ConstrainedType) )
+import Language.PureScript.CST.Convert qualified as CST
+    ( convertDeclaration, convertType )
+import Language.PureScript.CST.Errors qualified as CST
+    ( prettyPrintErrorMessage )
+import Language.PureScript.CST.Lexer qualified as CST ( lex )
+import Language.PureScript.CST.Monad qualified as CST
+    ( runTokenParser )
+import Language.PureScript.CST.Parser qualified as CST
+    ( parseDecl, parseType )
 
 import Language.PureScript.Externs
-import Language.PureScript.Ide.Error
+    ( ExternsDeclaration(EDType), ExternsFile(..) )
+import Language.PureScript.Ide.Error ( IdeError(GeneralError) )
 import Language.PureScript.Ide.State
-import Language.PureScript.Ide.Types
+    ( cachedRebuild, getExternFiles )
+import Language.PureScript.Ide.Types ( Ide )
 
 type Constructor = (P.ProperName 'P.ConstructorName, [P.SourceType])
 

@@ -7,6 +7,9 @@ module Language.PureScript.CoreImp.Optimizer.Blocks
 import Prelude
 
 import Language.PureScript.CoreImp.AST
+    ( everywhere,
+      AST(Binary, BooleanLiteral, Block, IfElse),
+      BinaryOperator(And) )
 
 -- | Collapse blocks which appear nested directly below another block
 collapseNestedBlocks :: AST -> AST

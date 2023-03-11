@@ -26,9 +26,34 @@ import Protolude hiding (moduleName)
 
 import Control.Lens                  hiding (anyOf, (&))
 import Data.Map qualified as Map
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( DeclarationRef(TypeClassRef, TypeRef, ValueRef, ValueOpRef,
+                     TypeOpRef) )
+import Language.PureScript.Names qualified as P
+    ( runModuleName, ModuleName )
 import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Util
+    ( _IdeDeclDataConstructor,
+      _IdeDeclType,
+      _IdeDeclTypeClass,
+      _IdeDeclTypeOperator,
+      _IdeDeclTypeSynonym,
+      _IdeDeclValue,
+      _IdeDeclValueOperator,
+      annExportedFrom,
+      anyOf,
+      idaAnnotation,
+      idaDeclaration,
+      ideDtorName,
+      ideDtorTypeName,
+      ideSynonymName,
+      ideTCName,
+      ideTypeName,
+      ideTypeOpName,
+      ideValueIdent,
+      ideValueOpName,
+      IdeDeclarationAnn,
+      ModuleMap )
+import Language.PureScript.Ide.Util ( discardAnn )
 
 -- | Contains the module with resolved reexports, and possible failures
 data ReexportResult a

@@ -7,13 +7,39 @@ import Prelude
 
 import Control.Applicative ((<|>))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class ( MonadSupply )
 import Data.Maybe (fromMaybe)
 import Data.Monoid (First(..))
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Binders
+    ( binderNames, Binder(VarBinder, PositionedBinder, NullBinder) )
+import Language.PureScript.AST.Declarations
+    ( pattern MkUnguarded,
+      pattern ValueDecl,
+      declSourceSpan,
+      CaseAlternative(CaseAlternative),
+      Declaration,
+      DoNotationElement(..),
+      Expr(PositionedValue, Do, App, Abs, Case, Var, Let),
+      Module(..),
+      WhereProvenance(FromLet) )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
+import Language.PureScript.AST.Traversals ( everywhereOnValuesM )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Errors
+    ( errorMessage,
+      errorMessage',
+      parU,
+      rethrowWithPosition,
+      MultipleErrors,
+      SimpleErrorMessage(CannotUseBindWithDo, InvalidDoBind,
+                         InvalidDoLet) )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      byMaybeModuleName,
+      freshIdent',
+      Ident(Ident, UnusedIdent),
+      ModuleName,
+      Qualified(Qualified) )
 import Language.PureScript.Constants.Libs qualified as C
 
 -- | Replace all @DoNotationBind@ and @DoNotationValue@ constructors with

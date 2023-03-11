@@ -18,7 +18,7 @@ module Language.PureScript.Bundle
 
 import Prelude
 
-import Control.Monad.Error.Class
+import Control.Monad.Error.Class ( MonadError(throwError) )
 
 import Data.Aeson ((.=))
 import Data.Char (chr, digitToInt)
@@ -28,8 +28,30 @@ import Data.Aeson qualified as A
 import Data.Text.Lazy qualified as LT
 
 import Language.JavaScript.Parser
+    ( JSStatement(JSAssignStatement, JSConstant, JSLet, JSClass,
+                  JSGenerator, JSVariable, JSFunction),
+      JSExpression(JSObjectLiteral, JSStringLiteral, JSMemberExpression,
+                   JSVarInitExpression, JSFunctionExpression, JSMemberSquare,
+                   JSMemberDot, JSIdentifier),
+      JSAST(JSAstStatement, JSAstModule),
+      renderToText,
+      JSAnnot(JSNoAnnot),
+      JSAssignOp(JSAssign) )
 import Language.JavaScript.Parser.AST
-import Language.JavaScript.Process.Minify
+    ( JSModuleItem(..),
+      JSCommaList(..),
+      JSPropertyName(JSPropertyIdent, JSPropertyString),
+      JSIdent(JSIdentName),
+      JSObjectPropertyList,
+      JSCommaTrailingList(..),
+      JSExportClause(JSExportClause),
+      JSExportDeclaration(JSExport, JSExportFrom, JSExportLocals),
+      JSExportSpecifier(JSExportSpecifierAs, JSExportSpecifier),
+      JSFromClause(JSFromClause),
+      JSImportDeclaration(JSImportDeclarationBare, JSImportDeclaration),
+      JSObjectProperty(JSPropertyNameandValue),
+      JSVarInitializer(JSVarInit) )
+import Language.JavaScript.Process.Minify ( minifyJS )
 
 -- | The type of error messages. We separate generation and rendering of errors using a data
 -- type, in case we need to match on error types later.

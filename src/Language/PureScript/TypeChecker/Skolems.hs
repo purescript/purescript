@@ -16,12 +16,31 @@ import Data.Foldable (traverse_)
 import Data.Functor.Identity (Identity(), runIdentity)
 import Data.Set (Set, fromList, notMember)
 import Data.Text (Text)
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Binders ( Binder(TypedBinder) )
+import Language.PureScript.AST.Declarations
+    ( ErrorMessageHint(ErrorInExpression),
+      Expr(DeferredDictionary, TypedValue, PositionedValue) )
+import Language.PureScript.AST.SourcePos
+    ( nonEmptySpan, SourceAnn, SourceSpan )
+import Language.PureScript.AST.Traversals
+    ( everythingWithContextOnValues, everywhereWithContextOnValuesM )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Errors
+    ( positionedError,
+      singleError,
+      ErrorMessage(..),
+      MultipleErrors,
+      SimpleErrorMessage(EscapedSkolem) )
 import Language.PureScript.Traversals (defS)
 import Language.PureScript.TypeChecker.Monad
+    ( CheckState(checkNextSkolemScope, checkNextSkolem) )
 import Language.PureScript.Types
+    ( everythingOnTypes,
+      everywhereOnTypesM,
+      replaceTypeVars,
+      SkolemScope(SkolemScope),
+      SourceType,
+      Type(Skolem, ForAll) )
 
 -- | Generate a new skolem constant
 newSkolemConstant :: MonadState CheckState m => m Int

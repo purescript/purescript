@@ -8,10 +8,15 @@ import Data.Functor.Identity
 import Text.Parsec qualified as P
 import Text.Parsec.Expr qualified as P
 
-import Language.PureScript.AST
+import Language.PureScript.AST.Declarations
+    ( Expr(Op, PositionedValue, BinaryNoParens) )
+import Language.PureScript.AST.Operators ( Associativity )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
 import Language.PureScript.Names
+    ( OpName(OpName), OpNameType(ValueOpName), Qualified(..) )
 import Language.PureScript.Sugar.Operators.Common
-import Language.PureScript.Errors
+    ( matchOperators, token, Chain )
+import Language.PureScript.Errors ( MultipleErrors )
 
 matchExprOperators
   :: MonadError MultipleErrors m

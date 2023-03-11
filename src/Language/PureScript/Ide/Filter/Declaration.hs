@@ -5,7 +5,7 @@ module Language.PureScript.Ide.Filter.Declaration
 import Protolude                     hiding (isPrefixOf)
 
 import Control.Monad.Fail (fail)
-import Data.Aeson
+import Data.Aeson ( FromJSON(parseJSON), ToJSON(toJSON), withText )
 
 data DeclarationType
   = Value

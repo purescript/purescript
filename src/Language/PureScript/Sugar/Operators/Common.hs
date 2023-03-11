@@ -2,11 +2,11 @@ module Language.PureScript.Sugar.Operators.Common where
 
 import Prelude
 
-import Control.Monad.State
-import Control.Monad.Except
+import Control.Monad.State ( guard, join )
+import Control.Monad.Except ( MonadError(throwError) )
 
 import Data.Either (rights)
-import Data.Functor.Identity
+import Data.Functor.Identity ( Identity )
 import Data.List (sortOn)
 import Data.Maybe (mapMaybe, fromJust)
 import Data.List.NonEmpty qualified as NEL
@@ -16,10 +16,16 @@ import Text.Parsec qualified as P
 import Text.Parsec.Pos qualified as P
 import Text.Parsec.Expr qualified as P
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Declarations
+    ( ErrorMessageHint(PositionedError) )
+import Language.PureScript.AST.Operators ( Associativity(..) )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Errors
-import Language.PureScript.Names
+    ( ErrorMessage(..),
+      MultipleErrors(MultipleErrors),
+      SimpleErrorMessage(NonAssociativeError, MixedAssociativityError) )
+import Language.PureScript.Names ( eraseOpName, OpName, Qualified )
 
 type Chain a = [Either a a]
 

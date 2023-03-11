@@ -40,21 +40,101 @@ module Language.PureScript.Ide.State
 import Protolude hiding (moduleName, unzip)
 
 import Control.Concurrent.STM
-import Control.Lens                       hiding (anyOf, op, (&))
+import Control.Lens ( preview, (^.), view, (%~), (.~), Ixed(ix) )
 import "monad-logger" Control.Monad.Logger
-import Data.IORef
+    ( MonadLogger, logWarnN )
+import Data.IORef ( readIORef, writeIORef )
 import Data.Map.Lazy qualified as Map
 import Data.Time.Clock (UTCTime)
 import Data.Zip (unzip)
-import Language.PureScript qualified as P
+import Language.PureScript.AST qualified as P
+    ( SourceSpan,
+      declName,
+      declSourceAnn,
+      getModuleName,
+      DataConstructorDeclaration(dataCtorAnn, dataCtorName),
+      Declaration(TypeDeclaration, DataDeclaration,
+                  TypeClassDeclaration),
+      Module(..),
+      TypeDeclarationData(tydeclIdent) )
+import Language.PureScript.Comments qualified as P ( Comment )
+import Language.PureScript.Externs qualified as P
+    ( ExternsDeclaration(EDInstance), ExternsFile )
+import Language.PureScript.Linter qualified as P
+    ( Name(ModName, IdentName, DctorName, TyName, TyClassName) )
+import Language.PureScript.Names qualified as P
+    ( moduleNameFromString,
+      runIdent,
+      runModuleName,
+      Ident(Ident),
+      ModuleName,
+      ProperName(ProperName),
+      ProperNameType(ClassName),
+      Qualified(Qualified),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.Docs.Convert.Single (convertComments)
 import Language.PureScript.Externs
+    ( ExternsDeclaration(edInstanceClassName, edInstanceSourceSpan,
+                         edInstanceNameSource, edInstanceChainIndex, edInstanceChain,
+                         edInstanceConstraints, edInstanceTypes, edInstanceKinds,
+                         edInstanceForAll, edInstanceName),
+      ExternsFile(efDeclarations, efModuleName) )
 import Language.PureScript.Make.Actions (cacheDbFile)
-import Language.PureScript.Ide.Externs
+import Language.PureScript.Ide.Externs ( convertExterns )
 import Language.PureScript.Ide.Reexports
-import Language.PureScript.Ide.SourceFile
+    ( prettyPrintReexportResult,
+      reexportHasFailures,
+      resolveReexports,
+      ReexportResult(reResolved) )
+import Language.PureScript.Ide.SourceFile ( extractAstInformation )
 import Language.PureScript.Ide.Types
+    ( _IdeDeclDataConstructor,
+      _IdeDeclType,
+      _IdeDeclTypeClass,
+      _IdeDeclValue,
+      anyOf,
+      emptyIdeState,
+      idaDeclaration,
+      ideDtorName,
+      ideDtorType,
+      ideSynonymName,
+      ideTCInstances,
+      ideTCName,
+      ideTypeDtors,
+      ideTypeKind,
+      ideTypeName,
+      ideTypeOpAlias,
+      ideTypeOpKind,
+      ideTypeOpName,
+      ideValueIdent,
+      ideValueOpAlias,
+      ideValueOpName,
+      ideValueOpType,
+      ideValueType,
+      Annotation(_annDocumentation, _annTypeAnnotation, _annLocation),
+      AstData(AstData),
+      DefinitionSites,
+      Ide,
+      IdeConfiguration(confLogLevel, confOutputPath),
+      IdeDataConstructor(IdeDataConstructor),
+      IdeDeclaration(..),
+      IdeDeclarationAnn(IdeDeclarationAnn),
+      IdeEnvironment(ideConfiguration, ideCacheDbTimestamp, ideStateVar),
+      IdeFileState(..),
+      IdeInstance(IdeInstance),
+      IdeNamespace(IdeNSModule, IdeNSValue, IdeNSType),
+      IdeNamespaced(IdeNamespaced),
+      IdeState(ideVolatileState, ideFileState),
+      IdeVolatileState(..),
+      ModuleMap,
+      TypeAnnotations )
 import Language.PureScript.Ide.Util
+    ( displayTimeSpec,
+      logPerf,
+      runLogger,
+      discardAnn,
+      opNameT,
+      properNameT )
 import System.Directory (getModificationTime)
 
 -- | Resets all State inside psc-ide

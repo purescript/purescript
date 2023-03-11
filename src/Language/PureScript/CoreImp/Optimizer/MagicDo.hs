@@ -8,7 +8,15 @@ import Protolude (ordNub)
 import Data.Maybe (fromJust, isJust)
 
 import Language.PureScript.CoreImp.AST
-import Language.PureScript.CoreImp.Optimizer.Common
+    ( everything,
+      everywhere,
+      everywhereTopDown,
+      AST(Var, Unary, While, For, ForIn, IfElse, Function, Block, Return,
+          ObjectLiteral, Assignment, Indexer, StringLiteral,
+          VariableIntroduction, App),
+      InitializerEffects(UnknownEffects),
+      UnaryOperator(Not) )
+import Language.PureScript.CoreImp.Optimizer.Common ( pattern Ref )
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (mkString)
 import Language.PureScript.Constants.Libs qualified as C

@@ -17,10 +17,28 @@ import Data.Semigroup (Max(..))
 import Data.Set qualified as S
 
 import Language.PureScript.AST.SourcePos
+    ( nullSourceSpan, SourcePos(sourcePosLine), SourceSpan(spanStart) )
 import Language.PureScript.Constants.Libs qualified as C
-import Language.PureScript.CoreFn
-import Language.PureScript.Crash
+import Language.PureScript.AST.Literals
+    ( Literal(NumericLiteral, StringLiteral) )
+import Language.PureScript.CoreFn.Ann ( ssAnn, Ann )
+import Language.PureScript.CoreFn.Expr
+    ( Bind,
+      Expr(Case, Let, Literal, App, Abs, Var) )
+import Language.PureScript.CoreFn.Meta
+    ( Meta(IsNewtype, IsConstructor) )
+import Language.PureScript.CoreFn.Traversals ( traverseCoreFn )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      runIdent,
+      runModuleName,
+      toMaybeModuleName,
+      Ident(Ident, InternalIdent, UnusedIdent),
+      InternalIdentData(Lazy, RuntimeLazyFactory),
+      ModuleName,
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.PSString (mkString)
 
 -- This module is responsible for ensuring that the bindings in recursive

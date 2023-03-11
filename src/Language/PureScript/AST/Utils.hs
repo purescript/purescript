@@ -2,9 +2,26 @@ module Language.PureScript.AST.Utils where
 
 import Protolude
 
-import Language.PureScript.AST
+import Language.PureScript.AST.Binders
+    ( Binder(ConstructorBinder, VarBinder) )
+import Language.PureScript.AST.Declarations
+    ( pattern Literal,
+      pattern MkUnguarded,
+      CaseAlternative,
+      Expr(Constructor, Abs, Case, Var, Literal),
+      GuardedExpr )
+import Language.PureScript.AST.Literals ( Literal )
+import Language.PureScript.AST.SourcePos ( nullSourceSpan )
 import Language.PureScript.Names
+    ( byMaybeModuleName,
+      Ident,
+      ModuleName,
+      ProperName,
+      ProperNameType(ConstructorName, TypeName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.Types
+    ( SourceType, Type(KindApp, TypeConstructor, TypeApp) )
 
 lam :: Ident -> Expr -> Expr
 lam = Abs . mkBinder

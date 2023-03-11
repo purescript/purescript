@@ -8,7 +8,12 @@ import Data.Text (Text, pack)
 
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Names
-import Language.PureScript.Types
+    ( disqualify,
+      Ident,
+      ProperName(runProperName),
+      ProperNameType(ClassName),
+      Qualified )
+import Language.PureScript.Types ( SourceConstraint, SourceType )
 
 --
 -- Data representing a type class dictionary which is in scope

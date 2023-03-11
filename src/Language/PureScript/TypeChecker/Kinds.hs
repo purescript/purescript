@@ -29,10 +29,10 @@ import Prelude
 
 import Control.Arrow ((***))
 import Control.Lens ((^.), _1, _2, _3)
-import Control.Monad
+import Control.Monad ( join, (<=<), unless, void, when )
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
-import Control.Monad.Supply.Class
+import Control.Monad.State ( MonadState, gets, modify )
+import Control.Monad.Supply.Class ( MonadSupply(fresh) )
 
 import Data.Bifunctor (first)
 import Data.Bitraversable (bitraverse)
@@ -47,15 +47,59 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Traversable (for)
 
-import Language.PureScript.Crash
+import Language.PureScript.Crash ( HasCallStack, internalError )
 import Language.PureScript.Environment qualified as E
 import Language.PureScript.Errors
+    ( nullSourceAnn,
+      nullSourceSpan,
+      SourceAnn,
+      SourceSpan,
+      mapDataCtorFields,
+      traverseDataCtorFields,
+      DataConstructorDeclaration(..),
+      Declaration(TypeDeclaration),
+      ErrorMessageHint(ErrorInRowLabel, ErrorInferringKind,
+                       ErrorCheckingKind),
+      TypeDeclarationData(TypeDeclarationData),
+      accumTypes,
+      errorMessage,
+      errorMessage',
+      errorMessage''',
+      internalCompilerError,
+      rethrowWithPosition,
+      MultipleErrors,
+      SimpleErrorMessage(UnsupportedTypeInKind, KindsDoNotUnify,
+                         ExpectedType, InfiniteKind, UnknownName, EscapedSkolem,
+                         QuantificationCheckFailureInKind,
+                         VisibleQuantificationCheckFailureInType,
+                         QuantificationCheckFailureInType) )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      coerceProperName,
+      mkQualified,
+      ModuleName,
+      Name(TyName, TyClassName),
+      ProperName(..),
+      ProperNameType(TypeName, ClassName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.TypeChecker.Monad
+    ( bindLocalTypeVariables,
+      debugType,
+      getEnv,
+      lookupTypeVariable,
+      unsafeCheckCurrentModule,
+      withErrorMessageHint,
+      withFreshSubstitution,
+      CheckState(checkSubstitution, checkNextType),
+      Substitution(substUnsolved, substType),
+      UnkLevel(..),
+      Unknown )
 import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, newSkolemScope, skolemize)
 import Language.PureScript.TypeChecker.Synonyms
+    ( replaceAllTypeSynonyms )
 import Language.PureScript.Types
-import Language.PureScript.Pretty.Types
+import Language.PureScript.Pretty.Types ( prettyPrintType )
 
 generalizeUnknowns :: [(Unknown, SourceType)] -> SourceType -> SourceType
 generalizeUnknowns unks ty =

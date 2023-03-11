@@ -9,14 +9,24 @@ import Prelude
 
 import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class ( MonadSupply(fresh) )
 import Control.DeepSeq (NFData)
 import Data.Functor.Contravariant (contramap)
 import Data.Vector qualified as V
 
 import GHC.Generics (Generic)
 import Data.Aeson
-import Data.Aeson.TH
+    ( FromJSON(parseJSON),
+      ToJSON(toJSON),
+      parseJSON2,
+      withArray,
+      defaultOptions,
+      toJSON2,
+      FromJSONKey(fromJSONKey),
+      Options(sumEncoding),
+      SumEncoding(ObjectWithSingleField),
+      ToJSONKey(toJSONKey) )
+import Data.Aeson.TH ( deriveJSON )
 import Data.Text (Text)
 import Data.Text qualified as T
 

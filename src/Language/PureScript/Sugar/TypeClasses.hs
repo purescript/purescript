@@ -13,8 +13,9 @@ import Prelude
 import Control.Arrow (first, second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
-import Control.Monad.Supply.Class
-import Data.Graph
+    ( StateT, MonadState(get), modify, evalStateT )
+import Control.Monad.Supply.Class ( MonadSupply )
+import Data.Graph ( stronglyConnComp, SCC(..) )
 import Data.List (find, partition)
 import Data.List.NonEmpty (nonEmpty)
 import Data.Map qualified as M
@@ -24,16 +25,92 @@ import Data.Set qualified as S
 import Data.Text (Text)
 import Data.Traversable (for)
 import Language.PureScript.Constants.Prim qualified as C
-import Language.PureScript.Crash
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment
-import Language.PureScript.Errors hiding (isExported, nonEmpty)
+    ( dictTypeName,
+      function,
+      makeTypeClassData,
+      primClasses,
+      primCoerceClasses,
+      primIntClasses,
+      primRowClasses,
+      primRowListClasses,
+      primSymbolClasses,
+      primTypeErrorClasses,
+      tyRecord,
+      DataDeclType(Newtype),
+      NameKind(Private),
+      TypeClassData(..) )
+import Language.PureScript.Errors
+    ( internalModuleSourceSpan,
+      SourceAnn,
+      SourceSpan,
+      Literal(ObjectLiteral),
+      Binder(VarBinder, ConstructorBinder),
+      pattern MkUnguarded,
+      pattern ValueDecl,
+      declSourceSpan,
+      isTypeClassDecl,
+      unwrapTypeDeclaration,
+      CaseAlternative(CaseAlternative),
+      DataConstructorDeclaration(DataConstructorDeclaration),
+      Declaration(TypeClassDeclaration, TypeInstanceDeclaration,
+                  DataDeclaration, TypeDeclaration, ValueDeclaration),
+      DeclarationRef(TypeRef, TypeInstanceRef, TypeClassRef),
+      ErrorMessageHint(ErrorInInstance),
+      Expr(DerivedInstancePlaceholder, Accessor, Case, Var, TypedValue,
+           Abs, DeferredDictionary, Literal, App, Constructor),
+      InstanceDerivationStrategy(NewtypeStrategy, KnownClassStrategy),
+      Module(..),
+      NameSource(UserNamed),
+      TypeDeclarationData(TypeDeclarationData, tydeclIdent),
+      TypeInstanceBody(ExplicitInstance, DerivedInstance,
+                       NewtypeInstance),
+      ValueDeclarationData(valdeclIdent),
+      addHint,
+      errorMessage',
+      parU,
+      rethrow,
+      MultipleErrors,
+      SimpleErrorMessage(MissingClassMember, CycleInTypeClassDeclaration,
+                         InvalidCoercibleInstanceDeclaration, ExtraneousClassMember,
+                         UnknownName) )
 import Language.PureScript.Externs
+    ( ExternsDeclaration(EDClass), ExternsFile(..) )
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      coerceProperName,
+      freshIdent,
+      qualify,
+      runIdent,
+      Ident(Ident, UnusedIdent),
+      ModuleName,
+      Name(TyClassName),
+      ProperName,
+      ProperNameType(TypeName, ClassName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.PSString (mkString)
-import Language.PureScript.Sugar.CaseDeclarations
+import Language.PureScript.Sugar.CaseDeclarations ( desugarCases )
 import Language.PureScript.TypeClassDictionaries (superclassName)
 import Language.PureScript.Types
+    ( everythingOnTypes,
+      moveQuantifiersToFront,
+      quantify,
+      replaceAllTypeVars,
+      rowFromList,
+      srcConstrainedType,
+      srcConstraint,
+      srcREmpty,
+      srcRowListItem,
+      srcTypeApp,
+      srcTypeConstructor,
+      srcTypeVar,
+      Constraint(Constraint),
+      SourceConstraint,
+      SourceType,
+      Type(TypeConstructor) )
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
 

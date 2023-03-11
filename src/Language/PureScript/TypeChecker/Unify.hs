@@ -16,7 +16,7 @@ module Language.PureScript.TypeChecker.Unify
 
 import Prelude
 
-import Control.Monad
+import Control.Monad ( forM_, void )
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify, state)
 import Control.Monad.Writer.Class (MonadWriter(..))
@@ -26,13 +26,49 @@ import Data.Maybe (fromMaybe)
 import Data.Map qualified as M
 import Data.Text qualified as T
 
-import Language.PureScript.Crash
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment qualified as E
 import Language.PureScript.Errors
+    ( SourceAnn,
+      ErrorMessageHint(ErrorInRowLabel, ErrorUnifyingTypes),
+      errorMessage,
+      internalCompilerError,
+      onErrorMessages,
+      rethrow,
+      warnWithPosition,
+      withoutPosition,
+      MultipleErrors,
+      SimpleErrorMessage(WildcardInferredType, InfiniteType,
+                         ConstrainedTypeUnified, TypesDoNotUnify, HoleInferredType) )
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, instantiateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad
+    ( getLocalContext,
+      guardWith,
+      lookupUnkName,
+      withErrorMessageHint,
+      CheckState(checkSubstitution, checkNextType),
+      Substitution(substType, substUnsolved),
+      UnkLevel(UnkLevel),
+      Unknown )
 import Language.PureScript.TypeChecker.Skolems
+    ( newSkolemConstant, skolemize )
 import Language.PureScript.Types
+    ( pattern REmptyKinded,
+      alignRowsWith,
+      everythingOnTypes,
+      everywhereOnTypes,
+      everywhereOnTypesM,
+      getAnnForType,
+      mkForAll,
+      rowFromList,
+      srcTUnknown,
+      Constraint(constraintArgs, constraintClass, constraintData),
+      RowListItem(rowListType),
+      SourceType,
+      Type(TypeVar, ForAll, TypeConstructor, TypeLevelString,
+           TypeLevelInt, TypeApp, KindApp, KindedType, RCons, ConstrainedType,
+           Skolem, TypeWildcard, TUnknown),
+      WildcardData(IgnoredWildcard, HoleWildcard, UnnamedWildcard) )
 
 -- | Generate a fresh type variable with an unknown kind. Avoid this if at all possible.
 freshType :: (MonadState CheckState m) => m SourceType

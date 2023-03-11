@@ -13,11 +13,11 @@ module Language.PureScript.Make.Actions
 
 import Prelude
 
-import Control.Monad hiding (sequence)
+import Control.Monad ( unless, when )
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.IO.Class
+import Control.Monad.IO.Class ( MonadIO(..) )
 import Control.Monad.Reader (asks)
-import Control.Monad.Supply
+import Control.Monad.Supply ( SupplyT )
 import Control.Monad.Trans.Class (MonadTrans(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Aeson (Value(String), (.=), object)
@@ -34,26 +34,62 @@ import Data.Text.Encoding qualified as TE
 import Data.Time.Clock (UTCTime)
 import Data.Version (showVersion)
 import Language.JavaScript.Parser qualified as JS
-import Language.PureScript.AST
+import Language.PureScript.AST.SourcePos ( SourcePos(..) )
 import Language.PureScript.Bundle qualified as Bundle
 import Language.PureScript.CodeGen.JS qualified as J
 import Language.PureScript.CodeGen.JS.Printer
-import Language.PureScript.CoreFn qualified as CF
+    ( prettyPrintJS, prettyPrintJSWithSourceMaps )
+import Language.PureScript.CoreFn.Ann qualified as CF ( Ann )
+import Language.PureScript.CoreFn.Module qualified as CF
+    ( Module(moduleSourceSpan, moduleForeign, moduleName) )
 import Language.PureScript.CoreFn.ToJSON qualified as CFJ
-import Language.PureScript.Crash
-import Language.PureScript.CST qualified as CST
+import Language.PureScript.Crash ( internalError )
+import Language.PureScript.CST.Lexer qualified as CST ( lex )
+import Language.PureScript.CST.Monad qualified as CST
+    ( runTokenParser )
+import Language.PureScript.CST.Parser qualified as CST
+    ( parseIdent )
+import Language.PureScript.CST.Types qualified as CST
+    ( Ident(getIdent), Name(nameValue) )
 import Language.PureScript.Docs.Prim qualified as Docs.Prim
 import Language.PureScript.Docs.Types qualified as Docs
 import Language.PureScript.Errors
+    ( errorMessage,
+      errorMessage',
+      MultipleErrors,
+      SimpleErrorMessage(MissingFFIModule, UnusedFFIImplementations,
+                         MissingFFIImplementations, ErrorParsingFFIModule,
+                         InvalidFFIIdentifier, DeprecatedFFIPrime,
+                         UnsupportedFFICommonJSExports, UnsupportedFFICommonJSImports,
+                         UnnecessaryFFIModule, DeprecatedFFICommonJSModule) )
 import Language.PureScript.Externs (ExternsFile, externsFileName)
 import Language.PureScript.Make.Monad
+    ( copyFile,
+      getTimestamp,
+      getTimestampMaybe,
+      hashFile,
+      makeIO,
+      readExternsFile,
+      readJSONFile,
+      readTextFile,
+      writeCborFile,
+      writeJSONFile,
+      writeTextFile,
+      Make )
 import Language.PureScript.Make.Cache
+    ( normaliseForCache, CacheDb, ContentHash )
 import Language.PureScript.Names
-import Language.PureScript.Options hiding (codegenTargets)
+    ( runModuleName, Ident(Ident), ModuleName )
+import Language.PureScript.Options
+    ( CodegenTarget(..), Options(optionsCodegenTargets) )
 import Language.PureScript.Pretty.Common (SMap(..))
 import Paths_purescript qualified as Paths
-import SourceMap
+import SourceMap ( generate )
 import SourceMap.Types
+    ( Mapping(Mapping, mapName, mapOriginal, mapSourceFile,
+              mapGenerated),
+      SourceMapping(SourceMapping, smMappings, smFile, smSourceRoot),
+      Pos(..) )
 import System.Directory (getCurrentDirectory)
 import System.FilePath ((</>), makeRelative, splitPath, normalise, splitDirectories)
 import System.FilePath.Posix qualified as Posix

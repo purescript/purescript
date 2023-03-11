@@ -2,12 +2,16 @@ module Language.PureScript.Sugar.Operators.Types where
 
 import Prelude
 
-import Control.Monad.Except
-import Language.PureScript.AST
-import Language.PureScript.Errors
+import Control.Monad.Except ( MonadError )
+import Language.PureScript.AST.Operators ( Associativity )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
+import Language.PureScript.Errors ( MultipleErrors )
 import Language.PureScript.Names
+    ( OpName(OpName), OpNameType(TypeOpName), Qualified(..) )
 import Language.PureScript.Sugar.Operators.Common
+    ( matchOperators )
 import Language.PureScript.Types
+    ( srcTypeApp, SourceType, Type(TypeOp, BinaryNoParensType) )
 
 matchTypeOperators
   :: MonadError MultipleErrors m

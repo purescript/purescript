@@ -24,7 +24,12 @@ import Data.Aeson qualified as A
 import Data.Text qualified as T
 import Data.Vector qualified as V
 
-import Language.PureScript.AST qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( KindSignatureFor(..) )
+import Language.PureScript.AST.Operators qualified as P
+    ( Associativity(..), Fixity(..) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( SourcePos(SourcePos), SourceSpan(SourceSpan) )
 import Language.PureScript.CoreFn.FromJSON qualified as P
 import Language.PureScript.Crash qualified as P
 import Language.PureScript.Environment qualified as P
@@ -33,13 +38,22 @@ import Language.PureScript.Roles qualified as P
 import Language.PureScript.Types qualified as P
 import Paths_purescript qualified as Paths
 
-import Web.Bower.PackageMeta hiding (Version, displayError)
+import Web.Bower.PackageMeta
+    ( BowerError,
+      PackageMeta(bowerName),
+      asPackageMeta,
+      parsePackageName,
+      runPackageName,
+      showBowerError,
+      PackageName )
 
-import Language.PureScript.Docs.RenderedCode as ReExports
-  (RenderedCode,
-   ContainingModule(..), asContainingModule,
-   RenderedCodeElement(..),
-   Namespace(..), FixityAlias)
+import Language.PureScript.Docs.RenderedCode.Types as ReExports
+    ( RenderedCode,
+      ContainingModule(..),
+      asContainingModule,
+      RenderedCodeElement(..),
+      Namespace(..),
+      FixityAlias )
 import Language.PureScript.Publish.Registry.Compat (PursJsonError, showPursJsonError)
 
 type Type' = P.Type ()

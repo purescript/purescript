@@ -15,22 +15,71 @@ import Data.List (init, last, zipWith3, (!!))
 import Data.Map qualified as M
 import Data.These (These(..), mergeTheseWith, these)
 
-import Control.Monad.Supply.Class
-import Language.PureScript.AST
+import Control.Monad.Supply.Class ( MonadSupply )
+import Language.PureScript.AST.Binders ( Binder(NullBinder) )
+import Language.PureScript.AST.Declarations
+    ( CaseAlternative(CaseAlternative),
+      ErrorMessageHint(RelatedPositions),
+      Expr(Constructor, DeferredDictionary, Case, ObjectUpdate, Accessor,
+           App),
+      InstanceDerivationStrategy(..) )
+import Language.PureScript.AST.Literals
+    ( Literal(BooleanLiteral, ObjectLiteral) )
+import Language.PureScript.AST.SourcePos
+    ( nullSourceSpan, SourceSpan )
 import Language.PureScript.AST.Utils
 import Language.PureScript.Constants.Libs qualified as Libs
 import Language.PureScript.Constants.Prim qualified as Prim
-import Language.PureScript.Crash
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment
-import Language.PureScript.Errors hiding (nonEmpty)
+    ( (-:>),
+      kindType,
+      DataDeclType(Newtype),
+      Environment(dataConstructors, typeClasses, typeClassDictionaries,
+                  types),
+      FunctionalDependency(fdDeterminers, fdDetermined),
+      TypeClassData(TypeClassData, typeClassDependencies,
+                    typeClassIsEmpty, typeClassCoveringSets,
+                    typeClassDeterminedArguments, typeClassMembers, typeClassArguments,
+                    typeClassSuperclasses),
+      TypeKind(DataType) )
+import Language.PureScript.Errors
+    ( addHint,
+      errorMessage,
+      internalCompilerError,
+      MultipleErrors,
+      SimpleErrorMessage(CannotDeriveInvalidConstructorArg, UnknownName,
+                         InvalidDerivedInstance, CannotDerive, ExpectedTypeConstructor,
+                         InvalidNewtypeInstance, MissingNewtypeSuperclassInstance,
+                         UnverifiableSuperclassInstance, CannotFindDerivingType,
+                         KindsDoNotUnify) )
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.Names
-import Language.PureScript.PSString
+    ( pattern ByNullSourcePos,
+      coerceProperName,
+      freshIdent,
+      qualify,
+      Ident(UnusedIdent),
+      ModuleName(..),
+      Name(TyClassName),
+      ProperName(ProperName),
+      ProperNameType(ConstructorName, ClassName, TypeName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
+import Language.PureScript.PSString ( mkString, PSString )
 import Language.PureScript.Sugar.TypeClasses
+    ( superClassDictionaryNames )
 import Language.PureScript.TypeChecker.Entailment
+    ( findDicts, InstanceContext )
 import Language.PureScript.TypeChecker.Monad
+    ( getEnv,
+      getTypeClassDictionaries,
+      unsafeCheckCurrentModule,
+      CheckState )
 import Language.PureScript.TypeChecker.Synonyms
+    ( replaceAllTypeSynonyms )
 import Language.PureScript.TypeClassDictionaries
+    ( TypeClassDictionaryInScope(tcdInstanceTypes) )
 import Language.PureScript.Types
 
 -- | Extract the name of the newtype appearing in the last type argument of

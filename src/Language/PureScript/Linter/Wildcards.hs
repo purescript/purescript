@@ -4,8 +4,16 @@ module Language.PureScript.Linter.Wildcards
 
 import Protolude hiding (Type)
 
-import Language.PureScript.AST
+import Language.PureScript.AST.Binders ( Binder(TypedBinder) )
+import Language.PureScript.AST.Declarations
+    ( Declaration, Expr(TypedValue) )
+import Language.PureScript.AST.Traversals
+    ( everywhereWithContextOnValues )
 import Language.PureScript.Types
+    ( everythingOnTypes,
+      everywhereOnTypes,
+      Type(TypeWildcard),
+      WildcardData(IgnoredWildcard, UnnamedWildcard) )
 
 -- |
 -- Replaces `TypeWildcard _ UnnamedWildcard` with

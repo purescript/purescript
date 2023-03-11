@@ -16,8 +16,22 @@ import Protolude (ordNub)
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
+    ( guard,
+      join,
+      (<=<),
+      foldM,
+      zipWithM,
+      zipWithM_,
+      StateT(..),
+      MonadState(get),
+      MonadTrans(lift),
+      gets,
+      modify,
+      evalStateT,
+      execStateT )
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
+    ( Any(..), WriterT(..), MonadWriter(tell) )
 
 import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
@@ -33,18 +47,69 @@ import Data.Text qualified as T
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List.NonEmpty qualified as NEL
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Binders ( Binder(VarBinder) )
+import Language.PureScript.AST.Declarations
+    ( ErrorMessageHint(ErrorSolvingConstraint),
+      Expr(Accessor, Abs, Constructor, Literal, Unused, Var,
+           TypeClassDictionary, App) )
+import Language.PureScript.AST.Literals
+    ( Literal(ObjectLiteral, NumericLiteral, BooleanLiteral,
+              StringLiteral) )
+import Language.PureScript.AST.SourcePos
+    ( pattern NullSourceSpan, nullSourceSpan )
+import Language.PureScript.AST.Traversals
+    ( everywhereOnValuesTopDownM )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment
+    ( dictTypeName,
+      kindRow,
+      tyBoolean,
+      tyInt,
+      tyString,
+      Environment(typeClasses),
+      FunctionalDependency(..),
+      TypeClassData(TypeClassData, typeClassArguments, typeClassIsEmpty,
+                    typeClassCoveringSets, typeClassDeterminedArguments,
+                    typeClassDependencies, typeClassSuperclasses, typeClassMembers) )
 import Language.PureScript.Errors
+    ( addHint,
+      addHints,
+      errorMessage,
+      rethrow,
+      MultipleErrors,
+      SimpleErrorMessage(UnknownClass, PossiblyInfiniteInstance,
+                         NoInstanceFound, OverlappingInstances, UserDefinedWarning) )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      byMaybeModuleName,
+      coerceProperName,
+      disqualify,
+      freshIdent,
+      getQual,
+      Ident(UnusedIdent),
+      ModuleName,
+      ProperName(runProperName),
+      ProperNameType(ClassName),
+      Qualified(..),
+      QualifiedBy(..) )
 import Language.PureScript.TypeChecker.Entailment.Coercible
+    ( initialGivenSolverState,
+      initialWantedSolverState,
+      insoluble,
+      solveGivens,
+      solveWanteds,
+      GivenSolverState(GivenSolverState, inertGivens),
+      WantedSolverState(WantedSolverState, inertWanteds) )
 import Language.PureScript.TypeChecker.Entailment.IntCompare
+    ( mkFacts, mkRelation, solveRelation )
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad
+    ( withErrorMessageHint, CheckState(checkEnv, checkSubstitution) )
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
 import Language.PureScript.TypeChecker.Unify
+    ( freshTypeWithKind, substituteType, unifyTypes )
 import Language.PureScript.TypeClassDictionaries
+    ( superclassName, NamedDict, TypeClassDictionaryInScope(..) )
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString, mkString, decodeString)

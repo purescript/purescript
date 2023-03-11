@@ -25,12 +25,29 @@ import Data.Text (Text)
 
 import Control.Monad.Supply.Class (MonadSupply)
 import Language.PureScript.CoreImp.AST
+    ( AST(VariableIntroduction), InitializerEffects(NoEffects) )
 import Language.PureScript.CoreImp.Optimizer.Blocks
+    ( collapseNestedBlocks, collapseNestedIfs )
 import Language.PureScript.CoreImp.Optimizer.Common
+    ( applyAll, replaceIdents )
 import Language.PureScript.CoreImp.Optimizer.Inliner
+    ( etaConvert,
+      evaluateIifes,
+      inlineCommonOperators,
+      inlineCommonValues,
+      inlineFnComposition,
+      inlineFnIdentity,
+      inlineUnsafeCoerce,
+      inlineUnsafePartial,
+      inlineVariables,
+      unThunk )
 import Language.PureScript.CoreImp.Optimizer.MagicDo
-import Language.PureScript.CoreImp.Optimizer.TCO
+    ( inlineST, magicDoEff, magicDoEffect, magicDoST )
+import Language.PureScript.CoreImp.Optimizer.TCO ( tco )
 import Language.PureScript.CoreImp.Optimizer.Unused
+    ( removeCodeAfterReturnStatements,
+      removeUndefinedApp,
+      removeUnusedEffectFreeVars )
 
 -- | Apply a series of optimizer passes to simplified JavaScript code
 optimize :: forall m. MonadSupply m => [Text] -> [[AST]] -> m [[AST]]

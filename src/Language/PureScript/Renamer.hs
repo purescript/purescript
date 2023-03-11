@@ -6,6 +6,7 @@ module Language.PureScript.Renamer (renameInModule) where
 import Prelude
 
 import Control.Monad.State
+    ( (>=>), MonadState(get, put), gets, modify, runState, State )
 
 import Data.Functor ((<&>))
 import Data.List (find)
@@ -14,9 +15,24 @@ import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
 
-import Language.PureScript.CoreFn
+import Language.PureScript.AST.Literals
+    ( Literal(ObjectLiteral, ArrayLiteral) )
+import Language.PureScript.CoreFn.Ann ( Ann )
+import Language.PureScript.CoreFn.Binders ( Binder(..) )
+import Language.PureScript.CoreFn.Expr
+    ( Bind(..),
+      CaseAlternative(CaseAlternative),
+      Expr(..) )
+import Language.PureScript.CoreFn.Module
+    ( Module(Module, moduleDecls, moduleExports) )
 import Language.PureScript.Names
-import Language.PureScript.Traversals
+    ( isBySourcePos,
+      isPlainIdent,
+      runIdent,
+      showIdent,
+      Ident(GenIdent, Ident, UnusedIdent),
+      Qualified(Qualified) )
+import Language.PureScript.Traversals ( eitherM, pairM, sndM )
 
 -- |
 -- The state object used in this module

@@ -29,15 +29,35 @@ import Data.Maybe (fromMaybe, catMaybes)
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.Crash
-import Language.PureScript.Environment
+import Language.PureScript.Crash ( internalError )
+import Language.PureScript.Environment ( tyFunction, tyRecord )
 import Language.PureScript.Names
+    ( coerceProperName,
+      disqualify,
+      showQualified,
+      OpName(runOpName),
+      OpNameType(TypeOpName),
+      ProperName(runProperName),
+      ProperNameType(TypeName, ClassName),
+      Qualified )
 import Language.PureScript.Pretty.Common
+    ( before, objectKeyRequiresQuoting )
 import Language.PureScript.Types
 import Language.PureScript.PSString (PSString, prettyPrintString, decodeString)
 import Language.PureScript.Label (Label(..))
 
-import Text.PrettyPrint.Boxes hiding ((<+>))
+import Text.PrettyPrint.Boxes
+    ( nullBox,
+      Box(rows),
+      (<>),
+      hcat,
+      hsep,
+      left,
+      moveRight,
+      render,
+      text,
+      top,
+      vcat )
 
 data PrettyPrintType
   = PPTUnknown Int

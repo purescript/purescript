@@ -7,11 +7,30 @@ import Prelude hiding (abs)
 
 import Control.Monad (foldM)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class ( MonadSupply )
 import Data.List (foldl')
-import Language.PureScript.AST
+import Language.PureScript.AST.Binders
+    ( Binder(VarBinder, NullBinder) )
+import Language.PureScript.AST.Declarations
+    ( pattern MkUnguarded,
+      declSourceSpan,
+      CaseAlternative(CaseAlternative),
+      Declaration,
+      DoNotationElement(..),
+      Expr(PositionedValue, Ado, App, Abs, Case, Var, Let),
+      Module(..),
+      WhereProvenance(FromLet) )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
+import Language.PureScript.AST.Traversals ( everywhereOnValuesM )
 import Language.PureScript.Errors
+    ( parU, rethrowWithPosition, MultipleErrors )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      byMaybeModuleName,
+      freshIdent',
+      Ident(Ident),
+      ModuleName,
+      Qualified(Qualified) )
 import Language.PureScript.Constants.Libs qualified as C
 
 -- | Replace all @AdoNotationBind@ and @AdoNotationValue@ constructors with

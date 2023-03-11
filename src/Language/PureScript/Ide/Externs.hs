@@ -7,15 +7,30 @@ module Language.PureScript.Ide.Externs
 
 import Protolude hiding (to, from, (&))
 
-import Codec.CBOR.Term as Term
-import Control.Lens hiding (anyOf)
+import Codec.CBOR.Term as Term ( Term(TString, TList) )
+import Control.Lens ( (&), preview, (^.), view )
 import "monad-logger" Control.Monad.Logger
+    ( MonadLogger, logErrorN )
 import Data.Version (showVersion)
 import Data.Text qualified as Text
 import Language.PureScript qualified as P
 import Language.PureScript.Make.Monad qualified as Make
 import Language.PureScript.Ide.Error (IdeError (..))
 import Language.PureScript.Ide.Types
+    ( _IdeDeclType,
+      anyOf,
+      emptyAnn,
+      ideTypeKind,
+      ideTypeName,
+      IdeDataConstructor(IdeDataConstructor),
+      IdeDeclaration(..),
+      IdeDeclarationAnn(IdeDeclarationAnn),
+      IdeType(IdeType),
+      IdeTypeClass(IdeTypeClass),
+      IdeTypeOperator(IdeTypeOperator),
+      IdeTypeSynonym(IdeTypeSynonym),
+      IdeValue(IdeValue),
+      IdeValueOperator(IdeValueOperator) )
 import Language.PureScript.Ide.Util (properNameT)
 
 readExternFile

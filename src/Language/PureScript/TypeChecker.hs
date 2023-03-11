@@ -27,25 +27,182 @@ import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
 
-import Language.PureScript.AST
+import Language.PureScript.AST.Declarations
+    ( pattern MkUnguarded,
+      pattern ValueDecl,
+      declRefSourceSpan,
+      declSourceSpan,
+      traverseTypeInstanceBody,
+      DataConstructorDeclaration(..),
+      Declaration(..),
+      DeclarationRef(TypeRef, TypeClassRef, ValueRef),
+      ErrorMessageHint(ErrorInModule, ErrorInDataConstructor,
+                       ErrorInRoleDeclaration, ErrorInTypeConstructor,
+                       ErrorInDataBindingGroup, ErrorInTypeSynonym,
+                       ErrorInKindDeclaration, ErrorInValueDeclaration,
+                       ErrorInBindingGroup, PositionedError, ErrorInForeignImportData,
+                       ErrorInForeignImport, ErrorInTypeClassDeclaration,
+                       ErrorInInstance),
+      ExportSource,
+      ImportDeclarationType,
+      KindSignatureFor(ClassSig, NewtypeSig, DataSig, TypeSynonymSig),
+      Module(..),
+      RoleDeclarationData(RoleDeclarationData),
+      TypeDeclarationData(TypeDeclarationData, tydeclIdent),
+      ValueDeclarationData(valdeclIdent) )
+import Language.PureScript.AST.SourcePos ( SourceAnn, SourceSpan )
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Constants.Libs qualified as Libs
-import Language.PureScript.Crash
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment
+    ( isDictTypeName,
+      kindArity,
+      makeTypeClassData,
+      nominalRolesForKind,
+      tyFunction,
+      DataDeclType(Newtype),
+      Environment(types, names, typeClasses, typeSynonyms,
+                  dataConstructors, typeClassDictionaries),
+      FunctionalDependency,
+      NameKind(External),
+      NameVisibility(Defined),
+      TypeClassData(typeClassIsEmpty, typeClassDeterminedArguments,
+                    typeClassSuperclasses, typeClassArguments, typeClassCoveringSets),
+      TypeKind(TypeSynonym, LocalTypeVariable, ExternData, DataType) )
 import Language.PureScript.Errors
-import Language.PureScript.Linter
+    ( addHint,
+      errorMessage,
+      errorMessage',
+      positionedError,
+      rethrow,
+      warnAndRethrow,
+      MultipleErrors,
+      SimpleErrorMessage(TransitiveDctorExportError, UnusableDeclaration,
+                         MissingKindDeclaration, DuplicateTypeArgument, InvalidInstanceHead,
+                         RedefinedIdent, DuplicateTypeClass, DuplicateInstance,
+                         ClassInstanceArityMismatch, DuplicateValueDeclaration,
+                         OverlappingInstances, OrphanInstance, InvalidNewtype,
+                         TransitiveExportError, HiddenConstructors) )
+import Language.PureScript.Linter.Exhaustive
+    ( checkExhaustiveExpr )
 import Language.PureScript.Linter.Wildcards
+    ( ignoreWildcardsUnderCompleteTypeSignatures )
 import Language.PureScript.Names
-import Language.PureScript.Roles
+    ( coerceProperName,
+      disqualify,
+      isPlainIdent,
+      mkQualified,
+      Ident,
+      ModuleName,
+      ProperName,
+      ProperNameType(ConstructorName, TypeName, ClassName),
+      Qualified(..),
+      QualifiedBy(..) )
+import Language.PureScript.Roles ( Role )
 import Language.PureScript.Sugar.Names.Env (Exports(..))
 import Language.PureScript.TypeChecker.Kinds as T
+    ( checkConstraint,
+      checkInstanceDeclaration,
+      checkKind,
+      checkKindDeclaration,
+      checkTypeKind,
+      elaborateKind,
+      freshKind,
+      freshKindWithKind,
+      inferKind,
+      instantiateKind,
+      kindOf,
+      kindOfClass,
+      kindOfData,
+      kindOfTypeSynonym,
+      kindOfWithScopedVars,
+      kindOfWithUnknowns,
+      kindsOfAll,
+      subsumesKind,
+      unifyKinds,
+      unifyKinds',
+      unknownsWithKinds )
 import Language.PureScript.TypeChecker.Monad as T
+    ( bindLocalTypeVariables,
+      bindLocalVariables,
+      bindNames,
+      bindTypes,
+      capturingSubstitution,
+      checkVisibility,
+      debugConstraint,
+      debugDataConstructors,
+      debugEnv,
+      debugNames,
+      debugSubstitution,
+      debugType,
+      debugTypeClassDictionaries,
+      debugTypeClasses,
+      debugTypeSynonyms,
+      debugTypes,
+      debugValue,
+      emptyCheckState,
+      emptySubstitution,
+      getEnv,
+      getHints,
+      getLocalContext,
+      getTypeClassDictionaries,
+      getVisibility,
+      guardWith,
+      insertUnkName,
+      lookupTypeClassDictionaries,
+      lookupTypeClassDictionariesForClass,
+      lookupTypeVariable,
+      lookupUnkName,
+      lookupVariable,
+      makeBindingGroupVisible,
+      modifyEnv,
+      preservingNames,
+      putEnv,
+      rethrowWithPositionTC,
+      runCheck,
+      unsafeCheckCurrentModule,
+      warnAndRethrowWithPositionTC,
+      withBindingGroupVisible,
+      withErrorMessageHint,
+      withFreshSubstitution,
+      withScopedTypeVars,
+      withTypeClassDictionaries,
+      withoutWarnings,
+      CheckState(..),
+      Substitution(..),
+      UnkLevel(..),
+      Unknown )
 import Language.PureScript.TypeChecker.Roles as T
+    ( checkRoleDeclarationArity,
+      checkRoles,
+      inferDataBindingGroupRoles,
+      inferRoles,
+      lookupRoles )
 import Language.PureScript.TypeChecker.Synonyms as T
+    ( replaceAllTypeSynonyms,
+      replaceAllTypeSynonymsM,
+      KindMap,
+      SynonymMap )
 import Language.PureScript.TypeChecker.Types as T
+    ( typesOf, BindingGroupType(..) )
 import Language.PureScript.TypeChecker.Unify (varIfUnknown)
 import Language.PureScript.TypeClassDictionaries
+    ( NamedDict,
+      TypeClassDictionaryInScope(TypeClassDictionaryInScope, tcdValue,
+                                 tcdChain, tcdDescription, tcdInstanceTypes) )
 import Language.PureScript.Types
+    ( containsForAll,
+      eqType,
+      everythingOnTypes,
+      freeTypeVariables,
+      overConstraintArgs,
+      srcInstanceType,
+      unapplyTypes,
+      Constraint(constraintClass),
+      SourceConstraint,
+      SourceType,
+      Type(TypeConstructor, REmpty, RCons, TypeLevelString, TypeLevelInt,
+           KindApp, TypeVar, KindedType, ForAll, TypeApp, ConstrainedType) )
 
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)

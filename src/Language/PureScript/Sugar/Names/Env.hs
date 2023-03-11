@@ -20,7 +20,7 @@ module Language.PureScript.Sugar.Names.Env
 
 import Prelude
 
-import Control.Monad
+import Control.Monad ( forM_, when )
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
 
@@ -33,11 +33,47 @@ import Data.Map qualified as M
 import Data.Set qualified as S
 
 import Language.PureScript.Constants.Prim qualified as C
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Declarations ( ExportSource(..) )
+import Language.PureScript.AST.SourcePos
+    ( internalModuleSourceSpan, nullSourceSpan, SourceSpan )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment
+    ( primBooleanTypes,
+      primClasses,
+      primCoerceClasses,
+      primCoerceTypes,
+      primIntClasses,
+      primIntTypes,
+      primOrderingTypes,
+      primRowClasses,
+      primRowListClasses,
+      primRowListTypes,
+      primRowTypes,
+      primSymbolClasses,
+      primSymbolTypes,
+      primTypeErrorClasses,
+      primTypeErrorTypes,
+      primTypes )
 import Language.PureScript.Errors
+    ( errorMessage,
+      errorMessage',
+      MultipleErrors,
+      SimpleErrorMessage(ScopeConflict, DeclConflict, ExportConflict,
+                         ScopeShadowing) )
 import Language.PureScript.Names
+    ( coerceProperName,
+      disqualify,
+      getQual,
+      Ident,
+      ModuleName,
+      Name(ValOpName, TyOpName, TyName, DctorName, TyClassName,
+           IdentName),
+      OpName,
+      OpNameType(TypeOpName, ValueOpName),
+      ProperName,
+      ProperNameType(ConstructorName, TypeName, ClassName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 
 -- |
 -- The details for an import: the name of the thing that is being imported

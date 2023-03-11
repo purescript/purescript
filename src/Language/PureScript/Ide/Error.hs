@@ -17,13 +17,24 @@ module Language.PureScript.Ide.Error
        , prettyPrintTypeSingleLine
        ) where
 
-import Data.Aeson
+import Data.Aeson ( ToJSON(toJSON), object, Value, KeyValue((.=)) )
 import Data.Aeson.Types qualified as Aeson
 import Data.Aeson.KeyMap qualified as KM
 import Data.Text qualified as T
-import Language.PureScript qualified as P
-import Language.PureScript.Errors.JSON
-import Language.PureScript.Ide.Types (ModuleIdent, Completion(..))
+import Language.PureScript.AST qualified as P
+    ( TypeSearch(TSAfter, tsAfterRecordFields, tsAfterIdentifiers) )
+import Language.PureScript.Errors qualified as P
+    ( ErrorMessage(ErrorMessage),
+      Level(Error),
+      MultipleErrors(runMultipleErrors),
+      SimpleErrorMessage(HoleInferredType) )
+import Language.PureScript.Names qualified as P
+    ( runModuleName, toMaybeModuleName, Qualified(Qualified) )
+import Language.PureScript.Pretty qualified as P
+    ( prettyPrintLabel, prettyPrintTypeWithUnicode )
+import Language.PureScript.Types qualified as P ( Type )
+import Language.PureScript.Errors.JSON ( toJSONError )
+import Language.PureScript.Ide.Types   (ModuleIdent, Completion(..))
 import Protolude
 
 data IdeError

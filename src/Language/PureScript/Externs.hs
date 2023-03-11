@@ -28,13 +28,53 @@ import Data.Version (showVersion)
 import Data.Map qualified as M
 import Data.List.NonEmpty qualified as NEL
 
-import Language.PureScript.AST
+import Language.PureScript.AST.Declarations
+    ( pattern TypeFixityDeclaration,
+      pattern ValueFixityDeclaration,
+      getTypeOpRef,
+      getValueOpRef,
+      Declaration(ImportDeclaration),
+      DeclarationRef(TypeInstanceRef, TypeRef, TypeClassRef, ValueRef),
+      ImportDeclarationType,
+      Module(..),
+      NameSource(..) )
+import Language.PureScript.AST.Operators
+    ( Associativity, Fixity(Fixity), Precedence )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
-import Language.PureScript.Crash
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment
+    ( dictTypeName,
+      makeTypeClassData,
+      DataDeclType,
+      Environment(typeClassDictionaries, typeSynonyms, names,
+                  typeClasses, types, dataConstructors),
+      FunctionalDependency,
+      NameKind(External),
+      NameVisibility(Defined),
+      TypeClassData(TypeClassData, typeClassArguments, typeClassIsEmpty,
+                    typeClassCoveringSets, typeClassDeterminedArguments,
+                    typeClassDependencies, typeClassSuperclasses, typeClassMembers),
+      TypeKind(DataType, TypeSynonym, ExternData) )
 import Language.PureScript.Names
+    ( coerceProperName,
+      isPlainIdent,
+      Ident,
+      ModuleName,
+      OpName,
+      OpNameType(ValueOpName, TypeOpName),
+      ProperName,
+      ProperNameType(ConstructorName, ClassName, TypeName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.TypeClassDictionaries
+    ( NamedDict,
+      TypeClassDictionaryInScope(TypeClassDictionaryInScope, tcdChain,
+                                 tcdDescription, tcdDependencies, tcdInstanceTypes,
+                                 tcdInstanceKinds, tcdForAll, tcdClassName, tcdPath, tcdValue,
+                                 tcdIndex) )
 import Language.PureScript.Types
+    ( srcInstanceType, SourceConstraint, SourceType )
 
 import Paths_purescript as Paths
 

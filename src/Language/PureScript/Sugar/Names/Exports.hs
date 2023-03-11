@@ -5,7 +5,7 @@ module Language.PureScript.Sugar.Names.Exports
 
 import Prelude
 
-import Control.Monad
+import Control.Monad ( filterM, foldM, unless, void, liftM2, when )
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Monad.Error.Class (MonadError(..))
 
@@ -15,11 +15,66 @@ import Data.List (intersect, groupBy, sortOn)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Map qualified as M
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Declarations
+    ( pattern TypeFixityDeclaration,
+      pattern ValueFixityDeclaration,
+      declRefSourceSpan,
+      declSourceSpan,
+      getTypeClassRef,
+      getTypeOpRef,
+      getTypeRef,
+      getValueOpRef,
+      getValueRef,
+      DataConstructorDeclaration(dataCtorName),
+      Declaration(ExternDeclaration, TypeClassDeclaration,
+                  TypeDeclaration, DataDeclaration, TypeSynonymDeclaration,
+                  ExternDataDeclaration, ValueDeclaration),
+      DeclarationRef(ModuleRef, TypeRef),
+      ErrorMessageHint(ErrorInModule),
+      ExportSource(..),
+      Module(..),
+      TypeDeclarationData(TypeDeclarationData),
+      ValueDeclarationData(valdeclIdent, valdeclSourceAnn) )
+import Language.PureScript.AST.SourcePos ( SourceSpan )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Errors
+    ( addHint,
+      errorMessage',
+      rethrow,
+      rethrowWithPosition,
+      warnAndRethrow,
+      MultipleErrors,
+      SimpleErrorMessage(UnknownExport, DuplicateExportRef,
+                         UnknownExportDataConstructor) )
 import Language.PureScript.Names
+    ( disqualifyFor,
+      isQualifiedWith,
+      isUnqualified,
+      Ident,
+      ModuleName,
+      Name(..),
+      OpName,
+      OpNameType(ValueOpName, TypeOpName),
+      ProperName,
+      ProperNameType(ConstructorName, ClassName, TypeName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.Sugar.Names.Env
+    ( checkImportConflicts,
+      envModuleExports,
+      exportType,
+      exportTypeClass,
+      exportTypeOp,
+      exportValue,
+      exportValueOp,
+      nullExports,
+      Env,
+      ExportMode(ReExport, Internal),
+      Exports(..),
+      ImportRecord(importName),
+      Imports(importedModules, importedTypes, importedTypeOps,
+              importedDataConstructors, importedTypeClasses, importedValues,
+              importedValueOps, importedKinds) )
 import Language.PureScript.Sugar.Names.Common (warnDuplicateRefs)
 
 -- |

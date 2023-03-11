@@ -17,7 +17,7 @@ import System.IO.UTF8 (readUTF8FileT)
 
 import Language.PureScript.Crash qualified as Crash
 import Language.PureScript.CST qualified as CST
-import Language.PureScript.Make qualified as Make
+import Language.PureScript.Make.Monad qualified as Make ( runMake )
 import Language.PureScript.ModuleDependencies qualified as Dependencies
 import Language.PureScript.Options qualified as Options
 

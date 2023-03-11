@@ -7,15 +7,52 @@ import Protolude (note)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class (MonadSupply)
 import Data.List (foldl', find, unzip5)
-import Language.PureScript.AST
+import Language.PureScript.AST.Binders
+    ( Binder(NullBinder, ConstructorBinder, VarBinder) )
+import Language.PureScript.AST.Declarations
+    ( pattern MkUnguarded,
+      pattern ValueDecl,
+      CaseAlternative(CaseAlternative),
+      DataConstructorDeclaration(DataConstructorDeclaration),
+      Declaration(TypeInstanceDeclaration, DataDeclaration),
+      Expr(Var, Constructor, App),
+      Module(..),
+      TypeInstanceBody(ExplicitInstance, DerivedInstance) )
+import Language.PureScript.AST.SourcePos ( SourceSpan(spanStart) )
 import Language.PureScript.AST.Utils
+    ( lamCase,
+      unguarded,
+      unwrapTypeConstructor,
+      UnwrappedTypeConstructor(UnwrappedTypeConstructor, utcModuleName,
+                               utcArgs, utcKindArgs, utcTyCon) )
 import Language.PureScript.Constants.Libs qualified as Libs
-import Language.PureScript.Crash
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment
+    ( DataDeclType(Newtype, Data), NameKind(Public) )
 import Language.PureScript.Errors
+    ( errorMessage',
+      MultipleErrors,
+      SimpleErrorMessage(CannotFindDerivingType, ExpectedTypeConstructor,
+                         InvalidDerivedInstance, ExpectedWildcard,
+                         CannotDeriveNewtypeForData) )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      freshIdent,
+      Ident(Ident),
+      ModuleName,
+      ProperName(runProperName),
+      ProperNameType(TypeName),
+      Qualified(Qualified),
+      QualifiedBy(BySourcePos, ByModuleName) )
 import Language.PureScript.PSString (mkString)
 import Language.PureScript.Types
+    ( replaceAllTypeVars,
+      srcTypeApp,
+      srcTypeConstructor,
+      srcTypeLevelString,
+      SourceType,
+      Type(TypeWildcard),
+      WildcardData(UnnamedWildcard) )
 import Language.PureScript.TypeChecker (checkNewtype)
 
 -- | Elaborates deriving instance declarations by code generation.

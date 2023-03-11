@@ -14,8 +14,6 @@ module Language.PureScript.CST
   , module Language.PureScript.CST.Lexer
   , module Language.PureScript.CST.Monad
   , module Language.PureScript.CST.Parser
-  , module Language.PureScript.CST.Print
-  , module Language.PureScript.CST.Types
   ) where
 
 import Prelude hiding (lex)
@@ -24,15 +22,14 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Parallel.Strategies (withStrategy, parList, evalTuple2, r0, rseq)
 import Data.List.NonEmpty qualified as NE
 import Data.Text (Text)
-import Language.PureScript.AST qualified as AST
+import Language.PureScript.AST.Declarations qualified as AST
+    ( Module )
 import Language.PureScript.Errors qualified as E
-import Language.PureScript.CST.Convert
-import Language.PureScript.CST.Errors
-import Language.PureScript.CST.Lexer
+import Language.PureScript.CST.Convert (convertModule, sourceSpan)
+import Language.PureScript.CST.Errors (ParserWarning, ParserError, errRange)
+import Language.PureScript.CST.Lexer (lexModule)
 import Language.PureScript.CST.Monad (Parser, ParserM(..), ParserState(..), LexResult, runParser, runTokenParser)
-import Language.PureScript.CST.Parser
-import Language.PureScript.CST.Print
-import Language.PureScript.CST.Types
+import Language.PureScript.CST.Parser (PartialResult(..), parseModule, parse)
 
 pureResult :: a -> PartialResult a
 pureResult a = PartialResult a ([], pure a)

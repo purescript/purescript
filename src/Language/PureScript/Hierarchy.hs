@@ -20,7 +20,15 @@ import Protolude (ordNub)
 
 import Data.List (sort)
 import Data.Text qualified as T
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( Declaration(TypeClassDeclaration), Module(..) )
+import Language.PureScript.Names qualified as P
+    ( ModuleName(..),
+      ProperName(runProperName),
+      ProperNameType(ClassName),
+      Qualified(Qualified) )
+import Language.PureScript.Types qualified as P
+    ( Constraint(Constraint) )
 
 newtype SuperMap = SuperMap
   { _unSuperMap :: Either (P.ProperName 'P.ClassName) (P.ProperName 'P.ClassName, P.ProperName 'P.ClassName)

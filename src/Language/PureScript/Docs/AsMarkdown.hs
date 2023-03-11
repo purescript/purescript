@@ -15,9 +15,18 @@ import Data.List (partition)
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.Docs.RenderedCode
+import Language.PureScript.Docs.RenderedCode.Types
+    ( outputWith,
+      RenderedCode,
+      RenderedCodeElement(Role, Syntax, Keyword, Space, Symbol) )
 import Language.PureScript.Docs.Types
-import Language.PureScript qualified as P
+    ( ignorePackage,
+      ChildDeclaration(..),
+      ChildDeclarationInfo(ChildInstance, ChildDataConstructor,
+                           ChildTypeClassMember),
+      Declaration(..),
+      Module(..) )
+import Language.PureScript.Names qualified as P ( runModuleName )
 import Language.PureScript.Docs.Render qualified as Render
 
 moduleAsMarkdown :: Module -> Docs

@@ -14,11 +14,37 @@ import Data.Char (isSpace)
 import Data.List (intercalate)
 import Data.List.NonEmpty qualified as NE
 import Data.Text qualified as T
-import Language.PureScript qualified as P
-import Language.PureScript.CST qualified as CST
+import Language.PureScript.Names qualified as P
+    ( Ident(Ident), ModuleName )
+import Language.PureScript.CST.Convert qualified as CST
+    ( convertDeclaration, convertExpr, convertImportDecl, convertType )
+import Language.PureScript.CST.Errors qualified as CST
+    ( prettyPrintError, ParserErrorType(ErrCustom) )
+import Language.PureScript.CST.Lexer qualified as CST
+    ( lexTopLevel )
+import Language.PureScript.CST.Monad qualified as CST
+    ( runParser, runTokenParser, Parser, ParserM(Parser) )
+import Language.PureScript.CST.Parser qualified as CST
+    ( parseDeclP,
+      parseExprP,
+      parseImportDeclP,
+      parseModuleNameP,
+      parseQualIdentP,
+      parseTypeP )
+import Language.PureScript.CST.Types qualified as CST
+    ( Ident(getIdent),
+      Name(nameValue),
+      QualifiedName(QualifiedName),
+      Token(TokEof, TokLayoutSep, TokLayoutStart, TokLayoutEnd) )
 import Language.PureScript.CST.Monad qualified as CSTM
 import Language.PureScript.Interactive.Directive qualified as D
 import Language.PureScript.Interactive.Types
+    ( parseReplQuery,
+      replQueryStrings,
+      Command(..),
+      Directive(Print, Help, Quit, Reload, Clear, Paste, Browse, Show,
+                Type, Kind, Complete),
+      ReplQuery(QueryPrint) )
 
 -- |
 -- Parses a limited set of commands from from .purs-repl

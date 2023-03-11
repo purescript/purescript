@@ -25,12 +25,18 @@ import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import Data.Traversable (for, sequence)
 import Language.PureScript.CST.Errors
+  ( ParserErrorInfo(..)
+  , ParserErrorType(..)
+  , ParserWarningType(..)
+  , ParserError
+  , ParserWarning
+  )
 import Language.PureScript.CST.Flatten (flattenType)
-import Language.PureScript.CST.Lexer
-import Language.PureScript.CST.Monad
-import Language.PureScript.CST.Positions
-import Language.PureScript.CST.Types
-import Language.PureScript.CST.Utils
+import Language.PureScript.CST.Lexer (lexModule)
+import Language.PureScript.CST.Monad (LexResult, ParserState(..), Parser, runParser, munch, oneOf, addFailure, pushBack, tryPrefix, addWarning, parseError)
+import Language.PureScript.CST.Positions (whereRange, guardedRange)
+import Language.PureScript.CST.Types (SourcePos(..), SourceRange(..), Comment(..), LineFeed(..), TokenAnn(..), SourceStyle(..), Token(..), SourceToken(..), Ident(..), Name(..), QualifiedName(..), Label(..), Wrapped(..), Separated(..), Labeled(..), Delimited, DelimitedNonEmpty, OneOrDelimited(..), Type(..), TypeVarBinding(..), Constraint(..), Row(..), Module(..), Export(..), DataMembers(..), Declaration(..), Instance(..), InstanceBinding(..), ImportDecl(..), Import(..), DataHead(..), DataCtor(..), ClassHead(..), ClassFundep(..), InstanceHead(..), Fixity(..), FixityOp(..), FixityFields(..), ValueBindingFields(..), Guarded(..), GuardedExpr(..), PatternGuard(..), Foreign(..), Role(..), Expr(..), RecordLabeled(..), RecordUpdate(..), RecordAccessor(..), Lambda(..), IfThenElse(..), CaseOf(..), LetIn(..), Where(..), LetBinding(..), DoBlock(..), DoStatement(..), AdoBlock(..), Binder(..))
+import Language.PureScript.CST.Utils (QualifiedProperName(..), ProperName(..), QualifiedOpName(..), OpName(..), opName, toQualifiedName, toName, toLabel, toString, toChar, toNumber, toInt, toBoolean, toConstraint, isConstrained, toBinderConstructor, toRecordFields, checkFundeps, toModuleDecls, TmpModuleDecl(..), isLeftFatArrow, placeholder, separated, revert, checkNoWildcards, checkNoForalls, getProperName, unexpectedName, qualifiedOpName, unexpectedName, properName, qualifiedProperName, upperToModuleName)
 import qualified Language.PureScript.Names as N
 import qualified Language.PureScript.Roles as R
 import Language.PureScript.PSString (PSString)

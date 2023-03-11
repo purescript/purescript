@@ -12,6 +12,10 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 
 import Data.Aeson.TH
+    ( defaultOptions,
+      Options(sumEncoding),
+      SumEncoding(ObjectWithSingleField),
+      deriveJSON )
 
 data Comment
   = LineComment Text

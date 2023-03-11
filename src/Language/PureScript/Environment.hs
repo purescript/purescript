@@ -20,12 +20,23 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.List.NonEmpty qualified as NEL
 
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Crash
+import Language.PureScript.AST.SourcePos ( nullSourceAnn )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Names
-import Language.PureScript.Roles
-import Language.PureScript.TypeClassDictionaries
+    ( coerceProperName,
+      Ident,
+      ProperName(..),
+      ProperNameType(TypeName, ConstructorName, ClassName),
+      Qualified,
+      QualifiedBy )
+import Language.PureScript.Roles ( Role(..) )
+import Language.PureScript.TypeClassDictionaries ( NamedDict )
 import Language.PureScript.Types
+    ( eqType,
+      srcTypeConstructor,
+      SourceConstraint,
+      SourceType,
+      Type(ForAll, TypeVar, TypeApp) )
 import Language.PureScript.Constants.Prim qualified as C
 
 -- | The @Environment@ defines all values and types which are currently in scope:

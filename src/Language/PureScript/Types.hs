@@ -24,8 +24,15 @@ import Data.Text qualified as T
 import GHC.Generics (Generic)
 
 import Language.PureScript.AST.SourcePos
+    ( pattern NullSourceAnn, SourceAnn, SourceSpan )
 import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.Names
+    ( coerceProperName,
+      OpName,
+      OpNameType(TypeOpName),
+      ProperName,
+      ProperNameType(TypeName, ClassName),
+      Qualified )
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)
 

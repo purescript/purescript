@@ -26,14 +26,35 @@ module Language.PureScript.Ide.Imports
 
 import Protolude hiding (moduleName)
 
-import Control.Lens ((^.), (%~), ix)
-import Data.List (partition)
+import Control.Lens                       ((^.), (%~), ix)
+import Data.List                          (partition)
 import Data.List.NonEmpty qualified as NE
 import Data.Text qualified as T
-import Language.PureScript qualified as P
-import Language.PureScript.CST qualified as CST
-import Language.PureScript.Ide.Error
-import Language.PureScript.Ide.Util
+import Language.PureScript.AST.Declarations qualified as P
+    ( ImportDeclarationType(Hiding, Implicit) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( SourcePos(SourcePos), SourceSpan(spanEnd, spanStart) )
+import Language.PureScript.Errors qualified as P
+    ( prettyPrintImport )
+import Language.PureScript.Names qualified as P ( ModuleName )
+import Language.PureScript.CST.Convert qualified as CST
+    ( convertImportDecl, sourcePos )
+import Language.PureScript.CST.Errors qualified as CST
+    ( prettyPrintError, ParserError )
+import Language.PureScript.CST.Lexer qualified as CST
+    ( lenient, lex, lexModule )
+import Language.PureScript.CST.Monad qualified as CST
+    ( runTokenParser )
+import Language.PureScript.CST.Parser qualified as CST
+    ( parseImportDeclP, parseModule, PartialResult(PartialResult) )
+import Language.PureScript.CST.Types qualified as CST
+    ( Module(modWhere, modNamespace, modImports),
+      Name(nameValue),
+      SourceRange(srcEnd),
+      SourceToken(tokAnn),
+      TokenAnn(tokRange) )
+import Language.PureScript.Ide.Error ( IdeError(GeneralError) )
+import Language.PureScript.Ide.Util ( ideReadFile )
 
 data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)
               deriving (Eq, Show)

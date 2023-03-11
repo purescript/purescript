@@ -15,11 +15,43 @@ import Data.Maybe (fromMaybe)
 import Data.Map qualified as M
 import Data.Set qualified as S
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Declarations
+    ( Declaration(ImportDeclaration),
+      DeclarationRef(..),
+      ErrorMessageHint(ErrorInModule),
+      ExportSource(exportSourceDefinedIn),
+      ImportDeclarationType(..),
+      Module(..) )
+import Language.PureScript.AST.SourcePos
+    ( internalModuleSourceSpan, SourceSpan )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Errors
+    ( addHint,
+      errorMessage',
+      rethrow,
+      MultipleErrors,
+      SimpleErrorMessage(UnknownImportDataConstructor, UnknownName,
+                         ImportHidingModule, UnknownImport) )
 import Language.PureScript.Names
+    ( pattern ByNullSourcePos,
+      byMaybeModuleName,
+      ModuleName,
+      Name(ModName, TyClassName, IdentName, ValOpName, TyName, TyOpName),
+      ProperName,
+      ProperNameType(ConstructorName, TypeName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.Sugar.Names.Env
+    ( envModuleExports,
+      nullImports,
+      Env,
+      Exports(exportedTypes, exportedValues, exportedValueOps,
+              exportedTypeOps, exportedTypeClasses),
+      ImportProvenance(FromImplicit, Local, FromExplicit),
+      ImportRecord(ImportRecord),
+      Imports(importedModules, importedQualModules, importedTypeClasses,
+              importedValues, importedValueOps, importedTypes,
+              importedDataConstructors, importedTypeOps) )
 
 type ImportDef = (SourceSpan, ImportDeclarationType, Maybe ModuleName)
 

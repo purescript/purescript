@@ -5,8 +5,12 @@ module Language.PureScript.CoreFn.Binders where
 
 import Prelude
 
-import Language.PureScript.AST.Literals
+import Language.PureScript.AST.Literals ( Literal )
 import Language.PureScript.Names
+    ( Ident,
+      ProperName,
+      ProperNameType(ConstructorName, TypeName),
+      Qualified )
 
 -- |
 -- Data type for binders

@@ -11,27 +11,43 @@ import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
-import Data.Functor.Identity
+import Data.Functor.Identity ( Identity(Identity, runIdentity) )
 
 import Data.Aeson.TH
+    ( defaultOptions,
+      Options(sumEncoding),
+      SumEncoding(ObjectWithSingleField),
+      deriveJSON )
 import Data.Map qualified as M
 import Data.Text (Text)
 import Data.List.NonEmpty qualified as NEL
 import GHC.Generics (Generic)
 
-import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Literals
-import Language.PureScript.AST.Operators
-import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.Binders ( Binder )
+import Language.PureScript.AST.Literals ( Literal(BooleanLiteral) )
+import Language.PureScript.AST.Operators ( Fixity )
+import Language.PureScript.AST.SourcePos ( SourceAnn, SourceSpan )
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
-import Language.PureScript.Types
+import Language.PureScript.Types ( SourceConstraint, SourceType )
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Label (Label)
 import Language.PureScript.Names
-import Language.PureScript.Roles
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Comments
+    ( pattern ByNullSourcePos,
+      toMaybeModuleName,
+      Ident(Ident),
+      ModuleName(..),
+      Name(TyName, ModName, ValOpName, TyOpName, TyClassName, IdentName),
+      OpName,
+      OpNameType(TypeOpName, ValueOpName),
+      ProperName,
+      ProperNameType(ConstructorName, ClassName, TypeName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
+import Language.PureScript.Roles ( Role )
+import Language.PureScript.TypeClassDictionaries ( NamedDict )
+import Language.PureScript.Comments ( Comment )
 import Language.PureScript.Environment
+    ( DataDeclType, Environment, FunctionalDependency, NameKind )
 import Language.PureScript.Constants.Prim qualified as C
 
 -- | A map of locally-bound names in scope.

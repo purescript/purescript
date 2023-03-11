@@ -32,17 +32,37 @@ module Language.PureScript.Ide.Util
 import Protolude                           hiding (decodeUtf8,
                                                       encodeUtf8, to)
 
-import Control.Lens                        hiding (op, (&))
-import Data.Aeson
+import Control.Lens ( (^.), to, Getting )
+import Data.Aeson ( FromJSON, ToJSON, eitherDecode, encode )
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
-import Data.Text.Lazy.Encoding             as TLE
-import Language.PureScript qualified as P
-import Language.PureScript.Ide.Error (IdeError(..))
+import Data.Text.Lazy.Encoding as TLE ( encodeUtf8, decodeUtf8 )
+import Language.PureScript.Names qualified as P
+    ( runIdent,
+      runModuleName,
+      showQualified,
+      Ident,
+      OpName(runOpName),
+      ProperName(runProperName),
+      ProperNameType(ConstructorName, TypeName),
+      Qualified )
+import Language.PureScript.Ide.Error       (IdeError(..))
 import Language.PureScript.Ide.Logging
 import Language.PureScript.Ide.Types
-import System.IO.UTF8 (readUTF8FileT)
-import System.Directory (makeAbsolute)
+    ( emptyAnn,
+      ideDtorName,
+      ideSynonymName,
+      ideTCName,
+      ideTypeName,
+      ideTypeOpName,
+      ideValueIdent,
+      ideValueOpName,
+      IdeDeclaration(..),
+      IdeDeclarationAnn(IdeDeclarationAnn),
+      IdeNamespace(..),
+      Match(..) )
+import System.IO.UTF8                      (readUTF8FileT)
+import System.Directory                    (makeAbsolute)
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of

@@ -25,10 +25,28 @@ import Data.Semigroup (Any(..))
 import Data.Text (Text)
 
 import Language.PureScript.Environment
+    ( Environment(types), TypeKind(ExternData, DataType) )
 import Language.PureScript.Errors
+    ( DataConstructorDeclaration(dataCtorFields),
+      RoleDeclarationData(rdeclRoles, rdeclIdent),
+      errorMessage,
+      MultipleErrors,
+      SimpleErrorMessage(RoleDeclarationArityMismatch, RoleMismatch) )
 import Language.PureScript.Names
-import Language.PureScript.Roles
+    ( ModuleName,
+      ProperName,
+      ProperNameType(TypeName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
+import Language.PureScript.Roles ( Role(..) )
 import Language.PureScript.Types
+    ( freeTypeVariables,
+      unapplyTypes,
+      Constraint(Constraint, constraintAnn, constraintData,
+                 constraintArgs, constraintKindArgs, constraintClass),
+      SourceType,
+      Type(TypeConstructor, TypeVar, ForAll, ConstrainedType, RCons,
+           KindedType) )
 
 -- |
 -- A map of a type's formal parameter names to their roles. This type's

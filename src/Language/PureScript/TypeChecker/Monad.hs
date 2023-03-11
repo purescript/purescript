@@ -10,9 +10,18 @@ import Prelude
 import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
+    ( guard,
+      join,
+      (<=<),
+      forM_,
+      when,
+      StateT(runStateT),
+      MonadState(get),
+      gets,
+      modify )
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
-import Data.Maybe
+import Data.Maybe ( fromMaybe )
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text (Text, isPrefixOf, unpack)
@@ -20,12 +29,53 @@ import Data.List.NonEmpty qualified as NEL
 
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
+    ( Environment(typeClasses, types, names, dataConstructors,
+                  typeSynonyms, typeClassDictionaries),
+      NameKind(Private),
+      NameVisibility(..),
+      TypeClassData(typeClassArguments),
+      TypeKind(..) )
 import Language.PureScript.Errors
+    ( SourceAnn,
+      SourceSpan(spanStart),
+      Context,
+      ErrorMessageHint,
+      ExportSource,
+      Expr,
+      ImportDeclarationType,
+      addHint,
+      errorMessage,
+      positionedError,
+      rethrow,
+      warnWithPosition,
+      MultipleErrors,
+      SimpleErrorMessage(UndefinedTypeVariable, ShadowedTypeVar,
+                         NameIsUndefined, CycleInDeclaration) )
 import Language.PureScript.Names
-import Language.PureScript.Pretty.Types
-import Language.PureScript.Pretty.Values
+    ( coerceProperName,
+      disqualify,
+      runIdent,
+      runModuleName,
+      showQualified,
+      toMaybeModuleName,
+      Ident(Ident),
+      ModuleName,
+      ProperName(..),
+      ProperNameType(TypeName, ConstructorName, ClassName),
+      Qualified(..),
+      QualifiedBy(..) )
+import Language.PureScript.Pretty.Types ( prettyPrintType )
+import Language.PureScript.Pretty.Values ( prettyPrintValue )
 import Language.PureScript.TypeClassDictionaries
+    ( NamedDict,
+      TypeClassDictionaryInScope(TypeClassDictionaryInScope,
+                                 tcdInstanceTypes, tcdValue, tcdClassName, tcdInstanceKinds) )
 import Language.PureScript.Types
+    ( srcKindedType,
+      srcTypeVar,
+      Constraint(Constraint),
+      SourceType,
+      Type(TypeConstructor, TypeApp, KindApp) )
 import Text.PrettyPrint.Boxes (render)
 
 newtype UnkLevel = UnkLevel (NEL.NonEmpty Unknown)

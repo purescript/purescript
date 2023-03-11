@@ -12,6 +12,11 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Map qualified as Map
 import Language.PureScript.Docs.Types
+    ( convertFundepsToStrings,
+      Declaration(..),
+      DeclarationInfo(TypeClassDeclaration, ExternDataDeclaration),
+      Module(..),
+      Type' )
 
 import Language.PureScript.Constants.Prim qualified as P
 import Language.PureScript.Crash qualified as P

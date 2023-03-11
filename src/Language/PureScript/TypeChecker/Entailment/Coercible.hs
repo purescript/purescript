@@ -35,17 +35,55 @@ import Data.Text (Text)
 import Data.Map qualified as M
 import Data.Set qualified as S
 
-import Language.PureScript.Crash
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment
-import Language.PureScript.Errors hiding (inScope)
+    ( unapplyKinds,
+      DataDeclType(Newtype),
+      Environment(types),
+      TypeKind(DataType) )
+import Language.PureScript.Errors
+    ( SourceAnn,
+      DeclarationRef(TypeRef),
+      ErrorMessageHint(MissingConstructorImportForCoercible),
+      ExportSource,
+      ImportDeclarationType(..),
+      errorMessage,
+      MultipleErrors,
+      SimpleErrorMessage(TypesDoNotUnify,
+                         PossiblyInfiniteCoercibleInstance, NoInstanceFound) )
 import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Kinds hiding (kindOf)
+    ( byMaybeModuleName,
+      toMaybeModuleName,
+      ModuleName,
+      ProperName,
+      ProperNameType(ConstructorName, TypeName),
+      Qualified(..) )
+import Language.PureScript.TypeChecker.Kinds
+    ( elaborateKind, freshKindWithKind, unifyKinds' )
 import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Roles
+    ( CheckState(checkConstructorImportsForCoercible,
+                 checkSubstitution, checkCurrentModule, checkCurrentModuleImports) )
+import Language.PureScript.TypeChecker.Roles ( lookupRoles )
 import Language.PureScript.TypeChecker.Synonyms
+    ( replaceAllTypeSynonyms )
 import Language.PureScript.TypeChecker.Unify
-import Language.PureScript.Roles
+    ( alignRowsWith, freshTypeWithKind, substituteType )
+import Language.PureScript.Roles ( Role(..) )
 import Language.PureScript.Types
+    ( completeBinderList,
+      containsUnknowns,
+      everythingOnTypes,
+      isMonoType,
+      replaceAllTypeVars,
+      rowFromList,
+      srcConstraint,
+      srcTypeApp,
+      unapplyTypes,
+      Constraint(Constraint, constraintAnn, constraintData,
+                 constraintArgs, constraintKindArgs, constraintClass),
+      SourceType,
+      Type(TypeApp, ForAll, ConstrainedType, KindedType, KindApp, RCons,
+           TUnknown, TypeConstructor, Skolem) )
 import Language.PureScript.Constants.Prim qualified as Prim
 
 -- | State of the given constraints solver.

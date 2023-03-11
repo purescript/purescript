@@ -20,17 +20,39 @@ import Data.List (uncons)
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
+    ( Pattern,
+      buildPrettyPrinter,
+      mkPattern,
+      pattern,
+      Operator(Wrap, AssocL, AssocR),
+      OperatorTable(OperatorTable) )
 
-import Language.PureScript.Crash
-import Language.PureScript.Label
-import Language.PureScript.Names
+import Language.PureScript.Crash ( internalError )
+import Language.PureScript.Label ( Label )
+import Language.PureScript.Names ( coerceProperName )
 import Language.PureScript.Pretty.Types
-import Language.PureScript.Roles
-import Language.PureScript.Types
+    ( convertPrettyPrintType,
+      prettyPrintLabel,
+      PrettyPrintConstraint,
+      PrettyPrintType(PPTypeWildcard, PPRecord, PPRow,
+                      PPBinaryNoParensType, PPTypeOp, PPTypeLevelString, PPTypeLevelInt,
+                      PPTypeConstructor, PPKindArg, PPFunction, PPKindedType,
+                      PPConstrainedType, PPParensInType, PPForAll, PPTypeApp,
+                      PPTypeVar) )
+import Language.PureScript.Roles ( displayRole, Role )
+import Language.PureScript.Types ( Type )
 import Language.PureScript.PSString (prettyPrintString)
 
 import Language.PureScript.Docs.RenderedCode.Types
-import Language.PureScript.Docs.Utils.MonoidExtras
+    ( keywordForall,
+      roleAnn,
+      sp,
+      syntax,
+      typeCtor,
+      typeOp,
+      typeVar,
+      RenderedCode )
+import Language.PureScript.Docs.Utils.MonoidExtras ( mintersperse )
 
 typeLiterals :: Pattern () PrettyPrintType RenderedCode
 typeLiterals = mkPattern match

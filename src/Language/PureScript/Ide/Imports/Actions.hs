@@ -13,21 +13,47 @@ where
 
 import Protolude hiding (moduleName)
 
-import Control.Lens ((^.), has)
-import Data.List (nubBy)
+import Control.Lens                       ((^.), has)
+import Data.List                          (nubBy)
 import Data.Map qualified as Map
 import Data.Text qualified as T
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( DeclarationRef(TypeRef, TypeClassRef, ValueOpRef, TypeOpRef,
+                     ValueRef),
+      ImportDeclarationType(Explicit, Implicit) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( internalModuleSourceSpan, SourceSpan )
+import Language.PureScript.Errors qualified as P
+    ( prettyPrintRef )
+import Language.PureScript.Names qualified as P
+    ( Ident(Ident), ModuleName, ProperName, ProperNameType(TypeName) )
 import Language.PureScript.Constants.Prim qualified as C
-import Language.PureScript.Ide.Completion
+import Language.PureScript.Ide.Completion ( getExactMatches )
 import Language.PureScript.Ide.Error
-import Language.PureScript.Ide.Filter
+    ( IdeError(GeneralError, NotFound) )
+import Language.PureScript.Ide.Filter ( Filter )
 import Language.PureScript.Ide.Imports
-import Language.PureScript.Ide.State
-import Language.PureScript.Ide.Prim
+    ( parseImportsFromFile', prettyPrintImportSection, Import(..) )
+import Language.PureScript.Ide.State ( getAllModules )
+import Language.PureScript.Ide.Prim ( idePrimDeclarations )
 import Language.PureScript.Ide.Types
+    ( _IdeDeclModule,
+      ideDtorName,
+      ideDtorTypeName,
+      ideTCName,
+      ideTypeName,
+      ideTypeOpName,
+      ideValueOpName,
+      Ide,
+      IdeDeclaration(IdeDeclTypeSynonym, IdeDeclTypeClass,
+                     IdeDeclValueOperator, IdeDeclTypeOperator, IdeDeclDataConstructor,
+                     IdeDeclType),
+      IdeType(_ideTypeName),
+      Match(..),
+      Success(TextResult, MultilineTextResult) )
 import Language.PureScript.Ide.Util
-import System.IO.UTF8 (writeUTF8FileT)
+    ( discardAnn, identifierFromIdeDeclaration )
+import System.IO.UTF8                     (writeUTF8FileT)
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
 addImplicitImport

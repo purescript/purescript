@@ -10,10 +10,17 @@ module Language.PureScript.Ide.Logging
 import Protolude
 
 import "monad-logger" Control.Monad.Logger
+    ( MonadLogger,
+      LoggingT,
+      filterLogger,
+      logOtherN,
+      runStdoutLoggingT,
+      LogLevel(LevelOther, LevelDebug) )
 import Data.Text qualified as T
-import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Types ( IdeLogLevel(..) )
 import System.Clock
-import Text.Printf
+    ( TimeSpec, diffTimeSpec, getTime, toNanoSecs, Clock(Monotonic) )
+import Text.Printf ( printf )
 
 runLogger :: MonadIO m => IdeLogLevel -> LoggingT m a -> m a
 runLogger logLevel' =

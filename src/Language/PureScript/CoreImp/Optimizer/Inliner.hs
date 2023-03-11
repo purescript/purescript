@@ -24,8 +24,29 @@ import Data.Text qualified as T
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.CoreImp.AST
+    ( everywhere,
+      everywhereTopDown,
+      everywhereTopDownM,
+      getSourceSpan,
+      AST(ModuleAccessor, StringLiteral, BooleanLiteral, NumericLiteral,
+          Binary, Unary, Indexer, VariableIntroduction, Function, Block,
+          Return, Var, App),
+      BinaryOperator(ZeroFillShiftRight, Multiply, Subtract, Divide,
+                     EqualTo, NotEqualTo, LessThan, LessThanOrEqualTo, GreaterThan,
+                     GreaterThanOrEqualTo, Add, And, Or, BitwiseOr, BitwiseAnd,
+                     BitwiseXor, ShiftLeft, ShiftRight),
+      InitializerEffects(UnknownEffects),
+      UnaryOperator(BitwiseNot, Negate, Not) )
 import Language.PureScript.CoreImp.Optimizer.Common
-import Language.PureScript.AST (SourceSpan(..))
+    ( pattern Ref,
+      applyAll,
+      isReassigned,
+      isRebound,
+      isUpdated,
+      removeFromBlock,
+      replaceIdent,
+      replaceIdents )
+import Language.PureScript.AST.SourcePos ( SourceSpan(..) )
 import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.Constants.Prim qualified as C
 

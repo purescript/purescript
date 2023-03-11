@@ -1,10 +1,11 @@
 module Language.PureScript.CoreImp.Module where
 
 import Protolude
+
 import Data.List.NonEmpty qualified as NEL (NonEmpty)
 
-import Language.PureScript.Comments
-import Language.PureScript.CoreImp.AST
+import Language.PureScript.Comments ( Comment )
+import Language.PureScript.CoreImp.AST ( AST )
 import Language.PureScript.PSString (PSString)
 
 data Module = Module

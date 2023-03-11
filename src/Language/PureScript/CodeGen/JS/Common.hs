@@ -3,12 +3,17 @@ module Language.PureScript.CodeGen.JS.Common where
 
 import Prelude
 
-import Data.Char
+import Data.Char ( ord, isAlphaNum, isDigit, isAlpha )
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.Crash
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Names
+    ( unusedIdent,
+      Ident(..),
+      InternalIdentData(Lazy, RuntimeLazyFactory),
+      ModuleName(..),
+      ProperName(runProperName) )
 
 moduleNameToJs :: ModuleName -> Text
 moduleNameToJs (ModuleName mn) =

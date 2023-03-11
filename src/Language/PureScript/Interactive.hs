@@ -21,23 +21,118 @@ import Data.Text qualified as T
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.State.Class
-import Control.Monad.Reader.Class
+    ( MonadState(get, put), gets, modify )
+import Control.Monad.Reader.Class ( MonadReader, asks )
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT)
 import Control.Monad.Writer.Strict (Writer(), runWriter)
 
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( getModuleName,
+      Declaration,
+      DeclarationRef(..),
+      Expr(Literal),
+      ImportDeclarationType(Hiding, Implicit, Explicit),
+      Module,
+      NameSource(CompilerNamed, UserNamed) )
+import Language.PureScript.AST.Literals qualified as P
+    ( Literal(NumericLiteral, ObjectLiteral) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( nullSourceSpan )
+import Language.PureScript.Crash qualified as P ( internalError )
+import Language.PureScript.Environment qualified as P
+    ( initEnvironment, Environment(typeSynonyms, names) )
+import Language.PureScript.Errors qualified as P
+    ( defaultPPEOptions,
+      prettyPrintMultipleErrors,
+      MultipleErrors,
+      PPEOptions(ppeRelativeDirectory) )
+import Language.PureScript.Externs qualified as P
+    ( applyExternsFileToEnvironment, ExternsFile )
+import Language.PureScript.Make qualified as P
+    ( runMake,
+      Make,
+      buildMakeActions,
+      MakeActions(progress),
+      RebuildPolicy(RebuildAlways),
+      inferForeignModules,
+      make,
+      rebuildModule )
+import Language.PureScript.Names qualified as P
+    ( mkQualified,
+      runModuleName,
+      Ident(Ident),
+      ModuleName(..),
+      ProperName(ProperName),
+      Qualified(Qualified),
+      QualifiedBy(ByModuleName) )
+import Language.PureScript.Options qualified as P
+    ( defaultOptions )
+import Language.PureScript.Pretty qualified as P
+    ( prettyPrintType )
+import Language.PureScript.TypeChecker qualified as P
+    ( emptyCheckState, CheckState(checkCurrentModule), kindOf )
+import Language.PureScript.Types qualified as P ( SourceType )
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Names qualified as N
 import Language.PureScript.Constants.Prim qualified as C
 
-import Language.PureScript.Interactive.Completion   as Interactive
-import Language.PureScript.Interactive.IO           as Interactive
-import Language.PureScript.Interactive.Message      as Interactive
-import Language.PureScript.Interactive.Module       as Interactive
-import Language.PureScript.Interactive.Parser       as Interactive
-import Language.PureScript.Interactive.Printer      as Interactive
-import Language.PureScript.Interactive.Types        as Interactive
+import Language.PureScript.Interactive.Completion as Interactive
+    ( completion,
+      completion',
+      formatCompletions,
+      liftCompletionM,
+      CompletionM )
+import Language.PureScript.Interactive.IO as Interactive
+    ( findNodeProcess,
+      getHistoryFilename,
+      readNodeProcessWithExitCode )
+import Language.PureScript.Interactive.Message as Interactive
+    ( guideURL,
+      helpMessage,
+      noInputMessage,
+      prologueMessage,
+      quitMessage,
+      supportModuleMessage )
+import Language.PureScript.Interactive.Module as Interactive
+    ( createTemporaryModule,
+      createTemporaryModuleForImports,
+      createTemporaryModuleForKind,
+      importDecl,
+      indexFile,
+      internalSpan,
+      loadAllModules,
+      modulesDir,
+      supportModuleIsDefined,
+      supportModuleName )
+import Language.PureScript.Interactive.Parser as Interactive
+    ( parseCommand, parseDotFile )
+import Language.PureScript.Interactive.Printer as Interactive
+    ( printModuleSignatures, textT )
+import Language.PureScript.Interactive.Types as Interactive
+    ( initialInteractivePrint,
+      initialPSCiState,
+      parseReplQuery,
+      psciEnvironment,
+      psciExports,
+      psciImportedModules,
+      psciImports,
+      psciInteractivePrint,
+      psciLetBindings,
+      psciLoadedExterns,
+      replQueries,
+      replQueryStrings,
+      setInteractivePrint,
+      showReplQuery,
+      updateImportedModules,
+      updateLets,
+      updateLoadedExterns,
+      Command(..),
+      Directive(..),
+      ImportedModule,
+      PSCiConfig(..),
+      PSCiState,
+      ReplQuery(..) )
 
 import System.Directory (getCurrentDirectory)
 import System.FilePath ((</>))

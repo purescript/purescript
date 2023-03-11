@@ -12,11 +12,12 @@ module Language.PureScript.Make
 import Prelude
 
 import Control.Concurrent.Lifted as C
+    ( fork, modifyMVar_, putMVar, readMVar, takeMVar )
 import Control.Exception.Base (onException)
-import Control.Monad hiding (sequence)
+import Control.Monad ( foldM, unless, when )
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.IO.Class
-import Control.Monad.Supply
+import Control.Monad.IO.Class ( MonadIO(..) )
+import Control.Monad.Supply ( evalSupplyT, runSupply, runSupplyT )
 import Control.Monad.Trans.Control (MonadBaseControl(..), control)
 import Control.Monad.Trans.State (runStateT)
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
@@ -29,25 +30,88 @@ import Data.Maybe (fromMaybe)
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Declarations
+    ( getModuleName,
+      getModuleSourceSpan,
+      importPrim,
+      ErrorMessageHint(ErrorInModule),
+      Module(..) )
+import Language.PureScript.AST.SourcePos ( SourceSpan(spanName) )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Docs.Convert qualified as Docs
-import Language.PureScript.Environment
+import Language.PureScript.Environment ( initEnvironment )
 import Language.PureScript.Errors
+    ( addHint,
+      defaultPPEOptions,
+      errorMessage',
+      errorMessage'',
+      prettyPrintMultipleErrors,
+      MultipleErrors,
+      SimpleErrorMessage(DuplicateModule, CannotDefinePrimModules) )
 import Language.PureScript.Externs
+    ( applyExternsFileToEnvironment, moduleToExternsFile, ExternsFile )
 import Language.PureScript.Linter
+    ( Name(DctorName), lintImports, lint )
 import Language.PureScript.ModuleDependencies
+    ( moduleSignature, sortModules, DependencyDepth(Transitive) )
 import Language.PureScript.Names
-import Language.PureScript.Renamer
+    ( isBuiltinModuleName, runModuleName, ModuleName )
+import Language.PureScript.Renamer ( renameInModule )
 import Language.PureScript.Sugar
+    ( primEnv,
+      Env,
+      collapseBindingGroups,
+      createBindingGroups,
+      desugarCaseGuards,
+      externsEnv,
+      desugar )
 import Language.PureScript.TypeChecker
+    ( emptyCheckState,
+      CheckState(CheckState, checkEnv,
+                 checkConstructorImportsForCoercible, checkHints, checkSubstitution,
+                 checkCurrentModuleImports, checkCurrentModule,
+                 checkNextSkolemScope, checkNextSkolem, checkNextType),
+      typeCheckModule )
 import Language.PureScript.Make.BuildPlan
+    ( getResult,
+      BuildJobResult(BuildJobSkipped, BuildJobSucceeded, BuildJobFailed),
+      BuildPlan(..) )
 import Language.PureScript.Make.BuildPlan qualified as BuildPlan
 import Language.PureScript.Make.Cache qualified as Cache
 import Language.PureScript.Make.Actions as Actions
+    ( buildMakeActions,
+      cacheDbFile,
+      checkForeignDecls,
+      ffiCodegen',
+      readCacheDb',
+      renderProgressMessage,
+      writeCacheDb',
+      MakeActions(..),
+      ProgressMessage(..),
+      RebuildPolicy(..) )
 import Language.PureScript.Make.Monad as Monad
-import Language.PureScript.CoreFn qualified as CF
+    ( copyFile,
+      getTimestamp,
+      getTimestampMaybe,
+      hashFile,
+      makeIO,
+      readCborFile,
+      readCborFileIO,
+      readExternsFile,
+      readJSONFile,
+      readJSONFileIO,
+      readTextFile,
+      runMake,
+      writeCborFile,
+      writeCborFileIO,
+      writeJSONFile,
+      writeTextFile,
+      Make(..) )
+import Language.PureScript.CoreFn.Desugar qualified as CF
+    ( moduleToCoreFn )
+import Language.PureScript.CoreFn.Optimizer qualified as CF
+    ( optimizeCoreFn )
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
 

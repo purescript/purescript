@@ -16,14 +16,34 @@ import Data.List (uncons)
 import Data.List.Ordered (minusBy')
 import Data.Ord (comparing)
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
+import Language.PureScript.AST.Declarations
+    ( ErrorMessageHint(ErrorInRowLabel, ErrorInSubsumption),
+      Expr(TypeClassDictionary, App) )
+import Language.PureScript.AST.SourcePos ( pattern NullSourceAnn )
+import Language.PureScript.Crash ( internalError )
+import Language.PureScript.Environment ( tyFunction, tyRecord )
 import Language.PureScript.Errors
+    ( errorMessage,
+      internalCompilerError,
+      MultipleErrors,
+      SimpleErrorMessage(AdditionalProperty, PropertyIsMissing) )
 import Language.PureScript.TypeChecker.Monad
+    ( getHints,
+      getTypeClassDictionaries,
+      withErrorMessageHint,
+      CheckState )
 import Language.PureScript.TypeChecker.Skolems
+    ( newSkolemConstant, skolemize )
 import Language.PureScript.TypeChecker.Unify
+    ( alignRowsWith, freshTypeWithKind, unifyTypes )
 import Language.PureScript.Types
+    ( eqType,
+      isREmpty,
+      replaceTypeVars,
+      rowFromList,
+      RowListItem(rowListLabel),
+      SourceType,
+      Type(TypeApp, ForAll, KindedType, ConstrainedType) )
 
 -- | Subsumption can operate in two modes:
 --

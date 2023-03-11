@@ -45,22 +45,150 @@ import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.IntSet qualified as IS
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST.Binders ( binderNames, Binder(..) )
+import Language.PureScript.AST.Declarations
+    ( pattern MkUnguarded,
+      pattern ValueDecl,
+      onTypeSearchTypes,
+      CaseAlternative(CaseAlternative, caseAlternativeBinders),
+      Declaration(BindingGroupDeclaration),
+      ErrorMessageHint(ErrorInApplication, ErrorInferringType,
+                       ErrorCheckingGuard, ErrorCheckingType, ErrorCheckingAccessor),
+      Expr(DerivedInstancePlaceholder, Hole, Abs, Var,
+           DeferredDictionary, Case, IfThenElse, Literal, ObjectUpdate,
+           Accessor, Let, TypeClassDictionary, App, PositionedValue,
+           TypedValue, Constructor),
+      Guard(PatternGuard, ConditionGuard),
+      GuardedExpr(..),
+      TypeSearch(TSBefore, TSAfter) )
+import Language.PureScript.AST.Literals
+    ( Literal(ObjectLiteral, NumericLiteral, StringLiteral,
+              CharLiteral, BooleanLiteral, ArrayLiteral) )
+import Language.PureScript.AST.SourcePos
+    ( pattern NullSourceAnn, nullSourceSpan, SourceAnn, SourceSpan(spanStart) )
+import Language.PureScript.AST.Traversals ( overTypes )
+import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Environment
+    ( function,
+      isDictTypeName,
+      kindRow,
+      kindType,
+      tyArray,
+      tyBoolean,
+      tyChar,
+      tyFunction,
+      tyInt,
+      tyNumber,
+      tyRecord,
+      tyString,
+      Environment(dataConstructors, typeClasses, types),
+      FunctionalDependency(fdDetermined, fdDeterminers),
+      NameKind(Private),
+      NameVisibility(..),
+      TypeClassData(TypeClassData, typeClassIsEmpty,
+                    typeClassDependencies) )
 import Language.PureScript.Errors
+    ( errorMessage,
+      errorMessage',
+      escalateWarningWhen,
+      internalCompilerError,
+      onErrorMessages,
+      onTypesInErrorMessage,
+      parU,
+      ErrorMessage(..),
+      MultipleErrors,
+      SimpleErrorMessage(DuplicateLabel, MissingTypeDeclaration,
+                         CannotGeneralizeRecursiveFunction, AmbiguousTypeVariables,
+                         HoleInferredType, IncorrectConstructorArity, OverlappingArgNames,
+                         UnknownName, PropertyIsMissing, AdditionalProperty,
+                         ExprDoesNotHaveType) )
 import Language.PureScript.Names
-import Language.PureScript.Traversals
-import Language.PureScript.TypeChecker.Deriving
+    ( pattern ByNullSourcePos,
+      byMaybeModuleName,
+      coerceProperName,
+      freshIdent,
+      Ident(UnusedIdent),
+      ModuleName,
+      Name(DctorName),
+      ProperName(ProperName),
+      ProperNameType(ClassName),
+      Qualified(..),
+      QualifiedBy(BySourcePos, ByModuleName) )
+import Language.PureScript.Traversals ( sndM )
+import Language.PureScript.TypeChecker.Deriving ( deriveInstance )
 import Language.PureScript.TypeChecker.Entailment
+    ( newDictionaries, replaceTypeClassDictionaries, InstanceContext )
 import Language.PureScript.TypeChecker.Kinds
+    ( checkConstraint,
+      checkTypeKind,
+      kindOf,
+      kindOfWithScopedVars,
+      unifyKinds',
+      unknownsWithKinds )
 import Language.PureScript.TypeChecker.Monad
+    ( bindLocalVariables,
+      bindNames,
+      capturingSubstitution,
+      checkVisibility,
+      getEnv,
+      getHints,
+      getLocalContext,
+      getTypeClassDictionaries,
+      guardWith,
+      insertUnkName,
+      lookupUnkName,
+      lookupVariable,
+      makeBindingGroupVisible,
+      unsafeCheckCurrentModule,
+      warnAndRethrowWithPositionTC,
+      withBindingGroupVisible,
+      withErrorMessageHint,
+      withFreshSubstitution,
+      withScopedTypeVars,
+      withTypeClassDictionaries,
+      withoutWarnings,
+      CheckState(checkEnv, checkSubstitution, checkCurrentModule),
+      Substitution )
 import Language.PureScript.TypeChecker.Skolems
-import Language.PureScript.TypeChecker.Subsumption
+    ( introduceSkolemScope,
+      newSkolemConstant,
+      newSkolemScope,
+      skolemEscapeCheck,
+      skolemize,
+      skolemizeTypesInValue )
+import Language.PureScript.TypeChecker.Subsumption ( subsumes )
 import Language.PureScript.TypeChecker.Synonyms
-import Language.PureScript.TypeChecker.TypeSearch
+    ( replaceAllTypeSynonyms )
+import Language.PureScript.TypeChecker.TypeSearch ( typeSearch )
 import Language.PureScript.TypeChecker.Unify
+    ( freshTypeWithKind,
+      replaceTypeWildcards,
+      substituteType,
+      unifyTypes,
+      unknownsInType,
+      varIfUnknown )
 import Language.PureScript.Types
+    ( pattern REmptyKinded,
+      eqType,
+      isMonoType,
+      replaceTypeVars,
+      rowFromList,
+      rowToList,
+      srcConstrainedType,
+      srcConstraint,
+      srcKindApp,
+      srcRCons,
+      srcREmpty,
+      srcRowListItem,
+      srcTypeApp,
+      srcTypeConstructor,
+      unknowns,
+      Constraint(Constraint, constraintClass, constraintArgs),
+      RowListItem(RowListItem, rowListLabel),
+      SourceConstraint,
+      SourceType,
+      Type(ConstrainedType, TUnknown, Skolem, TypeApp, ForAll,
+           KindedType) )
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
 

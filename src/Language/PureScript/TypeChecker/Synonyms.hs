@@ -13,15 +13,27 @@ module Language.PureScript.TypeChecker.Synonyms
 import Prelude
 
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
+import Control.Monad.State ( MonadState )
 import Data.Maybe (fromMaybe)
 import Data.Map qualified as M
 import Data.Text (Text)
 import Language.PureScript.Environment
+    ( Environment(types, typeSynonyms), TypeKind )
 import Language.PureScript.Errors
+    ( SourceSpan,
+      errorMessage',
+      MultipleErrors,
+      SimpleErrorMessage(PartiallyAppliedSynonym) )
 import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Monad
+    ( ProperName, ProperNameType(TypeName), Qualified )
+import Language.PureScript.TypeChecker.Monad ( getEnv, CheckState )
 import Language.PureScript.Types
+    ( completeBinderList,
+      everywhereOnTypesTopDownM,
+      getAnnForType,
+      replaceAllTypeVars,
+      SourceType,
+      Type(KindApp, TypeConstructor, TypeApp) )
 
 -- | Type synonym information (arguments with kinds, aliased type), indexed by name
 type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceType)], SourceType)

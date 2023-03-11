@@ -7,7 +7,29 @@ import Data.Map qualified as M
 import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
 import Data.Text (Text)
-import Language.PureScript qualified as P
+import Language.PureScript.Crash qualified as P ( internalError )
+import Language.PureScript.Environment qualified as P
+    ( showDataDeclType,
+      DataDeclType,
+      Environment(..),
+      NameKind,
+      NameVisibility,
+      TypeClassData(..),
+      TypeKind(DataType, TypeSynonym) )
+import Language.PureScript.Names qualified as P
+    ( coerceProperName,
+      disqualify,
+      getQual,
+      showIdent,
+      Ident,
+      ModuleName,
+      ProperName(runProperName),
+      ProperNameType(TypeName, ClassName, ConstructorName),
+      Qualified(..) )
+import Language.PureScript.Pretty.Types qualified as P
+    ( typeAsBox, typeAtomAsBox )
+import Language.PureScript.Types qualified as P
+    ( Constraint(Constraint), SourceType )
 import Text.PrettyPrint.Boxes qualified as Box
 
 -- TODO (Christoph): Text version of boxes

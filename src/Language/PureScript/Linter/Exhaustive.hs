@@ -22,15 +22,52 @@ import Data.Map qualified as M
 import Data.Text qualified as T
 
 import Language.PureScript.AST.Binders
+    ( Binder(VarBinder, NamedBinder, ConstructorBinder, LiteralBinder,
+             PositionedBinder, TypedBinder, NullBinder) )
 import Language.PureScript.AST.Declarations
+    ( pattern MkUnguarded,
+      pattern ValueDecl,
+      isTrueExpr,
+      CaseAlternative(..),
+      Declaration(BindingGroupDeclaration),
+      ErrorMessageHint(ErrorInValueDeclaration),
+      Expr(PositionedValue, UnaryMinus, Literal, Accessor, ObjectUpdate,
+           Abs, App, IfThenElse, Case, TypedValue, Let),
+      Guard(..),
+      GuardedExpr(..) )
 import Language.PureScript.AST.Literals
-import Language.PureScript.Crash
-import Language.PureScript.Environment hiding (tyVar)
+    ( Literal(ObjectLiteral, BooleanLiteral, ArrayLiteral) )
+import Language.PureScript.Crash ( internalError )
+import Language.PureScript.Environment
+    ( DataDeclType,
+      Environment(dataConstructors, types),
+      TypeKind(DataType) )
 import Language.PureScript.Errors
+    ( pattern NullSourceAnn,
+      SourceSpan,
+      addHint,
+      errorMessage',
+      MultipleErrors,
+      SimpleErrorMessage(IncompleteExhaustivityCheck,
+                         OverlappingPattern) )
 import Language.PureScript.Names as P
+    ( qualify,
+      showQualified,
+      Ident,
+      ModuleName,
+      ProperName(runProperName),
+      ProperNameType(TypeName, ConstructorName),
+      Qualified(..),
+      QualifiedBy(ByModuleName) )
 import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)
-import Language.PureScript.Traversals
+import Language.PureScript.Traversals ( sndM )
 import Language.PureScript.Types as P
+    ( srcConstrainedType,
+      srcConstraint,
+      ConstraintData(..),
+      SourceType,
+      Type(TypeWildcard),
+      WildcardData(IgnoredWildcard) )
 import Language.PureScript.Constants.Prim qualified as C
 
 -- | There are two modes of failure for the redundancy check:

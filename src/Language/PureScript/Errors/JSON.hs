@@ -8,7 +8,26 @@ import Data.Aeson.TH qualified as A
 import Data.List.NonEmpty qualified as NEL
 import Data.Text (Text)
 
-import Language.PureScript qualified as P
+import Language.PureScript.AST qualified as P
+    ( SourcePos(sourcePosColumn, sourcePosLine),
+      SourceSpan(spanName, spanStart, spanEnd) )
+import Language.PureScript.Errors qualified as P
+    ( errorCode,
+      errorDocUri,
+      errorModule,
+      errorSpan,
+      errorSuggestion,
+      prettyPrintSingleError,
+      renderBox,
+      stripModuleAndSpan,
+      suggestionSpan,
+      unwrapErrorMessage,
+      ErrorMessage,
+      ErrorSuggestion(ErrorSuggestion),
+      Level,
+      MultipleErrors(runMultipleErrors),
+      PPEOptions(PPEOptions) )
+import Language.PureScript.Names qualified as P ( runModuleName )
 
 data ErrorPosition = ErrorPosition
   { startLine :: Int

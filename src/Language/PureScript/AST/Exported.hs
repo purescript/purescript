@@ -13,8 +13,28 @@ import Data.Maybe (mapMaybe)
 import Data.Map qualified as M
 
 import Language.PureScript.AST.Declarations
+    ( declName,
+      declRefName,
+      flattenDecls,
+      DataConstructorDeclaration(dataCtorName),
+      Declaration(KindDeclaration, DataDeclaration,
+                  TypeInstanceDeclaration),
+      DeclarationRef(TypeRef, TypeClassRef),
+      Module(..) )
 import Language.PureScript.Types
+    ( everythingOnTypes,
+      Constraint(constraintArgs, constraintClass),
+      Type(ConstrainedType, TypeConstructor) )
 import Language.PureScript.Names
+    ( coerceProperName,
+      disqualify,
+      isQualified,
+      isQualifiedWith,
+      ModuleName,
+      Name(TyClassName, TyName),
+      ProperName,
+      ProperNameType(ClassName, ConstructorName, TypeName),
+      Qualified )
 
 -- |
 -- Return a list of all declarations which are exported from a module.

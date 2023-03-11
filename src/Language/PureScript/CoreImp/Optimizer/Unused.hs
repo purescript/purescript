@@ -13,7 +13,12 @@ import Data.Set qualified as S
 import Data.Text (Text)
 
 import Language.PureScript.CoreImp.AST
+    ( everything,
+      everywhere,
+      AST(Return, ReturnNoResult, App, VariableIntroduction, Var),
+      InitializerEffects(NoEffects) )
 import Language.PureScript.CoreImp.Optimizer.Common
+    ( removeFromBlock )
 import Language.PureScript.Constants.Prim qualified as C
 
 removeCodeAfterReturnStatements :: AST -> AST

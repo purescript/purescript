@@ -175,6 +175,18 @@ import Data.DList qualified as DList
 import Data.Foldable (find)
 import Data.Function ((&))
 import Language.PureScript.CST.Types
+    ( Comment,
+      LineFeed,
+      SourcePos(srcLine, srcColumn),
+      SourceRange(SourceRange, srcStart),
+      SourceToken(SourceToken),
+      Token(TokLayoutEnd, TokForall, TokBackslash, TokRightArrow,
+            TokEquals, TokPipe, TokTick, TokComma, TokDot, TokLeftParen,
+            TokLeftBrace, TokLeftSquare, TokRightParen, TokRightBrace,
+            TokRightSquare, TokString, TokLowerName, TokOperator,
+            TokLayoutStart, TokLayoutSep, TokEof),
+      TokenAnn(TokenAnn, tokLeadingComments, tokTrailingComments,
+               tokRange) )
 
 type LayoutStack = [(SourcePos, LayoutDelim)]
 

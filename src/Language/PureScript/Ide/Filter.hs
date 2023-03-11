@@ -26,19 +26,25 @@ module Language.PureScript.Ide.Filter
 import Protolude                     hiding (isPrefixOf, Prefix)
 
 import Control.Monad.Fail (fail)
-import Data.Aeson
+import Data.Aeson ( FromJSON(parseJSON), (.:), (.:?), withObject )
 import Data.Text (isPrefixOf)
 import Data.Set qualified as Set
 import Data.Map qualified as Map
 import Language.PureScript.Ide.Filter.Declaration (DeclarationType)
 import Language.PureScript.Ide.Types
+    ( declarationType, IdeDeclarationAnn, IdeNamespace, ModuleMap )
 import Language.PureScript.Ide.Imports
+    ( sliceImportSection, Import )
 import Language.PureScript.Ide.Util
+    ( discardAnn,
+      identifierFromIdeDeclaration,
+      namespaceForDeclaration )
 
-import Language.PureScript qualified as P
+import Language.PureScript.Names qualified as P
+    ( moduleNameFromString, ModuleName )
 import Data.Text qualified as T
 
-import Language.PureScript.Ide.Filter.Imports 
+import Language.PureScript.Ide.Filter.Imports ( matchImport ) 
 
 newtype Filter = Filter (Either (Set P.ModuleName) DeclarationFilter)
   deriving Show

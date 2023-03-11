@@ -2,9 +2,38 @@ module Language.PureScript.Interactive.Module where
 
 import Prelude
 
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( pattern MkUnguarded,
+      pattern ValueDecl,
+      Declaration(ImportDeclaration, TypeDeclaration,
+                  TypeSynonymDeclaration),
+      Expr(Var, App),
+      ImportDeclarationType(Implicit),
+      Module(..),
+      TypeDeclarationData(TypeDeclarationData) )
+import Language.PureScript.AST.SourcePos qualified as P
+    ( internalModuleSourceSpan, SourceSpan )
+import Language.PureScript.Environment qualified as P
+    ( NameKind(Public) )
+import Language.PureScript.Errors qualified as P
+    ( MultipleErrors )
+import Language.PureScript.Names qualified as P
+    ( pattern ByNullSourcePos,
+      Ident(Ident),
+      ModuleName(..),
+      ProperName(ProperName),
+      Qualified(Qualified),
+      QualifiedBy(ByModuleName) )
+import Language.PureScript.Types qualified as P
+    ( srcTypeApp, srcTypeConstructor, srcTypeWildcard, SourceType )
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Interactive.Types
+    ( initialInteractivePrint,
+      psciImportedModules,
+      psciInteractivePrint,
+      psciLetBindings,
+      ImportedModule,
+      PSCiState )
 import System.Directory (getCurrentDirectory)
 import System.FilePath (pathSeparator, makeRelative)
 import System.IO.UTF8 (readUTF8FilesT)

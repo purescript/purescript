@@ -16,6 +16,13 @@ import Data.DList qualified as DList
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Language.PureScript.CST.Types
+    ( Comment(..),
+      LineFeed(..),
+      Module,
+      SourceStyle(ASCII, Unicode),
+      SourceToken(SourceToken),
+      Token(..),
+      TokenAnn(TokenAnn) )
 import Language.PureScript.CST.Flatten (flattenModule)
 
 printToken :: Token -> Text
