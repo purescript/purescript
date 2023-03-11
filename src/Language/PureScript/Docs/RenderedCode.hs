@@ -4,6 +4,7 @@
 
 module Language.PureScript.Docs.RenderedCode (module RenderedCode) where
 
+-- Note to reviewer: should this module be removed? If so, where do the docs go?
 import Language.PureScript.Docs.RenderedCode.Types as RenderedCode
     ( alias,
       aliasName,

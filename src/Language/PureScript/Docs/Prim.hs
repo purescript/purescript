@@ -11,17 +11,12 @@ import Data.Functor (($>))
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Map qualified as Map
-import Language.PureScript.Docs.Types
-    ( convertFundepsToStrings,
-      Declaration(..),
-      DeclarationInfo(TypeClassDeclaration, ExternDataDeclaration),
-      Module(..),
-      Type' )
+import Language.PureScript.Docs.Types ( convertFundepsToStrings, Declaration(..), DeclarationInfo(TypeClassDeclaration, ExternDataDeclaration), Module(..), Type' )
 
-import Language.PureScript.Constants.Prim qualified as P
-import Language.PureScript.Crash qualified as P
-import Language.PureScript.Environment qualified as P
-import Language.PureScript.Names qualified as P
+import Language.PureScript.Constants.Prim qualified as CPrim
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment qualified as PEnv
+import Language.PureScript.Names qualified as PN
 
 primModules :: [Module]
 primModules =
@@ -38,7 +33,7 @@ primModules =
 
 primDocsModule :: Module
 primDocsModule = Module
-  { modName = P.moduleNameFromString "Prim"
+  { modName = PN.moduleNameFromString "Prim"
   , modComments = Just $ T.unlines
       [ "The `Prim` module is embedded in the PureScript compiler in order to provide compiler support for certain types &mdash; for example, value literals, or syntax sugar. It is implicitly imported unqualified in every module except those that list it as a qualified import."
       , ""
@@ -64,7 +59,7 @@ primDocsModule = Module
 
 primBooleanDocsModule :: Module
 primBooleanDocsModule = Module
-  { modName = P.moduleNameFromString "Prim.Boolean"
+  { modName = PN.moduleNameFromString "Prim.Boolean"
   , modComments = Just "The Prim.Boolean module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level `Boolean` data structure."
   , modDeclarations =
       [ booleanTrue
@@ -75,7 +70,7 @@ primBooleanDocsModule = Module
 
 primCoerceDocsModule :: Module
 primCoerceDocsModule = Module
-  { modName = P.moduleNameFromString "Prim.Coerce"
+  { modName = PN.moduleNameFromString "Prim.Coerce"
   , modComments = Just "The Prim.Coerce module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains an automatically solved type class for coercing types that have provably-identical runtime representations with [purescript-safe-coerce](https://pursuit.purescript.org/packages/purescript-safe-coerce)."
   , modDeclarations =
       [ coercible
@@ -85,7 +80,7 @@ primCoerceDocsModule = Module
 
 primOrderingDocsModule :: Module
 primOrderingDocsModule = Module
-  { modName = P.moduleNameFromString "Prim.Ordering"
+  { modName = PN.moduleNameFromString "Prim.Ordering"
   , modComments = Just "The Prim.Ordering module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level `Ordering` data structure."
   , modDeclarations =
       [ kindOrdering
@@ -98,7 +93,7 @@ primOrderingDocsModule = Module
 
 primRowDocsModule :: Module
 primRowDocsModule = Module
-  { modName = P.moduleNameFromString "Prim.Row"
+  { modName = PN.moduleNameFromString "Prim.Row"
   , modComments = Just "The Prim.Row module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with row types."
   , modDeclarations =
       [ union
@@ -111,7 +106,7 @@ primRowDocsModule = Module
 
 primRowListDocsModule :: Module
 primRowListDocsModule = Module
-  { modName = P.moduleNameFromString "Prim.RowList"
+  { modName = PN.moduleNameFromString "Prim.RowList"
   , modComments = Just "The Prim.RowList module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level list (`RowList`) that represents an ordered view of a row of types."
   , modDeclarations =
       [ kindRowList
@@ -124,7 +119,7 @@ primRowListDocsModule = Module
 
 primSymbolDocsModule :: Module
 primSymbolDocsModule = Module
-  { modName = P.moduleNameFromString "Prim.Symbol"
+  { modName = PN.moduleNameFromString "Prim.Symbol"
   , modComments = Just "The Prim.Symbol module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with `Symbols`."
   , modDeclarations =
       [ symbolAppend
@@ -136,7 +131,7 @@ primSymbolDocsModule = Module
 
 primIntDocsModule :: Module
 primIntDocsModule = Module
-  { modName = P.moduleNameFromString "Prim.Int"
+  { modName = PN.moduleNameFromString "Prim.Int"
   , modComments = Just "The Prim.Int module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with type-level intural numbers."
   , modDeclarations =
       [ intAdd
@@ -149,7 +144,7 @@ primIntDocsModule = Module
 
 primTypeErrorDocsModule :: Module
 primTypeErrorDocsModule = Module
-  { modName = P.moduleNameFromString "Prim.TypeError"
+  { modName = PN.moduleNameFromString "Prim.TypeError"
   , modComments = Just "The Prim.TypeError module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains type classes that provide custom type error and warning functionality."
   , modDeclarations =
       [ warn
@@ -165,33 +160,33 @@ primTypeErrorDocsModule = Module
   }
 
 unsafeLookup
-  :: forall v (a :: P.ProperNameType)
-  . Map.Map (P.Qualified (P.ProperName a)) v
+  :: forall v (a :: PN.ProperNameType)
+  . Map.Map (PN.Qualified (PN.ProperName a)) v
   -> String
-  -> P.Qualified (P.ProperName a)
+  -> PN.Qualified (PN.ProperName a)
   -> v
 unsafeLookup m errorMsg name = go name
   where
   go = fromJust' . flip Map.lookup m
 
   fromJust' (Just x) = x
-  fromJust' _ = P.internalError $ errorMsg ++ show (P.runProperName $ P.disqualify name)
+  fromJust' _ = internalError $ errorMsg ++ show (PN.runProperName $ PN.disqualify name)
 
 lookupPrimTypeKind
-  :: P.Qualified (P.ProperName 'P.TypeName)
+  :: PN.Qualified (PN.ProperName 'PN.TypeName)
   -> Type'
 lookupPrimTypeKind = ($> ()) . fst . unsafeLookup
-  ( P.primTypes <>
-    P.primBooleanTypes <>
-    P.primOrderingTypes <>
-    P.primRowTypes <>
-    P.primRowListTypes <>
-    P.primTypeErrorTypes
+  ( PEnv.primTypes <>
+    PEnv.primBooleanTypes <>
+    PEnv.primOrderingTypes <>
+    PEnv.primRowTypes <>
+    PEnv.primRowListTypes <>
+    PEnv.primTypeErrorTypes
   ) "Docs.Prim: No such Prim type: "
 
-primType :: P.Qualified (P.ProperName 'P.TypeName) -> Text -> Declaration
+primType :: PN.Qualified (PN.ProperName 'PN.TypeName) -> Text -> Declaration
 primType tn comments = Declaration
-  { declTitle = P.runProperName $ P.disqualify tn
+  { declTitle = PN.runProperName $ PN.disqualify tn
   , declComments = Just comments
   , declSourceSpan = Nothing
   , declChildren = []
@@ -201,42 +196,42 @@ primType tn comments = Declaration
 
 -- | Lookup the TypeClassData of a Prim class. This function is specifically
 -- not exported because it is partial.
-lookupPrimClass :: P.Qualified (P.ProperName 'P.ClassName) -> P.TypeClassData
+lookupPrimClass :: PN.Qualified (PN.ProperName 'PN.ClassName) -> PEnv.TypeClassData
 lookupPrimClass = unsafeLookup
-  ( P.primClasses <>
-    P.primCoerceClasses <>
-    P.primRowClasses <>
-    P.primRowListClasses <>
-    P.primSymbolClasses <>
-    P.primIntClasses <>
-    P.primTypeErrorClasses
+  ( PEnv.primClasses <>
+    PEnv.primCoerceClasses <>
+    PEnv.primRowClasses <>
+    PEnv.primRowListClasses <>
+    PEnv.primSymbolClasses <>
+    PEnv.primIntClasses <>
+    PEnv.primTypeErrorClasses
   ) "Docs.Prim: No such Prim class: "
 
-primClass :: P.Qualified (P.ProperName 'P.ClassName) -> Text -> Declaration
+primClass :: PN.Qualified (PN.ProperName 'PN.ClassName) -> Text -> Declaration
 primClass cn comments = Declaration
-  { declTitle = P.runProperName $ P.disqualify cn
+  { declTitle = PN.runProperName $ PN.disqualify cn
   , declComments = Just comments
   , declSourceSpan = Nothing
   , declChildren = []
   , declInfo =
       let
         tcd = lookupPrimClass cn
-        args = fmap (fmap ($> ())) <$> P.typeClassArguments tcd
-        superclasses = ($> ()) <$> P.typeClassSuperclasses tcd
-        fundeps = convertFundepsToStrings args (P.typeClassDependencies tcd)
+        args = fmap (fmap ($> ())) <$> PEnv.typeClassArguments tcd
+        superclasses = ($> ()) <$> PEnv.typeClassSuperclasses tcd
+        fundeps = convertFundepsToStrings args (PEnv.typeClassDependencies tcd)
       in
         TypeClassDeclaration args superclasses fundeps
   , declKind = Nothing
   }
 
 kindType :: Declaration
-kindType = primType P.Type $ T.unlines
+kindType = primType CPrim.Type $ T.unlines
   [ "`Type` is the kind of all proper types: those that classify value-level terms."
   , "For example the type `Boolean` has kind `Type`; denoted by `Boolean :: Type`."
   ]
 
 kindConstraint :: Declaration
-kindConstraint = primType P.Constraint $ T.unlines
+kindConstraint = primType CPrim.Constraint $ T.unlines
   [ "`Constraint` is the kind of type class constraints."
   , "For example, a type class declaration like this:"
   , ""
@@ -249,7 +244,7 @@ kindConstraint = primType P.Constraint $ T.unlines
   ]
 
 kindSymbol :: Declaration
-kindSymbol = primType P.Symbol $ T.unlines
+kindSymbol = primType CPrim.Symbol $ T.unlines
   [ "`Symbol` is the kind of type-level strings."
   , ""
   , "Construct types of this kind using the same literal syntax as documented"
@@ -261,7 +256,7 @@ kindSymbol = primType P.Symbol $ T.unlines
   ]
 
 kindRow :: Declaration
-kindRow = primType P.Row $ T.unlines
+kindRow = primType CPrim.Row $ T.unlines
   [ "`Row` is the kind constructor of label-indexed types which map type-level strings to other types."
   , "The most common use of `Row` is `Row Type`, a row mapping labels to basic (of kind `Type`) types:"
   , ""
@@ -273,7 +268,7 @@ kindRow = primType P.Row $ T.unlines
   ]
 
 function :: Declaration
-function = primType P.Function $ T.unlines
+function = primType CPrim.Function $ T.unlines
   [ "A function, which takes values of the type specified by the first type"
   , "parameter, and returns values of the type specified by the second."
   , "In the JavaScript backend, this is a standard JavaScript Function."
@@ -292,7 +287,7 @@ function = primType P.Function $ T.unlines
   ]
 
 array :: Declaration
-array = primType P.Array $ T.unlines
+array = primType CPrim.Array $ T.unlines
   [ "An Array: a data structure supporting efficient random access. In"
   , "the JavaScript backend, values of this type are represented as JavaScript"
   , "Arrays at runtime."
@@ -303,7 +298,7 @@ array = primType P.Array $ T.unlines
   ]
 
 record :: Declaration
-record = primType P.Record $ T.unlines
+record = primType CPrim.Record $ T.unlines
   [ "The type of records whose fields are known at compile time. In the"
   , "JavaScript backend, values of this type are represented as JavaScript"
   , "Objects at runtime."
@@ -325,7 +320,7 @@ record = primType P.Record $ T.unlines
   ]
 
 number :: Declaration
-number = primType P.Number $ T.unlines
+number = primType CPrim.Number $ T.unlines
   [ "A double precision floating point number (IEEE 754)."
   , ""
   , "Construct values of this type with literals."
@@ -338,7 +333,7 @@ number = primType P.Number $ T.unlines
   ]
 
 int :: Declaration
-int = primType P.Int $ T.unlines
+int = primType CPrim.Int $ T.unlines
   [ "A 32-bit signed integer. See the `purescript-integers` package for details"
   , "of how this is accomplished when compiling to JavaScript."
   , ""
@@ -371,7 +366,7 @@ int = primType P.Int $ T.unlines
   ]
 
 string :: Declaration
-string = primType P.String $ T.unlines
+string = primType CPrim.String $ T.unlines
   [ "A String. As in JavaScript, String values represent sequences of UTF-16"
   , "code units, which are not required to form a valid encoding of Unicode"
   , "text (for example, lone surrogates are permitted)."
@@ -393,7 +388,7 @@ string = primType P.String $ T.unlines
   ]
 
 char :: Declaration
-char = primType P.Char $ T.unlines
+char = primType CPrim.Char $ T.unlines
   [ "A single character (UTF-16 code unit). The JavaScript representation is a"
   , "normal `String`, which is guaranteed to contain one code unit. This means"
   , "that astral plane characters (i.e. those with code point values greater"
@@ -405,7 +400,7 @@ char = primType P.Char $ T.unlines
   ]
 
 boolean :: Declaration
-boolean = primType P.Boolean $ T.unlines
+boolean = primType CPrim.Boolean $ T.unlines
   [ "A JavaScript Boolean value."
   , ""
   , "Construct values of this type with the literals `true` and `false`."
@@ -414,7 +409,7 @@ boolean = primType P.Boolean $ T.unlines
   ]
 
 partial :: Declaration
-partial = primClass P.Partial $ T.unlines
+partial = primClass CPrim.Partial $ T.unlines
   [ "The Partial type class is used to indicate that a function is *partial,*"
   , "that is, it is not defined for all inputs. In practice, attempting to use"
   , "a partial function with a bad input will usually cause an error to be"
@@ -424,17 +419,17 @@ partial = primClass P.Partial $ T.unlines
   ]
 
 booleanTrue :: Declaration
-booleanTrue = primType P.True $ T.unlines
+booleanTrue = primType CPrim.True $ T.unlines
   [ "The 'True' boolean type."
   ]
 
 booleanFalse :: Declaration
-booleanFalse = primType P.False $ T.unlines
+booleanFalse = primType CPrim.False $ T.unlines
   [ "The 'False' boolean type."
   ]
 
 coercible :: Declaration
-coercible = primClass P.Coercible $ T.unlines
+coercible = primClass CPrim.Coercible $ T.unlines
   [ "Coercible is a two-parameter type class that has instances for types `a`"
   , "and `b` if the compiler can infer that they have the same representation."
   , "Coercible constraints are solved according to the following rules:"
@@ -490,29 +485,29 @@ coercible = primClass P.Coercible $ T.unlines
   ]
 
 kindOrdering :: Declaration
-kindOrdering = primType P.TypeOrdering $ T.unlines
+kindOrdering = primType CPrim.TypeOrdering $ T.unlines
   [ "The `Ordering` kind represents the three possibilities of comparing two"
   , "types of the same kind: `LT` (less than), `EQ` (equal to), and"
   , "`GT` (greater than)."
   ]
 
 orderingLT :: Declaration
-orderingLT = primType P.LT $ T.unlines
+orderingLT = primType CPrim.LT $ T.unlines
   [ "The 'less than' ordering type."
   ]
 
 orderingEQ :: Declaration
-orderingEQ = primType P.EQ $ T.unlines
+orderingEQ = primType CPrim.EQ $ T.unlines
   [ "The 'equal to' ordering type."
   ]
 
 orderingGT :: Declaration
-orderingGT = primType P.GT $ T.unlines
+orderingGT = primType CPrim.GT $ T.unlines
   [ "The 'greater than' ordering type."
   ]
 
 union :: Declaration
-union = primClass P.RowUnion $ T.unlines
+union = primClass CPrim.RowUnion $ T.unlines
   [ "The Union type class is used to compute the union of two rows of types"
   , "(left-biased, including duplicates)."
   , ""
@@ -520,58 +515,58 @@ union = primClass P.RowUnion $ T.unlines
   ]
 
 nub :: Declaration
-nub = primClass P.RowNub $ T.unlines
+nub = primClass CPrim.RowNub $ T.unlines
   [ "The Nub type class is used to remove duplicate labels from rows."
   ]
 
 lacks :: Declaration
-lacks = primClass P.RowLacks $ T.unlines
+lacks = primClass CPrim.RowLacks $ T.unlines
   [ "The Lacks type class asserts that a label does not occur in a given row."
   ]
 
 rowCons :: Declaration
-rowCons = primClass P.RowCons $ T.unlines
+rowCons = primClass CPrim.RowCons $ T.unlines
   [ "The Cons type class is a 4-way relation which asserts that one row of"
   , "types can be obtained from another by inserting a new label/type pair on"
   , "the left."
   ]
 
 kindRowList :: Declaration
-kindRowList = primType P.RowList $ T.unlines
+kindRowList = primType CPrim.RowList $ T.unlines
   [ "A type level list representation of a row of types."
   ]
 
 rowListCons :: Declaration
-rowListCons = primType P.RowListCons $ T.unlines
+rowListCons = primType CPrim.RowListCons $ T.unlines
   [ "Constructs a new `RowList` from a label, a type, and an existing tail"
   , "`RowList`.  E.g: `Cons \"x\" Int (Cons \"y\" Int Nil)`."
   ]
 
 rowListNil :: Declaration
-rowListNil = primType P.RowListNil $ T.unlines
+rowListNil = primType CPrim.RowListNil $ T.unlines
   [ "The empty `RowList`."
   ]
 
 rowToList :: Declaration
-rowToList = primClass P.RowToList $ T.unlines
+rowToList = primClass CPrim.RowToList $ T.unlines
   [ "Compiler solved type class for generating a `RowList` from a closed row"
   , "of types.  Entries are sorted by label and duplicates are preserved in"
   , "the order they appeared in the row."
   ]
 
 symbolAppend :: Declaration
-symbolAppend = primClass P.SymbolAppend $ T.unlines
+symbolAppend = primClass CPrim.SymbolAppend $ T.unlines
   [ "Compiler solved type class for appending `Symbol`s together."
   ]
 
 symbolCompare :: Declaration
-symbolCompare = primClass P.SymbolCompare $ T.unlines
+symbolCompare = primClass CPrim.SymbolCompare $ T.unlines
   [ "Compiler solved type class for comparing two `Symbol`s."
   , "Produces an `Ordering`."
   ]
 
 symbolCons :: Declaration
-symbolCons = primClass P.SymbolCons $ T.unlines
+symbolCons = primClass CPrim.SymbolCons $ T.unlines
   [ "Compiler solved type class for either splitting up a symbol into its"
   , "head and tail or for combining a head and tail into a new symbol."
   , "Requires the head to be a single character and the combined string"
@@ -579,28 +574,28 @@ symbolCons = primClass P.SymbolCons $ T.unlines
   ]
 
 intAdd :: Declaration
-intAdd = primClass P.IntAdd $ T.unlines
+intAdd = primClass CPrim.IntAdd $ T.unlines
   [ "Compiler solved type class for adding type-level `Int`s."
   ]
 
 intCompare :: Declaration
-intCompare = primClass P.IntCompare $ T.unlines
+intCompare = primClass CPrim.IntCompare $ T.unlines
   [ "Compiler solved type class for comparing two type-level `Int`s."
   , "Produces an `Ordering`."
   ]
 
 intMul :: Declaration
-intMul = primClass P.IntMul $ T.unlines
+intMul = primClass CPrim.IntMul $ T.unlines
   [ "Compiler solved type class for multiplying type-level `Int`s."
   ]
 
 intToString :: Declaration
-intToString = primClass P.IntToString $ T.unlines
+intToString = primClass CPrim.IntToString $ T.unlines
   [ "Compiler solved type class for converting a type-level `Int` into a type-level `String` (i.e. `Symbol`)."
   ]
 
 fail :: Declaration
-fail = primClass P.Fail $ T.unlines
+fail = primClass CPrim.Fail $ T.unlines
   [ "The Fail type class is part of the custom type errors feature. To provide"
   , "a custom type error when someone tries to use a particular instance,"
   , "write that instance out with a Fail constraint."
@@ -610,7 +605,7 @@ fail = primClass P.Fail $ T.unlines
   ]
 
 warn :: Declaration
-warn = primClass P.Warn $ T.unlines
+warn = primClass CPrim.Warn $ T.unlines
   [ "The Warn type class allows a custom compiler warning to be displayed."
   , ""
   , "For more information, see"
@@ -618,7 +613,7 @@ warn = primClass P.Warn $ T.unlines
   ]
 
 kindDoc :: Declaration
-kindDoc = primType P.Doc $ T.unlines
+kindDoc = primType CPrim.Doc $ T.unlines
   [ "`Doc` is the kind of type-level documents."
   , ""
   , "This kind is used with the `Fail` and `Warn` type classes."
@@ -626,7 +621,7 @@ kindDoc = primType P.Doc $ T.unlines
   ]
 
 textDoc :: Declaration
-textDoc = primType P.Text $ T.unlines
+textDoc = primType CPrim.Text $ T.unlines
   [ "The Text type constructor makes a Doc from a Symbol"
   , "to be used in a custom type error."
   , ""
@@ -635,7 +630,7 @@ textDoc = primType P.Text $ T.unlines
   ]
 
 quoteDoc :: Declaration
-quoteDoc = primType P.Quote $ T.unlines
+quoteDoc = primType CPrim.Quote $ T.unlines
   [ "The Quote type constructor renders any concrete type as a Doc"
   , "to be used in a custom type error."
   , ""
@@ -644,7 +639,7 @@ quoteDoc = primType P.Quote $ T.unlines
   ]
 
 quoteLabelDoc :: Declaration
-quoteLabelDoc = primType P.QuoteLabel $ T.unlines
+quoteLabelDoc = primType CPrim.QuoteLabel $ T.unlines
   [ "The `QuoteLabel` type constructor will produce a `Doc` when given a `Symbol`. When the resulting `Doc` is rendered"
   , "for a `Warn` or `Fail` constraint, a syntactically valid label will be produced, escaping with quotes as needed."
   , ""
@@ -653,7 +648,7 @@ quoteLabelDoc = primType P.QuoteLabel $ T.unlines
   ]
 
 besideDoc :: Declaration
-besideDoc = primType P.Beside $ T.unlines
+besideDoc = primType CPrim.Beside $ T.unlines
   [ "The Beside type constructor combines two Docs horizontally"
   , "to be used in a custom type error."
   , ""
@@ -662,7 +657,7 @@ besideDoc = primType P.Beside $ T.unlines
   ]
 
 aboveDoc :: Declaration
-aboveDoc = primType P.Above $ T.unlines
+aboveDoc = primType CPrim.Above $ T.unlines
   [ "The Above type constructor combines two Docs vertically"
   , "in a custom type error."
   , ""

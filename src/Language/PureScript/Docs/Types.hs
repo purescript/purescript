@@ -11,31 +11,24 @@ import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
 import Data.Aeson.Key qualified as A.Key
-import Data.Aeson.BetterErrors
-  (Parse, keyOrDefault, throwCustomError, key, asText,
-   keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser',
-   fromAesonParser, perhaps, withText, asIntegral, nth, eachInObjectWithKey,
-   asString)
+import Data.Aeson.BetterErrors (Parse, keyOrDefault, throwCustomError, key, asText, keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser', fromAesonParser, perhaps, withText, asIntegral, nth, eachInObjectWithKey, asString)
 import Data.Map qualified as Map
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format qualified as TimeFormat
-import Data.Version
+import Data.Version ( Version(Version), showVersion )
 import Data.Aeson qualified as A
 import Data.Text qualified as T
 import Data.Vector qualified as V
 
-import Language.PureScript.AST.Declarations qualified as P
-    ( KindSignatureFor(..) )
-import Language.PureScript.AST.Operators qualified as P
-    ( Associativity(..), Fixity(..) )
-import Language.PureScript.AST.SourcePos qualified as P
-    ( SourcePos(SourcePos), SourceSpan(SourceSpan) )
-import Language.PureScript.CoreFn.FromJSON qualified as P
-import Language.PureScript.Crash qualified as P
-import Language.PureScript.Environment qualified as P
-import Language.PureScript.Names qualified as P
-import Language.PureScript.Roles qualified as P
-import Language.PureScript.Types qualified as P
+import Language.PureScript.AST.Declarations ( KindSignatureFor(..) )
+import Language.PureScript.AST.Operators qualified as ASTO
+import Language.PureScript.AST.SourcePos ( SourcePos(SourcePos), SourceSpan(SourceSpan) )
+import Language.PureScript.CoreFn.FromJSON qualified as CoreFnFromJson
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment qualified as PEnv
+import Language.PureScript.Names qualified as PN
+import Language.PureScript.Roles (Role(..))
+import Language.PureScript.Types qualified as PT
 import Paths_purescript qualified as Paths
 
 import Web.Bower.PackageMeta
@@ -56,8 +49,8 @@ import Language.PureScript.Docs.RenderedCode.Types as ReExports
       FixityAlias )
 import Language.PureScript.Publish.Registry.Compat (PursJsonError, showPursJsonError)
 
-type Type' = P.Type ()
-type Constraint' = P.Constraint ()
+type Type' = PT.Type ()
+type Constraint' = PT.Constraint ()
 
 --------------------
 -- Types
@@ -71,7 +64,7 @@ data Package a = Package
   -- field. It should eventually be changed to just UTCTime.
   , pkgTagTime              :: Maybe UTCTime
   , pkgModules              :: [Module]
-  , pkgModuleMap            :: Map P.ModuleName PackageName
+  , pkgModuleMap            :: Map PN.ModuleName PackageName
   , pkgResolvedDependencies :: [(PackageName, Version)]
   , pkgGithub               :: (GithubUser, GithubRepo)
   , pkgUploader             :: a
@@ -143,11 +136,11 @@ parseTime =
   TimeFormat.parseTimeM False TimeFormat.defaultTimeLocale jsonTimeFormat
 
 data Module = Module
-  { modName         :: P.ModuleName
+  { modName         :: PN.ModuleName
   , modComments     :: Maybe Text
   , modDeclarations :: [Declaration]
   -- Re-exported values from other modules
-  , modReExports    :: [(InPackage P.ModuleName, [Declaration])]
+  , modReExports    :: [(InPackage PN.ModuleName, [Declaration])]
   }
   deriving (Show, Eq, Ord, Generic)
 
@@ -156,7 +149,7 @@ instance NFData Module
 data Declaration = Declaration
   { declTitle      :: Text
   , declComments   :: Maybe Text
-  , declSourceSpan :: Maybe P.SourceSpan
+  , declSourceSpan :: Maybe SourceSpan
   , declChildren   :: [ChildDeclaration]
   , declInfo       :: DeclarationInfo
   , declKind       :: Maybe KindInfo
@@ -185,12 +178,12 @@ data DeclarationInfo
   -- newtype) and its type arguments. Constructors are represented as child
   -- declarations.
   --
-  | DataDeclaration P.DataDeclType [(Text, Maybe Type')] [P.Role]
+  | DataDeclaration PEnv.DataDeclType [(Text, Maybe Type')] [Role]
 
   -- |
   -- A data type foreign import, with its kind.
   --
-  | ExternDataDeclaration Type' [P.Role]
+  | ExternDataDeclaration Type' [Role]
 
   -- |
   -- A type synonym, with its type arguments and its type.
@@ -207,7 +200,7 @@ data DeclarationInfo
   -- An operator alias declaration, with the member the alias is for and the
   -- operator's fixity.
   --
-  | AliasDeclaration P.Fixity FixityAlias
+  | AliasDeclaration ASTO.Fixity FixityAlias
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData DeclarationInfo
@@ -216,21 +209,21 @@ instance NFData DeclarationInfo
 -- Wraps enough information to properly render the kind signature
 -- of a data/newtype/type/class declaration.
 data KindInfo = KindInfo
-  { kiKeyword :: P.KindSignatureFor
+  { kiKeyword :: KindSignatureFor
   , kiKind :: Type'
   }
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData KindInfo
 
-convertFundepsToStrings :: [(Text, Maybe Type')] -> [P.FunctionalDependency] -> [([Text], [Text])]
+convertFundepsToStrings :: [(Text, Maybe Type')] -> [PEnv.FunctionalDependency] -> [([Text], [Text])]
 convertFundepsToStrings args fundeps =
-  map (\(P.FunctionalDependency from to) -> toArgs from to) fundeps
+  map (\(PEnv.FunctionalDependency from to) -> toArgs from to) fundeps
   where
   argsVec = V.fromList (map fst args)
   getArg i =
     fromMaybe
-      (P.internalError $ unlines
+      (internalError $ unlines
         [ "convertDeclaration: Functional dependency index"
         , show i
         , "is bigger than arguments list"
@@ -262,7 +255,7 @@ declInfoNamespace = \case
   TypeClassDeclaration{} ->
     TypeLevel
   AliasDeclaration _ alias ->
-    either (const TypeLevel) (const ValueLevel) (P.disqualify alias)
+    either (const TypeLevel) (const ValueLevel) (PN.disqualify alias)
 
 isTypeClass :: Declaration -> Bool
 isTypeClass Declaration{..} =
@@ -287,13 +280,13 @@ isType Declaration{..} =
 isValueAlias :: Declaration -> Bool
 isValueAlias Declaration{..} =
   case declInfo of
-    AliasDeclaration _ (P.Qualified _ d) -> isRight d
+    AliasDeclaration _ (PN.Qualified _ d) -> isRight d
     _ -> False
 
 isTypeAlias :: Declaration -> Bool
 isTypeAlias Declaration{..} =
   case declInfo of
-    AliasDeclaration _ (P.Qualified _ d) -> isLeft d
+    AliasDeclaration _ (PN.Qualified _ d) -> isLeft d
     _ -> False
 
 -- | Discard any children which do not satisfy the given predicate.
@@ -304,7 +297,7 @@ filterChildren p decl =
 data ChildDeclaration = ChildDeclaration
   { cdeclTitle      :: Text
   , cdeclComments   :: Maybe Text
-  , cdeclSourceSpan :: Maybe P.SourceSpan
+  , cdeclSourceSpan :: Maybe SourceSpan
   , cdeclInfo       :: ChildDeclarationInfo
   }
   deriving (Show, Eq, Ord, Generic)
@@ -413,7 +406,7 @@ ignorePackage (FromDep _ x) = x
 
 data LinksContext = LinksContext
   { ctxGithub               :: (GithubUser, GithubRepo)
-  , ctxModuleMap            :: Map P.ModuleName PackageName
+  , ctxModuleMap            :: Map PN.ModuleName PackageName
   , ctxResolvedDependencies :: [(PackageName, Version)]
   , ctxPackageName          :: PackageName
   , ctxVersion              :: Version
@@ -434,18 +427,18 @@ instance NFData DocLink
 
 data LinkLocation
   -- | A link to a declaration in the current package.
-  = LocalModule P.ModuleName
+  = LocalModule PN.ModuleName
 
   -- | A link to a declaration in a different package. The arguments represent
   -- the name of the other package, the version of the other package, and the
   -- name of the module in the other package that the declaration is in.
-  | DepsModule PackageName Version P.ModuleName
+  | DepsModule PackageName Version PN.ModuleName
 
   -- | A link to a declaration that is built in to the compiler, e.g. the Prim
   -- module. In this case we only need to store the module that the builtin
   -- comes from. Note that all builtin modules begin with "Prim", and that the
   -- compiler rejects attempts to define modules whose names start with "Prim".
-  | BuiltinModule P.ModuleName
+  | BuiltinModule PN.ModuleName
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData LinkLocation
@@ -453,7 +446,7 @@ instance NFData LinkLocation
 -- | Given a links context, the current module name, the namespace of a thing
 -- to link to, its title, and its containing module, attempt to create a
 -- DocLink.
-getLink :: LinksContext -> P.ModuleName -> Namespace -> Text -> ContainingModule -> Maybe DocLink
+getLink :: LinksContext -> PN.ModuleName -> Namespace -> Text -> ContainingModule -> Maybe DocLink
 getLink LinksContext{..} curMn namespace target containingMod = do
   location <- getLinkLocation
   return DocLink
@@ -479,7 +472,7 @@ getLink LinksContext{..} curMn namespace target containingMod = do
 
   builtinLinkLocation =
     case containingMod of
-      OtherModule mn | P.isBuiltinModuleName mn ->
+      OtherModule mn | PN.isBuiltinModuleName mn ->
         pure $ BuiltinModule mn
       _ ->
         empty
@@ -573,11 +566,11 @@ instance A.FromJSON GithubUser where
   parseJSON = toAesonParser' asGithubUser
 
 asVersion :: Parse PackageError Version
-asVersion = withString (maybe (Left InvalidVersion) Right . P.parseVersion')
+asVersion = withString (maybe (Left InvalidVersion) Right . CoreFnFromJson.parseVersion')
 
 asModule :: Parse PackageError Module
 asModule =
-  Module <$> key "name" (P.moduleNameFromString <$> asText)
+  Module <$> key "name" (PN.moduleNameFromString <$> asText)
          <*> key "comments" (perhaps asText)
          <*> key "declarations" (eachInArray asDeclaration)
          <*> key "reExports" (eachInArray asReExport)
@@ -591,16 +584,16 @@ asDeclaration =
               <*> key "info" asDeclarationInfo
               <*> keyOrDefault "kind" Nothing (perhaps asKindInfo)
 
-asReExport :: Parse PackageError (InPackage P.ModuleName, [Declaration])
+asReExport :: Parse PackageError (InPackage PN.ModuleName, [Declaration])
 asReExport =
   (,) <$> key "moduleName" asReExportModuleName
       <*> key "declarations" (eachInArray asDeclaration)
   where
   -- This is to preserve backwards compatibility with 0.10.3 and earlier versions
   -- of the compiler, where the modReExports field had the type
-  -- [(P.ModuleName, [Declaration])]. This should eventually be removed,
+  -- [(PN.ModuleName, [Declaration])]. This should eventually be removed,
   -- possibly at the same time as the next breaking change to this JSON format.
-  asReExportModuleName :: Parse PackageError (InPackage P.ModuleName)
+  asReExportModuleName :: Parse PackageError (InPackage PN.ModuleName)
   asReExportModuleName =
     asInPackage fromAesonParser .! ErrorInPackageMeta
     `pOr` fmap Local fromAesonParser
@@ -616,22 +609,22 @@ asInPackage inner =
   build Nothing = Local
   build (Just pn) = FromDep pn
 
-asFixity :: Parse PackageError P.Fixity
+asFixity :: Parse PackageError ASTO.Fixity
 asFixity =
-  P.Fixity <$> key "associativity" asAssociativity
+  ASTO.Fixity <$> key "associativity" asAssociativity
            <*> key "precedence" asIntegral
 
 asFixityAlias :: Parse PackageError FixityAlias
 asFixityAlias = fromAesonParser
 
-parseAssociativity :: String -> Maybe P.Associativity
+parseAssociativity :: String -> Maybe ASTO.Associativity
 parseAssociativity str = case str of
-  "infix"  -> Just P.Infix
-  "infixl" -> Just P.Infixl
-  "infixr" -> Just P.Infixr
+  "infix"  -> Just ASTO.Infix
+  "infixl" -> Just ASTO.Infixl
+  "infixr" -> Just ASTO.Infixr
   _        -> Nothing
 
-asAssociativity :: Parse PackageError P.Associativity
+asAssociativity :: Parse PackageError ASTO.Associativity
 asAssociativity = withString (maybe (Left InvalidFixity) Right . parseAssociativity)
 
 asDeclarationInfo :: Parse PackageError DeclarationInfo
@@ -659,7 +652,7 @@ asDeclarationInfo = do
                        <*> key "alias" asFixityAlias
     -- Backwards compat: kinds are extern data
     "kind" ->
-      pure $ ExternDataDeclaration (P.kindType $> ()) []
+      pure $ ExternDataDeclaration (PEnv.kindType $> ()) []
     other ->
       throwCustomError (InvalidDeclarationType other)
 
@@ -668,13 +661,13 @@ asKindInfo =
   KindInfo <$> key "keyword" asKindSignatureFor
            <*> key "kind" asType
 
-asKindSignatureFor :: Parse PackageError P.KindSignatureFor
+asKindSignatureFor :: Parse PackageError KindSignatureFor
 asKindSignatureFor =
   withText $ \case
-    "data" -> Right P.DataSig
-    "newtype" -> Right P.NewtypeSig
-    "class" -> Right P.ClassSig
-    "type" -> Right P.TypeSynonymSig
+    "data" -> Right DataSig
+    "newtype" -> Right NewtypeSig
+    "class" -> Right ClassSig
+    "type" -> Right TypeSynonymSig
     x -> Left (InvalidKindSignatureFor x)
 
 asTypeArguments :: Parse PackageError [(Text, Maybe Type')]
@@ -682,12 +675,12 @@ asTypeArguments = eachInArray asTypeArgument
   where
   asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asType)
 
-asRole :: Parse PackageError P.Role
+asRole :: Parse PackageError Role
 asRole =
   withText $ \case
-    "Representational" -> Right P.Representational
-    "Nominal" -> Right P.Nominal
-    "Phantom" -> Right P.Phantom
+    "Representational" -> Right Representational
+    "Nominal" -> Right Nominal
+    "Phantom" -> Right Phantom
     other -> Left (InvalidRole other)
 
 asType :: Parse e Type'
@@ -698,11 +691,11 @@ asFunDeps = eachInArray asFunDep
   where
   asFunDep = (,) <$> nth 0 (eachInArray asText) <*> nth 1 (eachInArray asText)
 
-asDataDeclType :: Parse PackageError P.DataDeclType
+asDataDeclType :: Parse PackageError PEnv.DataDeclType
 asDataDeclType =
   withText $ \case
-    "data"    -> Right P.Data
-    "newtype" -> Right P.Newtype
+    "data"    -> Right PEnv.Data
+    "newtype" -> Right PEnv.Newtype
     other     -> Left (InvalidDataDeclType other)
 
 asChildDeclaration :: Parse PackageError ChildDeclaration
@@ -726,35 +719,35 @@ asChildDeclarationInfo = do
     other ->
       throwCustomError $ InvalidChildDeclarationType other
 
-asSourcePos :: Parse e P.SourcePos
-asSourcePos = P.SourcePos <$> nth 0 asIntegral
+asSourcePos :: Parse e SourcePos
+asSourcePos = SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
 asConstraint :: Parse PackageError Constraint'
-asConstraint = P.Constraint () <$> key "constraintClass" asQualifiedProperName
+asConstraint = PT.Constraint () <$> key "constraintClass" asQualifiedProperName
                                <*> keyOrDefault "constraintKindArgs" [] (eachInArray asType)
                                <*> key "constraintArgs" (eachInArray asType)
                                <*> pure Nothing
 
-asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
+asQualifiedProperName :: Parse e (PN.Qualified (PN.ProperName a))
 asQualifiedProperName = fromAesonParser
 
-asModuleMap :: Parse PackageError (Map P.ModuleName PackageName)
+asModuleMap :: Parse PackageError (Map PN.ModuleName PackageName)
 asModuleMap =
   Map.fromList <$>
-    eachInObjectWithKey (Right . P.moduleNameFromString)
+    eachInObjectWithKey (Right . PN.moduleNameFromString)
                         (withText parsePackageName')
 
 -- This is here to preserve backwards compatibility with compilers which used
 -- to generate a 'bookmarks' field in the JSON (i.e. up to 0.10.5). We should
 -- remove this after the next breaking change to the JSON.
-bookmarksAsModuleMap :: Parse ManifestError (Map P.ModuleName PackageName)
+bookmarksAsModuleMap :: Parse ManifestError (Map PN.ModuleName PackageName)
 bookmarksAsModuleMap =
   convert <$>
-    eachInArray (asInPackage (nth 0 (P.moduleNameFromString <$> asText)))
+    eachInArray (asInPackage (nth 0 (PN.moduleNameFromString <$> asText)))
 
   where
-  convert :: [InPackage P.ModuleName] -> Map P.ModuleName PackageName
+  convert :: [InPackage PN.ModuleName] -> Map PN.ModuleName PackageName
   convert = Map.fromList . mapMaybe toTuple
 
   toTuple (Local _) = Nothing
@@ -776,8 +769,8 @@ asGithub :: Parse e (GithubUser, GithubRepo)
 asGithub = (,) <$> nth 0 (GithubUser <$> asText)
                <*> nth 1 (GithubRepo <$> asText)
 
-asSourceSpan :: Parse e P.SourceSpan
-asSourceSpan = P.SourceSpan <$> key "name" asString
+asSourceSpan :: Parse e SourceSpan
+asSourceSpan = SourceSpan <$> key "name" asString
                             <*> key "start" asSourcePos
                             <*> key "end" asSourcePos
 
@@ -791,7 +784,7 @@ instance A.ToJSON a => A.ToJSON (Package a) where
       , "version"              .= showVersion pkgVersion
       , "versionTag"           .= pkgVersionTag
       , "modules"              .= pkgModules
-      , "moduleMap"            .= assocListToJSON (A.Key.fromText . P.runModuleName)
+      , "moduleMap"            .= assocListToJSON (A.Key.fromText . PN.runModuleName)
                                                   runPackageName
                                                   (Map.toList pkgModuleMap)
       , "resolvedDependencies" .= assocListToJSON (A.Key.fromText . runPackageName)
@@ -808,7 +801,7 @@ instance A.ToJSON NotYetKnown where
 
 instance A.ToJSON Module where
   toJSON Module{..} =
-    A.object [ "name"         .= P.runModuleName modName
+    A.object [ "name"         .= PN.runModuleName modName
              , "comments"     .= modComments
              , "declarations" .= modDeclarations
              , "reExports"    .= map toObj modReExports
@@ -834,12 +827,12 @@ instance A.ToJSON KindInfo where
             , "kind"    .= kiKind
             ]
 
-kindSignatureForKeyword :: P.KindSignatureFor -> Text
+kindSignatureForKeyword :: KindSignatureFor -> Text
 kindSignatureForKeyword = \case
-  P.DataSig -> "data"
-  P.NewtypeSig -> "newtype"
-  P.TypeSynonymSig -> "type"
-  P.ClassSig -> "class"
+  DataSig -> "data"
+  NewtypeSig -> "newtype"
+  TypeSynonymSig -> "type"
+  ClassSig -> "class"
 
 instance A.ToJSON ChildDeclaration where
   toJSON ChildDeclaration{..} =

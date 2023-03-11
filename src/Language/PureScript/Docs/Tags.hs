@@ -10,12 +10,8 @@ import Control.Arrow (first)
 import Data.List (sort)
 import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
-import Language.PureScript.AST.SourcePos
-    ( SourceSpan, sourcePosLine, spanStart )
-import Language.PureScript.Docs.Types
-    ( ChildDeclaration(cdeclTitle, cdeclSourceSpan),
-      Declaration(declChildren, declSourceSpan, declTitle),
-      Module(modDeclarations) )
+import Language.PureScript.AST.SourcePos ( SourceSpan, sourcePosLine, spanStart )
+import Language.PureScript.Docs.Types ( ChildDeclaration(cdeclTitle, cdeclSourceSpan), Declaration(declChildren, declSourceSpan, declTitle), Module(modDeclarations) )
 
 tags :: Module -> [(String, Int)]
 tags = map (first T.unpack) . concatMap dtags . modDeclarations
