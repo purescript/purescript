@@ -1,16 +1,7 @@
 module Language.PureScript.Ide.Filter.Imports where
 
 
-import Protolude
-    ( ($),
-      Eq((==)),
-      Foldable(elem),
-      Bool(..),
-      Maybe,
-      (&&),
-      not,
-      any,
-      maybe )
+import Protolude hiding (isPrefixOf)
 
 import Language.PureScript.Ide.Types
     ( IdeDataConstructor(IdeDataConstructor),
