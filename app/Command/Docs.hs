@@ -3,15 +3,18 @@ module Command.Docs (command, infoModList) where
 
 import Prelude
 
-import Command.Docs.Html
-import Command.Docs.Markdown
-import Control.Applicative
-import Control.Monad.Writer
+import Command.Docs.Html ( writeHtmlModules, asHtml )
+import Command.Docs.Markdown ( asMarkdown, writeMarkdownModules )
+import Control.Applicative ( Alternative(many), optional )
+import Control.Monad.Writer ( when )
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
-import Language.PureScript qualified as P
-import Language.PureScript.Docs qualified as D
+import Language.PureScript.Errors qualified as P
+    ( defaultPPEOptions, prettyPrintMultipleErrors, MultipleErrors )
+import Language.PureScript.Docs.Collect qualified as D
+    ( collectDocs )
+import Language.PureScript.Docs.Prim qualified as D ( primModules )
 import Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import Options.Applicative qualified as Opts
 import Text.PrettyPrint.ANSI.Leijen qualified as PP

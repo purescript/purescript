@@ -8,7 +8,14 @@ import Data.ByteString.Lazy.Char8 qualified as BL
 import Data.Time.Clock (getCurrentTime)
 import Data.Version (Version(..))
 import Language.PureScript.Publish
+    ( defaultPublishOptions,
+      unsafePreparePackage,
+      warn,
+      PublishOptions(publishWorkingTreeDirty, publishManifestFile,
+                     publishResolutionsFile, publishCompileOutputDir, publishGetVersion,
+                     publishGetTagTime) )
 import Language.PureScript.Publish.ErrorsWarnings
+    ( PackageWarning(DirtyWorkingTreeWarn) )
 import Options.Applicative (Parser)
 import Options.Applicative qualified as Opts
 

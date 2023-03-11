@@ -8,8 +8,18 @@ import Data.Aeson qualified as Json
 import Data.Bool (bool)
 import Data.ByteString.Lazy qualified as LB
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
-import Language.PureScript qualified as P
+import Language.PureScript.Errors qualified as P
+    ( defaultCodeColor,
+      defaultPPEOptions,
+      nonEmpty,
+      prettyPrintMultipleErrors,
+      prettyPrintMultipleWarnings,
+      Level(Error, Warning),
+      MultipleErrors,
+      PPEOptions(ppeRelativeDirectory, ppeCodeColor, ppeFull) )
+import Language.PureScript.Graph qualified as P ( graph )
 import Language.PureScript.Errors.JSON
+    ( toJSONErrors, JSONResult(JSONResult) )
 import Options.Applicative qualified as Opts
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitFailure)

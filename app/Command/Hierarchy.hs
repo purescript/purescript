@@ -30,7 +30,12 @@ import System.FilePath.Glob (glob)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStr, stderr)
 import System.IO.UTF8 (readUTF8FilesT)
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( Module )
+import Language.PureScript.Errors qualified as P
+    ( defaultPPEOptions,
+      prettyPrintMultipleErrors,
+      MultipleErrors )
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
 

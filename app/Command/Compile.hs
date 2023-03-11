@@ -2,8 +2,8 @@ module Command.Compile (command) where
 
 import Prelude
 
-import Control.Applicative
-import Control.Monad
+import Control.Applicative ( Alternative(many) )
+import Control.Monad ( when )
 import Data.Aeson qualified as A
 import Data.Bool (bool)
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
@@ -12,10 +12,28 @@ import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
 import Data.Traversable (for)
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( getModuleName )
+import Language.PureScript.Errors qualified as P
+    ( defaultCodeColor,
+      defaultPPEOptions,
+      nonEmpty,
+      prettyPrintMultipleErrors,
+      prettyPrintMultipleWarnings,
+      Level(Error, Warning),
+      MultipleErrors,
+      PPEOptions(ppeFileContents, ppeCodeColor, ppeFull,
+                 ppeRelativeDirectory) )
+import Language.PureScript.Make qualified as P ( make )
+import Language.PureScript.Options qualified as P
+    ( codegenTargets,
+      CodegenTarget(JS, JSSourceMap),
+      Options(Options, optionsVerboseErrors) )
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Errors.JSON
+    ( toJSONErrors, JSONResult(JSONResult) )
 import Language.PureScript.Make
+    ( runMake, buildMakeActions, inferForeignModules )
 import Options.Applicative qualified as Opts
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitSuccess, exitFailure)

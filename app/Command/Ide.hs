@@ -20,24 +20,40 @@ module Command.Ide (command) where
 import Protolude
 
 import Data.Aeson qualified as Aeson
-import Control.Concurrent.STM
+import Control.Concurrent.STM ( newTVarIO )
 import "monad-logger" Control.Monad.Logger
-import Data.IORef
+    ( MonadLogger, logDebug, logError, logInfo )
+import Data.IORef ( newIORef )
 import Data.Text.IO qualified as T
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as BSL8
 import GHC.IO.Exception (IOErrorType(..), IOException(..))
-import Language.PureScript.Ide
+import Language.PureScript.Ide ( handleCommand )
 import Language.PureScript.Ide.Command
+    ( commandName, Command(Load, Reset, LoadSync) )
 import Language.PureScript.Ide.Util
-import Language.PureScript.Ide.Error
+    ( displayTimeSpec, logPerf, runLogger, decodeT, encodeT )
+import Language.PureScript.Ide.Error ( IdeError(GeneralError) )
 import Language.PureScript.Ide.State (updateCacheTimestamp)
 import Language.PureScript.Ide.Types
+    ( emptyIdeState,
+      Ide,
+      IdeConfiguration(IdeConfiguration, confLogLevel, confOutputPath,
+                       confGlobs),
+      IdeEnvironment(..),
+      IdeLogLevel(..) )
 import Network.Socket qualified as Network
 import Options.Applicative qualified as Opts
 import System.Directory
-import System.FilePath
-import System.IO hiding (putStrLn, print)
+    ( doesDirectoryExist, getCurrentDirectory, setCurrentDirectory )
+import System.FilePath ( (</>) )
+import System.IO
+    ( BufferMode(LineBuffering),
+      utf8,
+      hClose,
+      hFlush,
+      hSetBuffering,
+      hSetEncoding )
 import System.IO.Error (isEOFError)
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket

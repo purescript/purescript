@@ -5,21 +5,56 @@ module Command.REPL (command) where
 
 import Prelude
 import Control.Applicative (many, (<|>))
-import Control.Monad
+import Control.Monad ( unless, when )
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.IO.Class (liftIO, MonadIO)
-import Control.Monad.Trans.Class
+import Control.Monad.Trans.Class ( MonadTrans(lift) )
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import Control.Monad.Trans.State.Strict (StateT, evalStateT)
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.Foldable (for_)
-import Language.PureScript qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+    ( getModuleName )
+import Language.PureScript.Errors qualified as P
+    ( defaultPPEOptions,
+      prettyPrintMultipleErrors,
+      PPEOptions(ppeRelativeDirectory) )
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Interactive
+    ( getHistoryFilename,
+      readNodeProcessWithExitCode,
+      initialPSCiState,
+      updateLoadedExterns,
+      Command(QuitPSCi, PasteLines),
+      PSCiConfig(PSCiConfig),
+      PSCiState,
+      noInputMessage,
+      prologueMessage,
+      quitMessage,
+      supportModuleMessage,
+      completion,
+      parseCommand,
+      parseDotFile,
+      indexFile,
+      loadAllModules,
+      supportModuleIsDefined,
+      handleCommand,
+      make,
+      runMake )
 import Options.Applicative qualified as Opts
 import System.Console.Haskeline
+    ( defaultSettings,
+      getInputLine,
+      handleInterrupt,
+      outputStrLn,
+      withInterrupt,
+      runInputT,
+      setComplete,
+      InputT,
+      Settings(historyFile) )
 import System.IO.UTF8 (readUTF8File)
 import System.Exit
+    ( ExitCode(ExitFailure, ExitSuccess), exitFailure )
 import System.Directory (doesFileExist, getCurrentDirectory)
 import System.FilePath ((</>))
 import System.FilePath.Glob qualified as Glob

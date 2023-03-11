@@ -7,15 +7,26 @@ module Command.Docs.Html
 
 import Prelude
 
-import Control.Applicative
+import Control.Applicative ( Alternative((<|>)) )
 import Control.Arrow ((&&&))
-import Control.Monad.Writer
+import Control.Monad.Writer ( guard )
 import Data.List (sort)
 import Data.Text (Text)
 import Data.Text.Lazy (toStrict)
 import Data.Text qualified as T
-import Language.PureScript qualified as P
-import Language.PureScript.Docs qualified as D
+import Language.PureScript.Crash qualified as P ( internalError )
+import Language.PureScript.Names qualified as P
+    ( moduleNameFromString, runModuleName, ModuleName )
+import Language.PureScript.Docs.Css qualified as D
+    ( normalizeCssT, pursuitCssT )
+import Language.PureScript.Docs.RenderedCode.Types qualified as D
+    ( ContainingModule(..), Namespace )
+import Language.PureScript.Docs.Types qualified as D
+    ( ignorePackage,
+      DocLink(..),
+      InPackage,
+      LinkLocation(BuiltinModule, LocalModule, DepsModule),
+      Module(modName) )
 import Language.PureScript.Docs.AsHtml qualified as D
 import Text.Blaze.Html5 (Html, (!), toMarkup)
 import Text.Blaze.Html5 qualified as H

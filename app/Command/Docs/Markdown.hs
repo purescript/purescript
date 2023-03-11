@@ -7,8 +7,10 @@ import Prelude
 
 import Data.Text (Text)
 import Data.Text qualified as T
-import Language.PureScript qualified as P
-import Language.PureScript.Docs qualified as D
+import Language.PureScript.Names qualified as P
+    ( runModuleName, ModuleName )
+import Language.PureScript.Docs.Types qualified as D
+    ( Module(modName) )
 import Language.PureScript.Docs.AsMarkdown qualified as D
 import System.IO.UTF8 (writeUTF8FileT)
 
