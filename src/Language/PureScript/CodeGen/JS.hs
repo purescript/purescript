@@ -28,62 +28,23 @@ import Data.String (fromString)
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.AST.SourcePos
-    ( displayStartEndPos, SourceSpan )
-import Language.PureScript.CodeGen.JS.Common as Common
-    ( anyNameToJs,
-      identCharToText,
-      identToJs,
-      isValidJsIdentifier,
-      jsAnyReserved,
-      jsFutureReserved,
-      jsFutureReservedStrict,
-      jsKeywords,
-      jsLiterals,
-      jsOldReserved,
-      jsSometimesReserved,
-      moduleNameToJs,
-      nameIsJsBuiltIn,
-      nameIsJsReserved,
-      properToJs )
+import Language.PureScript.AST.SourcePos ( displayStartEndPos, SourceSpan )
+import Language.PureScript.CodeGen.JS.Common as Common ( anyNameToJs, identCharToText, identToJs, isValidJsIdentifier, jsAnyReserved, jsFutureReserved, jsFutureReservedStrict, jsKeywords, jsLiterals, jsOldReserved, jsSometimesReserved, moduleNameToJs, nameIsJsBuiltIn, nameIsJsReserved, properToJs )
 import Language.PureScript.CoreImp.AST (AST, InitializerEffects(..), everywhere, everywhereTopDownM, withSourceSpan)
 import Language.PureScript.CoreImp.AST qualified as AST
 import Language.PureScript.CoreImp.Module qualified as AST
 import Language.PureScript.CoreImp.Optimizer ( optimize )
 import Language.PureScript.AST.Literals ( Literal(..) )
 import Language.PureScript.CoreFn.Ann ( removeComments, Ann )
-import Language.PureScript.CoreFn.Binders
-    ( extractBinderAnn, Binder(..) )
-import Language.PureScript.CoreFn.Expr
-    ( extractAnn,
-      modifyAnn,
-      Bind(..),
-      CaseAlternative(CaseAlternative),
-      Expr(..),
-      Guard )
-import Language.PureScript.CoreFn.Meta
-    ( ConstructorType(SumType, ProductType),
-      Meta(IsConstructor, IsTypeClassConstructor, IsSyntheticApp,
-           IsForeign, IsNewtype) )
+import Language.PureScript.CoreFn.Binders ( extractBinderAnn, Binder(..) )
+import Language.PureScript.CoreFn.Expr ( extractAnn, modifyAnn, Bind(..), CaseAlternative(CaseAlternative), Expr(..), Guard )
+import Language.PureScript.CoreFn.Meta ( ConstructorType(SumType, ProductType), Meta(IsConstructor, IsTypeClassConstructor, IsSyntheticApp, IsForeign, IsNewtype) )
 import Language.PureScript.CoreFn.Module ( Module(Module) )
 import Language.PureScript.CoreFn.Laziness (applyLazinessTransform)
 import Language.PureScript.Crash ( internalError )
-import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
-                                   MultipleErrors(..), rethrow, errorMessage,
-                                   errorMessage', rethrowWithPosition, addHint)
-import Language.PureScript.Names
-    ( runIdent,
-      runModuleName,
-      showIdent,
-      showQualified,
-      Ident(UnusedIdent, Ident),
-      ModuleName,
-      ProperName(runProperName),
-      Qualified(..),
-      QualifiedBy(ByModuleName, BySourcePos) )
-import Language.PureScript.Options
-    ( CodegenTarget(JSSourceMap),
-      Options(optionsCodegenTargets, optionsNoComments) )
+import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..), MultipleErrors(..), rethrow, errorMessage, errorMessage', rethrowWithPosition, addHint)
+import Language.PureScript.Names ( runIdent, runModuleName, showIdent, showQualified, Ident(UnusedIdent, Ident), ModuleName, ProperName(runProperName), Qualified(..), QualifiedBy(ByModuleName, BySourcePos) )
+import Language.PureScript.Options ( CodegenTarget(JSSourceMap), Options(optionsCodegenTargets, optionsNoComments) )
 import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.Traversals (sndM)
 import Language.PureScript.Constants.Prim qualified as C
