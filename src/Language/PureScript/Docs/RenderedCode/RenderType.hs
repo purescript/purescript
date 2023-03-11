@@ -19,39 +19,17 @@ import Data.Text (Text, pack)
 import Data.List (uncons)
 
 import Control.Arrow ((<+>))
-import Control.PatternArrows as PA
-    ( Pattern,
-      buildPrettyPrinter,
-      mkPattern,
-      pattern,
-      Operator(Wrap, AssocL, AssocR),
-      OperatorTable(OperatorTable) )
+import Control.PatternArrows ( Pattern, buildPrettyPrinter, mkPattern, pattern, Operator(Wrap, AssocL, AssocR), OperatorTable(OperatorTable) )
 
 import Language.PureScript.Crash ( internalError )
 import Language.PureScript.Label ( Label )
 import Language.PureScript.Names ( coerceProperName )
-import Language.PureScript.Pretty.Types
-    ( convertPrettyPrintType,
-      prettyPrintLabel,
-      PrettyPrintConstraint,
-      PrettyPrintType(PPTypeWildcard, PPRecord, PPRow,
-                      PPBinaryNoParensType, PPTypeOp, PPTypeLevelString, PPTypeLevelInt,
-                      PPTypeConstructor, PPKindArg, PPFunction, PPKindedType,
-                      PPConstrainedType, PPParensInType, PPForAll, PPTypeApp,
-                      PPTypeVar) )
+import Language.PureScript.Pretty.Types ( convertPrettyPrintType, prettyPrintLabel, PrettyPrintConstraint, PrettyPrintType(PPTypeWildcard, PPRecord, PPRow, PPBinaryNoParensType, PPTypeOp, PPTypeLevelString, PPTypeLevelInt, PPTypeConstructor, PPKindArg, PPFunction, PPKindedType, PPConstrainedType, PPParensInType, PPForAll, PPTypeApp, PPTypeVar) )
 import Language.PureScript.Roles ( displayRole, Role )
 import Language.PureScript.Types ( Type )
 import Language.PureScript.PSString (prettyPrintString)
 
-import Language.PureScript.Docs.RenderedCode.Types
-    ( keywordForall,
-      roleAnn,
-      sp,
-      syntax,
-      typeCtor,
-      typeOp,
-      typeVar,
-      RenderedCode )
+import Language.PureScript.Docs.RenderedCode.Types ( keywordForall, roleAnn, sp, syntax, typeCtor, typeOp, typeVar, RenderedCode )
 import Language.PureScript.Docs.Utils.MonoidExtras ( mintersperse )
 
 typeLiterals :: Pattern () PrettyPrintType RenderedCode
@@ -255,7 +233,7 @@ renderTypeWithRole = \case
 renderType' :: PrettyPrintType -> RenderedCode
 renderType'
   = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern matchType ()
+  . pattern matchType ()
 
 renderTypeVars :: [(Text, Maybe PrettyPrintType)] -> RenderedCode
 renderTypeVars tyVars = mintersperse sp (map renderTypeVar tyVars)
@@ -274,4 +252,4 @@ renderTypeAtom = renderTypeAtom' . convertPrettyPrintType maxBound
 renderTypeAtom' :: PrettyPrintType -> RenderedCode
 renderTypeAtom'
   = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern matchTypeAtom ()
+  . pattern matchTypeAtom ()
