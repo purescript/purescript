@@ -16,46 +16,28 @@ import Data.String (String)
 import Data.Text qualified as T
 
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
-import Language.PureScript.Docs.Types
-    ( Declaration(..),
-      DeclarationInfo(TypeClassDeclaration, ExternDataDeclaration,
-                      ValueDeclaration, DataDeclaration, TypeSynonymDeclaration),
-      KindInfo(KindInfo, kiKind, kiKeyword),
-      Module(modDeclarations, modName),
-      Type' )
-import Language.PureScript.CST.Errors qualified as CST
-    ( prettyPrintError )
+import Language.PureScript.Docs.Types ( Declaration(..), DeclarationInfo(TypeClassDeclaration, ExternDataDeclaration, ValueDeclaration, DataDeclaration, TypeSynonymDeclaration), KindInfo(KindInfo, kiKind, kiKeyword), Module(modDeclarations, modName), Type' )
+import Language.PureScript.CST.Errors qualified as CST ( prettyPrintError )
 import Language.PureScript.CST.Lexer qualified as CST ( lex )
-import Language.PureScript.CST.Monad qualified as CST
-    ( runTokenParser, Parser )
-import Language.PureScript.CST.Parser qualified as CST
-    ( parseIdent )
-import Language.PureScript.CST.Types qualified as CST
-    ( Ident(getIdent), Name(nameValue) )
+import Language.PureScript.CST.Monad qualified as CST ( runTokenParser, Parser )
+import Language.PureScript.CST.Parser qualified as CST ( parseIdent )
+import Language.PureScript.CST.Types qualified as CST ( Ident(getIdent), Name(nameValue) )
 import Language.PureScript.Crash qualified as P
 import Language.PureScript.Errors qualified as P
 import Language.PureScript.Externs qualified as P
 import Language.PureScript.Environment qualified as P
 import Language.PureScript.Names qualified as P
 import Language.PureScript.Roles qualified as P
-import Language.PureScript.Sugar.AdoNotation qualified as P
-    ( desugarAdoModule )
-import Language.PureScript.Sugar.CaseDeclarations qualified as P
-    ( desugarCasesModule )
-import Language.PureScript.Sugar.DoNotation qualified as P
-    ( desugarDoModule )
-import Language.PureScript.Sugar.LetPattern qualified as P
-    ( desugarLetPatternModule )
-import Language.PureScript.Sugar.Names qualified as P
-    ( Env, desugarImports )
-import Language.PureScript.Sugar.Operators qualified as P
-    ( rebracketFiltered )
-import Language.PureScript.Sugar.TypeDeclarations qualified as P
-    ( desugarTypeDeclarationsModule )
+import Language.PureScript.Sugar.AdoNotation qualified as P ( desugarAdoModule )
+import Language.PureScript.Sugar.CaseDeclarations qualified as P ( desugarCasesModule )
+import Language.PureScript.Sugar.DoNotation qualified as P ( desugarDoModule )
+import Language.PureScript.Sugar.LetPattern qualified as P ( desugarLetPatternModule )
+import Language.PureScript.Sugar.Names qualified as P ( Env, desugarImports )
+import Language.PureScript.Sugar.Operators qualified as P ( rebracketFiltered )
+import Language.PureScript.Sugar.TypeDeclarations qualified as P ( desugarTypeDeclarationsModule )
 import Language.PureScript.Types qualified as P
 import Language.PureScript.Constants.Prim qualified as Prim
-import Language.PureScript.Sugar.Operators
-    ( RebracketCaller(CalledByDocs) )
+import Language.PureScript.Sugar.Operators ( RebracketCaller(CalledByDocs) )
 
 -- |
 -- Convert a single module to a Docs.Module, making use of a pre-existing
