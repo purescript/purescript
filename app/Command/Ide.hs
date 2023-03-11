@@ -21,7 +21,7 @@ import Protolude
 
 import Data.Aeson qualified as Aeson
 import Control.Concurrent.STM
-import           "monad-logger" Control.Monad.Logger
+import "monad-logger" Control.Monad.Logger
 import Data.IORef
 import Data.Text.IO qualified as T
 import Data.ByteString.Char8 qualified as BS8
