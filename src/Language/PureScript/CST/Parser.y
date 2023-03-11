@@ -24,13 +24,7 @@ import Data.Foldable (foldl', for_, toList)
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import Data.Traversable (for, sequence)
-import Language.PureScript.CST.Errors
-  ( ParserErrorInfo(..)
-  , ParserErrorType(..)
-  , ParserWarningType(..)
-  , ParserError
-  , ParserWarning
-  )
+import Language.PureScript.CST.Errors ( ParserErrorInfo(..), ParserErrorType(..), ParserWarningType(..), ParserError, ParserWarning )
 import Language.PureScript.CST.Flatten (flattenType)
 import Language.PureScript.CST.Lexer (lexModule)
 import Language.PureScript.CST.Monad (LexResult, ParserState(..), Parser, runParser, munch, oneOf, addFailure, pushBack, tryPrefix, addWarning, parseError)
