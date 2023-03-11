@@ -1,19 +1,19 @@
 module Language.PureScript.Ide.ImportsSpec where
 
-import           Protolude hiding (moduleName)
-import           Data.Maybe (fromJust)
+import Protolude hiding (moduleName)
+import Data.Maybe (fromJust)
 import Data.Set qualified as Set
 
 import Language.PureScript qualified as P
-import           Language.PureScript.Ide.Command as Command
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Imports
-import           Language.PureScript.Ide.Imports.Actions
-import           Language.PureScript.Ide.Filter (moduleFilter)
+import Language.PureScript.Ide.Command as Command
+import Language.PureScript.Ide.Error
+import Language.PureScript.Ide.Imports
+import Language.PureScript.Ide.Imports.Actions
+import Language.PureScript.Ide.Filter (moduleFilter)
 import Language.PureScript.Ide.Test qualified as Test
-import           Language.PureScript.Ide.Types
-import           System.FilePath
-import           Test.Hspec
+import Language.PureScript.Ide.Types
+import System.FilePath
+import Test.Hspec
 
 noImportsFile :: [Text]
 noImportsFile =
