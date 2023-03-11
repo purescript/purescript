@@ -29,9 +29,12 @@ import Data.Text (Text)
 import Data.Text qualified as T
 
 import Language.PureScript.AST.SourcePos ( displayStartEndPos, SourceSpan )
+-- Note for reviewer: this is only exported. Should it be removed?
 import Language.PureScript.CodeGen.JS.Common as Common ( anyNameToJs, identCharToText, identToJs, isValidJsIdentifier, jsAnyReserved, jsFutureReserved, jsFutureReservedStrict, jsKeywords, jsLiterals, jsOldReserved, jsSometimesReserved, moduleNameToJs, nameIsJsBuiltIn, nameIsJsReserved, properToJs )
 import Language.PureScript.CoreImp.AST (AST, InitializerEffects(..), everywhere, everywhereTopDownM, withSourceSpan)
+-- Note for reviewer: this is only exported. Should it be removed?
 import Language.PureScript.CoreImp.AST qualified as AST
+-- Note for reviewer: this is only exported. Should it be removed?
 import Language.PureScript.CoreImp.Module qualified as AST
 import Language.PureScript.CoreImp.Optimizer ( optimize )
 import Language.PureScript.AST.Literals ( Literal(..) )
