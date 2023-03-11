@@ -19,24 +19,24 @@ import Control.Monad (unless)
 import Data.Bifunctor (bimap)
 import Data.Char (isUpper)
 import Data.Either (isRight)
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
 import Data.Foldable (for_)
 import Data.String (fromString)
 
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Text.Blaze.Html5 as H hiding (map)
-import qualified Text.Blaze.Html5.Attributes as A
-import qualified Cheapskate
+import Text.Blaze.Html5.Attributes qualified as A
+import Cheapskate qualified
 
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.RenderedCode hiding (sp)
-import qualified Language.PureScript.Docs.Render as Render
-import qualified Language.PureScript.CST as CST
+import Language.PureScript.Docs.Render qualified as Render
+import Language.PureScript.CST qualified as CST
 
 data HtmlOutput a = HtmlOutput
   { htmlIndex     :: [(Maybe Char, a)]

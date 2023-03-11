@@ -5,8 +5,8 @@ import Prelude
 import Control.Monad.Except
 import Data.Functor.Identity
 
-import qualified Text.Parsec as P
-import qualified Text.Parsec.Expr as P
+import Text.Parsec qualified as P
+import Text.Parsec.Expr qualified as P
 
 import Language.PureScript.AST
 import Language.PureScript.Names

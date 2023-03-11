@@ -7,16 +7,16 @@ module Language.PureScript.ModuleDependencies
   , moduleSignature
   ) where
 
-import           Protolude hiding (head)
+import Protolude hiding (head)
 
-import           Data.Array ((!))
-import           Data.Graph
-import qualified Data.Set as S
-import           Language.PureScript.AST
-import qualified Language.PureScript.Constants.Prim as C
-import           Language.PureScript.Crash
-import           Language.PureScript.Errors hiding (nonEmpty)
-import           Language.PureScript.Names
+import Data.Array ((!))
+import Data.Graph
+import Data.Set qualified as S
+import Language.PureScript.AST
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Crash
+import Language.PureScript.Errors hiding (nonEmpty)
+import Language.PureScript.Names
 
 -- | A list of modules with their transitive dependencies
 type ModuleGraph = [(ModuleName, [ModuleName])]

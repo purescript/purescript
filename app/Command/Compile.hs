@@ -2,27 +2,27 @@ module Command.Compile (command) where
 
 import Prelude
 
-import           Control.Applicative
-import           Control.Monad
-import qualified Data.Aeson as A
-import           Data.Bool (bool)
-import qualified Data.ByteString.Lazy.UTF8 as LBU8
-import           Data.List (intercalate)
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.Text as T
-import           Data.Traversable (for)
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
-import           Language.PureScript.Errors.JSON
-import           Language.PureScript.Make
-import qualified Options.Applicative as Opts
-import qualified System.Console.ANSI as ANSI
-import           System.Exit (exitSuccess, exitFailure)
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath.Glob (glob)
-import           System.IO (hPutStr, hPutStrLn, stderr, stdout)
-import           System.IO.UTF8 (readUTF8FilesT)
+import Control.Applicative
+import Control.Monad
+import Data.Aeson qualified as A
+import Data.Bool (bool)
+import Data.ByteString.Lazy.UTF8 qualified as LBU8
+import Data.List (intercalate)
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text qualified as T
+import Data.Traversable (for)
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Errors.JSON
+import Language.PureScript.Make
+import Options.Applicative qualified as Opts
+import System.Console.ANSI qualified as ANSI
+import System.Exit (exitSuccess, exitFailure)
+import System.Directory (getCurrentDirectory)
+import System.FilePath.Glob (glob)
+import System.IO (hPutStr, hPutStrLn, stderr, stdout)
+import System.IO.UTF8 (readUTF8FilesT)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]

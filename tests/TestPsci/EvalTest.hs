@@ -2,17 +2,17 @@ module TestPsci.EvalTest where
 
 import Prelude
 
-import           Control.Monad (forM_, foldM_)
-import           Control.Monad.IO.Class (liftIO)
-import           Data.List (stripPrefix, intercalate)
-import           Data.List.Split (splitOn)
-import           System.Directory (getCurrentDirectory)
-import           System.Exit (exitFailure)
-import           System.FilePath ((</>), takeFileName)
-import qualified System.FilePath.Glob as Glob
-import           System.IO.UTF8 (readUTF8File)
-import           Test.Hspec
-import           TestPsci.TestEnv
+import Control.Monad (forM_, foldM_)
+import Control.Monad.IO.Class (liftIO)
+import Data.List (stripPrefix, intercalate)
+import Data.List.Split (splitOn)
+import System.Directory (getCurrentDirectory)
+import System.Exit (exitFailure)
+import System.FilePath ((</>), takeFileName)
+import System.FilePath.Glob qualified as Glob
+import System.IO.UTF8 (readUTF8File)
+import Test.Hspec
+import TestPsci.TestEnv
 
 evalTests :: Spec
 evalTests = context "evalTests" $ do

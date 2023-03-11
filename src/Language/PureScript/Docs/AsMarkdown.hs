@@ -13,12 +13,12 @@ import Control.Monad.Writer (Writer, tell, execWriter)
 import Data.Foldable (for_)
 import Data.List (partition)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Docs.Render as Render
+import Language.PureScript qualified as P
+import Language.PureScript.Docs.Render qualified as Render
 
 moduleAsMarkdown :: Module -> Docs
 moduleAsMarkdown Module{..} = do

@@ -1,12 +1,12 @@
 module Language.PureScript.Ide.MatcherSpec where
 
-import           Protolude
+import Protolude
 
-import qualified Language.PureScript                 as P
-import           Language.PureScript.Ide.Matcher
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           Test.Hspec
+import Language.PureScript qualified as P
+import Language.PureScript.Ide.Matcher
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util
+import Test.Hspec
 
 value :: Text -> IdeDeclarationAnn
 value s = withEmptyAnn (IdeDeclValue (IdeValue (P.Ident (toS s)) P.srcREmpty))

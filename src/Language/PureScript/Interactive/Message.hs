@@ -1,12 +1,12 @@
 module Language.PureScript.Interactive.Message where
 
-import           Prelude
+import Prelude
 
-import           Data.List (intercalate)
-import           Data.Version (showVersion)
-import qualified Paths_purescript as Paths
-import qualified Language.PureScript.Interactive.Directive as D
-import           Language.PureScript.Interactive.Types
+import Data.List (intercalate)
+import Data.Version (showVersion)
+import Paths_purescript qualified as Paths
+import Language.PureScript.Interactive.Directive qualified as D
+import Language.PureScript.Interactive.Types
 
 -- Messages
 

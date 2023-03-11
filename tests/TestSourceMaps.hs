@@ -6,12 +6,12 @@ import Control.Monad (void, forM_)
 import Data.Aeson as Json
 import Test.Hspec
 import System.FilePath (replaceExtension, takeFileName, (</>), (<.>))
-import qualified Language.PureScript as P
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
+import Language.PureScript qualified as P
+import Data.ByteString qualified as BS
+import Data.ByteString.Lazy qualified as LBS
 import Data.Foldable (fold)
 import TestUtils (getTestFiles, SupportModules (..), compile', ExpectedModuleName (IsSourceMap))
-import qualified Data.Set as Set
+import Data.Set qualified as Set
 import TestCompiler (getTestMain)
 import System.Process.Typed (proc, readProcess_)
 

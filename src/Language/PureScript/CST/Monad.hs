@@ -3,7 +3,7 @@ module Language.PureScript.CST.Monad where
 import Prelude
 
 import Data.List (sortOn)
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Data.Ord (comparing)
 import Data.Text (Text)
 import Language.PureScript.CST.Errors

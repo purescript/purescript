@@ -6,12 +6,12 @@ module Language.PureScript.Docs.Collect
 import Protolude hiding (check)
 
 import Control.Arrow ((&&&))
-import qualified Data.Aeson.BetterErrors as ABE
-import qualified Data.ByteString as BS
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
+import Data.Aeson.BetterErrors qualified as ABE
+import Data.ByteString qualified as BS
+import Data.Map qualified as Map
+import Data.Set qualified as Set
+import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
 import System.FilePath ((</>))
 import System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
 
@@ -19,14 +19,14 @@ import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Prim (primModules)
 import Language.PureScript.Docs.Types
 
-import qualified Language.PureScript.AST as P
-import qualified Language.PureScript.CST as P
-import qualified Language.PureScript.Crash as P
-import qualified Language.PureScript.Errors as P
-import qualified Language.PureScript.Externs as P
-import qualified Language.PureScript.Make as P
-import qualified Language.PureScript.Names as P
-import qualified Language.PureScript.Options as P
+import Language.PureScript.AST qualified as P
+import Language.PureScript.CST qualified as P
+import Language.PureScript.Crash qualified as P
+import Language.PureScript.Errors qualified as P
+import Language.PureScript.Externs qualified as P
+import Language.PureScript.Make qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Options qualified as P
 
 import Web.Bower.PackageMeta (PackageName)
 

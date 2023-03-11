@@ -13,18 +13,18 @@ import Control.DeepSeq (NFData)
 import Control.Lens (Lens', (^.), set)
 import Control.Monad ((<=<), (>=>))
 import Data.Aeson ((.:), (.:?), (.!=), (.=))
-import qualified Data.Aeson as A
-import qualified Data.Aeson.Types as A
+import Data.Aeson qualified as A
+import Data.Aeson.Types qualified as A
 import Data.Foldable (fold, foldl')
-import qualified Data.IntSet as IS
+import Data.IntSet qualified as IS
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, isJust)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import GHC.Generics (Generic)
 
 import Language.PureScript.AST.SourcePos
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.Names
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)

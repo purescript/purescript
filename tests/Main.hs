@@ -6,21 +6,21 @@ import Prelude
 
 import Test.Hspec
 
-import qualified TestAst
-import qualified TestCompiler
-import qualified TestCoreFn
-import qualified TestCst
-import qualified TestDocs
-import qualified TestHierarchy
-import qualified TestPrimDocs
-import qualified TestPsci
-import qualified TestIde
-import qualified TestPscPublish
-import qualified TestSourceMaps
--- import qualified TestBundle
-import qualified TestMake
-import qualified TestUtils
-import qualified TestGraph
+import TestAst qualified
+import TestCompiler qualified
+import TestCoreFn qualified
+import TestCst qualified
+import TestDocs qualified
+import TestHierarchy qualified
+import TestPrimDocs qualified
+import TestPsci qualified
+import TestIde qualified
+import TestPscPublish qualified
+import TestSourceMaps qualified
+-- import TestBundle qualified
+import TestMake qualified
+import TestUtils qualified
+import TestGraph qualified
 
 import System.IO (hSetEncoding, stdout, stderr, utf8)
 

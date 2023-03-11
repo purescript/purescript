@@ -7,24 +7,24 @@ module Language.PureScript.CoreFn.ToJSON
   ( moduleToJSON
   ) where
 
-import           Prelude
+import Prelude
 
-import           Control.Arrow ((***))
-import           Data.Either (isLeft)
-import qualified Data.Map.Strict as M
-import           Data.Aeson hiding ((.=))
-import qualified Data.Aeson
-import qualified Data.Aeson.Key
-import           Data.Aeson.Types (Pair)
-import           Data.Version (Version, showVersion)
-import           Data.Text (Text)
-import qualified Data.Text as T
+import Control.Arrow ((***))
+import Data.Either (isLeft)
+import Data.Map.Strict qualified as M
+import Data.Aeson hiding ((.=))
+import Data.Aeson qualified
+import Data.Aeson.Key qualified
+import Data.Aeson.Types (Pair)
+import Data.Version (Version, showVersion)
+import Data.Text (Text)
+import Data.Text qualified as T
 
-import           Language.PureScript.AST.Literals
-import           Language.PureScript.AST.SourcePos (SourceSpan(..))
-import           Language.PureScript.CoreFn
-import           Language.PureScript.Names
-import           Language.PureScript.PSString (PSString)
+import Language.PureScript.AST.Literals
+import Language.PureScript.AST.SourcePos (SourceSpan(..))
+import Language.PureScript.CoreFn
+import Language.PureScript.Names
+import Language.PureScript.PSString (PSString)
 
 constructorTypeToJSON :: ConstructorType -> Value
 constructorTypeToJSON ProductType = toJSON "ProductType"

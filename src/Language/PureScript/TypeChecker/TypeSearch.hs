@@ -2,26 +2,26 @@ module Language.PureScript.TypeChecker.TypeSearch
   ( typeSearch
   ) where
 
-import           Protolude
+import Protolude
 
-import           Control.Monad.Writer (WriterT, runWriterT)
-import qualified Data.Map                                    as Map
-import qualified Language.PureScript.TypeChecker.Entailment  as Entailment
+import Control.Monad.Writer (WriterT, runWriterT)
+import Data.Map qualified as Map
+import Language.PureScript.TypeChecker.Entailment qualified as Entailment
 
-import qualified Language.PureScript.TypeChecker.Monad       as TC
-import           Language.PureScript.TypeChecker.Subsumption
-import           Language.PureScript.TypeChecker.Unify       as P
+import Language.PureScript.TypeChecker.Monad qualified as TC
+import Language.PureScript.TypeChecker.Subsumption
+import Language.PureScript.TypeChecker.Unify       as P
 
-import           Control.Monad.Supply                        as P
-import           Language.PureScript.AST                     as P
-import           Language.PureScript.Environment             as P
-import           Language.PureScript.Errors                  as P
-import           Language.PureScript.Label
-import           Language.PureScript.Names                   as P
-import           Language.PureScript.Pretty.Types            as P
-import           Language.PureScript.TypeChecker.Skolems     as Skolem
-import           Language.PureScript.TypeChecker.Synonyms    as P
-import           Language.PureScript.Types                   as P
+import Control.Monad.Supply                        as P
+import Language.PureScript.AST                     as P
+import Language.PureScript.Environment             as P
+import Language.PureScript.Errors                  as P
+import Language.PureScript.Label
+import Language.PureScript.Names                   as P
+import Language.PureScript.Pretty.Types            as P
+import Language.PureScript.TypeChecker.Skolems     as Skolem
+import Language.PureScript.TypeChecker.Synonyms    as P
+import Language.PureScript.Types                   as P
 
 checkInEnvironment
   :: Environment

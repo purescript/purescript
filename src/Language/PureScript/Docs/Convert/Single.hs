@@ -7,16 +7,16 @@ import Protolude hiding (moduleName)
 
 import Control.Category ((>>>))
 
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.Docs.Types
 
-import qualified Language.PureScript.AST as P
-import qualified Language.PureScript.Comments as P
-import qualified Language.PureScript.Crash as P
-import qualified Language.PureScript.Names as P
-import qualified Language.PureScript.Roles as P
-import qualified Language.PureScript.Types as P
+import Language.PureScript.AST qualified as P
+import Language.PureScript.Comments qualified as P
+import Language.PureScript.Crash qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Roles qualified as P
+import Language.PureScript.Types qualified as P
 
 -- |
 -- Convert a single Module, but ignore re-exports; any re-exported types or

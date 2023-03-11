@@ -10,12 +10,12 @@ import Control.Arrow ((<+>))
 import Control.Monad (forM, mzero)
 import Control.Monad.State (StateT, evalStateT)
 import Control.PatternArrows
-import qualified Control.Arrow as A
+import Control.Arrow qualified as A
 
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.List.NonEmpty as NEL (toList)
+import Data.Text qualified as T
+import Data.List.NonEmpty qualified as NEL (toList)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.CodeGen.JS.Common

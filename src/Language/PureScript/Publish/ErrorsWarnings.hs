@@ -22,16 +22,16 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.Monoid
 import Data.Version
-import qualified Data.List.NonEmpty as NonEmpty
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
-import qualified Language.PureScript.Docs.Types as D
-import qualified Language.PureScript as P
+import Language.PureScript.Docs.Types qualified as D
+import Language.PureScript qualified as P
 import Language.PureScript.Publish.BoxesHelpers
 
 import Web.Bower.PackageMeta (PackageName, runPackageName, showBowerError)
-import qualified Web.Bower.PackageMeta as Bower
+import Web.Bower.PackageMeta qualified as Bower
 import Language.PureScript.Docs.Types (showManifestError)
 
 -- | An error which meant that it was not possible to retrieve metadata for a

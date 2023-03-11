@@ -5,10 +5,10 @@ import Prelude
 import Data.List (sort)
 import Control.Exception (evaluate)
 import Control.DeepSeq (force)
-import qualified Data.Map as Map
-import qualified Data.Text as Text
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Docs as D
+import Data.Map qualified as Map
+import Data.Text qualified as Text
+import Language.PureScript qualified as P
+import Language.PureScript.Docs qualified as D
 
 import Test.Hspec
 

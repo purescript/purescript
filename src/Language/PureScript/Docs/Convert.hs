@@ -10,24 +10,24 @@ import Protolude hiding (check)
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (runWriterT)
 import Control.Monad.Supply (evalSupplyT)
-import qualified Data.List.NonEmpty as NE
-import qualified Data.Map as Map
+import Data.List.NonEmpty qualified as NE
+import Data.Map qualified as Map
 import Data.String (String)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
 import Language.PureScript.Docs.Types
-import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.AST as P
-import qualified Language.PureScript.Crash as P
-import qualified Language.PureScript.Errors as P
-import qualified Language.PureScript.Externs as P
-import qualified Language.PureScript.Environment as P
-import qualified Language.PureScript.Names as P
-import qualified Language.PureScript.Roles as P
-import qualified Language.PureScript.Sugar as P
-import qualified Language.PureScript.Types as P
-import qualified Language.PureScript.Constants.Prim as Prim
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.AST qualified as P
+import Language.PureScript.Crash qualified as P
+import Language.PureScript.Errors qualified as P
+import Language.PureScript.Externs qualified as P
+import Language.PureScript.Environment qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Roles qualified as P
+import Language.PureScript.Sugar qualified as P
+import Language.PureScript.Types qualified as P
+import Language.PureScript.Constants.Prim qualified as Prim
 import Language.PureScript.Sugar (RebracketCaller(CalledByDocs))
 
 -- |

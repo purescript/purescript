@@ -39,16 +39,16 @@ import Data.Bitraversable (bitraverse)
 import Data.Foldable (for_, traverse_)
 import Data.Function (on)
 import Data.Functor (($>))
-import qualified Data.IntSet as IS
+import Data.IntSet qualified as IS
 import Data.List (nubBy, sortOn, (\\))
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.Traversable (for)
 
 import Language.PureScript.Crash
-import qualified Language.PureScript.Environment as E
+import Language.PureScript.Environment qualified as E
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad

@@ -18,9 +18,9 @@ import Control.Monad (unless, when, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State (MonadState(..), runState, state)
 import Data.Coerce (coerce)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Maybe (fromMaybe)
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Semigroup (Any(..))
 import Data.Text (Text)
 

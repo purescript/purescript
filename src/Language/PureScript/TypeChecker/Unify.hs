@@ -23,11 +23,11 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Foldable (traverse_)
 import Data.Maybe (fromMaybe)
-import qualified Data.Map as M
-import qualified Data.Text as T
+import Data.Map qualified as M
+import Data.Text qualified as T
 
 import Language.PureScript.Crash
-import qualified Language.PureScript.Environment as E
+import Language.PureScript.Environment qualified as E
 import Language.PureScript.Errors
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, instantiateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad

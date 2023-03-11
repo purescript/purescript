@@ -19,34 +19,34 @@ module Language.PureScript.Make.Monad
   , copyFile
   ) where
 
-import           Prelude
+import Prelude
 
-import           Codec.Serialise (Serialise)
-import qualified Codec.Serialise as Serialise
-import           Control.Exception (fromException, tryJust)
-import           Control.Monad (join, guard)
-import           Control.Monad.Base (MonadBase(..))
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader(..), ReaderT(..))
-import           Control.Monad.Trans.Control (MonadBaseControl(..))
-import           Control.Monad.Trans.Except
-import           Control.Monad.Writer.Class (MonadWriter(..))
-import qualified Data.Aeson as Aeson
-import qualified Data.ByteString as B
-import           Data.Text (Text)
-import qualified Data.Text as Text
-import           Data.Time.Clock (UTCTime)
-import           Language.PureScript.Errors
-import           Language.PureScript.Externs (ExternsFile, externsIsCurrentVersion)
-import           Language.PureScript.Make.Cache (ContentHash, hash)
-import           Language.PureScript.Options
-import           System.Directory (createDirectoryIfMissing, getModificationTime)
-import qualified System.Directory as Directory
-import           System.FilePath (takeDirectory)
-import           System.IO.Error (tryIOError, isDoesNotExistError)
-import           System.IO.UTF8 (readUTF8FileT)
+import Codec.Serialise (Serialise)
+import Codec.Serialise qualified as Serialise
+import Control.Exception (fromException, tryJust)
+import Control.Monad (join, guard)
+import Control.Monad.Base (MonadBase(..))
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.IO.Class
+import Control.Monad.Logger
+import Control.Monad.Reader (MonadReader(..), ReaderT(..))
+import Control.Monad.Trans.Control (MonadBaseControl(..))
+import Control.Monad.Trans.Except
+import Control.Monad.Writer.Class (MonadWriter(..))
+import Data.Aeson qualified as Aeson
+import Data.ByteString qualified as B
+import Data.Text (Text)
+import Data.Text qualified as Text
+import Data.Time.Clock (UTCTime)
+import Language.PureScript.Errors
+import Language.PureScript.Externs (ExternsFile, externsIsCurrentVersion)
+import Language.PureScript.Make.Cache (ContentHash, hash)
+import Language.PureScript.Options
+import System.Directory (createDirectoryIfMissing, getModificationTime)
+import System.Directory qualified as Directory
+import System.FilePath (takeDirectory)
+import System.IO.Error (tryIOError, isDoesNotExistError)
+import System.IO.UTF8 (readUTF8FileT)
 
 -- | A monad for running make actions
 newtype Make a = Make

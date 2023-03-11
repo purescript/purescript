@@ -5,8 +5,8 @@ module TestMake where
 
 import Prelude
 
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
 
 import Control.Concurrent (threadDelay)
 import Control.Monad
@@ -15,10 +15,10 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent.MVar (readMVar, newMVar, modifyMVar_)
 import Data.Time.Calendar
 import Data.Time.Clock
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.Set (Set)
-import qualified Data.Set as Set
-import qualified Data.Map as M
+import Data.Set qualified as Set
+import Data.Map qualified as M
 
 import System.FilePath
 import System.Directory

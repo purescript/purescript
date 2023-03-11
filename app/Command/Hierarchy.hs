@@ -15,24 +15,24 @@
 
 module Command.Hierarchy (command) where
 
-import           Prelude
-import           Protolude (catMaybes)
+import Prelude
+import Protolude (catMaybes)
 
-import           Control.Applicative (optional)
-import           Data.Foldable (for_)
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import           Options.Applicative (Parser)
-import qualified Options.Applicative as Opts
-import           System.Directory (createDirectoryIfMissing)
-import           System.FilePath ((</>))
-import           System.FilePath.Glob (glob)
-import           System.Exit (exitFailure, exitSuccess)
-import           System.IO (hPutStr, stderr)
-import           System.IO.UTF8 (readUTF8FilesT)
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
-import           Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
+import Control.Applicative (optional)
+import Data.Foldable (for_)
+import Data.Text qualified as T
+import Data.Text.IO qualified as T
+import Options.Applicative (Parser)
+import Options.Applicative qualified as Opts
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath ((</>))
+import System.FilePath.Glob (glob)
+import System.Exit (exitFailure, exitSuccess)
+import System.IO (hPutStr, stderr)
+import System.IO.UTF8 (readUTF8FilesT)
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
 
 data HierarchyOptions = HierarchyOptions
   { _hierarchyInput   :: FilePath

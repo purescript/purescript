@@ -7,18 +7,18 @@ import Control.Monad (void, guard)
 import Control.Monad.IO.Class (liftIO)
 import Data.ByteString.Lazy (ByteString)
 import Data.Time.Clock (getCurrentTime)
-import qualified Data.Aeson as A
+import Data.Aeson qualified as A
 import Data.Version
 import Data.Foldable (forM_)
-import qualified Text.PrettyPrint.Boxes as Boxes
+import Text.PrettyPrint.Boxes qualified as Boxes
 import System.Directory (listDirectory, removeDirectoryRecursive)
 import System.FilePath ((</>))
 import System.IO.Error (isDoesNotExistError)
 
 import Language.PureScript.Docs
 import Language.PureScript.Publish (PublishOptions(..), defaultPublishOptions)
-import qualified Language.PureScript.Publish as Publish
-import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
+import Language.PureScript.Publish qualified as Publish
+import Language.PureScript.Publish.ErrorsWarnings qualified as Publish
 
 import Test.Hspec
 import TestUtils hiding (inferForeignModules, makeActions)

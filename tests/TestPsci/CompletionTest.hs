@@ -4,14 +4,14 @@ import Prelude
 
 import Test.Hspec
 
-import           Control.Monad.Trans.State.Strict (evalStateT)
-import           Data.Functor ((<&>))
-import           Data.List (sort)
-import qualified Data.Text as T
-import qualified Language.PureScript as P
-import           Language.PureScript.Interactive
-import           TestPsci.TestEnv (initTestPSCiEnv)
-import           TestUtils (getSupportModuleNames)
+import Control.Monad.Trans.State.Strict (evalStateT)
+import Data.Functor ((<&>))
+import Data.List (sort)
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.Interactive
+import TestPsci.TestEnv (initTestPSCiEnv)
+import TestUtils (getSupportModuleNames)
 
 completionTests :: Spec
 completionTests = context "completionTests" $

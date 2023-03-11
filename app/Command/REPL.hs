@@ -3,26 +3,26 @@
 
 module Command.REPL (command) where
 
-import           Prelude
-import           Control.Applicative (many, (<|>))
-import           Control.Monad
-import           Control.Monad.Catch (MonadMask)
-import           Control.Monad.IO.Class (liftIO, MonadIO)
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
-import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
-import           Data.Foldable (for_)
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
-import           Language.PureScript.Interactive
-import qualified Options.Applicative as Opts
-import           System.Console.Haskeline
-import           System.IO.UTF8 (readUTF8File)
-import           System.Exit
-import           System.Directory (doesFileExist, getCurrentDirectory)
-import           System.FilePath ((</>))
-import qualified System.FilePath.Glob as Glob
+import Prelude
+import Control.Applicative (many, (<|>))
+import Control.Monad
+import Control.Monad.Catch (MonadMask)
+import Control.Monad.IO.Class (liftIO, MonadIO)
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
+import Control.Monad.Trans.State.Strict (StateT, evalStateT)
+import Control.Monad.Trans.Reader (ReaderT, runReaderT)
+import Data.Foldable (for_)
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Interactive
+import Options.Applicative qualified as Opts
+import System.Console.Haskeline
+import System.IO.UTF8 (readUTF8File)
+import System.Exit
+import System.Directory (doesFileExist, getCurrentDirectory)
+import System.FilePath ((</>))
+import System.FilePath.Glob qualified as Glob
 import System.IO (hPutStrLn, stderr)
 
 -- | Command line options

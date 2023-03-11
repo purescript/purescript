@@ -6,17 +6,17 @@ import Data.Bifunctor (first)
 import Data.List (findIndex)
 import Data.Foldable
 import Safe (headMay)
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isNothing, mapMaybe)
 import Data.Monoid
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Text.PrettyPrint.Boxes as Boxes
+import Data.Text qualified as T
+import Text.PrettyPrint.Boxes qualified as Boxes
 
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Docs as Docs
+import Language.PureScript qualified as P
+import Language.PureScript.Docs qualified as Docs
 import Language.PureScript.Docs.AsMarkdown (codeToString)
-import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
+import Language.PureScript.Publish.ErrorsWarnings qualified as Publish
 
 import Web.Bower.PackageMeta (parsePackageName, runPackageName)
 

@@ -13,8 +13,8 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Data.Void (Void)
 import GHC.Generics (Generic)
-import qualified Language.PureScript.Names as N
-import qualified Language.PureScript.Roles as R
+import Language.PureScript.Names qualified as N
+import Language.PureScript.Roles qualified as R
 import Language.PureScript.PSString (PSString)
 
 data SourcePos = SourcePos

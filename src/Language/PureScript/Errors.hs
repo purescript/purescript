@@ -3,56 +3,56 @@ module Language.PureScript.Errors
   , module Language.PureScript.Errors
   ) where
 
-import           Prelude
-import           Protolude (unsnoc)
+import Prelude
+import Protolude (unsnoc)
 
-import           Control.Arrow ((&&&))
-import           Control.Exception (displayException)
-import           Control.Lens (both, head1, over)
-import           Control.Monad
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Trans.State.Lazy
-import           Control.Monad.Writer
-import           Data.Bifunctor (first, second)
-import           Data.Bitraversable (bitraverse)
-import           Data.Char (isSpace)
-import           Data.Containers.ListUtils (nubOrdOn)
-import           Data.Either (partitionEithers)
-import           Data.Foldable (fold)
-import           Data.Function (on)
-import           Data.Functor (($>))
-import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn, uncons)
-import qualified Data.List.NonEmpty as NEL
-import           Data.List.NonEmpty (NonEmpty((:|)))
-import           Data.Maybe (maybeToList, fromMaybe, isJust, mapMaybe)
-import qualified Data.Map as M
-import           Data.Ord (Down(..))
-import qualified Data.Set as S
-import qualified Data.Text as T
-import           Data.Text (Text)
-import           Data.Traversable (for)
-import qualified GHC.Stack
-import           Language.PureScript.AST
-import qualified Language.PureScript.Bundle as Bundle
-import qualified Language.PureScript.Constants.Libs as C
-import qualified Language.PureScript.Constants.Prim as C
-import           Language.PureScript.Crash
-import qualified Language.PureScript.CST.Errors as CST
-import qualified Language.PureScript.CST.Print as CST
-import           Language.PureScript.Label (Label(..))
-import           Language.PureScript.Names
-import           Language.PureScript.Pretty
-import           Language.PureScript.Pretty.Common (endWith)
-import           Language.PureScript.PSString (decodeStringWithReplacement)
-import           Language.PureScript.Roles
-import           Language.PureScript.Traversals
-import           Language.PureScript.Types
-import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
-import qualified System.Console.ANSI as ANSI
-import           System.FilePath (makeRelative)
-import qualified Text.PrettyPrint.Boxes as Box
-import           Witherable (wither)
+import Control.Arrow ((&&&))
+import Control.Exception (displayException)
+import Control.Lens (both, head1, over)
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Trans.State.Lazy
+import Control.Monad.Writer
+import Data.Bifunctor (first, second)
+import Data.Bitraversable (bitraverse)
+import Data.Char (isSpace)
+import Data.Containers.ListUtils (nubOrdOn)
+import Data.Either (partitionEithers)
+import Data.Foldable (fold)
+import Data.Function (on)
+import Data.Functor (($>))
+import Data.Functor.Identity (Identity(..))
+import Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn, uncons)
+import Data.List.NonEmpty qualified as NEL
+import Data.List.NonEmpty (NonEmpty((:|)))
+import Data.Maybe (maybeToList, fromMaybe, isJust, mapMaybe)
+import Data.Map qualified as M
+import Data.Ord (Down(..))
+import Data.Set qualified as S
+import Data.Text qualified as T
+import Data.Text (Text)
+import Data.Traversable (for)
+import GHC.Stack qualified
+import Language.PureScript.AST
+import Language.PureScript.Bundle qualified as Bundle
+import Language.PureScript.Constants.Libs qualified as C
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Crash
+import Language.PureScript.CST.Errors qualified as CST
+import Language.PureScript.CST.Print qualified as CST
+import Language.PureScript.Label (Label(..))
+import Language.PureScript.Names
+import Language.PureScript.Pretty
+import Language.PureScript.Pretty.Common (endWith)
+import Language.PureScript.PSString (decodeStringWithReplacement)
+import Language.PureScript.Roles
+import Language.PureScript.Traversals
+import Language.PureScript.Types
+import Language.PureScript.Publish.BoxesHelpers qualified as BoxHelpers
+import System.Console.ANSI qualified as ANSI
+import System.FilePath (makeRelative)
+import Text.PrettyPrint.Boxes qualified as Box
+import Witherable (wither)
 
 -- | A type of error messages
 data SimpleErrorMessage

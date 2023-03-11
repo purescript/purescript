@@ -23,10 +23,10 @@ import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
 import Data.Foldable (fold)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.Version (showVersion)
-import qualified Data.Map as M
-import qualified Data.List.NonEmpty as NEL
+import Data.Map qualified as M
+import Data.List.NonEmpty qualified as NEL
 
 import Language.PureScript.AST
 import Language.PureScript.AST.Declarations.ChainId (ChainId)

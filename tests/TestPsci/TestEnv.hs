@@ -2,21 +2,21 @@ module TestPsci.TestEnv where
 
 import Prelude
 
-import           Control.Exception.Lifted (bracket_)
-import           Control.Monad (void, when)
-import           Control.Monad.IO.Class (liftIO)
-import           Control.Monad.Trans.RWS.Strict (evalRWST, asks, local, RWST)
-import           Data.Foldable (traverse_)
-import           Data.List (isSuffixOf)
-import qualified Data.Text as T
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
-import           Language.PureScript.Interactive
-import           System.Directory (getCurrentDirectory, doesPathExist, removeFile)
-import           System.Exit
-import           System.FilePath ((</>), pathSeparator)
-import qualified System.FilePath.Glob as Glob
-import           Test.Hspec (shouldBe, Expectation)
+import Control.Exception.Lifted (bracket_)
+import Control.Monad (void, when)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.RWS.Strict (evalRWST, asks, local, RWST)
+import Data.Foldable (traverse_)
+import Data.List (isSuffixOf)
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Interactive
+import System.Directory (getCurrentDirectory, doesPathExist, removeFile)
+import System.Exit
+import System.FilePath ((</>), pathSeparator)
+import System.FilePath.Glob qualified as Glob
+import Test.Hspec (shouldBe, Expectation)
 
 -- | A monad transformer for handle PSCi actions in tests
 type TestPSCi a = RWST PSCiConfig () PSCiState IO a

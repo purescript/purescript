@@ -11,23 +11,23 @@ module Language.PureScript.Ide.Imports.Actions
        )
 where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
-import           Control.Lens                       ((^.), has)
-import           Data.List                          (nubBy)
-import qualified Data.Map                           as Map
-import qualified Data.Text                          as T
-import qualified Language.PureScript                as P
-import qualified Language.PureScript.Constants.Prim as C
-import           Language.PureScript.Ide.Completion
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Filter
-import           Language.PureScript.Ide.Imports
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Prim
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           System.IO.UTF8                     (writeUTF8FileT)
+import Control.Lens ((^.), has)
+import Data.List (nubBy)
+import Data.Map qualified as Map
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Ide.Completion
+import Language.PureScript.Ide.Error
+import Language.PureScript.Ide.Filter
+import Language.PureScript.Ide.Imports
+import Language.PureScript.Ide.State
+import Language.PureScript.Ide.Prim
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util
+import System.IO.UTF8 (writeUTF8FileT)
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
 addImplicitImport

@@ -1,15 +1,15 @@
 module Language.PureScript.Ide.UsageSpec where
 
-import           Protolude
+import Protolude
 
-import qualified Data.Text as Text
-import           Language.PureScript.Ide.Command
-import           Language.PureScript.Ide.Types
-import qualified Language.PureScript.Ide.Test as Test
-import qualified Language.PureScript as P
-import           Test.Hspec
-import           Data.Text.Read (decimal)
-import           System.FilePath
+import Data.Text qualified as Text
+import Language.PureScript.Ide.Command
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Test qualified as Test
+import Language.PureScript qualified as P
+import Test.Hspec
+import Data.Text.Read (decimal)
+import System.FilePath
 
 load :: [Text] -> Command
 load = LoadSync . map Test.mn

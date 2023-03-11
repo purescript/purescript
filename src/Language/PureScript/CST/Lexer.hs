@@ -10,15 +10,15 @@ module Language.PureScript.CST.Lexer
 import Prelude hiding (lex, exp, exponent, lines)
 
 import Control.Monad (join)
-import qualified Data.Char as Char
-import qualified Data.DList as DList
+import Data.Char qualified as Char
+import Data.DList qualified as DList
 import Data.Foldable (foldl')
 import Data.Functor (($>))
-import qualified Data.Scientific as Sci
+import Data.Scientific qualified as Sci
 import Data.String (fromString)
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.PureScript as Text
+import Data.Text qualified as Text
+import Data.Text.PureScript qualified as Text
 import Language.PureScript.CST.Errors
 import Language.PureScript.CST.Monad hiding (token)
 import Language.PureScript.CST.Layout

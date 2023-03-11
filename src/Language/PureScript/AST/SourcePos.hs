@@ -12,8 +12,8 @@ import Data.Aeson ((.=), (.:))
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Language.PureScript.Comments
-import qualified Data.Aeson as A
-import qualified Data.Text as T
+import Data.Aeson qualified as A
+import Data.Text qualified as T
 import System.FilePath (makeRelative)
 
 -- | Source annotation - position information and comments.

@@ -5,8 +5,8 @@ import Prelude
 import Test.Hspec
 import Data.Either (isLeft)
 
-import qualified Data.Aeson as Json
-import qualified Language.PureScript as P
+import Data.Aeson qualified as Json
+import Language.PureScript qualified as P
 
 spec :: Spec
 spec = do

@@ -29,20 +29,20 @@ module Language.PureScript.Ide.Util
   , module Language.PureScript.Ide.Logging
   ) where
 
-import           Protolude                           hiding (decodeUtf8,
+import Protolude                           hiding (decodeUtf8,
                                                       encodeUtf8, to)
 
-import           Control.Lens                        hiding (op, (&))
-import           Data.Aeson
-import qualified Data.Text                           as T
-import qualified Data.Text.Lazy                      as TL
-import           Data.Text.Lazy.Encoding             as TLE
-import qualified Language.PureScript                 as P
-import           Language.PureScript.Ide.Error       (IdeError(..))
-import           Language.PureScript.Ide.Logging
-import           Language.PureScript.Ide.Types
-import           System.IO.UTF8                      (readUTF8FileT)
-import           System.Directory                    (makeAbsolute)
+import Control.Lens                        hiding (op, (&))
+import Data.Aeson
+import Data.Text qualified as T
+import Data.Text.Lazy qualified as TL
+import Data.Text.Lazy.Encoding             as TLE
+import Language.PureScript qualified as P
+import Language.PureScript.Ide.Error (IdeError(..))
+import Language.PureScript.Ide.Logging
+import Language.PureScript.Ide.Types
+import System.IO.UTF8 (readUTF8FileT)
+import System.Directory (makeAbsolute)
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of

@@ -2,15 +2,15 @@ module Command.Publish (command) where
 
 import Prelude
 
-import           Control.Monad.IO.Class (liftIO)
-import qualified Data.Aeson as A
-import qualified Data.ByteString.Lazy.Char8 as BL
-import           Data.Time.Clock (getCurrentTime)
-import           Data.Version (Version(..))
-import           Language.PureScript.Publish
-import           Language.PureScript.Publish.ErrorsWarnings
-import           Options.Applicative (Parser)
-import qualified Options.Applicative as Opts
+import Control.Monad.IO.Class (liftIO)
+import Data.Aeson qualified as A
+import Data.ByteString.Lazy.Char8 qualified as BL
+import Data.Time.Clock (getCurrentTime)
+import Data.Version (Version(..))
+import Language.PureScript.Publish
+import Language.PureScript.Publish.ErrorsWarnings
+import Options.Applicative (Parser)
+import Options.Applicative qualified as Opts
 
 data PublishOptionsCLI = PublishOptionsCLI
   { cliManifestPath :: FilePath

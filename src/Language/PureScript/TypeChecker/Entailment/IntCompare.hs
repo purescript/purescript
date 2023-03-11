@@ -6,12 +6,12 @@ module Language.PureScript.TypeChecker.Entailment.IntCompare where
 
 import Protolude
 
-import qualified Data.Graph as G
-import qualified Data.Map as M
+import Data.Graph qualified as G
+import Data.Map qualified as M
 
-import qualified Language.PureScript.Names as P
-import qualified Language.PureScript.Types as P
-import qualified Language.PureScript.Constants.Prim as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Types qualified as P
+import Language.PureScript.Constants.Prim qualified as P
 
 data Relation a
   = Equal a a

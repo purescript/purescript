@@ -13,8 +13,8 @@ import Language.PureScript.CoreFn.Module
 import Language.PureScript.CoreFn.Traversals
 import Language.PureScript.Label
 import Language.PureScript.Types
-import qualified Language.PureScript.Constants.Libs as C
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Libs qualified as C
+import Language.PureScript.Constants.Prim qualified as C
 
 -- |
 -- CoreFn optimization pass.

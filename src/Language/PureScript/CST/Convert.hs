@@ -21,19 +21,19 @@ import Data.Bifunctor (bimap, first)
 import Data.Char (toLower)
 import Data.Foldable (foldl', toList)
 import Data.Functor (($>))
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Data.Maybe (isJust, fromJust, mapMaybe)
-import qualified Data.Text as Text
-import qualified Language.PureScript.AST as AST
+import Data.Text qualified as Text
+import Language.PureScript.AST qualified as AST
 import Language.PureScript.AST.Declarations.ChainId (mkChainId)
-import qualified Language.PureScript.AST.SourcePos as Pos
-import qualified Language.PureScript.Comments as C
+import Language.PureScript.AST.SourcePos qualified as Pos
+import Language.PureScript.Comments qualified as C
 import Language.PureScript.Crash (internalError)
-import qualified Language.PureScript.Environment as Env
-import qualified Language.PureScript.Label as L
-import qualified Language.PureScript.Names as N
+import Language.PureScript.Environment qualified as Env
+import Language.PureScript.Label qualified as L
+import Language.PureScript.Names qualified as N
 import Language.PureScript.PSString (mkString, prettyPrintStringJS)
-import qualified Language.PureScript.Types as T
+import Language.PureScript.Types qualified as T
 import Language.PureScript.CST.Positions
 import Language.PureScript.CST.Print (printToken)
 import Language.PureScript.CST.Types
