@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad (unless)
 import Language.PureScript.Ide.Test
-import qualified PscIdeSpec
+import PscIdeSpec qualified
 import Test.Hspec
 
 spec :: Spec
