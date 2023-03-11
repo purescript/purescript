@@ -12,55 +12,20 @@ import Data.List.NonEmpty qualified as NEL
 import Data.Map qualified as M
 
 import Language.PureScript.AST.Literals ( Literal(BooleanLiteral) )
-import Language.PureScript.AST.SourcePos
-    ( pattern NullSourceSpan, SourceSpan(spanName) )
+import Language.PureScript.AST.SourcePos ( pattern NullSourceSpan, SourceSpan(spanName) )
 import Language.PureScript.AST.Traversals ( everythingOnValues )
 import Language.PureScript.Comments ( Comment )
 import Language.PureScript.CoreFn.Ann ( ssAnn, Ann )
 import Language.PureScript.CoreFn.Binders ( Binder(..) )
-import Language.PureScript.CoreFn.Expr
-    ( Bind(..), CaseAlternative(CaseAlternative), Expr(..), Guard )
-import Language.PureScript.CoreFn.Meta
-    ( ConstructorType(SumType, ProductType), Meta(..) )
+import Language.PureScript.CoreFn.Expr ( Bind(..), CaseAlternative(CaseAlternative), Expr(..), Guard )
+import Language.PureScript.CoreFn.Meta ( ConstructorType(SumType, ProductType), Meta(..) )
 import Language.PureScript.CoreFn.Module ( Module(Module) )
 import Language.PureScript.Crash ( internalError )
-import Language.PureScript.Environment
-    ( isDictTypeName,
-      lookupConstructor,
-      lookupValue,
-      DataDeclType(..),
-      Environment(dataConstructors),
-      NameKind(External) )
-import Language.PureScript.Names
-    ( pattern ByNullSourcePos,
-      getQual,
-      Ident(Ident),
-      ModuleName,
-      ProperName(runProperName),
-      ProperNameType(TypeName, ConstructorName),
-      Qualified(..),
-      QualifiedBy(ByModuleName) )
+import Language.PureScript.Environment ( isDictTypeName, lookupConstructor, lookupValue, DataDeclType(..), Environment(dataConstructors), NameKind(External) )
+import Language.PureScript.Names ( pattern ByNullSourcePos, getQual, Ident(Ident), ModuleName, ProperName(runProperName), ProperNameType(TypeName, ConstructorName), Qualified(..), QualifiedBy(ByModuleName) )
 import Language.PureScript.Types ( SourceType )
-import Language.PureScript.AST.Binders qualified as A
-    ( Binder(..) )
-import Language.PureScript.AST.Declarations qualified as A
-    ( pattern MkUnguarded,
-      pattern TypeFixityDeclaration,
-      pattern ValueDecl,
-      pattern ValueFixityDeclaration,
-      CaseAlternative(CaseAlternative),
-      DataConstructorDeclaration(dataCtorName),
-      Declaration(DataDeclaration, DataBindingGroupDeclaration,
-                  BindingGroupDeclaration, ExternDeclaration,
-                  TypeInstanceDeclaration, ImportDeclaration),
-      DeclarationRef(..),
-      ExportSource(exportSourceImportedFrom),
-      Expr(Literal, ObjectUpdate, Abs, App, Accessor, Unused, IfThenElse,
-           Case, TypedValue, Let, PositionedValue, Constructor, Var),
-      Guard(ConditionGuard),
-      GuardedExpr(..),
-      Module(..),
-      WhereProvenance(..) )
+import Language.PureScript.AST.Binders qualified as A ( Binder(..) )
+import Language.PureScript.AST.Declarations qualified as A ( pattern MkUnguarded, pattern TypeFixityDeclaration, pattern ValueDecl, pattern ValueFixityDeclaration, CaseAlternative(CaseAlternative), DataConstructorDeclaration(dataCtorName), Declaration(DataDeclaration, DataBindingGroupDeclaration, BindingGroupDeclaration, ExternDeclaration, TypeInstanceDeclaration, ImportDeclaration), DeclarationRef(..), ExportSource(exportSourceImportedFrom), Expr(Literal, ObjectUpdate, Abs, App, Accessor, Unused, IfThenElse, Case, TypedValue, Let, PositionedValue, Constructor, Var), Guard(ConditionGuard), GuardedExpr(..), Module(..), WhereProvenance(..) )
 import Language.PureScript.Constants.Prim qualified as C
 
 -- | Desugars a module from AST to CoreFn representation.
