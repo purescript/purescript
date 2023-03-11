@@ -2,7 +2,7 @@
 module Language.PureScript.Ide.Test where
 
 import Control.Concurrent.STM
-import           "monad-logger" Control.Monad.Logger
+import "monad-logger" Control.Monad.Logger
 import Data.IORef
 import Data.Map qualified as Map
 import Language.PureScript.Ide
