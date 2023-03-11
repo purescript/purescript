@@ -12,13 +12,13 @@ import Data.Text qualified as T
 import Language.PureScript.Docs.Types ( convertFundepsToStrings, isType, isTypeClass, ChildDeclaration(ChildDeclaration), ChildDeclarationInfo(ChildInstance, ChildDataConstructor, ChildTypeClassMember), Declaration(..), DeclarationInfo(..), KindInfo(KindInfo, kiKind, kiKeyword), Module(Module), Type' )
 
 import Language.PureScript.AST.Declarations qualified as P ( pattern MkUnguarded, pattern TypeFixityDeclaration, pattern ValueDecl, pattern ValueFixityDeclaration, DataConstructorDeclaration(..), Declaration(RoleDeclaration, ValueDeclaration, ExternDeclaration, DataDeclaration, ExternDataDeclaration, TypeSynonymDeclaration, TypeClassDeclaration, TypeDeclaration, TypeInstanceDeclaration, KindDeclaration), Expr(TypedValue), KindSignatureFor, Module(..), RoleDeclarationData(RoleDeclarationData, rdeclSourceAnn, rdeclRoles, rdeclIdent), TypeDeclarationData(TypeDeclarationData), ValueDeclarationData(valdeclIdent) )
-import Language.PureScript.AST.Exported qualified as P ( exportedDeclarations )
-import Language.PureScript.AST.SourcePos qualified as P ( SourceAnn )
-import Language.PureScript.Comments as P ( Comment(..) )
-import Language.PureScript.Crash as P ( internalError )
-import Language.PureScript.Names as P ( coerceProperName, showIdent, showOp, ProperName(runProperName), Qualified(Qualified) )
-import Language.PureScript.Roles as P ( Role )
-import Language.PureScript.Types as P ( everythingOnTypes, srcTypeApp, srcTypeConstructor, Type(TypeConstructor, TypeWildcard), WildcardData(UnnamedWildcard) )
+import Language.PureScript.AST.Exported ( exportedDeclarations )
+import Language.PureScript.AST.SourcePos ( SourceAnn )
+import Language.PureScript.Comments qualified as Comments
+import Language.PureScript.Crash ( internalError )
+import Language.PureScript.Names qualified as PN
+import Language.PureScript.Roles ( Role )
+import Language.PureScript.Types qualified as PT
 
 -- |
 -- Convert a single Module, but ignore re-exports; any re-exported types or
@@ -30,7 +30,7 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
   where
   comments = convertComments coms
   declarations =
-    P.exportedDeclarations
+    exportedDeclarations
     >>> mapMaybe (\d -> getDeclarationTitle d >>= convertDeclaration d)
     >>> augmentDeclarations
 
@@ -76,7 +76,7 @@ type IntermediateDeclaration
 data DeclarationAugment
   = AugmentChild ChildDeclaration
   | AugmentKindSig KindSignatureInfo
-  | AugmentRole (Maybe Text) [P.Role]
+  | AugmentRole (Maybe Text) [Role]
 
 data KindSignatureInfo = KindSignatureInfo
   { ksiComments :: Maybe Text
@@ -114,14 +114,14 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
         DataDeclaration dataDeclType args [] ->
           DataDeclaration dataDeclType args roles
         DataDeclaration _ _ _ ->
-          P.internalError "augmentWith: could not add a second role declaration to a data declaration"
+          internalError "augmentWith: could not add a second role declaration to a data declaration"
 
         ExternDataDeclaration kind [] ->
           ExternDataDeclaration kind roles
         ExternDataDeclaration _ _ ->
-          P.internalError "augmentWith: could not add a second role declaration to an FFI declaration"
+          internalError "augmentWith: could not add a second role declaration to an FFI declaration"
 
-        _ -> P.internalError "augmentWith: could not add role to declaration"
+        _ -> internalError "augmentWith: could not add role to declaration"
 
   mergeComments :: Maybe Text -> Maybe Text -> Maybe Text
   mergeComments Nothing bot = bot
@@ -130,21 +130,21 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
     Just $ topComs <> "\n" <> bottomComs
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
-getDeclarationTitle (P.ValueDeclaration vd) = Just (P.showIdent (P.valdeclIdent vd))
-getDeclarationTitle (P.ExternDeclaration _ name _) = Just (P.showIdent name)
-getDeclarationTitle (P.DataDeclaration _ _ name _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.ExternDataDeclaration _ name _) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeSynonymDeclaration _ name _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ _ name _ _ _ _) = Just $ either (const "<anonymous>") P.showIdent name
-getDeclarationTitle (P.TypeFixityDeclaration _ _ _ op) = Just ("type " <> P.showOp op)
-getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (P.showOp op)
-getDeclarationTitle (P.KindDeclaration _ _ n _) = Just (P.runProperName n)
-getDeclarationTitle (P.RoleDeclaration P.RoleDeclarationData{..}) = Just (P.runProperName rdeclIdent)
+getDeclarationTitle (P.ValueDeclaration vd) = Just (PN.showIdent (P.valdeclIdent vd))
+getDeclarationTitle (P.ExternDeclaration _ name _) = Just (PN.showIdent name)
+getDeclarationTitle (P.DataDeclaration _ _ name _ _) = Just (PN.runProperName name)
+getDeclarationTitle (P.ExternDataDeclaration _ name _) = Just (PN.runProperName name)
+getDeclarationTitle (P.TypeSynonymDeclaration _ name _ _) = Just (PN.runProperName name)
+getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _) = Just (PN.runProperName name)
+getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ _ name _ _ _ _) = Just $ either (const "<anonymous>") PN.showIdent name
+getDeclarationTitle (P.TypeFixityDeclaration _ _ _ op) = Just ("type " <> PN.showOp op)
+getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (PN.showOp op)
+getDeclarationTitle (P.KindDeclaration _ _ n _) = Just (PN.runProperName n)
+getDeclarationTitle (P.RoleDeclaration P.RoleDeclarationData{..}) = Just (PN.runProperName rdeclIdent)
 getDeclarationTitle _ = Nothing
 
 -- | Create a basic Declaration value.
-mkDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Declaration
+mkDeclaration :: SourceAnn -> Text -> DeclarationInfo -> Declaration
 mkDeclaration (ss, com) title info =
   Declaration { declTitle      = title
               , declComments   = convertComments com
@@ -154,7 +154,7 @@ mkDeclaration (ss, com) title info =
               , declKind       = Nothing -- kind sigs are added in augment pass
               }
 
-basicDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Maybe IntermediateDeclaration
+basicDeclaration :: SourceAnn -> Text -> DeclarationInfo -> Maybe IntermediateDeclaration
 basicDeclaration sa title = Just . Right . mkDeclaration sa title
 
 convertDeclaration :: P.Declaration -> Text -> Maybe IntermediateDeclaration
@@ -163,7 +163,7 @@ convertDeclaration (P.ValueDecl sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) 
 convertDeclaration (P.ValueDecl sa _ _ _ _) title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
-  basicDeclaration sa title (ValueDeclaration (P.TypeWildcard () P.UnnamedWildcard))
+  basicDeclaration sa title (ValueDeclaration (PT.TypeWildcard () PT.UnnamedWildcard))
 convertDeclaration (P.ExternDeclaration sa _ ty) title =
   basicDeclaration sa title (ValueDeclaration (ty $> ()))
 convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
@@ -174,7 +174,7 @@ convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
   convertCtor :: P.DataConstructorDeclaration -> ChildDeclaration
   convertCtor P.DataConstructorDeclaration{..} =
     let (sourceSpan, comments) = dataCtorAnn
-    in ChildDeclaration (P.runProperName dataCtorName) (convertComments comments) (Just sourceSpan) (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
+    in ChildDeclaration (PN.runProperName dataCtorName) (convertComments comments) (Just sourceSpan) (ChildDataConstructor (fmap (($> ()) . snd) dataCtorFields))
 convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
   basicDeclaration sa title (ExternDataDeclaration (kind' $> ()) [])
 convertDeclaration (P.TypeSynonymDeclaration sa _ args ty) title =
@@ -186,25 +186,25 @@ convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
   info = TypeClassDeclaration args' (fmap ($> ()) implies) (convertFundepsToStrings args' fundeps)
   children = map convertClassMember ds
   convertClassMember (P.TypeDeclaration (P.TypeDeclarationData (ss, com) ident' ty)) =
-    ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember (ty $> ()))
+    ChildDeclaration (PN.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember (ty $> ()))
   convertClassMember _ =
-    P.internalError "convertDeclaration: Invalid argument to convertClassMember."
+    internalError "convertDeclaration: Invalid argument to convertClassMember."
 convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ _ constraints className tys _) title =
   Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className
-  typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
-  unQual x = let (P.Qualified _ y) = x in P.runProperName y
+  typeNameStrings = ordNub (concatMap (PT.everythingOnTypes (++) extractProperNames) tys)
+  unQual x = let (PN.Qualified _ y) = x in PN.runProperName y
 
-  extractProperNames (P.TypeConstructor _ n) = [unQual n]
+  extractProperNames (PT.TypeConstructor _ n) = [unQual n]
   extractProperNames _ = []
 
   childDecl = ChildDeclaration title (convertComments com) (Just ss) (ChildInstance (fmap ($> ()) constraints) (classApp $> ()))
-  classApp = foldl' P.srcTypeApp (P.srcTypeConstructor (fmap P.coerceProperName className)) tys
-convertDeclaration (P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
-  Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
-convertDeclaration (P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
-  Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Left alias)))
+  classApp = foldl' PT.srcTypeApp (PT.srcTypeConstructor (fmap PN.coerceProperName className)) tys
+convertDeclaration (P.ValueFixityDeclaration sa fixity (PN.Qualified mn alias) _) title =
+  Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (PN.Qualified mn (Right alias)))
+convertDeclaration (P.TypeFixityDeclaration sa fixity (PN.Qualified mn alias) _) title =
+  Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (PN.Qualified mn (Left alias)))
 convertDeclaration (P.KindDeclaration sa keyword _ kind) title =
   Just $ Left ([(title, AugmentType), (title, AugmentClass)], AugmentKindSig ksi)
   where
@@ -217,7 +217,7 @@ convertDeclaration (P.RoleDeclaration P.RoleDeclarationData{..}) title =
 
 convertDeclaration _ _ = Nothing
 
-convertComments :: [P.Comment] -> Maybe Text
+convertComments :: [Comments.Comment] -> Maybe Text
 convertComments cs = do
   let raw = concatMap toLines cs
   let docs = mapMaybe stripPipe raw
@@ -225,8 +225,8 @@ convertComments cs = do
   pure (T.unlines docs)
 
   where
-  toLines (P.LineComment s) = [s]
-  toLines (P.BlockComment s) = T.lines s
+  toLines (Comments.LineComment s) = [s]
+  toLines (Comments.BlockComment s) = T.lines s
 
   stripPipe =
     T.dropWhile (== ' ')
