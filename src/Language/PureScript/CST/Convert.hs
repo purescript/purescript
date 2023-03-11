@@ -24,45 +24,10 @@ import Data.Functor (($>))
 import Data.List.NonEmpty qualified as NE
 import Data.Maybe (isJust, fromJust, mapMaybe)
 import Data.Text qualified as Text
-import Language.PureScript.AST.Binders qualified as AST
-    ( Binder(..) )
-import Language.PureScript.AST.Declarations qualified as AST
-    ( AssocList(AssocList),
-      CaseAlternative(CaseAlternative),
-      DataConstructorDeclaration(DataConstructorDeclaration),
-      Declaration(ImportDeclaration, BoundValueDeclaration,
-                  TypeSynonymDeclaration, TypeClassDeclaration,
-                  TypeInstanceDeclaration, KindDeclaration, FixityDeclaration,
-                  ExternDeclaration, ExternDataDeclaration, DataDeclaration,
-                  RoleDeclaration, TypeDeclaration, ValueDeclaration),
-      DeclarationRef(ModuleRef, ValueRef, ValueOpRef, TypeRef, TypeOpRef,
-                     TypeClassRef),
-      DoNotationElement(DoNotationBind, DoNotationLet, DoNotationValue,
-                        PositionedDoNotationElement),
-      Expr(Ado, PositionedValue, Hole, AnonymousArgument, Var,
-           Constructor, Literal, Parens, TypedValue, BinaryNoParens, Op,
-           UnaryMinus, Accessor, ObjectUpdateNested, App, Abs, IfThenElse,
-           Case, Let, Do),
-      Guard(PatternGuard, ConditionGuard),
-      GuardedExpr(..),
-      ImportDeclarationType(..),
-      KindSignatureFor(ClassSig, DataSig, NewtypeSig, TypeSynonymSig),
-      Module(..),
-      PathNode(Branch, Leaf),
-      PathTree(PathTree),
-      RoleDeclarationData(RoleDeclarationData),
-      TypeDeclarationData(TypeDeclarationData),
-      TypeFixity(TypeFixity),
-      TypeInstanceBody(DerivedInstance, ExplicitInstance,
-                       NewtypeInstance),
-      ValueDeclarationData(ValueDeclarationData),
-      ValueFixity(ValueFixity),
-      WhereProvenance(FromLet, FromWhere) )
-import Language.PureScript.AST.Literals qualified as AST
-    ( Literal(ObjectLiteral, BooleanLiteral, CharLiteral,
-              StringLiteral, NumericLiteral, ArrayLiteral) )
-import Language.PureScript.AST.Operators qualified as AST
-    ( Associativity(Infixl, Infix, Infixr), Fixity(Fixity) )
+import Language.PureScript.AST.Binders qualified as ASTB
+import Language.PureScript.AST.Declarations qualified as AST ( AssocList(AssocList), CaseAlternative(CaseAlternative), DataConstructorDeclaration(DataConstructorDeclaration), Declaration(ImportDeclaration, BoundValueDeclaration, TypeSynonymDeclaration, TypeClassDeclaration, TypeInstanceDeclaration, KindDeclaration, FixityDeclaration, ExternDeclaration, ExternDataDeclaration, DataDeclaration, RoleDeclaration, TypeDeclaration, ValueDeclaration), DeclarationRef(ModuleRef, ValueRef, ValueOpRef, TypeRef, TypeOpRef, TypeClassRef), DoNotationElement(DoNotationBind, DoNotationLet, DoNotationValue, PositionedDoNotationElement), Expr(Ado, PositionedValue, Hole, AnonymousArgument, Var, Constructor, Literal, Parens, TypedValue, BinaryNoParens, Op, UnaryMinus, Accessor, ObjectUpdateNested, App, Abs, IfThenElse, Case, Let, Do), Guard(PatternGuard, ConditionGuard), GuardedExpr(..), ImportDeclarationType(..), KindSignatureFor(ClassSig, DataSig, NewtypeSig, TypeSynonymSig), Module(..), PathNode(Branch, Leaf), PathTree(PathTree), RoleDeclarationData(RoleDeclarationData), TypeDeclarationData(TypeDeclarationData), TypeFixity(TypeFixity), TypeInstanceBody(DerivedInstance, ExplicitInstance, NewtypeInstance), ValueDeclarationData(ValueDeclarationData), ValueFixity(ValueFixity), WhereProvenance(FromLet, FromWhere) )
+import Language.PureScript.AST.Literals qualified as ASTL
+import Language.PureScript.AST.Operators qualified as ASTO
 import Language.PureScript.AST.Declarations.ChainId (mkChainId)
 import Language.PureScript.AST.SourcePos qualified as Pos
 import Language.PureScript.Comments qualified as C
@@ -72,77 +37,9 @@ import Language.PureScript.Label qualified as L
 import Language.PureScript.Names qualified as N
 import Language.PureScript.PSString (mkString, prettyPrintStringJS)
 import Language.PureScript.Types qualified as T
-import Language.PureScript.CST.Positions
-    ( binderRange,
-      constraintRange,
-      declRange,
-      doStatementRange,
-      exportRange,
-      exprRange,
-      importDeclRange,
-      importRange,
-      instanceBindingRange,
-      instanceRange,
-      letBindingRange,
-      moduleRange,
-      qualRange,
-      toSourceRange,
-      typeRange )
+import Language.PureScript.CST.Positions ( binderRange, constraintRange, declRange, doStatementRange, exportRange, exprRange, importDeclRange, importRange, instanceBindingRange, instanceRange, letBindingRange, moduleRange, qualRange, toSourceRange, typeRange )
 import Language.PureScript.CST.Print (printToken)
-import Language.PureScript.CST.Types
-    ( AdoBlock(AdoBlock),
-      Binder(..),
-      CaseOf(CaseOf),
-      ClassFundep(FundepDetermines, FundepDetermined),
-      ClassHead(ClassHead),
-      Comment(Comment),
-      Constraint(..),
-      DataCtor(DataCtor),
-      DataHead(DataHead),
-      DataMembers(DataEnumerated, DataAll),
-      Declaration(..),
-      DoBlock(DoBlock),
-      DoStatement(DoBind, DoLet, DoDiscard),
-      Export(..),
-      Expr(..),
-      Fixity(Infixl, Infix, Infixr),
-      FixityFields(FixityFields),
-      FixityOp(FixityType, FixityValue),
-      Foreign(ForeignKind, ForeignValue, ForeignData),
-      Guarded(..),
-      GuardedExpr(GuardedExpr),
-      Ident(getIdent),
-      IfThenElse(IfThenElse),
-      Import(..),
-      ImportDecl(ImportDecl),
-      Instance(Instance, instHead),
-      InstanceBinding(InstanceBindingName, InstanceBindingSignature),
-      InstanceHead(InstanceHead, instKeyword),
-      Label(lblName, lblTok),
-      Labeled(Labeled),
-      Lambda(Lambda),
-      LetBinding(..),
-      LetIn(LetIn),
-      Module(Module),
-      Name(nameValue, nameTok),
-      PatternGuard(PatternGuard),
-      QualifiedName(..),
-      RecordAccessor(RecordAccessor),
-      RecordLabeled(RecordField, RecordPun),
-      RecordUpdate(RecordUpdateBranch, RecordUpdateLeaf),
-      Role(roleValue),
-      Row(Row),
-      Separated(Separated, sepHead),
-      SourcePos(SourcePos),
-      SourceRange(..),
-      SourceToken(..),
-      Token(TokLowerName, TokUpperName, TokSymbolName, TokOperator),
-      TokenAnn(tokRange, tokLeadingComments),
-      Type(..),
-      TypeVarBinding(TypeVarName, TypeVarKinded),
-      ValueBindingFields(ValueBindingFields),
-      Where(Where),
-      Wrapped(Wrapped, wrpValue) )
+import Language.PureScript.CST.Types ( AdoBlock(AdoBlock), Binder(..), CaseOf(CaseOf), ClassFundep(FundepDetermines, FundepDetermined), ClassHead(ClassHead), Comment(Comment), Constraint(..), DataCtor(DataCtor), DataHead(DataHead), DataMembers(DataEnumerated, DataAll), Declaration(..), DoBlock(DoBlock), DoStatement(DoBind, DoLet, DoDiscard), Export(..), Expr(..), Fixity(Infixl, Infix, Infixr), FixityFields(FixityFields), FixityOp(FixityType, FixityValue), Foreign(ForeignKind, ForeignValue, ForeignData), Guarded(..), GuardedExpr(GuardedExpr), Ident(getIdent), IfThenElse(IfThenElse), Import(..), ImportDecl(ImportDecl), Instance(Instance, instHead), InstanceBinding(InstanceBindingName, InstanceBindingSignature), InstanceHead(InstanceHead, instKeyword), Label(lblName, lblTok), Labeled(Labeled), Lambda(Lambda), LetBinding(..), LetIn(LetIn), Module(Module), Name(nameValue, nameTok), PatternGuard(PatternGuard), QualifiedName(..), RecordAccessor(RecordAccessor), RecordLabeled(RecordField, RecordPun), RecordUpdate(RecordUpdateBranch, RecordUpdateLeaf), Role(roleValue), Row(Row), Separated(Separated, sepHead), SourcePos(SourcePos), SourceRange(..), SourceToken(..), Token(TokLowerName, TokUpperName, TokSymbolName, TokOperator), TokenAnn(tokRange, tokLeadingComments), Type(..), TypeVarBinding(TypeVarName, TypeVarKinded), ValueBindingFields(ValueBindingFields), Where(Where), Wrapped(Wrapped, wrpValue) )
 
 comment :: Comment a -> Maybe C.Comment
 comment = \case
@@ -370,23 +267,23 @@ convertExpr fileName = go
       positioned ann . AST.Constructor (fst ann) $ qualified a
     ExprBoolean _ a b -> do
       let ann = sourceAnnCommented fileName a a
-      positioned ann . AST.Literal (fst ann) $ AST.BooleanLiteral b
+      positioned ann . AST.Literal (fst ann) $ ASTL.BooleanLiteral b
     ExprChar _ a b -> do
       let ann = sourceAnnCommented fileName a a
-      positioned ann . AST.Literal (fst ann) $ AST.CharLiteral b
+      positioned ann . AST.Literal (fst ann) $ ASTL.CharLiteral b
     ExprString _ a b -> do
       let ann = sourceAnnCommented fileName a a
-      positioned ann . AST.Literal (fst ann) . AST.StringLiteral $ b
+      positioned ann . AST.Literal (fst ann) . ASTL.StringLiteral $ b
     ExprNumber _ a b -> do
       let ann = sourceAnnCommented fileName a a
-      positioned ann . AST.Literal (fst ann) $ AST.NumericLiteral b
+      positioned ann . AST.Literal (fst ann) $ ASTL.NumericLiteral b
     ExprArray _ (Wrapped a bs c) -> do
       let
         ann = sourceAnnCommented fileName a c
         vals = case bs of
           Just (Separated x xs) -> go x : (go . snd <$> xs)
           Nothing -> []
-      positioned ann . AST.Literal (fst ann) $ AST.ArrayLiteral vals
+      positioned ann . AST.Literal (fst ann) $ ASTL.ArrayLiteral vals
     ExprRecord z (Wrapped a bs c) -> do
       let
         ann = sourceAnnCommented fileName a c
@@ -396,7 +293,7 @@ convertExpr fileName = go
         vals = case bs of
           Just (Separated x xs) -> lbl x : (lbl . snd <$> xs)
           Nothing -> []
-      positioned ann . AST.Literal (fst ann) $ AST.ObjectLiteral vals
+      positioned ann . AST.Literal (fst ann) $ ASTL.ObjectLiteral vals
     ExprParens _ (Wrapped a b c) ->
       positioned (sourceAnnCommented fileName a c) . AST.Parens $ go b
     expr@(ExprTyped _ a _ b) -> do
@@ -469,47 +366,47 @@ convertExpr fileName = go
       let ann = uncurry (sourceAnnCommented fileName) $ exprRange expr
       positioned ann . AST.Ado (moduleName $ tokValue kw) (goDoStatement <$> stms) $ go a
 
-convertBinder :: String -> Binder a -> AST.Binder
+convertBinder :: String -> Binder a -> ASTB.Binder
 convertBinder fileName = go
   where
   positioned =
-    uncurry AST.PositionedBinder
+    uncurry ASTB.PositionedBinder
 
   go = \case
     BinderWildcard _ a ->
-      positioned (sourceAnnCommented fileName a a) AST.NullBinder
+      positioned (sourceAnnCommented fileName a a) ASTB.NullBinder
     BinderVar _ a -> do
       let ann = sourceName fileName a
-      positioned ann . AST.VarBinder (fst ann) . ident $ nameValue a
+      positioned ann . ASTB.VarBinder (fst ann) . ident $ nameValue a
     binder@(BinderNamed _ a _ b) -> do
       let ann = uncurry (sourceAnnCommented fileName) $ binderRange binder
-      positioned ann . AST.NamedBinder (fst ann) (ident $ nameValue a) $ go b
+      positioned ann . ASTB.NamedBinder (fst ann) (ident $ nameValue a) $ go b
     binder@(BinderConstructor _ a bs) -> do
       let ann = uncurry (sourceAnnCommented fileName) $ binderRange binder
-      positioned ann . AST.ConstructorBinder (fst ann) (qualified a) $ go <$> bs
+      positioned ann . ASTB.ConstructorBinder (fst ann) (qualified a) $ go <$> bs
     BinderBoolean _ a b -> do
       let ann = sourceAnnCommented fileName a a
-      positioned ann . AST.LiteralBinder (fst ann) $ AST.BooleanLiteral b
+      positioned ann . ASTB.LiteralBinder (fst ann) $ ASTL.BooleanLiteral b
     BinderChar _ a b -> do
       let ann = sourceAnnCommented fileName a a
-      positioned ann . AST.LiteralBinder (fst ann) $ AST.CharLiteral b
+      positioned ann . ASTB.LiteralBinder (fst ann) $ ASTL.CharLiteral b
     BinderString _ a b -> do
       let ann = sourceAnnCommented fileName a a
-      positioned ann . AST.LiteralBinder (fst ann) . AST.StringLiteral $ b
+      positioned ann . ASTB.LiteralBinder (fst ann) . ASTL.StringLiteral $ b
     BinderNumber _ n a b -> do
       let
         ann = sourceAnnCommented fileName a a
         b'
           | isJust n = bimap negate negate b
           | otherwise = b
-      positioned ann . AST.LiteralBinder (fst ann) $ AST.NumericLiteral b'
+      positioned ann . ASTB.LiteralBinder (fst ann) $ ASTL.NumericLiteral b'
     BinderArray _ (Wrapped a bs c) -> do
       let
         ann = sourceAnnCommented fileName a c
         vals = case bs of
           Just (Separated x xs) -> go x : (go . snd <$> xs)
           Nothing -> []
-      positioned ann . AST.LiteralBinder (fst ann) $ AST.ArrayLiteral vals
+      positioned ann . ASTB.LiteralBinder (fst ann) $ ASTL.ArrayLiteral vals
     BinderRecord z (Wrapped a bs c) -> do
       let
         ann = sourceAnnCommented fileName a c
@@ -519,21 +416,21 @@ convertBinder fileName = go
         vals = case bs of
           Just (Separated x xs) -> lbl x : (lbl . snd <$> xs)
           Nothing -> []
-      positioned ann . AST.LiteralBinder (fst ann) $ AST.ObjectLiteral vals
+      positioned ann . ASTB.LiteralBinder (fst ann) $ ASTL.ObjectLiteral vals
     BinderParens _ (Wrapped a b c) ->
-      positioned (sourceAnnCommented fileName a c) . AST.ParensInBinder $ go b
+      positioned (sourceAnnCommented fileName a c) . ASTB.ParensInBinder $ go b
     binder@(BinderTyped _ a _ b) -> do
       let
         a' = go a
         b' = convertType fileName b
         ann = (sourceSpan fileName . toSourceRange $ binderRange binder, [])
-      positioned ann $ AST.TypedBinder b' a'
+      positioned ann $ ASTB.TypedBinder b' a'
     binder@(BinderOp _ _ _ _) -> do
       let
         ann = uncurry (sourceAnn fileName) $ binderRange binder
         reassoc op b a = do
-          let op' = AST.OpBinder (sourceSpan fileName . toSourceRange $ qualRange op) $ qualified op
-          AST.BinaryNoParensBinder op' (go a) b
+          let op' = ASTB.OpBinder (sourceSpan fileName . toSourceRange $ qualRange op) $ qualified op
+          ASTB.BinaryNoParensBinder op' (go a) b
         loop k = \case
           BinderOp _ a op b -> loop (reassoc op (k b)) a
           binder' -> k binder'
@@ -620,10 +517,10 @@ convertDeclaration fileName decl = case decl of
   DeclFixity _ (FixityFields (_, kw) (_, prec) fxop) -> do
     let
       assoc =  case kw of
-        Infix  -> AST.Infix
-        Infixr -> AST.Infixr
-        Infixl -> AST.Infixl
-      fixity = AST.Fixity assoc prec
+        Infix  -> ASTO.Infix
+        Infixr -> ASTO.Infixr
+        Infixl -> ASTO.Infixl
+      fixity = ASTO.Fixity assoc prec
     pure $ AST.FixityDeclaration ann $ case fxop of
       FixityValue name _ op -> do
         Left $ AST.ValueFixity fixity (first ident <$> qualified name) (nameValue op)
