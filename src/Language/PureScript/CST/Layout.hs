@@ -170,23 +170,10 @@ module Language.PureScript.CST.Layout where
 
 import Prelude
 
-import Data.DList (snoc)
 import Data.DList qualified as DList
 import Data.Foldable (find)
 import Data.Function ((&))
-import Language.PureScript.CST.Types
-    ( Comment,
-      LineFeed,
-      SourcePos(srcLine, srcColumn),
-      SourceRange(SourceRange, srcStart),
-      SourceToken(SourceToken),
-      Token(TokLayoutEnd, TokForall, TokBackslash, TokRightArrow,
-            TokEquals, TokPipe, TokTick, TokComma, TokDot, TokLeftParen,
-            TokLeftBrace, TokLeftSquare, TokRightParen, TokRightBrace,
-            TokRightSquare, TokString, TokLowerName, TokOperator,
-            TokLayoutStart, TokLayoutSep, TokEof),
-      TokenAnn(TokenAnn, tokLeadingComments, tokTrailingComments,
-               tokRange) )
+import Language.PureScript.CST.Types ( Comment, LineFeed, SourcePos(srcLine, srcColumn), SourceRange(SourceRange, srcStart), SourceToken(SourceToken), Token(TokLayoutEnd, TokForall, TokBackslash, TokRightArrow, TokEquals, TokPipe, TokTick, TokComma, TokDot, TokLeftParen, TokLeftBrace, TokLeftSquare, TokRightParen, TokRightBrace, TokRightSquare, TokString, TokLowerName, TokOperator, TokLayoutStart, TokLayoutSep, TokEof), TokenAnn(TokenAnn, tokLeadingComments, tokTrailingComments, tokRange) )
 
 type LayoutStack = [(SourcePos, LayoutDelim)]
 
@@ -519,7 +506,7 @@ insertLayout src@(SourceToken tokAnn tok) nextPos stack =
     insertToken (lytToken tokPos TokLayoutEnd)
 
   insertToken token (stk, acc) =
-    (stk, acc `snoc` token)
+    (stk, acc `DList.snoc` token)
 
   pushStack lytPos lyt (stk, acc) =
     ((lytPos, lyt) : stk, acc)
@@ -533,7 +520,7 @@ insertLayout src@(SourceToken tokAnn tok) nextPos stack =
     go ((lytPos, lyt) : stk) acc
       | p lytPos lyt =
           go stk $ if isIndented lyt
-                   then acc `snoc` lytToken tokPos TokLayoutEnd
+                   then acc `DList.snoc` lytToken tokPos TokLayoutEnd
                    else acc
     go stk acc = (stk, acc)
 

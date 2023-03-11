@@ -19,41 +19,11 @@ import Data.String (fromString)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.PureScript qualified as Text
-import Language.PureScript.CST.Errors
-    ( ParserErrorInfo(ParserErrorInfo),
-      ParserErrorType(ErrReservedSymbol, ErrAstralCodePointInChar,
-                      ErrLineFeedInString, ErrCharInGap, ErrEof, ErrCharEscape,
-                      ErrLexeme, ErrNumberOutOfRange, ErrLeadingZero,
-                      ErrExpectedExponent, ErrExpectedHex) )
-import Language.PureScript.CST.Monad
-    ( throw, LexResult, LexState(..), ParserM(..) )
-import Language.PureScript.CST.Layout
-    ( insertLayout,
-      lytToken,
-      unwindLayout,
-      LayoutDelim(LytRoot, LytWhere) )
-import Language.PureScript.CST.Positions
-    ( advanceLeading,
-      advanceToken,
-      advanceTrailing,
-      applyDelta,
-      textDelta )
-import Language.PureScript.CST.Types
-    ( Comment(..),
-      LineFeed(..),
-      SourcePos(SourcePos),
-      SourceRange(SourceRange),
-      SourceStyle(ASCII, Unicode),
-      SourceToken(SourceToken),
-      Token(TokLayoutStart, TokEof, TokRightParen, TokLeftBrace,
-            TokRightBrace, TokLeftSquare, TokRightSquare, TokTick, TokComma,
-            TokPipe, TokDot, TokBackslash, TokLeftArrow, TokRightArrow,
-            TokEquals, TokRightFatArrow, TokDoubleColon, TokSymbolArr,
-            TokLeftParen, TokSymbolName, TokOperator, TokUpperName,
-            TokUnderscore, TokForall, TokLowerName, TokHole, TokChar,
-            TokString, TokRawString, TokNumber, TokInt),
-      TokenAnn(TokenAnn, tokTrailingComments, tokRange,
-               tokLeadingComments) )
+import Language.PureScript.CST.Errors ( ParserErrorInfo(ParserErrorInfo), ParserErrorType(ErrReservedSymbol, ErrAstralCodePointInChar, ErrLineFeedInString, ErrCharInGap, ErrEof, ErrCharEscape, ErrLexeme, ErrNumberOutOfRange, ErrLeadingZero, ErrExpectedExponent, ErrExpectedHex) )
+import Language.PureScript.CST.Monad ( throw, LexResult, LexState(..), ParserM(..) )
+import Language.PureScript.CST.Layout ( insertLayout, lytToken, unwindLayout, LayoutDelim(LytRoot, LytWhere) )
+import Language.PureScript.CST.Positions ( advanceLeading, advanceToken, advanceTrailing, applyDelta, textDelta )
+import Language.PureScript.CST.Types ( Comment(..), LineFeed(..), SourcePos(SourcePos), SourceRange(SourceRange), SourceStyle(ASCII, Unicode), SourceToken(SourceToken), Token(TokLayoutStart, TokEof, TokRightParen, TokLeftBrace, TokRightBrace, TokLeftSquare, TokRightSquare, TokTick, TokComma, TokPipe, TokDot, TokBackslash, TokLeftArrow, TokRightArrow, TokEquals, TokRightFatArrow, TokDoubleColon, TokSymbolArr, TokLeftParen, TokSymbolName, TokOperator, TokUpperName, TokUnderscore, TokForall, TokLowerName, TokHole, TokChar, TokString, TokRawString, TokNumber, TokInt), TokenAnn(TokenAnn, tokTrailingComments, tokRange, tokLeadingComments) )
 
 -- | Stops at the first lexing error and replaces it with TokEof. Otherwise,
 -- the parser will fail when it attempts to draw a lookahead token.

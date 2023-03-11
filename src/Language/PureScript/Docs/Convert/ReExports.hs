@@ -19,22 +19,7 @@ import Data.Map qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.Docs.Types
-    ( filterChildren,
-      isDataConstructor,
-      isType,
-      isTypeAlias,
-      isTypeClass,
-      isTypeClassMember,
-      isValue,
-      isValueAlias,
-      ChildDeclaration(..),
-      ChildDeclarationInfo(ChildTypeClassMember),
-      Constraint',
-      Declaration(..),
-      DeclarationInfo(TypeClassDeclaration, ValueDeclaration),
-      InPackage,
-      Module(..) )
+import Language.PureScript.Docs.Types ( filterChildren, isDataConstructor, isType, isTypeAlias, isTypeClass, isTypeClassMember, isValue, isValueAlias, ChildDeclaration(..), ChildDeclarationInfo(ChildTypeClassMember), Constraint', Declaration(..), DeclarationInfo(TypeClassDeclaration, ValueDeclaration), InPackage, Module(..) )
 
 import Language.PureScript.Crash qualified as P
 import Language.PureScript.Errors qualified as P

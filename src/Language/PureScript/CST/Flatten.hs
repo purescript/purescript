@@ -3,59 +3,8 @@ module Language.PureScript.CST.Flatten where
 import Prelude
 
 import Data.DList (DList)
-import Language.PureScript.CST.Types
-    ( AdoBlock(AdoBlock),
-      Binder(..),
-      CaseOf(CaseOf),
-      ClassFundep(..),
-      ClassHead(ClassHead),
-      Constraint(..),
-      DataCtor(DataCtor),
-      DataHead(DataHead),
-      DataMembers(..),
-      Declaration(..),
-      DoBlock(DoBlock),
-      DoStatement(..),
-      Export(..),
-      Expr(..),
-      FixityFields(FixityFields),
-      FixityOp(..),
-      Foreign(..),
-      Guarded(..),
-      GuardedExpr(GuardedExpr),
-      IfThenElse(IfThenElse),
-      Import(..),
-      ImportDecl(ImportDecl),
-      Instance(Instance),
-      InstanceBinding(..),
-      InstanceHead(InstanceHead),
-      Label(lblTok),
-      Labeled(Labeled),
-      Lambda(Lambda),
-      LetBinding(..),
-      LetIn(LetIn),
-      Module(Module),
-      Name(nameTok),
-      OneOrDelimited(..),
-      PatternGuard(PatternGuard),
-      QualifiedName(qualTok),
-      RecordAccessor(RecordAccessor),
-      RecordLabeled(..),
-      RecordUpdate(..),
-      Role(roleTok),
-      Row(Row),
-      Separated(Separated),
-      SourceRange(SourceRange, srcEnd),
-      SourceToken(SourceToken),
-      Token(TokEof),
-      TokenAnn(TokenAnn),
-      Type(..),
-      TypeVarBinding(..),
-      ValueBindingFields(ValueBindingFields),
-      Where(Where),
-      Wrapped(Wrapped) )
-import Language.PureScript.CST.Positions
-    ( advanceLeading, moduleRange, srcRange )
+import Language.PureScript.CST.Types ( AdoBlock(AdoBlock), Binder(..), CaseOf(CaseOf), ClassFundep(..), ClassHead(ClassHead), Constraint(..), DataCtor(DataCtor), DataHead(DataHead), DataMembers(..), Declaration(..), DoBlock(DoBlock), DoStatement(..), Export(..), Expr(..), FixityFields(FixityFields), FixityOp(..), Foreign(..), Guarded(..), GuardedExpr(GuardedExpr), IfThenElse(IfThenElse), Import(..), ImportDecl(ImportDecl), Instance(Instance), InstanceBinding(..), InstanceHead(InstanceHead), Label(lblTok), Labeled(Labeled), Lambda(Lambda), LetBinding(..), LetIn(LetIn), Module(Module), Name(nameTok), OneOrDelimited(..), PatternGuard(PatternGuard), QualifiedName(qualTok), RecordAccessor(RecordAccessor), RecordLabeled(..), RecordUpdate(..), Role(roleTok), Row(Row), Separated(Separated), SourceRange(SourceRange, srcEnd), SourceToken(SourceToken), Token(TokEof), TokenAnn(TokenAnn), Type(..), TypeVarBinding(..), ValueBindingFields(ValueBindingFields), Where(Where), Wrapped(Wrapped) )
+import Language.PureScript.CST.Positions ( advanceLeading, moduleRange, srcRange )
 
 flattenModule :: Module a -> DList SourceToken
 flattenModule m@(Module _ a b c d e f g) =

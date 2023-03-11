@@ -11,52 +11,11 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Language.PureScript.CST.Errors
-    ( ParserErrorType(ErrToken, ErrModuleName, ErrKeywordVar,
-                      ErrQuotedPun, ErrTypeInConstraint, ErrExprInBinder,
-                      ErrRecordUpdateInCtr, ErrRecordPunInUpdate, ErrRecordCtrInUpdate,
-                      ErrUnknownFundep, ErrImportInDecl, ErrInstanceNameMismatch,
-                      ErrElseInDecl, ErrWildcardInType, ErrHoleInType) )
-import Language.PureScript.CST.Monad
-    ( addFailure, parseFail, pushBack, Parser )
-import Language.PureScript.CST.Positions
-    ( binderRange,
-      importDeclRange,
-      recordUpdateRange,
-      typeRange,
-      TokenRange )
-import Language.PureScript.CST.Traversals.Type
-    ( everythingOnTypes )
-import Language.PureScript.CST.Types
-    ( Binder(BinderConstructor, BinderVar),
-      ClassFundep(FundepDetermines, FundepDetermined),
-      ClassHead(ClassHead),
-      Constraint(..),
-      Declaration(DeclInstanceChain),
-      Expr(ExprIdent),
-      Ident(..),
-      ImportDecl,
-      Instance(instHead),
-      InstanceHead(instClass),
-      Label(Label),
-      Labeled(Labeled),
-      Name(..),
-      QualifiedName(QualifiedName, qualTok),
-      RecordLabeled(..),
-      RecordUpdate(RecordUpdateLeaf),
-      Separated(Separated),
-      SourcePos(SourcePos),
-      SourceRange(SourceRange),
-      SourceStyle(ASCII),
-      SourceToken(..),
-      Token(TokLowerName, TokUpperName, TokSymbolName, TokOperator,
-            TokHole, TokForall, TokString, TokRawString, TokChar, TokNumber,
-            TokInt),
-      TokenAnn(TokenAnn),
-      Type(TypeForall, TypeParens, TypeApp, TypeConstructor,
-           TypeConstrained, TypeWildcard, TypeHole),
-      TypeVarBinding(TypeVarName, TypeVarKinded),
-      Wrapped(Wrapped) )
+import Language.PureScript.CST.Errors ( ParserErrorType(ErrToken, ErrModuleName, ErrKeywordVar, ErrQuotedPun, ErrTypeInConstraint, ErrExprInBinder, ErrRecordUpdateInCtr, ErrRecordPunInUpdate, ErrRecordCtrInUpdate, ErrUnknownFundep, ErrImportInDecl, ErrInstanceNameMismatch, ErrElseInDecl, ErrWildcardInType, ErrHoleInType) )
+import Language.PureScript.CST.Monad ( addFailure, parseFail, pushBack, Parser )
+import Language.PureScript.CST.Positions ( binderRange, importDeclRange, recordUpdateRange, typeRange, TokenRange )
+import Language.PureScript.CST.Traversals.Type ( everythingOnTypes )
+import Language.PureScript.CST.Types ( Binder(BinderConstructor, BinderVar), ClassFundep(FundepDetermines, FundepDetermined), ClassHead(ClassHead), Constraint(..), Declaration(DeclInstanceChain), Expr(ExprIdent), Ident(..), ImportDecl, Instance(instHead), InstanceHead(instClass), Label(Label), Labeled(Labeled), Name(..), QualifiedName(QualifiedName, qualTok), RecordLabeled(..), RecordUpdate(RecordUpdateLeaf), Separated(Separated), SourcePos(SourcePos), SourceRange(SourceRange), SourceStyle(ASCII), SourceToken(..), Token(TokLowerName, TokUpperName, TokSymbolName, TokOperator, TokHole, TokForall, TokString, TokRawString, TokChar, TokNumber, TokInt), TokenAnn(TokenAnn), Type(TypeForall, TypeParens, TypeApp, TypeConstructor, TypeConstrained, TypeWildcard, TypeHole), TypeVarBinding(TypeVarName, TypeVarKinded), Wrapped(Wrapped) )
 import Language.PureScript.Names qualified as N
 import Language.PureScript.PSString (PSString, mkString)
 

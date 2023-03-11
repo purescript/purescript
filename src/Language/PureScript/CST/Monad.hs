@@ -6,22 +6,10 @@ import Data.List (sortOn)
 import Data.List.NonEmpty qualified as NE
 import Data.Ord (comparing)
 import Data.Text (Text)
-import Language.PureScript.CST.Errors
-    ( ParserError,
-      ParserErrorInfo(..),
-      ParserErrorType(ErrToken),
-      ParserWarning,
-      ParserWarningType )
+import Language.PureScript.CST.Errors ( ParserError, ParserErrorInfo(..), ParserErrorType(ErrToken), ParserWarning, ParserWarningType )
 import Language.PureScript.CST.Layout ( LayoutStack )
 import Language.PureScript.CST.Positions ( widen )
-import Language.PureScript.CST.Types
-    ( Comment,
-      LineFeed,
-      SourcePos(SourcePos),
-      SourceRange(SourceRange),
-      SourceToken(tokValue, tokAnn),
-      Token,
-      TokenAnn(tokRange) )
+import Language.PureScript.CST.Types ( Comment, LineFeed, SourcePos(SourcePos), SourceRange(SourceRange), SourceToken(tokValue, tokAnn), Token, TokenAnn(tokRange) )
 
 type LexResult = Either (LexState, ParserError) SourceToken
 
