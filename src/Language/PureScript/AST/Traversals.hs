@@ -6,8 +6,8 @@ module Language.PureScript.AST.Traversals where
 import Prelude
 import Protolude (swap)
 
-import Control.Monad
-import Control.Monad.Trans.State
+import Control.Monad ( (<=<), (>=>) )
+import Control.Monad.Trans.State ( StateT(StateT, runStateT) )
 
 import Data.Foldable (fold)
 import Data.Functor.Identity (runIdentity)
