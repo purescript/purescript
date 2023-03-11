@@ -15,28 +15,29 @@ import Data.Map qualified as Map
 import Data.String (String)
 import Data.Text qualified as T
 
+import Language.PureScript.AST.Declarations qualified as ASTD
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
 import Language.PureScript.Docs.Types ( Declaration(..), DeclarationInfo(TypeClassDeclaration, ExternDataDeclaration, ValueDeclaration, DataDeclaration, TypeSynonymDeclaration), KindInfo(KindInfo, kiKind, kiKeyword), Module(modDeclarations, modName), Type' )
-import Language.PureScript.CST.Errors qualified as CST ( prettyPrintError )
-import Language.PureScript.CST.Lexer qualified as CST ( lex )
-import Language.PureScript.CST.Monad qualified as CST ( runTokenParser, Parser )
-import Language.PureScript.CST.Parser qualified as CST ( parseIdent )
-import Language.PureScript.CST.Types qualified as CST ( Ident(getIdent), Name(nameValue) )
-import Language.PureScript.Crash qualified as P
-import Language.PureScript.Errors qualified as P
-import Language.PureScript.Externs qualified as P
-import Language.PureScript.Environment qualified as P
-import Language.PureScript.Names qualified as P
-import Language.PureScript.Roles qualified as P
-import Language.PureScript.Sugar.AdoNotation qualified as P ( desugarAdoModule )
-import Language.PureScript.Sugar.CaseDeclarations qualified as P ( desugarCasesModule )
-import Language.PureScript.Sugar.DoNotation qualified as P ( desugarDoModule )
-import Language.PureScript.Sugar.LetPattern qualified as P ( desugarLetPatternModule )
-import Language.PureScript.Sugar.Names qualified as P ( Env, desugarImports )
-import Language.PureScript.Sugar.Operators qualified as P ( rebracketFiltered )
-import Language.PureScript.Sugar.TypeDeclarations qualified as P ( desugarTypeDeclarationsModule )
-import Language.PureScript.Types qualified as P
-import Language.PureScript.Constants.Prim qualified as Prim
+import Language.PureScript.CST.Errors ( prettyPrintError )
+import Language.PureScript.CST.Lexer ( lex )
+import Language.PureScript.CST.Monad ( runTokenParser, Parser )
+import Language.PureScript.CST.Parser qualified as CSTParser
+import Language.PureScript.CST.Types ( Ident(getIdent), Name(nameValue) )
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors)
+import Language.PureScript.Externs (ExternsFile)
+import Language.PureScript.Environment qualified as PEnv
+import Language.PureScript.Names qualified as PN
+import Language.PureScript.Roles (Role)
+import Language.PureScript.Sugar.AdoNotation ( desugarAdoModule )
+import Language.PureScript.Sugar.CaseDeclarations ( desugarCasesModule )
+import Language.PureScript.Sugar.DoNotation ( desugarDoModule )
+import Language.PureScript.Sugar.LetPattern ( desugarLetPatternModule )
+import Language.PureScript.Sugar.Names ( Env, desugarImports )
+import Language.PureScript.Sugar.Operators ( rebracketFiltered )
+import Language.PureScript.Sugar.TypeDeclarations ( desugarTypeDeclarationsModule )
+import Language.PureScript.Types qualified as PT
+import Language.PureScript.Constants.Prim qualified as CPrim
 import Language.PureScript.Sugar.Operators ( RebracketCaller(CalledByDocs) )
 
 -- |
@@ -45,11 +46,11 @@ import Language.PureScript.Sugar.Operators ( RebracketCaller(CalledByDocs) )
 -- re-exports will not be included.
 --
 convertModule ::
-  MonadError P.MultipleErrors m =>
-  [P.ExternsFile] ->
-  P.Env ->
-  P.Environment ->
-  P.Module ->
+  MonadError MultipleErrors m =>
+  [ExternsFile] ->
+  Env ->
+  PEnv.Environment ->
+  Module ->
   m Module
 convertModule externs env checkEnv =
   fmap (insertValueTypesAndAdjustKinds checkEnv . convertSingleModule) . partiallyDesugar externs env
@@ -71,7 +72,7 @@ convertModule externs env checkEnv =
 -- signature is "interesting."
 --
 insertValueTypesAndAdjustKinds ::
-  P.Environment -> Module -> Module
+  PEnv.Environment -> Module -> Module
 insertValueTypesAndAdjustKinds env m =
   m { modDeclarations = map (go . insertInferredRoles . convertFFIDecl) (modDeclarations m) }
   where
@@ -82,7 +83,7 @@ insertValueTypesAndAdjustKinds env m =
   -- so `ExternDataDeclaration` values will still exist beyond this point.
   convertFFIDecl d@Declaration { declInfo = ExternDataDeclaration kind roles } =
     d { declInfo = DataDeclaration P.Data (genTypeParams kind) roles
-      , declKind = Just (KindInfo P.DataSig kind)
+      , declKind = Just (KindInfo ASTD.DataSig kind)
       }
 
   convertFFIDecl other = other
@@ -91,14 +92,14 @@ insertValueTypesAndAdjustKinds env m =
     d { declInfo = DataDeclaration dataDeclType args inferredRoles }
 
     where
-    inferredRoles :: [P.Role]
+    inferredRoles :: [Role]
     inferredRoles = do
-      let key = P.Qualified (P.ByModuleName (modName m)) (P.ProperName (declTitle d))
-      case Map.lookup key (P.types env) of
+      let key = PN.Qualified (PN.ByModuleName (modName m)) (PN.ProperName (declTitle d))
+      case Map.lookup key (PEnv.types env) of
         Just (_, tyKind) -> case tyKind of
-          P.DataType _ tySourceTyRole _ ->
+          PEnv.DataType _ tySourceTyRole _ ->
             map (\(_,_,r) -> r) tySourceTyRole
-          P.ExternData rs ->
+          PEnv.ExternData rs ->
             rs
           _ ->
             []
@@ -130,27 +131,27 @@ insertValueTypesAndAdjustKinds env m =
     where
       countParams :: Int -> Type' -> Int
       countParams acc = \case
-        P.ForAll _ _ _ rest _ ->
+        PT.ForAll _ _ _ rest _ ->
           countParams acc rest
 
-        P.TypeApp _ f a | isFunctionApplication f ->
+        PT.TypeApp _ f a | isFunctionApplication f ->
           countParams (acc + 1) a
 
-        P.ParensInType _ ty ->
+        PT.ParensInType _ ty ->
           countParams acc ty
 
         _ ->
           acc
 
       isFunctionApplication = \case
-        P.TypeApp _ (P.TypeConstructor () Prim.Function) _ -> True
-        P.ParensInType _ ty -> isFunctionApplication ty
+        PT.TypeApp _ (PT.TypeConstructor () CPrim.Function) _ -> True
+        PT.ParensInType _ ty -> isFunctionApplication ty
         _ -> False
 
   -- insert value types
-  go d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} } =
+  go d@Declaration { declInfo = ValueDeclaration PT.TypeWildcard{} } =
     let
-      ident = P.Ident . CST.getIdent . CST.nameValue . parseIdent $ declTitle d
+      ident = PN.Ident . getIdent . nameValue . parseIdent $ declTitle d
       ty = lookupName ident
     in
       d { declInfo = ValueDeclaration (ty $> ()) }
@@ -170,11 +171,11 @@ insertValueTypesAndAdjustKinds env m =
     other
 
   parseIdent =
-    either (err . ("failed to parse Ident: " ++)) identity . runParser CST.parseIdent
+    either (err . ("failed to parse Ident: " ++)) identity . runParser CSTParser.parseIdent
 
   lookupName name =
-    let key = P.Qualified (P.ByModuleName (modName m)) name
-    in case Map.lookup key (P.names env) of
+    let key = PN.Qualified (PN.ByModuleName (modName m)) name
+    in case Map.lookup key (PEnv.names env) of
       Just (ty, _, _) ->
         ty
       Nothing ->
@@ -182,13 +183,13 @@ insertValueTypesAndAdjustKinds env m =
 
   -- |
   -- Extracts the keyword for a declaration (if there is one)
-  extractKeyword :: DeclarationInfo -> Maybe P.KindSignatureFor
+  extractKeyword :: DeclarationInfo -> Maybe ASTD.KindSignatureFor
   extractKeyword = \case
     DataDeclaration dataDeclType _ _ -> Just $ case dataDeclType of
-      P.Data -> P.DataSig
-      P.Newtype -> P.NewtypeSig
-    TypeSynonymDeclaration _ _ -> Just P.TypeSynonymSig
-    TypeClassDeclaration _ _ _ -> Just P.ClassSig
+      PEnv.Data -> ASTD.DataSig
+      PEnv.Newtype -> ASTD.NewtypeSig
+    TypeSynonymDeclaration _ _ -> Just ASTD.TypeSynonymSig
+    TypeClassDeclaration _ _ _ -> Just ASTD.ClassSig
     _ -> Nothing
 
   -- |
@@ -198,36 +199,36 @@ insertValueTypesAndAdjustKinds env m =
   -- - `Constraint` (class declaration only)
   -- - `Type -> K` where `K` is an "uninteresting" kind
   isUninteresting
-    :: P.KindSignatureFor -> Type' -> Bool
+    :: ASTD.KindSignatureFor -> Type' -> Bool
   isUninteresting keyword = \case
     -- `Type -> ...`
-    P.TypeApp _ f a | isTypeAppFunctionType f -> isUninteresting keyword a
-    P.ParensInType _ ty -> isUninteresting keyword ty
+    PT.TypeApp _ f a | isTypeAppFunctionType f -> isUninteresting keyword a
+    PT.ParensInType _ ty -> isUninteresting keyword ty
     x -> isKindPrimType x || (isClassKeyword && isKindPrimConstraint x)
     where
       isClassKeyword = case keyword of
-        P.ClassSig -> True
+        ASTD.ClassSig -> True
         _ -> False
 
       isTypeAppFunctionType = \case
-        P.TypeApp _ f a -> isKindFunction f && isKindPrimType a
-        P.ParensInType _ ty -> isTypeAppFunctionType ty
+        PT.TypeApp _ f a -> isKindFunction f && isKindPrimType a
+        PT.ParensInType _ ty -> isTypeAppFunctionType ty
         _ -> False
 
-      isKindFunction = isTypeConstructor Prim.Function
-      isKindPrimType = isTypeConstructor Prim.Type
-      isKindPrimConstraint = isTypeConstructor Prim.Constraint
+      isKindFunction = isTypeConstructor CPrim.Function
+      isKindPrimType = isTypeConstructor CPrim.Type
+      isKindPrimConstraint = isTypeConstructor CPrim.Constraint
 
       isTypeConstructor k = \case
-        P.TypeConstructor _ k' -> k' == k
-        P.ParensInType _ ty -> isTypeConstructor k ty
+        PT.TypeConstructor _ k' -> k' == k
+        PT.ParensInType _ ty -> isTypeConstructor k ty
         _ -> False
 
-  insertInferredKind :: Declaration -> Text -> P.KindSignatureFor -> Declaration
+  insertInferredKind :: Declaration -> Text -> ASTD.KindSignatureFor -> Declaration
   insertInferredKind d name keyword =
     let
-      key = P.Qualified (P.ByModuleName (modName m)) (P.ProperName name)
-    in case Map.lookup key (P.types env) of
+      key = PN.Qualified (PN.ByModuleName (modName m)) (PN.ProperName name)
+    in case Map.lookup key (PEnv.types env) of
       Just (inferredKind, _) ->
         if isUninteresting keyword inferredKind'
           then  d
@@ -245,42 +246,42 @@ insertValueTypesAndAdjustKinds env m =
           -- changes `forall (k :: Type). k -> ...`
           -- to      `forall k          . k -> ...`
           dropTypeSortAnnotation = \case
-            P.ForAll sa txt (Just (P.TypeConstructor _ Prim.Type)) rest skol ->
-              P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol
+            PT.ForAll sa txt (Just (PT.TypeConstructor _ CPrim.Type)) rest skol ->
+              PT.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol
             rest -> rest
 
       Nothing ->
         err ("type not found: " ++ show key)
 
   err msg =
-    P.internalError ("Docs.Convert.insertValueTypes: " ++ msg)
+    internalError ("Docs.Convert.insertValueTypes: " ++ msg)
 
-runParser :: CST.Parser a -> Text -> Either String a
+runParser :: Parser a -> Text -> Either String a
 runParser p =
-  bimap (CST.prettyPrintError . NE.head) snd
-    . CST.runTokenParser p
-    . CST.lex
+  bimap (prettyPrintError . NE.head) snd
+    . runTokenParser p
+    . lex
 
 -- |
 -- Partially desugar modules so that they are suitable for extracting
 -- documentation information from.
 --
 partiallyDesugar ::
-  (MonadError P.MultipleErrors m) =>
-  [P.ExternsFile] ->
-  P.Env ->
-  P.Module ->
-  m P.Module
+  (MonadError MultipleErrors m) =>
+  [ExternsFile] ->
+  Env ->
+  Module ->
+  m Module
 partiallyDesugar externs env = evalSupplyT 0 . desugar'
   where
   desugar' =
-    P.desugarDoModule
-      >=> P.desugarAdoModule
-      >=> P.desugarLetPatternModule
-      >>> P.desugarCasesModule
-      >=> P.desugarTypeDeclarationsModule
-      >=> fmap fst . runWriterT . flip evalStateT (env, mempty) . P.desugarImports
-      >=> P.rebracketFiltered CalledByDocs isInstanceDecl externs
+    desugarDoModule
+      >=> desugarAdoModule
+      >=> desugarLetPatternModule
+      >>> desugarCasesModule
+      >=> desugarTypeDeclarationsModule
+      >=> fmap fst . runWriterT . flip evalStateT (env, mempty) . desugarImports
+      >=> rebracketFiltered CalledByDocs isInstanceDecl externs
 
-  isInstanceDecl P.TypeInstanceDeclaration {} = True
+  isInstanceDecl ASTD.TypeInstanceDeclaration {} = True
   isInstanceDecl _ = False
