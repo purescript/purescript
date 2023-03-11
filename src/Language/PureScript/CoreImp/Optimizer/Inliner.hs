@@ -23,32 +23,11 @@ import Data.Text qualified as T
 
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString, mkString)
-import Language.PureScript.CoreImp.AST
-    ( everywhere,
-      everywhereTopDown,
-      everywhereTopDownM,
-      getSourceSpan,
-      AST(ModuleAccessor, StringLiteral, BooleanLiteral, NumericLiteral,
-          Binary, Unary, Indexer, VariableIntroduction, Function, Block,
-          Return, Var, App),
-      BinaryOperator(ZeroFillShiftRight, Multiply, Subtract, Divide,
-                     EqualTo, NotEqualTo, LessThan, LessThanOrEqualTo, GreaterThan,
-                     GreaterThanOrEqualTo, Add, And, Or, BitwiseOr, BitwiseAnd,
-                     BitwiseXor, ShiftLeft, ShiftRight),
-      InitializerEffects(UnknownEffects),
-      UnaryOperator(BitwiseNot, Negate, Not) )
-import Language.PureScript.CoreImp.Optimizer.Common
-    ( pattern Ref,
-      applyAll,
-      isReassigned,
-      isRebound,
-      isUpdated,
-      removeFromBlock,
-      replaceIdent,
-      replaceIdents )
+import Language.PureScript.CoreImp.AST ( everywhere, everywhereTopDown, everywhereTopDownM, getSourceSpan, AST(ModuleAccessor, StringLiteral, BooleanLiteral, NumericLiteral, Binary, Unary, Indexer, VariableIntroduction, Function, Block, Return, Var, App), BinaryOperator(ZeroFillShiftRight, Multiply, Subtract, Divide, EqualTo, NotEqualTo, LessThan, LessThanOrEqualTo, GreaterThan, GreaterThanOrEqualTo, Add, And, Or, BitwiseOr, BitwiseAnd, BitwiseXor, ShiftLeft, ShiftRight), InitializerEffects(UnknownEffects), UnaryOperator(BitwiseNot, Negate, Not) )
+import Language.PureScript.CoreImp.Optimizer.Common ( pattern Ref, applyAll, isReassigned, isRebound, isUpdated, removeFromBlock, replaceIdent, replaceIdents )
 import Language.PureScript.AST.SourcePos ( SourceSpan(..) )
-import Language.PureScript.Constants.Libs qualified as C
-import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Constants.Libs qualified as CLibs
+import Language.PureScript.Constants.Prim qualified as CPrim
 
 -- TODO: Potential bug:
 -- Shouldn't just inline this case: { var x = 0; x.toFixed(10); }
@@ -92,7 +71,7 @@ evaluateIifes = everywhere convert
   convert :: AST -> AST
   convert (App _ (Function _ Nothing [] (Block _ [Return _ ret])) []) = ret
   convert (App _ (Function _ Nothing idents (Block _ [Return ss ret])) [])
-    | not (any (`isReassigned` ret) idents) = replaceIdents (map (, Var ss C.S_undefined) idents) ret
+    | not (any (`isReassigned` ret) idents) = replaceIdents (map (, Var ss CPrim.S_undefined) idents) ret
   convert js = js
 
 inlineVariables :: AST -> AST
@@ -110,81 +89,81 @@ inlineCommonValues expander = everywhere convert
   where
   convert :: AST -> AST
   convert (expander -> App ss (Ref fn) [Ref dict])
-    | dict `elem` [C.P_semiringNumber, C.P_semiringInt], C.P_zero <- fn = NumericLiteral ss (Left 0)
-    | dict `elem` [C.P_semiringNumber, C.P_semiringInt], C.P_one <- fn = NumericLiteral ss (Left 1)
-    | C.P_boundedBoolean <- dict, C.P_bottom <- fn = BooleanLiteral ss False
-    | C.P_boundedBoolean <- dict, C.P_top <- fn = BooleanLiteral ss True
-  convert (App ss (expander -> App _ (Ref C.P_negate) [Ref C.P_ringInt]) [x])
+    | dict `elem` [CLibs.P_semiringNumber, CLibs.P_semiringInt], CLibs.P_zero <- fn = NumericLiteral ss (Left 0)
+    | dict `elem` [CLibs.P_semiringNumber, CLibs.P_semiringInt], CLibs.P_one <- fn = NumericLiteral ss (Left 1)
+    | CLibs.P_boundedBoolean <- dict, CLibs.P_bottom <- fn = BooleanLiteral ss False
+    | CLibs.P_boundedBoolean <- dict, CLibs.P_top <- fn = BooleanLiteral ss True
+  convert (App ss (expander -> App _ (Ref CLibs.P_negate) [Ref CLibs.P_ringInt]) [x])
     = Binary ss BitwiseOr (Unary ss Negate x) (NumericLiteral ss (Left 0))
   convert (App ss (App _ (expander -> App _ (Ref fn) [Ref dict]) [x]) [y])
-    | C.P_semiringInt <- dict, C.P_add <- fn = intOp ss Add x y
-    | C.P_semiringInt <- dict, C.P_mul <- fn = intOp ss Multiply x y
-    | C.P_ringInt <- dict, C.P_sub <- fn = intOp ss Subtract x y
+    | CLibs.P_semiringInt <- dict, CLibs.P_add <- fn = intOp ss Add x y
+    | CLibs.P_semiringInt <- dict, CLibs.P_mul <- fn = intOp ss Multiply x y
+    | CLibs.P_ringInt <- dict, CLibs.P_sub <- fn = intOp ss Subtract x y
   convert other = other
   intOp ss op x y = Binary ss BitwiseOr (Binary ss op x y) (NumericLiteral ss (Left 0))
 
 inlineCommonOperators :: (AST -> AST) -> AST -> AST
 inlineCommonOperators expander = everywhereTopDown $ applyAll $
-  [ binary C.P_semiringNumber C.P_add Add
-  , binary C.P_semiringNumber C.P_mul Multiply
+  [ binary CLibs.P_semiringNumber CLibs.P_add Add
+  , binary CLibs.P_semiringNumber CLibs.P_mul Multiply
 
-  , binary C.P_ringNumber C.P_sub Subtract
-  , unary  C.P_ringNumber C.P_negate Negate
+  , binary CLibs.P_ringNumber CLibs.P_sub Subtract
+  , unary  CLibs.P_ringNumber CLibs.P_negate Negate
 
-  , binary C.P_euclideanRingNumber C.P_div Divide
+  , binary CLibs.P_euclideanRingNumber CLibs.P_div Divide
 
-  , binary C.P_eqNumber C.P_eq EqualTo
-  , binary C.P_eqNumber C.P_notEq NotEqualTo
-  , binary C.P_eqInt C.P_eq EqualTo
-  , binary C.P_eqInt C.P_notEq NotEqualTo
-  , binary C.P_eqString C.P_eq EqualTo
-  , binary C.P_eqString C.P_notEq NotEqualTo
-  , binary C.P_eqChar C.P_eq EqualTo
-  , binary C.P_eqChar C.P_notEq NotEqualTo
-  , binary C.P_eqBoolean C.P_eq EqualTo
-  , binary C.P_eqBoolean C.P_notEq NotEqualTo
+  , binary CLibs.P_eqNumber CLibs.P_eq EqualTo
+  , binary CLibs.P_eqNumber CLibs.P_notEq NotEqualTo
+  , binary CLibs.P_eqInt CLibs.P_eq EqualTo
+  , binary CLibs.P_eqInt CLibs.P_notEq NotEqualTo
+  , binary CLibs.P_eqString CLibs.P_eq EqualTo
+  , binary CLibs.P_eqString CLibs.P_notEq NotEqualTo
+  , binary CLibs.P_eqChar CLibs.P_eq EqualTo
+  , binary CLibs.P_eqChar CLibs.P_notEq NotEqualTo
+  , binary CLibs.P_eqBoolean CLibs.P_eq EqualTo
+  , binary CLibs.P_eqBoolean CLibs.P_notEq NotEqualTo
 
-  , binary C.P_ordBoolean C.P_lessThan LessThan
-  , binary C.P_ordBoolean C.P_lessThanOrEq LessThanOrEqualTo
-  , binary C.P_ordBoolean C.P_greaterThan GreaterThan
-  , binary C.P_ordBoolean C.P_greaterThanOrEq GreaterThanOrEqualTo
-  , binary C.P_ordChar C.P_lessThan LessThan
-  , binary C.P_ordChar C.P_lessThanOrEq LessThanOrEqualTo
-  , binary C.P_ordChar C.P_greaterThan GreaterThan
-  , binary C.P_ordChar C.P_greaterThanOrEq GreaterThanOrEqualTo
-  , binary C.P_ordInt C.P_lessThan LessThan
-  , binary C.P_ordInt C.P_lessThanOrEq LessThanOrEqualTo
-  , binary C.P_ordInt C.P_greaterThan GreaterThan
-  , binary C.P_ordInt C.P_greaterThanOrEq GreaterThanOrEqualTo
-  , binary C.P_ordNumber C.P_lessThan LessThan
-  , binary C.P_ordNumber C.P_lessThanOrEq LessThanOrEqualTo
-  , binary C.P_ordNumber C.P_greaterThan GreaterThan
-  , binary C.P_ordNumber C.P_greaterThanOrEq GreaterThanOrEqualTo
-  , binary C.P_ordString C.P_lessThan LessThan
-  , binary C.P_ordString C.P_lessThanOrEq LessThanOrEqualTo
-  , binary C.P_ordString C.P_greaterThan GreaterThan
-  , binary C.P_ordString C.P_greaterThanOrEq GreaterThanOrEqualTo
+  , binary CLibs.P_ordBoolean CLibs.P_lessThan LessThan
+  , binary CLibs.P_ordBoolean CLibs.P_lessThanOrEq LessThanOrEqualTo
+  , binary CLibs.P_ordBoolean CLibs.P_greaterThan GreaterThan
+  , binary CLibs.P_ordBoolean CLibs.P_greaterThanOrEq GreaterThanOrEqualTo
+  , binary CLibs.P_ordChar CLibs.P_lessThan LessThan
+  , binary CLibs.P_ordChar CLibs.P_lessThanOrEq LessThanOrEqualTo
+  , binary CLibs.P_ordChar CLibs.P_greaterThan GreaterThan
+  , binary CLibs.P_ordChar CLibs.P_greaterThanOrEq GreaterThanOrEqualTo
+  , binary CLibs.P_ordInt CLibs.P_lessThan LessThan
+  , binary CLibs.P_ordInt CLibs.P_lessThanOrEq LessThanOrEqualTo
+  , binary CLibs.P_ordInt CLibs.P_greaterThan GreaterThan
+  , binary CLibs.P_ordInt CLibs.P_greaterThanOrEq GreaterThanOrEqualTo
+  , binary CLibs.P_ordNumber CLibs.P_lessThan LessThan
+  , binary CLibs.P_ordNumber CLibs.P_lessThanOrEq LessThanOrEqualTo
+  , binary CLibs.P_ordNumber CLibs.P_greaterThan GreaterThan
+  , binary CLibs.P_ordNumber CLibs.P_greaterThanOrEq GreaterThanOrEqualTo
+  , binary CLibs.P_ordString CLibs.P_lessThan LessThan
+  , binary CLibs.P_ordString CLibs.P_lessThanOrEq LessThanOrEqualTo
+  , binary CLibs.P_ordString CLibs.P_greaterThan GreaterThan
+  , binary CLibs.P_ordString CLibs.P_greaterThanOrEq GreaterThanOrEqualTo
 
-  , binary C.P_semigroupString C.P_append Add
+  , binary CLibs.P_semigroupString CLibs.P_append Add
 
-  , binary C.P_heytingAlgebraBoolean C.P_conj And
-  , binary C.P_heytingAlgebraBoolean C.P_disj Or
-  , unary  C.P_heytingAlgebraBoolean C.P_not Not
+  , binary CLibs.P_heytingAlgebraBoolean CLibs.P_conj And
+  , binary CLibs.P_heytingAlgebraBoolean CLibs.P_disj Or
+  , unary  CLibs.P_heytingAlgebraBoolean CLibs.P_not Not
 
-  , binary' C.P_or BitwiseOr
-  , binary' C.P_and BitwiseAnd
-  , binary' C.P_xor BitwiseXor
-  , binary' C.P_shl ShiftLeft
-  , binary' C.P_shr ShiftRight
-  , binary' C.P_zshr ZeroFillShiftRight
-  , unary'  C.P_complement BitwiseNot
+  , binary' CLibs.P_or BitwiseOr
+  , binary' CLibs.P_and BitwiseAnd
+  , binary' CLibs.P_xor BitwiseXor
+  , binary' CLibs.P_shl ShiftLeft
+  , binary' CLibs.P_shr ShiftRight
+  , binary' CLibs.P_zshr ZeroFillShiftRight
+  , unary'  CLibs.P_complement BitwiseNot
 
-  , inlineNonClassFunction (isModFnWithDict C.P_unsafeIndex) $ flip (Indexer Nothing)
+  , inlineNonClassFunction (isModFnWithDict CLibs.P_unsafeIndex) $ flip (Indexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ] ++
-  [ fn | i <- [0..10], fn <- [ mkEffFn C.P_mkEffFn i, runEffFn C.P_runEffFn i ] ] ++
-  [ fn | i <- [0..10], fn <- [ mkEffFn C.P_mkEffectFn i, runEffFn C.P_runEffectFn i ] ] ++
-  [ fn | i <- [0..10], fn <- [ mkEffFn C.P_mkSTFn i, runEffFn C.P_runSTFn i ] ]
+  [ fn | i <- [0..10], fn <- [ mkEffFn CLibs.P_mkEffFn i, runEffFn CLibs.P_runEffFn i ] ] ++
+  [ fn | i <- [0..10], fn <- [ mkEffFn CLibs.P_mkEffectFn i, runEffFn CLibs.P_runEffectFn i ] ] ++
+  [ fn | i <- [0..10], fn <- [ mkEffFn CLibs.P_mkSTFn i, runEffFn CLibs.P_runSTFn i ] ]
   where
   binary :: (ModuleName, PSString) -> (ModuleName, PSString) -> BinaryOperator -> AST -> AST
   binary dict fn op = convert where
@@ -208,7 +187,7 @@ inlineCommonOperators expander = everywhereTopDown $ applyAll $
     convert other = other
 
   mkFn :: Int -> AST -> AST
-  mkFn = mkFn' C.P_mkFn $ \ss1 ss2 ss3 args js ->
+  mkFn = mkFn' CLibs.P_mkFn $ \ss1 ss2 ss3 args js ->
     Function ss1 Nothing args (Block ss2 [Return ss3 js])
 
   mkEffFn :: (ModuleName, PSString) -> Int -> AST -> AST
@@ -237,7 +216,7 @@ inlineCommonOperators expander = everywhereTopDown $ applyAll $
   isNFn prefix n fn = fmap (<> mkString (T.pack $ show n)) prefix == fn
 
   runFn :: Int -> AST -> AST
-  runFn = runFn' C.P_runFn App
+  runFn = runFn' CLibs.P_runFn App
 
   runEffFn :: (ModuleName, PSString) -> Int -> AST -> AST
   runEffFn runFn_ = runFn' runFn_ $ \ss fn acc ->
@@ -270,11 +249,11 @@ inlineFnComposition :: forall m. MonadSupply m => (AST -> AST) -> AST -> m AST
 inlineFnComposition expander = everywhereTopDownM convert
   where
   convert :: AST -> m AST
-  convert (App s1 (App s2 (App _ (expander -> App _ (Ref fn) [Ref C.P_semigroupoidFn]) [x]) [y]) [z])
-    | C.P_compose <- fn = return $ App s1 x [App s2 y [z]]
-    | C.P_composeFlipped <- fn = return $ App s2 y [App s1 x [z]]
-  convert app@(App ss (App _ (expander -> App _ (Ref fn) [Ref C.P_semigroupoidFn]) _) _)
-    | fn `elem` [C.P_compose, C.P_composeFlipped] = mkApps ss <$> goApps app <*> freshName
+  convert (App s1 (App s2 (App _ (expander -> App _ (Ref fn) [Ref CLibs.P_semigroupoidFn]) [x]) [y]) [z])
+    | CLibs.P_compose <- fn = return $ App s1 x [App s2 y [z]]
+    | CLibs.P_composeFlipped <- fn = return $ App s2 y [App s1 x [z]]
+  convert app@(App ss (App _ (expander -> App _ (Ref fn) [Ref CLibs.P_semigroupoidFn]) _) _)
+    | fn `elem` [CLibs.P_compose, CLibs.P_composeFlipped] = mkApps ss <$> goApps app <*> freshName
   convert other = return other
 
   mkApps :: Maybe SourceSpan -> [Either AST (Text, AST)] -> Text -> AST
@@ -288,9 +267,9 @@ inlineFnComposition expander = everywhereTopDownM convert
   mkApp = either id $ \(name, arg) -> Var (getSourceSpan arg) name
 
   goApps :: AST -> m [Either AST (Text, AST)]
-  goApps (App _ (App _ (expander -> App _ (Ref fn) [Ref C.P_semigroupoidFn]) [x]) [y])
-    | C.P_compose <- fn = mappend <$> goApps x <*> goApps y
-    | C.P_composeFlipped <- fn = mappend <$> goApps y <*> goApps x
+  goApps (App _ (App _ (expander -> App _ (Ref fn) [Ref CLibs.P_semigroupoidFn]) [x]) [y])
+    | CLibs.P_compose <- fn = mappend <$> goApps x <*> goApps y
+    | CLibs.P_composeFlipped <- fn = mappend <$> goApps y <*> goApps x
   goApps app@App {} = pure . Right . (,app) <$> freshName
   goApps other = pure [Left other]
 
@@ -298,18 +277,18 @@ inlineFnIdentity :: (AST -> AST) -> AST -> AST
 inlineFnIdentity expander = everywhereTopDown convert
   where
   convert :: AST -> AST
-  convert (App _ (expander -> App _ (Ref C.P_identity) [Ref C.P_categoryFn]) [x]) = x
+  convert (App _ (expander -> App _ (Ref CLibs.P_identity) [Ref CLibs.P_categoryFn]) [x]) = x
   convert other = other
 
 inlineUnsafeCoerce :: AST -> AST
 inlineUnsafeCoerce = everywhereTopDown convert where
-  convert (App _ (Ref C.P_unsafeCoerce) [ comp ]) = comp
+  convert (App _ (Ref CLibs.P_unsafeCoerce) [ comp ]) = comp
   convert other = other
 
 inlineUnsafePartial :: AST -> AST
 inlineUnsafePartial = everywhereTopDown convert where
-  convert (App ss (Ref C.P_unsafePartial) [ comp ])
+  convert (App ss (Ref CLibs.P_unsafePartial) [ comp ])
     -- Apply to undefined here, the application should be optimized away
     -- if it is safe to do so
-    = App ss comp [ Var ss C.S_undefined ]
+    = App ss comp [ Var ss CPrim.S_undefined ]
   convert other = other

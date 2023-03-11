@@ -24,21 +24,10 @@ import Language.PureScript.AST.Literals ( Literal(..) )
 import Language.PureScript.AST.SourcePos (SourceSpan(..))
 import Language.PureScript.CoreFn.Ann ( Ann )
 import Language.PureScript.CoreFn.Binders ( Binder(..) )
-import Language.PureScript.CoreFn.Expr
-    ( Bind(..), CaseAlternative(CaseAlternative), Expr(..) )
-import Language.PureScript.CoreFn.Meta
-    ( ConstructorType(..), Meta(..) )
-import Language.PureScript.CoreFn.Module
-    ( Module(moduleComments, moduleSourceSpan, moduleName, modulePath,
-             moduleImports, moduleExports, moduleReExports, moduleForeign,
-             moduleDecls) )
-import Language.PureScript.Names
-    ( runIdent,
-      Ident,
-      ModuleName(..),
-      ProperName(runProperName),
-      Qualified(..),
-      QualifiedBy(BySourcePos, ByModuleName) )
+import Language.PureScript.CoreFn.Expr ( Bind(..), CaseAlternative(CaseAlternative), Expr(..) )
+import Language.PureScript.CoreFn.Meta ( ConstructorType(..), Meta(..) )
+import Language.PureScript.CoreFn.Module ( Module(moduleComments, moduleSourceSpan, moduleName, modulePath, moduleImports, moduleExports, moduleReExports, moduleForeign, moduleDecls) )
+import Language.PureScript.Names ( runIdent, Ident, ModuleName(..), ProperName(runProperName), Qualified(..), QualifiedBy(BySourcePos, ByModuleName) )
 import Language.PureScript.PSString (PSString)
 
 constructorTypeToJSON :: ConstructorType -> Value

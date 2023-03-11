@@ -12,14 +12,9 @@ import Data.Monoid (Any(..))
 import Data.Set qualified as S
 import Data.Text (Text)
 
-import Language.PureScript.CoreImp.AST
-    ( everything,
-      everywhere,
-      AST(Return, ReturnNoResult, App, VariableIntroduction, Var),
-      InitializerEffects(NoEffects) )
-import Language.PureScript.CoreImp.Optimizer.Common
-    ( removeFromBlock )
-import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.CoreImp.AST ( everything, everywhere, AST(Return, ReturnNoResult, App, VariableIntroduction, Var), InitializerEffects(NoEffects) )
+import Language.PureScript.CoreImp.Optimizer.Common ( removeFromBlock )
+import Language.PureScript.Constants.Prim qualified as CPrim
 
 removeCodeAfterReturnStatements :: AST -> AST
 removeCodeAfterReturnStatements = everywhere (removeFromBlock go)
@@ -37,7 +32,7 @@ removeCodeAfterReturnStatements = everywhere (removeFromBlock go)
 removeUndefinedApp :: AST -> AST
 removeUndefinedApp = everywhere convert
   where
-  convert (App ss fn [Var _ C.S_undefined]) = App ss fn []
+  convert (App ss fn [Var _ CPrim.S_undefined]) = App ss fn []
   convert js = js
 
 removeUnusedEffectFreeVars :: [Text] -> [[AST]] -> [[AST]]

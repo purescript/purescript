@@ -16,29 +16,15 @@ import Data.Map.Monoidal qualified as M
 import Data.Semigroup (Max(..))
 import Data.Set qualified as S
 
-import Language.PureScript.AST.SourcePos
-    ( nullSourceSpan, SourcePos(sourcePosLine), SourceSpan(spanStart) )
+import Language.PureScript.AST.SourcePos ( nullSourceSpan, SourcePos(sourcePosLine), SourceSpan(spanStart) )
 import Language.PureScript.Constants.Libs qualified as C
-import Language.PureScript.AST.Literals
-    ( Literal(NumericLiteral, StringLiteral) )
+import Language.PureScript.AST.Literals ( Literal(NumericLiteral, StringLiteral) )
 import Language.PureScript.CoreFn.Ann ( ssAnn, Ann )
-import Language.PureScript.CoreFn.Expr
-    ( Bind,
-      Expr(Case, Let, Literal, App, Abs, Var) )
-import Language.PureScript.CoreFn.Meta
-    ( Meta(IsNewtype, IsConstructor) )
+import Language.PureScript.CoreFn.Expr ( Bind, Expr(Case, Let, Literal, App, Abs, Var) )
+import Language.PureScript.CoreFn.Meta ( Meta(IsNewtype, IsConstructor) )
 import Language.PureScript.CoreFn.Traversals ( traverseCoreFn )
 import Language.PureScript.Crash ( internalError )
-import Language.PureScript.Names
-    ( pattern ByNullSourcePos,
-      runIdent,
-      runModuleName,
-      toMaybeModuleName,
-      Ident(Ident, InternalIdent, UnusedIdent),
-      InternalIdentData(Lazy, RuntimeLazyFactory),
-      ModuleName,
-      Qualified(..),
-      QualifiedBy(ByModuleName) )
+import Language.PureScript.Names ( pattern ByNullSourcePos, runIdent, runModuleName, toMaybeModuleName, Ident(Ident, InternalIdent, UnusedIdent), InternalIdentData(Lazy, RuntimeLazyFactory), ModuleName, Qualified(..), QualifiedBy(ByModuleName) )
 import Language.PureScript.PSString (mkString)
 
 -- This module is responsible for ensuring that the bindings in recursive
@@ -467,8 +453,7 @@ applyLazinessTransform mn rawItems = let
   -- by `refsByIndex` and find all reachable names.
   --
   -- The parts of this type mean:
-  -- D is the maximum force with which the identifier C is referenced,
-  -- directly or indirectly, during the initialization of identifier A. B is
+  -- D is the maximum force with which the identifier C is referenced, -- directly or indirectly, during the initialization of identifier A. B is
   -- Nothing if the analysis of A was inconclusive and A might need the entire
   -- binding group.
   -- 
@@ -523,8 +508,7 @@ applyLazinessTransform mn rawItems = let
   replacementsByName = M.fromAscList . map (bimap (flip S.elemAt names) (M.fromAscList . map (first (flip S.elemAt names)) . IM.toAscList)) . IM.toAscList $ replacements
 
   -- And finally, this is the second delay/force traversal where we take
-  -- `replacementsByName` and use it to rewrite references with force calls,
-  -- but only if the delay of those references is at most the maximum amount
+  -- `replacementsByName` and use it to rewrite references with force calls, -- but only if the delay of those references is at most the maximum amount
   -- of force used by the initialization of the referenced binding to
   -- reference the outer binding. A reference made with a higher delay than
   -- that can safely continue to use the original reference, since it won't be
@@ -539,8 +523,7 @@ applyLazinessTransform mn rawItems = let
         q -> Var ann q
       in (ident, rewriteExpr <$> item)
 
-  -- All that's left to do is run the above replacement on every item,
-  -- translate items from our `RecursiveGroupItem` representation back into the
+  -- All that's left to do is run the above replacement on every item, -- translate items from our `RecursiveGroupItem` representation back into the
   -- form CoreFn expects, and inform the caller whether we made any laziness
   -- transformations after all. (That last bit of information is used to
   -- determine if the runtime factory function needs to be injected.)

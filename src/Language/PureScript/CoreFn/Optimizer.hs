@@ -7,18 +7,14 @@ import Data.List (lookup)
 import Language.PureScript.AST.Literals ( Literal(ObjectLiteral) )
 import Language.PureScript.AST.SourcePos ( nullSourceSpan )
 import Language.PureScript.CoreFn.Ann ( Ann )
-import Language.PureScript.CoreFn.CSE
-    ( optimizeCommonSubexpressions )
-import Language.PureScript.CoreFn.Expr
-    ( Bind, Expr(App, ObjectUpdate, Accessor, Literal, Var) )
-import Language.PureScript.CoreFn.Module
-    ( Module(moduleDecls, moduleName) )
+import Language.PureScript.CoreFn.CSE ( optimizeCommonSubexpressions )
+import Language.PureScript.CoreFn.Expr ( Bind, Expr(App, ObjectUpdate, Accessor, Literal, Var) )
+import Language.PureScript.CoreFn.Module ( Module(moduleDecls, moduleName) )
 import Language.PureScript.CoreFn.Traversals ( everywhereOnValues )
 import Language.PureScript.Label ( Label(Label) )
-import Language.PureScript.Types
-    ( pattern REmptyKinded, Type(TypeApp, TypeConstructor, RCons) )
-import Language.PureScript.Constants.Libs qualified as C
-import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Types ( pattern REmptyKinded, Type(TypeApp, TypeConstructor, RCons) )
+import Language.PureScript.Constants.Libs qualified as CLibs
+import Language.PureScript.Constants.Prim qualified as CPrim
 
 -- |
 -- CoreFn optimization pass.
@@ -46,7 +42,7 @@ optimizeClosedRecordUpdate e = e
 
 -- | Return the labels of a closed record, or Nothing for other types or open records.
 closedRecordFields :: Type a -> Maybe [Label]
-closedRecordFields (TypeApp _ (TypeConstructor _ C.Record) row) =
+closedRecordFields (TypeApp _ (TypeConstructor _ CPrim.Record) row) =
   collect row
   where
     collect :: Type a -> Maybe [Label]
@@ -58,6 +54,6 @@ closedRecordFields _ = Nothing
 optimizeDataFunctionApply :: Expr a -> Expr a
 optimizeDataFunctionApply e = case e of
   (App a (App _ (Var _ fn) x) y)
-    | C.I_functionApply <- fn -> App a x y
-    | C.I_functionApplyFlipped <- fn -> App a y x
+    | CLibs.I_functionApply <- fn -> App a x y
+    | CLibs.I_functionApplyFlipped <- fn -> App a y x
   _ -> e

@@ -8,14 +8,9 @@ import Prelude
 import Control.Arrow (second, (***), (+++))
 import Data.Bitraversable (bitraverse)
 
-import Language.PureScript.AST.Literals
-    ( Literal(ObjectLiteral, ArrayLiteral) )
-import Language.PureScript.CoreFn.Binders
-    ( Binder(ConstructorBinder, LiteralBinder, NamedBinder) )
-import Language.PureScript.CoreFn.Expr
-    ( Bind(..),
-      CaseAlternative(..),
-      Expr(Let, Literal, Accessor, ObjectUpdate, Abs, App, Case) )
+import Language.PureScript.AST.Literals ( Literal(ObjectLiteral, ArrayLiteral) )
+import Language.PureScript.CoreFn.Binders ( Binder(ConstructorBinder, LiteralBinder, NamedBinder) )
+import Language.PureScript.CoreFn.Expr ( Bind(..), CaseAlternative(..), Expr(Let, Literal, Accessor, ObjectUpdate, Abs, App, Case) )
 
 everywhereOnValues :: (Bind a -> Bind a) ->
                       (Expr a -> Expr a) ->

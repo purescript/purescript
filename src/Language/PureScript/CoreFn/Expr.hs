@@ -9,11 +9,7 @@ import Control.Arrow ((***))
 
 import Language.PureScript.AST.Literals ( Literal )
 import Language.PureScript.CoreFn.Binders ( Binder )
-import Language.PureScript.Names
-    ( Ident,
-      ProperName,
-      ProperNameType(ConstructorName, TypeName),
-      Qualified )
+import Language.PureScript.Names ( Ident, ProperName, ProperNameType(ConstructorName, TypeName), Qualified )
 import Language.PureScript.PSString (PSString)
 
 -- |

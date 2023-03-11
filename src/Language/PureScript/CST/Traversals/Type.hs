@@ -2,12 +2,7 @@ module Language.PureScript.CST.Traversals.Type where
 
 import Prelude
 
-import Language.PureScript.CST.Types
-    ( Constraint(ConstraintParens, Constraint),
-      Labeled(lblValue),
-      Row(Row),
-      Type(..),
-      Wrapped(Wrapped) )
+import Language.PureScript.CST.Types ( Constraint(ConstraintParens, Constraint), Labeled(lblValue), Row(Row), Type(..), Wrapped(Wrapped) )
 import Language.PureScript.CST.Traversals ( everythingOnSeparated )
 
 everythingOnTypes :: (r -> r -> r) -> (Type a -> r) -> Type a -> r

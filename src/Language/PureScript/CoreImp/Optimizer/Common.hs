@@ -8,11 +8,7 @@ import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash ( internalError )
-import Language.PureScript.CoreImp.AST
-    ( everything,
-      everywhere,
-      AST(Function, VariableIntroduction, For, ForIn, Var, Indexer,
-          ModuleAccessor, Assignment, Block) )
+import Language.PureScript.CoreImp.AST ( everything, everywhere, AST(Function, VariableIntroduction, For, ForIn, Var, Indexer, ModuleAccessor, Assignment, Block) )
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString)
 
