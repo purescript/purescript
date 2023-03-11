@@ -34,11 +34,10 @@ import Language.PureScript.Sugar.CaseDeclarations ( desugarCasesModule )
 import Language.PureScript.Sugar.DoNotation ( desugarDoModule )
 import Language.PureScript.Sugar.LetPattern ( desugarLetPatternModule )
 import Language.PureScript.Sugar.Names ( Env, desugarImports )
-import Language.PureScript.Sugar.Operators ( rebracketFiltered )
+import Language.PureScript.Sugar.Operators ( rebracketFiltered, RebracketCaller(CalledByDocs) )
 import Language.PureScript.Sugar.TypeDeclarations ( desugarTypeDeclarationsModule )
 import Language.PureScript.Types qualified as PT
 import Language.PureScript.Constants.Prim qualified as CPrim
-import Language.PureScript.Sugar.Operators ( RebracketCaller(CalledByDocs) )
 
 -- |
 -- Convert a single module to a Docs.Module, making use of a pre-existing
