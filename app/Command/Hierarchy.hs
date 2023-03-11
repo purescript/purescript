@@ -21,7 +21,7 @@ import Protolude (catMaybes)
 import Control.Applicative (optional)
 import Data.Foldable (for_)
 import Data.Text qualified as T
-import Data.Text.IO qualified as T
+import Data.Text.IO qualified as TIO
 import Options.Applicative (Parser)
 import Options.Applicative qualified as Opts
 import System.Directory (createDirectoryIfMissing)
@@ -60,8 +60,8 @@ compile (HierarchyOptions inputGlob mOutput) = do
         case mOutput of
           Just output -> do
             createDirectoryIfMissing True output
-            T.writeFile (output </> T.unpack (_unGraphName name)) (_unDigraph graph)
-          Nothing -> T.putStrLn (_unDigraph graph)
+            TIO.writeFile (output </> T.unpack (_unGraphName name)) (_unDigraph graph)
+          Nothing -> TIO.putStrLn (_unDigraph graph)
       exitSuccess
 
 inputFile :: Parser FilePath

@@ -8,18 +8,9 @@ import Data.Aeson qualified as Json
 import Data.Bool (bool)
 import Data.ByteString.Lazy qualified as LB
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
-import Language.PureScript.Errors qualified as P
-    ( defaultCodeColor,
-      defaultPPEOptions,
-      nonEmpty,
-      prettyPrintMultipleErrors,
-      prettyPrintMultipleWarnings,
-      Level(Error, Warning),
-      MultipleErrors,
-      PPEOptions(ppeRelativeDirectory, ppeCodeColor, ppeFull) )
-import Language.PureScript.Graph qualified as P ( graph )
-import Language.PureScript.Errors.JSON
-    ( toJSONErrors, JSONResult(JSONResult) )
+import Language.PureScript.Errors ( defaultCodeColor, defaultPPEOptions, nonEmpty, prettyPrintMultipleErrors, prettyPrintMultipleWarnings, Level(Error, Warning), MultipleErrors, PPEOptions(ppeRelativeDirectory, ppeCodeColor, ppeFull) )
+import Language.PureScript.Graph qualified as PGraph
+import Language.PureScript.Errors.JSON ( toJSONErrors, JSONResult(JSONResult) )
 import Options.Applicative qualified as Opts
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitFailure)
@@ -42,7 +33,7 @@ graph GraphOptions{..} = do
       ]
     exitFailure
 
-  (makeResult, makeWarnings) <- P.graph input
+  (makeResult, makeWarnings) <- PGraph.graph input
 
   printWarningsAndErrors graphJSONErrors makeWarnings makeResult
     >>= (LB.putStr . Json.encode)
@@ -74,23 +65,23 @@ command = graph <$> (Opts.helper <*> graphOptions)
       Opts.help "Print errors to stderr as JSON"
 
 -- | Arguments: use JSON, warnings, errors
-printWarningsAndErrors :: Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO a
+printWarningsAndErrors :: Bool -> MultipleErrors -> Either MultipleErrors a -> IO a
 printWarningsAndErrors False warnings errors = do
   pwd <- getCurrentDirectory
-  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stderr
-  let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = True, P.ppeRelativeDirectory = pwd }
-  when (P.nonEmpty warnings) $
-    hPutStrLn stderr (P.prettyPrintMultipleWarnings ppeOpts warnings)
+  cc <- bool Nothing (Just defaultCodeColor) <$> ANSI.hSupportsANSI stderr
+  let ppeOpts = defaultPPEOptions { ppeCodeColor = cc, ppeFull = True, ppeRelativeDirectory = pwd }
+  when (nonEmpty warnings) $
+    hPutStrLn stderr (prettyPrintMultipleWarnings ppeOpts warnings)
   case errors of
     Left errs -> do
-      hPutStrLn stderr (P.prettyPrintMultipleErrors ppeOpts errs)
+      hPutStrLn stderr (prettyPrintMultipleErrors ppeOpts errs)
       exitFailure
     Right res -> pure res
 printWarningsAndErrors True warnings errors = do
   let verbose = True
   hPutStrLn stderr . LBU8.toString . Json.encode $
-    JSONResult (toJSONErrors verbose P.Warning [] warnings)
-               (either (toJSONErrors verbose P.Error []) (const []) errors)
+    JSONResult (toJSONErrors verbose Warning [] warnings)
+               (either (toJSONErrors verbose Error []) (const []) errors)
   case errors of
     Left _errs -> exitFailure
     Right res -> pure res

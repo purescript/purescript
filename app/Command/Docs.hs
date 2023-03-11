@@ -10,11 +10,9 @@ import Control.Monad.Writer ( when )
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
-import Language.PureScript.Errors qualified as P
-    ( defaultPPEOptions, prettyPrintMultipleErrors, MultipleErrors )
-import Language.PureScript.Docs.Collect qualified as D
-    ( collectDocs )
-import Language.PureScript.Docs.Prim qualified as D ( primModules )
+import Language.PureScript.Errors ( defaultPPEOptions, prettyPrintMultipleErrors, MultipleErrors )
+import Language.PureScript.Docs.Collect ( collectDocs )
+import Language.PureScript.Docs.Prim ( primModules )
 import Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import Options.Applicative qualified as Opts
 import Text.PrettyPrint.ANSI.Leijen qualified as PP
@@ -51,7 +49,7 @@ docgen (PSCDocsOptions fmt moutput compileOutput inputGlob) = do
   let output = fromMaybe (defaultOutputForFormat fmt) moutput
 
   fileMs <- parseAndConvert input
-  let ms = D.primModules ++ map snd fileMs
+  let ms = primModules ++ map snd fileMs
   case fmt of
     Etags -> writeTagsToFile output $ dumpEtags fileMs
     Ctags -> writeTagsToFile output $ dumpCtags fileMs
@@ -71,17 +69,17 @@ docgen (PSCDocsOptions fmt moutput compileOutput inputGlob) = do
   putStrLn $ "Documentation written to: " ++ output
 
   where
-  successOrExit :: Either P.MultipleErrors a -> IO a
+  successOrExit :: Either MultipleErrors a -> IO a
   successOrExit act =
     case act of
       Right x ->
         return x
       Left err -> do
-        hPutStrLn stderr $ P.prettyPrintMultipleErrors P.defaultPPEOptions err
+        hPutStrLn stderr $ prettyPrintMultipleErrors defaultPPEOptions err
         exitFailure
 
   parseAndConvert input =
-    runExceptT (fmap fst (D.collectDocs compileOutput input []))
+    runExceptT (fmap fst (collectDocs compileOutput input []))
     >>= successOrExit
 
   writeTagsToFile :: String -> [String] -> IO ()

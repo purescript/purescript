@@ -13,48 +13,14 @@ import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import Control.Monad.Trans.State.Strict (StateT, evalStateT)
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.Foldable (for_)
-import Language.PureScript.AST.Declarations qualified as P
-    ( getModuleName )
-import Language.PureScript.Errors qualified as P
-    ( defaultPPEOptions,
-      prettyPrintMultipleErrors,
-      PPEOptions(ppeRelativeDirectory) )
+import Language.PureScript.AST.Declarations ( getModuleName )
+import Language.PureScript.Errors ( defaultPPEOptions, prettyPrintMultipleErrors, PPEOptions(ppeRelativeDirectory) )
 import Language.PureScript.CST qualified as CST
-import Language.PureScript.Interactive
-    ( getHistoryFilename,
-      readNodeProcessWithExitCode,
-      initialPSCiState,
-      updateLoadedExterns,
-      Command(QuitPSCi, PasteLines),
-      PSCiConfig(PSCiConfig),
-      PSCiState,
-      noInputMessage,
-      prologueMessage,
-      quitMessage,
-      supportModuleMessage,
-      completion,
-      parseCommand,
-      parseDotFile,
-      indexFile,
-      loadAllModules,
-      supportModuleIsDefined,
-      handleCommand,
-      make,
-      runMake )
+import Language.PureScript.Interactive ( getHistoryFilename, readNodeProcessWithExitCode, initialPSCiState, updateLoadedExterns, Command(QuitPSCi, PasteLines), PSCiConfig(PSCiConfig), PSCiState, noInputMessage, prologueMessage, quitMessage, supportModuleMessage, completion, parseCommand, parseDotFile, indexFile, loadAllModules, supportModuleIsDefined, handleCommand, make, runMake )
 import Options.Applicative qualified as Opts
-import System.Console.Haskeline
-    ( defaultSettings,
-      getInputLine,
-      handleInterrupt,
-      outputStrLn,
-      withInterrupt,
-      runInputT,
-      setComplete,
-      InputT,
-      Settings(historyFile) )
+import System.Console.Haskeline ( defaultSettings, getInputLine, handleInterrupt, outputStrLn, withInterrupt, runInputT, setComplete, InputT, Settings(historyFile) )
 import System.IO.UTF8 (readUTF8File)
-import System.Exit
-    ( ExitCode(ExitFailure, ExitSuccess), exitFailure )
+import System.Exit ( ExitCode(ExitFailure, ExitSuccess), exitFailure )
 import System.Directory (doesFileExist, getCurrentDirectory)
 import System.FilePath ((</>))
 import System.FilePath.Glob qualified as Glob
@@ -173,7 +139,7 @@ command = loop <$> options
           when (null modules) . liftIO $ do
             putStr noInputMessage
             exitFailure
-          unless (supportModuleIsDefined (map (P.getModuleName . snd) modules)) . liftIO $ do
+          unless (supportModuleIsDefined (map (getModuleName . snd) modules)) . liftIO $ do
             putStr supportModuleMessage
             exitFailure
           (externs, _) <- ExceptT . runMake . make $ fmap CST.pureResult <$> modules
@@ -183,7 +149,7 @@ command = loop <$> options
             case e of
               Left errs -> do
                 pwd <- getCurrentDirectory
-                putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd} errs) >> exitFailure
+                putStrLn (prettyPrintMultipleErrors defaultPPEOptions {ppeRelativeDirectory = pwd} errs) >> exitFailure
               Right (modules, externs) -> do
                 historyFilename <- getHistoryFilename
                 let settings = defaultSettings { historyFile = Just historyFilename }

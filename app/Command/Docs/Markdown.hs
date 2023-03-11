@@ -7,20 +7,18 @@ import Prelude
 
 import Data.Text (Text)
 import Data.Text qualified as T
-import Language.PureScript.Names qualified as P
-    ( runModuleName, ModuleName )
-import Language.PureScript.Docs.Types qualified as D
-    ( Module(modName) )
-import Language.PureScript.Docs.AsMarkdown qualified as D
+import Language.PureScript.Names qualified as PN
+import Language.PureScript.Docs.Types ( Module(modName) )
+import Language.PureScript.Docs.AsMarkdown qualified as DMark
 import System.IO.UTF8 (writeUTF8FileT)
 
-asMarkdown :: D.Module -> (P.ModuleName, Text)
-asMarkdown m = (D.modName m, D.runDocs . D.moduleAsMarkdown $ m)
+asMarkdown :: Module -> (PN.ModuleName, Text)
+asMarkdown m = (modName m, DMark.runDocs . DMark.moduleAsMarkdown $ m)
 
-writeMarkdownModules :: FilePath -> [(P.ModuleName, Text)] -> IO ()
+writeMarkdownModules :: FilePath -> [(PN.ModuleName, Text)] -> IO ()
 writeMarkdownModules outputDir = mapM_ $ writeMarkdownModule outputDir
 
-writeMarkdownModule :: FilePath -> (P.ModuleName, Text) -> IO ()
+writeMarkdownModule :: FilePath -> (PN.ModuleName, Text) -> IO ()
 writeMarkdownModule outputDir (mn, text) = do
-  let filepath = outputDir ++ "/" ++ T.unpack (P.runModuleName mn) ++ ".md"
+  let filepath = outputDir ++ "/" ++ T.unpack (PN.runModuleName mn) ++ ".md"
   writeUTF8FileT filepath text

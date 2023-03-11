@@ -21,39 +21,23 @@ import Protolude
 
 import Data.Aeson qualified as Aeson
 import Control.Concurrent.STM ( newTVarIO )
-import "monad-logger" Control.Monad.Logger
-    ( MonadLogger, logDebug, logError, logInfo )
+import "monad-logger" Control.Monad.Logger ( MonadLogger, logDebug, logError, logInfo )
 import Data.IORef ( newIORef )
-import Data.Text.IO qualified as T
+import Data.Text.IO qualified as TIO
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as BSL8
 import GHC.IO.Exception (IOErrorType(..), IOException(..))
 import Language.PureScript.Ide ( handleCommand )
-import Language.PureScript.Ide.Command
-    ( commandName, Command(Load, Reset, LoadSync) )
-import Language.PureScript.Ide.Util
-    ( displayTimeSpec, logPerf, runLogger, decodeT, encodeT )
+import Language.PureScript.Ide.Command ( commandName, Command(Load, Reset, LoadSync) )
+import Language.PureScript.Ide.Util ( displayTimeSpec, logPerf, runLogger, decodeT, encodeT )
 import Language.PureScript.Ide.Error ( IdeError(GeneralError) )
 import Language.PureScript.Ide.State (updateCacheTimestamp)
-import Language.PureScript.Ide.Types
-    ( emptyIdeState,
-      Ide,
-      IdeConfiguration(IdeConfiguration, confLogLevel, confOutputPath,
-                       confGlobs),
-      IdeEnvironment(..),
-      IdeLogLevel(..) )
+import Language.PureScript.Ide.Types ( emptyIdeState, Ide, IdeConfiguration(IdeConfiguration, confLogLevel, confOutputPath, confGlobs), IdeEnvironment(..), IdeLogLevel(..) )
 import Network.Socket qualified as Network
 import Options.Applicative qualified as Opts
-import System.Directory
-    ( doesDirectoryExist, getCurrentDirectory, setCurrentDirectory )
+import System.Directory ( doesDirectoryExist, getCurrentDirectory, setCurrentDirectory )
 import System.FilePath ( (</>) )
-import System.IO
-    ( BufferMode(LineBuffering),
-      utf8,
-      hClose,
-      hFlush,
-      hSetBuffering,
-      hSetEncoding )
+import System.IO ( BufferMode(LineBuffering), utf8, hClose, hFlush, hSetBuffering, hSetEncoding )
 import System.IO.Error (isEOFError)
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
@@ -105,7 +89,7 @@ command = Opts.helper <*> subcommands where
     hSetEncoding stdin utf8
     hSetEncoding stdout utf8
     let handler (SomeException e) = do
-          T.putStrLn ("Couldn't connect to purs ide server on port " <> show clientPort <> ":")
+          TIO.putStrLn ("Couldn't connect to purs ide server on port " <> show clientPort <> ":")
           print e
           exitFailure
     let hints = Network.defaultHints
@@ -116,7 +100,7 @@ command = Opts.helper <*> subcommands where
     sock <- Network.socket (Network.addrFamily addr) (Network.addrSocketType addr) (Network.addrProtocol addr)
     Network.connect sock (Network.addrAddress addr) `catch` handler
     h <- Network.socketToHandle sock ReadWriteMode
-    T.hPutStrLn h =<< T.getLine
+    TIO.hPutStrLn h =<< TIO.getLine
     BS8.putStrLn =<< BS8.hGetLine h
     hFlush stdout
     hClose h
@@ -224,7 +208,7 @@ startServer port env = Network.withSocketsDo $ do
               let errMsg = "Parsing the command failed with:\n" <> err <> "\nCommand: " <> cmd
               $(logError) errMsg
               liftIO $ do
-                catchGoneHandle (T.hPutStrLn h (encodeT (GeneralError errMsg)))
+                catchGoneHandle (TIO.hPutStrLn h (encodeT (GeneralError errMsg)))
                 hFlush stdout
           liftIO $ catchGoneHandle (hClose h)
 
@@ -251,7 +235,7 @@ acceptCommand sock = do
                   -- this means that the connection was
                   -- terminated without receiving any input
                   (\e -> if isEOFError e then Just () else Nothing)
-                  (Just <$> T.hGetLine h)
+                  (Just <$> TIO.hGetLine h)
                   (const (pure Nothing)))
   case cmd' of
     Nothing -> throwError "Connection was closed before any input arrived"

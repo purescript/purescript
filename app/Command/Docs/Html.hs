@@ -14,20 +14,12 @@ import Data.List (sort)
 import Data.Text (Text)
 import Data.Text.Lazy (toStrict)
 import Data.Text qualified as T
-import Language.PureScript.Crash qualified as P ( internalError )
-import Language.PureScript.Names qualified as P
-    ( moduleNameFromString, runModuleName, ModuleName )
-import Language.PureScript.Docs.Css qualified as D
-    ( normalizeCssT, pursuitCssT )
-import Language.PureScript.Docs.RenderedCode.Types qualified as D
-    ( ContainingModule(..), Namespace )
-import Language.PureScript.Docs.Types qualified as D
-    ( ignorePackage,
-      DocLink(..),
-      InPackage,
-      LinkLocation(BuiltinModule, LocalModule, DepsModule),
-      Module(modName) )
-import Language.PureScript.Docs.AsHtml qualified as D
+import Language.PureScript.Crash ( internalError )
+import Language.PureScript.Names qualified as PN
+import Language.PureScript.Docs.Css ( normalizeCssT, pursuitCssT )
+import Language.PureScript.Docs.RenderedCode.Types ( ContainingModule(..), Namespace )
+import Language.PureScript.Docs.Types ( ignorePackage, DocLink(..), InPackage, LinkLocation(BuiltinModule, LocalModule, DepsModule), Module(modName) )
+import Language.PureScript.Docs.AsHtml qualified as DHtml
 import Text.Blaze.Html5 (Html, (!), toMarkup)
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as A
@@ -35,39 +27,39 @@ import Text.Blaze.Html.Renderer.Text qualified as Blaze
 import System.IO.UTF8 (writeUTF8FileT)
 import Version (versionString)
 
-writeHtmlModules :: FilePath -> [(P.ModuleName, D.HtmlOutputModule Html)] -> IO ()
+writeHtmlModules :: FilePath -> [(PN.ModuleName, DHtml.HtmlOutputModule Html)] -> IO ()
 writeHtmlModules outputDir modules = do
   let moduleList = sort $ map fst modules
   writeHtmlFile (outputDir ++ "/index.html") (renderIndexModule moduleList)
   mapM_ (writeHtmlModule outputDir . (fst &&& layout moduleList)) modules
 
-asHtml :: D.Module -> (P.ModuleName, D.HtmlOutputModule Html)
-asHtml m = D.moduleAsHtml (const $ Just $ getHtmlRenderContext (D.modName m)) m
+asHtml :: Module -> (PN.ModuleName, DHtml.HtmlOutputModule Html)
+asHtml m = DHtml.moduleAsHtml (const $ Just $ getHtmlRenderContext (modName m)) m
 
-writeHtmlModule :: FilePath -> (P.ModuleName, Html) -> IO ()
+writeHtmlModule :: FilePath -> (PN.ModuleName, Html) -> IO ()
 writeHtmlModule outputDir (mn, html) = do
-  let filepath = outputDir ++ "/" ++ T.unpack (P.runModuleName mn) ++ ".html"
+  let filepath = outputDir ++ "/" ++ T.unpack (PN.runModuleName mn) ++ ".html"
   writeHtmlFile filepath html
 
 writeHtmlFile :: FilePath -> Html -> IO ()
 writeHtmlFile filepath =
   writeUTF8FileT filepath . toStrict . Blaze.renderHtml
 
-getHtmlRenderContext :: P.ModuleName -> D.HtmlRenderContext
-getHtmlRenderContext mn = D.HtmlRenderContext
-  { D.buildDocLink = getLink mn
-  , D.renderDocLink = renderLink
-  , D.renderSourceLink = const Nothing
+getHtmlRenderContext :: PN.ModuleName -> DHtml.HtmlRenderContext
+getHtmlRenderContext mn = DHtml.HtmlRenderContext
+  { DHtml.buildDocLink = getLink mn
+  , DHtml.renderDocLink = renderLink
+  , DHtml.renderSourceLink = const Nothing
   }
 
 -- TODO: try to combine this with the one in Docs.Types?
-getLink :: P.ModuleName -> D.Namespace -> Text -> D.ContainingModule -> Maybe D.DocLink
+getLink :: PN.ModuleName -> Namespace -> Text -> ContainingModule -> Maybe DocLink
 getLink curMn namespace target containingMod = do
   location <- getLinkLocation
-  return D.DocLink
-    { D.linkLocation = location
-    , D.linkTitle = target
-    , D.linkNamespace = namespace
+  return DocLink
+    { linkLocation = location
+    , linkTitle = target
+    , linkNamespace = namespace
     }
 
   where
@@ -75,29 +67,29 @@ getLink curMn namespace target containingMod = do
 
   normalLinkLocation = do
     case containingMod of
-      D.ThisModule ->
-        return $ D.LocalModule curMn
-      D.OtherModule destMn ->
+      ThisModule ->
+        return $ LocalModule curMn
+      OtherModule destMn ->
         -- This is OK because all modules count as 'local' for purs docs in
         -- html mode
-        return $ D.LocalModule destMn
+        return $ LocalModule destMn
 
   builtinLinkLocation = do
-    let primMn = P.moduleNameFromString "Prim"
-    guard $ containingMod == D.OtherModule primMn
-    return $ D.BuiltinModule primMn
+    let primMn = PN.moduleNameFromString "Prim"
+    guard $ containingMod == OtherModule primMn
+    return $ BuiltinModule primMn
 
-renderLink :: D.DocLink -> Text
+renderLink :: DocLink -> Text
 renderLink l =
-  case D.linkLocation l of
-    D.LocalModule dest ->
-      P.runModuleName dest <> ".html"
-    D.DepsModule{} ->
-      P.internalError "DepsModule: not implemented"
-    D.BuiltinModule dest  ->
-      P.runModuleName dest <> ".html"
+  case linkLocation l of
+    LocalModule dest ->
+      PN.runModuleName dest <> ".html"
+    DepsModule{} ->
+      internalError "DepsModule: not implemented"
+    BuiltinModule dest  ->
+      PN.runModuleName dest <> ".html"
 
-layout :: [P.ModuleName] -> (P.ModuleName, D.HtmlOutputModule Html) -> Html
+layout :: [PN.ModuleName] -> (PN.ModuleName, DHtml.HtmlOutputModule Html) -> Html
 layout moduleList (mn, htmlDocs) =
   basicLayout ("PureScript: " <> modName) $ do
     H.div ! A.class_ "page-title clearfix" $ do
@@ -105,16 +97,16 @@ layout moduleList (mn, htmlDocs) =
       H.h1 ! A.class_ "page-title__title" $ toMarkup modName
 
     H.div ! A.class_ "col col--main" $ do
-      D.htmlOutputModuleLocals htmlDocs
-      mapM_ renderReExports (D.htmlOutputModuleReExports htmlDocs)
+      DHtml.htmlOutputModuleLocals htmlDocs
+      mapM_ renderReExports (DHtml.htmlOutputModuleReExports htmlDocs)
 
     H.div ! A.class_ "col col--aside" $ do
       H.h3 "Modules"
       renderModuleList moduleList
   where
-  modName = P.runModuleName mn
+  modName = PN.runModuleName mn
 
-  renderReExports :: (D.InPackage P.ModuleName, Html) -> Html
+  renderReExports :: (InPackage PN.ModuleName, Html) -> Html
   renderReExports (reExpFrom, html) = do
     H.h2 ! A.class_ "re-exports" $ do
       toMarkup ("Re-exports from " :: Text)
@@ -122,7 +114,7 @@ layout moduleList (mn, htmlDocs) =
         toMarkup (toText reExpFrom)
     html
 
-  toText = P.runModuleName . D.ignorePackage
+  toText = PN.runModuleName . ignorePackage
 
 basicLayout :: Text -> Html -> Html
 basicLayout title inner =
@@ -136,9 +128,9 @@ basicLayout title inner =
       H.link ! A.href "https://fonts.googleapis.com/css?family=Roboto+Mono|Roboto:300,400,400i,700,700i"
              ! A.type_ "text/css" ! A.rel "stylesheet"
       H.style ! A.type_ "text/css" $
-        toMarkup D.normalizeCssT
+        toMarkup normalizeCssT
       H.style ! A.type_ "text/css" $
-        toMarkup D.pursuitCssT
+        toMarkup pursuitCssT
     H.body $ do
       H.div ! A.class_ "everything-except-footer" $ do
         H.div ! A.class_ "top-banner clearfix" $ do
@@ -160,7 +152,7 @@ basicLayout title inner =
   -- Like Pursuit's .top-banner__logo except without the 'hover' styles
   inlineHeaderStyles = "float: left; font-size: 2.44em; font-weight: 300; line-height: 90px; margin: 0"
 
-renderIndexModule :: [P.ModuleName] -> Html
+renderIndexModule :: [PN.ModuleName] -> Html
 renderIndexModule moduleList =
   basicLayout "PureScript API documentation" $ do
     H.div ! A.class_ "page-title clearfix" $ do
@@ -168,11 +160,11 @@ renderIndexModule moduleList =
     H.div ! A.class_ "col col--main" $ do
       renderModuleList moduleList
 
-renderModuleList :: [P.ModuleName] -> Html
+renderModuleList :: [PN.ModuleName] -> Html
 renderModuleList moduleList =
   H.ul $ mapM_ listItem moduleList
 
   where
   listItem mn = H.li $
-    H.a ! A.href (H.toValue (P.runModuleName mn <> ".html")) $
-      toMarkup (P.runModuleName mn)
+    H.a ! A.href (H.toValue (PN.runModuleName mn <> ".html")) $
+      toMarkup (PN.runModuleName mn)
