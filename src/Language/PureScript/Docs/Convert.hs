@@ -50,7 +50,7 @@ convertModule ::
   [ExternsFile] ->
   Env ->
   PEnv.Environment ->
-  Module ->
+  ASTD.Module ->
   m Module
 convertModule externs env checkEnv =
   fmap (insertValueTypesAndAdjustKinds checkEnv . convertSingleModule) . partiallyDesugar externs env
@@ -82,7 +82,7 @@ insertValueTypesAndAdjustKinds env m =
   -- Note: `Prim` modules' docs don't go through this conversion process
   -- so `ExternDataDeclaration` values will still exist beyond this point.
   convertFFIDecl d@Declaration { declInfo = ExternDataDeclaration kind roles } =
-    d { declInfo = DataDeclaration P.Data (genTypeParams kind) roles
+    d { declInfo = DataDeclaration PEnv.Data (genTypeParams kind) roles
       , declKind = Just (KindInfo ASTD.DataSig kind)
       }
 
@@ -270,8 +270,8 @@ partiallyDesugar ::
   (MonadError MultipleErrors m) =>
   [ExternsFile] ->
   Env ->
-  Module ->
-  m Module
+  ASTD.Module ->
+  m ASTD.Module
 partiallyDesugar externs env = evalSupplyT 0 . desugar'
   where
   desugar' =
