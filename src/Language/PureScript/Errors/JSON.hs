@@ -8,26 +8,9 @@ import Data.Aeson.TH qualified as A
 import Data.List.NonEmpty qualified as NEL
 import Data.Text (Text)
 
-import Language.PureScript.AST qualified as P
-    ( SourcePos(sourcePosColumn, sourcePosLine),
-      SourceSpan(spanName, spanStart, spanEnd) )
-import Language.PureScript.Errors qualified as P
-    ( errorCode,
-      errorDocUri,
-      errorModule,
-      errorSpan,
-      errorSuggestion,
-      prettyPrintSingleError,
-      renderBox,
-      stripModuleAndSpan,
-      suggestionSpan,
-      unwrapErrorMessage,
-      ErrorMessage,
-      ErrorSuggestion(ErrorSuggestion),
-      Level,
-      MultipleErrors(runMultipleErrors),
-      PPEOptions(PPEOptions) )
-import Language.PureScript.Names qualified as P ( runModuleName )
+import Language.PureScript.AST.SourcePos ( SourcePos(sourcePosColumn, sourcePosLine), SourceSpan(spanName, spanStart, spanEnd) )
+import Language.PureScript.Errors qualified as PErr
+import Language.PureScript.Names qualified as PN
 
 data ErrorPosition = ErrorPosition
   { startLine :: Int
@@ -49,7 +32,7 @@ data JSONError = JSONError
   , filename :: Maybe String
   , moduleName :: Maybe Text
   , suggestion :: Maybe ErrorSuggestion
-  , allSpans :: [P.SourceSpan]
+  , allSpans :: [SourceSpan]
   } deriving (Show, Eq)
 
 data JSONResult = JSONResult
@@ -62,33 +45,33 @@ $(A.deriveJSON A.defaultOptions ''ErrorSuggestion)
 $(A.deriveJSON A.defaultOptions ''JSONError)
 $(A.deriveJSON A.defaultOptions ''JSONResult)
 
-toJSONErrors :: Bool -> P.Level -> [(FilePath, Text)] -> P.MultipleErrors -> [JSONError]
-toJSONErrors verbose level files = map (toJSONError verbose level files) . P.runMultipleErrors
+toJSONErrors :: Bool -> PErr.Level -> [(FilePath, Text)] -> PErr.MultipleErrors -> [JSONError]
+toJSONErrors verbose level files = map (toJSONError verbose level files) . PErr.runMultipleErrors
 
-toJSONError :: Bool -> P.Level -> [(FilePath, Text)] -> P.ErrorMessage -> JSONError
+toJSONError :: Bool -> PErr.Level -> [(FilePath, Text)] -> PErr.ErrorMessage -> JSONError
 toJSONError verbose level files e =
   JSONError (toErrorPosition <$> fmap NEL.head spans)
-            (P.renderBox (P.prettyPrintSingleError (P.PPEOptions Nothing verbose level False mempty files) (P.stripModuleAndSpan e)))
-            (P.errorCode e)
-            (P.errorDocUri e)
-            (P.spanName <$> fmap NEL.head spans)
-            (P.runModuleName <$> P.errorModule e)
+            (PErr.renderBox (PErr.prettyPrintSingleError (PErr.PPEOptions Nothing verbose level False mempty files) (PErr.stripModuleAndSpan e)))
+            (PErr.errorCode e)
+            (PErr.errorDocUri e)
+            (spanName <$> fmap NEL.head spans)
+            (PN.runModuleName <$> PErr.errorModule e)
             (toSuggestion e)
             (maybe [] NEL.toList spans)
   where
-  spans :: Maybe (NEL.NonEmpty P.SourceSpan)
-  spans = P.errorSpan e
+  spans :: Maybe (NEL.NonEmpty SourceSpan)
+  spans = PErr.errorSpan e
 
-  toErrorPosition :: P.SourceSpan -> ErrorPosition
+  toErrorPosition :: SourceSpan -> ErrorPosition
   toErrorPosition ss =
-    ErrorPosition (P.sourcePosLine   (P.spanStart ss))
-                  (P.sourcePosColumn (P.spanStart ss))
-                  (P.sourcePosLine   (P.spanEnd   ss))
-                  (P.sourcePosColumn (P.spanEnd   ss))
-  toSuggestion :: P.ErrorMessage -> Maybe ErrorSuggestion
+    ErrorPosition (sourcePosLine   (spanStart ss))
+                  (sourcePosColumn (spanStart ss))
+                  (sourcePosLine   (spanEnd   ss))
+                  (sourcePosColumn (spanEnd   ss))
+  toSuggestion :: PErr.ErrorMessage -> Maybe ErrorSuggestion
   toSuggestion em =
-    case P.errorSuggestion $ P.unwrapErrorMessage em of
+    case PErr.errorSuggestion $ PErr.unwrapErrorMessage em of
       Nothing -> Nothing
-      Just s -> Just $ ErrorSuggestion (suggestionText s) (toErrorPosition <$> P.suggestionSpan em)
+      Just s -> Just $ ErrorSuggestion (suggestionText s) (toErrorPosition <$> PErr.suggestionSpan em)
 
-  suggestionText (P.ErrorSuggestion s) = s
+  suggestionText (PErr.ErrorSuggestion s) = s
