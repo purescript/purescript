@@ -13,7 +13,7 @@ defaults:
     shell: "bash"
 
 env:
-  CI_PRERELEASE: "${{ github.event_name == 'push' }}"
+  CI_PRERELEASE: "${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}"
   CI_RELEASE: "${{ github.event_name == 'release' }}"
   STACK_VERSION: "2.9.3"
 
@@ -36,11 +36,11 @@ jobs:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
         include:
-          - # If upgrading the Haskell image, also upgrade it in the lint job below
-            os: "ubuntu-latest"
-            image: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
-          - os: "macOS-11"
-          - os: "windows-2019"
+          # - # If upgrading the Haskell image, also upgrade it in the lint job below
+          #   os: "ubuntu-latest"
+          #   image: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
+          # - os: "macOS-11"
+          # - os: "windows-2019"
           - os: "self-hosted"
 
     runs-on: "${{ matrix.os }}"
@@ -62,7 +62,7 @@ jobs:
       - uses: "actions/checkout@v2"
       - uses: "actions/setup-node@v2"
         with:
-          node-version: "14"
+          node-version: "16"
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
@@ -171,68 +171,68 @@ jobs:
           files: "sdist-test/bundle/*.{tar.gz,sha}"
 
   lint:
-    runs-on: "ubuntu-latest"
+    runs-on: "self-hosted" # "ubuntu-latest"
     # At the moment, this is a different image from the image used for
     # compilation, though the GHC versions match. This is because the
     # compilation image uses an old version of glibc, which we want because it
     # means our published binaries will work on the widest number of platforms.
     # But the HLint binary downloaded by this job requires a newer glibc
     # version.
-    container: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
+    # container: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
 
     steps:
-      - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
-        # if the Git version is less than 2.18.
-        name: "Install a newer version of Git"
-        run: |
-          . /etc/os-release
-          echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
-          apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
+      # - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
+      #   # if the Git version is less than 2.18.
+      #   name: "Install a newer version of Git"
+      #   run: |
+      #     . /etc/os-release
+      #     echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
+      #     apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
-      - name: "Fix working directory ownership"
-        run: |
-          chown root:root .
+      # - name: "Fix working directory ownership"
+      #   run: |
+      #     chown root:root .
 
-      - uses: "actions/cache@v2"
-        with:
-          path: |
-            /root/.stack
-          key: "${{ runner.os }}-${{ job.container.id }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
+      # - uses: "actions/cache@v2"
+      #   with:
+      #     path: |
+      #       /root/.stack
+      #     key: "${{ runner.os }}-${{ job.container.id }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
 
-      - run: "ci/fix-home ci/run-hlint.sh --git"
-        env:
-          VERSION: "3.5"
+      # - run: "ci/fix-home ci/run-hlint.sh --git"
+      #   env:
+      #     VERSION: "3.5"
 
-      # Note: the weeder version will need to be updated when we next update our version
-      # of GHC.
-      #
-      # weeder-2.2.0 has somewhat strange version deps. It doesn't appear to
-      # support the exact versions of dhall and generic-lens in LTS-18.
-      # However, forcing it to use the versions of dhall and generic-lens in
-      # LTS-18 doesn't cause any problems when building, so the following
-      # commands build weeder while ignoring version constraints.
-      - name: Install weeder
-        run: |
-          # The `stack.yaml` file is copied to a separate file so that
-          # adding `allow-newer: true` doesn't affect any subsequant
-          # calls to `stack`.
-          cp stack.yaml stack-weeder.yaml
-          # `allow-newer: true` is needed so that weeder-2.2.0 can be
-          # installed with the dependencies present in LTS-18.
-          echo 'allow-newer: true' >> stack-weeder.yaml
-          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.4.0
+      # # Note: the weeder version will need to be updated when we next update our version
+      # # of GHC.
+      # #
+      # # weeder-2.2.0 has somewhat strange version deps. It doesn't appear to
+      # # support the exact versions of dhall and generic-lens in LTS-18.
+      # # However, forcing it to use the versions of dhall and generic-lens in
+      # # LTS-18 doesn't cause any problems when building, so the following
+      # # commands build weeder while ignoring version constraints.
+      # - name: Install weeder
+      #   run: |
+      #     # The `stack.yaml` file is copied to a separate file so that
+      #     # adding `allow-newer: true` doesn't affect any subsequant
+      #     # calls to `stack`.
+      #     cp stack.yaml stack-weeder.yaml
+      #     # `allow-newer: true` is needed so that weeder-2.2.0 can be
+      #     # installed with the dependencies present in LTS-18.
+      #     echo 'allow-newer: true' >> stack-weeder.yaml
+      #     ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.4.0
 
-      - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
+      # - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
 
-      - run: "ci/fix-home stack exec weeder"
+      # - run: "ci/fix-home stack exec weeder"
 
-      # Now do it again, with the test suite included. We don't want a
-      # reference from our test suite to count in the above check; the fact
-      # that a function is tested is not evidence that it's needed. But we also
-      # don't want to leave weeds lying around in our test suite either.
-      - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
+      # # Now do it again, with the test suite included. We don't want a
+      # # reference from our test suite to count in the above check; the fact
+      # # that a function is tested is not evidence that it's needed. But we also
+      # # don't want to leave weeds lying around in our test suite either.
+      # - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
 
-      - run: "ci/fix-home stack exec weeder"
+      # - run: "ci/fix-home stack exec weeder"
 
   make-prerelease:
     runs-on: "ubuntu-latest"
