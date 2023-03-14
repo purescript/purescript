@@ -2,7 +2,7 @@ name: "CI"
 
 on:
   push:
-    branches: ["master"]
+    branches: ["master", "f-f/arm64-runner"]
   pull_request:
     branches: ["master"]
   release:
