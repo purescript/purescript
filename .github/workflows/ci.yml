@@ -2,11 +2,11 @@ name: "CI"
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
   release:
-    types: [ "published" ]
+    types: ["published"]
 
 defaults:
   run:
@@ -41,6 +41,7 @@ jobs:
             image: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
           - os: "macOS-11"
           - os: "windows-2019"
+          - os: "self-hosted"
 
     runs-on: "${{ matrix.os }}"
     container: "${{ matrix.image }}"
@@ -59,7 +60,6 @@ jobs:
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
-
       - uses: "actions/setup-node@v2"
         with:
           node-version: "14"
@@ -129,11 +129,17 @@ jobs:
         if: "${{ env.CI_RELEASE == 'true' || env.CI_PRERELEASE == 'true' && steps.build.outputs.do-not-prerelease != 'true' }}"
         run: |
           os_name="${{ runner.os }}"
+          os_arch="${{ runner.arch }}"
           case "$os_name" in
             Linux)
               bundle_os=linux64;;
             macOS)
-              bundle_os=macos;;
+              case "$os_arch" in
+                ARM64)
+                  bundle_os=macos64;;
+                *)
+                  bundle_os=macos;;
+              esac
             Windows)
               bundle_os=win64;;
             *)
@@ -183,7 +189,6 @@ jobs:
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
-
       - name: "Fix working directory ownership"
         run: |
           chown root:root .
