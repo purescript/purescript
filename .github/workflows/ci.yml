@@ -64,9 +64,15 @@ jobs:
         with:
           node-version: "16"
 
+      - name: "(macOS ARM64 only) Install Haskell, but not stack"
+        if: "${{ runner.os == 'self-hosted' }}"
+        uses: "haskell/actions/setup@v1"
+        with:
+          enable-stack: false
+
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
-        if: "${{ runner.os != 'Linux' }}"
+        if: "${{ runner.os != 'Linux' && runner.os != 'self-hosted' }}"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
@@ -234,32 +240,32 @@ jobs:
 
       # - run: "ci/fix-home stack exec weeder"
 
-  make-prerelease:
-    runs-on: "ubuntu-latest"
-    needs:
-      - "build"
-      - "lint"
-    if: "${{ github.event_name == 'push' && needs.build.outputs.do-not-prerelease != 'true' }}"
-    steps:
-      - uses: "actions/download-artifact@v3"
-      - uses: "ncipollo/release-action@v1.10.0"
-        with:
-          tag: "v${{ needs.build.outputs.version }}"
-          artifacts: "*-bundle/*"
-          prerelease: true
-          body: "This is an automated preview release. Get the latest stable release [here](https://github.com/purescript/purescript/releases/latest)."
-      - uses: "actions/checkout@v3"
-      - uses: "actions/setup-node@v3"
-        with:
-          node-version: "16.x"
-          registry-url: "https://registry.npmjs.org"
-      - name: "Publish npm package"
-        working-directory: "npm-package"
-        env:
-          BUILD_VERSION: "${{ needs.build.outputs.version }}"
-          NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}"
-        run: |
-          src_version=$(node -pe 'require("./package.json").version')
-          npm version --allow-same-version "$BUILD_VERSION"
-          sed -i -e "s/--purs-ver=${src_version//./\\.}/--purs-ver=$BUILD_VERSION/" package.json
-          npm publish --tag next
+  # make-prerelease:
+  #   runs-on: "ubuntu-latest"
+  #   needs:
+  #     - "build"
+  #     - "lint"
+  #   if: "${{ github.event_name == 'push' && needs.build.outputs.do-not-prerelease != 'true' }}"
+  #   steps:
+  #     - uses: "actions/download-artifact@v3"
+  #     - uses: "ncipollo/release-action@v1.10.0"
+  #       with:
+  #         tag: "v${{ needs.build.outputs.version }}"
+  #         artifacts: "*-bundle/*"
+  #         prerelease: true
+  #         body: "This is an automated preview release. Get the latest stable release [here](https://github.com/purescript/purescript/releases/latest)."
+  #     - uses: "actions/checkout@v3"
+  #     - uses: "actions/setup-node@v3"
+  #       with:
+  #         node-version: "16.x"
+  #         registry-url: "https://registry.npmjs.org"
+  #     - name: "Publish npm package"
+  #       working-directory: "npm-package"
+  #       env:
+  #         BUILD_VERSION: "${{ needs.build.outputs.version }}"
+  #         NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}"
+  #       run: |
+  #         src_version=$(node -pe 'require("./package.json").version')
+  #         npm version --allow-same-version "$BUILD_VERSION"
+  #         sed -i -e "s/--purs-ver=${src_version//./\\.}/--purs-ver=$BUILD_VERSION/" package.json
+  #         npm publish --tag next
