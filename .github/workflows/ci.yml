@@ -65,14 +65,14 @@ jobs:
           node-version: "16"
 
       - name: "(macOS ARM64 only) Install Haskell, but not stack"
-        if: "${{ runner.os == 'self-hosted' }}"
+        if: "${{ matrix.os == 'self-hosted' }}"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: false
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
-        if: "${{ runner.os != 'Linux' && runner.os != 'self-hosted' }}"
+        if: "${{ runner.os != 'Linux' && matrix.os != 'self-hosted' }}"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
