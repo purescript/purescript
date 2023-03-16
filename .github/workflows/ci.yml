@@ -37,13 +37,13 @@ jobs:
       matrix:
         include:
           # - # If upgrading the Haskell image, also upgrade it in the lint job below
-          #   os: "ubuntu-latest"
+          #   os: ["ubuntu-latest"]
           #   image: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
-          # - os: "macOS-11"
-          # - os: "windows-2019"
-          - os: "self-hosted"
+          # - os: ["macOS-11"]
+          # - os: ["windows-2019"]
+          - os: ["self-hosted", "macos", "ARM64"]
 
-    runs-on: "${{ matrix.os }}"
+    runs-on: ${{ [matrix.os] }}
     container: "${{ matrix.image }}"
 
     outputs:
@@ -66,7 +66,7 @@ jobs:
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
-        if: "${{ runner.os != 'Linux' && matrix.os != 'self-hosted' }}"
+        if: "${{ runner.os != 'Linux' && !contains(matrix.os, 'self-hosted') }}"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
@@ -136,7 +136,7 @@ jobs:
             macOS)
               case "$os_arch" in
                 ARM64)
-                  bundle_os=macos64;;
+                  bundle_os=macos-arm64;;
                 *)
                   bundle_os=macos;;
               esac
