@@ -42,6 +42,7 @@ jobs:
           # - os: ["macOS-11"]
           # - os: ["windows-2019"]
           - os: ["self-hosted", "macos", "ARM64"]
+          - os: ["self-hosted", "Linux", "ARM64"]
 
     runs-on: ${{ matrix.os }}
     container: "${{ matrix.image }}"
@@ -54,7 +55,7 @@ jobs:
       - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
         # if the Git version is less than 2.18.
         name: "(Linux only) Install a newer version of Git"
-        if: "${{ runner.os == 'Linux' }}"
+        if: "${{ matrix.os == 'ubuntu-latest' }}"
         run: |
           . /etc/os-release
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
@@ -66,7 +67,7 @@ jobs:
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
-        if: "${{ runner.os != 'Linux' && !contains(matrix.os, 'self-hosted') }}"
+        if: "${{ matrix.os != 'ubuntu-latest' && !contains(matrix.os, 'self-hosted') }}"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
@@ -74,7 +75,7 @@ jobs:
           stack-no-global: true
 
       - name: "(Linux only) Check Stack version and fix working directory ownership"
-        if: "${{ runner.os == 'Linux' }}"
+        if: "${{ matrix.os == 'ubuntu-latest' }}"
         run: |
           [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
           chown root:root .
@@ -99,7 +100,7 @@ jobs:
         run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Build the entire package set"
-        if: "${{ runner.os == 'Linux' }}"
+        if: "${{ matrix.os == 'ubuntu-latest' }}"
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual package-set building happens in a
         # temporary directory.
@@ -132,7 +133,12 @@ jobs:
           os_arch="${{ runner.arch }}"
           case "$os_name" in
             Linux)
-              bundle_os=linux64;;
+              case "$os_arch" in
+                ARM64)
+                  bundle_os=linux-arm64;;
+                *)
+                  bundle_os=linux64;;
+              esac
             macOS)
               case "$os_arch" in
                 ARM64)
@@ -153,7 +159,7 @@ jobs:
         if: "${{ env.CI_PRERELEASE == 'true' && steps.build.outputs.do-not-prerelease != 'true' }}"
         uses: "actions/upload-artifact@v3"
         with:
-          name: "${{ runner.os }}-bundle"
+          name: "${{ runner.os }}-${{ runner.arch }}-bundle"
           path: |
             sdist-test/bundle/*.sha
             sdist-test/bundle/*.tar.gz
