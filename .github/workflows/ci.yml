@@ -43,7 +43,7 @@ jobs:
           # - os: ["windows-2019"]
           - os: ["self-hosted", "macos", "ARM64"]
 
-    runs-on: ${{ [matrix.os] }}
+    runs-on: ${{ matrix.os }}
     container: "${{ matrix.image }}"
 
     outputs:
