@@ -2,11 +2,11 @@ name: "CI"
 
 on:
   push:
-    branches: ["master", "f-f/arm64-runner"]
+    branches: [ "master" ]
   pull_request:
-    branches: ["master"]
+    branches: [ "master" ]
   release:
-    types: ["published"]
+    types: [ "published" ]
 
 defaults:
   run:
@@ -36,11 +36,11 @@ jobs:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
         include:
-          # - # If upgrading the Haskell image, also upgrade it in the lint job below
-          #   os: ["ubuntu-latest"]
-          #   image: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
-          # - os: ["macOS-11"]
-          # - os: ["windows-2019"]
+          - # If upgrading the Haskell image, also upgrade it in the lint job below
+            os: ["ubuntu-latest"]
+            image: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
+          - os: ["macOS-11"]
+          - os: ["windows-2019"]
           - os: ["self-hosted", "macos", "ARM64"]
           - os: ["self-hosted", "Linux", "ARM64"]
 
@@ -55,19 +55,23 @@ jobs:
       - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
         # if the Git version is less than 2.18.
         name: "(Linux only) Install a newer version of Git"
-        if: "${{ matrix.os == 'ubuntu-latest' }}"
+        if: "${{ matrix.os == ['ubuntu-latest'] }}"
         run: |
           . /etc/os-release
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
+
       - uses: "actions/setup-node@v2"
         with:
           node-version: "16"
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
-        if: "${{ matrix.os != 'ubuntu-latest' && !contains(matrix.os, 'self-hosted') }}"
+        # Note: here we exclude the self-hosted runners because this action does not work on ARM
+        # and their Haskell environment is instead provided by a nix-shell
+        # See https://github.com/purescript/purescript/pulls/4455
+        if: "${{ matrix.os != ['ubuntu-latest'] && !contains(matrix.os, 'self-hosted') }}"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
@@ -75,7 +79,7 @@ jobs:
           stack-no-global: true
 
       - name: "(Linux only) Check Stack version and fix working directory ownership"
-        if: "${{ matrix.os == 'ubuntu-latest' }}"
+        if: "${{ matrix.os == ['ubuntu-latest'] }}"
         run: |
           [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
           chown root:root .
@@ -100,7 +104,7 @@ jobs:
         run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Build the entire package set"
-        if: "${{ matrix.os == 'ubuntu-latest' }}"
+        if: "${{ matrix.os == ['ubuntu-latest'] }}"
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual package-set building happens in a
         # temporary directory.
@@ -189,95 +193,96 @@ jobs:
           files: "sdist-test/bundle/*.{tar.gz,sha}"
 
   lint:
-    runs-on: "self-hosted" # "ubuntu-latest"
+    runs-on: "ubuntu-latest"
     # At the moment, this is a different image from the image used for
     # compilation, though the GHC versions match. This is because the
     # compilation image uses an old version of glibc, which we want because it
     # means our published binaries will work on the widest number of platforms.
     # But the HLint binary downloaded by this job requires a newer glibc
     # version.
-    # container: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
+    container: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
 
     steps:
-      # - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
-      #   # if the Git version is less than 2.18.
-      #   name: "Install a newer version of Git"
-      #   run: |
-      #     . /etc/os-release
-      #     echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
-      #     apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
+      - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
+        # if the Git version is less than 2.18.
+        name: "Install a newer version of Git"
+        run: |
+          . /etc/os-release
+          echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
+          apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
-      # - name: "Fix working directory ownership"
-      #   run: |
-      #     chown root:root .
 
-      # - uses: "actions/cache@v2"
-      #   with:
-      #     path: |
-      #       /root/.stack
-      #     key: "${{ runner.os }}-${{ job.container.id }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
+      - name: "Fix working directory ownership"
+        run: |
+          chown root:root .
 
-      # - run: "ci/fix-home ci/run-hlint.sh --git"
-      #   env:
-      #     VERSION: "3.5"
+      - uses: "actions/cache@v2"
+        with:
+          path: |
+            /root/.stack
+          key: "${{ runner.os }}-${{ job.container.id }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
 
-      # # Note: the weeder version will need to be updated when we next update our version
-      # # of GHC.
-      # #
-      # # weeder-2.2.0 has somewhat strange version deps. It doesn't appear to
-      # # support the exact versions of dhall and generic-lens in LTS-18.
-      # # However, forcing it to use the versions of dhall and generic-lens in
-      # # LTS-18 doesn't cause any problems when building, so the following
-      # # commands build weeder while ignoring version constraints.
-      # - name: Install weeder
-      #   run: |
-      #     # The `stack.yaml` file is copied to a separate file so that
-      #     # adding `allow-newer: true` doesn't affect any subsequant
-      #     # calls to `stack`.
-      #     cp stack.yaml stack-weeder.yaml
-      #     # `allow-newer: true` is needed so that weeder-2.2.0 can be
-      #     # installed with the dependencies present in LTS-18.
-      #     echo 'allow-newer: true' >> stack-weeder.yaml
-      #     ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.4.0
+      - run: "ci/fix-home ci/run-hlint.sh --git"
+        env:
+          VERSION: "3.5"
 
-      # - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
+      # Note: the weeder version will need to be updated when we next update our version
+      # of GHC.
+      #
+      # weeder-2.2.0 has somewhat strange version deps. It doesn't appear to
+      # support the exact versions of dhall and generic-lens in LTS-18.
+      # However, forcing it to use the versions of dhall and generic-lens in
+      # LTS-18 doesn't cause any problems when building, so the following
+      # commands build weeder while ignoring version constraints.
+      - name: Install weeder
+        run: |
+          # The `stack.yaml` file is copied to a separate file so that
+          # adding `allow-newer: true` doesn't affect any subsequant
+          # calls to `stack`.
+          cp stack.yaml stack-weeder.yaml
+          # `allow-newer: true` is needed so that weeder-2.2.0 can be
+          # installed with the dependencies present in LTS-18.
+          echo 'allow-newer: true' >> stack-weeder.yaml
+          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.4.0
 
-      # - run: "ci/fix-home stack exec weeder"
+      - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
 
-      # # Now do it again, with the test suite included. We don't want a
-      # # reference from our test suite to count in the above check; the fact
-      # # that a function is tested is not evidence that it's needed. But we also
-      # # don't want to leave weeds lying around in our test suite either.
-      # - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
+      - run: "ci/fix-home stack exec weeder"
 
-      # - run: "ci/fix-home stack exec weeder"
+      # Now do it again, with the test suite included. We don't want a
+      # reference from our test suite to count in the above check; the fact
+      # that a function is tested is not evidence that it's needed. But we also
+      # don't want to leave weeds lying around in our test suite either.
+      - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
 
-  # make-prerelease:
-  #   runs-on: "ubuntu-latest"
-  #   needs:
-  #     - "build"
-  #     - "lint"
-  #   if: "${{ github.event_name == 'push' && needs.build.outputs.do-not-prerelease != 'true' }}"
-  #   steps:
-  #     - uses: "actions/download-artifact@v3"
-  #     - uses: "ncipollo/release-action@v1.10.0"
-  #       with:
-  #         tag: "v${{ needs.build.outputs.version }}"
-  #         artifacts: "*-bundle/*"
-  #         prerelease: true
-  #         body: "This is an automated preview release. Get the latest stable release [here](https://github.com/purescript/purescript/releases/latest)."
-  #     - uses: "actions/checkout@v3"
-  #     - uses: "actions/setup-node@v3"
-  #       with:
-  #         node-version: "16.x"
-  #         registry-url: "https://registry.npmjs.org"
-  #     - name: "Publish npm package"
-  #       working-directory: "npm-package"
-  #       env:
-  #         BUILD_VERSION: "${{ needs.build.outputs.version }}"
-  #         NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}"
-  #       run: |
-  #         src_version=$(node -pe 'require("./package.json").version')
-  #         npm version --allow-same-version "$BUILD_VERSION"
-  #         sed -i -e "s/--purs-ver=${src_version//./\\.}/--purs-ver=$BUILD_VERSION/" package.json
-  #         npm publish --tag next
+      - run: "ci/fix-home stack exec weeder"
+
+  make-prerelease:
+    runs-on: "ubuntu-latest"
+    needs:
+      - "build"
+      - "lint"
+    if: "${{ github.event_name == 'push' && needs.build.outputs.do-not-prerelease != 'true' }}"
+    steps:
+      - uses: "actions/download-artifact@v3"
+      - uses: "ncipollo/release-action@v1.10.0"
+        with:
+          tag: "v${{ needs.build.outputs.version }}"
+          artifacts: "*-bundle/*"
+          prerelease: true
+          body: "This is an automated preview release. Get the latest stable release [here](https://github.com/purescript/purescript/releases/latest)."
+      - uses: "actions/checkout@v3"
+      - uses: "actions/setup-node@v3"
+        with:
+          node-version: "16.x"
+          registry-url: "https://registry.npmjs.org"
+      - name: "Publish npm package"
+        working-directory: "npm-package"
+        env:
+          BUILD_VERSION: "${{ needs.build.outputs.version }}"
+          NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}"
+        run: |
+          src_version=$(node -pe 'require("./package.json").version')
+          npm version --allow-same-version "$BUILD_VERSION"
+          sed -i -e "s/--purs-ver=${src_version//./\\.}/--purs-ver=$BUILD_VERSION/" package.json
+          npm publish --tag next
