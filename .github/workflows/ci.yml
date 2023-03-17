@@ -135,7 +135,7 @@ jobs:
         # So here we first point the binary to the right linker that should work on a generic linux,
         # and then fix the RUNPATH with the right location to load the shared libraries from
         run: |
-          ldd /usr/lib/ld-linux-aarch64.so.1 $(stack path --local-doc-root)/../bin/purs
+          patchelf --set-interpreter /usr/lib/ld-linux-aarch64.so.1 $(stack path --local-doc-root)/../bin/purs
           patchelf --set-rpath /usr/lib/aarch64-linux-gnu $(stack path --local-doc-root)/../bin/purs
 
       - name: "(Release/prerelease only) Create bundle"
