@@ -55,7 +55,7 @@ jobs:
       - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
         # if the Git version is less than 2.18.
         name: "(Linux only) Install a newer version of Git"
-        if: "${{ matrix.os == ['ubuntu-latest'] }}"
+        if: contains(matrix.os, 'ubuntu-latest')
         run: |
           . /etc/os-release
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
@@ -71,7 +71,7 @@ jobs:
         # Note: here we exclude the self-hosted runners because this action does not work on ARM
         # and their Haskell environment is instead provided by a nix-shell
         # See https://github.com/purescript/purescript/pulls/4455
-        if: "${{ matrix.os != ['ubuntu-latest'] && !contains(matrix.os, 'self-hosted') }}"
+        if: "!contains(matrix.os, 'ubuntu-latest') && !contains(matrix.os, 'self-hosted')"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
@@ -79,7 +79,7 @@ jobs:
           stack-no-global: true
 
       - name: "(Linux only) Check Stack version and fix working directory ownership"
-        if: "${{ matrix.os == ['ubuntu-latest'] }}"
+        if: contains(matrix.os, 'ubuntu-latest')
         run: |
           [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
           chown root:root .
@@ -104,7 +104,7 @@ jobs:
         run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Build the entire package set"
-        if: "${{ matrix.os == ['ubuntu-latest'] }}"
+        if: contains(matrix.os, 'ubuntu-latest')
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual package-set building happens in a
         # temporary directory.
