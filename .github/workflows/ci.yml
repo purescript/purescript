@@ -44,7 +44,7 @@ jobs:
           - os: ["self-hosted", "macos", "ARM64"]
           - os: ["self-hosted", "Linux", "ARM64"]
 
-    runs-on: ${{ matrix.os }}
+    runs-on: "${{ matrix.os }}"
     container: "${{ matrix.image }}"
 
     outputs:
@@ -55,13 +55,12 @@ jobs:
       - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
         # if the Git version is less than 2.18.
         name: "(Linux only) Install a newer version of Git"
-        if: contains(matrix.os, 'ubuntu-latest')
+        if: "contains(matrix.os, 'ubuntu-latest')"
         run: |
           . /etc/os-release
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
-
       - uses: "actions/setup-node@v2"
         with:
           node-version: "16"
@@ -79,7 +78,7 @@ jobs:
           stack-no-global: true
 
       - name: "(Linux only) Check Stack version and fix working directory ownership"
-        if: contains(matrix.os, 'ubuntu-latest')
+        if: "contains(matrix.os, 'ubuntu-latest')"
         run: |
           [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
           chown root:root .
@@ -104,7 +103,7 @@ jobs:
         run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Build the entire package set"
-        if: contains(matrix.os, 'ubuntu-latest')
+        if: "contains(matrix.os, 'ubuntu-latest')"
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual package-set building happens in a
         # temporary directory.
@@ -121,7 +120,7 @@ jobs:
           ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
 
       - name: Verify that 'libtinfo' isn't in binary
-        if: runner.os == 'Linux'
+        if: "runner.os == 'Linux'"
         working-directory: "sdist-test"
         run: |
           if [ $(ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
@@ -131,7 +130,7 @@ jobs:
           fi
 
       - name: "(Self-hosted Linux ARM64 only) Patch the binary to work on non-Nix systems"
-        if: runner.os == 'Linux' && runner.arch == 'ARM64'
+        if: "runner.os == 'Linux' && runner.arch == 'ARM64'"
         working-directory: "sdist-test"
         # The self-hosted build happens inside a nix-shell that provides a working stack binary
         # on ARM systems, and while the macOS binary is fine - because macOS binaries are almost
@@ -153,14 +152,14 @@ jobs:
                   bundle_os=linux-arm64;;
                 *)
                   bundle_os=linux64;;
-              esac
+              esac;;
             macOS)
               case "$os_arch" in
                 ARM64)
                   bundle_os=macos-arm64;;
                 *)
                   bundle_os=macos;;
-              esac
+              esac;;
             Windows)
               bundle_os=win64;;
             *)
