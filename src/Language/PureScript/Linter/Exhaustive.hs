@@ -273,7 +273,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
       tellRedundant = tell . errorMessage' ss . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
       tellIncomplete = tell . errorMessage' ss $ IncompleteExhaustivityCheck
 
-  -- | We add a Partial constraint by annotating the expression to have type `Partial => _`.
+  -- We add a Partial constraint by annotating the expression to have type `Partial => _`.
   --
   -- The binder information is provided so that it can be embedded in the constraint,
   -- and then included in the error message.

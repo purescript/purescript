@@ -162,7 +162,9 @@ tar -xzf sdist-test/purescript-*.tar.gz -C sdist-test --strip-components=1
 (echo "::endgroup::"; echo "::group::Build and test PureScript") 2>/dev/null
 
 pushd sdist-test
-$STACK build $STACK_OPTS
+# Haddock -Werror goes here to keep us honest but prevent failing on
+# documentation errors in dependencies
+$STACK build $STACK_OPTS --haddock-arguments --optghc=-Werror
 popd
 
 (echo "::endgroup::") 2>/dev/null

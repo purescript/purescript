@@ -28,11 +28,11 @@ desugarLetPattern decl =
   replace other = other
 
   go :: WhereProvenance
-     -- ^ Metadata about whether the let-in was a where clause
+          -- Metadata about whether the let-in was a where clause
      -> [Either [Declaration] (SourceAnn, Binder, Expr)]
-     -- ^ Declarations to desugar
+          -- Declarations to desugar
      -> Expr
-     -- ^ The original let-in result expression
+          -- The original let-in result expression
      -> Expr
   go _ [] e = e
   go w (Right ((pos, com), binder, boundE) : ds) e =

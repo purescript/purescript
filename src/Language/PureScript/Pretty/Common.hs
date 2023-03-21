@@ -61,9 +61,7 @@ instance Monoid StrPos where
       plus (a, c) (StrPos (a', _, c')) = (a `addPos` a', (bumpPos a <$> c') : c)
 
 instance Emit StrPos where
-  -- |
   -- Augment a string with its length (rows/column)
-  --
   emit str =
     -- TODO(Christoph): get rid of T.unpack
     let newlines = elemIndices '\n' (T.unpack str)
@@ -71,9 +69,7 @@ instance Emit StrPos where
     in
     StrPos (SourcePos { sourcePosLine = length newlines, sourcePosColumn = T.length str - index }, str, [])
 
-  -- |
   -- Add a new mapping entry for given source position with initially zero generated position
-  --
   addMapping ss@SourceSpan { spanName = file, spanStart = startPos } = StrPos (zeroPos, mempty, [ mapping | ss /= nullSourceSpan ])
     where
       mapping = SMap (T.pack file) startPos zeroPos

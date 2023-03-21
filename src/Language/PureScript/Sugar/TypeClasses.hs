@@ -229,7 +229,6 @@ desugarDecl mn exps = go
     return (expRef name' className tys, [d, dictDecl])
   go other = return (Nothing, [other])
 
-  -- |
   -- Completes the name generation for type class instances that do not have
   -- a unique name defined in source code.
   desugarInstName :: MonadSupply m => Either Text Ident -> Desugar m Ident

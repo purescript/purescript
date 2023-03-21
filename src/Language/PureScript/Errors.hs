@@ -1676,7 +1676,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
   paras :: forall f. Foldable f => f Box.Box -> Box.Box
   paras = Box.vcat Box.left
 
-  -- | Simplify an error message
+  -- Simplify an error message
   simplifyErrorMessage :: ErrorMessage -> ErrorMessage
   simplifyErrorMessage (ErrorMessage hints simple) = ErrorMessage (simplifyHints hints) simple
     where
@@ -1692,7 +1692,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
         (_, OtherHint) -> False
         (c1, c2) -> c1 == c2
 
-    -- | See https://github.com/purescript/purescript/issues/1802
+    -- See https://github.com/purescript/purescript/issues/1802
     stripRedundantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
     stripRedundantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
       where
@@ -1764,7 +1764,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
         Box.<> (line . displayStartEndPos . fst $ getAnnForType ty)
     Qualified mn (Right inst) -> line . markCode . showQualified showIdent $ Qualified mn inst
 
-  -- | As of this writing, this function assumes that all provided SourceSpans
+  -- As of this writing, this function assumes that all provided SourceSpans
   -- are non-overlapping (except for exact duplicates) and span no line breaks. A
   -- more sophisticated implementation without this limitation would be possible
   -- but isn't yet needed.
@@ -1845,7 +1845,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     lineNumberStyle :: String -> Box.Box
     lineNumberStyle = colorCodeBox (codeColor $> (ANSI.Vivid, ANSI.Black)) . Box.alignHoriz Box.right 5 . lineS
 
-  -- | Lookup the nth element of a list, but without retraversing the list every
+  -- Lookup the nth element of a list, but without retraversing the list every
   -- time, by instead keeping a tail of the list and the current element number
   -- in State. Only works if the argument provided is strictly ascending over
   -- the life of the State.
