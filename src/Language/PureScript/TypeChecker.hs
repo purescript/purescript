@@ -561,7 +561,6 @@ typeCheckAll moduleName = traverse go
     | moduleName `S.member` nonOrphanModules = return ()
     | otherwise = throwError . errorMessage $ OrphanInstance dictName className nonOrphanModules tys'
 
-  -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
   --

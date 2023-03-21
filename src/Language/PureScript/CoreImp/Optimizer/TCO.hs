@@ -40,8 +40,8 @@ tco = flip evalState 0 . everywhereTopDownM convert where
       innerArgs = headDef [] argss
       outerArgs = concat . reverse $ tailSafe argss
       arity = length argss
-      -- ^ this is the number of calls, not the number of arguments, if there's
-      -- ever a practical difference.
+        -- this is the number of calls, not the number of arguments, if there's
+        -- ever a practical difference.
       (argss, body', replace) = topCollectAllFunctionArgs [] id fn
   convert js = pure js
 

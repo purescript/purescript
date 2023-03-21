@@ -212,7 +212,7 @@ rebracketModule !caller pred_ valueOpTable typeOpTable (Module ss coms mn ds ext
     fmap (map (\d -> if pred_ d then removeParens d else d)) .
     flip parU (usingPredicate pred_ h)
 
-  -- | The AST will run through all the desugar passes when compiling
+  -- The AST will run through all the desugar passes when compiling
   -- and only some of the desugar passes when generating docs.
   -- When generating docs, `case _ of` syntax used in an instance declaration
   -- can trigger the `IncorrectAnonymousArgument` error because it does not

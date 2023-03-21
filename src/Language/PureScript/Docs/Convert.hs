@@ -66,7 +66,6 @@ insertValueTypesAndAdjustKinds ::
 insertValueTypesAndAdjustKinds env m =
   m { modDeclarations = map (go . insertInferredRoles . convertFFIDecl) (modDeclarations m) }
   where
-  -- |
   -- Convert FFI declarations into data declaration
   -- by generating the type parameters' names based on its kind signature.
   -- Note: `Prim` modules' docs don't go through this conversion process
@@ -99,7 +98,6 @@ insertValueTypesAndAdjustKinds env m =
   insertInferredRoles other =
     other
 
-  -- |
   -- Given an FFI declaration like this
   -- ```
   -- foreign import data Foo
@@ -171,7 +169,6 @@ insertValueTypesAndAdjustKinds env m =
       Nothing ->
         err ("name not found: " ++ show key)
 
-  -- |
   -- Extracts the keyword for a declaration (if there is one)
   extractKeyword :: DeclarationInfo -> Maybe P.KindSignatureFor
   extractKeyword = \case
@@ -182,7 +179,6 @@ insertValueTypesAndAdjustKinds env m =
     TypeClassDeclaration _ _ _ -> Just P.ClassSig
     _ -> Nothing
 
-  -- |
   -- Returns True if the kind signature is "uninteresting", which
   -- is a kind that follows this form:
   -- - `Type`

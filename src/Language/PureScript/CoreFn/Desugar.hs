@@ -40,7 +40,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       decls' = concatMap declToCoreFn decls
   in Module modSS coms mn (spanName modSS) imports' exps' reExps externs decls'
   where
-  -- | Creates a map from a module name to the re-export references defined in
+  -- Creates a map from a module name to the re-export references defined in
   -- that module.
   reExportsToCoreFn :: (ModuleName, A.DeclarationRef) -> M.Map ModuleName [Ident]
   reExportsToCoreFn (mn', ref') = M.singleton mn' (exportToCoreFn ref')
@@ -52,14 +52,14 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
         (A.exportSourceImportedFrom src)
   toReExportRef _ = Nothing
 
-  -- | Remove duplicate imports
+  -- Remove duplicate imports
   dedupeImports :: [(Ann, ModuleName)] -> [(Ann, ModuleName)]
   dedupeImports = fmap swap . M.toList . M.fromListWith const . fmap swap
 
   ssA :: SourceSpan -> Ann
   ssA ss = (ss, [], Nothing, Nothing)
 
-  -- | Desugars member declarations from AST to CoreFn representation.
+  -- Desugars member declarations from AST to CoreFn representation.
   declToCoreFn :: A.Declaration -> [Bind Ann]
   declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [ctor]) =
     [NonRec (ss, [], Nothing, declMeta) (properToIdent $ A.dataCtorName ctor) $
@@ -82,7 +82,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]
   declToCoreFn _ = []
 
-  -- | Desugars expressions from AST to CoreFn representation.
+  -- Desugars expressions from AST to CoreFn representation.
   exprToCoreFn :: SourceSpan -> [Comment] -> Maybe SourceType -> A.Expr -> Expr Ann
   exprToCoreFn _ com ty (A.Literal ss lit) =
     Literal (ss, com, ty, Nothing) (fmap (exprToCoreFn ss com Nothing) lit)
@@ -131,7 +131,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn _ _ _ e =
     error $ "Unexpected value in exprToCoreFn mn: " ++ show e
 
-  -- | Desugars case alternatives from AST to CoreFn representation.
+  -- Desugars case alternatives from AST to CoreFn representation.
   altToCoreFn :: SourceSpan -> A.CaseAlternative -> CaseAlternative Ann
   altToCoreFn ss (A.CaseAlternative bs vs) = CaseAlternative (map (binderToCoreFn ss []) bs) (go vs)
     where
@@ -147,7 +147,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     guardToExpr [A.ConditionGuard cond] = cond
     guardToExpr _ = internalError "Guard not correctly desugared"
 
-  -- | Desugars case binders from AST to CoreFn representation.
+  -- Desugars case binders from AST to CoreFn representation.
   binderToCoreFn :: SourceSpan -> [Comment] -> A.Binder -> Binder Ann
   binderToCoreFn _ com (A.LiteralBinder ss lit) =
     LiteralBinder (ss, com, Nothing, Nothing) (fmap (binderToCoreFn ss com) lit)
@@ -171,19 +171,19 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   binderToCoreFn _ _ A.ParensInBinder{} =
     internalError "ParensInBinder should have been desugared before binderToCoreFn"
 
-  -- | Gets metadata for let bindings.
+  -- Gets metadata for let bindings.
   getLetMeta :: A.WhereProvenance -> Maybe Meta
   getLetMeta A.FromWhere = Just IsWhere
   getLetMeta A.FromLet = Nothing
 
-  -- | Gets metadata for values.
+  -- Gets metadata for values.
   getValueMeta :: Qualified Ident -> Maybe Meta
   getValueMeta name =
     case lookupValue env name of
       Just (_, External, _) -> Just IsForeign
       _ -> Nothing
 
-  -- | Gets metadata for data constructors.
+  -- Gets metadata for data constructors.
   getConstructorMeta :: Qualified (ProperName 'ConstructorName) -> Meta
   getConstructorMeta ctor =
     case lookupConstructor env ctor of

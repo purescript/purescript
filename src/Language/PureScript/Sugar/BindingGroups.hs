@@ -62,9 +62,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleExprs (Let w ds val) = (\ds' -> Let w ds' val) <$> handleDecls ds
   handleExprs other = return other
 
-  -- |
   -- Replace all sets of mutually-recursive declarations with binding groups
-  --
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds

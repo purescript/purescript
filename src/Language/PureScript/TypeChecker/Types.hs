@@ -197,12 +197,12 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       -> ErrorMessage
     replaceTypes subst = onTypesInErrorMessage (substituteType subst)
 
-    -- | Run type search to complete any typed hole error messages
+    -- Run type search to complete any typed hole error messages
     runTypeSearch
       :: Maybe [(Ident, InstanceContext, SourceConstraint)]
-      -- ^ Any unsolved constraints which we need to continue to satisfy
+           -- Any unsolved constraints which we need to continue to satisfy
       -> CheckState
-      -- ^ The final type checker state
+           -- The final type checker state
       -> ErrorMessage
       -> ErrorMessage
     runTypeSearch cons st = \case
@@ -214,7 +214,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         in ErrorMessage hints (HoleInferredType x ty y (Just searchResult))
       other -> other
 
-    -- | Add any unsolved constraints
+    -- Add any unsolved constraints
     constrain cs ty = foldr srcConstrainedType ty (map (\(_, _, x) -> x) cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
@@ -271,7 +271,7 @@ typeDictionaryForBindingGroup moduleName vals = do
                           ]
     return (SplitBindingGroup untyped' typed' dict)
   where
-    -- | Check if a value contains a type annotation, and if so, separate it
+    -- Check if a value contains a type annotation, and if so, separate it
     -- from the value itself.
     splitTypeAnnotation :: (a, Expr) -> Either (a, Expr) (a, (Expr, SourceType, Bool))
     splitTypeAnnotation (a, TypedValue checkType value ty) = Right (a, (value, ty, checkType))

@@ -321,7 +321,7 @@ entails SolverOptions{..} constraint context hints =
                 -- with no unsolved constraints. Hopefully, we can solve this later.
                 return (TypeClassDictionary (srcConstraint className' kinds'' tys'' conInfo) context hints')
           where
-            -- | When checking functional dependencies, we need to use unification to make
+            -- When checking functional dependencies, we need to use unification to make
             -- sure it is safe to use the selected instance. We will unify the solved type with
             -- the type in the instance head under the substitution inferred from its instantiation.
             -- As an example, when solving MonadState t0 (State Int), we choose the
@@ -380,7 +380,6 @@ entails SolverOptions{..} constraint context hints =
             canBeGeneralized (KindedType _ t _) = canBeGeneralized t
             canBeGeneralized _ = False
 
-            -- |
             -- Check if two dictionaries are overlapping
             --
             -- Dictionaries which are subclass dictionaries cannot overlap, since otherwise the overlap would have
@@ -475,7 +474,7 @@ entails SolverOptions{..} constraint context hints =
       pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.SymbolAppend [] [] args' Nothing Nothing]
     solveSymbolAppend _ = Nothing
 
-    -- | Append type level symbols, or, run backwards, strip a prefix or suffix
+    -- Append type level symbols, or, run backwards, strip a prefix or suffix
     appendSymbols :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
     appendSymbols arg0@(TypeLevelString _ lhs) arg1@(TypeLevelString _ rhs) _ = Just (arg0, arg1, srcTypeLevelString (lhs <> rhs))
     appendSymbols arg0@(TypeLevelString _ lhs) _ arg2@(TypeLevelString _ out) = do
@@ -544,11 +543,11 @@ entails SolverOptions{..} constraint context hints =
     solveIntAdd _ = Nothing
 
     addInts :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
-    -- | l r -> o, l + r = o
+    -- l r -> o, l + r = o
     addInts arg0@(TypeLevelInt _ l) arg1@(TypeLevelInt _ r) _ = pure (arg0, arg1, srcTypeLevelInt (l + r))
-    -- | l o -> r, o - l = r
+    -- l o -> r, o - l = r
     addInts arg0@(TypeLevelInt _ l) _ arg2@(TypeLevelInt _ o) = pure (arg0, srcTypeLevelInt (o - l), arg2)
-    -- | r o -> l, o - r = l
+    -- r o -> l, o - r = l
     addInts _ arg1@(TypeLevelInt _ r) arg2@(TypeLevelInt _ o) = pure (srcTypeLevelInt (o - r), arg1, arg2)
     addInts _ _ _                                             = Nothing
 
@@ -582,7 +581,7 @@ entails SolverOptions{..} constraint context hints =
       pure [ TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.RowUnion vars kinds [lOut, rOut, uOut] cst Nothing ]
     solveUnion _ _ = Nothing
 
-    -- | Left biased union of two row types
+    -- Left biased union of two row types
 
     unionRows :: [SourceType] -> SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType, Maybe [SourceConstraint], [(Text, SourceType)])
     unionRows kinds l r u =
@@ -643,7 +642,7 @@ entails SolverOptions{..} constraint context hints =
       pure [ TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.RowToList [] [kind] [r, entries] Nothing Nothing ]
     solveRowToList _ _ = Nothing
 
-    -- | Convert a closed row to a sorted list of entries
+    -- Convert a closed row to a sorted list of entries
     rowToRowList :: SourceType -> SourceType -> Maybe SourceType
     rowToRowList kind r =
         guard (isREmpty rest) $>
@@ -705,7 +704,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
                 solved = map snd . filter ((`S.notMember` determinedSet) . fst) $ zipWith (\(_, ts) i -> (i, ts)) matched [0..]
             in verifySubstitution (M.unionsWith (++) solved)
   where
-    -- | Find the closure of a set of functional dependencies.
+    -- Find the closure of a set of functional dependencies.
     covers :: [(Matched (), subst)] -> Bool
     covers ms = finalSet == S.fromList [0..length ms - 1]
       where
@@ -875,10 +874,10 @@ pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs
 tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
 tails1 =
   -- NEL.fromList is an unsafe function, but this usage should be safe, since:
-  -- * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
-  -- * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
+  -- - `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
+  -- - If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
   --   list, since `head (tails xs) = xs`.
-  -- * The only empty element of `tails xs` is the last one (by the definition of `tails`)
-  -- * Therefore, if we take all but the last element of `tails xs` i.e.
+  -- - The only empty element of `tails xs` is the last one (by the definition of `tails`)
+  -- - Therefore, if we take all but the last element of `tails xs` i.e.
   --   `init (tails xs)`, we have a nonempty list of nonempty lists
   NEL.fromList . map NEL.fromList . init . tails . NEL.toList

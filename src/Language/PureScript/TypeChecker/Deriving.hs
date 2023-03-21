@@ -533,10 +533,10 @@ validateParamsInTypeConstructors derivingClass utc isBi CovariantClasses{..} con
     where
     tcdAppliesToType tcd = case tcdInstanceTypes tcd of
       [headOfType -> ht'] -> ht == ht'
-      -- ^ It's possible that, if ht and ht' are Lefts, this might require
-      -- verifying that the name isn't shadowed by something in tcdForAll. I
-      -- can't devise a legal program that causes this issue, but if in the
-      -- future it seems like a good idea, it probably is.
+        -- It's possible that, if ht and ht' are Lefts, this might require
+        -- verifying that the name isn't shadowed by something in tcdForAll. I
+        -- can't devise a legal program that causes this issue, but if in the
+        -- future it seems like a good idea, it probably is.
       _ -> False
 
   headOfType :: SourceType -> Qualified (Either Text (ProperName 'TypeName))
