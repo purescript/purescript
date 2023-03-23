@@ -29,10 +29,10 @@ import Prelude
 
 import Control.Arrow ((***))
 import Control.Lens ((^.), _1, _2, _3)
-import Control.Monad
+import Control.Monad (join, unless, void, when, (<=<))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
-import Control.Monad.Supply.Class
+import Control.Monad.State (MonadState, gets, modify)
+import Control.Monad.Supply.Class (MonadSupply(..))
 
 import Data.Bifunctor (first)
 import Data.Bitraversable (bitraverse)
@@ -47,15 +47,15 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Traversable (for)
 
-import Language.PureScript.Crash
+import Language.PureScript.Crash (HasCallStack, internalError)
 import Language.PureScript.Environment qualified as E
 import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.Names (pattern ByNullSourcePos, ModuleName, Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, mkQualified)
+import Language.PureScript.TypeChecker.Monad (CheckState(..), Substitution(..), UnkLevel(..), Unknown, bindLocalTypeVariables, debugType, getEnv, lookupTypeVariable, unsafeCheckCurrentModule, withErrorMessageHint, withFreshSubstitution)
 import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, newSkolemScope, skolemize)
-import Language.PureScript.TypeChecker.Synonyms
+import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
 import Language.PureScript.Types
-import Language.PureScript.Pretty.Types
+import Language.PureScript.Pretty.Types (prettyPrintType)
 
 generalizeUnknowns :: [(Unknown, SourceType)] -> SourceType -> SourceType
 generalizeUnknowns unks ty =

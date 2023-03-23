@@ -3,13 +3,13 @@ module Language.PureScript.Ide.UsageSpec where
 import Protolude
 
 import Data.Text qualified as Text
-import Language.PureScript.Ide.Command
-import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Command (Command(..))
+import Language.PureScript.Ide.Types (IdeNamespace(..), Success(..))
 import Language.PureScript.Ide.Test qualified as Test
 import Language.PureScript qualified as P
-import Test.Hspec
+import Test.Hspec (Expectation, Spec, describe, it, shouldBe)
 import Data.Text.Read (decimal)
-import System.FilePath
+import System.FilePath ((</>))
 
 load :: [Text] -> Command
 load = LoadSync . map Test.mn

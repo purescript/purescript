@@ -1,6 +1,3 @@
--- HLint is confused by the identifier `pattern` if PatternSynonyms is enabled.
-{-# LANGUAGE NoPatternSynonyms #-}
-
 -- |
 -- Pretty printer for Types
 --
@@ -29,15 +26,15 @@ import Data.Maybe (fromMaybe, catMaybes)
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Names
-import Language.PureScript.Pretty.Common
-import Language.PureScript.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (tyFunction, tyRecord)
+import Language.PureScript.Names (OpName(..), OpNameType(..), ProperName(..), ProperNameType(..), Qualified, coerceProperName, disqualify, showQualified)
+import Language.PureScript.Pretty.Common (before, objectKeyRequiresQuoting)
+import Language.PureScript.Types (Constraint(..), pattern REmptyKinded, RowListItem(..), Type(..), WildcardData(..), eqType, rowToSortedList)
 import Language.PureScript.PSString (PSString, prettyPrintString, decodeString)
 import Language.PureScript.Label (Label(..))
 
-import Text.PrettyPrint.Boxes hiding ((<+>))
+import Text.PrettyPrint.Boxes (Box(..), hcat, hsep, left, moveRight, nullBox, render, text, top, vcat, (<>))
 
 data PrettyPrintType
   = PPTUnknown Int

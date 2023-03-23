@@ -12,8 +12,8 @@ import Data.Monoid (Any(..))
 import Data.Set qualified as S
 import Data.Text (Text)
 
-import Language.PureScript.CoreImp.AST
-import Language.PureScript.CoreImp.Optimizer.Common
+import Language.PureScript.CoreImp.AST (AST(..), InitializerEffects(..), everything, everywhere)
+import Language.PureScript.CoreImp.Optimizer.Common (removeFromBlock)
 import Language.PureScript.Constants.Prim qualified as C
 
 removeCodeAfterReturnStatements :: AST -> AST

@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad (void, forM_)
 import Data.Aeson as Json
-import Test.Hspec
+import Test.Hspec (Expectation, SpecWith, describe, expectationFailure, it, runIO, shouldBe)
 import System.FilePath (replaceExtension, takeFileName, (</>), (<.>))
 import Language.PureScript qualified as P
 import Data.ByteString qualified as BS

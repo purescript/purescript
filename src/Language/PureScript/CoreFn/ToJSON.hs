@@ -12,7 +12,7 @@ import Prelude
 import Control.Arrow ((***))
 import Data.Either (isLeft)
 import Data.Map.Strict qualified as M
-import Data.Aeson hiding ((.=))
+import Data.Aeson (ToJSON(..), Value(..), object)
 import Data.Aeson qualified
 import Data.Aeson.Key qualified
 import Data.Aeson.Types (Pair)
@@ -20,10 +20,10 @@ import Data.Version (Version, showVersion)
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.AST.Literals
+import Language.PureScript.AST.Literals (Literal(..))
 import Language.PureScript.AST.SourcePos (SourceSpan(..))
-import Language.PureScript.CoreFn
-import Language.PureScript.Names
+import Language.PureScript.CoreFn (Ann, Bind(..), Binder(..), CaseAlternative(..), ConstructorType(..), Expr(..), Meta(..), Module(..))
+import Language.PureScript.Names (Ident, ModuleName(..), ProperName(..), Qualified(..), QualifiedBy(..), runIdent)
 import Language.PureScript.PSString (PSString)
 
 constructorTypeToJSON :: ConstructorType -> Value

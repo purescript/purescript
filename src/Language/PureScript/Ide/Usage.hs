@@ -14,7 +14,7 @@ import Data.Set qualified as Set
 import Language.PureScript qualified as P
 import Language.PureScript.Ide.State (getAllModules, getFileState)
 import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Util
+import Language.PureScript.Ide.Util (identifierFromIdeDeclaration, namespaceForDeclaration)
 
 -- |
 -- How we find usages, given an IdeDeclaration and the module it was defined in:

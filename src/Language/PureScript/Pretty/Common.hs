@@ -14,7 +14,7 @@ import Data.Text qualified as T
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..), nullSourceSpan)
 import Language.PureScript.CST.Lexer (isUnquotedKey)
 
-import Text.PrettyPrint.Boxes hiding ((<>))
+import Text.PrettyPrint.Boxes (Box(..), emptyBox, text, top, vcat, (//))
 import Text.PrettyPrint.Boxes qualified as Box
 
 parensT :: Text -> Text

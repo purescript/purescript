@@ -14,7 +14,7 @@ import Protolude (ordNub, swap)
 import Control.Monad ((<=<), guard)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Data.Graph
+import Data.Graph (SCC(..), stronglyConnComp, stronglyConnCompR)
 import Data.List (intersect, (\\))
 import Data.List.NonEmpty (NonEmpty((:|)), nonEmpty)
 import Data.Foldable (find)
@@ -25,11 +25,11 @@ import Data.Map qualified as M
 import Data.Set qualified as S
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors hiding (nonEmpty)
-import Language.PureScript.Names
-import Language.PureScript.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (NameKind)
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors(..), SimpleErrorMessage(..), errorMessage', parU, positionedError)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident, ModuleName, ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName)
+import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), everythingOnTypes)
 
 data VertexType
   = VertexDefinition

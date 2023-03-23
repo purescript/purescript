@@ -1,6 +1,6 @@
 module Language.PureScript.Docs.Utils.MonoidExtras where
 
-import Data.Monoid
+import Data.Monoid (Monoid(..), (<>))
 
 mintersperse :: (Monoid m) => m -> [m] -> m
 mintersperse _ []       = mempty

@@ -24,11 +24,11 @@ module Language.PureScript.Ide.Reexports
 
 import Protolude hiding (moduleName)
 
-import Control.Lens                  hiding (anyOf, (&))
+import Control.Lens (set)
 import Data.Map qualified as Map
 import Language.PureScript qualified as P
 import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Util
+import Language.PureScript.Ide.Util (discardAnn)
 
 -- | Contains the module with resolved reexports, and possible failures
 data ReexportResult a

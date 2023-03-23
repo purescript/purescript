@@ -26,9 +26,9 @@ import Control.Parallel.Strategies (withStrategy, parList, rseq)
 import Data.Map qualified as Map
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
-import Language.PureScript.Ide.Error
-import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Util
+import Language.PureScript.Ide.Error (IdeError)
+import Language.PureScript.Ide.Types (DefinitionSites, IdeNamespace(..), IdeNamespaced(..), TypeAnnotations)
+import Language.PureScript.Ide.Util (ideReadFile)
 
 parseModule :: FilePath -> Text -> Either FilePath (FilePath, P.Module)
 parseModule path file =

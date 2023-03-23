@@ -12,9 +12,9 @@ import Control.Applicative ((<|>))
 import Data.Maybe (mapMaybe)
 import Data.Map qualified as M
 
-import Language.PureScript.AST.Declarations
-import Language.PureScript.Types
-import Language.PureScript.Names
+import Language.PureScript.AST.Declarations (DataConstructorDeclaration(..), Declaration(..), DeclarationRef(..), Module(..), declName, declRefName, flattenDecls)
+import Language.PureScript.Types (Constraint(..), Type(..), everythingOnTypes)
+import Language.PureScript.Names (ModuleName, Name(..), ProperName, ProperNameType(..), Qualified, coerceProperName, disqualify, isQualified, isQualifiedWith)
 
 -- |
 -- Return a list of all declarations which are exported from a module.

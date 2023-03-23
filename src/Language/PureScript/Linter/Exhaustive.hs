@@ -11,25 +11,25 @@ module Language.PureScript.Linter.Exhaustive
 import Prelude
 import Protolude (ordNub)
 
-import Control.Applicative
+import Control.Applicative (Applicative(..))
 import Control.Arrow (first, second)
 import Control.Monad (unless)
-import Control.Monad.Writer.Class
+import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe)
 import Data.Map qualified as M
 import Data.Text qualified as T
 
-import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Declarations
-import Language.PureScript.AST.Literals
-import Language.PureScript.Crash
-import Language.PureScript.Environment hiding (tyVar)
-import Language.PureScript.Errors
+import Language.PureScript.AST.Binders (Binder(..))
+import Language.PureScript.AST.Declarations (CaseAlternative(..), Declaration(..), ErrorMessageHint(..), Expr(..), Guard(..), GuardedExpr(..), pattern MkUnguarded, pattern ValueDecl, isTrueExpr)
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType, Environment(..), TypeKind(..))
+import Language.PureScript.Errors (MultipleErrors, pattern NullSourceAnn, SimpleErrorMessage(..), SourceSpan, addHint, errorMessage')
 import Language.PureScript.Names as P
 import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)
-import Language.PureScript.Traversals
+import Language.PureScript.Traversals (sndM)
 import Language.PureScript.Types as P
 import Language.PureScript.Constants.Prim qualified as C
 

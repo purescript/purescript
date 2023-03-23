@@ -7,7 +7,7 @@ import Data.Map qualified as Map
 import Language.PureScript qualified as P
 import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.Environment qualified as PEnv
-import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Types (IdeDeclaration(..), IdeDeclarationAnn(..), IdeType(..), IdeTypeClass(..), ModuleMap, emptyAnn)
 
 idePrimDeclarations :: ModuleMap [IdeDeclarationAnn]
 idePrimDeclarations = Map.fromList

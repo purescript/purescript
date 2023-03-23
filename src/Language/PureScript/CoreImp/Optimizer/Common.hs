@@ -7,8 +7,8 @@ import Data.Text (Text)
 import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 
-import Language.PureScript.Crash
-import Language.PureScript.CoreImp.AST
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.CoreImp.AST (AST(..), everything, everywhere)
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString)
 

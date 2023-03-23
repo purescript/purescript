@@ -13,7 +13,7 @@ import Control.Applicative (liftA2)
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class (MonadSupply, freshName)
 import Control.Monad.Writer (MonadWriter, runWriterT, writer)
 
 import Data.Bifunctor (first)
@@ -28,20 +28,20 @@ import Data.String (fromString)
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.SourcePos (SourceSpan, displayStartEndPos)
 import Language.PureScript.CodeGen.JS.Common as Common
 import Language.PureScript.CoreImp.AST (AST, InitializerEffects(..), everywhere, everywhereTopDownM, withSourceSpan)
 import Language.PureScript.CoreImp.AST qualified as AST
 import Language.PureScript.CoreImp.Module qualified as AST
-import Language.PureScript.CoreImp.Optimizer
-import Language.PureScript.CoreFn
+import Language.PureScript.CoreImp.Optimizer (optimize)
+import Language.PureScript.CoreFn (Ann, Bind(..), Binder(..), CaseAlternative(..), ConstructorType(..), Expr(..), Guard, Literal(..), Meta(..), Module(..), extractAnn, extractBinderAnn, modifyAnn, removeComments)
 import Language.PureScript.CoreFn.Laziness (applyLazinessTransform)
-import Language.PureScript.Crash
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
                                    MultipleErrors(..), rethrow, errorMessage,
                                    errorMessage', rethrowWithPosition, addHint)
-import Language.PureScript.Names
-import Language.PureScript.Options
+import Language.PureScript.Names (Ident(..), ModuleName, ProperName(..), Qualified(..), QualifiedBy(..), runIdent, runModuleName, showIdent, showQualified)
+import Language.PureScript.Options (CodegenTarget(..), Options(..))
 import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.Traversals (sndM)
 import Language.PureScript.Constants.Prim qualified as C

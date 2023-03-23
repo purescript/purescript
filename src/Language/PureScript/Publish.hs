@@ -29,7 +29,7 @@ import Data.List (stripPrefix, (\\))
 import Data.Text qualified as T
 import Data.Time.Clock (UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
-import Data.Version
+import Data.Version (Version)
 import Distribution.SPDX qualified as SPDX
 import Distribution.Parsec qualified as CabalParsec
 
@@ -40,9 +40,9 @@ import System.Process (readProcess)
 import Web.Bower.PackageMeta (PackageMeta(..), PackageName, Repository(..))
 import Web.Bower.PackageMeta qualified as Bower
 
-import Language.PureScript.Publish.ErrorsWarnings
-import Language.PureScript.Publish.Registry.Compat
-import Language.PureScript.Publish.Utils
+import Language.PureScript.Publish.ErrorsWarnings (InternalError(..), OtherError(..), PackageError(..), PackageWarning(..), RepositoryFieldError(..), UserError(..), printError, printWarnings)
+import Language.PureScript.Publish.Registry.Compat (asPursJson, toBowerPackage)
+import Language.PureScript.Publish.Utils (globRelative, purescriptSourceFiles)
 import Language.PureScript qualified as P (version, ModuleName)
 import Language.PureScript.CoreFn.FromJSON qualified as P
 import Language.PureScript.Docs qualified as D

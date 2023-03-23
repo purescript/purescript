@@ -4,7 +4,7 @@ import Prelude
 
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
-import Language.PureScript.Interactive.Types
+import Language.PureScript.Interactive.Types (ImportedModule, PSCiState, initialInteractivePrint, psciImportedModules, psciInteractivePrint, psciLetBindings)
 import System.Directory (getCurrentDirectory)
 import System.FilePath (pathSeparator, makeRelative)
 import System.IO.UTF8 (readUTF8FilesT)

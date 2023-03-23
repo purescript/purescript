@@ -3,8 +3,8 @@ module Language.PureScript.Ide.Filter.Imports where
 
 import Protolude                     hiding (isPrefixOf)
 
-import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Imports
+import Language.PureScript.Ide.Types (IdeDataConstructor(..), IdeDeclaration(..), IdeDeclarationAnn(..), IdeType(..), IdeTypeClass(..), IdeTypeOperator(..), IdeTypeSynonym(..), IdeValue(..), IdeValueOperator(..))
+import Language.PureScript.Ide.Imports (Import(..))
 
 import Language.PureScript qualified as P
 

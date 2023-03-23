@@ -15,23 +15,23 @@ import Data.List (init, last, zipWith3, (!!))
 import Data.Map qualified as M
 import Data.These (These(..), mergeTheseWith, these)
 
-import Control.Monad.Supply.Class
-import Language.PureScript.AST
-import Language.PureScript.AST.Utils
+import Control.Monad.Supply.Class (MonadSupply)
+import Language.PureScript.AST (Binder(..), CaseAlternative(..), ErrorMessageHint(..), Expr(..), InstanceDerivationStrategy(..), Literal(..), SourceSpan, nullSourceSpan)
+import Language.PureScript.AST.Utils (UnwrappedTypeConstructor(..), lam, lamCase, lamCase2, mkBinder, mkCtor, mkCtorBinder, mkLit, mkRef, mkVar, unguarded, unwrapTypeConstructor, utcQTyCon)
 import Language.PureScript.Constants.Libs qualified as Libs
 import Language.PureScript.Constants.Prim qualified as Prim
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors hiding (nonEmpty)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType(..), Environment(..), FunctionalDependency(..), TypeClassData(..), TypeKind(..), kindType, (-:>))
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, internalCompilerError)
 import Language.PureScript.Label (Label(..))
-import Language.PureScript.Names
-import Language.PureScript.PSString
-import Language.PureScript.Sugar.TypeClasses
-import Language.PureScript.TypeChecker.Entailment
-import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Synonyms
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Types
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName(..), Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, freshIdent, qualify)
+import Language.PureScript.PSString (PSString, mkString)
+import Language.PureScript.Sugar.TypeClasses (superClassDictionaryNames)
+import Language.PureScript.TypeChecker.Entailment (InstanceContext, findDicts)
+import Language.PureScript.TypeChecker.Monad (CheckState, getEnv, getTypeClassDictionaries, unsafeCheckCurrentModule)
+import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
+import Language.PureScript.TypeClassDictionaries (TypeClassDictionaryInScope(..))
+import Language.PureScript.Types (Constraint(..), pattern REmptyKinded, SourceType, Type(..), completeBinderList, eqType, everythingOnTypes, replaceAllTypeVars, srcTypeVar, usedTypeVariables)
 
 -- | Extract the name of the newtype appearing in the last type argument of
 -- a derived newtype instance.

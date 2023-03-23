@@ -11,7 +11,7 @@ import Data.List (isSuffixOf)
 import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
-import Language.PureScript.Interactive
+import Language.PureScript.Interactive (Command(..), PSCiConfig(..), PSCiState, handleCommand, indexFile, initialPSCiState, loadAllModules, make, modulesDir, parseCommand, readNodeProcessWithExitCode, runMake, updateLoadedExterns)
 import System.Directory (getCurrentDirectory, doesPathExist, removeFile)
 import System.Exit
 import System.FilePath ((</>), pathSeparator)

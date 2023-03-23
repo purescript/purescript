@@ -19,11 +19,11 @@ import Data.String (fromString)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.PureScript qualified as Text
-import Language.PureScript.CST.Errors
-import Language.PureScript.CST.Monad hiding (token)
-import Language.PureScript.CST.Layout
-import Language.PureScript.CST.Positions
-import Language.PureScript.CST.Types
+import Language.PureScript.CST.Errors (ParserErrorInfo(..), ParserErrorType(..))
+import Language.PureScript.CST.Monad (LexResult, LexState(..), ParserM(..), throw)
+import Language.PureScript.CST.Layout (LayoutDelim(..), insertLayout, lytToken, unwindLayout)
+import Language.PureScript.CST.Positions (advanceLeading, advanceToken, advanceTrailing, applyDelta, textDelta)
+import Language.PureScript.CST.Types (Comment(..), LineFeed(..), SourcePos(..), SourceRange(..), SourceStyle(..), SourceToken(..), Token(..), TokenAnn(..))
 
 -- | Stops at the first lexing error and replaces it with TokEof. Otherwise,
 -- the parser will fail when it attempts to draw a lookahead token.

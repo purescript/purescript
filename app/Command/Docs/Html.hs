@@ -7,9 +7,9 @@ module Command.Docs.Html
 
 import Prelude
 
-import Control.Applicative
+import Control.Applicative (Alternative(..))
 import Control.Arrow ((&&&))
-import Control.Monad.Writer
+import Control.Monad.Writer (guard)
 import Data.List (sort)
 import Data.Text (Text)
 import Data.Text.Lazy (toStrict)

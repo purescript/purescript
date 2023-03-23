@@ -13,9 +13,9 @@ import Prelude
 
 import Data.Text qualified as Text
 import Data.Char (isSpace, toUpper)
-import Language.PureScript.CST.Layout
-import Language.PureScript.CST.Print
-import Language.PureScript.CST.Types
+import Language.PureScript.CST.Layout (LayoutStack)
+import Language.PureScript.CST.Print (printToken)
+import Language.PureScript.CST.Types (SourcePos(..), SourceRange(..), SourceToken(..), Token(..))
 import Text.Printf (printf)
 
 data ParserErrorType

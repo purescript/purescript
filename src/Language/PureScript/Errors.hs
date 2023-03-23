@@ -9,10 +9,10 @@ import Protolude (unsnoc)
 import Control.Arrow ((&&&))
 import Control.Exception (displayException)
 import Control.Lens (both, head1, over)
-import Control.Monad
+import Control.Monad (forM, unless)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Trans.State.Lazy
-import Control.Monad.Writer
+import Control.Monad.Trans.State.Lazy (State, evalState, get, put)
+import Control.Monad.Writer (Last(..), MonadWriter(..), censor)
 import Data.Bifunctor (first, second)
 import Data.Bitraversable (bitraverse)
 import Data.Char (isSpace)
@@ -37,17 +37,17 @@ import Language.PureScript.AST
 import Language.PureScript.Bundle qualified as Bundle
 import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.Constants.Prim qualified as C
-import Language.PureScript.Crash
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.CST.Errors qualified as CST
 import Language.PureScript.CST.Print qualified as CST
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.Names
-import Language.PureScript.Pretty
+import Language.PureScript.Pretty (prettyPrintBinderAtom, prettyPrintLabel, prettyPrintObjectKey, prettyPrintSuggestedType, prettyPrintValue, typeAsBox, typeAtomAsBox, typeDiffAsBox)
 import Language.PureScript.Pretty.Common (endWith)
 import Language.PureScript.PSString (decodeStringWithReplacement)
-import Language.PureScript.Roles
-import Language.PureScript.Traversals
-import Language.PureScript.Types
+import Language.PureScript.Roles (Role, displayRole)
+import Language.PureScript.Traversals (sndM)
+import Language.PureScript.Types (Constraint(..), ConstraintData(..), RowListItem(..), SourceConstraint, SourceType, Type(..), eraseForAllKindAnnotations, eraseKindApps, everywhereOnTypesTopDownM, getAnnForType, overConstraintArgs, rowFromList, rowToList, srcTUnknown)
 import Language.PureScript.Publish.BoxesHelpers qualified as BoxHelpers
 import System.Console.ANSI qualified as ANSI
 import System.FilePath (makeRelative)

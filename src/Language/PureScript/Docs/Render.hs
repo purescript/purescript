@@ -16,8 +16,8 @@ import Data.Text (Text)
 import Data.Text qualified as T
 
 import Language.PureScript.Docs.RenderedCode
-import Language.PureScript.Docs.Types
-import Language.PureScript.Docs.Utils.MonoidExtras
+import Language.PureScript.Docs.Types (ChildDeclaration(..), ChildDeclarationInfo(..), Constraint', Declaration(..), DeclarationInfo(..), KindInfo(..), Type', isTypeClassMember, kindSignatureForKeyword)
+import Language.PureScript.Docs.Utils.MonoidExtras (mintersperse)
 
 import Language.PureScript.AST qualified as P
 import Language.PureScript.Environment qualified as P

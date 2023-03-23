@@ -8,7 +8,7 @@ module Language.PureScript.Ide.Rebuild
 
 import Protolude hiding (moduleName)
 
-import "monad-logger" Control.Monad.Logger
+import "monad-logger" Control.Monad.Logger (LoggingT, MonadLogger, logDebug)
 import Data.List qualified as List
 import Data.Map.Lazy qualified as M
 import Data.Maybe (fromJust)
@@ -20,11 +20,11 @@ import Language.PureScript.Make (ffiCodegen')
 import Language.PureScript.Make.Cache (CacheInfo(..), normaliseForCache)
 import Language.PureScript.CST qualified as CST
 
-import Language.PureScript.Ide.Error
-import Language.PureScript.Ide.Logging
-import Language.PureScript.Ide.State
-import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Util
+import Language.PureScript.Ide.Error (IdeError(..))
+import Language.PureScript.Ide.Logging (labelTimespec, logPerf, runLogger)
+import Language.PureScript.Ide.State (cacheRebuild, getExternFiles, insertExterns, insertModule, populateVolatileState, updateCacheTimestamp)
+import Language.PureScript.Ide.Types (Ide, IdeConfiguration(..), IdeEnvironment(..), ModuleMap, Success(..))
+import Language.PureScript.Ide.Util (ideReadFile)
 import System.Directory (getCurrentDirectory)
 
 -- | Given a filepath performs the following steps:

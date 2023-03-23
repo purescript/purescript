@@ -32,8 +32,8 @@ import Data.List.NonEmpty qualified as NE
 import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
-import Language.PureScript.Ide.Error
-import Language.PureScript.Ide.Util
+import Language.PureScript.Ide.Error (IdeError(..))
+import Language.PureScript.Ide.Util (ideReadFile)
 
 data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)
               deriving (Eq, Show)

@@ -9,7 +9,7 @@ import Data.Bool (bool)
 import Data.ByteString.Lazy qualified as LB
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
 import Language.PureScript qualified as P
-import Language.PureScript.Errors.JSON
+import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
 import Options.Applicative qualified as Opts
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitFailure)

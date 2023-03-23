@@ -5,7 +5,7 @@ module Language.PureScript.Sugar.Names.Exports
 
 import Prelude
 
-import Control.Monad
+import Control.Monad (filterM, foldM, liftM2, unless, void, when)
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Monad.Error.Class (MonadError(..))
 
@@ -16,10 +16,10 @@ import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Map qualified as M
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.Sugar.Names.Env
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage', rethrow, rethrowWithPosition, warnAndRethrow)
+import Language.PureScript.Names (Ident, ModuleName, Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), disqualifyFor, isQualifiedWith, isUnqualified)
+import Language.PureScript.Sugar.Names.Env (Env, ExportMode(..), Exports(..), ImportRecord(..), Imports(..), checkImportConflicts, envModuleExports, exportType, exportTypeClass, exportTypeOp, exportValue, exportValueOp, nullExports)
 import Language.PureScript.Sugar.Names.Common (warnDuplicateRefs)
 
 -- |

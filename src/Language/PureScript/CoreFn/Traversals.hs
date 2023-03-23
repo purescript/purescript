@@ -8,9 +8,9 @@ import Prelude
 import Control.Arrow (second, (***), (+++))
 import Data.Bitraversable (bitraverse)
 
-import Language.PureScript.AST.Literals
-import Language.PureScript.CoreFn.Binders
-import Language.PureScript.CoreFn.Expr
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.CoreFn.Binders (Binder(..))
+import Language.PureScript.CoreFn.Expr (Bind(..), CaseAlternative(..), Expr(..))
 
 everywhereOnValues :: (Bind a -> Bind a) ->
                       (Expr a -> Expr a) ->

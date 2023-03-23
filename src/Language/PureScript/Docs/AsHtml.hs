@@ -34,7 +34,7 @@ import Cheapskate qualified
 import Language.PureScript qualified as P
 
 import Language.PureScript.Docs.Types
-import Language.PureScript.Docs.RenderedCode hiding (sp)
+import Language.PureScript.Docs.RenderedCode (Link(..), outputWith)
 import Language.PureScript.Docs.Render qualified as Render
 import Language.PureScript.CST qualified as CST
 

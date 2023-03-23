@@ -5,13 +5,13 @@ module Language.PureScript.Docs.Convert.ReExports
 import Prelude
 
 import Control.Arrow ((&&&), first, second)
-import Control.Monad
+import Control.Monad (foldM, (<=<))
 import Control.Monad.Reader.Class (MonadReader, ask)
 import Control.Monad.State.Class (MonadState, gets, modify)
 import Control.Monad.Trans.Reader (runReaderT)
 import Control.Monad.Trans.State.Strict (execState)
 
-import Data.Either
+import Data.Either (partitionEithers)
 import Data.Foldable (fold, traverse_)
 import Data.Map (Map)
 import Data.Maybe (mapMaybe)

@@ -32,15 +32,15 @@ module Language.PureScript.Ide.Util
 import Protolude                           hiding (decodeUtf8,
                                                       encodeUtf8, to)
 
-import Control.Lens                        hiding (op, (&))
-import Data.Aeson
+import Control.Lens (Getting, to, (^.))
+import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode)
 import Data.Text qualified as T
 import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding             as TLE
 import Language.PureScript qualified as P
 import Language.PureScript.Ide.Error (IdeError(..))
 import Language.PureScript.Ide.Logging
-import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Types (IdeDeclaration(..), IdeDeclarationAnn(..), IdeNamespace(..), Match(..), emptyAnn, ideDtorName, ideSynonymName, ideTCName, ideTypeName, ideTypeOpName, ideValueIdent, ideValueOpName)
 import System.IO.UTF8 (readUTF8FileT)
 import System.Directory (makeAbsolute)
 

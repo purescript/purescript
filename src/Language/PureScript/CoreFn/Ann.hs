@@ -2,10 +2,10 @@ module Language.PureScript.CoreFn.Ann where
 
 import Prelude
 
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Comments
-import Language.PureScript.CoreFn.Meta
-import Language.PureScript.Types
+import Language.PureScript.AST.SourcePos (SourceSpan)
+import Language.PureScript.Comments (Comment)
+import Language.PureScript.CoreFn.Meta (Meta)
+import Language.PureScript.Types (SourceType)
 
 -- |
 -- Type alias for basic annotations

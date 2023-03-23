@@ -16,13 +16,13 @@ import Data.Maybe (catMaybes, mapMaybe)
 
 import Control.Monad ((<=<), forM, replicateM, join, unless)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class (MonadSupply)
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (NameKind(..))
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors(..), SimpleErrorMessage(..), addHint, errorMessage', parU, rethrow, withPosition)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident, Qualified(..), freshIdent')
 import Language.PureScript.TypeChecker.Monad (guardWith)
 
 -- |

@@ -11,7 +11,7 @@ import Control.DeepSeq (NFData)
 import Data.Aeson ((.=), (.:))
 import Data.Text (Text)
 import GHC.Generics (Generic)
-import Language.PureScript.Comments
+import Language.PureScript.Comments (Comment)
 import Data.Aeson qualified as A
 import Data.Text qualified as T
 import System.FilePath (makeRelative)

@@ -174,7 +174,7 @@ import Data.DList (snoc)
 import Data.DList qualified as DList
 import Data.Foldable (find)
 import Data.Function ((&))
-import Language.PureScript.CST.Types
+import Language.PureScript.CST.Types (Comment, LineFeed, SourcePos(..), SourceRange(..), SourceToken(..), Token(..), TokenAnn(..))
 
 type LayoutStack = [(SourcePos, LayoutDelim)]
 

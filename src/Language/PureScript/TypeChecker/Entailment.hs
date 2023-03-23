@@ -15,9 +15,9 @@ import Protolude (ordNub)
 
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
+import Control.Monad.State (MonadState(..), MonadTrans(..), StateT(..), evalStateT, execStateT, foldM, gets, guard, join, modify, zipWithM, zipWithM_, (<=<))
 import Control.Monad.Supply.Class (MonadSupply(..))
-import Control.Monad.Writer
+import Control.Monad.Writer (Any(..), MonadWriter(..), WriterT(..))
 
 import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
@@ -33,18 +33,18 @@ import Data.Text qualified as T
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List.NonEmpty qualified as NEL
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Entailment.Coercible
-import Language.PureScript.TypeChecker.Entailment.IntCompare
+import Language.PureScript.AST (Binder(..), ErrorMessageHint(..), Expr(..), Literal(..), pattern NullSourceSpan, everywhereOnValuesTopDownM, nullSourceSpan)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (Environment(..), FunctionalDependency(..), TypeClassData(..), dictTypeName, kindRow, tyBoolean, tyInt, tyString)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, addHints, errorMessage, rethrow)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), byMaybeModuleName, coerceProperName, disqualify, freshIdent, getQual)
+import Language.PureScript.TypeChecker.Entailment.Coercible (GivenSolverState(..), WantedSolverState(..), initialGivenSolverState, initialWantedSolverState, insoluble, solveGivens, solveWanteds)
+import Language.PureScript.TypeChecker.Entailment.IntCompare (mkFacts, mkRelation, solveRelation)
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
-import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.TypeChecker.Monad (CheckState(..), withErrorMessageHint)
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
-import Language.PureScript.TypeChecker.Unify
-import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, substituteType, unifyTypes)
+import Language.PureScript.TypeClassDictionaries (NamedDict, TypeClassDictionaryInScope(..), superclassName)
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString, mkString, decodeString)

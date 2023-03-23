@@ -15,8 +15,8 @@ import Data.List (partition)
 import Data.Text (Text)
 import Data.Text qualified as T
 
-import Language.PureScript.Docs.RenderedCode
-import Language.PureScript.Docs.Types
+import Language.PureScript.Docs.RenderedCode (RenderedCode, RenderedCodeElement(..), outputWith)
+import Language.PureScript.Docs.Types (ChildDeclaration(..), ChildDeclarationInfo(..), Declaration(..), Module(..), ignorePackage)
 import Language.PureScript qualified as P
 import Language.PureScript.Docs.Render qualified as Render
 

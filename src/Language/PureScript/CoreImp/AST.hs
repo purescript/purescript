@@ -8,10 +8,10 @@ import Control.Monad.Identity (Identity(..), runIdentity)
 import Data.Text (Text)
 
 import Language.PureScript.AST (SourceSpan(..))
-import Language.PureScript.Comments
+import Language.PureScript.Comments (Comment)
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString)
-import Language.PureScript.Traversals
+import Language.PureScript.Traversals (sndM)
 
 -- | Built-in unary operators
 data UnaryOperator

@@ -18,8 +18,8 @@ import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.Interactive.Directive qualified as D
-import Language.PureScript.Interactive.Types
-import System.Console.Haskeline
+import Language.PureScript.Interactive.Types (Directive(..), PSCiState, psciExports, psciImports, psciLoadedExterns, replQueryStrings)
+import System.Console.Haskeline (Completion(..), CompletionFunc, completeWordWithPrev, listFiles, simpleCompletion)
 
 -- Completions may read the state, but not modify it.
 type CompletionM = ReaderT PSCiState IO

@@ -11,10 +11,10 @@ import Prelude
 import Control.Monad (unless)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Language.PureScript.AST
-import Language.PureScript.Names
-import Language.PureScript.Environment
-import Language.PureScript.Errors
+import Language.PureScript.AST (Declaration(..), ErrorMessageHint(..), Expr(..), GuardedExpr(..), KindSignatureFor(..), pattern MkUnguarded, Module(..), RoleDeclarationData(..), TypeDeclarationData(..), TypeInstanceBody(..), pattern ValueDecl, declSourceSpan, everywhereOnValuesTopDownM)
+import Language.PureScript.Names (Ident, coerceProperName)
+import Language.PureScript.Environment (DataDeclType(..), NameKind)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage', rethrow)
 
 -- |
 -- Replace all top level type declarations in a module with type annotations

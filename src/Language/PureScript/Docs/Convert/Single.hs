@@ -9,7 +9,7 @@ import Control.Category ((>>>))
 
 import Data.Text qualified as T
 
-import Language.PureScript.Docs.Types
+import Language.PureScript.Docs.Types (ChildDeclaration(..), ChildDeclarationInfo(..), Declaration(..), DeclarationInfo(..), KindInfo(..), Module(..), Type', convertFundepsToStrings, isType, isTypeClass)
 
 import Language.PureScript.AST qualified as P
 import Language.PureScript.Comments qualified as P
