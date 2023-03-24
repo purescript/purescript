@@ -23,8 +23,8 @@ import Data.Text qualified as T
 
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString, mkString)
-import Language.PureScript.CoreImp.AST
-import Language.PureScript.CoreImp.Optimizer.Common
+import Language.PureScript.CoreImp.AST (AST(..), BinaryOperator(..), InitializerEffects(..), UnaryOperator(..), everywhere, everywhereTopDown, everywhereTopDownM, getSourceSpan)
+import Language.PureScript.CoreImp.Optimizer.Common (pattern Ref, applyAll, isReassigned, isRebound, isUpdated, removeFromBlock, replaceIdent, replaceIdents)
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.Constants.Prim qualified as C

@@ -6,7 +6,7 @@ module Language.PureScript.CoreImp.Optimizer.Blocks
 
 import Prelude
 
-import Language.PureScript.CoreImp.AST
+import Language.PureScript.CoreImp.AST (AST(..), BinaryOperator(..), everywhere)
 
 -- | Collapse blocks which appear nested directly below another block
 collapseNestedBlocks :: AST -> AST

@@ -16,11 +16,11 @@ import Data.Map.Monoidal qualified as M
 import Data.Semigroup (Max(..))
 import Data.Set qualified as S
 
-import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.SourcePos (SourcePos(..), SourceSpan(..), nullSourceSpan)
 import Language.PureScript.Constants.Libs qualified as C
-import Language.PureScript.CoreFn
-import Language.PureScript.Crash
-import Language.PureScript.Names
+import Language.PureScript.CoreFn (Ann, Bind, Expr(..), Literal(..), Meta(..), ssAnn, traverseCoreFn)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), InternalIdentData(..), ModuleName, Qualified(..), QualifiedBy(..), runIdent, runModuleName, toMaybeModuleName)
 import Language.PureScript.PSString (mkString)
 
 -- This module is responsible for ensuring that the bindings in recursive

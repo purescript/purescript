@@ -27,7 +27,7 @@ import Prelude
 import Protolude (ordNub, fold, atMay)
 
 import Control.Arrow (first, second, (***))
-import Control.Monad
+import Control.Monad (forM, forM_, guard, replicateM, unless, when, zipWithM, (<=<))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
 import Control.Monad.Supply.Class (MonadSupply)
@@ -46,20 +46,20 @@ import Data.Set qualified as S
 import Data.IntSet qualified as IS
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.Traversals
-import Language.PureScript.TypeChecker.Deriving
-import Language.PureScript.TypeChecker.Entailment
-import Language.PureScript.TypeChecker.Kinds
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage', escalateWarningWhen, internalCompilerError, onErrorMessages, onTypesInErrorMessage, parU)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), byMaybeModuleName, coerceProperName, freshIdent)
+import Language.PureScript.Traversals (sndM)
+import Language.PureScript.TypeChecker.Deriving (deriveInstance)
+import Language.PureScript.TypeChecker.Entailment (InstanceContext, newDictionaries, replaceTypeClassDictionaries)
+import Language.PureScript.TypeChecker.Kinds (checkConstraint, checkTypeKind, kindOf, kindOfWithScopedVars, unifyKinds', unknownsWithKinds)
 import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Skolems
-import Language.PureScript.TypeChecker.Subsumption
-import Language.PureScript.TypeChecker.Synonyms
-import Language.PureScript.TypeChecker.TypeSearch
-import Language.PureScript.TypeChecker.Unify
+import Language.PureScript.TypeChecker.Skolems (introduceSkolemScope, newSkolemConstant, newSkolemScope, skolemEscapeCheck, skolemize, skolemizeTypesInValue)
+import Language.PureScript.TypeChecker.Subsumption (subsumes)
+import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
+import Language.PureScript.TypeChecker.TypeSearch (typeSearch)
+import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, replaceTypeWildcards, substituteType, unifyTypes, unknownsInType, varIfUnknown)
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)

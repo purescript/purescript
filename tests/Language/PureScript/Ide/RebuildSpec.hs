@@ -5,14 +5,14 @@ import Protolude
 import Data.Set qualified as Set
 import Language.PureScript qualified as P
 import Language.PureScript.AST.SourcePos (spanName)
-import Language.PureScript.Ide.Command
-import Language.PureScript.Ide.Completion
-import Language.PureScript.Ide.Matcher
-import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Command (Command(..))
+import Language.PureScript.Ide.Completion (defaultCompletionOptions)
+import Language.PureScript.Ide.Matcher (flexMatcher)
+import Language.PureScript.Ide.Types (Completion(..), Success(..), emptyIdeState)
 import Language.PureScript.Ide.Test qualified as Test
-import System.FilePath
+import System.FilePath ((</>))
 import System.Directory (doesFileExist, removePathForcibly)
-import Test.Hspec
+import Test.Hspec (Spec, describe, it, shouldBe, shouldSatisfy)
 
 defaultTarget :: Set P.CodegenTarget
 defaultTarget = Set.singleton P.JS

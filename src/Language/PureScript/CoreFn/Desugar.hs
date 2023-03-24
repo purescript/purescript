@@ -11,19 +11,19 @@ import Data.Tuple (swap)
 import Data.List.NonEmpty qualified as NEL
 import Data.Map qualified as M
 
-import Language.PureScript.AST.Literals
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.AST.Traversals
-import Language.PureScript.Comments
-import Language.PureScript.CoreFn.Ann
-import Language.PureScript.CoreFn.Binders
-import Language.PureScript.CoreFn.Expr
-import Language.PureScript.CoreFn.Meta
-import Language.PureScript.CoreFn.Module
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Names
-import Language.PureScript.Types
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.AST.SourcePos (pattern NullSourceSpan, SourceSpan(..))
+import Language.PureScript.AST.Traversals (everythingOnValues)
+import Language.PureScript.Comments (Comment)
+import Language.PureScript.CoreFn.Ann (Ann, ssAnn)
+import Language.PureScript.CoreFn.Binders (Binder(..))
+import Language.PureScript.CoreFn.Expr (Bind(..), CaseAlternative(..), Expr(..), Guard)
+import Language.PureScript.CoreFn.Meta (ConstructorType(..), Meta(..))
+import Language.PureScript.CoreFn.Module (Module(..))
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType(..), Environment(..), NameKind(..), isDictTypeName, lookupConstructor, lookupValue)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), getQual)
+import Language.PureScript.Types (SourceType)
 import Language.PureScript.AST qualified as A
 import Language.PureScript.Constants.Prim qualified as C
 

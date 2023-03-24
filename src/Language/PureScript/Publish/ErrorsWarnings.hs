@@ -19,16 +19,16 @@ import Control.Exception (IOException)
 import Data.Aeson.BetterErrors (ParseError, displayError)
 import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe
-import Data.Monoid
-import Data.Version
+import Data.Maybe (catMaybes, fromMaybe)
+import Data.Monoid (Any(..))
+import Data.Version (Version, showVersion)
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Text (Text)
 import Data.Text qualified as T
 
 import Language.PureScript.Docs.Types qualified as D
 import Language.PureScript qualified as P
-import Language.PureScript.Publish.BoxesHelpers
+import Language.PureScript.Publish.BoxesHelpers (Box, bulletedList, bulletedListT, indented, nullBox, para, printToStderr, spacer, successivelyIndented, vcat)
 
 import Web.Bower.PackageMeta (PackageName, runPackageName, showBowerError)
 import Web.Bower.PackageMeta qualified as Bower

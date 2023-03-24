@@ -5,10 +5,10 @@ import Protolude
 import Language.PureScript qualified as P
 import Language.PureScript.Ide.Test as Test
 import Language.PureScript.Ide.Command as Command
-import Language.PureScript.Ide.Completion
+import Language.PureScript.Ide.Completion (CompletionOptions(..), applyCompletionOptions, defaultCompletionOptions)
 import Language.PureScript.Ide.Filter.Declaration qualified as DeclarationType
-import Language.PureScript.Ide.Types
-import Test.Hspec
+import Language.PureScript.Ide.Types (Completion(..), IdeDeclarationAnn, Match(..), Success(..))
+import Test.Hspec (Spec, describe, it, shouldBe, shouldMatchList, shouldSatisfy)
 
 reexportMatches :: [Match IdeDeclarationAnn]
 reexportMatches =

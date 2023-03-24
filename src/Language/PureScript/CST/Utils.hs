@@ -11,10 +11,10 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Language.PureScript.CST.Errors
-import Language.PureScript.CST.Monad
-import Language.PureScript.CST.Positions
-import Language.PureScript.CST.Traversals.Type
+import Language.PureScript.CST.Errors (ParserErrorType(..))
+import Language.PureScript.CST.Monad (Parser, addFailure, parseFail, pushBack)
+import Language.PureScript.CST.Positions (TokenRange, binderRange, importDeclRange, recordUpdateRange, typeRange)
+import Language.PureScript.CST.Traversals.Type (everythingOnTypes)
 import Language.PureScript.CST.Types
 import Language.PureScript.Names qualified as N
 import Language.PureScript.PSString (PSString, mkString)

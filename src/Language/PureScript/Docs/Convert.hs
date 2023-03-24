@@ -16,7 +16,7 @@ import Data.String (String)
 import Data.Text qualified as T
 
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
-import Language.PureScript.Docs.Types
+import Language.PureScript.Docs.Types (Declaration(..), DeclarationInfo(..), KindInfo(..), Module(..), Type')
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.AST qualified as P
 import Language.PureScript.Crash qualified as P

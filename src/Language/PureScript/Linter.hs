@@ -5,7 +5,7 @@ module Language.PureScript.Linter (lint, module L) where
 
 import Prelude
 
-import Control.Monad.Writer.Class
+import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Maybe (mapMaybe)
 import Data.Set qualified as S
@@ -14,11 +14,11 @@ import Data.Text qualified as Text
 import Control.Monad ((<=<))
 
 import Language.PureScript.AST
-import Language.PureScript.Errors
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage')
 import Language.PureScript.Linter.Exhaustive as L
 import Language.PureScript.Linter.Imports as L
-import Language.PureScript.Names
-import Language.PureScript.Types
+import Language.PureScript.Names (Ident(..), Qualified(..), QualifiedBy(..), getIdentName, runIdent)
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), everythingWithContextOnTypes)
 import Language.PureScript.Constants.Libs qualified as C
 
 -- | Lint the PureScript AST.

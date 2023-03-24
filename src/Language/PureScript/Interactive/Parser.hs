@@ -18,7 +18,7 @@ import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.CST.Monad qualified as CSTM
 import Language.PureScript.Interactive.Directive qualified as D
-import Language.PureScript.Interactive.Types
+import Language.PureScript.Interactive.Types (Command(..), Directive(..), ReplQuery(..), parseReplQuery, replQueryStrings)
 
 -- |
 -- Parses a limited set of commands from from .purs-repl

@@ -11,7 +11,7 @@ import Data.List (sort)
 import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
 import Language.PureScript.AST (SourceSpan, sourcePosLine, spanStart)
-import Language.PureScript.Docs.Types
+import Language.PureScript.Docs.Types (ChildDeclaration(..), Declaration(..), Module(..))
 
 tags :: Module -> [(String, Int)]
 tags = map (first T.unpack) . concatMap dtags . modDeclarations

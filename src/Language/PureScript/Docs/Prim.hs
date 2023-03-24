@@ -11,7 +11,7 @@ import Data.Functor (($>))
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Map qualified as Map
-import Language.PureScript.Docs.Types
+import Language.PureScript.Docs.Types (Declaration(..), DeclarationInfo(..), Module(..), Type', convertFundepsToStrings)
 
 import Language.PureScript.Constants.Prim qualified as P
 import Language.PureScript.Crash qualified as P

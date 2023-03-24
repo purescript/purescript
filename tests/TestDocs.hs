@@ -4,11 +4,11 @@ import Prelude
 
 import Data.Bifunctor (first)
 import Data.List (findIndex)
-import Data.Foldable
+import Data.Foldable (find, forM_)
 import Safe (headMay)
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isNothing, mapMaybe)
-import Data.Monoid
+import Data.Monoid (Any(..), First(..))
 import Data.Text (Text)
 import Data.Text qualified as T
 import Text.PrettyPrint.Boxes qualified as Boxes
@@ -22,7 +22,7 @@ import Web.Bower.PackageMeta (parsePackageName, runPackageName)
 
 import TestPscPublish (preparePackage)
 
-import Test.Hspec
+import Test.Hspec (Spec, beforeAll, context, expectationFailure, it)
 
 spec :: Spec
 spec = beforeAll (handleDocPrepFailure <$> preparePackage "tests/purs/docs" "purs.json" "resolutions.json") $

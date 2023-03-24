@@ -13,9 +13,9 @@ import Prelude
 import Protolude (sortOn, swap, foldl')
 
 import Control.Arrow (first, second, (&&&))
-import Control.Monad
+import Control.Monad (foldM, when, (>=>))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Lazy
+import Control.Monad.State.Lazy (MonadState, StateT(..), gets, modify)
 import Control.Monad.Writer (MonadWriter(..))
 
 import Data.List.NonEmpty qualified as NEL
@@ -24,16 +24,16 @@ import Data.Map qualified as M
 import Data.Set qualified as S
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.Externs
-import Language.PureScript.Linter.Imports
-import Language.PureScript.Names
-import Language.PureScript.Sugar.Names.Env
-import Language.PureScript.Sugar.Names.Exports
-import Language.PureScript.Sugar.Names.Imports
-import Language.PureScript.Traversals
-import Language.PureScript.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, errorMessage'', nonEmpty, parU, warnAndRethrow, warnAndRethrowWithPosition)
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..), ExternsImport(..))
+import Language.PureScript.Linter.Imports (Name(..), UsedImports)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident, OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..))
+import Language.PureScript.Sugar.Names.Env (Env, Exports(..), ImportProvenance(..), ImportRecord(..), Imports(..), checkImportConflicts, nullImports, primEnv)
+import Language.PureScript.Sugar.Names.Exports (findExportable, resolveExports)
+import Language.PureScript.Sugar.Names.Imports (resolveImports, resolveModuleImport)
+import Language.PureScript.Traversals (defS, sndM)
+import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), everywhereOnTypesM)
 
 -- |
 -- Replaces all local names with qualified names.

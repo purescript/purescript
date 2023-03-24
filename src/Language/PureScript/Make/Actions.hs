@@ -13,11 +13,11 @@ module Language.PureScript.Make.Actions
 
 import Prelude
 
-import Control.Monad hiding (sequence)
+import Control.Monad (unless, when)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.IO.Class
+import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Reader (asks)
-import Control.Monad.Supply
+import Control.Monad.Supply (SupplyT)
 import Control.Monad.Trans.Class (MonadTrans(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Aeson (Value(String), (.=), object)
@@ -34,26 +34,26 @@ import Data.Text.Encoding qualified as TE
 import Data.Time.Clock (UTCTime)
 import Data.Version (showVersion)
 import Language.JavaScript.Parser qualified as JS
-import Language.PureScript.AST
+import Language.PureScript.AST (SourcePos(..))
 import Language.PureScript.Bundle qualified as Bundle
 import Language.PureScript.CodeGen.JS qualified as J
-import Language.PureScript.CodeGen.JS.Printer
+import Language.PureScript.CodeGen.JS.Printer (prettyPrintJS, prettyPrintJSWithSourceMaps)
 import Language.PureScript.CoreFn qualified as CF
 import Language.PureScript.CoreFn.ToJSON qualified as CFJ
-import Language.PureScript.Crash
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Docs.Prim qualified as Docs.Prim
 import Language.PureScript.Docs.Types qualified as Docs
-import Language.PureScript.Errors
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage')
 import Language.PureScript.Externs (ExternsFile, externsFileName)
-import Language.PureScript.Make.Monad
-import Language.PureScript.Make.Cache
-import Language.PureScript.Names
-import Language.PureScript.Options hiding (codegenTargets)
+import Language.PureScript.Make.Monad (Make, copyFile, getTimestamp, getTimestampMaybe, hashFile, makeIO, readExternsFile, readJSONFile, readTextFile, writeCborFile, writeJSONFile, writeTextFile)
+import Language.PureScript.Make.Cache (CacheDb, ContentHash, normaliseForCache)
+import Language.PureScript.Names (Ident(..), ModuleName, runModuleName)
+import Language.PureScript.Options (CodegenTarget(..), Options(..))
 import Language.PureScript.Pretty.Common (SMap(..))
 import Paths_purescript qualified as Paths
-import SourceMap
-import SourceMap.Types
+import SourceMap (generate)
+import SourceMap.Types (Mapping(..), Pos(..), SourceMapping(..))
 import System.Directory (getCurrentDirectory)
 import System.FilePath ((</>), makeRelative, splitPath, normalise, splitDirectories)
 import System.FilePath.Posix qualified as Posix

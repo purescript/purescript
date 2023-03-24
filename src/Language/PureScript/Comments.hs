@@ -11,7 +11,7 @@ import Control.DeepSeq (NFData)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 
-import Data.Aeson.TH
+import Data.Aeson.TH (Options(..), SumEncoding(..), defaultOptions, deriveJSON)
 
 data Comment
   = LineComment Text

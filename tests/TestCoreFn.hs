@@ -4,21 +4,21 @@ module TestCoreFn (spec) where
 
 import Prelude
 
-import Data.Aeson
-import Data.Aeson.Types as Aeson
+import Data.Aeson (Result(..), Value)
+import Data.Aeson.Types (parse)
 import Data.Map as M
-import Data.Version
+import Data.Version (Version(..))
 
-import Language.PureScript.AST.Literals
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Comments
-import Language.PureScript.CoreFn
-import Language.PureScript.CoreFn.FromJSON
-import Language.PureScript.CoreFn.ToJSON
-import Language.PureScript.Names
-import Language.PureScript.PSString
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.AST.SourcePos (SourcePos(..), SourceSpan(..))
+import Language.PureScript.Comments (Comment(..))
+import Language.PureScript.CoreFn (Ann, Bind(..), Binder(..), CaseAlternative(..), ConstructorType(..), Expr(..), Meta(..), Module(..), ssAnn)
+import Language.PureScript.CoreFn.FromJSON (moduleFromJSON)
+import Language.PureScript.CoreFn.ToJSON (moduleToJSON)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName(..), ProperName(..), Qualified(..), QualifiedBy(..))
+import Language.PureScript.PSString (mkString)
 
-import Test.Hspec
+import Test.Hspec (Spec, context, shouldBe, shouldSatisfy, specify)
 
 parseModule :: Value -> Result (Version, Module Ann)
 parseModule = parse moduleFromJSON
@@ -30,7 +30,7 @@ parseMod m =
   in snd <$> parseModule (moduleToJSON v m)
 
 isSuccess :: Result a -> Bool
-isSuccess (Aeson.Success _) = True
+isSuccess (Success _) = True
 isSuccess _           = False
 
 spec :: Spec
@@ -47,49 +47,49 @@ spec = context "CoreFnFromJson" $ do
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Aeson.Success v' -> v' `shouldBe` v
+      Success v' -> v' `shouldBe` v
 
   specify "should parse an empty module" $ do
     let r = parseMod $ Module ss [] mn mp [] [] M.empty [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Aeson.Success m -> moduleName m `shouldBe` mn
+      Success m -> moduleName m `shouldBe` mn
 
   specify "should parse source span" $ do
     let r = parseMod $ Module ss [] mn mp [] [] M.empty [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Aeson.Success m -> moduleSourceSpan m `shouldBe` ss
+      Success m -> moduleSourceSpan m `shouldBe` ss
 
   specify "should parse module path" $ do
     let r = parseMod $ Module ss [] mn mp [] [] M.empty [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Aeson.Success m -> modulePath m `shouldBe` mp
+      Success m -> modulePath m `shouldBe` mp
 
   specify "should parse imports" $ do
     let r = parseMod $ Module ss [] mn mp [(ann, mn)] [] M.empty [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Aeson.Success m -> moduleImports m `shouldBe` [(ann, mn)]
+      Success m -> moduleImports m `shouldBe` [(ann, mn)]
 
   specify "should parse exports" $ do
     let r = parseMod $ Module ss [] mn mp [] [Ident "exp"] M.empty [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Aeson.Success m -> moduleExports m `shouldBe` [Ident "exp"]
+      Success m -> moduleExports m `shouldBe` [Ident "exp"]
 
   specify "should parse re-exports" $ do
     let r = parseMod $ Module ss [] mn mp [] [] (M.singleton (ModuleName "Example.A") [Ident "exp"]) [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Aeson.Success m -> moduleReExports m `shouldBe` M.singleton (ModuleName "Example.A") [Ident "exp"]
+      Success m -> moduleReExports m `shouldBe` M.singleton (ModuleName "Example.A") [Ident "exp"]
 
 
   specify "should parse foreign" $ do
@@ -97,7 +97,7 @@ spec = context "CoreFnFromJson" $ do
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Aeson.Success m -> moduleForeign m `shouldBe` [Ident "exp"]
+      Success m -> moduleForeign m `shouldBe` [Ident "exp"]
 
   context "Expr" $ do
     specify "should parse literals" $ do
@@ -154,7 +154,7 @@ spec = context "CoreFnFromJson" $ do
       r `shouldSatisfy` isSuccess
       case r of
         Error _ -> pure ()
-        Aeson.Success Module{..} ->
+        Success Module{..} ->
           moduleDecls `shouldBe` [i]
 
     specify "should parse Case" $ do

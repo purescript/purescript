@@ -12,9 +12,9 @@ import Prelude
 
 import Control.Arrow (first, second)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
-import Control.Monad.Supply.Class
-import Data.Graph
+import Control.Monad.State (MonadState(..), StateT, evalStateT, modify)
+import Control.Monad.Supply.Class (MonadSupply)
+import Data.Graph (SCC(..), stronglyConnComp)
 import Data.List (find, partition)
 import Data.List.NonEmpty (nonEmpty)
 import Data.Map qualified as M
@@ -24,14 +24,14 @@ import Data.Set qualified as S
 import Data.Text (Text)
 import Data.Traversable (for)
 import Language.PureScript.Constants.Prim qualified as C
-import Language.PureScript.Crash
-import Language.PureScript.Environment
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType(..), NameKind(..), TypeClassData(..), dictTypeName, function, makeTypeClassData, primClasses, primCoerceClasses, primIntClasses, primRowClasses, primRowListClasses, primSymbolClasses, primTypeErrorClasses, tyRecord)
 import Language.PureScript.Errors hiding (isExported, nonEmpty)
-import Language.PureScript.Externs
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
 import Language.PureScript.Label (Label(..))
-import Language.PureScript.Names
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, freshIdent, qualify, runIdent)
 import Language.PureScript.PSString (mkString)
-import Language.PureScript.Sugar.CaseDeclarations
+import Language.PureScript.Sugar.CaseDeclarations (desugarCases)
 import Language.PureScript.TypeClassDictionaries (superclassName)
 import Language.PureScript.Types
 

@@ -20,8 +20,8 @@ import Data.Text (Text)
 import Data.Text qualified as T
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.State.Class
-import Control.Monad.Reader.Class
+import Control.Monad.State.Class (MonadState(..), gets, modify)
+import Control.Monad.Reader.Class (MonadReader, asks)
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT)
 import Control.Monad.Writer.Strict (Writer(), runWriter)

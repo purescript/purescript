@@ -16,15 +16,15 @@ module Language.PureScript.Sugar.Operators
 import Prelude
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.Externs
-import Language.PureScript.Names
-import Language.PureScript.Sugar.Operators.Binders
-import Language.PureScript.Sugar.Operators.Expr
-import Language.PureScript.Sugar.Operators.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, errorMessage', parU, rethrow, rethrowWithPosition)
+import Language.PureScript.Externs (ExternsFile(..), ExternsFixity(..), ExternsTypeFixity(..))
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), freshIdent')
+import Language.PureScript.Sugar.Operators.Binders (matchBinderOperators)
+import Language.PureScript.Sugar.Operators.Expr (matchExprOperators)
+import Language.PureScript.Sugar.Operators.Types (matchTypeOperators)
 import Language.PureScript.Traversals (defS, sndM)
-import Language.PureScript.Types
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), everywhereOnTypesTopDownM, overConstraintArgs)
 
 import Control.Monad (unless, (<=<))
 import Control.Monad.Error.Class (MonadError(..))

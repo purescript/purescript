@@ -10,7 +10,7 @@ import Data.Text qualified as Text
 import Language.PureScript qualified as P
 import Language.PureScript.Docs qualified as D
 
-import Test.Hspec
+import Test.Hspec (Spec, it, shouldBe)
 
 spec :: Spec
 spec = do

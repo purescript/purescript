@@ -19,7 +19,7 @@ import Data.Aeson.BetterErrors
 import Data.Map qualified as Map
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format qualified as TimeFormat
-import Data.Version
+import Data.Version (Version(..), showVersion)
 import Data.Aeson qualified as A
 import Data.Text qualified as T
 import Data.Vector qualified as V
@@ -33,7 +33,7 @@ import Language.PureScript.Roles qualified as P
 import Language.PureScript.Types qualified as P
 import Paths_purescript qualified as Paths
 
-import Web.Bower.PackageMeta hiding (Version, displayError)
+import Web.Bower.PackageMeta (BowerError, PackageMeta(..), PackageName, asPackageMeta, parsePackageName, runPackageName, showBowerError)
 
 import Language.PureScript.Docs.RenderedCode as ReExports
   (RenderedCode,

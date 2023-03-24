@@ -2,14 +2,14 @@ module TestPsci.CompletionTest where
 
 import Prelude
 
-import Test.Hspec
+import Test.Hspec (Spec, SpecWith, beforeAll, context, shouldBe, specify)
 
 import Control.Monad.Trans.State.Strict (evalStateT)
 import Data.Functor ((<&>))
 import Data.List (sort)
 import Data.Text qualified as T
 import Language.PureScript qualified as P
-import Language.PureScript.Interactive
+import Language.PureScript.Interactive (CompletionM, PSCiState, completion', formatCompletions, liftCompletionM, updateImportedModules)
 import TestPsci.TestEnv (initTestPSCiEnv)
 import TestUtils (getSupportModuleNames)
 

@@ -9,7 +9,7 @@ import Control.Monad.State (State, evalState, get, modify)
 import Data.Functor (($>), (<&>))
 import Data.Set qualified as S
 import Data.Text (Text, pack)
-import Language.PureScript.CoreImp.AST
+import Language.PureScript.CoreImp.AST (AST(..), InitializerEffects(..), UnaryOperator(..), everything, everywhereTopDownM)
 import Language.PureScript.AST.SourcePos (SourceSpan)
 import Safe (headDef, tailSafe)
 

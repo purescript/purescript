@@ -10,13 +10,13 @@ module Language.PureScript.ModuleDependencies
 import Protolude hiding (head)
 
 import Data.Array ((!))
-import Data.Graph
+import Data.Graph (SCC(..), graphFromEdges, reachable, stronglyConnComp)
 import Data.Set qualified as S
-import Language.PureScript.AST
+import Language.PureScript.AST (Declaration(..), ErrorMessageHint(..), Module(..), SourceSpan)
 import Language.PureScript.Constants.Prim qualified as C
-import Language.PureScript.Crash
-import Language.PureScript.Errors hiding (nonEmpty)
-import Language.PureScript.Names
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage', errorMessage'', parU)
+import Language.PureScript.Names (ModuleName)
 
 -- | A list of modules with their transitive dependencies
 type ModuleGraph = [(ModuleName, [ModuleName])]

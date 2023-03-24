@@ -2,7 +2,7 @@ module TestGraph where
 
 import Prelude
 
-import Test.Hspec
+import Test.Hspec (Spec, it, shouldBe, shouldSatisfy)
 import Data.Either (isLeft)
 
 import Data.Aeson qualified as Json

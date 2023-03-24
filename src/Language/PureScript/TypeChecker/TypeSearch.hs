@@ -9,14 +9,14 @@ import Data.Map qualified as Map
 import Language.PureScript.TypeChecker.Entailment qualified as Entailment
 
 import Language.PureScript.TypeChecker.Monad qualified as TC
-import Language.PureScript.TypeChecker.Subsumption
+import Language.PureScript.TypeChecker.Subsumption (subsumes)
 import Language.PureScript.TypeChecker.Unify       as P
 
 import Control.Monad.Supply                        as P
 import Language.PureScript.AST                     as P
 import Language.PureScript.Environment             as P
 import Language.PureScript.Errors                  as P
-import Language.PureScript.Label
+import Language.PureScript.Label (Label)
 import Language.PureScript.Names                   as P
 import Language.PureScript.Pretty.Types            as P
 import Language.PureScript.TypeChecker.Skolems     as Skolem

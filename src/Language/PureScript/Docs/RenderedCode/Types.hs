@@ -45,7 +45,7 @@ import Data.Text qualified as T
 import Data.ByteString.Lazy qualified as BS
 import Data.Text.Encoding qualified as TE
 
-import Language.PureScript.Names
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, OpName(..), OpNameType(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), moduleNameFromString, runIdent, runModuleName)
 import Language.PureScript.AST (Associativity(..))
 
 -- | Given a list of actions, attempt them all, returning the first success.

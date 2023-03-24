@@ -29,10 +29,10 @@ import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 
-import Language.PureScript.Externs
-import Language.PureScript.Ide.Error
-import Language.PureScript.Ide.State
-import Language.PureScript.Ide.Types
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
+import Language.PureScript.Ide.Error (IdeError(..))
+import Language.PureScript.Ide.State (cachedRebuild, getExternFiles)
+import Language.PureScript.Ide.Types (Ide)
 
 type Constructor = (P.ProperName 'P.ConstructorName, [P.SourceType])
 

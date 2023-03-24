@@ -14,22 +14,22 @@ import Prelude
 import Control.Concurrent.Async.Lifted as A
 import Control.Concurrent.Lifted as C
 import Control.Monad.Base (liftBase)
-import Control.Monad hiding (sequence)
+import Control.Monad (foldM)
 import Control.Monad.Trans.Control (MonadBaseControl(..))
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Data.Foldable (foldl')
 import Data.Map qualified as M
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Time.Clock (UTCTime)
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST (Module, getModuleName)
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.CST qualified as CST
-import Language.PureScript.Errors
-import Language.PureScript.Externs
+import Language.PureScript.Errors (MultipleErrors(..))
+import Language.PureScript.Externs (ExternsFile)
 import Language.PureScript.Make.Actions as Actions
-import Language.PureScript.Make.Cache
+import Language.PureScript.Make.Cache (CacheDb, CacheInfo, checkChanged)
 import Language.PureScript.Names (ModuleName)
-import Language.PureScript.Sugar.Names.Env
+import Language.PureScript.Sugar.Names.Env (Env, primEnv)
 import System.Directory (getCurrentDirectory)
 
 -- | The BuildPlan tracks information about our build progress, and holds all

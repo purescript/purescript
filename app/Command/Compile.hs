@@ -2,8 +2,8 @@ module Command.Compile (command) where
 
 import Prelude
 
-import Control.Applicative
-import Control.Monad
+import Control.Applicative (Alternative(..))
+import Control.Monad (when)
 import Data.Aeson qualified as A
 import Data.Bool (bool)
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
@@ -14,8 +14,8 @@ import Data.Text qualified as T
 import Data.Traversable (for)
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
-import Language.PureScript.Errors.JSON
-import Language.PureScript.Make
+import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
+import Language.PureScript.Make (buildMakeActions, inferForeignModules, runMake)
 import Options.Applicative qualified as Opts
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitSuccess, exitFailure)

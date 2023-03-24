@@ -3,11 +3,11 @@ module Language.PureScript.Ide.SourceFileSpec where
 import Protolude
 
 import Language.PureScript qualified as P
-import Language.PureScript.Ide.Command
-import Language.PureScript.Ide.SourceFile
-import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Command (Command(..))
+import Language.PureScript.Ide.SourceFile (extractSpans, extractTypeAnnotations)
+import Language.PureScript.Ide.Types (Completion(..), IdeNamespace(..), IdeNamespaced(..), Success(..), emptyIdeState)
 import Language.PureScript.Ide.Test
-import Test.Hspec
+import Test.Hspec (Spec, describe, it, shouldBe)
 
 span1, span2 :: P.SourceSpan
 span1 = P.SourceSpan "" (P.SourcePos 1 1) (P.SourcePos 2 2)

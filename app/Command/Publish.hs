@@ -7,8 +7,8 @@ import Data.Aeson qualified as A
 import Data.ByteString.Lazy.Char8 qualified as BL
 import Data.Time.Clock (getCurrentTime)
 import Data.Version (Version(..))
-import Language.PureScript.Publish
-import Language.PureScript.Publish.ErrorsWarnings
+import Language.PureScript.Publish (PublishOptions(..), defaultPublishOptions, unsafePreparePackage, warn)
+import Language.PureScript.Publish.ErrorsWarnings (PackageWarning(..))
 import Options.Applicative (Parser)
 import Options.Applicative qualified as Opts
 

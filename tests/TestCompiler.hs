@@ -36,18 +36,18 @@ import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 
 
-import Control.Monad
+import Control.Monad (forM_, when)
 
-import System.Exit
-import System.FilePath
-import System.IO
+import System.Exit (ExitCode(..))
+import System.FilePath (pathSeparator, replaceExtension, takeFileName, (</>))
+import System.IO (Handle, hPutStr, hPutStrLn)
 import System.IO.UTF8 (readUTF8File)
 
-import Text.Regex.Base
+import Text.Regex.Base (RegexContext(..), RegexMaker(..))
 import Text.Regex.TDFA (Regex)
 
-import TestUtils
-import Test.Hspec
+import TestUtils (ExpectedModuleName(..), SupportModules, compile, createOutputFile, getTestFiles, goldenVsString, modulesDir, trim)
+import Test.Hspec (Expectation, SpecWith, beforeAllWith, describe, expectationFailure, it, runIO)
 
 spec :: SpecWith SupportModules
 spec = do

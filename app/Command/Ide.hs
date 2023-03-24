@@ -20,24 +20,24 @@ module Command.Ide (command) where
 import Protolude
 
 import Data.Aeson qualified as Aeson
-import Control.Concurrent.STM
-import "monad-logger" Control.Monad.Logger
-import Data.IORef
+import Control.Concurrent.STM (newTVarIO)
+import "monad-logger" Control.Monad.Logger (MonadLogger, logDebug, logError, logInfo)
+import Data.IORef (newIORef)
 import Data.Text.IO qualified as T
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as BSL8
 import GHC.IO.Exception (IOErrorType(..), IOException(..))
-import Language.PureScript.Ide
-import Language.PureScript.Ide.Command
-import Language.PureScript.Ide.Util
-import Language.PureScript.Ide.Error
+import Language.PureScript.Ide (handleCommand)
+import Language.PureScript.Ide.Command (Command(..), commandName)
+import Language.PureScript.Ide.Util (decodeT, displayTimeSpec, encodeT, logPerf, runLogger)
+import Language.PureScript.Ide.Error (IdeError(..))
 import Language.PureScript.Ide.State (updateCacheTimestamp)
-import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Types (Ide, IdeConfiguration(..), IdeEnvironment(..), IdeLogLevel(..), emptyIdeState)
 import Network.Socket qualified as Network
 import Options.Applicative qualified as Opts
-import System.Directory
-import System.FilePath
-import System.IO hiding (putStrLn, print)
+import System.Directory (doesDirectoryExist, getCurrentDirectory, setCurrentDirectory)
+import System.FilePath ((</>))
+import System.IO (BufferMode(..), hClose, hFlush, hSetBuffering, hSetEncoding, utf8)
 import System.IO.Error (isEOFError)
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket

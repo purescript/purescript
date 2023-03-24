@@ -3,10 +3,10 @@ module Command.Docs (command, infoModList) where
 
 import Prelude
 
-import Command.Docs.Html
-import Command.Docs.Markdown
-import Control.Applicative
-import Control.Monad.Writer
+import Command.Docs.Html (asHtml, writeHtmlModules)
+import Command.Docs.Markdown (asMarkdown, writeMarkdownModules)
+import Control.Applicative (Alternative(..), optional)
+import Control.Monad.Writer (when)
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Maybe (fromMaybe)
 import Data.Text qualified as T

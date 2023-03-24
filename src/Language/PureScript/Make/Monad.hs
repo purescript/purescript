@@ -27,21 +27,21 @@ import Control.Exception (fromException, tryJust)
 import Control.Monad (join, guard)
 import Control.Monad.Base (MonadBase(..))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.IO.Class
-import Control.Monad.Logger
+import Control.Monad.IO.Class (MonadIO(..))
+import Control.Monad.Logger (Logger, runLogger')
 import Control.Monad.Reader (MonadReader(..), ReaderT(..))
 import Control.Monad.Trans.Control (MonadBaseControl(..))
-import Control.Monad.Trans.Except
+import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Aeson qualified as Aeson
 import Data.ByteString qualified as B
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time.Clock (UTCTime)
-import Language.PureScript.Errors
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), singleError)
 import Language.PureScript.Externs (ExternsFile, externsIsCurrentVersion)
 import Language.PureScript.Make.Cache (ContentHash, hash)
-import Language.PureScript.Options
+import Language.PureScript.Options (Options)
 import System.Directory (createDirectoryIfMissing, getModificationTime)
 import System.Directory qualified as Directory
 import System.FilePath (takeDirectory)

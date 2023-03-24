@@ -11,27 +11,27 @@ import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
-import Data.Functor.Identity
+import Data.Functor.Identity (Identity(..))
 
-import Data.Aeson.TH
+import Data.Aeson.TH (Options(..), SumEncoding(..), defaultOptions, deriveJSON)
 import Data.Map qualified as M
 import Data.Text (Text)
 import Data.List.NonEmpty qualified as NEL
 import GHC.Generics (Generic)
 
-import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Literals
-import Language.PureScript.AST.Operators
-import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.Binders (Binder)
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.AST.Operators (Fixity)
+import Language.PureScript.AST.SourcePos (SourceAnn, SourceSpan)
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
-import Language.PureScript.Types
+import Language.PureScript.Types (SourceConstraint, SourceType)
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Label (Label)
-import Language.PureScript.Names
-import Language.PureScript.Roles
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Comments
-import Language.PureScript.Environment
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName(..), Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), toMaybeModuleName)
+import Language.PureScript.Roles (Role)
+import Language.PureScript.TypeClassDictionaries (NamedDict)
+import Language.PureScript.Comments (Comment)
+import Language.PureScript.Environment (DataDeclType, Environment, FunctionalDependency, NameKind)
 import Language.PureScript.Constants.Prim qualified as C
 
 -- | A map of locally-bound names in scope.

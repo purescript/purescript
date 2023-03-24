@@ -8,7 +8,7 @@ module Language.PureScript.Ide.Types where
 import Protolude hiding (moduleName)
 
 import Control.Concurrent.STM (TVar)
-import Control.Lens hiding (op, (.=))
+import Control.Lens (Getting, Traversal', makeLenses)
 import Control.Monad.Fail (fail)
 import Data.Aeson (ToJSON, FromJSON, (.=))
 import Data.Aeson qualified as Aeson
