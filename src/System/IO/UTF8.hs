@@ -23,6 +23,10 @@ readUTF8FileT :: FilePath -> IO Text
 readUTF8FileT inFile =
   fmap (TE.decodeUtf8 . fixCRLF) (BS.readFile inFile)
 
+readUTF8FileT' :: FilePath -> IO (BS.ByteString, Text)
+readUTF8FileT' inFile =
+  fmap ((,) <*> TE.decodeUtf8 . fixCRLF) (BS.readFile inFile)
+
 writeUTF8FileT :: FilePath -> Text -> IO ()
 writeUTF8FileT inFile text =
   BS.writeFile inFile (TE.encodeUtf8 text)
