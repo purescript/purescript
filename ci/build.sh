@@ -52,7 +52,7 @@ then
   then
     echo "Skipping prerelease because no input affecting the published package was"
     echo "changed since the last prerelease"
-    echo "::set-output name=do-not-prerelease::true"
+    echo "do-not-prerelease=true" >> $GITHUB_OUTPUT
   else
     do_prerelease=true
   fi
@@ -127,11 +127,11 @@ then
       build_version=${build_version#v}
     else # (current version has not been published)
       build_version=$package_version
-      echo "::set-output name=do-not-prerelease::true"
+      echo "do-not-prerelease=true" >> $GITHUB_OUTPUT
     fi
   fi
 
-  echo "::set-output name=version::$build_version"
+  echo "version=$build_version" >> $GITHUB_OUTPUT
 
   popd
 
