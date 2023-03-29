@@ -52,7 +52,7 @@ then
   then
     echo "Skipping prerelease because no input affecting the published package was"
     echo "changed since the last prerelease"
-    echo "::set-output name=do-not-prerelease::true"
+    echo "do-not-prerelease=true" >> $GITHUB_OUTPUT
   else
     do_prerelease=true
   fi
@@ -82,6 +82,16 @@ fi
 
 if [ "$do_prerelease" ]
 then
+  # (some versions of?) macOS have an old FreeBSD sed that requires -i to be followed with an argument
+  if sed --version >/dev/null
+  then
+    # Probably GNU sed
+    sedi=(sed -i)
+  else
+    # Probably FreeBSD sed
+    sedi=(sed -i '')
+  fi
+
   function largest-matching-git-tag {
     grep -E "^${1//./\\.}(\\.|$)" "$git_tags" | head -n 1
   }
@@ -127,11 +137,11 @@ then
       build_version=${build_version#v}
     else # (current version has not been published)
       build_version=$package_version
-      echo "::set-output name=do-not-prerelease::true"
+      echo "do-not-prerelease=true" >> $GITHUB_OUTPUT
     fi
   fi
 
-  echo "::set-output name=version::$build_version"
+  echo "version=$build_version" >> $GITHUB_OUTPUT
 
   popd
 
@@ -142,8 +152,8 @@ then
     # We don't need to update the install-purescript command before we build;
     # we'll do that when we publish. All we need to update here are the files
     # that affect the purs binary.
-    sed -i -e "s/^\\(version:\\s*\\)${package_release_version//./\\.}/\1$build_release_version/" purescript.cabal
-    sed -i -e "s/^prerelease = \"${package_prerelease_suffix//./\\.}\"$/prerelease = \"${build_prerelease_suffix}\"/" app/Version.hs
+    "${sedi[@]}" -e "s/^\\(version:[[:blank:]]*\\)${package_release_version//./\\.}/\1$build_release_version/" purescript.cabal
+    "${sedi[@]}" -e "s/^prerelease = \"${package_prerelease_suffix//./\\.}\"$/prerelease = \"${build_prerelease_suffix}\"/" app/Version.hs
   fi
 fi
 
@@ -165,6 +175,15 @@ pushd sdist-test
 # Haddock -Werror goes here to keep us honest but prevent failing on
 # documentation errors in dependencies
 $STACK build $STACK_OPTS --haddock-arguments --optghc=-Werror
+
+if [ "$do_prerelease" ]
+then
+  if [ "$($STACK exec -- purs --version)" != "$build_version" ]
+  then
+    echo "purs --version doesn't equal the expected value"
+    exit 1
+  fi
+fi
 popd
 
 (echo "::endgroup::") 2>/dev/null
