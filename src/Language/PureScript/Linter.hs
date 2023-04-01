@@ -183,6 +183,8 @@ lintUnused (Module modSS _ mn modDecls exports) =
         in
           (vars, errs')
 
+    goDecl (ValueFixityDeclaration _ _ (Qualified _ (Left v)) _) = (S.singleton v, mempty)
+
     goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
     goDecl _ = mempty
 
