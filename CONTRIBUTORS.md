@@ -113,6 +113,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@noraesae](https://github.com/noraesae) | Hyunje Jun | [MIT license] |
 | [@nullobject](https://github.com/nullobject) | Josh Bassett | [MIT license] |
 | [@osa1](https://github.com/osa1) | Ömer Sinan Ağacan | [MIT license] |
+| [@ozkutuk](https://github.com/ozkutuk) | Berk Özkütük | [MIT license] |
 | [@paf31](https://github.com/paf31) | Phil Freeman | [MIT license] |
 | [@parsonsmatt](https://github.com/parsonsmatt) | Matt Parsons | [MIT license] |
 | [@passy](https://github.com/passy) | Pascal Hartig | [MIT license] |
