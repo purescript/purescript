@@ -30,7 +30,7 @@ import Language.PureScript.Sugar as P
 import Language.PureScript.TypeChecker as P
 import Language.PureScript.Types as P
 
-import qualified Paths_purescript as Paths
+import Paths_purescript qualified as Paths
 
 version :: Version
 version = Paths.version

@@ -6,26 +6,26 @@ module Language.PureScript.Ide.Rebuild
   , rebuildFile
   ) where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
-import           "monad-logger" Control.Monad.Logger
-import qualified Data.List                       as List
-import qualified Data.Map.Lazy                   as M
-import           Data.Maybe                      (fromJust)
-import qualified Data.Set                        as S
-import qualified Data.Time                       as Time
-import qualified Data.Text                       as Text
-import qualified Language.PureScript             as P
-import           Language.PureScript.Make (ffiCodegen')
-import           Language.PureScript.Make.Cache (CacheInfo(..), normaliseForCache)
-import qualified Language.PureScript.CST         as CST
+import "monad-logger" Control.Monad.Logger (LoggingT, MonadLogger, logDebug)
+import Data.List qualified as List
+import Data.Map.Lazy qualified as M
+import Data.Maybe (fromJust)
+import Data.Set qualified as S
+import Data.Time qualified as Time
+import Data.Text qualified as Text
+import Language.PureScript qualified as P
+import Language.PureScript.Make (ffiCodegen')
+import Language.PureScript.Make.Cache (CacheInfo(..), normaliseForCache)
+import Language.PureScript.CST qualified as CST
 
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Logging
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           System.Directory (getCurrentDirectory)
+import Language.PureScript.Ide.Error (IdeError(..))
+import Language.PureScript.Ide.Logging (labelTimespec, logPerf, runLogger)
+import Language.PureScript.Ide.State (cacheRebuild, getExternFiles, insertExterns, insertModule, populateVolatileState, updateCacheTimestamp)
+import Language.PureScript.Ide.Types (Ide, IdeConfiguration(..), IdeEnvironment(..), ModuleMap, Success(..))
+import Language.PureScript.Ide.Util (ideReadFile)
+import System.Directory (getCurrentDirectory)
 
 -- | Given a filepath performs the following steps:
 --

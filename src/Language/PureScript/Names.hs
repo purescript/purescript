@@ -9,16 +9,16 @@ import Prelude
 
 import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.DeepSeq (NFData)
 import Data.Functor.Contravariant (contramap)
-import qualified Data.Vector as V
+import Data.Vector qualified as V
 
 import GHC.Generics (Generic)
-import Data.Aeson
-import Data.Aeson.TH
+import Data.Aeson (FromJSON(..), FromJSONKey(..), Options(..), SumEncoding(..), ToJSON(..), ToJSONKey(..), defaultOptions, parseJSON2, toJSON2, withArray)
+import Data.Aeson.TH (deriveJSON)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.AST.SourcePos (SourcePos, pattern SourcePos)
 

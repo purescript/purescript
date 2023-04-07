@@ -4,16 +4,16 @@
 module Language.PureScript.Sugar (desugar, module S) where
 
 import Control.Category ((>>>))
-import Control.Monad
+import Control.Monad ((>=>))
 import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Writer.Class (MonadWriter)
 
-import Language.PureScript.AST
-import Language.PureScript.Errors
-import Language.PureScript.Externs
-import Language.PureScript.Linter.Imports
+import Language.PureScript.AST (Module)
+import Language.PureScript.Errors (MultipleErrors)
+import Language.PureScript.Externs (ExternsFile)
+import Language.PureScript.Linter.Imports (UsedImports)
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.DoNotation as S

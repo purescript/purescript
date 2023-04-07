@@ -2,16 +2,16 @@ module Language.PureScript.Sugar.Operators.Expr where
 
 import Prelude
 
-import Control.Monad.Except
-import Data.Functor.Identity
+import Control.Monad.Except (MonadError)
+import Data.Functor.Identity (Identity)
 
-import qualified Text.Parsec as P
-import qualified Text.Parsec.Expr as P
+import Text.Parsec qualified as P
+import Text.Parsec.Expr qualified as P
 
-import Language.PureScript.AST
-import Language.PureScript.Names
-import Language.PureScript.Sugar.Operators.Common
-import Language.PureScript.Errors
+import Language.PureScript.AST (Associativity, Expr(..), SourceSpan)
+import Language.PureScript.Names (OpName(..), OpNameType(..), Qualified(..))
+import Language.PureScript.Sugar.Operators.Common (Chain, matchOperators, token)
+import Language.PureScript.Errors (MultipleErrors)
 
 matchExprOperators
   :: MonadError MultipleErrors m

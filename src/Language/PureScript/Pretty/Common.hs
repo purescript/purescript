@@ -9,13 +9,13 @@ import Control.Monad.State (StateT, modify, get)
 
 import Data.List (elemIndices, intersperse)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..), nullSourceSpan)
 import Language.PureScript.CST.Lexer (isUnquotedKey)
 
-import Text.PrettyPrint.Boxes hiding ((<>))
-import qualified Text.PrettyPrint.Boxes as Box
+import Text.PrettyPrint.Boxes (Box(..), emptyBox, text, top, vcat, (//))
+import Text.PrettyPrint.Boxes qualified as Box
 
 parensT :: Text -> Text
 parensT s = "(" <> s <> ")"
@@ -61,9 +61,7 @@ instance Monoid StrPos where
       plus (a, c) (StrPos (a', _, c')) = (a `addPos` a', (bumpPos a <$> c') : c)
 
 instance Emit StrPos where
-  -- |
   -- Augment a string with its length (rows/column)
-  --
   emit str =
     -- TODO(Christoph): get rid of T.unpack
     let newlines = elemIndices '\n' (T.unpack str)
@@ -71,9 +69,7 @@ instance Emit StrPos where
     in
     StrPos (SourcePos { sourcePosLine = length newlines, sourcePosColumn = T.length str - index }, str, [])
 
-  -- |
   -- Add a new mapping entry for given source position with initially zero generated position
-  --
   addMapping ss@SourceSpan { spanName = file, spanStart = startPos } = StrPos (zeroPos, mempty, [ mapping | ss /= nullSourceSpan ])
     where
       mapping = SMap (T.pack file) startPos zeroPos

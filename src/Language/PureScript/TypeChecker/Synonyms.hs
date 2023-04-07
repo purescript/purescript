@@ -10,18 +10,18 @@ module Language.PureScript.TypeChecker.Synonyms
   , replaceAllTypeSynonymsM
   ) where
 
-import           Prelude
+import Prelude
 
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.State
-import           Data.Maybe (fromMaybe)
-import qualified Data.Map as M
-import           Data.Text (Text)
-import           Language.PureScript.Environment
-import           Language.PureScript.Errors
-import           Language.PureScript.Names
-import           Language.PureScript.TypeChecker.Monad
-import           Language.PureScript.Types
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State (MonadState)
+import Data.Maybe (fromMaybe)
+import Data.Map qualified as M
+import Data.Text (Text)
+import Language.PureScript.Environment (Environment(..), TypeKind)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), SourceSpan, errorMessage')
+import Language.PureScript.Names (ProperName, ProperNameType(..), Qualified)
+import Language.PureScript.TypeChecker.Monad (CheckState, getEnv)
+import Language.PureScript.Types (SourceType, Type(..), completeBinderList, everywhereOnTypesTopDownM, getAnnForType, replaceAllTypeVars)
 
 -- | Type synonym information (arguments with kinds, aliased type), indexed by name
 type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceType)], SourceType)

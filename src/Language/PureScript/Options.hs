@@ -2,9 +2,9 @@
 module Language.PureScript.Options where
 
 import Prelude
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 
 -- | The data type of compiler options
 data Options = Options

@@ -2,13 +2,13 @@ module System.IO.UTF8 where
 
 import Prelude
 
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as BSL
-import qualified Data.ByteString.Search as BSS
-import qualified Data.ByteString.UTF8 as UTF8
-import           Data.Text (Text)
-import qualified Data.Text.Encoding as TE
-import           Protolude (ordNub)
+import Data.ByteString qualified as BS
+import Data.ByteString.Lazy qualified as BSL
+import Data.ByteString.Search qualified as BSS
+import Data.ByteString.UTF8 qualified as UTF8
+import Data.Text (Text)
+import Data.Text.Encoding qualified as TE
+import Protolude (ordNub)
 
 -- | Unfortunately ByteString's readFile does not convert line endings on
 -- Windows, so we have to do it ourselves

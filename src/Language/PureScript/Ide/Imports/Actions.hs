@@ -11,23 +11,23 @@ module Language.PureScript.Ide.Imports.Actions
        )
 where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
-import           Control.Lens                       ((^.), has)
-import           Data.List                          (nubBy)
-import qualified Data.Map                           as Map
-import qualified Data.Text                          as T
-import qualified Language.PureScript                as P
-import qualified Language.PureScript.Constants.Prim as C
-import           Language.PureScript.Ide.Completion
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Filter
-import           Language.PureScript.Ide.Imports
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Prim
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           System.IO.UTF8                     (writeUTF8FileT)
+import Control.Lens ((^.), has)
+import Data.List (nubBy)
+import Data.Map qualified as Map
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Ide.Completion (getExactMatches)
+import Language.PureScript.Ide.Error (IdeError(..))
+import Language.PureScript.Ide.Filter (Filter)
+import Language.PureScript.Ide.Imports (Import(..), parseImportsFromFile', prettyPrintImportSection)
+import Language.PureScript.Ide.State (getAllModules)
+import Language.PureScript.Ide.Prim (idePrimDeclarations)
+import Language.PureScript.Ide.Types (Ide, IdeDeclaration(..), IdeType(..), Match(..), Success(..), _IdeDeclModule, ideDtorName, ideDtorTypeName, ideTCName, ideTypeName, ideTypeOpName, ideValueOpName)
+import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration)
+import System.IO.UTF8 (writeUTF8FileT)
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
 addImplicitImport
@@ -118,7 +118,7 @@ addExplicitImport' decl moduleName qualifier imports =
     refFromDeclaration d =
       P.ValueRef ideSpan (P.Ident (identifierFromIdeDeclaration d))
 
-    -- | Adds a declaration to an import:
+    -- Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
     insertDeclIntoImport :: IdeDeclaration -> Import -> Import
     insertDeclIntoImport decl' (Import mn (P.Explicit refs) qual) =

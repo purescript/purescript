@@ -13,38 +13,38 @@ import Control.Applicative (liftA2)
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class (MonadSupply, freshName)
 import Control.Monad.Writer (MonadWriter, runWriterT, writer)
 
 import Data.Bifunctor (first)
 import Data.List ((\\), intersect)
-import qualified Data.List.NonEmpty as NEL (nonEmpty)
-import qualified Data.Foldable as F
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.List.NonEmpty qualified as NEL (nonEmpty)
+import Data.Foldable qualified as F
+import Data.Map qualified as M
+import Data.Set qualified as S
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.Monoid (Any(..))
 import Data.String (fromString)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
-import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.SourcePos (SourceSpan, displayStartEndPos)
 import Language.PureScript.CodeGen.JS.Common as Common
 import Language.PureScript.CoreImp.AST (AST, InitializerEffects(..), everywhere, everywhereTopDownM, withSourceSpan)
-import qualified Language.PureScript.CoreImp.AST as AST
-import qualified Language.PureScript.CoreImp.Module as AST
-import Language.PureScript.CoreImp.Optimizer
-import Language.PureScript.CoreFn
+import Language.PureScript.CoreImp.AST qualified as AST
+import Language.PureScript.CoreImp.Module qualified as AST
+import Language.PureScript.CoreImp.Optimizer (optimize)
+import Language.PureScript.CoreFn (Ann, Bind(..), Binder(..), CaseAlternative(..), ConstructorType(..), Expr(..), Guard, Literal(..), Meta(..), Module(..), extractAnn, extractBinderAnn, modifyAnn, removeComments)
 import Language.PureScript.CoreFn.Laziness (applyLazinessTransform)
-import Language.PureScript.Crash
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
                                    MultipleErrors(..), rethrow, errorMessage,
                                    errorMessage', rethrowWithPosition, addHint)
-import Language.PureScript.Names
-import Language.PureScript.Options
+import Language.PureScript.Names (Ident(..), ModuleName, ProperName(..), Qualified(..), QualifiedBy(..), runIdent, runModuleName, showIdent, showQualified)
+import Language.PureScript.Options (CodegenTarget(..), Options(..))
 import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.Traversals (sndM)
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Prim qualified as C
 
 import System.FilePath.Posix ((</>))
 
@@ -83,7 +83,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     return $ AST.Module header (foreign' ++ jsImports) renamedModuleBody jsExports
 
   where
-  -- | Adds purity annotations to top-level values for bundlers.
+  -- Adds purity annotations to top-level values for bundlers.
   -- The semantics here derive from treating top-level module evaluation as pure, which lets
   -- us remove any unreferenced top-level declarations. To achieve this, we wrap any non-trivial
   -- top-level values in an IIFE marked with a pure annotation.
@@ -92,14 +92,14 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     where
     annotateOrWrap = liftA2 fromMaybe pureIife maybePure
 
-    -- | If the JS is potentially effectful (in the eyes of a bundler that
+    -- If the JS is potentially effectful (in the eyes of a bundler that
     -- doesn't know about PureScript), return Nothing. Otherwise, return Just
     -- the JS with any needed pure annotations added, and, in the case of a
     -- variable declaration, an IIFE to be annotated.
     maybePure :: AST -> Maybe AST
     maybePure = maybePureGen False
 
-    -- | Like maybePure, but doesn't add a pure annotation to App. This exists
+    -- Like maybePure, but doesn't add a pure annotation to App. This exists
     -- to prevent from doubling up on annotation comments on curried
     -- applications; from experimentation, it turns out that a comment on the
     -- outermost App is sufficient for the entire curried chain to be
@@ -131,12 +131,12 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
     pureApp :: Maybe SourceSpan -> AST -> [AST] -> AST
     pureApp ss f = AST.Comment AST.PureAnnotation . AST.App ss f
 
-  -- | Extracts all declaration names from a binding group.
+  -- Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]
   getNames (NonRec _ ident _) = [ident]
   getNames (Rec vals) = map (snd . fst) vals
 
-  -- | Creates alternative names for each module to ensure they don't collide
+  -- Creates alternative names for each module to ensure they don't collide
   -- with declaration names.
   renameImports :: [Ident] -> [ModuleName] -> M.Map ModuleName Text
   renameImports = go M.empty
@@ -157,19 +157,19 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
          then freshModuleName (i + 1) mn' used
          else newName
 
-  -- | Generates JavaScript code for a module import, binding the required module
+  -- Generates JavaScript code for a module import, binding the required module
   -- to the alternative
   importToJs :: M.Map ModuleName Text -> ModuleName -> AST.Import
   importToJs mnLookup mn' =
     let mnSafe = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
     in AST.Import mnSafe (moduleImportPath mn')
 
-  -- | Generates JavaScript code for exporting at least one identifier,
+  -- Generates JavaScript code for exporting at least one identifier,
   -- eventually from another module.
   exportsToJs :: Maybe PSString -> [Ident] -> Maybe AST.Export
   exportsToJs from = fmap (flip AST.Export from) . NEL.nonEmpty . fmap runIdent
 
-  -- | Generates JavaScript code for re-exporting at least one identifier from
+  -- Generates JavaScript code for re-exporting at least one identifier from
   -- from another module.
   reExportsToJs :: (ModuleName, [Ident]) -> Maybe AST.Export
   reExportsToJs = uncurry exportsToJs . first (Just . moduleImportPath)
@@ -177,7 +177,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   moduleImportPath :: ModuleName -> PSString
   moduleImportPath mn' = fromString (".." </> T.unpack (runModuleName mn') </> "index.js")
 
-  -- | Replaces the `ModuleAccessor`s in the AST with `Indexer`s, ensuring that
+  -- Replaces the `ModuleAccessor`s in the AST with `Indexer`s, ensuring that
   -- the generated code refers to the collision-avoiding renamed module
   -- imports. Also returns set of used module names.
   replaceModuleAccessors :: M.Map ModuleName Text -> AST -> (S.Set ModuleName, AST)
@@ -238,9 +238,7 @@ moduleBindToJs
   -> m [AST]
 moduleBindToJs mn = bindToJs
   where
-  -- |
   -- Generate code in the simplified JavaScript intermediate representation for a declaration
-  --
   bindToJs :: Bind Ann -> m [AST]
   bindToJs (NonRec (_, _, _, Just IsTypeClassConstructor) _ _) = pure []
     -- Unlike other newtype constructors, type class constructors are only
@@ -249,7 +247,7 @@ moduleBindToJs mn = bindToJs
   bindToJs (NonRec ann ident val) = return <$> nonRecToJS ann ident val
   bindToJs (Rec vals) = writer (applyLazinessTransform mn vals) >>= traverse (uncurry . uncurry $ nonRecToJS)
 
-  -- | Generate code in the simplified JavaScript intermediate representation for a single non-recursive
+  -- Generate code in the simplified JavaScript intermediate representation for a single non-recursive
   -- declaration.
   --
   -- The main purpose of this function is to handle code generation for comments.
@@ -276,12 +274,12 @@ moduleBindToJs mn = bindToJs
       then withSourceSpan ss js
       else js
 
-  -- | Generate code in the simplified JavaScript intermediate representation for a variable based on a
+  -- Generate code in the simplified JavaScript intermediate representation for a variable based on a
   -- PureScript identifier.
   var :: Ident -> AST
   var = AST.Var Nothing . identToJs
 
-  -- | Generate code in the simplified JavaScript intermediate representation for a value or expression.
+  -- Generate code in the simplified JavaScript intermediate representation for a value or expression.
   valueToJs :: Expr Ann -> m AST
   valueToJs e =
     let (ss, _, _, _) = extractAnn e in
@@ -364,7 +362,7 @@ moduleBindToJs mn = bindToJs
   literalToValueJS ss (ArrayLiteral xs) = AST.ArrayLiteral (Just ss) <$> mapM valueToJs xs
   literalToValueJS ss (ObjectLiteral ps) = AST.ObjectLiteral (Just ss) <$> mapM (sndM valueToJs) ps
 
-  -- | Shallow copy an object.
+  -- Shallow copy an object.
   extendObj :: AST -> [(PSString, AST)] -> m AST
   extendObj obj sts = do
     newObj <- freshName
@@ -384,13 +382,13 @@ moduleBindToJs mn = bindToJs
       extend = map stToAssign sts
     return $ AST.App Nothing (AST.Function Nothing Nothing [] block) []
 
-  -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
+  -- Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable.
   varToJs :: Qualified Ident -> AST
   varToJs (Qualified (BySourcePos _) ident) = var ident
   varToJs qual = qualifiedToJS id qual
 
-  -- | Generate code in the simplified JavaScript intermediate representation for a reference to a
+  -- Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable that may have a qualified name.
   qualifiedToJS :: (a -> Ident) -> Qualified a -> AST
   qualifiedToJS f (Qualified (ByModuleName C.M_Prim) a) = AST.Var Nothing . runIdent $ f a
@@ -400,7 +398,7 @@ moduleBindToJs mn = bindToJs
   foreignIdent :: Ident -> AST
   foreignIdent ident = accessorString (mkString $ runIdent ident) (AST.Var Nothing FFINamespace)
 
-  -- | Generate code in the simplified JavaScript intermediate representation for pattern match binders
+  -- Generate code in the simplified JavaScript intermediate representation for pattern match binders
   -- and guards.
   bindersToJs :: SourceSpan -> [CaseAlternative Ann] -> [AST] -> m AST
   bindersToJs ss binders vals = do
@@ -447,7 +445,7 @@ moduleBindToJs mn = bindToJs
     let (ss, _, _, _) = extractBinderAnn binder in
     traverse (withPos ss) =<< binderToJs' s done binder
 
-  -- | Generate code in the simplified JavaScript intermediate representation for a pattern match
+  -- Generate code in the simplified JavaScript intermediate representation for a pattern match
   -- binder.
   binderToJs' :: Text -> [AST] -> Binder Ann -> m [AST]
   binderToJs' _ done NullBinder{} = return done

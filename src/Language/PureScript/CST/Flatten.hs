@@ -4,7 +4,7 @@ import Prelude
 
 import Data.DList (DList)
 import Language.PureScript.CST.Types
-import Language.PureScript.CST.Positions
+import Language.PureScript.CST.Positions (advanceLeading, moduleRange, srcRange)
 
 flattenModule :: Module a -> DList SourceToken
 flattenModule m@(Module _ a b c d e f g) =

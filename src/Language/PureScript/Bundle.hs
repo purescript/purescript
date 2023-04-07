@@ -18,18 +18,18 @@ module Language.PureScript.Bundle
 
 import Prelude
 
-import Control.Monad.Error.Class
+import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Aeson ((.=))
 import Data.Char (chr, digitToInt)
 import Data.Foldable (fold)
 import Data.Maybe (mapMaybe, maybeToList)
-import qualified Data.Aeson as A
-import qualified Data.Text.Lazy as LT
+import Data.Aeson qualified as A
+import Data.Text.Lazy qualified as LT
 
-import Language.JavaScript.Parser
-import Language.JavaScript.Parser.AST
-import Language.JavaScript.Process.Minify
+import Language.JavaScript.Parser (JSAST(..), JSAnnot(..), JSAssignOp(..), JSExpression(..), JSStatement(..), renderToText)
+import Language.JavaScript.Parser.AST (JSCommaList(..), JSCommaTrailingList(..), JSExportClause(..), JSExportDeclaration(..), JSExportSpecifier(..), JSFromClause(..), JSIdent(..), JSImportDeclaration(..), JSModuleItem(..), JSObjectProperty(..), JSObjectPropertyList, JSPropertyName(..), JSVarInitializer(..))
+import Language.JavaScript.Process.Minify (minifyJS)
 
 -- | The type of error messages. We separate generation and rendering of errors using a data
 -- type, in case we need to match on error types later.

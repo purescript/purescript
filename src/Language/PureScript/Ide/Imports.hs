@@ -24,16 +24,16 @@ module Language.PureScript.Ide.Imports
        )
        where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
-import           Control.Lens                       ((^.), (%~), ix)
-import           Data.List                          (partition)
-import qualified Data.List.NonEmpty                 as NE
-import qualified Data.Text                          as T
-import qualified Language.PureScript                as P
-import qualified Language.PureScript.CST            as CST
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Util
+import Control.Lens ((^.), (%~), ix)
+import Data.List (partition)
+import Data.List.NonEmpty qualified as NE
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Ide.Error (IdeError(..))
+import Language.PureScript.Ide.Util (ideReadFile)
 
 data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)
               deriving (Eq, Show)

@@ -9,21 +9,21 @@ import Prelude
 import Control.Arrow ((<+>))
 import Control.Monad (forM, mzero)
 import Control.Monad.State (StateT, evalStateT)
-import Control.PatternArrows
-import qualified Control.Arrow as A
+import Control.PatternArrows (Operator(..), OperatorTable(..), Pattern(..), buildPrettyPrinter, mkPattern, mkPattern')
+import Control.Arrow qualified as A
 
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.List.NonEmpty as NEL (toList)
+import Data.Text qualified as T
+import Data.List.NonEmpty qualified as NEL (toList)
 
 import Language.PureScript.AST (SourceSpan(..))
-import Language.PureScript.CodeGen.JS.Common
-import Language.PureScript.CoreImp.AST
-import Language.PureScript.CoreImp.Module
-import Language.PureScript.Comments
-import Language.PureScript.Crash
-import Language.PureScript.Pretty.Common
+import Language.PureScript.CodeGen.JS.Common (identCharToText, isValidJsIdentifier, nameIsJsBuiltIn, nameIsJsReserved)
+import Language.PureScript.CoreImp.AST (AST(..), BinaryOperator(..), CIComments(..), UnaryOperator(..), getSourceSpan)
+import Language.PureScript.CoreImp.Module (Export(..), Import(..), Module(..))
+import Language.PureScript.Comments (Comment(..))
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Pretty.Common (Emit(..), PrinterState(..), SMap, StrPos(..), addMapping', currentIndent, intercalate, parensPos, runPlainString, withIndent)
 import Language.PureScript.PSString (PSString, decodeString, prettyPrintStringJS)
 
 -- TODO (Christoph): Get rid of T.unpack / pack

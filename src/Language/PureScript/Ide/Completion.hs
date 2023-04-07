@@ -9,18 +9,18 @@ module Language.PureScript.Ide.Completion
        , applyCompletionOptions
        ) where
 
-import           Protolude hiding ((<&>), moduleName)
+import Protolude hiding ((<&>), moduleName)
 
-import           Control.Lens hiding (op, (&))
-import           Data.Aeson
-import qualified Data.Map as Map
-import qualified Data.Text as T
-import qualified Language.PureScript as P
-import           Language.PureScript.Ide.Error (prettyPrintTypeSingleLine)
-import           Language.PureScript.Ide.Filter
-import           Language.PureScript.Ide.Matcher
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
+import Control.Lens ((.~), (<&>), (^.))
+import Data.Aeson (FromJSON(..), withObject, (.!=), (.:?))
+import Data.Map qualified as Map
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.Ide.Error (prettyPrintTypeSingleLine)
+import Language.PureScript.Ide.Filter (Filter, applyFilters, exactFilter)
+import Language.PureScript.Ide.Matcher (Matcher, runMatcher)
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util (identT, identifierFromIdeDeclaration, namespaceForDeclaration, properNameT, typeOperatorAliasT, valueOperatorAliasT)
 
 -- | Applies the CompletionFilters and the Matcher to the given Modules
 --   and sorts the found Completions according to the Matching Score

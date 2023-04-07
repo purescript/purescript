@@ -5,21 +5,21 @@ module Language.PureScript.Linter (lint, module L) where
 
 import Prelude
 
-import Control.Monad.Writer.Class
+import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Maybe (mapMaybe)
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 import Control.Monad ((<=<))
 
 import Language.PureScript.AST
-import Language.PureScript.Errors
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage')
 import Language.PureScript.Linter.Exhaustive as L
 import Language.PureScript.Linter.Imports as L
-import Language.PureScript.Names
-import Language.PureScript.Types
-import qualified Language.PureScript.Constants.Libs as C
+import Language.PureScript.Names (Ident(..), Qualified(..), QualifiedBy(..), getIdentName, runIdent)
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), everythingWithContextOnTypes)
+import Language.PureScript.Constants.Libs qualified as C
 
 -- | Lint the PureScript AST.
 -- |
@@ -182,6 +182,8 @@ lintUnused (Module modSS _ mn modDecls exports) =
             errs' = addHint (ErrorInValueDeclaration $ valdeclIdent vd) errs
         in
           (vars, errs')
+
+    goDecl (ValueFixityDeclaration _ _ (Qualified _ (Left v)) _) = (S.singleton v, mempty)
 
     goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
     goDecl _ = mempty

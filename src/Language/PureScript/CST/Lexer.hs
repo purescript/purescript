@@ -10,20 +10,20 @@ module Language.PureScript.CST.Lexer
 import Prelude hiding (lex, exp, exponent, lines)
 
 import Control.Monad (join)
-import qualified Data.Char as Char
-import qualified Data.DList as DList
+import Data.Char qualified as Char
+import Data.DList qualified as DList
 import Data.Foldable (foldl')
 import Data.Functor (($>))
-import qualified Data.Scientific as Sci
+import Data.Scientific qualified as Sci
 import Data.String (fromString)
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.PureScript as Text
-import Language.PureScript.CST.Errors
-import Language.PureScript.CST.Monad hiding (token)
-import Language.PureScript.CST.Layout
-import Language.PureScript.CST.Positions
-import Language.PureScript.CST.Types
+import Data.Text qualified as Text
+import Data.Text.PureScript qualified as Text
+import Language.PureScript.CST.Errors (ParserErrorInfo(..), ParserErrorType(..))
+import Language.PureScript.CST.Monad (LexResult, LexState(..), ParserM(..), throw)
+import Language.PureScript.CST.Layout (LayoutDelim(..), insertLayout, lytToken, unwindLayout)
+import Language.PureScript.CST.Positions (advanceLeading, advanceToken, advanceTrailing, applyDelta, textDelta)
+import Language.PureScript.CST.Types (Comment(..), LineFeed(..), SourcePos(..), SourceRange(..), SourceStyle(..), SourceToken(..), Token(..), TokenAnn(..))
 
 -- | Stops at the first lexing error and replaces it with TokEof. Otherwise,
 -- the parser will fail when it attempts to draw a lookahead token.

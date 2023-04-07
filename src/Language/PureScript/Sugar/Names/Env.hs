@@ -20,7 +20,7 @@ module Language.PureScript.Sugar.Names.Env
 
 import Prelude
 
-import Control.Monad
+import Control.Monad (forM_, when)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
 
@@ -29,15 +29,15 @@ import Data.Foldable (find)
 import Data.List (groupBy, sortOn, delete)
 import Data.Maybe (mapMaybe)
 import Safe (headMay)
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 
-import qualified Language.PureScript.Constants.Prim as C
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.AST (ExportSource(..), SourceSpan, internalModuleSourceSpan, nullSourceSpan)
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage')
+import Language.PureScript.Names (Ident, ModuleName, Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, disqualify, getQual)
 
 -- |
 -- The details for an import: the name of the thing that is being imported

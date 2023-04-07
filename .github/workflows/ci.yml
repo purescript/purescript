@@ -13,7 +13,7 @@ defaults:
     shell: "bash"
 
 env:
-  CI_PRERELEASE: "${{ github.event_name == 'push' }}"
+  CI_PRERELEASE: "${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}"
   CI_RELEASE: "${{ github.event_name == 'release' }}"
   STACK_VERSION: "2.9.3"
 
@@ -37,10 +37,12 @@ jobs:
       matrix:
         include:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
-            os: "ubuntu-latest"
+            os: ["ubuntu-latest"]
             image: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
-          - os: "macOS-11"
-          - os: "windows-2019"
+          - os: ["macOS-11"]
+          - os: ["windows-2019"]
+          - os: ["self-hosted", "macos", "ARM64"]
+          - os: ["self-hosted", "Linux", "ARM64"]
 
     runs-on: "${{ matrix.os }}"
     container: "${{ matrix.image }}"
@@ -53,20 +55,22 @@ jobs:
       - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
         # if the Git version is less than 2.18.
         name: "(Linux only) Install a newer version of Git"
-        if: "${{ runner.os == 'Linux' }}"
+        if: "contains(matrix.os, 'ubuntu-latest')"
         run: |
           . /etc/os-release
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
-
       - uses: "actions/setup-node@v2"
         with:
-          node-version: "14"
+          node-version: "16"
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
-        if: "${{ runner.os != 'Linux' }}"
+        # Note: here we exclude the self-hosted runners because this action does not work on ARM
+        # and their Haskell environment is instead provided by a nix-shell
+        # See https://github.com/purescript/purescript/pulls/4455
+        if: "!contains(matrix.os, 'ubuntu-latest') && !contains(matrix.os, 'self-hosted')"
         uses: "haskell/actions/setup@v1"
         with:
           enable-stack: true
@@ -74,7 +78,7 @@ jobs:
           stack-no-global: true
 
       - name: "(Linux only) Check Stack version and fix working directory ownership"
-        if: "${{ runner.os == 'Linux' }}"
+        if: "contains(matrix.os, 'ubuntu-latest')"
         run: |
           [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
           chown root:root .
@@ -99,7 +103,7 @@ jobs:
         run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Build the entire package set"
-        if: "${{ runner.os == 'Linux' }}"
+        if: "contains(matrix.os, 'ubuntu-latest')"
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual package-set building happens in a
         # temporary directory.
@@ -116,7 +120,7 @@ jobs:
           ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
 
       - name: Verify that 'libtinfo' isn't in binary
-        if: runner.os == 'Linux'
+        if: "runner.os == 'Linux'"
         working-directory: "sdist-test"
         run: |
           if [ $(ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
@@ -125,15 +129,37 @@ jobs:
             exit 1
           fi
 
+      - name: "(Self-hosted Linux ARM64 only) Patch the binary to work on non-Nix systems"
+        if: "runner.os == 'Linux' && runner.arch == 'ARM64'"
+        working-directory: "sdist-test"
+        # The self-hosted build happens inside a nix-shell that provides a working stack binary
+        # on ARM systems, and while the macOS binary is fine - because macOS binaries are almost
+        # statically linked), the linux ones are all pointing at the nix store.
+        # So here we first point the binary to the right linker that should work on a generic linux,
+        # and then fix the RUNPATH with the right location to load the shared libraries from
+        run: |
+          patchelf --set-interpreter /usr/lib/ld-linux-aarch64.so.1 --set-rpath /usr/lib/aarch64-linux-gnu $(stack path --local-doc-root)/../bin/purs
+
       - name: "(Release/prerelease only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' || env.CI_PRERELEASE == 'true' && steps.build.outputs.do-not-prerelease != 'true' }}"
         run: |
           os_name="${{ runner.os }}"
+          os_arch="${{ runner.arch }}"
           case "$os_name" in
             Linux)
-              bundle_os=linux64;;
+              case "$os_arch" in
+                ARM64)
+                  bundle_os=linux-arm64;;
+                *)
+                  bundle_os=linux64;;
+              esac;;
             macOS)
-              bundle_os=macos;;
+              case "$os_arch" in
+                ARM64)
+                  bundle_os=macos-arm64;;
+                *)
+                  bundle_os=macos;;
+              esac;;
             Windows)
               bundle_os=win64;;
             *)
@@ -147,7 +173,7 @@ jobs:
         if: "${{ env.CI_PRERELEASE == 'true' && steps.build.outputs.do-not-prerelease != 'true' }}"
         uses: "actions/upload-artifact@v3"
         with:
-          name: "${{ runner.os }}-bundle"
+          name: "${{ runner.os }}-${{ runner.arch }}-bundle"
           path: |
             sdist-test/bundle/*.sha
             sdist-test/bundle/*.tar.gz

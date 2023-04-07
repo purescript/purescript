@@ -9,9 +9,9 @@ import Data.Foldable (for_)
 import Data.List (group, sort, (\\))
 import Data.Maybe (mapMaybe)
 
-import Language.PureScript.AST
-import Language.PureScript.Errors
-import Language.PureScript.Names
+import Language.PureScript.AST (DeclarationRef(..), SourceSpan)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage, errorMessage, warnWithPosition)
+import Language.PureScript.Names (Name(..))
 
 -- |
 -- Warns about duplicate values in a list of declaration refs.

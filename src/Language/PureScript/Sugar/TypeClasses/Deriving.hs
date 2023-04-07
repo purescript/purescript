@@ -1,22 +1,22 @@
 -- | This module implements the generic deriving elaboration that takes place during desugaring.
 module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 
-import           Prelude
-import           Protolude (note)
+import Prelude
+import Protolude (note)
 
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Supply.Class (MonadSupply)
-import           Data.List (foldl', find, unzip5)
-import           Language.PureScript.AST
-import           Language.PureScript.AST.Utils
-import qualified Language.PureScript.Constants.Libs as Libs
-import           Language.PureScript.Crash
-import           Language.PureScript.Environment
-import           Language.PureScript.Errors
-import           Language.PureScript.Names
-import           Language.PureScript.PSString (mkString)
-import           Language.PureScript.Types
-import           Language.PureScript.TypeChecker (checkNewtype)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class (MonadSupply)
+import Data.List (foldl', find, unzip5)
+import Language.PureScript.AST (Binder(..), CaseAlternative(..), DataConstructorDeclaration(..), Declaration(..), Expr(..), pattern MkUnguarded, Module(..), SourceSpan(..), TypeInstanceBody(..), pattern ValueDecl)
+import Language.PureScript.AST.Utils (UnwrappedTypeConstructor(..), lamCase, unguarded, unwrapTypeConstructor)
+import Language.PureScript.Constants.Libs qualified as Libs
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType(..), NameKind(..))
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage')
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), freshIdent)
+import Language.PureScript.PSString (mkString)
+import Language.PureScript.Types (SourceType, Type(..), WildcardData(..), replaceAllTypeVars, srcTypeApp, srcTypeConstructor, srcTypeLevelString)
+import Language.PureScript.TypeChecker (checkNewtype)
 
 -- | Elaborates deriving instance declarations by code generation.
 deriveInstances

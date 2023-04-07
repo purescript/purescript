@@ -12,19 +12,19 @@ import Prelude hiding ((<>))
 import Control.Arrow (second)
 
 import Data.Text (Text)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Monoid as Monoid ((<>))
-import qualified Data.Text as T
+import Data.List.NonEmpty qualified as NEL
+import Data.Monoid qualified as Monoid ((<>))
+import Data.Text qualified as T
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Names
-import Language.PureScript.Pretty.Common
+import Language.PureScript.AST (AssocList(..), Binder(..), CaseAlternative(..), Declaration(..), DoNotationElement(..), Expr(..), Guard(..), GuardedExpr(..), Literal(..), PathNode(..), PathTree(..), TypeDeclarationData(..), pattern ValueDecl, WhereProvenance(..))
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Names (OpName(..), ProperName(..), Qualified(..), disqualify, runModuleName, showIdent)
+import Language.PureScript.Pretty.Common (before, beforeWithSpace, parensT)
 import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox, prettyPrintObjectKey)
 import Language.PureScript.Types (Constraint(..))
 import Language.PureScript.PSString (PSString, prettyPrintString)
 
-import Text.PrettyPrint.Boxes
+import Text.PrettyPrint.Boxes (Box, left, moveRight, text, vcat, vsep, (//), (<>))
 
 -- TODO(Christoph): remove T.unpack s
 

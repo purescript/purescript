@@ -39,13 +39,13 @@ import Control.DeepSeq (NFData)
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Aeson.BetterErrors (Parse, nth, withText, withValue, toAesonParser, perhaps, asText)
-import qualified Data.Aeson as A
+import Data.Aeson qualified as A
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.Text.Encoding as TE
+import Data.Text qualified as T
+import Data.ByteString.Lazy qualified as BS
+import Data.Text.Encoding qualified as TE
 
-import Language.PureScript.Names
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, OpName(..), OpNameType(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), moduleNameFromString, runIdent, runModuleName)
 import Language.PureScript.AST (Associativity(..))
 
 -- | Given a list of actions, attempt them all, returning the first success.

@@ -3,16 +3,16 @@
 
 module Language.PureScript.Sugar.AdoNotation (desugarAdoModule) where
 
-import           Prelude hiding (abs)
+import Prelude hiding (abs)
 
-import           Control.Monad (foldM)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Supply.Class
-import           Data.List (foldl')
-import           Language.PureScript.AST
-import           Language.PureScript.Errors
-import           Language.PureScript.Names
-import qualified Language.PureScript.Constants.Libs as C
+import Control.Monad (foldM)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class (MonadSupply)
+import Data.List (foldl')
+import Language.PureScript.AST (Binder(..), CaseAlternative(..), Declaration, DoNotationElement(..), Expr(..), pattern MkUnguarded, Module(..), SourceSpan, WhereProvenance(..), declSourceSpan, everywhereOnValuesM)
+import Language.PureScript.Errors (MultipleErrors, parU, rethrowWithPosition)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Qualified(..), byMaybeModuleName, freshIdent')
+import Language.PureScript.Constants.Libs qualified as C
 
 -- | Replace all @AdoNotationBind@ and @AdoNotationValue@ constructors with
 -- applications of the pure and apply functions in scope, and all @AdoNotationLet@

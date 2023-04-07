@@ -1,20 +1,20 @@
 {-# LANGUAGE PackageImports    #-}
 module Language.PureScript.Ide.Test where
 
-import           Control.Concurrent.STM
-import           "monad-logger" Control.Monad.Logger
-import           Data.IORef
-import qualified Data.Map                        as Map
-import           Language.PureScript.Ide
-import           Language.PureScript.Ide.Command
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Types
-import           Protolude
-import           System.Directory
-import           System.FilePath
-import           System.Process
+import Control.Concurrent.STM (newTVarIO, readTVarIO)
+import "monad-logger" Control.Monad.Logger (NoLoggingT(..))
+import Data.IORef (newIORef)
+import Data.Map qualified as Map
+import Language.PureScript.Ide (handleCommand)
+import Language.PureScript.Ide.Command (Command)
+import Language.PureScript.Ide.Error (IdeError)
+import Language.PureScript.Ide.Types
+import Protolude
+import System.Directory (doesDirectoryExist, getCurrentDirectory, makeAbsolute, removeDirectoryRecursive, setCurrentDirectory)
+import System.FilePath ((</>))
+import System.Process (createProcess, getProcessExitCode, shell)
 
-import qualified Language.PureScript             as P
+import Language.PureScript qualified as P
 
 defConfig :: IdeConfiguration
 defConfig =

@@ -1,15 +1,15 @@
 module Language.PureScript.Ide.FilterSpec where
 
-import           Protolude
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import           Language.PureScript.Ide.Filter
-import           Language.PureScript.Ide.Filter.Declaration as D
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Imports
-import           Language.PureScript.Ide.Test as T
-import qualified Language.PureScript as P
-import           Test.Hspec
+import Protolude
+import Data.Map qualified as Map
+import Data.Set qualified as Set
+import Language.PureScript.Ide.Filter (applyFilters, declarationTypeFilter, dependencyFilter, exactFilter, moduleFilter, namespaceFilter, prefixFilter)
+import Language.PureScript.Ide.Filter.Declaration as D
+import Language.PureScript.Ide.Types (IdeDeclarationAnn, IdeNamespace(..), ModuleMap)
+import Language.PureScript.Ide.Imports (Import, sliceImportSection)
+import Language.PureScript.Ide.Test as T
+import Language.PureScript qualified as P
+import Test.Hspec (Spec, describe, it, shouldBe)
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 

@@ -15,12 +15,12 @@
 
 module Language.PureScript.Hierarchy where
 
-import           Prelude
-import           Protolude (ordNub)
+import Prelude
+import Protolude (ordNub)
 
-import           Data.List (sort)
-import qualified Data.Text as T
-import qualified Language.PureScript as P
+import Data.List (sort)
+import Data.Text qualified as T
+import Language.PureScript qualified as P
 
 newtype SuperMap = SuperMap
   { _unSuperMap :: Either (P.ProperName 'P.ClassName) (P.ProperName 'P.ClassName, P.ProperName 'P.ClassName)

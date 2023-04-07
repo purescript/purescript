@@ -24,30 +24,30 @@ module TestCompiler where
 
 import Prelude
 
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 import Language.PureScript.Interactive.IO (readNodeProcessWithExitCode)
 
 import Control.Arrow ((>>>))
-import qualified Data.ByteString as BS
+import Data.ByteString qualified as BS
 import Data.Function (on)
 import Data.List (sort, stripPrefix, minimumBy)
 import Data.Maybe (mapMaybe)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as T
 
 
-import Control.Monad
+import Control.Monad (forM_, when)
 
-import System.Exit
-import System.FilePath
-import System.IO
+import System.Exit (ExitCode(..))
+import System.FilePath (pathSeparator, replaceExtension, takeFileName, (</>))
+import System.IO (Handle, hPutStr, hPutStrLn)
 import System.IO.UTF8 (readUTF8File)
 
-import Text.Regex.Base
+import Text.Regex.Base (RegexContext(..), RegexMaker(..))
 import Text.Regex.TDFA (Regex)
 
-import TestUtils
-import Test.Hspec
+import TestUtils (ExpectedModuleName(..), SupportModules, compile, createOutputFile, getTestFiles, goldenVsString, modulesDir, trim)
+import Test.Hspec (Expectation, SpecWith, beforeAllWith, describe, expectationFailure, it, runIO)
 
 spec :: SpecWith SupportModules
 spec = do

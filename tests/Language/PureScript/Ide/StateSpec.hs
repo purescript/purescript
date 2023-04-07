@@ -1,13 +1,13 @@
 module Language.PureScript.Ide.StateSpec where
 
-import           Protolude
-import           Control.Lens hiding (anyOf, (&))
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Test
-import qualified Language.PureScript as P
-import           Test.Hspec
-import qualified Data.Map as Map
+import Protolude
+import Control.Lens (Ixed(..), folded)
+import Language.PureScript.Ide.Types (IdeDeclarationAnn, IdeInstance(..), ModuleMap, _IdeDeclTypeClass, anyOf, idaDeclaration, ideTCInstances)
+import Language.PureScript.Ide.State (resolveDataConstructorsForModule, resolveInstances, resolveOperatorsForModule)
+import Language.PureScript.Ide.Test (ideDtor, ideType, ideTypeClass, ideTypeOp, ideValue, ideValueOp, mn)
+import Language.PureScript qualified as P
+import Test.Hspec (Spec, describe, it, shouldSatisfy)
+import Data.Map qualified as Map
 
 valueOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 valueOperator =

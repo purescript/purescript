@@ -4,29 +4,29 @@ module Language.PureScript.CoreFn.CSE (optimizeCommonSubexpressions) where
 
 import Protolude hiding (pass)
 
-import Control.Lens
+import Control.Lens (At(..), makeLenses, non, view, (%~), (.=), (.~), (<>~), (^.))
 import Control.Monad.Supply (Supply)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.RWS (MonadWriter, RWST, censor, evalRWST, listen, pass, tell)
 import Data.Bitraversable (bitraverse)
 import Data.Functor.Compose (Compose(..))
-import qualified Data.IntMap.Monoidal as IM
-import qualified Data.IntSet as IS
-import qualified Data.Map as M
+import Data.IntMap.Monoidal qualified as IM
+import Data.IntSet qualified as IS
+import Data.Map qualified as M
 import Data.Maybe (fromJust)
 import Data.Semigroup (Min(..))
 import Data.Semigroup.Generic (GenericSemigroupMonoid(..))
 
-import Language.PureScript.AST.Literals
+import Language.PureScript.AST.Literals (Literal(..))
 import Language.PureScript.AST.SourcePos (nullSourceSpan)
-import qualified Language.PureScript.Constants.Libs as C
+import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.CoreFn.Ann (Ann)
-import Language.PureScript.CoreFn.Binders
-import Language.PureScript.CoreFn.Expr
+import Language.PureScript.CoreFn.Binders (Binder(..))
+import Language.PureScript.CoreFn.Expr (Bind(..), CaseAlternative(..), Expr(..))
 import Language.PureScript.CoreFn.Meta (Meta(IsSyntheticApp))
-import Language.PureScript.CoreFn.Traversals
+import Language.PureScript.CoreFn.Traversals (everywhereOnValues, traverseCoreFn)
 import Language.PureScript.Environment (dictTypeName)
-import Language.PureScript.Names
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), Qualified(..), QualifiedBy(..), freshIdent, runIdent, toMaybeModuleName)
 import Language.PureScript.PSString (decodeString)
 
 -- |

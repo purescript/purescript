@@ -7,19 +7,19 @@ module Language.PureScript.Sugar.Names.Imports
 
 import Prelude
 
-import Control.Monad
+import Control.Monad (foldM, when)
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (fromMaybe)
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.Sugar.Names.Env
+import Language.PureScript.AST (Declaration(..), DeclarationRef(..), ErrorMessageHint(..), ExportSource(..), ImportDeclarationType(..), Module(..), SourceSpan, internalModuleSourceSpan)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage', rethrow)
+import Language.PureScript.Names (pattern ByNullSourcePos, ModuleName, Name(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), byMaybeModuleName)
+import Language.PureScript.Sugar.Names.Env (Env, Exports(..), ImportProvenance(..), ImportRecord(..), Imports(..), envModuleExports, nullImports)
 
 type ImportDef = (SourceSpan, ImportDeclarationType, Maybe ModuleName)
 

@@ -4,7 +4,7 @@ module Language.PureScript.AST.Declarations.ChainId
   ) where
 
 import Prelude
-import qualified Language.PureScript.AST.SourcePos as Pos
+import Language.PureScript.AST.SourcePos qualified as Pos
 import Control.DeepSeq (NFData)
 import Codec.Serialise (Serialise)
 

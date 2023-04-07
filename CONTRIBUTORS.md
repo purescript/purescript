@@ -113,6 +113,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@noraesae](https://github.com/noraesae) | Hyunje Jun | [MIT license] |
 | [@nullobject](https://github.com/nullobject) | Josh Bassett | [MIT license] |
 | [@osa1](https://github.com/osa1) | Ömer Sinan Ağacan | [MIT license] |
+| [@ozkutuk](https://github.com/ozkutuk) | Berk Özkütük | [MIT license] |
 | [@paf31](https://github.com/paf31) | Phil Freeman | [MIT license] |
 | [@parsonsmatt](https://github.com/parsonsmatt) | Matt Parsons | [MIT license] |
 | [@passy](https://github.com/passy) | Pascal Hartig | [MIT license] |
@@ -146,6 +147,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@sigma-andex](https://github.com/sigma-andex) | Jan Schulte | [MIT license] |
 | [@simonyangme](https://github.com/simonyangme) | Simon Yang | [MIT license] |
 | [@sloosch](https://github.com/sloosch) | Simon Looschen | [MIT license] |
+| [@sometimes-i-send-pull-requests](https://github.com/sometimes-i-send-pull-requests) | Alexander Kirchhoff | [MIT license] |
 | [@soupi](https://github.com/soupi) | Gil Mizrahi | [MIT license] |
 | [@stefanholzmueller](https://github.com/stefanholzmueller) | Stefan Holzmüller | [MIT license] |
 | [@sztupi](https://github.com/sztupi) | Attila Sztupak | [MIT license] |

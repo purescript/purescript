@@ -5,18 +5,18 @@ module Language.PureScript.Renamer (renameInModule) where
 
 import Prelude
 
-import Control.Monad.State
+import Control.Monad.State (MonadState(..), State, gets, modify, runState, (>=>))
 
 import Data.Functor ((<&>))
 import Data.List (find)
 import Data.Maybe (fromJust, fromMaybe)
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.Text as T
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text qualified as T
 
-import Language.PureScript.CoreFn
-import Language.PureScript.Names
-import Language.PureScript.Traversals
+import Language.PureScript.CoreFn (Ann, Bind(..), Binder(..), CaseAlternative(..), Expr(..), Literal(..), Module(..))
+import Language.PureScript.Names (Ident(..), Qualified(..), isBySourcePos, isPlainIdent, runIdent, showIdent)
+import Language.PureScript.Traversals (eitherM, pairM, sndM)
 
 -- |
 -- The state object used in this module

@@ -9,8 +9,8 @@ import Prelude
 import Data.List (groupBy)
 import Data.Function (on)
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.AST (Binder, CaseAlternative(..), Declaration(..), Expr(..), pattern MkUnguarded, Module(..), SourceAnn, WhereProvenance, everywhereOnValues)
+import Language.PureScript.Crash (internalError)
 
 -- | Replace every @BoundValueDeclaration@ in @Let@ expressions with @Case@
 -- expressions.
@@ -28,11 +28,11 @@ desugarLetPattern decl =
   replace other = other
 
   go :: WhereProvenance
-     -- ^ Metadata about whether the let-in was a where clause
+          -- Metadata about whether the let-in was a where clause
      -> [Either [Declaration] (SourceAnn, Binder, Expr)]
-     -- ^ Declarations to desugar
+          -- Declarations to desugar
      -> Expr
-     -- ^ The original let-in result expression
+          -- The original let-in result expression
      -> Expr
   go _ [] e = e
   go w (Right ((pos, com), binder, boundE) : ds) e =

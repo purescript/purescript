@@ -7,10 +7,10 @@ module Language.PureScript.Publish.BoxesHelpers
 import Prelude
 
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import System.IO (hPutStr, stderr)
 
-import qualified Text.PrettyPrint.Boxes as Boxes
+import Text.PrettyPrint.Boxes qualified as Boxes
 
 width :: Int
 width = 79

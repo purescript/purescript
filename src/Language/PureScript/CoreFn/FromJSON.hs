@@ -9,24 +9,24 @@ module Language.PureScript.CoreFn.FromJSON
 
 import Prelude
 
-import           Control.Applicative ((<|>))
+import Control.Applicative ((<|>))
 
-import           Data.Aeson
-import           Data.Aeson.Types (Parser, listParser)
-import qualified Data.Map.Strict as M
-import           Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Vector as V
-import           Data.Version (Version, parseVersion)
+import Data.Aeson (FromJSON(..), Object, Value(..), withObject, withText, (.:))
+import Data.Aeson.Types (Parser, listParser)
+import Data.Map.Strict qualified as M
+import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Vector qualified as V
+import Data.Version (Version, parseVersion)
 
-import           Language.PureScript.AST.SourcePos (SourceSpan(..))
-import           Language.PureScript.AST.Literals
-import           Language.PureScript.CoreFn.Ann
-import           Language.PureScript.CoreFn
-import           Language.PureScript.Names
-import           Language.PureScript.PSString (PSString)
+import Language.PureScript.AST.SourcePos (SourceSpan(..))
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.CoreFn.Ann (Ann)
+import Language.PureScript.CoreFn (Bind(..), Binder(..), CaseAlternative(..), ConstructorType(..), Expr(..), Guard, Meta(..), Module(..))
+import Language.PureScript.Names (Ident(..), ModuleName(..), ProperName(..), Qualified(..), QualifiedBy(..), unusedIdent)
+import Language.PureScript.PSString (PSString)
 
-import           Text.ParserCombinators.ReadP (readP_to_S)
+import Text.ParserCombinators.ReadP (readP_to_S)
 
 parseVersion' :: String -> Maybe Version
 parseVersion' str =

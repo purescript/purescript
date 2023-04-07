@@ -6,24 +6,24 @@ module Language.PureScript.AST.Traversals where
 import Prelude
 import Protolude (swap)
 
-import Control.Monad
-import Control.Monad.Trans.State
+import Control.Monad ((<=<), (>=>))
+import Control.Monad.Trans.State (StateT(..))
 
 import Data.Foldable (fold)
 import Data.Functor.Identity (runIdentity)
 import Data.List (mapAccumL)
 import Data.Maybe (mapMaybe)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.List.NonEmpty qualified as NEL
+import Data.Map qualified as M
+import Data.Set qualified as S
 
-import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Declarations
-import Language.PureScript.AST.Literals
-import Language.PureScript.Names
-import Language.PureScript.Traversals
+import Language.PureScript.AST.Binders (Binder(..), binderNames)
+import Language.PureScript.AST.Declarations (CaseAlternative(..), DataConstructorDeclaration(..), Declaration(..), DoNotationElement(..), Expr(..), Guard(..), GuardedExpr(..), TypeDeclarationData(..), TypeInstanceBody(..), pattern ValueDecl, ValueDeclarationData(..), mapTypeInstanceBody, traverseTypeInstanceBody)
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident)
+import Language.PureScript.Traversals (sndM, sndM', thirdM)
 import Language.PureScript.TypeClassDictionaries (TypeClassDictionaryInScope(..))
-import Language.PureScript.Types
+import Language.PureScript.Types (Constraint(..), SourceType, mapConstraintArgs)
 
 guardedExprM :: Applicative m
              => (Guard -> m Guard)
