@@ -259,9 +259,13 @@ typeToJSON annToJSON ty =
     KindApp a b c ->
       variant "KindApp" a (go b, go c)
     ForAll a b c d e f ->
-      case d of
-        Nothing -> variant "ForAll" a (b, c, go e, f)
-        Just k -> variant "ForAll" a (b, c, go k, go e, f)
+      variant "ForAll" a $ A.object
+        [ "visibility" .= b
+        , "identifier" .= c
+        , "kind" .= fmap go d
+        , "type" .= go e
+        , "skolem" .= f
+        ]
     ConstrainedType a b c ->
       variant "ConstrainedType" a (constraintToJSON annToJSON b, go c)
     Skolem a b c d e ->
@@ -366,23 +370,23 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
       KindApp a <$> go b <*> go c
     "ForAll" -> do
       let
-        -- ["x", "Type", 0]
+        asObject = do
+          f <- contents
+          v <- f .: "visibility"
+          i <- f .: "identifier"
+          k <- f .:? "kind"
+          t <- f .: "type"
+          s <- f .: "skolem"
+          ForAll a v i <$> traverse go k <*> go t <*> pure s
+
         withoutMbKind = do
           (b, c, d) <- contents
           ForAll a TypeVarInvisible b Nothing <$> go c <*> pure d
-        -- ["@", "x", "Type", 0]
-        withoutMbKind' = do
-          (b, c, d, e) <- contents
-          ForAll a <$> typeVarVisFromJSON b <*> pure c <*> pure Nothing <*> go d <*> pure e
-        -- ["x", "Kind?", "Type", 0]
+
         withMbKind = do
           (b, c, d, e) <- contents
           ForAll a TypeVarInvisible b <$> (Just <$> go c) <*> go d <*> pure e
-        -- ["@", "x", "Kind?", "Type", 0]
-        withMbKind' = do
-          (b, c, d, e, f) <- contents
-          ForAll a <$> typeVarVisFromJSON b <*> pure c <*> (Just <$> go d) <*> go e <*> pure f
-      withMbKind' <|> withMbKind <|> withoutMbKind' <|> withoutMbKind
+      asObject <|> withMbKind <|> withoutMbKind
     "ConstrainedType" -> do
       (b, c) <- contents
       ConstrainedType a <$> constraintFromJSON defaultAnn annFromJSON b <*> go c
