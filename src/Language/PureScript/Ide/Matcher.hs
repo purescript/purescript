@@ -19,16 +19,16 @@ module Language.PureScript.Ide.Matcher
        , flexMatcher
        ) where
 
-import           Protolude
+import Protolude
 
-import           Control.Monad.Fail (fail)
-import           Data.Aeson
-import qualified Data.Text                     as T
-import qualified Data.Text.Encoding            as TE
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           Text.EditDistance
-import           Text.Regex.TDFA               ((=~))
+import Control.Monad.Fail (fail)
+import Data.Aeson (FromJSON(..), withObject, (.:), (.:?))
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as TE
+import Language.PureScript.Ide.Types (IdeDeclarationAnn, Match)
+import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, unwrapMatch)
+import Text.EditDistance (defaultEditCosts, levenshteinDistance)
+import Text.Regex.TDFA ((=~))
 
 
 type ScoredMatch a = (Match a, Double)
@@ -94,7 +94,7 @@ flexRate p c = do
 -- Borrowed from: http://cdewaka.com/2013/06/fuzzy-pattern-matching-in-haskell/
 --
 -- By string =~ pattern we'll get the start of the match and the length of
--- the matchas a (start, length) tuple if there's a match.
+-- the matches a (start, length) tuple if there's a match.
 -- If match fails then it would be (-1,0)
 flexScore :: Text -> Text -> Maybe Double
 flexScore pat str =

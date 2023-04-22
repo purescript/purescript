@@ -12,23 +12,22 @@ module Language.PureScript.CoreImp.Optimizer.Inliner
   , evaluateIifes
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 
 import Data.Either (rights)
 import Data.Maybe (fromMaybe)
-import Data.String (IsString, fromString)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.Names (ModuleName)
-import Language.PureScript.PSString (PSString)
-import Language.PureScript.CoreImp.AST
-import Language.PureScript.CoreImp.Optimizer.Common
+import Language.PureScript.PSString (PSString, mkString)
+import Language.PureScript.CoreImp.AST (AST(..), BinaryOperator(..), InitializerEffects(..), UnaryOperator(..), everywhere, everywhereTopDown, everywhereTopDownM, getSourceSpan)
+import Language.PureScript.CoreImp.Optimizer.Common (pattern Ref, applyAll, isReassigned, isRebound, isUpdated, removeFromBlock, replaceIdent, replaceIdents)
 import Language.PureScript.AST (SourceSpan(..))
-import qualified Language.PureScript.Constants.Prelude as C
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Libs qualified as C
+import Language.PureScript.Constants.Prim qualified as C
 
 -- TODO: Potential bug:
 -- Shouldn't just inline this case: { var x = 0; x.toFixed(10); }
@@ -72,7 +71,7 @@ evaluateIifes = everywhere convert
   convert :: AST -> AST
   convert (App _ (Function _ Nothing [] (Block _ [Return _ ret])) []) = ret
   convert (App _ (Function _ Nothing idents (Block _ [Return ss ret])) [])
-    | not (any (`isReassigned` ret) idents) = replaceIdents (map (, Var ss C.undefined) idents) ret
+    | not (any (`isReassigned` ret) idents) = replaceIdents (map (, Var ss C.S_undefined) idents) ret
   convert js = js
 
 inlineVariables :: AST -> AST
@@ -89,128 +88,121 @@ inlineCommonValues :: (AST -> AST) -> AST -> AST
 inlineCommonValues expander = everywhere convert
   where
   convert :: AST -> AST
-  convert (expander -> App ss fn [dict])
-    | isDict' [semiringNumber, semiringInt] dict && isDict fnZero fn = NumericLiteral ss (Left 0)
-    | isDict' [semiringNumber, semiringInt] dict && isDict fnOne fn = NumericLiteral ss (Left 1)
-    | isDict boundedBoolean dict && isDict fnBottom fn = BooleanLiteral ss False
-    | isDict boundedBoolean dict && isDict fnTop fn = BooleanLiteral ss True
-  convert (App ss (expander -> App _ fn [dict]) [x])
-    | isDict ringInt dict && isDict fnNegate fn = Binary ss BitwiseOr (Unary ss Negate x) (NumericLiteral ss (Left 0))
-  convert (App ss (App _ (expander -> App _ fn [dict]) [x]) [y])
-    | isDict semiringInt dict && isDict fnAdd fn = intOp ss Add x y
-    | isDict semiringInt dict && isDict fnMultiply fn = intOp ss Multiply x y
-    | isDict ringInt dict && isDict fnSubtract fn = intOp ss Subtract x y
+  convert (expander -> App ss (Ref fn) [Ref dict])
+    | dict `elem` [C.P_semiringNumber, C.P_semiringInt], C.P_zero <- fn = NumericLiteral ss (Left 0)
+    | dict `elem` [C.P_semiringNumber, C.P_semiringInt], C.P_one <- fn = NumericLiteral ss (Left 1)
+    | C.P_boundedBoolean <- dict, C.P_bottom <- fn = BooleanLiteral ss False
+    | C.P_boundedBoolean <- dict, C.P_top <- fn = BooleanLiteral ss True
+  convert (App ss (expander -> App _ (Ref C.P_negate) [Ref C.P_ringInt]) [x])
+    = Binary ss BitwiseOr (Unary ss Negate x) (NumericLiteral ss (Left 0))
+  convert (App ss (App _ (expander -> App _ (Ref fn) [Ref dict]) [x]) [y])
+    | C.P_semiringInt <- dict, C.P_add <- fn = intOp ss Add x y
+    | C.P_semiringInt <- dict, C.P_mul <- fn = intOp ss Multiply x y
+    | C.P_ringInt <- dict, C.P_sub <- fn = intOp ss Subtract x y
   convert other = other
-  fnZero = (C.DataSemiring, C.zero)
-  fnOne = (C.DataSemiring, C.one)
-  fnBottom = (C.DataBounded, C.bottom)
-  fnTop = (C.DataBounded, C.top)
-  fnAdd = (C.DataSemiring, C.add)
-  fnMultiply = (C.DataSemiring, C.mul)
-  fnSubtract = (C.DataRing, C.sub)
-  fnNegate = (C.DataRing, C.negate)
   intOp ss op x y = Binary ss BitwiseOr (Binary ss op x y) (NumericLiteral ss (Left 0))
 
 inlineCommonOperators :: (AST -> AST) -> AST -> AST
 inlineCommonOperators expander = everywhereTopDown $ applyAll $
-  [ binary semiringNumber opAdd Add
-  , binary semiringNumber opMul Multiply
+  [ binary C.P_semiringNumber C.P_add Add
+  , binary C.P_semiringNumber C.P_mul Multiply
 
-  , binary ringNumber opSub Subtract
-  , unary  ringNumber opNegate Negate
+  , binary C.P_ringNumber C.P_sub Subtract
+  , unary  C.P_ringNumber C.P_negate Negate
 
-  , binary euclideanRingNumber opDiv Divide
+  , binary C.P_euclideanRingNumber C.P_div Divide
 
-  , binary eqNumber opEq EqualTo
-  , binary eqNumber opNotEq NotEqualTo
-  , binary eqInt opEq EqualTo
-  , binary eqInt opNotEq NotEqualTo
-  , binary eqString opEq EqualTo
-  , binary eqString opNotEq NotEqualTo
-  , binary eqChar opEq EqualTo
-  , binary eqChar opNotEq NotEqualTo
-  , binary eqBoolean opEq EqualTo
-  , binary eqBoolean opNotEq NotEqualTo
+  , binary C.P_eqNumber C.P_eq EqualTo
+  , binary C.P_eqNumber C.P_notEq NotEqualTo
+  , binary C.P_eqInt C.P_eq EqualTo
+  , binary C.P_eqInt C.P_notEq NotEqualTo
+  , binary C.P_eqString C.P_eq EqualTo
+  , binary C.P_eqString C.P_notEq NotEqualTo
+  , binary C.P_eqChar C.P_eq EqualTo
+  , binary C.P_eqChar C.P_notEq NotEqualTo
+  , binary C.P_eqBoolean C.P_eq EqualTo
+  , binary C.P_eqBoolean C.P_notEq NotEqualTo
 
-  , binary ordBoolean opLessThan LessThan
-  , binary ordBoolean opLessThanOrEq LessThanOrEqualTo
-  , binary ordBoolean opGreaterThan GreaterThan
-  , binary ordBoolean opGreaterThanOrEq GreaterThanOrEqualTo
-  , binary ordChar opLessThan LessThan
-  , binary ordChar opLessThanOrEq LessThanOrEqualTo
-  , binary ordChar opGreaterThan GreaterThan
-  , binary ordChar opGreaterThanOrEq GreaterThanOrEqualTo
-  , binary ordInt opLessThan LessThan
-  , binary ordInt opLessThanOrEq LessThanOrEqualTo
-  , binary ordInt opGreaterThan GreaterThan
-  , binary ordInt opGreaterThanOrEq GreaterThanOrEqualTo
-  , binary ordNumber opLessThan LessThan
-  , binary ordNumber opLessThanOrEq LessThanOrEqualTo
-  , binary ordNumber opGreaterThan GreaterThan
-  , binary ordNumber opGreaterThanOrEq GreaterThanOrEqualTo
-  , binary ordString opLessThan LessThan
-  , binary ordString opLessThanOrEq LessThanOrEqualTo
-  , binary ordString opGreaterThan GreaterThan
-  , binary ordString opGreaterThanOrEq GreaterThanOrEqualTo
+  , binary C.P_ordBoolean C.P_lessThan LessThan
+  , binary C.P_ordBoolean C.P_lessThanOrEq LessThanOrEqualTo
+  , binary C.P_ordBoolean C.P_greaterThan GreaterThan
+  , binary C.P_ordBoolean C.P_greaterThanOrEq GreaterThanOrEqualTo
+  , binary C.P_ordChar C.P_lessThan LessThan
+  , binary C.P_ordChar C.P_lessThanOrEq LessThanOrEqualTo
+  , binary C.P_ordChar C.P_greaterThan GreaterThan
+  , binary C.P_ordChar C.P_greaterThanOrEq GreaterThanOrEqualTo
+  , binary C.P_ordInt C.P_lessThan LessThan
+  , binary C.P_ordInt C.P_lessThanOrEq LessThanOrEqualTo
+  , binary C.P_ordInt C.P_greaterThan GreaterThan
+  , binary C.P_ordInt C.P_greaterThanOrEq GreaterThanOrEqualTo
+  , binary C.P_ordNumber C.P_lessThan LessThan
+  , binary C.P_ordNumber C.P_lessThanOrEq LessThanOrEqualTo
+  , binary C.P_ordNumber C.P_greaterThan GreaterThan
+  , binary C.P_ordNumber C.P_greaterThanOrEq GreaterThanOrEqualTo
+  , binary C.P_ordString C.P_lessThan LessThan
+  , binary C.P_ordString C.P_lessThanOrEq LessThanOrEqualTo
+  , binary C.P_ordString C.P_greaterThan GreaterThan
+  , binary C.P_ordString C.P_greaterThanOrEq GreaterThanOrEqualTo
 
-  , binary semigroupString opAppend Add
+  , binary C.P_semigroupString C.P_append Add
 
-  , binary heytingAlgebraBoolean opConj And
-  , binary heytingAlgebraBoolean opDisj Or
-  , unary  heytingAlgebraBoolean opNot Not
+  , binary C.P_heytingAlgebraBoolean C.P_conj And
+  , binary C.P_heytingAlgebraBoolean C.P_disj Or
+  , unary  C.P_heytingAlgebraBoolean C.P_not Not
 
-  , binary' C.DataIntBits C.or BitwiseOr
-  , binary' C.DataIntBits C.and BitwiseAnd
-  , binary' C.DataIntBits C.xor BitwiseXor
-  , binary' C.DataIntBits C.shl ShiftLeft
-  , binary' C.DataIntBits C.shr ShiftRight
-  , binary' C.DataIntBits C.zshr ZeroFillShiftRight
-  , unary'  C.DataIntBits C.complement BitwiseNot
+  , binary' C.P_or BitwiseOr
+  , binary' C.P_and BitwiseAnd
+  , binary' C.P_xor BitwiseXor
+  , binary' C.P_shl ShiftLeft
+  , binary' C.P_shr ShiftRight
+  , binary' C.P_zshr ZeroFillShiftRight
+  , unary'  C.P_complement BitwiseNot
 
-  , inlineNonClassFunction (isModFnWithDict (C.DataArray, C.unsafeIndex)) $ flip (Indexer Nothing)
+  , inlineNonClassFunction (isModFnWithDict C.P_unsafeIndex) $ flip (Indexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ] ++
-  [ fn | i <- [0..10], fn <- [ mkEffFn C.ControlMonadEffUncurried C.mkEffFn i, runEffFn C.ControlMonadEffUncurried C.runEffFn i ] ] ++
-  [ fn | i <- [0..10], fn <- [ mkEffFn C.EffectUncurried C.mkEffectFn i, runEffFn C.EffectUncurried C.runEffectFn i ] ]
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.P_mkEffFn i, runEffFn C.P_runEffFn i ] ] ++
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.P_mkEffectFn i, runEffFn C.P_runEffectFn i ] ] ++
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.P_mkSTFn i, runEffFn C.P_runSTFn i ] ]
   where
   binary :: (ModuleName, PSString) -> (ModuleName, PSString) -> BinaryOperator -> AST -> AST
-  binary dict fns op = convert where
+  binary dict fn op = convert where
     convert :: AST -> AST
-    convert (App ss (App _ (expander -> App _ fn [dict']) [x]) [y]) | isDict dict dict' && isDict fns fn = Binary ss op x y
+    convert (App ss (App _ (expander -> App _ (Ref fn') [Ref dict']) [x]) [y]) | dict == dict', fn == fn' = Binary ss op x y
     convert other = other
-  binary' :: ModuleName -> PSString -> BinaryOperator -> AST -> AST
-  binary' moduleName opString op = convert where
+  binary' :: (ModuleName, PSString) -> BinaryOperator -> AST -> AST
+  binary' fn op = convert where
     convert :: AST -> AST
-    convert (App ss (App _ fn [x]) [y]) | isDict (moduleName, opString) fn = Binary ss op x y
+    convert (App ss (App _ (Ref fn') [x]) [y]) | fn == fn' = Binary ss op x y
     convert other = other
   unary :: (ModuleName, PSString) -> (ModuleName, PSString) -> UnaryOperator -> AST -> AST
-  unary dicts fns op = convert where
+  unary dict fn op = convert where
     convert :: AST -> AST
-    convert (App ss (expander -> App _ fn [dict']) [x]) | isDict dicts dict' && isDict fns fn = Unary ss op x
+    convert (App ss (expander -> App _ (Ref fn') [Ref dict']) [x]) | dict == dict', fn == fn' = Unary ss op x
     convert other = other
-  unary' :: ModuleName -> PSString -> UnaryOperator -> AST -> AST
-  unary' moduleName fnName op = convert where
+  unary' :: (ModuleName, PSString) -> UnaryOperator -> AST -> AST
+  unary' fn op = convert where
     convert :: AST -> AST
-    convert (App ss fn [x]) | isDict (moduleName, fnName) fn = Unary ss op x
+    convert (App ss (Ref fn') [x]) | fn == fn' = Unary ss op x
     convert other = other
 
   mkFn :: Int -> AST -> AST
-  mkFn = mkFn' C.DataFunctionUncurried C.mkFn $ \ss1 ss2 ss3 args js ->
+  mkFn = mkFn' C.P_mkFn $ \ss1 ss2 ss3 args js ->
     Function ss1 Nothing args (Block ss2 [Return ss3 js])
 
-  mkEffFn :: ModuleName -> Text -> Int -> AST -> AST
-  mkEffFn modName fnName = mkFn' modName fnName $ \ss1 ss2 ss3 args js ->
+  mkEffFn :: (ModuleName, PSString) -> Int -> AST -> AST
+  mkEffFn mkFn_ = mkFn' mkFn_ $ \ss1 ss2 ss3 args js ->
     Function ss1 Nothing args (Block ss2 [Return ss3 (App ss3 js [])])
 
-  mkFn' :: ModuleName -> Text -> (Maybe SourceSpan -> Maybe SourceSpan -> Maybe SourceSpan -> [Text] -> AST -> AST) -> Int -> AST -> AST
-  mkFn' modName fnName res 0 = convert where
+  mkFn' :: (ModuleName, PSString) -> (Maybe SourceSpan -> Maybe SourceSpan -> Maybe SourceSpan -> [Text] -> AST -> AST) -> Int -> AST -> AST
+  mkFn' mkFn_ res 0 = convert where
     convert :: AST -> AST
-    convert (App _ mkFnN [Function s1 Nothing [_] (Block s2 [Return s3 js])]) | isNFn modName fnName 0 mkFnN =
+    convert (App _ (Ref mkFnN) [Function s1 Nothing [_] (Block s2 [Return s3 js])]) | isNFn mkFn_ 0 mkFnN =
       res s1 s2 s3 [] js
     convert other = other
-  mkFn' modName fnName res n = convert where
+  mkFn' mkFn_ res n = convert where
     convert :: AST -> AST
-    convert orig@(App ss mkFnN [fn]) | isNFn modName fnName n mkFnN =
+    convert orig@(App ss (Ref mkFnN) [fn]) | isNFn mkFn_ n mkFnN =
       case collectArgs n [] fn of
         Just (args, [Return ss' ret]) -> res ss ss ss' args ret
         _ -> orig
@@ -220,25 +212,23 @@ inlineCommonOperators expander = everywhereTopDown $ applyAll $
     collectArgs m acc (Function _ Nothing [oneArg] (Block _ [Return _ ret])) = collectArgs (m - 1) (oneArg : acc) ret
     collectArgs _ _   _ = Nothing
 
-  isNFn :: ModuleName -> Text -> Int -> AST -> Bool
-  isNFn expectMod prefix n (ModuleAccessor _ modName name) | modName == expectMod =
-    name == fromString (T.unpack prefix <> show n)
-  isNFn _ _ _ _ = False
+  isNFn :: (ModuleName, PSString) -> Int -> (ModuleName, PSString) -> Bool
+  isNFn prefix n fn = fmap (<> mkString (T.pack $ show n)) prefix == fn
 
   runFn :: Int -> AST -> AST
-  runFn = runFn' C.DataFunctionUncurried C.runFn App
+  runFn = runFn' C.P_runFn App
 
-  runEffFn :: ModuleName -> Text -> Int -> AST -> AST
-  runEffFn modName fnName = runFn' modName fnName $ \ss fn acc ->
+  runEffFn :: (ModuleName, PSString) -> Int -> AST -> AST
+  runEffFn runFn_ = runFn' runFn_ $ \ss fn acc ->
     Function ss Nothing [] (Block ss [Return ss (App ss fn acc)])
 
-  runFn' :: ModuleName -> Text -> (Maybe SourceSpan -> AST -> [AST] -> AST) -> Int -> AST -> AST
-  runFn' modName runFnName res n = convert where
+  runFn' :: (ModuleName, PSString) -> (Maybe SourceSpan -> AST -> [AST] -> AST) -> Int -> AST -> AST
+  runFn' runFn_ res n = convert where
     convert :: AST -> AST
     convert js = fromMaybe js $ go n [] js
 
     go :: Int -> [AST] -> AST -> Maybe AST
-    go 0 acc (App ss runFnN [fn]) | isNFn modName runFnName n runFnN && length acc == n =
+    go 0 acc (App ss (Ref runFnN) [fn]) | isNFn runFn_ n runFnN && length acc == n =
       Just $ res ss fn acc
     go m acc (App _ lhs [arg]) = go (m - 1) (arg : acc) lhs
     go _ _   _ = Nothing
@@ -250,8 +240,7 @@ inlineCommonOperators expander = everywhereTopDown $ applyAll $
     convert other = other
 
   isModFnWithDict :: (ModuleName, PSString) -> AST -> Bool
-  isModFnWithDict (m, op) (App _ (ModuleAccessor _ m' op') [Var _ _]) =
-    m == m' && op == op'
+  isModFnWithDict fn (App _ (Ref fn') [Var _ _]) = fn == fn'
   isModFnWithDict _ _ = False
 
 -- (f <<< g $ x) = f (g x)
@@ -260,11 +249,11 @@ inlineFnComposition :: forall m. MonadSupply m => (AST -> AST) -> AST -> m AST
 inlineFnComposition expander = everywhereTopDownM convert
   where
   convert :: AST -> m AST
-  convert (App s1 (App s2 (App _ (expander -> App _ fn [dict']) [x]) [y]) [z])
-    | isFnCompose dict' fn = return $ App s1 x [App s2 y [z]]
-    | isFnComposeFlipped dict' fn = return $ App s2 y [App s1 x [z]]
-  convert app@(App ss (App _ (expander -> App _ fn [dict']) _) _)
-    | isFnCompose dict' fn || isFnComposeFlipped dict' fn = mkApps ss <$> goApps app <*> freshName
+  convert (App s1 (App s2 (App _ (expander -> App _ (Ref fn) [Ref C.P_semigroupoidFn]) [x]) [y]) [z])
+    | C.P_compose <- fn = return $ App s1 x [App s2 y [z]]
+    | C.P_composeFlipped <- fn = return $ App s2 y [App s1 x [z]]
+  convert app@(App ss (App _ (expander -> App _ (Ref fn) [Ref C.P_semigroupoidFn]) _) _)
+    | fn `elem` [C.P_compose, C.P_composeFlipped] = mkApps ss <$> goApps app <*> freshName
   convert other = return other
 
   mkApps :: Maybe SourceSpan -> [Either AST (Text, AST)] -> Text -> AST
@@ -278,151 +267,28 @@ inlineFnComposition expander = everywhereTopDownM convert
   mkApp = either id $ \(name, arg) -> Var (getSourceSpan arg) name
 
   goApps :: AST -> m [Either AST (Text, AST)]
-  goApps (App _ (App _ (expander -> App _ fn [dict']) [x]) [y])
-    | isFnCompose dict' fn = mappend <$> goApps x <*> goApps y
-    | isFnComposeFlipped dict' fn = mappend <$> goApps y <*> goApps x
+  goApps (App _ (App _ (expander -> App _ (Ref fn) [Ref C.P_semigroupoidFn]) [x]) [y])
+    | C.P_compose <- fn = mappend <$> goApps x <*> goApps y
+    | C.P_composeFlipped <- fn = mappend <$> goApps y <*> goApps x
   goApps app@App {} = pure . Right . (,app) <$> freshName
   goApps other = pure [Left other]
-
-  isFnCompose :: AST -> AST -> Bool
-  isFnCompose dict' fn = isDict semigroupoidFn dict' && isDict fnCompose fn
-
-  isFnComposeFlipped :: AST -> AST -> Bool
-  isFnComposeFlipped dict' fn = isDict semigroupoidFn dict' && isDict fnComposeFlipped fn
-
-  fnCompose :: forall a. IsString a => (ModuleName, a)
-  fnCompose = (C.ControlSemigroupoid, C.compose)
-
-  fnComposeFlipped :: forall a. IsString a => (ModuleName, a)
-  fnComposeFlipped = (C.ControlSemigroupoid, C.composeFlipped)
 
 inlineFnIdentity :: (AST -> AST) -> AST -> AST
 inlineFnIdentity expander = everywhereTopDown convert
   where
   convert :: AST -> AST
-  convert (App _ (expander -> App _ fn [dict]) [x]) | isDict categoryFn dict && isDict fnIdentity fn = x
+  convert (App _ (expander -> App _ (Ref C.P_identity) [Ref C.P_categoryFn]) [x]) = x
   convert other = other
-
-  fnIdentity :: forall a. IsString a => (ModuleName, a)
-  fnIdentity = (C.ControlCategory, C.identity)
 
 inlineUnsafeCoerce :: AST -> AST
 inlineUnsafeCoerce = everywhereTopDown convert where
-  convert (App _ (ModuleAccessor _ C.UnsafeCoerce unsafeCoerceFn) [ comp ])
-    | unsafeCoerceFn == C.unsafeCoerceFn
-    = comp
+  convert (App _ (Ref C.P_unsafeCoerce) [ comp ]) = comp
   convert other = other
 
 inlineUnsafePartial :: AST -> AST
 inlineUnsafePartial = everywhereTopDown convert where
-  convert (App ss (ModuleAccessor _ C.PartialUnsafe unsafePartial) [ comp ])
-    | unsafePartial == C.unsafePartial
+  convert (App ss (Ref C.P_unsafePartial) [ comp ])
     -- Apply to undefined here, the application should be optimized away
     -- if it is safe to do so
-    = App ss comp [ Var ss C.undefined ]
+    = App ss comp [ Var ss C.S_undefined ]
   convert other = other
-
-semiringNumber :: forall a. IsString a => (ModuleName, a)
-semiringNumber = (C.DataSemiring, C.semiringNumber)
-
-semiringInt :: forall a. IsString a => (ModuleName, a)
-semiringInt = (C.DataSemiring, C.semiringInt)
-
-ringNumber :: forall a. IsString a => (ModuleName, a)
-ringNumber = (C.DataRing, C.ringNumber)
-
-ringInt :: forall a. IsString a => (ModuleName, a)
-ringInt = (C.DataRing, C.ringInt)
-
-euclideanRingNumber :: forall a. IsString a => (ModuleName, a)
-euclideanRingNumber = (C.DataEuclideanRing, C.euclideanRingNumber)
-
-eqNumber :: forall a. IsString a => (ModuleName, a)
-eqNumber = (C.DataEq, C.eqNumber)
-
-eqInt :: forall a. IsString a => (ModuleName, a)
-eqInt = (C.DataEq, C.eqInt)
-
-eqString :: forall a. IsString a => (ModuleName, a)
-eqString = (C.DataEq, C.eqString)
-
-eqChar :: forall a. IsString a => (ModuleName, a)
-eqChar = (C.DataEq, C.eqChar)
-
-eqBoolean :: forall a. IsString a => (ModuleName, a)
-eqBoolean = (C.DataEq, C.eqBoolean)
-
-ordBoolean :: forall a. IsString a => (ModuleName, a)
-ordBoolean = (C.DataOrd, C.ordBoolean)
-
-ordNumber :: forall a. IsString a => (ModuleName, a)
-ordNumber = (C.DataOrd, C.ordNumber)
-
-ordInt :: forall a. IsString a => (ModuleName, a)
-ordInt = (C.DataOrd, C.ordInt)
-
-ordString :: forall a. IsString a => (ModuleName, a)
-ordString = (C.DataOrd, C.ordString)
-
-ordChar :: forall a. IsString a => (ModuleName, a)
-ordChar = (C.DataOrd, C.ordChar)
-
-semigroupString :: forall a. IsString a => (ModuleName, a)
-semigroupString = (C.DataSemigroup, C.semigroupString)
-
-boundedBoolean :: forall a. IsString a => (ModuleName, a)
-boundedBoolean = (C.DataBounded, C.boundedBoolean)
-
-heytingAlgebraBoolean :: forall a. IsString a => (ModuleName, a)
-heytingAlgebraBoolean = (C.DataHeytingAlgebra, C.heytingAlgebraBoolean)
-
-semigroupoidFn :: forall a. IsString a => (ModuleName, a)
-semigroupoidFn = (C.ControlSemigroupoid, C.semigroupoidFn)
-
-categoryFn :: forall a. IsString a => (ModuleName, a)
-categoryFn = (C.ControlCategory, C.categoryFn)
-
-opAdd :: forall a. IsString a => (ModuleName, a)
-opAdd = (C.DataSemiring, C.add)
-
-opMul :: forall a. IsString a => (ModuleName, a)
-opMul = (C.DataSemiring, C.mul)
-
-opEq :: forall a. IsString a => (ModuleName, a)
-opEq = (C.DataEq, C.eq)
-
-opNotEq :: forall a. IsString a => (ModuleName, a)
-opNotEq = (C.DataEq, C.notEq)
-
-opLessThan :: forall a. IsString a => (ModuleName, a)
-opLessThan = (C.DataOrd, C.lessThan)
-
-opLessThanOrEq :: forall a. IsString a => (ModuleName, a)
-opLessThanOrEq = (C.DataOrd, C.lessThanOrEq)
-
-opGreaterThan :: forall a. IsString a => (ModuleName, a)
-opGreaterThan = (C.DataOrd, C.greaterThan)
-
-opGreaterThanOrEq :: forall a. IsString a => (ModuleName, a)
-opGreaterThanOrEq = (C.DataOrd, C.greaterThanOrEq)
-
-opAppend :: forall a. IsString a => (ModuleName, a)
-opAppend = (C.DataSemigroup, C.append)
-
-opSub :: forall a. IsString a => (ModuleName, a)
-opSub = (C.DataRing, C.sub)
-
-opNegate :: forall a. IsString a => (ModuleName, a)
-opNegate = (C.DataRing, C.negate)
-
-opDiv :: forall a. IsString a => (ModuleName, a)
-opDiv = (C.DataEuclideanRing, C.div)
-
-opConj :: forall a. IsString a => (ModuleName, a)
-opConj = (C.DataHeytingAlgebra, C.conj)
-
-opDisj :: forall a. IsString a => (ModuleName, a)
-opDisj = (C.DataHeytingAlgebra, C.disj)
-
-opNot :: forall a. IsString a => (ModuleName, a)
-opNot = (C.DataHeytingAlgebra, C.not)

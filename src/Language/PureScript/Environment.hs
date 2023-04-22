@@ -1,30 +1,32 @@
 module Language.PureScript.Environment where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import Prelude
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
+import Control.Monad (unless)
 import Codec.Serialise (Serialise)
 import Data.Aeson ((.=), (.:))
-import qualified Data.Aeson as A
-import qualified Data.Map as M
-import qualified Data.Set as S
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Aeson qualified as A
+import Data.Foldable (find, fold)
+import Data.Functor ((<&>))
+import Data.IntMap qualified as IM
+import Data.IntSet qualified as IS
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Maybe (fromMaybe)
+import Data.Semigroup (First(..))
 import Data.Text (Text)
-import qualified Data.Text as T
-import Data.Tree (Tree, rootLabel)
-import qualified Data.Graph as G
-import Data.Foldable (toList)
-import qualified Data.List.NonEmpty as NEL
+import Data.Text qualified as T
+import Data.List.NonEmpty qualified as NEL
 
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Crash
-import Language.PureScript.Names
-import Language.PureScript.Roles
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Types
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.AST.SourcePos (nullSourceAnn)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Names (Ident, ProperName(..), ProperNameType(..), Qualified, QualifiedBy, coerceProperName)
+import Language.PureScript.Roles (Role(..))
+import Language.PureScript.TypeClassDictionaries (NamedDict)
+import Language.PureScript.Types (SourceConstraint, SourceType, Type(..), eqType, srcTypeConstructor)
+import Language.PureScript.Constants.Prim qualified as C
 
 -- | The @Environment@ defines all values and types which are currently in scope:
 data Environment = Environment
@@ -129,49 +131,87 @@ makeTypeClassData
   -> TypeClassData
 makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
   where
-    argumentIndices = [0 .. length args - 1]
+    ( determinedArgs, coveringSets ) = computeCoveringSets (length args) deps
 
-    -- each argument determines themselves
-    identities = (\i -> (i, [i])) <$> argumentIndices
+-- A moving frontier of sets to consider, along with the fundeps that can be
+-- applied in each case. At each stage, all sets in the frontier will be the
+-- same size, decreasing by 1 each time.
+type Frontier = M.Map IS.IntSet (First (IM.IntMap (NEL.NonEmpty IS.IntSet)))
+--                         ^                 ^          ^          ^
+--         when *these* parameters           |          |          |
+--         are still needed,                 |          |          |
+--                              *these* parameters      |          |
+--                              can be determined       |          |
+--                                         from a non-zero         |
+--                                         number of fundeps,      |
+--                                                      which accept *these*
+--                                                      parameters as inputs.
 
-    -- list all the edges in the graph: for each fundep an edge exists for each determiner to each determined
-    contributingDeps = M.fromListWith (++) $ identities ++ do
-      fd <- deps
-      src <- fdDeterminers fd
-      (src, fdDetermined fd) : map (, []) (fdDetermined fd)
+computeCoveringSets :: Int -> [FunctionalDependency] -> (S.Set Int, S.Set (S.Set Int))
+computeCoveringSets nargs deps = ( determinedArgs, coveringSets )
+  where
+    argumentIndices = S.fromList [0 .. nargs - 1]
 
-    -- build a graph of which arguments determine other arguments
-    (depGraph, fromVertex, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, ordNub v)) <$> M.toList contributingDeps)
+    -- Compute all sets of arguments that determine the remaining arguments via
+    -- functional dependencies. This is done in stages, where each stage
+    -- considers sets of the same size to share work.
+    allCoveringSets :: S.Set (S.Set Int)
+    allCoveringSets = S.map (S.fromDistinctAscList . IS.toAscList) $ fst $ search $
+      -- The initial frontier consists of just the set of all parameters and all
+      -- fundeps organized into the map structure.
+      M.singleton
+        (IS.fromList [0 .. nargs - 1]) $
+          First $ IM.fromListWith (<>) $ do
+            fd <- deps
+            let srcs = pure (IS.fromList (fdDeterminers fd))
+            tgt <- fdDetermined fd
+            pure (tgt, srcs)
 
-    -- do there exist any arguments that contribute to `arg` that `arg` doesn't contribute to
-    isFunDepDetermined :: Int -> Bool
-    isFunDepDetermined arg = case fromKey arg of
-      Nothing -> internalError "Unknown argument index in makeTypeClassData"
-      Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
-                    varContributesTo = G.reachable depGraph v
-                in any (`notElem` varContributesTo) contributesToVar
+      where
 
-    -- find all the arguments that are determined
-    determinedArgs :: S.Set Int
-    determinedArgs = S.fromList $ filter isFunDepDetermined argumentIndices
+      -- Recursively advance the frontier until all frontiers are exhausted
+      -- and coverings sets found. The covering sets found during the process
+      -- are locally-minimal, in that none can be reduced by a fundep, but
+      -- there may be subsets found from other frontiers.
+      search :: Frontier -> (S.Set IS.IntSet, ())
+      search frontier = unless (null frontier) $ M.foldMapWithKey step frontier >>= search
 
-    argFromVertex :: G.Vertex -> Int
-    argFromVertex index = let (_, arg, _) = fromVertex index in arg
+      -- The input set from the frontier is known to cover all parameters, but
+      -- it may be able to be reduced by more fundeps.
+      step :: IS.IntSet -> First (IM.IntMap (NEL.NonEmpty IS.IntSet)) -> (S.Set IS.IntSet, Frontier)
+      step needed (First inEdges)
+        -- If there are no applicable fundeps, record it as a locally minimal
+        -- covering set. This has already been reduced to only applicable fundeps
+        | IM.null inEdges = (S.singleton needed, M.empty)
+        | otherwise       = (S.empty, foldMap removeParameter paramsToTry)
 
-    isVertexDetermined :: G.Vertex -> Bool
-    isVertexDetermined = isFunDepDetermined . argFromVertex
+          where
 
-    -- from an scc find the non-determined args
-    sccNonDetermined :: Tree G.Vertex -> Maybe [Int]
-    sccNonDetermined tree
-      -- if any arg in an scc is determined then all of them are
-      | isVertexDetermined (rootLabel tree) = Nothing
-      | otherwise = Just (argFromVertex <$> toList tree)
+          determined = IM.keys inEdges
+          -- If there is an acyclically determined functional dependency, prefer
+          -- it to reduce the number of cases to check. That is a dependency
+          -- that does not help determine other parameters.
+          acycDetermined = find (`IS.notMember` (IS.unions $ concatMap NEL.toList $ IM.elems inEdges)) determined
+          paramsToTry = maybe determined pure acycDetermined
 
-    -- find the covering sets
-    coveringSets :: S.Set (S.Set Int)
-    coveringSets = let funDepSets = sequence (mapMaybe sccNonDetermined (G.scc depGraph))
-                   in S.fromList (S.fromList <$> funDepSets)
+          -- For each parameter to be removed to build the next frontier,
+          -- delete the fundeps that determine it and filter out the fundeps
+          -- that make use of it. Of course, if it an acyclic fundep we already
+          -- found that there are none that use it.
+          removeParameter :: Int -> Frontier
+          removeParameter y =
+            M.singleton
+              (IS.delete y needed) $
+                case acycDetermined of
+                  Just _ -> First $ IM.delete y inEdges
+                  Nothing ->
+                    First $ IM.mapMaybe (NEL.nonEmpty . NEL.filter (y `IS.notMember`)) $ IM.delete y inEdges
+
+    -- Reduce to the inclusion-minimal sets
+    coveringSets = S.filter (\v -> not (any (\c -> c `S.isProperSubsetOf` v) allCoveringSets)) allCoveringSets
+
+    -- An argument is determined if it is in no covering set
+    determinedArgs = argumentIndices `S.difference` fold coveringSets
 
 -- | The visibility of a name in scope
 data NameVisibility
@@ -240,81 +280,62 @@ instance A.FromJSON DataDeclType where
     "newtype" -> return Newtype
     other -> fail $ "invalid type: '" ++ T.unpack other ++ "'"
 
--- | Construct a ProperName in the Prim module
-primName :: Text -> Qualified (ProperName a)
-primName = Qualified (ByModuleName C.Prim) . ProperName
-
--- | Construct a 'ProperName' in the @Prim.NAME@ module.
-primSubName :: Text -> Text -> Qualified (ProperName a)
-primSubName sub =
-  Qualified (ByModuleName $ ModuleName $ C.prim <> "." <> sub) . ProperName
-
-primKind :: Text -> SourceType
-primKind = primTy
-
-primSubKind :: Text -> Text -> SourceType
-primSubKind sub = TypeConstructor nullSourceAnn . primSubName sub
-
 -- | Kind of ground types
 kindType :: SourceType
-kindType = primKind C.typ
+kindType = srcTypeConstructor C.Type
 
 kindConstraint :: SourceType
-kindConstraint = primKind C.constraint
+kindConstraint = srcTypeConstructor C.Constraint
 
 kindSymbol :: SourceType
-kindSymbol = primKind C.symbol
+kindSymbol = srcTypeConstructor C.Symbol
 
 kindDoc :: SourceType
-kindDoc = primSubKind C.typeError C.doc
+kindDoc = srcTypeConstructor C.Doc
 
 kindOrdering :: SourceType
-kindOrdering = primSubKind C.moduleOrdering C.kindOrdering
+kindOrdering = srcTypeConstructor C.TypeOrdering
 
 kindRowList :: SourceType -> SourceType
-kindRowList = TypeApp nullSourceAnn (primSubKind C.moduleRowList C.kindRowList)
+kindRowList = TypeApp nullSourceAnn (srcTypeConstructor C.RowList)
 
 kindRow :: SourceType -> SourceType
-kindRow = TypeApp nullSourceAnn (primKind C.row)
+kindRow = TypeApp nullSourceAnn (srcTypeConstructor C.Row)
 
 kindOfREmpty :: SourceType
 kindOfREmpty = tyForall "k" kindType (kindRow (tyVar "k"))
 
--- | Construct a type in the Prim module
-primTy :: Text -> SourceType
-primTy = TypeConstructor nullSourceAnn . primName
-
 -- | Type constructor for functions
 tyFunction :: SourceType
-tyFunction = primTy "Function"
+tyFunction = srcTypeConstructor C.Function
 
 -- | Type constructor for strings
 tyString :: SourceType
-tyString = primTy "String"
+tyString = srcTypeConstructor C.String
 
 -- | Type constructor for strings
 tyChar :: SourceType
-tyChar = primTy "Char"
+tyChar = srcTypeConstructor C.Char
 
 -- | Type constructor for numbers
 tyNumber :: SourceType
-tyNumber = primTy "Number"
+tyNumber = srcTypeConstructor C.Number
 
 -- | Type constructor for integers
 tyInt :: SourceType
-tyInt = primTy "Int"
+tyInt = srcTypeConstructor C.Int
 
 -- | Type constructor for booleans
 tyBoolean :: SourceType
-tyBoolean = primTy "Boolean"
+tyBoolean = srcTypeConstructor C.Boolean
 
 -- | Type constructor for arrays
 tyArray :: SourceType
-tyArray = primTy "Array"
+tyArray = srcTypeConstructor C.Array
 
 -- | Type constructor for records
 tyRecord :: SourceType
-tyRecord = primTy "Record"
+tyRecord = srcTypeConstructor C.Record
 
 tyVar :: Text -> SourceType
 tyVar = TypeVar nullSourceAnn
@@ -331,12 +352,12 @@ function = TypeApp nullSourceAnn . TypeApp nullSourceAnn tyFunction
 (-:>) = function
 infixr 4 -:>
 
-primClass :: Qualified (ProperName 'TypeName) -> (SourceType -> SourceType) -> [(Qualified (ProperName 'TypeName), (SourceType, TypeKind))]
+primClass :: Qualified (ProperName 'ClassName) -> (SourceType -> SourceType) -> [(Qualified (ProperName 'TypeName), (SourceType, TypeKind))]
 primClass name mkKind =
   [ let k = mkKind kindConstraint
-    in (name, (k, ExternData (nominalRolesForKind k)))
+    in (coerceProperName <$> name, (k, ExternData (nominalRolesForKind k)))
   , let k = mkKind kindType
-    in (dictTypeName <$> name, (k, TypeSynonym))
+    in (dictTypeName . coerceProperName <$> name, (k, TypeSynonym))
   ]
 
 -- | The primitive types in the external environment with their
@@ -345,19 +366,19 @@ primClass name mkKind =
 primTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primTypes =
   M.fromList
-    [ (primName "Type",             (kindType, ExternData []))
-    , (primName "Constraint",       (kindType, ExternData []))
-    , (primName "Symbol",           (kindType, ExternData []))
-    , (primName "Row",              (kindType -:> kindType, ExternData [Phantom]))
-    , (primName "Function",         (kindType -:> kindType -:> kindType, ExternData [Representational, Representational]))
-    , (primName "Array",            (kindType -:> kindType, ExternData [Representational]))
-    , (primName "Record",           (kindRow kindType -:> kindType, ExternData [Representational]))
-    , (primName "String",           (kindType, ExternData []))
-    , (primName "Char",             (kindType, ExternData []))
-    , (primName "Number",           (kindType, ExternData []))
-    , (primName "Int",              (kindType, ExternData []))
-    , (primName "Boolean",          (kindType, ExternData []))
-    , (primName "Partial",          (kindConstraint, ExternData []))
+    [ (C.Type,                         (kindType, ExternData []))
+    , (C.Constraint,                   (kindType, ExternData []))
+    , (C.Symbol,                       (kindType, ExternData []))
+    , (C.Row,                          (kindType -:> kindType, ExternData [Phantom]))
+    , (C.Function,                     (kindType -:> kindType -:> kindType, ExternData [Representational, Representational]))
+    , (C.Array,                        (kindType -:> kindType, ExternData [Representational]))
+    , (C.Record,                       (kindRow kindType -:> kindType, ExternData [Representational]))
+    , (C.String,                       (kindType, ExternData []))
+    , (C.Char,                         (kindType, ExternData []))
+    , (C.Number,                       (kindType, ExternData []))
+    , (C.Int,                          (kindType, ExternData []))
+    , (C.Boolean,                      (kindType, ExternData []))
+    , (C.Partial <&> coerceProperName, (kindConstraint, ExternData []))
     ]
 
 -- | This 'Map' contains all of the prim types from all Prim modules.
@@ -377,75 +398,75 @@ allPrimTypes = M.unions
 primBooleanTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primBooleanTypes =
   M.fromList
-    [ (primSubName C.moduleBoolean "True", (tyBoolean, ExternData []))
-    , (primSubName C.moduleBoolean "False", (tyBoolean, ExternData []))
+    [ (C.True, (tyBoolean, ExternData []))
+    , (C.False, (tyBoolean, ExternData []))
     ]
 
 primCoerceTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primCoerceTypes =
   M.fromList $ mconcat
-    [ primClass (primSubName C.moduleCoerce "Coercible") (\kind -> tyForall "k" kindType $ tyVar "k" -:> tyVar "k" -:> kind)
+    [ primClass C.Coercible (\kind -> tyForall "k" kindType $ tyVar "k" -:> tyVar "k" -:> kind)
     ]
 
 primOrderingTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primOrderingTypes =
   M.fromList
-    [ (primSubName C.moduleOrdering "Ordering", (kindType, ExternData []))
-    , (primSubName C.moduleOrdering "LT", (kindOrdering, ExternData []))
-    , (primSubName C.moduleOrdering "EQ", (kindOrdering, ExternData []))
-    , (primSubName C.moduleOrdering "GT", (kindOrdering, ExternData []))
+    [ (C.TypeOrdering, (kindType, ExternData []))
+    , (C.LT, (kindOrdering, ExternData []))
+    , (C.EQ, (kindOrdering, ExternData []))
+    , (C.GT, (kindOrdering, ExternData []))
     ]
 
 primRowTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primRowTypes =
   M.fromList $ mconcat
-    [ primClass (primSubName C.moduleRow "Union") (\kind -> tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kind)
-    , primClass (primSubName C.moduleRow "Nub")   (\kind -> tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kind)
-    , primClass (primSubName C.moduleRow "Lacks") (\kind -> tyForall "k" kindType $ kindSymbol -:> kindRow (tyVar "k") -:> kind)
-    , primClass (primSubName C.moduleRow "Cons")  (\kind -> tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kind)
+    [ primClass C.RowUnion (\kind -> tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kind)
+    , primClass C.RowNub   (\kind -> tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kind)
+    , primClass C.RowLacks (\kind -> tyForall "k" kindType $ kindSymbol -:> kindRow (tyVar "k") -:> kind)
+    , primClass C.RowCons  (\kind -> tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kind)
     ]
 
 primRowListTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primRowListTypes =
   M.fromList $
-    [ (primSubName C.moduleRowList "RowList", (kindType -:> kindType, ExternData [Phantom]))
-    , (primSubName C.moduleRowList "Cons", (tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRowList (tyVar "k") -:> kindRowList (tyVar "k"), ExternData [Phantom, Phantom, Phantom]))
-    , (primSubName C.moduleRowList "Nil", (tyForall "k" kindType $ kindRowList (tyVar "k"), ExternData []))
+    [ (C.RowList, (kindType -:> kindType, ExternData [Phantom]))
+    , (C.RowListCons, (tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRowList (tyVar "k") -:> kindRowList (tyVar "k"), ExternData [Phantom, Phantom, Phantom]))
+    , (C.RowListNil, (tyForall "k" kindType $ kindRowList (tyVar "k"), ExternData []))
     ] <> mconcat
-    [ primClass (primSubName C.moduleRowList "RowToList")  (\kind -> tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRowList (tyVar "k") -:> kind)
+    [ primClass C.RowToList  (\kind -> tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRowList (tyVar "k") -:> kind)
     ]
 
 primSymbolTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primSymbolTypes =
   M.fromList $ mconcat
-    [ primClass (primSubName C.moduleSymbol "Append")  (\kind -> kindSymbol -:> kindSymbol -:> kindSymbol -:> kind)
-    , primClass (primSubName C.moduleSymbol "Compare") (\kind -> kindSymbol -:> kindSymbol -:> kindOrdering -:> kind)
-    , primClass (primSubName C.moduleSymbol "Cons")    (\kind -> kindSymbol -:> kindSymbol -:> kindSymbol -:> kind)
+    [ primClass C.SymbolAppend  (\kind -> kindSymbol -:> kindSymbol -:> kindSymbol -:> kind)
+    , primClass C.SymbolCompare (\kind -> kindSymbol -:> kindSymbol -:> kindOrdering -:> kind)
+    , primClass C.SymbolCons    (\kind -> kindSymbol -:> kindSymbol -:> kindSymbol -:> kind)
     ]
 
 primIntTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primIntTypes =
   M.fromList $ mconcat
-    [ primClass (primSubName C.moduleInt "Add")     (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
-    , primClass (primSubName C.moduleInt "Compare") (\kind -> tyInt -:> tyInt -:> kindOrdering -:> kind)
-    , primClass (primSubName C.moduleInt "Mul")     (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
-    , primClass (primSubName C.moduleInt "ToString") (\kind -> tyInt -:> kindSymbol -:> kind)
+    [ primClass C.IntAdd      (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
+    , primClass C.IntCompare  (\kind -> tyInt -:> tyInt -:> kindOrdering -:> kind)
+    , primClass C.IntMul      (\kind -> tyInt -:> tyInt -:> tyInt -:> kind)
+    , primClass C.IntToString (\kind -> tyInt -:> kindSymbol -:> kind)
     ]
 
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primTypeErrorTypes =
   M.fromList $
-    [ (primSubName C.typeError "Doc", (kindType, ExternData []))
-    , (primSubName C.typeError "Fail", (kindDoc -:> kindConstraint, ExternData [Nominal]))
-    , (primSubName C.typeError "Warn", (kindDoc -:> kindConstraint, ExternData [Nominal]))
-    , (primSubName C.typeError "Text", (kindSymbol -:> kindDoc, ExternData [Phantom]))
-    , (primSubName C.typeError "Quote", (tyForall "k" kindType $ tyVar "k" -:> kindDoc, ExternData [Phantom]))
-    , (primSubName C.typeError "QuoteLabel", (kindSymbol -:> kindDoc, ExternData [Phantom]))
-    , (primSubName C.typeError "Beside", (kindDoc -:> kindDoc -:> kindDoc, ExternData [Phantom, Phantom]))
-    , (primSubName C.typeError "Above", (kindDoc -:> kindDoc -:> kindDoc, ExternData [Phantom, Phantom]))
+    [ (C.Doc, (kindType, ExternData []))
+    , (C.Fail <&> coerceProperName, (kindDoc -:> kindConstraint, ExternData [Nominal]))
+    , (C.Warn <&> coerceProperName, (kindDoc -:> kindConstraint, ExternData [Nominal]))
+    , (C.Text, (kindSymbol -:> kindDoc, ExternData [Phantom]))
+    , (C.Quote, (tyForall "k" kindType $ tyVar "k" -:> kindDoc, ExternData [Phantom]))
+    , (C.QuoteLabel, (kindSymbol -:> kindDoc, ExternData [Phantom]))
+    , (C.Beside, (kindDoc -:> kindDoc -:> kindDoc, ExternData [Phantom, Phantom]))
+    , (C.Above, (kindDoc -:> kindDoc -:> kindDoc, ExternData [Phantom, Phantom]))
     ] <> mconcat
-    [ primClass (primSubName C.typeError "Fail") (\kind -> kindDoc -:> kind)
-    , primClass (primSubName C.typeError "Warn") (\kind -> kindDoc -:> kind)
+    [ primClass C.Fail (\kind -> kindDoc -:> kind)
+    , primClass C.Warn (\kind -> kindDoc -:> kind)
     ]
 
 -- | The primitive class map. This just contains the `Partial` class.
@@ -453,7 +474,7 @@ primTypeErrorTypes =
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
-    [ (primName "Partial", makeTypeClassData [] [] [] [] True)
+    [ (C.Partial, makeTypeClassData [] [] [] [] True)
     ]
 
 -- | This contains all of the type classes from all Prim modules.
@@ -472,7 +493,7 @@ primCoerceClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primCoerceClasses =
   M.fromList
     -- class Coercible (a :: k) (b :: k)
-    [ (primSubName C.moduleCoerce "Coercible", makeTypeClassData
+    [ (C.Coercible, makeTypeClassData
         [ ("a", Just (tyVar "k"))
         , ("b", Just (tyVar "k"))
         ] [] [] [] True)
@@ -482,7 +503,7 @@ primRowClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primRowClasses =
   M.fromList
     -- class Union (left :: Row k) (right :: Row k) (union :: Row k) | left right -> union, right union -> left, union left -> right
-    [ (primSubName C.moduleRow "Union", makeTypeClassData
+    [ (C.RowUnion, makeTypeClassData
         [ ("left", Just (kindRow (tyVar "k")))
         , ("right", Just (kindRow (tyVar "k")))
         , ("union", Just (kindRow (tyVar "k")))
@@ -493,7 +514,7 @@ primRowClasses =
         ] True)
 
     -- class Nub (original :: Row k) (nubbed :: Row k) | original -> nubbed
-    , (primSubName C.moduleRow "Nub", makeTypeClassData
+    , (C.RowNub, makeTypeClassData
         [ ("original", Just (kindRow (tyVar "k")))
         , ("nubbed", Just (kindRow (tyVar "k")))
         ] [] []
@@ -501,13 +522,13 @@ primRowClasses =
         ] True)
 
     -- class Lacks (label :: Symbol) (row :: Row k)
-    , (primSubName C.moduleRow "Lacks", makeTypeClassData
+    , (C.RowLacks, makeTypeClassData
         [ ("label", Just kindSymbol)
         , ("row", Just (kindRow (tyVar "k")))
         ] [] [] [] True)
 
     -- class RowCons (label :: Symbol) (a :: k) (tail :: Row k) (row :: Row k) | label tail a -> row, label row -> tail a
-    , (primSubName C.moduleRow "Cons", makeTypeClassData
+    , (C.RowCons, makeTypeClassData
         [ ("label", Just kindSymbol)
         , ("a", Just (tyVar "k"))
         , ("tail", Just (kindRow (tyVar "k")))
@@ -522,7 +543,7 @@ primRowListClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primRowListClasses =
   M.fromList
     -- class RowToList (row :: Row k) (list :: RowList k) | row -> list
-    [ (primSubName C.moduleRowList "RowToList", makeTypeClassData
+    [ (C.RowToList, makeTypeClassData
         [ ("row", Just (kindRow (tyVar "k")))
         , ("list", Just (kindRowList (tyVar "k")))
         ] [] []
@@ -534,7 +555,7 @@ primSymbolClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primSymbolClasses =
   M.fromList
     -- class Append (left :: Symbol) (right :: Symbol) (appended :: Symbol) | left right -> appended, right appended -> left, appended left -> right
-    [ (primSubName C.moduleSymbol "Append", makeTypeClassData
+    [ (C.SymbolAppend, makeTypeClassData
         [ ("left", Just kindSymbol)
         , ("right", Just kindSymbol)
         , ("appended", Just kindSymbol)
@@ -545,7 +566,7 @@ primSymbolClasses =
         ] True)
 
     -- class Compare (left :: Symbol) (right :: Symbol) (ordering :: Ordering) | left right -> ordering
-    , (primSubName C.moduleSymbol "Compare", makeTypeClassData
+    , (C.SymbolCompare, makeTypeClassData
         [ ("left", Just kindSymbol)
         , ("right", Just kindSymbol)
         , ("ordering", Just kindOrdering)
@@ -554,7 +575,7 @@ primSymbolClasses =
         ] True)
 
     -- class Cons (head :: Symbol) (tail :: Symbol) (symbol :: Symbol) | head tail -> symbol, symbol -> head tail
-    , (primSubName C.moduleSymbol "Cons", makeTypeClassData
+    , (C.SymbolCons, makeTypeClassData
         [ ("head", Just kindSymbol)
         , ("tail", Just kindSymbol)
         , ("symbol", Just kindSymbol)
@@ -568,7 +589,7 @@ primIntClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primIntClasses =
   M.fromList
     -- class Add (left :: Int) (right :: Int) (sum :: Int) | left right -> sum, left sum -> right, right sum -> left
-    [ (primSubName C.moduleInt "Add", makeTypeClassData
+    [ (C.IntAdd, makeTypeClassData
         [ ("left", Just tyInt)
         , ("right", Just tyInt)
         , ("sum", Just tyInt)
@@ -579,7 +600,7 @@ primIntClasses =
         ] True)
 
     -- class Compare (left :: Int) (right :: Int) (ordering :: Ordering) | left right -> ordering
-    , (primSubName C.moduleInt "Compare", makeTypeClassData
+    , (C.IntCompare, makeTypeClassData
         [ ("left", Just tyInt)
         , ("right", Just tyInt)
         , ("ordering", Just kindOrdering)
@@ -588,7 +609,7 @@ primIntClasses =
         ] True)
 
     -- class Mul (left :: Int) (right :: Int) (product :: Int) | left right -> product
-    , (primSubName C.moduleInt "Mul", makeTypeClassData
+    , (C.IntMul, makeTypeClassData
         [ ("left", Just tyInt)
         , ("right", Just tyInt)
         , ("product", Just tyInt)
@@ -597,7 +618,7 @@ primIntClasses =
         ] True)
 
     -- class ToString (int :: Int) (string :: Symbol) | int -> string
-    , (primSubName C.moduleInt "ToString", makeTypeClassData
+    , (C.IntToString, makeTypeClassData
         [ ("int", Just tyInt)
         , ("string", Just kindSymbol)
         ] [] []
@@ -609,11 +630,11 @@ primTypeErrorClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primTypeErrorClasses =
   M.fromList
     -- class Fail (message :: Symbol)
-    [ (primSubName C.typeError "Fail", makeTypeClassData
+    [ (C.Fail, makeTypeClassData
         [("message", Just kindDoc)] [] [] [] True)
 
     -- class Warn (message :: Symbol)
-    , (primSubName C.typeError "Warn", makeTypeClassData
+    , (C.Warn, makeTypeClassData
         [("message", Just kindDoc)] [] [] [] True)
     ]
 

@@ -12,7 +12,7 @@ module Language.PureScript.Docs.RenderedCode.RenderType
   , renderRow
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack)
@@ -21,16 +21,16 @@ import Data.List (uncons)
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
-import Language.PureScript.Crash
-import Language.PureScript.Label
-import Language.PureScript.Names
-import Language.PureScript.Pretty.Types
-import Language.PureScript.Roles
-import Language.PureScript.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Label (Label)
+import Language.PureScript.Names (coerceProperName)
+import Language.PureScript.Pretty.Types (PrettyPrintConstraint, PrettyPrintType(..), convertPrettyPrintType, prettyPrintLabel)
+import Language.PureScript.Roles (Role, displayRole)
+import Language.PureScript.Types (Type)
 import Language.PureScript.PSString (prettyPrintString)
 
-import Language.PureScript.Docs.RenderedCode.Types
-import Language.PureScript.Docs.Utils.MonoidExtras
+import Language.PureScript.Docs.RenderedCode.Types (RenderedCode, keywordForall, roleAnn, sp, syntax, typeCtor, typeOp, typeVar)
+import Language.PureScript.Docs.Utils.MonoidExtras (mintersperse)
 
 typeLiterals :: Pattern () PrettyPrintType RenderedCode
 typeLiterals = mkPattern match

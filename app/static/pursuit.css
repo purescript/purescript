@@ -49,6 +49,9 @@
  * ========================================================================== */
 /* Section: Document Styles
  * ========================================================================== */
+:root {
+  color-scheme: light dark;
+}
 html {
   box-sizing: border-box;
   /* This overflow rule prevents everything from shifting slightly to the side
@@ -63,10 +66,16 @@ html {
 }
 body {
   background-color: #ffffff;
-  color: #000;
+  color: #000000;
   font-family: "Roboto", sans-serif;
   font-size: 87.5%;
   line-height: 1.563;
+}
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #141417;
+    color: #dedede;
+  }
 }
 @media (min-width: 38em) {
   body {
@@ -158,6 +167,12 @@ body {
   background-color: #1d222d;
   color: #f0f0f0;
 }
+@media (prefers-color-scheme: dark) {
+  .footer {
+    background-color: #1d222d;
+    color: #f0f0f0;
+  }
+}
 .footer * {
   margin-bottom: 0;
 }
@@ -169,15 +184,31 @@ body {
 :target {
   background-color: #f1f5f9;
 }
+@media (prefers-color-scheme: dark) {
+  :target {
+    background-color: #232327;
+  }
+}
 a,
 a:visited {
   color: #c4953a;
   text-decoration: none;
   font-weight: bold;
 }
+@media (prefers-color-scheme: dark) {
+  a,
+  a:visited {
+    color: #d8ac55;
+  }
+}
 a:hover {
   color: #7b5904;
   text-decoration: none;
+}
+@media (prefers-color-scheme: dark) {
+  a:hover {
+    color: #f0dcab;
+  }
 }
 code,
 pre {
@@ -187,9 +218,22 @@ pre {
   font-family: "Roboto Mono", monospace;
   font-size: 87.5%;
 }
+@media (prefers-color-scheme: dark) {
+  code,
+  pre {
+    background-color: #232327;
+    color: #c1d3da;
+  }
+}
 :target code,
 :target pre {
   background-color: #dfe8f1;
+}
+@media (prefers-color-scheme: dark) {
+  :target code,
+  :target pre {
+    background-color: #2f2f34;
+  }
 }
 code {
   padding: 0.2em 0;
@@ -211,6 +255,11 @@ a > code::before {
 }
 a:hover > code {
   color: #c4953a;
+}
+@media (prefers-color-scheme: dark) {
+  a:hover > code {
+    color: #d8ac55;
+  }
 }
 pre {
   margin-top: 0;
@@ -255,14 +304,14 @@ h1 {
 h2 {
   font-size: 1.953em;
   font-weight: normal;
-  line-height: 1.250;
+  line-height: 1.25;
   margin-top: 3.052rem;
   margin-bottom: 1rem;
 }
 h3 {
   font-size: 1.563em;
   font-weight: normal;
-  line-height: 1.250;
+  line-height: 1.25;
   margin-top: 2.441rem;
   margin-bottom: 1rem;
 }
@@ -285,6 +334,11 @@ hr {
   height: 1px;
   background-color: #cccccc;
 }
+@media (prefers-color-scheme: dark) {
+  hr {
+    background-color: #43434e;
+  }
+}
 img {
   border-style: none;
   max-width: 100%;
@@ -302,6 +356,11 @@ table {
   margin-bottom: 1rem;
   width: 100%;
 }
+@media (prefers-color-scheme: dark) {
+  table {
+    border-bottom-color: #43434e;
+  }
+}
 td,
 th {
   text-align: left;
@@ -309,6 +368,11 @@ th {
 }
 td {
   border-top: 1px solid #cccccc;
+}
+@media (prefers-color-scheme: dark) {
+  td {
+    border-top-color: #43434e;
+  }
 }
 td:first-child,
 th:first-child {
@@ -326,7 +390,7 @@ ul {
 }
 ul li {
   position: relative;
-  padding-left: 1.250em;
+  padding-left: 1.25em;
 }
 ul li::before {
   position: absolute;
@@ -334,7 +398,12 @@ ul li::before {
   content: "–";
   display: inline-block;
   margin-left: -1.25em;
-  width: 1.250em;
+  width: 1.25em;
+}
+@media (prefers-color-scheme: dark) {
+  ul li::before {
+    color: #a0a0a0;
+  }
 }
 /* Tying this tightly to ul at the moment because it's a slight variation thereof */
 ul.ul--search li::before {
@@ -345,7 +414,7 @@ ul.ul--search li::before {
 ol {
   margin-top: 1rem;
   margin-bottom: 1rem;
-  padding-left: 1.250em;
+  padding-left: 1.25em;
 }
 ol li {
   position: relative;
@@ -359,9 +428,9 @@ ol li {
   position: relative;
   top: -0.1em;
   display: inline-block;
-  background-color: #000;
+  background-color: #000000;
   border-radius: 1.3em;
-  color: #fff;
+  color: #ffffff;
   font-size: 77%;
   font-weight: bold;
   line-height: 1.563;
@@ -369,9 +438,20 @@ ol li {
   height: 1.5em;
   width: 1.5em;
 }
+@media (prefers-color-scheme: dark) {
+  .badge {
+    background-color: #dedede;
+    color: #141417;
+  }
+}
 .badge.badge--package {
   background-color: #c4953a;
   letter-spacing: -0.1em;
+}
+@media (prefers-color-scheme: dark) {
+  .badge.badge--package {
+    background-color: #d8ac55;
+  }
 }
 .badge.badge--module {
   background-color: #75B134;
@@ -396,8 +476,19 @@ ol li {
   left: -0.8em;
   color: #bababa;
 }
+@media (prefers-color-scheme: dark) {
+  .decl__anchor,
+  .decl__anchor:visited {
+    color: #878787;
+  }
+}
 .decl__anchor:hover {
   color: #c4953a;
+}
+@media (prefers-color-scheme: dark) {
+  .decl__anchor:hover {
+    color: #d8ac55;
+  }
 }
 .decl__signature {
   background-color: transparent;
@@ -405,6 +496,12 @@ ol li {
   border-top: 1px solid #cccccc;
   border-bottom: 1px solid #cccccc;
   padding: 0;
+}
+@media (prefers-color-scheme: dark) {
+  .decl__signature {
+    border-top-color: #43434e;
+    border-bottom-color: #43434e;
+  }
 }
 .decl__signature code {
   display: block;
@@ -437,6 +534,11 @@ ol li {
 .decl__kind {
   border-bottom: 1px solid #cccccc;
 }
+@media (prefers-color-scheme: dark) {
+  .decl__kind {
+    border-bottom-color: #43434e;
+  }
+}
 :target .decl__signature,
 :target .decl__signature code {
   /* We want the background to be transparent, even when the parent is a target */
@@ -444,7 +546,13 @@ ol li {
 }
 .decl__body .keyword,
 .decl__body .syntax {
-  color: #0B71B4;
+  color: #0b71b4;
+}
+@media (prefers-color-scheme: dark) {
+  .decl__body .keyword,
+  .decl__body .syntax {
+    color: #3796d5;
+  }
 }
 .decl__child_comments {
   margin-top: 1rem;
@@ -465,11 +573,21 @@ ol li {
   font-size: 0.8em;
   line-height: 1;
 }
+@media (prefers-color-scheme: dark) {
+  .deplink__version {
+    color: #a0a0a0;
+  }
+}
 /* Component: Grouped List
  * -------------------------------------------------------------------------- */
 .grouped-list {
   border-top: 1px solid #cccccc;
   margin: 0 0 2.44em 0;
+}
+@media (prefers-color-scheme: dark) {
+  .grouped-list {
+    border-top-color: #43434e;
+  }
 }
 .grouped-list__title {
   color: #666666;
@@ -478,6 +596,11 @@ ol li {
   letter-spacing: 1px;
   margin: 0.8em 0 -0.1em 0;
   text-transform: uppercase;
+}
+@media (prefers-color-scheme: dark) {
+  .grouped-list__title {
+    border-top-color: #a0a0a0;
+  }
 }
 .grouped-list__item {
   margin: 0;
@@ -493,9 +616,21 @@ ol li {
   background-color: #fff0f0;
   border-color: #c85050;
 }
+@media (prefers-color-scheme: dark) {
+  .message.message--error {
+    background-color: #6b0e0e;
+    border-color: #c85050;
+  }
+}
 .message.message--not-available {
   background-color: #f0f096;
   border-color: #e3e33d;
+}
+@media (prefers-color-scheme: dark) {
+  .message.message--not-available {
+    background-color: #56560b;
+    border-color: #b0b017;
+  }
 }
 /* Component: Multi Col
  * Multiple columns side by side
@@ -548,12 +683,23 @@ ol li {
   text-transform: uppercase;
   z-index: 1;
 }
+@media (prefers-color-scheme: dark) {
+  .page-title__label {
+    color: #a0a0a0;
+  }
+}
 /* Component: Top Banner
  * -------------------------------------------------------------------------- */
 .top-banner {
   background-color: #1d222d;
   color: #f0f0f0;
   font-weight: normal;
+}
+@media (prefers-color-scheme: dark) {
+  .top-banner {
+    background-color: #1d222d;
+    color: #f0f0f0;
+  }
 }
 .top-banner__logo,
 .top-banner__logo:visited {
@@ -563,6 +709,12 @@ ol li {
   font-weight: 300;
   line-height: 90px;
   margin: 0;
+}
+@media (prefers-color-scheme: dark) {
+  .top-banner__logo,
+  .top-banner__logo:visited {
+    color: #f0f0f0;
+  }
 }
 .top-banner__logo:hover {
   color: #c4953a;
@@ -574,11 +726,19 @@ ol li {
 .top-banner__form input {
   border: 1px solid #1d222d;
   border-radius: 3px;
+  background-color: #ffffff;
   color: #1d222d;
   font-weight: 300;
   line-height: 2;
   padding: 0.21em 0.512em;
   width: 100%;
+}
+@media (prefers-color-scheme: dark) {
+  .top-banner__form input {
+    border-color: #1d222d;
+    background-color: #141417;
+    color: #dedede;
+  }
 }
 .top-banner__actions {
   float: right;
@@ -597,8 +757,19 @@ ol li {
 .top-banner__actions__item a:visited {
   color: #f0f0f0;
 }
+@media (prefers-color-scheme: dark) {
+  .top-banner__actions__item a,
+  .top-banner__actions__item a:visited {
+    color: #f0f0f0;
+  }
+}
 .top-banner__actions__item a:hover {
   color: #c4953a;
+}
+@media (prefers-color-scheme: dark) {
+  .top-banner__actions__item a:hover {
+    color: #d8ac55;
+  }
 }
 @media (min-width: 38em) {
   .top-banner__logo {
@@ -640,6 +811,12 @@ ol li {
   border-top: 1px solid #cccccc;
   border-bottom: 1px solid #cccccc;
   padding: 0.328em 0;
+}
+@media (prefers-color-scheme: dark) {
+  .result__signature {
+    border-top-color: #43434e;
+    border-bottom-color: #43434e;
+  }
 }
 .result__signature code {
   display: block;
@@ -707,6 +884,11 @@ ol li {
   color: #777;
   border-left: 0.25em solid #ddd;
 }
+@media (prefers-color-scheme: dark) {
+  .markdown-body blockquote {
+    border-left-color: #444;
+  }
+}
 .markdown-body blockquote > :first-child {
   margin-top: 0;
 }
@@ -720,6 +902,11 @@ ol li {
 .markdown-body .pl-k {
   /* Keyword */
   color: #a0a0a0;
+}
+@media (prefers-color-scheme: dark) {
+  .markdown-body .pl-k {
+    color: #676767;
+  }
 }
 .markdown-body .pl-c1,
 .markdown-body .pl-en {

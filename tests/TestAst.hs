@@ -5,14 +5,14 @@ import Protolude hiding (Constraint, Type, (:+))
 
 import Control.Lens ((+~))
 import Control.Newtype (ala')
-import Generic.Random
-import Test.Hspec
-import Test.QuickCheck
+import Generic.Random (genericArbitraryRecG, genericArbitraryUG, listOf', uniform, withBaseCase, (:+)(..))
+import Test.Hspec (Spec, describe, it)
+import Test.QuickCheck (Arbitrary(..), Gen, Property, Testable, counterexample, forAllShrink, subterms, (===))
 
-import Language.PureScript.Label
-import Language.PureScript.Names
-import Language.PureScript.PSString
-import Language.PureScript.Types
+import Language.PureScript.Label (Label(..))
+import Language.PureScript.Names (pattern ByNullSourcePos, OpName(..), OpNameType(..), ProperName(..), ProperNameType(..), Qualified(..))
+import Language.PureScript.PSString (PSString)
+import Language.PureScript.Types (Constraint, ConstraintData, SkolemScope(..), Type(..), WildcardData, annForType, everythingOnTypes, everythingWithContextOnTypes, everywhereOnTypes, everywhereOnTypesM, everywhereOnTypesTopDownM, getAnnForType)
 
 spec :: Spec
 spec = do

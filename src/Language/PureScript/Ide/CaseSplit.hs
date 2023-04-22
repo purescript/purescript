@@ -21,18 +21,18 @@ module Language.PureScript.Ide.CaseSplit
        , caseSplit
        ) where
 
-import           Protolude                     hiding (Constructor)
+import Protolude                     hiding (Constructor)
 
-import qualified Data.List.NonEmpty            as NE
-import qualified Data.Map                      as M
-import qualified Data.Text                     as T
-import qualified Language.PureScript           as P
-import qualified Language.PureScript.CST       as CST
+import Data.List.NonEmpty qualified as NE
+import Data.Map qualified as M
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
 
-import           Language.PureScript.Externs
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Types
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
+import Language.PureScript.Ide.Error (IdeError(..))
+import Language.PureScript.Ide.State (cachedRebuild, getExternFiles)
+import Language.PureScript.Ide.Types (Ide)
 
 type Constructor = (P.ProperName 'P.ConstructorName, [P.SourceType])
 
@@ -91,8 +91,8 @@ splitTypeConstructor = go []
 prettyCtor :: WildcardAnnotations -> Constructor -> Text
 prettyCtor _ (ctorName, []) = P.runProperName ctorName
 prettyCtor wsa (ctorName, ctorArgs) =
-  "("<> P.runProperName ctorName <> " "
-  <> T.unwords (map (prettyPrintWildcard wsa) ctorArgs) <>")"
+  "(" <> P.runProperName ctorName <> " "
+  <> T.unwords (map (prettyPrintWildcard wsa) ctorArgs) <> ")"
 
 prettyPrintWildcard :: WildcardAnnotations -> P.Type a -> Text
 prettyPrintWildcard (WildcardAnnotations True) = prettyWildcard

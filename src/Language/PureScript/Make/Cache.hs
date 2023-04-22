@@ -13,13 +13,13 @@ import Prelude
 import Control.Category ((>>>))
 import Control.Monad ((>=>))
 import Crypto.Hash (HashAlgorithm, Digest, SHA512)
-import qualified Crypto.Hash as Hash
-import qualified Data.Aeson as Aeson
+import Crypto.Hash qualified as Hash
+import Data.Aeson qualified as Aeson
 import Data.Align (align)
 import Data.ByteArray.Encoding (Base(Base16), convertToBase, convertFromBase)
-import qualified Data.ByteString as BS
+import Data.ByteString qualified as BS
 import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 import Data.Maybe (fromMaybe)
 import Data.Monoid (All(..))
 import Data.Set (Set)
@@ -28,7 +28,7 @@ import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.These (These(..))
 import Data.Time.Clock (UTCTime)
 import Data.Traversable (for)
-import qualified System.FilePath as FilePath
+import System.FilePath qualified as FilePath
 
 import Language.PureScript.Names (ModuleName)
 

@@ -3,13 +3,13 @@
 --
 module Language.PureScript.CoreFn.Expr where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((***))
 
-import Language.PureScript.AST.Literals
-import Language.PureScript.CoreFn.Binders
-import Language.PureScript.Names
+import Language.PureScript.AST.Literals (Literal)
+import Language.PureScript.CoreFn.Binders (Binder)
+import Language.PureScript.Names (Ident, ProperName, ProperNameType(..), Qualified)
 import Language.PureScript.PSString (PSString)
 
 -- |

@@ -5,20 +5,20 @@
 --
 module Language.PureScript.Names where
 
-import Prelude.Compat
+import Prelude
 
 import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.DeepSeq (NFData)
 import Data.Functor.Contravariant (contramap)
-import qualified Data.Vector as V
+import Data.Vector qualified as V
 
 import GHC.Generics (Generic)
-import Data.Aeson
-import Data.Aeson.TH
+import Data.Aeson (FromJSON(..), FromJSONKey(..), Options(..), SumEncoding(..), ToJSON(..), ToJSONKey(..), defaultOptions, parseJSON2, toJSON2, withArray)
+import Data.Aeson.TH (deriveJSON)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.AST.SourcePos (SourcePos, pattern SourcePos)
 
@@ -292,7 +292,7 @@ instance ToJSON a => ToJSON (Qualified a) where
     BySourcePos ss -> toJSON2 (ss, a)
 
 instance FromJSON a => FromJSON (Qualified a) where
-  parseJSON v = byModule <|> bySourcePos
+  parseJSON v = byModule <|> bySourcePos <|> byMaybeModuleName'
     where
     byModule = do
       (mn, a) <- parseJSON2 v
@@ -300,6 +300,9 @@ instance FromJSON a => FromJSON (Qualified a) where
     bySourcePos = do
       (ss, a) <- parseJSON2 v
       pure $ Qualified (BySourcePos ss) a
+    byMaybeModuleName' = do
+      (mn, a) <- parseJSON2 v
+      pure $ Qualified (byMaybeModuleName mn) a
 
 instance ToJSON ModuleName where
   toJSON (ModuleName name) = toJSON (T.splitOn "." name)

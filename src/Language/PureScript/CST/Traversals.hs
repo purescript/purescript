@@ -2,7 +2,7 @@ module Language.PureScript.CST.Traversals where
 
 import Prelude
 
-import Language.PureScript.CST.Types
+import Language.PureScript.CST.Types (Separated(..))
 
 everythingOnSeparated :: (r -> r -> r) -> (a -> r) -> Separated a -> r
 everythingOnSeparated op k (Separated hd tl) = go hd tl

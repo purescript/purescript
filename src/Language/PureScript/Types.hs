@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Types where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Codec.Serialise (Serialise)
@@ -13,19 +13,19 @@ import Control.DeepSeq (NFData)
 import Control.Lens (Lens', (^.), set)
 import Control.Monad ((<=<), (>=>))
 import Data.Aeson ((.:), (.:?), (.!=), (.=))
-import qualified Data.Aeson as A
-import qualified Data.Aeson.Types as A
+import Data.Aeson qualified as A
+import Data.Aeson.Types qualified as A
 import Data.Foldable (fold, foldl')
-import qualified Data.IntSet as IS
+import Data.IntSet qualified as IS
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, isJust)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import GHC.Generics (Generic)
 
-import Language.PureScript.AST.SourcePos
-import qualified Language.PureScript.Constants.Prim as C
-import Language.PureScript.Names
+import Language.PureScript.AST.SourcePos (pattern NullSourceAnn, SourceAnn, SourceSpan)
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Names (OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified, coerceProperName)
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)
 
@@ -365,7 +365,7 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
     "ParensInType" -> do
       b <- contents
       ParensInType a <$> go b
-    -- Backwards compatability for kinds
+    -- Backwards compatibility for kinds
     "KUnknown" ->
       TUnknown a <$> contents
     "Row" ->
@@ -443,7 +443,7 @@ rowFromList (xs, r) = foldr (\(RowListItem ann name ty) -> RCons ann name ty) r 
 --
 -- Note: importantly, we preserve the order of the types with a given label.
 alignRowsWith
-  :: (Type a -> Type a -> r)
+  :: (Label -> Type a -> Type a -> r)
   -> Type a
   -> Type a
   -> ([r], (([RowListItem a], Type a), ([RowListItem a], Type a)))
@@ -453,10 +453,11 @@ alignRowsWith f ty1 ty2 = go s1 s2 where
 
   go [] r = ([], (([], tail1), (r, tail2)))
   go r [] = ([], ((r, tail1), ([], tail2)))
-  go lhs@(RowListItem a1 l1 t1 : r1) rhs@(RowListItem a2 l2 t2 : r2)
-    | l1 < l2 = (second . first . first) (RowListItem a1 l1 t1 :) (go r1 rhs)
-    | l2 < l1 = (second . second . first) (RowListItem a2 l2 t2 :) (go lhs r2)
-    | otherwise = first (f t1 t2 :) (go r1 r2)
+  go lhs@(RowListItem a1 l1 t1 : r1) rhs@(RowListItem a2 l2 t2 : r2) = 
+    case compare l1 l2 of
+      LT -> (second . first . first) (RowListItem a1 l1 t1 :) (go r1 rhs)
+      GT -> (second . second . first) (RowListItem a2 l2 t2 :) (go lhs r2)
+      EQ -> first (f l1 t1 t2 :) (go r1 r2)
 
 -- | Check whether a type is a monotype
 isMonoType :: Type a -> Bool

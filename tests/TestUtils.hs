@@ -1,42 +1,41 @@
 module TestUtils where
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.AST as AST
-import qualified Language.PureScript.Names as N
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.AST qualified as AST
+import Language.PureScript.Names qualified as N
 import Language.PureScript.Interactive.IO (findNodeProcess)
 
 import Control.Arrow ((***), (>>>))
-import Control.Monad
-import Control.Monad.Reader
-import Control.Monad.Trans.Except
-import Control.Monad.Trans.Maybe
+import Control.Monad (forM, guard, unless)
+import Control.Monad.Reader (MonadIO(..), MonadTrans(..))
+import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
+import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Writer.Class (tell)
-import Control.Exception
+import Control.Exception (IOException, catch, throw, throwIO, try, tryJust)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
+import Data.ByteString qualified as BS
 import Data.Char (isSpace)
 import Data.Function (on)
 import Data.List (sort, sortBy, stripPrefix, groupBy, find)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Maybe (isJust)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as T
 import Data.Time.Clock (UTCTime(), diffUTCTime, getCurrentTime, nominalDay)
 import Data.Tuple (swap)
-import System.Directory
+import System.Directory (createDirectoryIfMissing, doesDirectoryExist, getCurrentDirectory, getModificationTime, getTemporaryDirectory, listDirectory, setCurrentDirectory, withCurrentDirectory)
 import System.Exit (exitFailure)
 import System.Environment (lookupEnv)
-import System.FilePath
+import System.FilePath (dropExtensions, makeRelative, takeDirectory, takeExtensions, takeFileName, (</>))
 import System.IO.Error (isDoesNotExistError)
 import System.IO.UTF8 (readUTF8FileT)
-import System.Process hiding (cwd)
-import qualified System.FilePath.Glob as Glob
-import System.IO
-import Test.Hspec
+import System.Process (callCommand, callProcess)
+import System.FilePath.Glob qualified as Glob
+import System.IO (Handle, IOMode(..), hPutStrLn, openFile, stderr)
+import Test.Hspec (Expectation, HasCallStack, expectationFailure, pendingWith)
 
 -- |
 -- Fetches code necessary to run the tests with. The resulting support code
@@ -189,7 +188,7 @@ compile
   :: Maybe ExpectedModuleName
   -> SupportModules
   -> [FilePath]
-  -> IO (Either P.MultipleErrors FilePath, P.MultipleErrors)
+  -> IO ([(FilePath, T.Text)], (Either P.MultipleErrors FilePath, P.MultipleErrors))
 compile = compile' P.defaultOptions
 
 compile'
@@ -197,41 +196,42 @@ compile'
   -> Maybe ExpectedModuleName
   -> SupportModules
   -> [FilePath]
-  -> IO (Either P.MultipleErrors FilePath, P.MultipleErrors)
-compile' options expectedModule SupportModules{..} inputFiles = P.runMake options $ do
+  -> IO ([(FilePath, T.Text)], (Either P.MultipleErrors FilePath, P.MultipleErrors))
+compile' options expectedModule SupportModules{..} inputFiles = do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
-  fs <- liftIO $ readInput (sort inputFiles)
-  msWithWarnings <- CST.parseFromFiles id fs
-  tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
-  let ms = fmap snd <$> msWithWarnings
-  foreigns <- inferForeignModules ms
-  let
-    actions = makeActions supportModules (foreigns `M.union` supportForeigns)
-    (hasExpectedModuleName, expectedModuleName, compiledModulePath) = case expectedModule of
-      -- Check if there is one (and only one) module called "Main"
-      Just IsMain ->
-        let
-          moduleName = "Main"
-          compiledPath = modulesDir </> moduleName </> "index.js"
-        in ((==) 1 $ length $ filter (== moduleName) $ fmap (T.unpack . getPsModuleName) ms, moduleName, compiledPath)
-      -- Check if main sourcemap module starts with "SourceMaps." and matches its file name
-      Just (IsSourceMap modulePath) ->
-        let
-          moduleName = "SourceMaps." <> (dropExtensions . takeFileName $ modulePath)
-          compiledPath = modulesDir </> moduleName </> "index.js.map"
-        in (maybe False ((==) moduleName . T.unpack . getPsModuleName) (find ((==) modulePath . fst) ms), moduleName, compiledPath)
-      Nothing -> (True, mempty, mempty)
+  fs <- readInput (sort inputFiles)
+  fmap (fs, ) . P.runMake options $ do
+    msWithWarnings <- CST.parseFromFiles id fs
+    tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
+    let ms = fmap snd <$> msWithWarnings
+    foreigns <- inferForeignModules ms
+    let
+      actions = makeActions supportModules (foreigns `M.union` supportForeigns)
+      (hasExpectedModuleName, expectedModuleName, compiledModulePath) = case expectedModule of
+        -- Check if there is one (and only one) module called "Main"
+        Just IsMain ->
+          let
+            moduleName = "Main"
+            compiledPath = modulesDir </> moduleName </> "index.js"
+          in ((==) 1 $ length $ filter (== moduleName) $ fmap (T.unpack . getPsModuleName) ms, moduleName, compiledPath)
+        -- Check if main sourcemap module starts with "SourceMaps." and matches its file name
+        Just (IsSourceMap modulePath) ->
+          let
+            moduleName = "SourceMaps." <> (dropExtensions . takeFileName $ modulePath)
+            compiledPath = modulesDir </> moduleName </> "index.js.map"
+          in (maybe False ((==) moduleName . T.unpack . getPsModuleName) (find ((==) modulePath . fst) ms), moduleName, compiledPath)
+        Nothing -> (True, mempty, mempty)
 
-  case ms of
-    [singleModule] -> do
-      unless hasExpectedModuleName $
-        error ("While testing a single PureScript file, the expected module name was '" <> expectedModuleName <>
-          "' but got '" <> T.unpack (getPsModuleName singleModule) <> "'.")
-      compiledModulePath <$ P.rebuildModule actions supportExterns (snd singleModule)
-    _ -> do
-      unless hasExpectedModuleName $
-        error $ "While testing multiple PureScript files, the expected main module was not found: '" <> expectedModuleName <> "'."
-      compiledModulePath <$ P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
+    case ms of
+      [singleModule] -> do
+        unless hasExpectedModuleName $
+          error ("While testing a single PureScript file, the expected module name was '" <> expectedModuleName <>
+            "' but got '" <> T.unpack (getPsModuleName singleModule) <> "'.")
+        compiledModulePath <$ P.rebuildModule actions supportExterns (snd singleModule)
+      _ -> do
+        unless hasExpectedModuleName $
+          error $ "While testing multiple PureScript files, the expected main module was not found: '" <> expectedModuleName <> "'."
+        compiledModulePath <$ P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
 
 getPsModuleName :: (a, AST.Module) -> T.Text
 getPsModuleName psModule = case snd psModule of

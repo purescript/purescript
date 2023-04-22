@@ -8,27 +8,28 @@ module Language.PureScript.Sugar.BindingGroups
   , collapseBindingGroups
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import Prelude
+import Protolude (ordNub, swap)
 
 import Control.Monad ((<=<), guard)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Data.Graph
+import Data.Graph (SCC(..), stronglyConnComp, stronglyConnCompR)
 import Data.List (intersect, (\\))
 import Data.List.NonEmpty (NonEmpty((:|)), nonEmpty)
 import Data.Foldable (find)
 import Data.Functor (($>))
 import Data.Maybe (isJust, mapMaybe)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Set as S
+import Data.List.NonEmpty qualified as NEL
+import Data.Map qualified as M
+import Data.Set qualified as S
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors hiding (nonEmpty)
-import Language.PureScript.Names
-import Language.PureScript.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (NameKind)
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors(..), SimpleErrorMessage(..), errorMessage', parU, positionedError)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident, ModuleName, ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName)
+import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), everythingOnTypes)
 
 data VertexType
   = VertexDefinition
@@ -61,9 +62,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleExprs (Let w ds val) = (\ds' -> Let w ds' val) <$> handleDecls ds
   handleExprs other = return other
 
-  -- |
   -- Replace all sets of mutually-recursive declarations with binding groups
-  --
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
@@ -103,9 +102,24 @@ createBindingGroups moduleName = mapM f <=< handleDecls
           in (d, (name, vty), self ++ deps)
         dataVerts = fmap mkVert allDecls
     dataBindingGroupDecls <- parU (stronglyConnCompR dataVerts) toDataBindingGroup
-    let allIdents = fmap valdeclIdent values
-        valueVerts = fmap (\d -> (d, valdeclIdent d, usedIdents moduleName d `intersect` allIdents)) values
-    bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
+    let
+      -- #4437
+      --
+      -- The idea here is to create a `Graph` whose `key` is a tuple: `(Bool, Ident)`,
+      -- where the `Bool` encodes the absence of a type hole. This relies on an implementation
+      -- detail for `stronglyConnComp` which allows identifiers with no type holes to "float"
+      -- and get checked before those that do, while preserving reverse topological sorting.
+      makeValueDeclarationKey = (,) <$> exprHasNoTypeHole . valdeclExpression <*> valdeclIdent
+      valueDeclarationKeys = makeValueDeclarationKey <$> values
+
+      valueDeclarationInfo = M.fromList $ swap <$> valueDeclarationKeys
+      findDeclarationInfo i = (M.findWithDefault False i valueDeclarationInfo, i)
+      computeValueDependencies = (`intersect` valueDeclarationKeys) . fmap findDeclarationInfo . usedIdents moduleName 
+  
+      makeValueDeclarationVert = (,,) <$> id <*> makeValueDeclarationKey <*> computeValueDependencies
+      valueDeclarationVerts = makeValueDeclarationVert <$> values
+
+    bindingGroupDecls <- parU (stronglyConnComp valueDeclarationVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
              dataBindingGroupDecls ++
              filter isTypeClassInstanceDecl ds ++
@@ -115,6 +129,19 @@ createBindingGroups moduleName = mapM f <=< handleDecls
     where
       extractGuardedExpr [MkUnguarded expr] = expr
       extractGuardedExpr _ = internalError "Expected Guards to have been desugared in handleDecls."
+
+      exprHasNoTypeHole :: Expr -> Bool
+      exprHasNoTypeHole = not . exprHasTypeHole
+        where
+        exprHasTypeHole :: Expr -> Bool
+        (_, exprHasTypeHole, _, _, _) = everythingOnValues (||) goDefault goExpr goDefault goDefault goDefault
+          where
+          goExpr :: Expr -> Bool
+          goExpr (Hole _) = True
+          goExpr _ = False
+
+          goDefault :: forall a. a -> Bool
+          goDefault = const False
 
 -- |
 -- Collapse all binding groups to individual declarations

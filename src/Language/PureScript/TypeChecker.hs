@@ -7,7 +7,7 @@ module Language.PureScript.TypeChecker
   , checkNewtype
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (headMay, maybeToLeft, ordNub)
 
 import Control.Lens ((^..), _2)
@@ -19,25 +19,24 @@ import Control.Monad.Writer.Class (MonadWriter, tell)
 
 import Data.Foldable (for_, traverse_, toList)
 import Data.List (nub, nubBy, (\\), sort, group)
-import Data.Maybe
+import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Either (partitionEithers)
 import Data.Text (Text)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.Text as T
+import Data.List.NonEmpty qualified as NEL
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text qualified as T
 
 import Language.PureScript.AST
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
-import qualified Language.PureScript.Constants.Data.Generic.Rep as DataGenericRep
-import qualified Language.PureScript.Constants.Data.Newtype as DataNewtype
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Linter
-import Language.PureScript.Linter.Wildcards
-import Language.PureScript.Names
-import Language.PureScript.Roles
+import Language.PureScript.Constants.Libs qualified as Libs
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType(..), Environment(..), FunctionalDependency, NameKind(..), NameVisibility(..), TypeClassData(..), TypeKind(..), isDictTypeName, kindArity, makeTypeClassData, nominalRolesForKind, tyFunction)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, errorMessage', positionedError, rethrow, warnAndRethrow)
+import Language.PureScript.Linter (checkExhaustiveExpr)
+import Language.PureScript.Linter.Wildcards (ignoreWildcardsUnderCompleteTypeSignatures)
+import Language.PureScript.Names (Ident, ModuleName, ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, disqualify, isPlainIdent, mkQualified)
+import Language.PureScript.Roles (Role)
 import Language.PureScript.Sugar.Names.Env (Exports(..))
 import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
@@ -45,8 +44,8 @@ import Language.PureScript.TypeChecker.Roles as T
 import Language.PureScript.TypeChecker.Synonyms as T
 import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Unify (varIfUnknown)
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Types
+import Language.PureScript.TypeClassDictionaries (NamedDict, TypeClassDictionaryInScope(..))
+import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), containsForAll, eqType, everythingOnTypes, freeTypeVariables, overConstraintArgs, srcInstanceType, unapplyTypes)
 
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -409,8 +408,8 @@ typeCheckAll moduleName = traverse go
       (args', implies', tys', kind) <- kindOfClass moduleName (sa, pn, args, implies, tys)
       addTypeClass moduleName qualifiedClassName (fmap Just <$> args') implies' deps tys' kind
       return d
-  go (TypeInstanceDeclaration _ _ _ (Left _) _ _ _ _) = internalError "typeCheckAll: type class instance generated name should have been desugared"
-  go d@(TypeInstanceDeclaration sa@(ss, _) ch idx (Right dictName) deps className tys body) =
+  go (TypeInstanceDeclaration _ _ _ _ (Left _) _ _ _ _) = internalError "typeCheckAll: type class instance generated name should have been desugared"
+  go d@(TypeInstanceDeclaration sa@(ss, _) _ ch idx (Right dictName) deps className tys body) =
     rethrow (addHint (ErrorInInstance className tys) . addHint (positionedError ss)) $ do
       env <- getEnv
       let qualifiedDictName = Qualified (ByModuleName moduleName) dictName
@@ -562,7 +561,6 @@ typeCheckAll moduleName = traverse go
     | moduleName `S.member` nonOrphanModules = return ()
     | otherwise = throwError . errorMessage $ OrphanInstance dictName className nonOrphanModules tys'
 
-  -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
   --
@@ -789,8 +787,8 @@ typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
   checkDataConstructorsAreExported :: DeclarationRef -> m ()
   checkDataConstructorsAreExported dr@(TypeRef ss' name (fromMaybe [] -> exportedDataConstructorsNames))
     | null exportedDataConstructorsNames = for_
-      [ DataGenericRep.Generic
-      , DataNewtype.Newtype
+      [ Libs.Generic
+      , Libs.Newtype
       ] $ \className -> do
         env <- getEnv
         let dicts = foldMap (foldMap NEL.toList) $

@@ -1,0 +1,34 @@
+Error found:
+in module [33mNestedRecordLabelOnTypeError[0m
+at tests/purs/failing/NestedRecordLabelOnTypeError.purs:8:9 - 8:15 (line 8, column 9 - line 8, column 15)
+
+  Could not match type
+  [33m     [0m
+  [33m  Int[0m
+  [33m     [0m
+  with type
+  [33m        [0m
+  [33m  String[0m
+  [33m        [0m
+
+while matching label [33mc[0m
+while matching label [33mb[0m
+while matching label [33ma[0m
+while checking that type [33m{ a :: { b :: { c :: Int[0m
+                         [33m              }         [0m
+                         [33m       }                [0m
+                         [33m}                       [0m
+  is at least as general as type [33m{ a :: { b :: { c :: String[0m
+                                 [33m              }            [0m
+                                 [33m       }                   [0m
+                                 [33m}                          [0m
+while checking that expression [33mrecord[0m
+  has type [33m{ a :: { b :: { c :: String[0m
+           [33m              }            [0m
+           [33m       }                   [0m
+           [33m}                          [0m
+in value declaration [33merror[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+or to contribute content related to this error.
+

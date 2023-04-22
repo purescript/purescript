@@ -49,9 +49,9 @@
 /* Section: Variables
  * ========================================================================== */
 @background: rgb(255, 255, 255);
+@foreground: rgb(0, 0, 0);
 @banner_background: rgb(29, 34, 45);
-@package_banner_background: lighten(@banner_background, 30%);
-@dark_foreground: rgb(240, 240, 240);
+@dim_foreground: rgb(240, 240, 240);
 @link: rgb(196, 149, 58);
 @link_active: rgb(123, 89, 4);
 @error_background: rgb(255, 240, 240);
@@ -59,11 +59,31 @@
 @not_available_background: rgb(240, 240, 150);
 @code_foreground: rgb(25, 74, 91);
 @code_background: rgb(241, 245, 249);
-@light_glyph: rgb(160, 160, 160);
-@light_type: rgb(102, 102, 102);
+@dim_glyph: rgb(160, 160, 160);
+@dim_type: rgb(102, 102, 102);
+@keyword: rgb(11, 113, 180);
+
+@dark_background: rgb(20, 20, 23);
+@dark_foreground: rgb(222, 222, 222);
+@dark_banner_background: rgb(29, 34, 45);
+@dark_dim_foreground: rgb(240, 240, 240);
+@dark_link: rgb(216, 172, 85);
+@dark_link_active: rgb(240, 220, 171);
+@dark_error_background: rgb(107, 14, 14);
+@dark_error_border: rgb(200, 80, 80);
+@dark_not_available_background: rgb(86, 86, 11);
+@dark_code_foreground: rgb(193, 211, 218);
+@dark_code_background: rgb(35, 35, 39);
+@dark_dim_glyph: rgb(160, 160, 160);
+@dark_dim_type: rgb(160, 160, 160);
+@dark_keyword: rgb(55, 150, 213);
 
 /* Section: Document Styles
  * ========================================================================== */
+
+:root {
+  color-scheme: light dark;
+}
 
 html {
   box-sizing: border-box;
@@ -80,10 +100,15 @@ html {
 
 body {
   background-color: @background;
-  color: #000;
+  color: @foreground;
   font-family: "Roboto", sans-serif;
   font-size: 87.5%;
   line-height: 1.563;
+
+  @media (prefers-color-scheme: dark) {
+    background-color: @dark_background;
+    color: @dark_foreground;
+  }
 }
 
 @media (min-width: 38em) {
@@ -193,7 +218,12 @@ html, body {
   width: 100%;
   text-align: center;
   background-color: @banner_background;
-  color: @dark_foreground;
+  color: @dim_foreground;
+
+  @media (prefers-color-scheme: dark) {
+    background-color: @dark_banner_background;
+    color: @dark_dim_foreground;
+  }
 }
 
 .footer * {
@@ -209,17 +239,29 @@ html, body {
 
 :target {
   background-color: @code_background;
+
+  @media (prefers-color-scheme: dark) {
+    background-color: @dark_code_background;
+  }
 }
 
 a, a:visited {
   color: @link;
   text-decoration: none;
   font-weight: bold;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_link;
+  }
 }
 
 a:hover {
   color: @link_active;
   text-decoration: none;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_link_active;
+  }
 }
 
 code, pre {
@@ -228,11 +270,20 @@ code, pre {
   color: @code_foreground;
   font-family: "Roboto Mono", monospace;
   font-size: 87.5%;
+
+  @media (prefers-color-scheme: dark) {
+    background-color: @dark_code_background;
+    color: @dark_code_foreground;
+  }
 }
 
 :target code,
 :target pre {
   background-color: darken(@code_background, 5%);
+
+  @media (prefers-color-scheme: dark) {
+    background-color: lighten(@dark_code_background, 5%);
+  }
 }
 
 code {
@@ -259,6 +310,10 @@ a > code::before {
 
 a:hover > code {
   color: @link;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_link;
+  }
 }
 
 pre {
@@ -341,6 +396,10 @@ hr {
   border: none;
   height: 1px;
   background-color: darken(@background, 20%);
+
+  @media (prefers-color-scheme: dark) {
+    background-color: lighten(@dark_background, 20%);
+  }
 }
 
 img {
@@ -361,6 +420,10 @@ table {
   margin-top: 1rem;
   margin-bottom: 1rem;
   width: 100%;
+
+  @media (prefers-color-scheme: dark) {
+    border-bottom-color: lighten(@dark_background, 20%);
+  }
 }
 
 td, th {
@@ -370,6 +433,10 @@ td, th {
 
 td {
   border-top: 1px solid darken(@background, 20%);
+
+  @media (prefers-color-scheme: dark) {
+    border-top-color: lighten(@dark_background, 20%);
+  }
 }
 
 td:first-child, th:first-child {
@@ -394,11 +461,15 @@ ul li {
 
 ul li::before {
   position: absolute;
-  color: @light_glyph;
+  color: @dim_glyph;
   content: "–";
   display: inline-block;
   margin-left: -1.250em;
   width: 1.250em;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_dim_glyph;
+  }
 }
 
 /* Tying this tightly to ul at the moment because it's a slight variation thereof */
@@ -430,20 +501,29 @@ ol li {
   position: relative;
   top: -0.1em;
   display: inline-block;
-  background-color: #000;
+  background-color: @foreground;
   border-radius: 1.3em;
-  color: #fff;
+  color: @background;
   font-size: 77%;
   font-weight: bold;
   line-height: 1.563;
   text-align: center;
   height: 1.5em;
   width: 1.5em;
+
+  @media (prefers-color-scheme: dark) {
+    background-color: @dark_foreground;
+    color: @dark_background;
+  }
 }
 
 .badge.badge--package {
   background-color: @link;
   letter-spacing: -0.1em;
+
+  @media (prefers-color-scheme: dark) {
+    background-color: @dark_link;
+  }
 }
 
 .badge.badge--module {
@@ -473,11 +553,19 @@ ol li {
 .decl__anchor, .decl__anchor:visited {
   position: absolute;
   left: -0.8em;
-  color: lighten(@light_glyph, 10%);
+  color: lighten(@dim_glyph, 10%);
+
+  @media (prefers-color-scheme: dark) {
+    color: darken(@dark_dim_glyph, 10%);
+  }
 }
 
 .decl__anchor:hover {
   color: @link;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_link;
+  }
 }
 
 .decl__signature {
@@ -486,6 +574,11 @@ ol li {
   border-top: 1px solid darken(@background, 20%);
   border-bottom: 1px solid darken(@background, 20%);
   padding: 0;
+
+  @media (prefers-color-scheme: dark) {
+    border-top-color: lighten(@dark_background, 20%);
+    border-bottom-color: lighten(@dark_background, 20%);
+  }
 }
 
 .decl__signature code {
@@ -524,6 +617,10 @@ ol li {
 
 .decl__kind {
   border-bottom: 1px solid darken(@background, 20%);
+
+  @media (prefers-color-scheme: dark) {
+    border-bottom-color: lighten(@dark_background, 20%);
+  }
 }
 
 :target .decl__signature,
@@ -534,7 +631,11 @@ ol li {
 
 .decl__body .keyword,
 .decl__body .syntax {
-  color: #0B71B4;
+  color: @keyword;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_keyword;
+  }
 }
 
 .decl__child_comments {
@@ -553,10 +654,14 @@ ol li {
 }
 
 .deplink__version {
-  color: @light_type;
+  color: @dim_type;
   display: inline-block;
   font-size: 0.8em;
   line-height: 1;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_dim_type;
+  }
 }
 
 
@@ -566,15 +671,23 @@ ol li {
 .grouped-list {
   border-top: 1px solid darken(@background, 20%);
   margin: 0 0 2.44em 0;
+
+  @media (prefers-color-scheme: dark) {
+    border-top-color: lighten(@dark_background, 20%);
+  }
 }
 
 .grouped-list__title {
-  color: @light_type;
+  color: @dim_type;
   font-size: 0.8em;
   font-weight: 300;
   letter-spacing: 1px;
   margin: 0.8em 0 -0.1em 0;
   text-transform: uppercase;
+
+  @media (prefers-color-scheme: dark) {
+    border-top-color: @dark_dim_type;
+  }
 }
 
 .grouped-list__item {
@@ -594,11 +707,21 @@ ol li {
 .message.message--error {
   background-color: @error_background;
   border-color: @error_border;
+
+  @media (prefers-color-scheme: dark) {
+    background-color: @dark_error_background;
+    border-color: @dark_error_border;
+  }
 }
 
 .message.message--not-available {
   background-color: @not_available_background;
   border-color: darken(@not_available_background, 20%);
+
+  @media (prefers-color-scheme: dark) {
+    background-color: @dark_not_available_background;
+    border-color: lighten(@dark_not_available_background, 20%);
+  }
 }
 
 
@@ -655,13 +778,17 @@ ol li {
 
 .page-title__label {
   position: relative;
-  color: @light_type;
+  color: @dim_type;
   font-size: 0.8rem;
   font-weight: 300;
   letter-spacing: 1px;
   margin-bottom: -0.8em;
   text-transform: uppercase;
   z-index: 1;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_dim_type;
+  }
 }
 
 
@@ -670,18 +797,27 @@ ol li {
 
 .top-banner {
   background-color: @banner_background;
-  color: @dark_foreground;
+  color: @dim_foreground;
   font-weight: normal;
+
+  @media (prefers-color-scheme: dark) {
+    background-color: @dark_banner_background;
+    color: @dark_dim_foreground;
+  }
 }
 
 .top-banner__logo,
 .top-banner__logo:visited {
   float: left;
-  color: @dark_foreground;
+  color: @dim_foreground;
   font-size: 2.44em;
   font-weight: 300;
   line-height: 90px;
   margin: 0;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_dim_foreground;
+  }
 }
 
 .top-banner__logo:hover {
@@ -696,11 +832,18 @@ ol li {
 .top-banner__form input {
   border: 1px solid @banner_background;
   border-radius: 3px;
+  background-color: @background;
   color: @banner_background;
   font-weight: 300;
   line-height: 2;
   padding: 0.21em 0.512em;
   width: 100%;
+
+  @media (prefers-color-scheme: dark) {
+    border-color: @dark_banner_background;
+    background-color: @dark_background;
+    color: @dark_foreground;
+  }
 }
 
 .top-banner__actions {
@@ -721,11 +864,19 @@ ol li {
 
 .top-banner__actions__item a,
 .top-banner__actions__item a:visited {
-  color: @dark_foreground;
+  color: @dim_foreground;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_dim_foreground;
+  }
 }
 
 .top-banner__actions__item a:hover {
   color: @link;
+
+  @media (prefers-color-scheme: dark) {
+    color: @dark_link;
+  }
 }
 
 @media (min-width: 38em) {
@@ -780,6 +931,11 @@ ol li {
   border-top: 1px solid darken(@background, 20%);
   border-bottom: 1px solid darken(@background, 20%);
   padding: 0.328em 0;
+
+  @media (prefers-color-scheme: dark) {
+    border-top-color: lighten(@dark_background, 20%);
+    border-bottom-color: lighten(@dark_background, 20%);
+  }
 }
 
 .result__signature code {
@@ -864,6 +1020,10 @@ ol li {
   padding: 0 1em;
   color: #777;
   border-left: 0.25em solid #ddd;
+
+  @media (prefers-color-scheme: dark) {
+    border-left-color: #444;
+  }
 }
 
 .markdown-body blockquote>:first-child {
@@ -882,6 +1042,10 @@ ol li {
 .markdown-body .pl-k {
   /* Keyword */
   color: #a0a0a0;
+
+  @media (prefers-color-scheme: dark) {
+    color: #676767;
+  }
 }
 
 .markdown-body .pl-c1,

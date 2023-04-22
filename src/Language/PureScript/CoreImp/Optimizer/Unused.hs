@@ -5,16 +5,16 @@ module Language.PureScript.CoreImp.Optimizer.Unused
   , removeUnusedEffectFreeVars
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad (filterM)
 import Data.Monoid (Any(..))
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Text (Text)
 
-import Language.PureScript.CoreImp.AST
-import Language.PureScript.CoreImp.Optimizer.Common
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.CoreImp.AST (AST(..), InitializerEffects(..), everything, everywhere)
+import Language.PureScript.CoreImp.Optimizer.Common (removeFromBlock)
+import Language.PureScript.Constants.Prim qualified as C
 
 removeCodeAfterReturnStatements :: AST -> AST
 removeCodeAfterReturnStatements = everywhere (removeFromBlock go)
@@ -32,7 +32,7 @@ removeCodeAfterReturnStatements = everywhere (removeFromBlock go)
 removeUndefinedApp :: AST -> AST
 removeUndefinedApp = everywhere convert
   where
-  convert (App ss fn [Var _ arg]) | arg == C.undefined = App ss fn []
+  convert (App ss fn [Var _ C.S_undefined]) = App ss fn []
   convert js = js
 
 removeUnusedEffectFreeVars :: [Text] -> [[AST]] -> [[AST]]

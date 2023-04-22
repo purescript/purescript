@@ -2,32 +2,32 @@ module Language.PureScript.Docs.Convert.ReExports
   ( updateReExports
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((&&&), first, second)
-import Control.Monad
+import Control.Monad (foldM, (<=<))
 import Control.Monad.Reader.Class (MonadReader, ask)
 import Control.Monad.State.Class (MonadState, gets, modify)
 import Control.Monad.Trans.Reader (runReaderT)
 import Control.Monad.Trans.State.Strict (execState)
 
-import Data.Either
-import Data.Foldable (traverse_)
+import Data.Either (partitionEithers)
+import Data.Foldable (fold, traverse_)
 import Data.Map (Map)
-import Data.Maybe (mapMaybe, fromMaybe)
-import qualified Data.Map as Map
+import Data.Maybe (mapMaybe)
+import Data.Map qualified as Map
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.Docs.Types
 
-import qualified Language.PureScript.AST as P
-import qualified Language.PureScript.Crash as P
-import qualified Language.PureScript.Errors as P
-import qualified Language.PureScript.Externs as P
-import qualified Language.PureScript.ModuleDependencies as P
-import qualified Language.PureScript.Names as P
-import qualified Language.PureScript.Types as P
+import Language.PureScript.AST qualified as P
+import Language.PureScript.Crash qualified as P
+import Language.PureScript.Errors qualified as P
+import Language.PureScript.Externs qualified as P
+import Language.PureScript.ModuleDependencies qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Types qualified as P
 
 
 -- |
@@ -147,8 +147,7 @@ collectDeclarations reExports = do
   where
 
   collect
-    :: (Eq a, Show a)
-    => (P.ModuleName -> a -> m (P.ModuleName, [b]))
+    :: (P.ModuleName -> a -> m (P.ModuleName, [b]))
     -> Map a P.ExportSource
     -> m (Map P.ModuleName [b])
   collect lookup' exps = do
@@ -177,7 +176,7 @@ collectDeclarations reExports = do
       mapMaybe (\(exportSrc, ref) -> (,exportSrc) <$> f ref) reExports
 
   expCtors :: [P.ProperName 'P.ConstructorName]
-  expCtors = concatMap (fromMaybe [] . (>>= snd) . P.getTypeRef . snd) reExports
+  expCtors = concatMap (fold . (snd <=< P.getTypeRef . snd)) reExports
 
 lookupValueDeclaration ::
   forall m.

@@ -1,6 +1,6 @@
 # Please update Haskell image versions under .github/workflows/ci.yml together to use the same GHC version
 # (or the CI build will fail)
-resolver: nightly-2022-06-09
+resolver: lts-20.9
 pvp-bounds: both
 packages:
 - '.'
@@ -18,15 +18,15 @@ extra-deps:
 - process-1.6.13.1
 # The Cabal library is not in Stackage
 - Cabal-3.6.3.0
-# Protolude is not yet in resolver snapshot
-- protolude-0.3.1
-# hspec@2.9.3 is the first version that starts depending on ghc
+# hspec versions 2.9.3 to 2.10.6 depend on ghc
 # ghc depends on terminfo by default, but that can be ignored
 # if one uses the '-terminfo' flag.
 # Unfortunately, hspec doesn't expose a similar flag.
-- hspec-2.9.2
-- hspec-core-2.9.2
-- hspec-discover-2.9.2
+#
+# Using hspec >= 2.10.7 addresses this.
+- hspec-2.10.9
+- hspec-core-2.10.9
+- hspec-discover-2.10.9
 nix:
   packages:
   - zlib

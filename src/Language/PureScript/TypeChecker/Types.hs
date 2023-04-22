@@ -23,11 +23,11 @@ module Language.PureScript.TypeChecker.Types
       Check a function of a given type returns a value of another type when applied to its arguments
 -}
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub, fold, atMay)
 
 import Control.Arrow (first, second, (***))
-import Control.Monad
+import Control.Monad (forM, forM_, guard, replicateM, unless, when, zipWithM, (<=<))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
 import Control.Monad.Supply.Class (MonadSupply)
@@ -40,25 +40,25 @@ import Data.List (transpose, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Traversable (for)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.IntSet as IS
+import Data.List.NonEmpty qualified as NEL
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.IntSet qualified as IS
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Deriving
-import Language.PureScript.TypeChecker.Entailment
-import Language.PureScript.TypeChecker.Kinds
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage', escalateWarningWhen, internalCompilerError, onErrorMessages, onTypesInErrorMessage, parU)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), byMaybeModuleName, coerceProperName, freshIdent)
+import Language.PureScript.TypeChecker.Deriving (deriveInstance)
+import Language.PureScript.TypeChecker.Entailment (InstanceContext, newDictionaries, replaceTypeClassDictionaries)
+import Language.PureScript.TypeChecker.Kinds (checkConstraint, checkTypeKind, kindOf, kindOfWithScopedVars, unifyKinds', unknownsWithKinds)
 import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Skolems
-import Language.PureScript.TypeChecker.Subsumption
-import Language.PureScript.TypeChecker.Synonyms
-import Language.PureScript.TypeChecker.TypeSearch
-import Language.PureScript.TypeChecker.Unify
+import Language.PureScript.TypeChecker.Skolems (introduceSkolemScope, newSkolemConstant, newSkolemScope, skolemEscapeCheck, skolemize, skolemizeTypesInValue)
+import Language.PureScript.TypeChecker.Subsumption (subsumes)
+import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
+import Language.PureScript.TypeChecker.TypeSearch (typeSearch)
+import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, replaceTypeWildcards, substituteType, unifyTypes, unknownsInType, varIfUnknown)
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
@@ -196,12 +196,12 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       -> ErrorMessage
     replaceTypes subst = onTypesInErrorMessage (substituteType subst)
 
-    -- | Run type search to complete any typed hole error messages
+    -- Run type search to complete any typed hole error messages
     runTypeSearch
       :: Maybe [(Ident, InstanceContext, SourceConstraint)]
-      -- ^ Any unsolved constraints which we need to continue to satisfy
+           -- Any unsolved constraints which we need to continue to satisfy
       -> CheckState
-      -- ^ The final type checker state
+           -- The final type checker state
       -> ErrorMessage
       -> ErrorMessage
     runTypeSearch cons st = \case
@@ -213,7 +213,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         in ErrorMessage hints (HoleInferredType x ty y (Just searchResult))
       other -> other
 
-    -- | Add any unsolved constraints
+    -- Add any unsolved constraints
     constrain cs ty = foldr srcConstrainedType ty (map (\(_, _, x) -> x) cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
@@ -270,7 +270,7 @@ typeDictionaryForBindingGroup moduleName vals = do
                           ]
     return (SplitBindingGroup untyped' typed' dict)
   where
-    -- | Check if a value contains a type annotation, and if so, separate it
+    -- Check if a value contains a type annotation, and if so, separate it
     -- from the value itself.
     splitTypeAnnotation :: (a, Expr) -> Either (a, Expr) (a, (Expr, SourceType, Bool))
     splitTypeAnnotation (a, TypedValue checkType value ty) = Right (a, (value, ty, checkType))

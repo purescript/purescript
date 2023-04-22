@@ -2,7 +2,7 @@ cabal-version:  2.4
 
 name:           purescript
 -- Note: don't add prerelease identifiers here! Add them in app/Version.hs and npm-package/package.json instead.
-version:        0.15.4
+version:        0.15.8
 synopsis:       PureScript Programming Language Compiler
 description:    A small strongly, statically typed programming language with expressive types, inspired by Haskell and compiling to JavaScript.
 category:       Language
@@ -53,12 +53,39 @@ flag release
   default: False
 
 common defaults
-  -- Note: -Wall-incomplete-uni-patterns and -Wincomplete-record-updates can be
-  -- removed once we upgrade to GHC 9.2.1 since they are now included in -Wall.
   ghc-options:
-    -Wall
-    -Wincomplete-uni-patterns
-    -Wincomplete-record-updates
+    -- This list taken from https://medium.com/mercury-bank/enable-all-the-warnings-a0517bc081c3
+    -- Enable all warnings with -Weverything, then disable the ones we don’t care about
+    -Weverything
+
+    -- missing-exported-signatures turns off the more strict -Wmissing-signatures. See https://ghc.haskell.org/trac/ghc/ticket/14794#ticket
+    -Wno-missing-exported-signatures
+
+    -- Requires explicit imports of _every_ function (e.g. ‘$’); too strict
+    -Wno-missing-import-lists
+
+    -- When GHC can’t specialize a polymorphic function. No big deal and requires fixing underlying libraries to solve.
+    -Wno-missed-specialisations
+    -Wno-all-missed-specialisations
+
+    -- Don’t use Safe Haskell warnings
+    -Wno-unsafe
+    -Wno-safe
+    -Wno-trustworthy-safe
+    -Wno-inferred-safe-imports
+    -Wno-missing-safe-haskell-mode
+
+    -- Warning for polymorphic local bindings; nothing wrong with those.
+    -Wno-missing-local-signatures
+
+    -- Don’t warn if the monomorphism restriction is used
+    -Wno-monomorphism-restriction
+
+    -- Remaining options don't come from the above blog post
+    -Wno-missing-deriving-strategies
+    -Wno-missing-export-lists
+    -Wno-missing-kind-signatures
+    -Wno-partial-fields
   default-language: Haskell2010
   default-extensions:
     BangPatterns
@@ -75,6 +102,7 @@ common defaults
     FlexibleContexts
     FlexibleInstances
     GeneralizedNewtypeDeriving
+    ImportQualifiedPost
     KindSignatures
     LambdaCase
     MultiParamTypeClasses
@@ -127,11 +155,9 @@ common defaults
     -- specific version.
     aeson >=2.0.3.0 && <2.1,
     aeson-better-errors >=0.9.1.1 && <0.10,
-    aeson-pretty >=0.8.9 && <0.9,
     ansi-terminal >=0.11.3 && <0.12,
     array >=0.5.4.0 && <0.6,
     base >=4.16.2.0 && <4.17,
-    base-compat >=0.12.1 && <0.13,
     blaze-html >=0.9.1.2 && <0.10,
     bower-json >=1.1.0.0 && <1.2,
     boxes >=0.1.5 && <0.2,
@@ -150,7 +176,6 @@ common defaults
     edit-distance >=0.2.2.1 && <0.3,
     file-embed >=0.0.15.0 && <0.1,
     filepath >=1.4.2.2 && <1.5,
-    fsnotify >=0.3.0.1 && <0.4,
     Glob >=0.10.2 && <0.11,
     haskeline >=0.8.2 && <0.9,
     language-javascript ==0.7.0.0,
@@ -173,20 +198,17 @@ common defaults
     semigroups ==0.20.*,
     semialign >=1.2.0.1 && <1.3,
     sourcemap >=0.1.7 && <0.2,
-    split >=0.2.3.4 && <0.3,
     stm >=2.5.0.2 && <2.6,
     stringsearch >=0.3.6.6 && <0.4,
-    syb >=0.7.2.1 && <0.8,
+    template-haskell >=2.18.0.0 && <2.19,
     text >=1.2.5.0 && <1.3,
     these >=1.1.1.1 && <1.2,
     time >=1.11.1.1 && <1.12,
     transformers >=0.5.6.2 && <0.6,
     transformers-base >=0.4.6 && <0.5,
-    transformers-compat >=0.7.1 && <0.8,
-    typed-process >=0.2.10.1 && <0.3,
-    unordered-containers >=0.2.19.1 && <0.3,
     utf8-string >=1.0.2 && <1.1,
-    vector >=0.12.3.1 && <0.13
+    vector >=0.12.3.1 && <0.13,
+    witherable >=0.4.2 && <0.5
 
 library
   import: defaults
@@ -211,9 +233,7 @@ library
     Language.PureScript.CodeGen.JS
     Language.PureScript.CodeGen.JS.Common
     Language.PureScript.CodeGen.JS.Printer
-    Language.PureScript.Constants.Prelude
-    Language.PureScript.Constants.Data.Generic.Rep
-    Language.PureScript.Constants.Data.Newtype
+    Language.PureScript.Constants.Libs
     Language.PureScript.CoreFn
     Language.PureScript.CoreFn.Ann
     Language.PureScript.CoreFn.Binders
@@ -284,7 +304,9 @@ library
     Language.PureScript.Ide.Externs
     Language.PureScript.Ide.Filter
     Language.PureScript.Ide.Filter.Declaration
+    Language.PureScript.Ide.Filter.Imports
     Language.PureScript.Ide.Imports
+    Language.PureScript.Ide.Imports.Actions
     Language.PureScript.Ide.Logging
     Language.PureScript.Ide.Matcher
     Language.PureScript.Ide.Prim
@@ -369,6 +391,7 @@ library
     System.IO.UTF8
   other-modules:
     Data.Text.PureScript
+    Language.PureScript.Constants.TH
     Paths_purescript
   autogen-modules:
     Paths_purescript
@@ -377,12 +400,10 @@ executable purs
   import: defaults
   hs-source-dirs: app
   main-is: Main.hs
-  ghc-options: -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N -Wno-unused-packages
   build-depends:
     ansi-wl-pprint >=0.6.9 && <0.7,
     exceptions >=0.10.4 && <0.11,
-    file-embed >=0.0.13.0 && <0.1,
-    http-types >=0.12.3 && <0.13,
     network >=3.1.2.7 && <3.2,
     optparse-applicative >=0.17.0.0 && <0.18,
     purescript
@@ -413,15 +434,17 @@ test-suite tests
   hs-source-dirs: tests
   main-is: Main.hs
   -- Not a problem for this warning to arise in tests
-  ghc-options: -Wno-incomplete-uni-patterns
+  ghc-options: -Wno-incomplete-uni-patterns -Wno-unused-packages
   build-depends:
     purescript,
     generic-random >=1.5.0.1 && <1.6,
-    hspec ==2.9.2,
+    hspec >= 2.10.7 && < 3,
     HUnit >=1.6.2.0 && <1.7,
     newtype >=0.2.2.0 && <0.3,
     QuickCheck >=2.14.2 && <2.15,
-    regex-base >=0.94.0.2 && <0.95
+    regex-base >=0.94.0.2 && <0.95,
+    split >=0.2.3.4 && <0.3,
+    typed-process >=0.2.10.1 && <0.3
   build-tool-depends:
       hspec-discover:hspec-discover -any
     -- we need the compiler's executable available for the ide tests

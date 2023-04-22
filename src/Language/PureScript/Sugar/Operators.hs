@@ -13,18 +13,18 @@ module Language.PureScript.Sugar.Operators
   , checkFixityExports
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.Externs
-import Language.PureScript.Names
-import Language.PureScript.Sugar.Operators.Binders
-import Language.PureScript.Sugar.Operators.Expr
-import Language.PureScript.Sugar.Operators.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, errorMessage', parU, rethrow, rethrowWithPosition)
+import Language.PureScript.Externs (ExternsFile(..), ExternsFixity(..), ExternsTypeFixity(..))
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), freshIdent')
+import Language.PureScript.Sugar.Operators.Binders (matchBinderOperators)
+import Language.PureScript.Sugar.Operators.Expr (matchExprOperators)
+import Language.PureScript.Sugar.Operators.Types (matchTypeOperators)
 import Language.PureScript.Traversals (defS, sndM)
-import Language.PureScript.Types
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), everywhereOnTypesTopDownM, overConstraintArgs)
 
 import Control.Monad (unless, (<=<))
 import Control.Monad.Error.Class (MonadError(..))
@@ -37,10 +37,10 @@ import Data.Functor (($>))
 import Data.Functor.Identity (Identity(..), runIdentity)
 import Data.List (groupBy, sortOn)
 import Data.Maybe (mapMaybe, listToMaybe)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Ord (Down(..))
 
-import qualified Language.PureScript.Constants.Prelude as C
+import Language.PureScript.Constants.Libs qualified as C
 
 -- |
 -- Removes unary negation operators and replaces them with calls to `negate`.
@@ -50,7 +50,7 @@ desugarSignedLiterals (Module ss coms mn ds exts) =
   Module ss coms mn (map f' ds) exts
   where
   (f', _, _) = everywhereOnValues id go id
-  go (UnaryMinus ss' val) = App (Var ss' (Qualified ByNullSourcePos (Ident C.negate))) val
+  go (UnaryMinus ss' val) = App (Var ss' (Qualified ByNullSourcePos (Ident C.S_negate))) val
   go other = other
 
 -- |
@@ -184,7 +184,7 @@ rebracketFiltered !caller pred_ externs m = do
 -- | Indicates whether the `rebracketModule`
 -- is being called with the full desugar pass
 -- run via `purs compile` or whether
--- only the partial desguar pass is run
+-- only the partial desugar pass is run
 -- via `purs docs`.
 -- This indication is needed to prevent
 -- a `purs docs` error when using
@@ -212,11 +212,11 @@ rebracketModule !caller pred_ valueOpTable typeOpTable (Module ss coms mn ds ext
     fmap (map (\d -> if pred_ d then removeParens d else d)) .
     flip parU (usingPredicate pred_ h)
 
-  -- | The AST will run through all the desugar passes when compiling
+  -- The AST will run through all the desugar passes when compiling
   -- and only some of the desugar passes when generating docs.
   -- When generating docs, `case _ of` syntax used in an instance declaration
   -- can trigger the `IncorrectAnonymousArgument` error because it does not
-  -- run the same passes that the compile desguaring does. Since `purs docs`
+  -- run the same passes that the compile desugaring does. Since `purs docs`
   -- will only succeed once `purs compile` succeeds, we can ignore this check
   -- when running `purs docs`.
   -- See https://github.com/purescript/purescript/issues/4274#issuecomment-1087730651=
@@ -380,10 +380,10 @@ updateTypes goType = (goDecl, goExpr, goBinder)
     implies' <- traverse (overConstraintArgs (traverse (goType' ss))) implies
     args' <- traverse (traverse (traverse (goType' ss))) args
     return $ TypeClassDeclaration sa name args' implies' deps decls
-  goDecl (TypeInstanceDeclaration sa@(ss, _) ch idx name cs className tys impls) = do
+  goDecl (TypeInstanceDeclaration sa@(ss, _) na ch idx name cs className tys impls) = do
     cs' <- traverse (overConstraintArgs (traverse (goType' ss))) cs
     tys' <- traverse (goType' ss) tys
-    return $ TypeInstanceDeclaration sa ch idx name cs' className tys' impls
+    return $ TypeInstanceDeclaration sa na ch idx name cs' className tys' impls
   goDecl (TypeSynonymDeclaration sa@(ss, _) name args ty) =
     TypeSynonymDeclaration sa name
       <$> traverse (traverse (traverse (goType' ss))) args

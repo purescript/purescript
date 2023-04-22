@@ -11,24 +11,24 @@ module Language.PureScript.TypeChecker.Roles
   , inferDataBindingGroupRoles
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((&&&))
 import Control.Monad (unless, when, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State (MonadState(..), runState, state)
 import Data.Coerce (coerce)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Maybe (fromMaybe)
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Semigroup (Any(..))
 import Data.Text (Text)
 
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.Roles
-import Language.PureScript.Types
+import Language.PureScript.Environment (Environment(..), TypeKind(..))
+import Language.PureScript.Errors (DataConstructorDeclaration(..), MultipleErrors, RoleDeclarationData(..), SimpleErrorMessage(..), errorMessage)
+import Language.PureScript.Names (ModuleName, ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..))
+import Language.PureScript.Roles (Role(..))
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), freeTypeVariables, unapplyTypes)
 
 -- |
 -- A map of a type's formal parameter names to their roles. This type's

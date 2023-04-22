@@ -6,21 +6,21 @@ import Protolude hiding (force)
 import Protolude.Unsafe (unsafeHead)
 
 import Control.Arrow ((&&&))
-import qualified Data.Array as A
+import Data.Array qualified as A
 import Data.Coerce (coerce)
 import Data.Graph (SCC(..), stronglyConnComp)
 import Data.List (foldl1', (!!))
-import qualified Data.IntMap.Monoidal as IM
-import qualified Data.IntSet as IS
-import qualified Data.Map.Monoidal as M
+import Data.IntMap.Monoidal qualified as IM
+import Data.IntSet qualified as IS
+import Data.Map.Monoidal qualified as M
 import Data.Semigroup (Max(..))
-import qualified Data.Set as S
+import Data.Set qualified as S
 
-import Language.PureScript.AST.SourcePos
-import qualified Language.PureScript.Constants.Prelude as C
-import Language.PureScript.CoreFn
-import Language.PureScript.Crash
-import Language.PureScript.Names
+import Language.PureScript.AST.SourcePos (SourcePos(..), SourceSpan(..), nullSourceSpan)
+import Language.PureScript.Constants.Libs qualified as C
+import Language.PureScript.CoreFn (Ann, Bind, Expr(..), Literal(..), Meta(..), ssAnn, traverseCoreFn)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), InternalIdentData(..), ModuleName, Qualified(..), QualifiedBy(..), runIdent, runModuleName, toMaybeModuleName)
 import Language.PureScript.PSString (mkString)
 
 -- This module is responsible for ensuring that the bindings in recursive
@@ -128,8 +128,7 @@ onVarsWithDelayAndForce f = snd . go 0 $ Just 0
       Var a i -> f delay force a i
       Abs a i e -> Abs a i <$> snd (if force == Just 0 then go (succ delay) force else go delay $ fmap pred force) e
       -- A clumsy hack to preserve TCO in a particular idiom of unsafePartial once seen in Data.Map.Internal, possibly still used elsewhere.
-      App a1 e1@(Var _ (Qualified (ByModuleName C.PartialUnsafe) (Ident up))) (Abs a2 i e2) | up == C.unsafePartial
-        -> App a1 e1 . Abs a2 i <$> handleExpr' e2
+      App a1 e1@(Var _ C.I_unsafePartial) (Abs a2 i e2) -> App a1 e1 . Abs a2 i <$> handleExpr' e2
       App a e1 e2 ->
         -- `handleApp` is just to handle the constructor application exception
         -- somewhat gracefully (i.e., without requiring a deep inspection of
@@ -533,7 +532,7 @@ applyLazinessTransform mn rawItems = let
 
   nullAnn = ssAnn nullSourceSpan
   runtimeLazy = Var nullAnn . Qualified ByNullSourcePos $ InternalIdent RuntimeLazyFactory
-  runFn3 = Var nullAnn . Qualified (ByModuleName C.DataFunctionUncurried) . Ident $ C.runFn <> "3"
+  runFn3 = Var nullAnn . Qualified (ByModuleName C.M_Data_Function_Uncurried) . Ident $ C.S_runFn <> "3"
   strLit = Literal nullAnn . StringLiteral . mkString
 
   lazifyIdent = \case

@@ -25,37 +25,37 @@ module Language.PureScript.TypeChecker.Kinds
   , freshKindWithKind
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((***))
 import Control.Lens ((^.), _1, _2, _3)
-import Control.Monad
+import Control.Monad (join, unless, void, when, (<=<))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
-import Control.Monad.Supply.Class
+import Control.Monad.State (MonadState, gets, modify)
+import Control.Monad.Supply.Class (MonadSupply(..))
 
 import Data.Bifunctor (first)
 import Data.Bitraversable (bitraverse)
 import Data.Foldable (for_, traverse_)
 import Data.Function (on)
 import Data.Functor (($>))
-import qualified Data.IntSet as IS
+import Data.IntSet qualified as IS
 import Data.List (nubBy, sortOn, (\\))
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.Traversable (for)
 
-import Language.PureScript.Crash
-import qualified Language.PureScript.Environment as E
+import Language.PureScript.Crash (HasCallStack, internalError)
+import Language.PureScript.Environment qualified as E
 import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.Names (pattern ByNullSourcePos, ModuleName, Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, mkQualified)
+import Language.PureScript.TypeChecker.Monad (CheckState(..), Substitution(..), UnkLevel(..), Unknown, bindLocalTypeVariables, debugType, getEnv, lookupTypeVariable, unsafeCheckCurrentModule, withErrorMessageHint, withFreshSubstitution)
 import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, newSkolemScope, skolemize)
-import Language.PureScript.TypeChecker.Synonyms
+import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
 import Language.PureScript.Types
-import Language.PureScript.Pretty.Types
+import Language.PureScript.Pretty.Types (prettyPrintType)
 
 generalizeUnknowns :: [(Unknown, SourceType)] -> SourceType -> SourceType
 generalizeUnknowns unks ty =
@@ -419,6 +419,7 @@ unifyKindsWithFailure
   -> m ()
 unifyKindsWithFailure onFailure = go
   where
+  goWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ go t1 t2
   go = curry $ \case
     (TypeApp _ p1 p2, TypeApp _ p3 p4) -> do
       go p1 p3
@@ -444,7 +445,7 @@ unifyKindsWithFailure onFailure = go
       onFailure w1 w2
 
   unifyRows r1 r2 = do
-    let (matches, rest) = alignRowsWith go r1 r2
+    let (matches, rest) = alignRowsWith goWithLabel r1 r2
     sequence_ matches
     unifyTails rest
 
@@ -910,7 +911,7 @@ checkKindDeclaration _ ty = do
   checkQuantification finalTy
   checkValidKind finalTy
   where
-  -- When expanding type synoyms and generalizing, we need to generate more
+  -- When expanding type synonyms and generalizing, we need to generate more
   -- unique names so that they don't clash or shadow other names, or can
   -- be referenced (easily).
   freshVar arg = (arg <>) . T.pack . show <$> fresh

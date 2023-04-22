@@ -3,9 +3,9 @@
 --
 module Language.PureScript.CoreFn.Meta where
 
-import Prelude.Compat
+import Prelude
 
-import Language.PureScript.Names
+import Language.PureScript.Names (Ident)
 
 -- |
 -- Metadata annotations

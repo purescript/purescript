@@ -5,19 +5,19 @@
 
 module Language.PureScript.Ide.Types where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
-import           Control.Concurrent.STM (TVar)
-import           Control.Lens hiding (op, (.=))
-import           Control.Monad.Fail (fail)
-import           Data.Aeson (ToJSON, FromJSON, (.=))
-import qualified Data.Aeson as Aeson
-import           Data.IORef (IORef)
-import           Data.Time.Clock (UTCTime)
-import qualified Data.Map.Lazy as M
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Errors.JSON as P
-import           Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
+import Control.Concurrent.STM (TVar)
+import Control.Lens (Getting, Traversal', makeLenses)
+import Control.Monad.Fail (fail)
+import Data.Aeson (ToJSON, FromJSON, (.=))
+import Data.Aeson qualified as Aeson
+import Data.IORef (IORef)
+import Data.Time.Clock (UTCTime)
+import Data.Map.Lazy qualified as M
+import Language.PureScript qualified as P
+import Language.PureScript.Errors.JSON qualified as P
+import Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a
@@ -287,7 +287,7 @@ instance ToJSON Success where
             ]
         ]
     ModuleList modules -> encodeSuccess modules
-    RebuildSuccess warnings -> encodeSuccess (P.toJSONErrors False P.Warning warnings)
+    RebuildSuccess warnings -> encodeSuccess (P.toJSONErrors False P.Warning [] warnings)
 
 encodeImport :: (P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName) -> Aeson.Value
 encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifier) = case importType of

@@ -1,6 +1,6 @@
 module Language.PureScript.Sugar.Names.Common (warnDuplicateRefs) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Control.Monad.Writer (MonadWriter(..))
@@ -9,9 +9,9 @@ import Data.Foldable (for_)
 import Data.List (group, sort, (\\))
 import Data.Maybe (mapMaybe)
 
-import Language.PureScript.AST
-import Language.PureScript.Errors
-import Language.PureScript.Names
+import Language.PureScript.AST (DeclarationRef(..), SourceSpan)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage, errorMessage, warnWithPosition)
+import Language.PureScript.Names (Name(..))
 
 -- |
 -- Warns about duplicate values in a list of declaration refs.
@@ -40,7 +40,7 @@ warnDuplicateRefs pos toError refs = do
   -- but that requires additional changes in how warnings are printed.
   -- Example of keeping all duplicates (not what this code currently does):
   --  removeUnique [1,2,2,3,3,3,4] == [2,2,3,3,3]
-  removeUnique :: Eq a => Ord a => [a] -> [a]
+  removeUnique :: Ord a => [a] -> [a]
   removeUnique = concatMap (drop 1) . group . sort
 
   -- Deletes the constructor information from TypeRefs so that only the

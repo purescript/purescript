@@ -2,9 +2,9 @@ module Language.PureScript.AST.Utils where
 
 import Protolude
 
-import Language.PureScript.AST
-import Language.PureScript.Names
-import Language.PureScript.Types
+import Language.PureScript.AST (Binder(..), CaseAlternative, Expr(..), GuardedExpr, Literal, pattern MkUnguarded, nullSourceSpan)
+import Language.PureScript.Names (Ident, ModuleName, ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), byMaybeModuleName)
+import Language.PureScript.Types (SourceType, Type(..))
 
 lam :: Ident -> Expr -> Expr
 lam = Abs . mkBinder
@@ -39,11 +39,21 @@ mkCtorBinder mn name = ConstructorBinder nullSourceSpan (Qualified (ByModuleName
 unguarded :: Expr -> [GuardedExpr]
 unguarded e = [MkUnguarded e]
 
-unwrapTypeConstructor :: SourceType -> Maybe (Qualified (ProperName 'TypeName), [SourceType], [SourceType])
+data UnwrappedTypeConstructor = UnwrappedTypeConstructor
+  { utcModuleName :: ModuleName
+  , utcTyCon :: ProperName 'TypeName
+  , utcKindArgs :: [SourceType]
+  , utcArgs :: [SourceType]
+  }
+
+utcQTyCon :: UnwrappedTypeConstructor -> Qualified (ProperName 'TypeName)
+utcQTyCon UnwrappedTypeConstructor{..} = Qualified (ByModuleName utcModuleName) utcTyCon
+
+unwrapTypeConstructor :: SourceType -> Maybe UnwrappedTypeConstructor
 unwrapTypeConstructor = go [] []
   where
   go kargs args = \case
-    TypeConstructor _ tyCon -> Just (tyCon, kargs, args)
+    TypeConstructor _ (Qualified (ByModuleName mn) tyCon) -> Just (UnwrappedTypeConstructor mn tyCon kargs args)
     TypeApp _ ty arg -> go kargs (arg : args) ty
     KindApp _ ty karg -> go (karg : kargs) args ty
     _ -> Nothing

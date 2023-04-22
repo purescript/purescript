@@ -6,33 +6,33 @@
 --
 module Language.PureScript.AST.Declarations where
 
-import Prelude.Compat
+import Prelude
 import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
-import Data.Functor.Identity
+import Data.Functor.Identity (Identity(..))
 
-import Data.Aeson.TH
-import qualified Data.Map as M
+import Data.Aeson.TH (Options(..), SumEncoding(..), defaultOptions, deriveJSON)
+import Data.Map qualified as M
 import Data.Text (Text)
-import qualified Data.List.NonEmpty as NEL
+import Data.List.NonEmpty qualified as NEL
 import GHC.Generics (Generic)
 
-import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Literals
-import Language.PureScript.AST.Operators
-import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.Binders (Binder)
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.AST.Operators (Fixity)
+import Language.PureScript.AST.SourcePos (SourceAnn, SourceSpan)
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
-import Language.PureScript.Types
+import Language.PureScript.Types (SourceConstraint, SourceType)
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Label (Label)
-import Language.PureScript.Names
-import Language.PureScript.Roles
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Comments
-import Language.PureScript.Environment
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName(..), Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), toMaybeModuleName)
+import Language.PureScript.Roles (Role)
+import Language.PureScript.TypeClassDictionaries (NamedDict)
+import Language.PureScript.Comments (Comment)
+import Language.PureScript.Environment (DataDeclType, Environment, FunctionalDependency, NameKind)
+import Language.PureScript.Constants.Prim qualified as C
 
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, SourceType)]
@@ -42,14 +42,14 @@ data TypeSearch
   = TSBefore Environment
   -- ^ An Environment captured for later consumption by type directed search
   | TSAfter
+  -- ^ Results of applying type directed search to the previously captured
+  -- Environment
     { tsAfterIdentifiers :: [(Qualified Text, SourceType)]
     -- ^ The identifiers that fully satisfy the subsumption check
     , tsAfterRecordFields :: Maybe [(Label, SourceType)]
     -- ^ Record fields that are available on the first argument to the typed
     -- hole
     }
-  -- ^ Results of applying type directed search to the previously captured
-  -- Environment
   deriving Show
 
 onTypeSearchTypes :: (SourceType -> SourceType) -> TypeSearch -> TypeSearch
@@ -66,6 +66,7 @@ data ErrorMessageHint
   | ErrorInModule ModuleName
   | ErrorInInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | ErrorInSubsumption SourceType SourceType
+  | ErrorInRowLabel Label
   | ErrorCheckingAccessor Expr PSString
   | ErrorCheckingType Expr SourceType
   | ErrorCheckingKind SourceType SourceType
@@ -88,6 +89,7 @@ data ErrorMessageHint
   | ErrorSolvingConstraint SourceConstraint
   | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   | PositionedError (NEL.NonEmpty SourceSpan)
+  | RelatedPositions (NEL.NonEmpty SourceSpan)
   deriving (Show)
 
 -- | Categories of hints
@@ -146,7 +148,7 @@ addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps
 importPrim :: Module -> Module
 importPrim =
   let
-    primModName = C.Prim
+    primModName = C.M_Prim
   in
     addDefaultImport (Qualified (ByModuleName primModName) primModName)
       . addDefaultImport (Qualified ByNullSourcePos primModName)
@@ -428,7 +430,10 @@ data Declaration
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
   --
-  | TypeInstanceDeclaration SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
+  -- The first @SourceAnn@ serves as the annotation for the entire
+  -- declaration, while the second @SourceAnn@ serves as the
+  -- annotation for the type class and its arguments.
+  | TypeInstanceDeclaration SourceAnn SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
   deriving (Show)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -491,7 +496,7 @@ declSourceAnn (ExternDataDeclaration sa _ _) = sa
 declSourceAnn (FixityDeclaration sa _) = sa
 declSourceAnn (ImportDeclaration sa _ _ _) = sa
 declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
-declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _) = sa
+declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
@@ -508,7 +513,7 @@ declName (ExternDataDeclaration _ n _) = Just (TyName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
-declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = IdentName <$> hush n
+declName (TypeInstanceDeclaration _ _ _ _ n _ _ _ _) = IdentName <$> hush n
 declName (RoleDeclaration RoleDeclarationData{..}) = Just (TyName rdeclIdent)
 declName ImportDeclaration{} = Nothing
 declName BindingGroupDeclaration{} = Nothing

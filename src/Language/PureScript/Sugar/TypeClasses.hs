@@ -8,32 +8,32 @@ module Language.PureScript.Sugar.TypeClasses
   , superClassDictionaryNames
   ) where
 
-import Prelude.Compat
+import Prelude
 
-import           Control.Arrow (first, second)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.State
-import           Control.Monad.Supply.Class
-import           Data.Graph
-import           Data.List (find, partition)
-import           Data.List.NonEmpty (nonEmpty)
-import qualified Data.Map as M
-import           Data.Maybe (catMaybes, mapMaybe, isJust)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Set as S
-import           Data.Text (Text)
-import           Data.Traversable (for)
-import qualified Language.PureScript.Constants.Prim as C
-import           Language.PureScript.Crash
-import           Language.PureScript.Environment
-import           Language.PureScript.Errors hiding (isExported, nonEmpty)
-import           Language.PureScript.Externs
-import           Language.PureScript.Label (Label(..))
-import           Language.PureScript.Names
-import           Language.PureScript.PSString (mkString)
-import           Language.PureScript.Sugar.CaseDeclarations
-import           Language.PureScript.TypeClassDictionaries (superclassName)
-import           Language.PureScript.Types
+import Control.Arrow (first, second)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State (MonadState(..), StateT, evalStateT, modify)
+import Control.Monad.Supply.Class (MonadSupply)
+import Data.Graph (SCC(..), stronglyConnComp)
+import Data.List (find, partition)
+import Data.List.NonEmpty (nonEmpty)
+import Data.Map qualified as M
+import Data.Maybe (catMaybes, mapMaybe, isJust)
+import Data.List.NonEmpty qualified as NEL
+import Data.Set qualified as S
+import Data.Text (Text)
+import Data.Traversable (for)
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType(..), NameKind(..), TypeClassData(..), dictTypeName, function, makeTypeClassData, primClasses, primCoerceClasses, primIntClasses, primRowClasses, primRowListClasses, primSymbolClasses, primTypeErrorClasses, tyRecord)
+import Language.PureScript.Errors hiding (isExported, nonEmpty)
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
+import Language.PureScript.Label (Label(..))
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, freshIdent, qualify, runIdent)
+import Language.PureScript.PSString (mkString)
+import Language.PureScript.Sugar.CaseDeclarations (desugarCases)
+import Language.PureScript.TypeClassDictionaries (superclassName)
+import Language.PureScript.Types
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
 
@@ -53,13 +53,13 @@ desugarTypeClasses externs = flip evalStateT initialState . desugarModule
   initialState :: MemberMap
   initialState =
     mconcat
-      [ M.mapKeys (qualify C.Prim) primClasses
-      , M.mapKeys (qualify C.PrimCoerce) primCoerceClasses
-      , M.mapKeys (qualify C.PrimRow) primRowClasses
-      , M.mapKeys (qualify C.PrimRowList) primRowListClasses
-      , M.mapKeys (qualify C.PrimSymbol) primSymbolClasses
-      , M.mapKeys (qualify C.PrimInt) primIntClasses
-      , M.mapKeys (qualify C.PrimTypeError) primTypeErrorClasses
+      [ M.mapKeys (qualify C.M_Prim) primClasses
+      , M.mapKeys (qualify C.M_Prim_Coerce) primCoerceClasses
+      , M.mapKeys (qualify C.M_Prim_Row) primRowClasses
+      , M.mapKeys (qualify C.M_Prim_RowList) primRowListClasses
+      , M.mapKeys (qualify C.M_Prim_Symbol) primSymbolClasses
+      , M.mapKeys (qualify C.M_Prim_Int) primIntClasses
+      , M.mapKeys (qualify C.M_Prim_TypeError) primTypeErrorClasses
       , M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
       ]
 
@@ -206,9 +206,9 @@ desugarDecl mn exps = go
   go d@(TypeClassDeclaration sa name args implies deps members) = do
     modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
-  go (TypeInstanceDeclaration sa chainId idx name deps className tys body) = do
+  go (TypeInstanceDeclaration sa na chainId idx name deps className tys body) = do
     name' <- desugarInstName name
-    let d = TypeInstanceDeclaration sa chainId idx (Right name') deps className tys body
+    let d = TypeInstanceDeclaration sa na chainId idx (Right name') deps className tys body
     let explicitOrNot = case body of
           DerivedInstance -> Left $ DerivedInstancePlaceholder className KnownClassStrategy
           NewtypeInstance -> Left $ DerivedInstancePlaceholder className NewtypeStrategy
@@ -229,7 +229,6 @@ desugarDecl mn exps = go
     return (expRef name' className tys, [d, dictDecl])
   go other = return (Nothing, [other])
 
-  -- |
   -- Completes the name generation for type class instances that do not have
   -- a unique name defined in source code.
   desugarInstName :: MonadSupply m => Either Text Ident -> Desugar m Ident

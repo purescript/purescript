@@ -8,8 +8,8 @@
 module Language.PureScript.Publish.Registry.Compat where
 
 import Protolude
-import qualified Data.Map as Map
-import qualified Web.Bower.PackageMeta as Bower
+import Data.Map qualified as Map
+import Web.Bower.PackageMeta qualified as Bower
 import Data.Bitraversable (Bitraversable(..))
 import Data.Aeson.BetterErrors (key, asText, keyMay, eachInObject, Parse, throwCustomError)
 

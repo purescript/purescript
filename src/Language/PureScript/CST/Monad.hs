@@ -3,13 +3,13 @@ module Language.PureScript.CST.Monad where
 import Prelude
 
 import Data.List (sortOn)
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Data.Ord (comparing)
 import Data.Text (Text)
-import Language.PureScript.CST.Errors
-import Language.PureScript.CST.Layout
-import Language.PureScript.CST.Positions
-import Language.PureScript.CST.Types
+import Language.PureScript.CST.Errors (ParserError, ParserErrorInfo(..), ParserErrorType(..), ParserWarning, ParserWarningType)
+import Language.PureScript.CST.Layout (LayoutStack)
+import Language.PureScript.CST.Positions (widen)
+import Language.PureScript.CST.Types (Comment, LineFeed, SourcePos(..), SourceRange(..), SourceToken(..), Token, TokenAnn(..))
 
 type LexResult = Either (LexState, ParserError) SourceToken
 

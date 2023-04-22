@@ -1,38 +1,38 @@
 module Language.PureScript.Ide.Prim (idePrimDeclarations) where
 
-import           Protolude
+import Protolude
 
-import qualified Data.Text as T
-import qualified Data.Map as Map
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Constants.Prim as C
-import qualified Language.PureScript.Environment as PEnv
-import           Language.PureScript.Ide.Types
+import Data.Text qualified as T
+import Data.Map qualified as Map
+import Language.PureScript qualified as P
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Environment qualified as PEnv
+import Language.PureScript.Ide.Types (IdeDeclaration(..), IdeDeclarationAnn(..), IdeType(..), IdeTypeClass(..), ModuleMap, emptyAnn)
 
 idePrimDeclarations :: ModuleMap [IdeDeclarationAnn]
 idePrimDeclarations = Map.fromList
-  [ ( C.Prim
+  [ ( C.M_Prim
     , mconcat [primTypes, primClasses]
     )
-  , ( C.PrimBoolean
+  , ( C.M_Prim_Boolean
     , mconcat [primBooleanTypes]
     )
-  , ( C.PrimOrdering
+  , ( C.M_Prim_Ordering
     , mconcat [primOrderingTypes]
     )
-  , ( C.PrimRow
+  , ( C.M_Prim_Row
     , mconcat [primRowTypes, primRowClasses]
     )
-  , ( C.PrimRowList
+  , ( C.M_Prim_RowList
     , mconcat [primRowListTypes, primRowListClasses]
     )
-  , ( C.PrimSymbol
+  , ( C.M_Prim_Symbol
     , mconcat [primSymbolTypes, primSymbolClasses]
     )
-  , ( C.PrimInt
+  , ( C.M_Prim_Int
     , mconcat [primIntTypes, primIntClasses]
     )
-  , ( C.PrimTypeError
+  , ( C.M_Prim_TypeError
     , mconcat [primTypeErrorTypes, primTypeErrorClasses]
     )
   ]

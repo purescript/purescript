@@ -1,0 +1,16 @@
+Error found:
+in module [33mBifunctorInstance1[0m
+at tests/purs/failing/BifunctorInstance1.purs:10:1 - 10:31 (line 10, column 1 - line 10, column 31)
+
+  One or more type variables are in positions that prevent [33mBifunctor[0m from being derived.
+  To derive this class, make sure that these variables are only used as the final arguments to type constructors, that their variance matches the variance of [33mBifunctor[0m, and that those type constructors themselves have instances of [33mData.Functor.Functor[0m, [33mData.Bifunctor.Bifunctor[0m, [33mData.Functor.Contravariant.Contravariant[0m, or [33mData.Profunctor.Profunctor[0m.
+
+  tests/purs/failing/BifunctorInstance1.purs:
+  [90m    8[0m [33m[0m
+  [90m    9[0m [33mdata Test a b = Test (Tuple (Predicate [7ma[27m) (Predicate [7mb[27m)) (Tuple a b)[0m
+  [90m   10[0m [33mderive instance Bifunctor Test[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CannotDeriveInvalidConstructorArg.md for more information,
+or to contribute content related to this error.
+

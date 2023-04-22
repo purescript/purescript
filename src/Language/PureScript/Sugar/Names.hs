@@ -9,30 +9,31 @@ module Language.PureScript.Sugar.Names
   , Exports(..)
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub, sortOn, swap, foldl')
+import Prelude
+import Protolude (sortOn, swap, foldl')
 
-import Control.Arrow (first, second)
-import Control.Monad
+import Control.Arrow (first, second, (&&&))
+import Control.Monad (foldM, when, (>=>))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Lazy
+import Control.Monad.State.Lazy (MonadState, StateT(..), gets, modify)
 import Control.Monad.Writer (MonadWriter(..))
 
+import Data.List.NonEmpty qualified as NEL
 import Data.Maybe (fromMaybe, mapMaybe)
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.Externs
-import Language.PureScript.Linter.Imports
-import Language.PureScript.Names
-import Language.PureScript.Sugar.Names.Env
-import Language.PureScript.Sugar.Names.Exports
-import Language.PureScript.Sugar.Names.Imports
-import Language.PureScript.Traversals
-import Language.PureScript.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, errorMessage'', nonEmpty, parU, warnAndRethrow, warnAndRethrowWithPosition)
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..), ExternsImport(..))
+import Language.PureScript.Linter.Imports (Name(..), UsedImports)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident, OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..))
+import Language.PureScript.Sugar.Names.Env (Env, Exports(..), ImportProvenance(..), ImportRecord(..), Imports(..), checkImportConflicts, nullImports, primEnv)
+import Language.PureScript.Sugar.Names.Exports (findExportable, resolveExports)
+import Language.PureScript.Sugar.Names.Imports (resolveImports, resolveModuleImport)
+import Language.PureScript.Traversals (defS, sndM)
+import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), everywhereOnTypesM)
 
 -- |
 -- Replaces all local names with qualified names.
@@ -196,17 +197,17 @@ renameInModule imports (Module modSS coms mn decls exps) =
       TypeSynonymDeclaration sa name
         <$> updateTypeArguments ps
         <*> updateTypesEverywhere ty
-  updateDecl bound (TypeClassDeclaration sa@(ss, _) className args implies deps ds) =
+  updateDecl bound (TypeClassDeclaration sa className args implies deps ds) =
     fmap (bound,) $
       TypeClassDeclaration sa className
         <$> updateTypeArguments args
-        <*> updateConstraints ss implies
+        <*> updateConstraints implies
         <*> pure deps
         <*> pure ds
-  updateDecl bound (TypeInstanceDeclaration sa@(ss, _) ch idx name cs cn ts ds) =
+  updateDecl bound (TypeInstanceDeclaration sa na@(ss, _) ch idx name cs cn ts ds) =
     fmap (bound,) $
-      TypeInstanceDeclaration sa ch idx name
-        <$> updateConstraints ss cs
+      TypeInstanceDeclaration sa na ch idx name
+        <$> updateConstraints cs
         <*> updateClassName cn ss
         <*> traverse updateTypesEverywhere ts
         <*> pure ds
@@ -253,9 +254,15 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateValue (pos, bound) (Abs (VarBinder ss arg) val') =
     return ((pos, M.insert arg (spanStart ss) bound), Abs (VarBinder ss arg) val')
   updateValue (pos, bound) (Let w ds val') = do
-    let args = mapMaybe letBoundVariable ds
-    unless (length (ordNub args) == length args) .
-      throwError . errorMessage' pos $ OverlappingNamesInLet
+    let
+      args = mapMaybe letBoundVariable ds
+      groupByFst = map (\ts -> (fst (NEL.head ts), snd <$> ts)) . NEL.groupAllWith fst
+      duplicateArgsErrs = foldMap mkArgError $ groupByFst args
+      mkArgError (ident, poses)
+        | NEL.length poses < 2 = mempty
+        | otherwise = errorMessage'' (NEL.reverse poses) (OverlappingNamesInLet ident)
+    when (nonEmpty duplicateArgsErrs) $
+      throwError duplicateArgsErrs
     return ((pos, declarationsToMap ds `M.union` bound), Let w ds val')
   updateValue (_, bound) (Var ss name'@(Qualified qualifiedBy ident)) =
     ((ss, bound), ) <$> case (M.lookup ident bound, qualifiedBy) of
@@ -324,8 +331,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     . fmap (second spanStart . swap)
     . binderNamesWithSpans
 
-  letBoundVariable :: Declaration -> Maybe Ident
-  letBoundVariable = fmap valdeclIdent . getValueDeclaration
+  letBoundVariable :: Declaration -> Maybe (Ident, SourceSpan)
+  letBoundVariable = fmap (valdeclIdent &&& (fst . valdeclSourceAnn)) . getValueDeclaration
 
   declarationsToMap :: [Declaration] -> M.Map Ident SourcePos
   declarationsToMap = foldl goDTM M.empty
@@ -352,8 +359,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     updateInConstraint (Constraint ann@(ss, _) name ks ts info) =
       Constraint ann <$> updateClassName name ss <*> pure ks <*> pure ts <*> pure info
 
-  updateConstraints :: SourceSpan -> [SourceConstraint] -> m [SourceConstraint]
-  updateConstraints pos = traverse $ \(Constraint ann name ks ts info) ->
+  updateConstraints :: [SourceConstraint] -> m [SourceConstraint]
+  updateConstraints = traverse $ \(Constraint ann@(pos, _) name ks ts info) ->
     Constraint ann
       <$> updateClassName name pos
       <*> traverse updateTypesEverywhere ks

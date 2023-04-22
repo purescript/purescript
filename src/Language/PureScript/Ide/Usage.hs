@@ -6,15 +6,15 @@ module Language.PureScript.Ide.Usage
   , findUsages
   ) where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
-import           Control.Lens (preview)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Language.PureScript as P
-import           Language.PureScript.Ide.State (getAllModules, getFileState)
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
+import Control.Lens (preview)
+import Data.Map qualified as Map
+import Data.Set qualified as Set
+import Language.PureScript qualified as P
+import Language.PureScript.Ide.State (getAllModules, getFileState)
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util (identifierFromIdeDeclaration, namespaceForDeclaration)
 
 -- |
 -- How we find usages, given an IdeDeclaration and the module it was defined in:
@@ -25,7 +25,7 @@ import           Language.PureScript.Ide.Util
 -- module.
 -- 3. Apply the collected search specifications and collect the results
 findUsages
-  :: (MonadIO m, Ide m)
+  :: Ide m
   => IdeDeclaration
   -> P.ModuleName
   -> m (ModuleMap (NonEmpty P.SourceSpan))

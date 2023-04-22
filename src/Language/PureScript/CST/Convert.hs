@@ -21,19 +21,19 @@ import Data.Bifunctor (bimap, first)
 import Data.Char (toLower)
 import Data.Foldable (foldl', toList)
 import Data.Functor (($>))
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Data.Maybe (isJust, fromJust, mapMaybe)
-import qualified Data.Text as Text
-import qualified Language.PureScript.AST as AST
+import Data.Text qualified as Text
+import Language.PureScript.AST qualified as AST
 import Language.PureScript.AST.Declarations.ChainId (mkChainId)
-import qualified Language.PureScript.AST.SourcePos as Pos
-import qualified Language.PureScript.Comments as C
+import Language.PureScript.AST.SourcePos qualified as Pos
+import Language.PureScript.Comments qualified as C
 import Language.PureScript.Crash (internalError)
-import qualified Language.PureScript.Environment as Env
-import qualified Language.PureScript.Label as L
-import qualified Language.PureScript.Names as N
+import Language.PureScript.Environment qualified as Env
+import Language.PureScript.Label qualified as L
+import Language.PureScript.Names qualified as N
 import Language.PureScript.PSString (mkString, prettyPrintStringJS)
-import qualified Language.PureScript.Types as T
+import Language.PureScript.Types qualified as T
 import Language.PureScript.CST.Positions
 import Language.PureScript.CST.Print (printToken)
 import Language.PureScript.CST.Types
@@ -477,7 +477,8 @@ convertDeclaration fileName decl = case decl of
       chainId = mkChainId fileName $ startSourcePos $ instKeyword $ instHead $ sepHead insts
       goInst ix inst@(Instance (InstanceHead _ nameSep ctrs cls args) bd) = do
         let ann' = uncurry (sourceAnnCommented fileName) $ instanceRange inst
-        AST.TypeInstanceDeclaration ann' chainId ix
+            clsAnn = findInstanceAnn cls args
+        AST.TypeInstanceDeclaration ann' clsAnn chainId ix
           (mkPartialInstanceName nameSep cls args)
           (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
           (qualified cls)
@@ -491,7 +492,8 @@ convertDeclaration fileName decl = case decl of
       instTy
         | isJust new = AST.NewtypeInstance
         | otherwise = AST.DerivedInstance
-    pure $ AST.TypeInstanceDeclaration ann chainId 0 name'
+      clsAnn = findInstanceAnn cls args
+    pure $ AST.TypeInstanceDeclaration ann clsAnn chainId 0 name'
       (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
       (qualified cls)
       (convertType fileName <$> args)
@@ -600,6 +602,12 @@ convertDeclaration fileName decl = case decl of
     binding@(InstanceBindingName _ fields) -> do
       let ann' = uncurry (sourceAnnCommented fileName) $ instanceBindingRange binding
       convertValueBindingFields fileName ann' fields
+
+  findInstanceAnn cls args = uncurry (sourceAnnCommented fileName) $
+    if null args then
+      qualRange cls
+    else
+      (fst $ qualRange cls, snd $ typeRange $ last args)
 
 convertSignature :: String -> Labeled (Name Ident) (Type a) -> AST.Declaration
 convertSignature fileName (Labeled a _ b) = do

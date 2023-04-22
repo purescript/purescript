@@ -8,31 +8,30 @@ module Language.PureScript.Linter.Exhaustive
   ( checkExhaustiveExpr
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
-import Control.Applicative
+import Control.Applicative (Applicative(..))
 import Control.Arrow (first, second)
 import Control.Monad (unless)
-import Control.Monad.Writer.Class
-import Control.Monad.Supply.Class (MonadSupply)
+import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe)
-import qualified Data.Map as M
-import qualified Data.Text as T
+import Data.Map qualified as M
+import Data.Text qualified as T
 
-import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Declarations
-import Language.PureScript.AST.Literals
-import Language.PureScript.Crash
-import Language.PureScript.Environment hiding (tyVar)
-import Language.PureScript.Errors
+import Language.PureScript.AST.Binders (Binder(..))
+import Language.PureScript.AST.Declarations (CaseAlternative(..), Declaration(..), ErrorMessageHint(..), Expr(..), Guard(..), GuardedExpr(..), pattern MkUnguarded, pattern ValueDecl, isTrueExpr)
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType, Environment(..), TypeKind(..))
+import Language.PureScript.Errors (MultipleErrors, pattern NullSourceAnn, SimpleErrorMessage(..), SourceSpan, addHint, errorMessage')
 import Language.PureScript.Names as P
 import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)
-import Language.PureScript.Traversals
+import Language.PureScript.Traversals (sndM)
 import Language.PureScript.Types as P
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Prim qualified as C
 
 -- | There are two modes of failure for the redundancy check:
 --
@@ -204,7 +203,7 @@ missingCasesMultiple env mn = go
 isExhaustiveGuard :: Environment -> ModuleName -> [GuardedExpr] -> Bool
 isExhaustiveGuard _ _ [MkUnguarded _] = True
 isExhaustiveGuard env moduleName gs   =
-  not . null $ filter (\(GuardedExpr grd _) -> isExhaustive grd) gs
+  any (\(GuardedExpr grd _) -> isExhaustive grd) gs
   where
     isExhaustive :: [Guard] -> Bool
     isExhaustive = all checkGuard
@@ -237,7 +236,7 @@ missingAlternative env mn ca uncovered
 --
 checkExhaustive
   :: forall m
-   . (MonadWriter MultipleErrors m, MonadSupply m)
+   . MonadWriter MultipleErrors m
    => SourceSpan
    -> Environment
    -> ModuleName
@@ -255,7 +254,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     in (missed', ( if null approx
                      then liftA2 (&&) cond nec
                      else Left Incomplete
-                 , if either (const True) id cond
+                 , if and cond
                      then redundant
                      else caseAlternativeBinders ca : redundant
                  )
@@ -274,7 +273,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
       tellRedundant = tell . errorMessage' ss . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
       tellIncomplete = tell . errorMessage' ss $ IncompleteExhaustivityCheck
 
-  -- | We add a Partial constraint by annotating the expression to have type `Partial => _`.
+  -- We add a Partial constraint by annotating the expression to have type `Partial => _`.
   --
   -- The binder information is provided so that it can be embedded in the constraint,
   -- and then included in the error message.
@@ -292,7 +291,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
 --
 checkExhaustiveExpr
   :: forall m
-   . (MonadWriter MultipleErrors m, MonadSupply m)
+   . MonadWriter MultipleErrors m
    => SourceSpan
    -> Environment
    -> ModuleName

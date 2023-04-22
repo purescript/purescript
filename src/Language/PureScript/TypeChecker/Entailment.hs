@@ -7,16 +7,17 @@ module Language.PureScript.TypeChecker.Entailment
   , replaceTypeClassDictionaries
   , newDictionaries
   , entails
+  , findDicts
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
+import Control.Monad.State (MonadState(..), MonadTrans(..), StateT(..), evalStateT, execStateT, foldM, gets, guard, join, modify, zipWithM, zipWithM_, (<=<))
 import Control.Monad.Supply.Class (MonadSupply(..))
-import Control.Monad.Writer
+import Control.Monad.Writer (Any(..), MonadWriter(..), WriterT(..))
 
 import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
@@ -24,31 +25,31 @@ import Data.Function (on)
 import Data.Functor (($>))
 import Data.List (delete, findIndices, minimumBy, nubBy, sortOn, tails)
 import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 import Data.Traversable (for)
 import Data.Text (Text, stripPrefix, stripSuffix)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NEL
+import Data.List.NonEmpty qualified as NEL
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Entailment.Coercible
-import Language.PureScript.TypeChecker.Entailment.IntCompare
+import Language.PureScript.AST (Binder(..), ErrorMessageHint(..), Expr(..), Literal(..), pattern NullSourceSpan, everywhereOnValuesTopDownM, nullSourceSpan)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (Environment(..), FunctionalDependency(..), TypeClassData(..), dictTypeName, kindRow, tyBoolean, tyInt, tyString)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, addHints, errorMessage, rethrow)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), byMaybeModuleName, coerceProperName, disqualify, freshIdent, getQual)
+import Language.PureScript.TypeChecker.Entailment.Coercible (GivenSolverState(..), WantedSolverState(..), initialGivenSolverState, initialWantedSolverState, insoluble, solveGivens, solveWanteds)
+import Language.PureScript.TypeChecker.Entailment.IntCompare (mkFacts, mkRelation, solveRelation)
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
-import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.TypeChecker.Monad (CheckState(..), withErrorMessageHint)
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
-import Language.PureScript.TypeChecker.Unify
-import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, substituteType, unifyTypes)
+import Language.PureScript.TypeClassDictionaries (NamedDict, TypeClassDictionaryInScope(..), superclassName)
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString, mkString, decodeString)
-import qualified Language.PureScript.Constants.Prelude as C
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Libs qualified as C
+import Language.PureScript.Constants.Prim qualified as C
 
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence
@@ -77,9 +78,9 @@ asExpression = \case
   ReflectableString s -> Literal NullSourceSpan $ StringLiteral s
   ReflectableBoolean b -> Literal NullSourceSpan $ BooleanLiteral b
   ReflectableOrdering o -> Constructor NullSourceSpan $ case o of
-    LT -> C.LT
-    EQ -> C.EQ
-    GT -> C.GT
+    LT -> C.C_LT
+    EQ -> C.C_EQ
+    GT -> C.C_GT
 
 -- | Extract the identifier of a named instance
 namedInstanceIdentifier :: Evidence -> Maybe (Qualified Ident)
@@ -93,6 +94,9 @@ type TypeClassDict = TypeClassDictionaryInScope Evidence
 type InstanceContext = M.Map QualifiedBy
                          (M.Map (Qualified (ProperName 'ClassName))
                            (M.Map (Qualified Ident) (NonEmpty NamedDict)))
+
+findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> QualifiedBy -> [TypeClassDict]
+findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (M.lookup cn <=< flip M.lookup ctx)
 
 -- | A type substitution which makes an instance head match a list of types.
 --
@@ -224,11 +228,8 @@ entails SolverOptions{..} constraint context hints =
     ctorModules (KindedType _ ty _) = ctorModules ty
     ctorModules _ = Nothing
 
-    findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> QualifiedBy -> [TypeClassDict]
-    findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (>>= M.lookup cn) . flip M.lookup ctx
-
     valUndefined :: Expr
-    valUndefined = Var nullSourceSpan (Qualified (ByModuleName C.Prim) (Ident C.undefined))
+    valUndefined = Var nullSourceSpan C.I_undefined
 
     solve :: SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
     solve = go 0 hints
@@ -320,7 +321,7 @@ entails SolverOptions{..} constraint context hints =
                 -- with no unsolved constraints. Hopefully, we can solve this later.
                 return (TypeClassDictionary (srcConstraint className' kinds'' tys'' conInfo) context hints')
           where
-            -- | When checking functional dependencies, we need to use unification to make
+            -- When checking functional dependencies, we need to use unification to make
             -- sure it is safe to use the selected instance. We will unify the solved type with
             -- the type in the instance head under the substitution inferred from its instantiation.
             -- As an example, when solving MonadState t0 (State Int), we choose the
@@ -379,7 +380,6 @@ entails SolverOptions{..} constraint context hints =
             canBeGeneralized (KindedType _ t _) = canBeGeneralized t
             canBeGeneralized _ = False
 
-            -- |
             -- Check if two dictionaries are overlapping
             --
             -- Dictionaries which are subclass dictionaries cannot overlap, since otherwise the overlap would have
@@ -460,9 +460,9 @@ entails SolverOptions{..} constraint context hints =
     solveSymbolCompare :: [SourceType] -> Maybe [TypeClassDict]
     solveSymbolCompare [arg0@(TypeLevelString _ lhs), arg1@(TypeLevelString _ rhs), _] =
       let ordering = case compare lhs rhs of
-                  LT -> C.orderingLT
-                  EQ -> C.orderingEQ
-                  GT -> C.orderingGT
+                  LT -> C.LT
+                  EQ -> C.EQ
+                  GT -> C.GT
           args' = [arg0, arg1, srcTypeConstructor ordering]
       in Just [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.SymbolCompare [] [] args' Nothing Nothing]
     solveSymbolCompare _ = Nothing
@@ -474,7 +474,7 @@ entails SolverOptions{..} constraint context hints =
       pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.SymbolAppend [] [] args' Nothing Nothing]
     solveSymbolAppend _ = Nothing
 
-    -- | Append type level symbols, or, run backwards, strip a prefix or suffix
+    -- Append type level symbols, or, run backwards, strip a prefix or suffix
     appendSymbols :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
     appendSymbols arg0@(TypeLevelString _ lhs) arg1@(TypeLevelString _ rhs) _ = Just (arg0, arg1, srcTypeLevelString (lhs <> rhs))
     appendSymbols arg0@(TypeLevelString _ lhs) _ arg2@(TypeLevelString _ out) = do
@@ -526,11 +526,11 @@ entails SolverOptions{..} constraint context hints =
         TypeLevelInt _ i -> pure (ReflectableInt i, tyInt)
         TypeLevelString _ s -> pure (ReflectableString s, tyString)
         TypeConstructor _ n
-          | n == C.booleanTrue -> pure (ReflectableBoolean True, tyBoolean)
-          | n == C.booleanFalse -> pure (ReflectableBoolean False, tyBoolean)
-          | n == C.orderingLT -> pure (ReflectableOrdering LT, srcTypeConstructor C.Ordering)
-          | n == C.orderingEQ -> pure (ReflectableOrdering EQ, srcTypeConstructor C.Ordering)
-          | n == C.orderingGT -> pure (ReflectableOrdering GT, srcTypeConstructor C.Ordering)
+          | n == C.True -> pure (ReflectableBoolean True, tyBoolean)
+          | n == C.False -> pure (ReflectableBoolean False, tyBoolean)
+          | n == C.LT -> pure (ReflectableOrdering LT, srcTypeConstructor C.Ordering)
+          | n == C.EQ -> pure (ReflectableOrdering EQ, srcTypeConstructor C.Ordering)
+          | n == C.GT -> pure (ReflectableOrdering GT, srcTypeConstructor C.Ordering)
         _ -> Nothing
       pure [TypeClassDictionaryInScope Nothing 0 (ReflectableInstance ref) [] C.Reflectable [] [] [typeLevel, typ] Nothing Nothing]
     solveReflectable _ = Nothing
@@ -543,20 +543,20 @@ entails SolverOptions{..} constraint context hints =
     solveIntAdd _ = Nothing
 
     addInts :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
-    -- | l r -> o, l + r = o
+    -- l r -> o, l + r = o
     addInts arg0@(TypeLevelInt _ l) arg1@(TypeLevelInt _ r) _ = pure (arg0, arg1, srcTypeLevelInt (l + r))
-    -- | l o -> r, o - l = r
+    -- l o -> r, o - l = r
     addInts arg0@(TypeLevelInt _ l) _ arg2@(TypeLevelInt _ o) = pure (arg0, srcTypeLevelInt (o - l), arg2)
-    -- | r o -> l, o - r = l
+    -- r o -> l, o - r = l
     addInts _ arg1@(TypeLevelInt _ r) arg2@(TypeLevelInt _ o) = pure (srcTypeLevelInt (o - r), arg1, arg2)
     addInts _ _ _                                             = Nothing
 
     solveIntCompare :: InstanceContext -> [SourceType] -> Maybe [TypeClassDict]
     solveIntCompare _ [arg0@(TypeLevelInt _ a), arg1@(TypeLevelInt _ b), _] =
       let ordering = case compare a b of
-            EQ -> C.orderingEQ
-            LT -> C.orderingLT
-            GT -> C.orderingGT
+            EQ -> C.EQ
+            LT -> C.LT
+            GT -> C.GT
           args' = [arg0, arg1, srcTypeConstructor ordering]
       in pure [TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.IntCompare [] [] args' Nothing Nothing]
     solveIntCompare ctx args@[a, b, _] = do
@@ -581,7 +581,7 @@ entails SolverOptions{..} constraint context hints =
       pure [ TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.RowUnion vars kinds [lOut, rOut, uOut] cst Nothing ]
     solveUnion _ _ = Nothing
 
-    -- | Left biased union of two row types
+    -- Left biased union of two row types
 
     unionRows :: [SourceType] -> SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType, Maybe [SourceConstraint], [(Text, SourceType)])
     unionRows kinds l r u =
@@ -642,7 +642,7 @@ entails SolverOptions{..} constraint context hints =
       pure [ TypeClassDictionaryInScope Nothing 0 EmptyClassInstance [] C.RowToList [] [kind] [r, entries] Nothing Nothing ]
     solveRowToList _ _ = Nothing
 
-    -- | Convert a closed row to a sorted list of entries
+    -- Convert a closed row to a sorted list of entries
     rowToRowList :: SourceType -> SourceType -> Maybe SourceType
     rowToRowList kind r =
         guard (isREmpty rest) $>
@@ -704,7 +704,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
                 solved = map snd . filter ((`S.notMember` determinedSet) . fst) $ zipWith (\(_, ts) i -> (i, ts)) matched [0..]
             in verifySubstitution (M.unionsWith (++) solved)
   where
-    -- | Find the closure of a set of functional dependencies.
+    -- Find the closure of a set of functional dependencies.
     covers :: [(Matched (), subst)] -> Bool
     covers ms = finalSet == S.fromList [0..length ms - 1]
       where
@@ -750,7 +750,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
     typeHeadsAreEqual r1@RCons{} r2@RCons{} =
         foldr both (uncurry go rest) common
       where
-        (common, rest) = alignRowsWith typeHeadsAreEqual r1 r2
+        (common, rest) = alignRowsWith (const typeHeadsAreEqual) r1 r2
 
         go :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Matched (), Matching [Type a])
         go (l,  KindedType _ t1 _) (r,  t2)                            = go (l, t1) (r, t2)
@@ -795,7 +795,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
       typesAreEqual (KindApp _ h1 t1)      (KindApp _ h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2
       typesAreEqual (REmpty _)             (REmpty _)             = Match ()
       typesAreEqual r1                     r2                     | isRCons r1 || isRCons r2 =
-          let (common, rest) = alignRowsWith typesAreEqual r1 r2
+          let (common, rest) = alignRowsWith (const typesAreEqual) r1 r2
           in fold common <> uncurry go rest
         where
           go :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> Matched ()
@@ -874,10 +874,10 @@ pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs
 tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
 tails1 =
   -- NEL.fromList is an unsafe function, but this usage should be safe, since:
-  -- * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
-  -- * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
+  -- - `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
+  -- - If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
   --   list, since `head (tails xs) = xs`.
-  -- * The only empty element of `tails xs` is the last one (by the definition of `tails`)
-  -- * Therefore, if we take all but the last element of `tails xs` i.e.
+  -- - The only empty element of `tails xs` is the last one (by the definition of `tails`)
+  -- - Therefore, if we take all but the last element of `tails xs` i.e.
   --   `init (tails xs)`, we have a nonempty list of nonempty lists
   NEL.fromList . map NEL.fromList . init . tails . NEL.toList

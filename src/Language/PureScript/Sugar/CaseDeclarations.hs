@@ -8,7 +8,7 @@ module Language.PureScript.Sugar.CaseDeclarations
   , desugarCaseGuards
   ) where
 
-import Prelude.Compat
+import Prelude
 import Protolude (ordNub)
 
 import Data.List (groupBy, foldl1')
@@ -16,13 +16,13 @@ import Data.Maybe (catMaybes, mapMaybe)
 
 import Control.Monad ((<=<), forM, replicateM, join, unless)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Supply.Class
+import Control.Monad.Supply.Class (MonadSupply)
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (NameKind(..))
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors(..), SimpleErrorMessage(..), addHint, errorMessage', parU, rethrow, withPosition)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident, Qualified(..), freshIdent')
 import Language.PureScript.TypeChecker.Monad (guardWith)
 
 -- |
@@ -327,8 +327,8 @@ desugarCases :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Decla
 desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGroup
   where
     desugarRest :: [Declaration] -> m [Declaration]
-    desugarRest (TypeInstanceDeclaration sa cd idx name constraints className tys ds : rest) =
-      (:) <$> (TypeInstanceDeclaration sa cd idx name constraints className tys <$> traverseTypeInstanceBody desugarCases ds) <*> desugarRest rest
+    desugarRest (TypeInstanceDeclaration sa na cd idx name constraints className tys ds : rest) =
+      (:) <$> (TypeInstanceDeclaration sa na cd idx name constraints className tys <$> traverseTypeInstanceBody desugarCases ds) <*> desugarRest rest
     desugarRest (ValueDecl sa name nameKind bs result : rest) =
       let (_, f, _) = everywhereOnValuesTopDownM return go return
           f' = mapM (\(GuardedExpr gs e) -> GuardedExpr gs <$> f e)
