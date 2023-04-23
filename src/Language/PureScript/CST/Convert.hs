@@ -138,11 +138,9 @@ convertType fileName = go
       let
         mkForAll a b v t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
-          T.ForAll ann' v (getIdent $ nameValue a) b t Nothing
-        k (TypeVarKinded (Wrapped _ (Labeled (Just _, a) _ b) _)) = mkForAll a (Just (go b)) T.TypeVarVisible
-        k (TypeVarKinded (Wrapped _ (Labeled (_, a) _ b) _)) = mkForAll a (Just (go b)) T.TypeVarInvisible
-        k (TypeVarName (Just _, a)) = mkForAll a Nothing T.TypeVarVisible
-        k (TypeVarName (_, a)) = mkForAll a Nothing T.TypeVarInvisible
+          T.ForAll ann' (maybe T.TypeVarInvisible (const T.TypeVarVisible) v) (getIdent $ nameValue a) b t Nothing
+        k (TypeVarKinded (Wrapped _ (Labeled (v, a) _ b) _)) = mkForAll a (Just (go b)) v
+        k (TypeVarName (v, a)) = mkForAll a Nothing v
         ty' = foldr k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
       T.setAnnForType ann ty'
