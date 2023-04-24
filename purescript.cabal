@@ -428,6 +428,20 @@ executable purs
   autogen-modules:
     Paths_purescript
 
+executable playground
+  import: defaults
+  hs-source-dirs: playground
+  main-is: Main.hs
+  ghc-options:
+    -O2
+    -threaded
+    -fprof-auto
+    "-with-rtsopts=-hT"
+  build-depends:
+    Glob >=0.10.2 && <0.11,
+    haskeline >=0.8.2 && <0.9,
+    purescript
+
 test-suite tests
   import: defaults
   type: exitcode-stdio-1.0
