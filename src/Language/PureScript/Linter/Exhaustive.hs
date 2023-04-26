@@ -14,7 +14,6 @@ import Protolude (ordNub)
 import Control.Applicative (Applicative(..))
 import Control.Arrow (first, second)
 import Control.Monad (unless)
-import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.List (foldl', sortOn)
@@ -25,9 +24,10 @@ import Data.Text qualified as T
 import Language.PureScript.AST.Binders (Binder(..))
 import Language.PureScript.AST.Declarations (CaseAlternative(..), Expr(..), Guard(..), GuardedExpr(..), pattern MkUnguarded, isTrueExpr)
 import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.AST.Traversals (everywhereOnValuesM)
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (DataDeclType, Environment(..), TypeKind(..))
-import Language.PureScript.Errors (MultipleErrors, pattern NullSourceAnn, SimpleErrorMessage(..), SourceSpan, errorMessage', everywhereOnValuesM)
+import Language.PureScript.Errors (MultipleErrors, pattern NullSourceAnn, SimpleErrorMessage(..), SourceSpan, errorMessage')
 import Language.PureScript.Names as P
 import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)
 import Language.PureScript.Types as P
@@ -291,19 +291,19 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
 --
 checkExhaustiveExpr
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . MonadWriter MultipleErrors m
    => SourceSpan
    -> Environment
    -> ModuleName
    -> Expr
    -> m Expr
-checkExhaustiveExpr initSS env mn = onExpr'
+checkExhaustiveExpr ss env mn = onExpr'
   where
   (_, onExpr', _) = everywhereOnValuesM pure onExpr pure
 
   onExpr :: Expr -> m Expr
   onExpr e = case e of
     Case es cas ->
-      checkExhaustive initSS env mn (length es) cas e
+      checkExhaustive ss env mn (length es) cas e
     _ ->
       pure e
