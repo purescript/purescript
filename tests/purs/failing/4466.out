@@ -1,0 +1,24 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/4466.purs:15:44 - 15:67 (line 15, column 44 - line 15, column 67)
+
+  A case expression could not be determined to cover all inputs.
+  The following additional cases are required to cover all inputs:
+
+    [33m{ sound: Quack }[0m
+    [33m{ sound: Bark }[0m
+
+  Alternatively, add a Partial constraint to the type of the enclosing value.
+
+while checking that type [33mPartial => t0[0m
+  is at least as general as type [33mBoolean[0m
+while checking that expression [33mcase $0 of              [0m
+                               [33m  { sound: Moo } -> true[0m
+  has type [33mBoolean[0m
+in value declaration [33manimalFunc[0m
+
+where [33mt0[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+
