@@ -5,7 +5,6 @@ import Prelude
 
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
-import Partial.Unsafe (unsafePartial)
 
 data Sound = Moo | Quack | Bark
 
