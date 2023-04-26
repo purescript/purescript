@@ -1,6 +1,6 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/failing/4466.purs:16:44 - 16:67 (line 16, column 44 - line 16, column 67)
+at tests/purs/failing/4466.purs:15:44 - 15:67 (line 15, column 44 - line 15, column 67)
 
   A case expression could not be determined to cover all inputs.
   The following additional cases are required to cover all inputs:
