@@ -2,6 +2,69 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.9
+
+New features:
+
+* Add release artifacts for Linux and macOS running on the ARM64 architecture. (#4455 by @f-f)
+
+Bugfixes:
+
+* Fix prerelease version number on macOS (#4461 by @rhendric)
+
+* Consider fixity declarations during linting (#4462 by @ozkutuk)
+
+* Defer monomorphization for data constructors (#4376 by @purefunctor)
+
+  In `0.15.4` and earlier, the compiler monomorphizes type
+  constructors early, yielding the following type:
+
+  ```purs
+  > :t Nothing
+  forall (a1 :: Type). Maybe a1
+
+  > :t { a : Nothing }
+  forall (a1 :: Type).
+    { a :: Maybe a1
+    }
+  ```
+
+  With this change, the monomorphization introduced in
+  [#835](https://github.com/purescript/purescript/pull/835) is
+  deferred to only when it's needed, such as when constructors are
+  used as values inside of records.
+
+  ```purs
+  > :t Nothing
+  forall a. Maybe a
+
+  > :t { a : Nothing }
+  forall (a1 :: Type).
+    { a :: Maybe a1
+    }
+  ```
+
+  Also as a consequence, record updates should not throw
+  `ConstrainedTypeUnified` in cases such as:
+
+  ```purs
+  v1 :: { a :: Maybe Unit }
+  v1 = { a : Just Unit }
+
+  v2 :: { a :: Maybe Unit }
+  v2 = let v3 = v1 { a = mempty } in v3
+  ```
+
+* Update installer to version 0.3.5 to support ARM builds (#4468 and #4469 by @rhendric)
+
+* Fix exhaustiveness checking to account for case guards (#4467 by @purefunctor)
+
+Internal:
+
+* Refactor module imports to make identifiers' origins obvious (#4451 by @JordanMartinez)
+
+* Require comments not to cause Haddock warnings (#4456 by @rhendric)
+
 ## 0.15.8
 
 New features:
