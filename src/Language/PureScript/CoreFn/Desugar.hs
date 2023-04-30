@@ -6,7 +6,7 @@ import Protolude (ordNub, orEmpty)
 import Control.Arrow (second)
 
 import Data.Function (on)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Tuple (swap)
 import Data.List.NonEmpty qualified as NEL
 import Data.Map qualified as M
@@ -76,10 +76,15 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration ds) =
     concatMap declToCoreFn ds
-  declToCoreFn (A.ValueDecl (ss, com) name _ _ [A.MkUnguarded e]) =
-    [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
-  declToCoreFn (A.BindingGroupDeclaration ds) =
-    [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]
+  declToCoreFn (A.ValueDecl sa ta name _ _ [A.MkUnguarded e]) =
+    let (ss, com) = fromMaybe sa ta
+    in [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
+  declToCoreFn (A.BindingGroupDeclaration ds) = do
+    let 
+      toBinding ((sa, ta, name), _, e) =
+        let (ss, com) = fromMaybe sa ta
+        in ((ssA ss, name), exprToCoreFn ss com Nothing e)
+    [Rec . NEL.toList $ toBinding <$> ds]
   declToCoreFn _ = []
 
   -- Desugars expressions from AST to CoreFn representation.

@@ -57,8 +57,8 @@ everywhereOnValues f g h = (f', g', h')
   where
   f' :: Declaration -> Declaration
   f' (DataBindingGroupDeclaration ds) = f (DataBindingGroupDeclaration (fmap f' ds))
-  f' (ValueDecl sa name nameKind bs val) =
-     f (ValueDecl sa name nameKind (fmap h' bs) (fmap (mapGuardedExpr handleGuard g') val))
+  f' (ValueDecl sa ta name nameKind bs val) =
+     f (ValueDecl sa ta name nameKind (fmap h' bs) (fmap (mapGuardedExpr handleGuard g') val))
   f' (BoundValueDeclaration sa b expr) = f (BoundValueDeclaration sa (h' b) (g' expr))
   f' (BindingGroupDeclaration ds) = f (BindingGroupDeclaration (fmap (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
   f' (TypeClassDeclaration sa name args implies deps ds) = f (TypeClassDeclaration sa name args implies deps (fmap f' ds))
@@ -131,8 +131,8 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
 
   f' :: Declaration -> m Declaration
   f' (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> traverse (f' <=< f) ds
-  f' (ValueDecl sa name nameKind bs val) =
-     ValueDecl sa name nameKind <$> traverse (h' <=< h) bs <*> traverse (guardedExprM handleGuard (g' <=< g)) val
+  f' (ValueDecl sa ta name nameKind bs val) =
+     ValueDecl sa ta name nameKind <$> traverse (h' <=< h) bs <*> traverse (guardedExprM handleGuard (g' <=< g)) val
   f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (name, nameKind, ) <$> (g val >>= g')) ds
   f' (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f' <=< f) ds
   f' (TypeInstanceDeclaration sa na ch idx name cs className args ds) = TypeInstanceDeclaration sa na ch idx name cs className args <$> traverseTypeInstanceBody (traverse (f' <=< f)) ds
@@ -200,8 +200,8 @@ everywhereOnValuesM f g h = (f', g', h')
 
   f' :: Declaration -> m Declaration
   f' (DataBindingGroupDeclaration ds) = (DataBindingGroupDeclaration <$> traverse f' ds) >>= f
-  f' (ValueDecl sa name nameKind bs val) =
-    ValueDecl sa name nameKind <$> traverse h' bs <*> traverse (guardedExprM handleGuard g') val >>= f
+  f' (ValueDecl sa ta name nameKind bs val) =
+    ValueDecl sa ta name nameKind <$> traverse h' bs <*> traverse (guardedExprM handleGuard g') val >>= f
   f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (name, nameKind, ) <$> g' val) ds) >>= f
   f' (BoundValueDeclaration sa b expr) = (BoundValueDeclaration sa <$> h' b <*> g' expr) >>= f
   f' (TypeClassDeclaration sa name args implies deps ds) = (TypeClassDeclaration sa name args implies deps <$> traverse f' ds) >>= f
@@ -461,8 +461,8 @@ everywhereWithContextOnValuesM s0 f g h i j k = (f'' s0, g'' s0, h'' s0, i'' s0,
   f'' s = uncurry f' <=< f s
 
   f' s (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> traverse (f'' s) ds
-  f' s (ValueDecl sa name nameKind bs val) =
-    ValueDecl sa name nameKind <$> traverse (h'' s) bs <*> traverse (guardedExprM (k' s) (g'' s)) val
+  f' s (ValueDecl sa ta name nameKind bs val) =
+    ValueDecl sa ta name nameKind <$> traverse (h'' s) bs <*> traverse (guardedExprM (k' s) (g'' s)) val
   f' s (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (thirdM (g'' s)) ds
   f' s (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f'' s) ds
   f' s (TypeInstanceDeclaration sa na ch idx name cs className args ds) = TypeInstanceDeclaration sa na ch idx name cs className args <$> traverseTypeInstanceBody (traverse (f'' s)) ds
@@ -561,12 +561,12 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   f' s (DataBindingGroupDeclaration ds) =
     let s' = S.union s (S.fromList (map ToplevelIdent (mapMaybe getDeclIdent (NEL.toList ds))))
     in foldMap (f'' s') ds
-  f' s (ValueDecl _ name _ bs val) =
+  f' s (ValueDecl _ _ name _ bs val) =
     let s' = S.insert (ToplevelIdent name) s
         s'' = S.union s' (S.fromList (concatMap localBinderNames bs))
     in foldMap (h'' s') bs <> foldMap (l' s'') val
   f' s (BindingGroupDeclaration ds) =
-    let s' = S.union s (S.fromList (NEL.toList (fmap (\((_, name), _, _) -> ToplevelIdent name) ds)))
+    let s' = S.union s (S.fromList (NEL.toList (fmap (\((_, _, name), _, _) -> ToplevelIdent name) ds)))
     in foldMap (\(_, _, val) -> g'' s' val) ds
   f' s (TypeClassDeclaration _ _ _ _ _ ds) = foldMap (f'' s) ds
   f' s (TypeInstanceDeclaration _ _ _ _ _ _ _ _ (ExplicitInstance ds)) = foldMap (f'' s) ds

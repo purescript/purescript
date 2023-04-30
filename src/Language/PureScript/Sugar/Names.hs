@@ -332,7 +332,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
     . binderNamesWithSpans
 
   letBoundVariable :: Declaration -> Maybe (Ident, SourceSpan)
-  letBoundVariable = fmap (valdeclIdent &&& (fst . valdeclSourceAnn)) . getValueDeclaration
+  letBoundVariable = fmap (valdeclIdent &&& (\d -> fst $ fromMaybe (valdeclSourceAnn d) (valdeclTypeDeclAnn d))) . getValueDeclaration
 
   declarationsToMap :: [Declaration] -> M.Map Ident SourcePos
   declarationsToMap = foldl goDTM M.empty

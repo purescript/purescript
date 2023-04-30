@@ -225,7 +225,7 @@ desugarDecl mn exps = go
           dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictTypeName) className)) tys
           constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
         in
-          return $ ValueDecl sa name' Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
+          return $ ValueDecl sa Nothing name' Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
     return (expRef name' className tys, [d, dictDecl])
   go other = return (Nothing, [other])
 
@@ -300,7 +300,7 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarati
       dictObjIdent = Ident "v"
       ctor = ConstructorBinder ss (coerceProperName . dictTypeName <$> className) [VarBinder ss dictObjIdent]
       acsr = Accessor (mkString $ runIdent ident) (Var ss (Qualified ByNullSourcePos dictObjIdent))
-  in ValueDecl sa ident Private []
+  in ValueDecl sa Nothing ident Private []
     [MkUnguarded (
      TypedValue False (Abs (VarBinder ss dictIdent) (Case [Var ss $ Qualified ByNullSourcePos dictIdent] [CaseAlternative [ctor] [MkUnguarded acsr]])) $
        moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty))
@@ -353,13 +353,13 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
           dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictTypeName) className)) tys
           constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
           dict = App (Constructor ss (fmap (coerceProperName . dictTypeName) className)) props
-          result = ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
+          result = ValueDecl sa Nothing name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
       return result
 
   where
 
   memberToValue :: [(Ident, SourceType)] -> Declaration -> Desugar m Expr
-  memberToValue tys' (ValueDecl (ss', _) ident _ [] [MkUnguarded val]) = do
+  memberToValue tys' (ValueDecl (ss', _) _ ident _ [] [MkUnguarded val]) = do
     _ <- maybe (throwError . errorMessage' ss' $ ExtraneousClassMember ident className) return $ lookup ident tys'
     return val
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"

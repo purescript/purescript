@@ -256,7 +256,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
 
     -- (non-recursively, recursively) bound idents in decl
     declIdents :: Declaration -> (S.Set (SourceSpan, Ident), S.Set (SourceSpan, Ident))
-    declIdents (ValueDecl (ss,_) ident _ _ _) = (S.empty, S.singleton (ss, ident))
+    declIdents (ValueDecl (ss,_) _ ident _ _ _) = (S.empty, S.singleton (ss, ident))
     declIdents (BoundValueDeclaration _ binders _) = (S.fromList $ binderNamesWithSpans binders, S.empty)
     declIdents _ = (S.empty, S.empty)
 
@@ -274,7 +274,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
         removeAndWarn letNamesRec errs''
 
     -- let f x = e  -- check the x in e (but not the f)
-    underDecl (ValueDecl _ _ _ binders gexprs) =
+    underDecl (ValueDecl _ _ _ _ binders gexprs) =
       let bindNewNames = S.fromList (concatMap binderNamesWithSpans binders)
           allExprs = concatMap unguard gexprs
       in

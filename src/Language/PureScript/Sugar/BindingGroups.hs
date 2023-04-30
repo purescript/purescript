@@ -160,8 +160,8 @@ flattenBindingGroups = concatMap go
   where
   go (DataBindingGroupDeclaration ds) = NEL.toList ds
   go (BindingGroupDeclaration ds) =
-    NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
-      ValueDecl sa ident nameKind [] [MkUnguarded val]) ds
+    NEL.toList $ fmap (\((sa, ta, ident), nameKind, val) ->
+      ValueDecl sa ta ident nameKind [] [MkUnguarded val]) ds
   go other = [other]
 
 usedIdents :: ModuleName -> ValueDeclarationData Expr -> [Ident]
@@ -253,12 +253,12 @@ toBindingGroup moduleName (CyclicSCC ds') = do
   valueVerts :: [(ValueDeclarationData Expr, Ident, [Ident])]
   valueVerts = fmap (\d -> (d, valdeclIdent d, usedImmediateIdents moduleName (mkDeclaration d) `intersect` idents)) ds'
 
-  toBinding :: SCC (ValueDeclarationData Expr) -> m ((SourceAnn, Ident), NameKind, Expr)
+  toBinding :: SCC (ValueDeclarationData Expr) -> m ((SourceAnn, Maybe SourceAnn, Ident), NameKind, Expr)
   toBinding (AcyclicSCC d) = return $ fromValueDecl d
   toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
   cycleError :: ValueDeclarationData Expr -> MultipleErrors
-  cycleError (ValueDeclarationData (ss, _) n _ _ _) = errorMessage' ss $ CycleInDeclaration n
+  cycleError (ValueDeclarationData (ss, _) _ n _ _ _) = errorMessage' ss $ CycleInDeclaration n
 
 toDataBindingGroup
   :: MonadError MultipleErrors m
@@ -300,6 +300,6 @@ isTypeSynonym _ = Nothing
 mkDeclaration :: ValueDeclarationData Expr -> Declaration
 mkDeclaration = ValueDeclaration . fmap (pure . MkUnguarded)
 
-fromValueDecl :: ValueDeclarationData Expr -> ((SourceAnn, Ident), NameKind, Expr)
-fromValueDecl (ValueDeclarationData sa ident nameKind [] val) = ((sa, ident), nameKind, val)
+fromValueDecl :: ValueDeclarationData Expr -> ((SourceAnn, Maybe SourceAnn, Ident), NameKind, Expr)
+fromValueDecl (ValueDeclarationData sa ta ident nameKind [] val) = ((sa, ta, ident), nameKind, val)
 fromValueDecl ValueDeclarationData{} = internalError "Binders should have been desugared"

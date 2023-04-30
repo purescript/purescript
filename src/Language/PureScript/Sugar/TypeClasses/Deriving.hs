@@ -79,13 +79,13 @@ deriveGenericRep ss mn tyCon tyConArgs =
       let rep = toRepTy reps
           inst | null reps =
                    -- If there are no cases, spin
-                   [ ValueDecl (ss', []) (Ident "to") Public [] $ unguarded $
+                   [ ValueDecl (ss', []) Nothing (Ident "to") Public [] $ unguarded $
                       lamCase x
                         [ CaseAlternative
                             [NullBinder]
                             (unguarded (App (Var ss Libs.I_to) (Var ss' (Qualified ByNullSourcePos x))))
                         ]
-                   , ValueDecl (ss', []) (Ident "from") Public [] $ unguarded $
+                   , ValueDecl (ss', []) Nothing (Ident "from") Public [] $ unguarded $
                       lamCase x
                         [ CaseAlternative
                             [NullBinder]
@@ -93,9 +93,9 @@ deriveGenericRep ss mn tyCon tyConArgs =
                         ]
                    ]
                | otherwise =
-                   [ ValueDecl (ss', []) (Ident "to") Public [] $ unguarded $
+                   [ ValueDecl (ss', []) Nothing (Ident "to") Public [] $ unguarded $
                        lamCase x (zipWith ($) (map underBinder (sumBinders (length dctors))) to)
-                   , ValueDecl (ss', []) (Ident "from") Public [] $ unguarded $
+                   , ValueDecl (ss', []) Nothing (Ident "from") Public [] $ unguarded $
                        lamCase x (zipWith ($) (map underExpr (sumExprs (length dctors))) from)
                    ]
 

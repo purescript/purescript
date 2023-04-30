@@ -621,7 +621,7 @@ convertValueBindingFields fileName ann (ValueBindingFields a bs c) = do
   let
     bs' = convertBinder fileName <$> bs
     cs' = convertGuarded fileName c
-  AST.ValueDeclaration $ AST.ValueDeclarationData ann (ident $ nameValue a) Env.Public bs' cs'
+  AST.ValueDeclaration $ AST.ValueDeclarationData ann Nothing (ident $ nameValue a) Env.Public bs' cs'
 
 convertImportDecl
   :: String
