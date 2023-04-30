@@ -87,8 +87,8 @@ typesOf
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => BindingGroupType
   -> ModuleName
-  -> [((SourceAnn, Ident), Expr)]
-  -> m [((SourceAnn, Ident), (Expr, SourceType))]
+  -> [((SourceAnn, Maybe SourceAnn, Ident), Expr)]
+  -> m [((SourceAnn, Maybe SourceAnn, Ident), (Expr, SourceType))]
 typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     (tys, wInfer) <- capturingSubstitution tidyUp $ do
       (SplitBindingGroup untyped typed dict, w) <- withoutWarnings $ typeDictionaryForBindingGroup (Just moduleName) vals
@@ -96,7 +96,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       ds2 <- forM untyped $ \e -> withoutWarnings $ typeForBindingGroupElement e dict
       return (map (False, ) ds1 ++ map (True, ) ds2, w)
 
-    inferred <- forM tys $ \(shouldGeneralize, ((sai@((ss, _), ident), (val, ty)), _)) -> do
+    inferred <- forM tys $ \(shouldGeneralize, ((sai@((ss, _), _, ident), (val, ty)), _)) -> do
       -- Replace type class dictionary placeholders with actual dictionaries
       (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize val
       -- Generalize and constrain the type
@@ -229,9 +229,9 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 --
 -- This structure breaks down a binding group into typed and untyped parts.
 data SplitBindingGroup = SplitBindingGroup
-  { _splitBindingGroupUntyped :: [((SourceAnn, Ident), (Expr, SourceType))]
+  { _splitBindingGroupUntyped :: [((SourceAnn, Maybe SourceAnn, Ident), (Expr, SourceType))]
   -- ^ The untyped expressions
-  , _splitBindingGroupTyped :: [((SourceAnn, Ident), (Expr, [(Text, SourceType)], SourceType, Bool))]
+  , _splitBindingGroupTyped :: [((SourceAnn, Maybe SourceAnn, Ident), (Expr, [(Text, SourceType)], SourceType, Bool))]
   -- ^ The typed expressions, along with their type annotations
   , _splitBindingGroupNames :: M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
   -- ^ A map containing all expressions and their assigned types (which might be
@@ -247,7 +247,7 @@ data SplitBindingGroup = SplitBindingGroup
 typeDictionaryForBindingGroup
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Maybe ModuleName
-  -> [((SourceAnn, Ident), Expr)]
+  -> [((SourceAnn, Maybe SourceAnn, Ident), Expr)]
   -> m SplitBindingGroup
 typeDictionaryForBindingGroup moduleName vals = do
     -- Filter the typed and untyped declarations and make a map of names to typed declarations.
@@ -266,7 +266,7 @@ typeDictionaryForBindingGroup moduleName vals = do
     -- Create the dictionary of all name/type pairs, which will be added to the
     -- environment during type checking
     let dict = M.fromList [ (Qualified (maybe (BySourcePos $ spanStart ss) ByModuleName moduleName) ident, (ty, Private, Undefined))
-                          | (((ss, _), ident), ty) <- typedDict <> untypedDict
+                          | (((ss, _), _, ident), ty) <- typedDict <> untypedDict
                           ]
     return (SplitBindingGroup untyped' typed' dict)
   where
@@ -284,11 +284,11 @@ typeDictionaryForBindingGroup moduleName vals = do
 checkTypedBindingGroupElement
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> ((SourceAnn, Ident), (Expr, [(Text, SourceType)], SourceType, Bool))
+  -> ((SourceAnn, Maybe SourceAnn, Ident), (Expr, [(Text, SourceType)], SourceType, Bool))
   -- ^ The identifier we are trying to define, along with the expression and its type annotation
   -> M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
   -- ^ Names brought into scope in this binding group
-  -> m ((SourceAnn, Ident), (Expr, SourceType))
+  -> m ((SourceAnn, Maybe SourceAnn, Ident), (Expr, SourceType))
 checkTypedBindingGroupElement mn (ident, (val, args, ty, checkType)) dict = do
   -- We replace type synonyms _after_ kind-checking, since we don't want type
   -- synonym expansion to bring type variables into scope. See #2542.
@@ -302,12 +302,12 @@ checkTypedBindingGroupElement mn (ident, (val, args, ty, checkType)) dict = do
 -- | Infer a type for a value in a binding group which lacks an annotation.
 typeForBindingGroupElement
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => ((SourceAnn, Ident), (Expr, SourceType))
+  => ((SourceAnn, Maybe SourceAnn, Ident), (Expr, SourceType))
   -- ^ The identifier we are trying to define, along with the expression and its assigned type
   -- (at this point, this should be a unification variable)
   -> M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
   -- ^ Names brought into scope in this binding group
-  -> m ((SourceAnn, Ident), (Expr, SourceType))
+  -> m ((SourceAnn, Maybe SourceAnn, Ident), (Expr, SourceType))
 typeForBindingGroupElement (ident, (val, ty)) dict = do
   -- Infer the type with the new names in scope
   TypedValue' _ val' ty' <- bindNames dict $ infer val
@@ -542,9 +542,10 @@ inferLetBinding
   -> (Expr -> m TypedValue')
   -> m ([Declaration], TypedValue')
 inferLetBinding seen [] ret j = (seen, ) <$> withBindingGroupVisible (j ret)
-inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (TypedValue checkType val ty)] : rest) ret j = do
+inferLetBinding seen (ValueDecl sa@(ss, _) ta ident nameKind [] [MkUnguarded (TypedValue checkType val ty)] : rest) ret j = do
+  let (errorSpan, _) = fromMaybe sa ta
   moduleName <- unsafeCheckCurrentModule
-  TypedValue' _ val' ty'' <- warnAndRethrowWithPositionTC ss $ do
+  TypedValue' _ val' ty'' <- warnAndRethrowWithPositionTC errorSpan $ do
     ((args, elabTy), kind) <- kindOfWithScopedVars ty
     checkTypeKind ty kind
     let dict = M.singleton (Qualified (BySourcePos $ spanStart ss) ident) (elabTy, nameKind, Undefined)
@@ -553,21 +554,22 @@ inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (Typed
       then withScopedTypeVars moduleName args (bindNames dict (check val ty'))
       else return (TypedValue' checkType val elabTy)
   bindNames (M.singleton (Qualified (BySourcePos $ spanStart ss) ident) (ty'', nameKind, Defined))
-    $ inferLetBinding (seen ++ [ValueDecl sa ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
-inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded val] : rest) ret j = do
+    $ inferLetBinding (seen ++ [ValueDecl sa ta ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
+inferLetBinding seen (ValueDecl sa@(ss, _) ta ident nameKind [] [MkUnguarded val] : rest) ret j = do
+  let (errorSpan, _) = fromMaybe sa ta
   valTy <- freshTypeWithKind kindType
-  TypedValue' _ val' valTy' <- warnAndRethrowWithPositionTC ss $ do
+  TypedValue' _ val' valTy' <- warnAndRethrowWithPositionTC errorSpan $ do
     let dict = M.singleton (Qualified (BySourcePos $ spanStart ss) ident) (valTy, nameKind, Undefined)
     bindNames dict $ infer val
-  warnAndRethrowWithPositionTC ss $ unifyTypes valTy valTy'
+  warnAndRethrowWithPositionTC errorSpan $ unifyTypes valTy valTy'
   bindNames (M.singleton (Qualified (BySourcePos $ spanStart ss) ident) (valTy', nameKind, Defined))
-    $ inferLetBinding (seen ++ [ValueDecl sa ident nameKind [] [MkUnguarded val']]) rest ret j
+    $ inferLetBinding (seen ++ [ValueDecl sa ta ident nameKind [] [MkUnguarded val']]) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   moduleName <- unsafeCheckCurrentModule
   SplitBindingGroup untyped typed dict <- typeDictionaryForBindingGroup Nothing . NEL.toList $ fmap (\(i, _, v) -> (i, v)) ds
   ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
   ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict
-  let ds' = NEL.fromList [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
+  let ds' = NEL.fromList [((sa, ta, cm), Private, val') | ((sa, ta, cm), (val', _)) <- ds1' ++ ds2']
   bindNames dict $ do
     makeBindingGroupVisible
     inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j

@@ -65,7 +65,7 @@ desugarGuardedExprs ss (Case scrut alternatives)
     (scrut', scrut_decls) <- unzip <$> forM scrut (\e -> do
       scrut_id <- freshIdent'
       pure ( Var ss (Qualified ByNullSourcePos scrut_id)
-           , ValueDecl (ss, []) scrut_id Private [] [MkUnguarded e]
+           , ValueDecl (ss, []) Nothing scrut_id Private [] [MkUnguarded e]
            )
       )
     Let FromLet scrut_decls <$> desugarGuardedExprs ss (Case scrut' alternatives)
@@ -232,7 +232,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           alt_fail n = [CaseAlternative (replicate n NullBinder) [MkUnguarded goto_rem_case]]
 
         pure $ Let FromLet [
-          ValueDecl (ss, []) rem_case_id Private []
+          ValueDecl (ss, []) Nothing rem_case_id Private []
             [MkUnguarded (Abs (VarBinder ss unused_binder) desugared)]
           ] (mk_body alt_fail)
 
@@ -329,10 +329,10 @@ desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGro
     desugarRest :: [Declaration] -> m [Declaration]
     desugarRest (TypeInstanceDeclaration sa na cd idx name constraints className tys ds : rest) =
       (:) <$> (TypeInstanceDeclaration sa na cd idx name constraints className tys <$> traverseTypeInstanceBody desugarCases ds) <*> desugarRest rest
-    desugarRest (ValueDecl sa name nameKind bs result : rest) =
+    desugarRest (ValueDecl sa ta name nameKind bs result : rest) =
       let (_, f, _) = everywhereOnValuesTopDownM return go return
           f' = mapM (\(GuardedExpr gs e) -> GuardedExpr gs <$> f e)
-      in (:) <$> (ValueDecl sa name nameKind bs <$> f' result) <*> desugarRest rest
+      in (:) <$> (ValueDecl sa ta name nameKind bs <$> f' result) <*> desugarRest rest
       where
       go (Let w ds val') = Let w <$> desugarCases ds <*> pure val'
       go other = return other
@@ -344,11 +344,11 @@ inSameGroup (ValueDeclaration vd1) (ValueDeclaration vd2) = valdeclIdent vd1 == 
 inSameGroup _ _ = False
 
 toDecls :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
-toDecls [ValueDecl sa@(ss, _) ident nameKind bs [MkUnguarded val]] | all isIrrefutable bs = do
+toDecls [ValueDecl sa@(ss, _) ta ident nameKind bs [MkUnguarded val]] | all isIrrefutable bs = do
   args <- mapM fromVarBinder bs
   let body = foldr (Abs . VarBinder ss) val args
   guardWith (errorMessage' ss (OverlappingArgNames (Just ident))) $ length (ordNub args) == length args
-  return [ValueDecl sa ident nameKind [] [MkUnguarded body]]
+  return [ValueDecl sa ta ident nameKind [] [MkUnguarded body]]
   where
   fromVarBinder :: Binder -> m Ident
   fromVarBinder NullBinder = freshIdent'
@@ -356,7 +356,7 @@ toDecls [ValueDecl sa@(ss, _) ident nameKind bs [MkUnguarded val]] | all isIrref
   fromVarBinder (PositionedBinder _ _ b) = fromVarBinder b
   fromVarBinder (TypedBinder _ b) = fromVarBinder b
   fromVarBinder _ = internalError "fromVarBinder: Invalid argument"
-toDecls ds@(ValueDecl (ss, _) ident _ bs (result : _) : _) = do
+toDecls ds@(ValueDecl (ss, _) _ ident _ bs (result : _) : _) = do
   let tuples = map toTuple ds
 
       isGuarded (MkUnguarded _) = False
@@ -371,7 +371,7 @@ toDecls ds@(ValueDecl (ss, _) ident _ bs (result : _) : _) = do
 toDecls ds = return ds
 
 toTuple :: Declaration -> ([Binder], [GuardedExpr])
-toTuple (ValueDecl _ _ _ bs result) = (bs, result)
+toTuple (ValueDecl _ _ _ _ bs result) = (bs, result)
 toTuple _ = internalError "Not a value declaration"
 
 makeCaseDeclaration :: forall m. (MonadSupply m) => SourceSpan -> Ident -> [([Binder], [GuardedExpr])] -> m Declaration
@@ -385,7 +385,7 @@ makeCaseDeclaration ss ident alternatives = do
       binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
   let value = foldr (Abs . uncurry VarBinder) (Case vars binders) args
 
-  return $ ValueDecl (ss, []) ident Public [] [MkUnguarded value]
+  return $ ValueDecl (ss, []) Nothing ident Public [] [MkUnguarded value]
   where
   -- We will construct a table of potential names.
   -- VarBinders will become Just _ which is a potential name.

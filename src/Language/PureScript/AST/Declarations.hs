@@ -15,6 +15,7 @@ import Data.Functor.Identity (Identity(..))
 
 import Data.Aeson.TH (Options(..), SumEncoding(..), defaultOptions, deriveJSON)
 import Data.Map qualified as M
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.List.NonEmpty qualified as NEL
 import GHC.Generics (Generic)
@@ -339,6 +340,8 @@ unwrapTypeDeclaration td = (tydeclIdent td, tydeclType td)
 -- In this example @double@ is the identifier, @x@ is a binder and @x + x@ is the expression.
 data ValueDeclarationData a = ValueDeclarationData
   { valdeclSourceAnn :: !SourceAnn
+  , valdeclTypeDeclAnn :: !(Maybe SourceAnn)
+  -- ^ The matching type declaration's annotation
   , valdeclIdent :: !Ident
   -- ^ The declared value's name
   , valdeclName :: !NameKind
@@ -351,9 +354,9 @@ getValueDeclaration :: Declaration -> Maybe (ValueDeclarationData [GuardedExpr])
 getValueDeclaration (ValueDeclaration d) = Just d
 getValueDeclaration _ = Nothing
 
-pattern ValueDecl :: SourceAnn -> Ident -> NameKind -> [Binder] -> [GuardedExpr] -> Declaration
-pattern ValueDecl sann ident name binders expr
-  = ValueDeclaration (ValueDeclarationData sann ident name binders expr)
+pattern ValueDecl :: SourceAnn -> Maybe SourceAnn -> Ident -> NameKind -> [Binder] -> [GuardedExpr] -> Declaration
+pattern ValueDecl sann tann ident name binders expr
+  = ValueDeclaration (ValueDeclarationData sann tann ident name binders expr)
 
 data DataConstructorDeclaration = DataConstructorDeclaration
   { dataCtorAnn :: !SourceAnn
@@ -405,7 +408,7 @@ data Declaration
   -- |
   -- A minimal mutually recursive set of value declarations
   --
-  | BindingGroupDeclaration (NEL.NonEmpty ((SourceAnn, Ident), NameKind, Expr))
+  | BindingGroupDeclaration (NEL.NonEmpty ((SourceAnn, Maybe SourceAnn, Ident), NameKind, Expr))
   -- |
   -- A foreign import declaration (name, type)
   --
@@ -488,9 +491,9 @@ declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
 declSourceAnn (KindDeclaration sa _ _ _) = sa
 declSourceAnn (RoleDeclaration rd) = rdeclSourceAnn rd
 declSourceAnn (TypeDeclaration td) = tydeclSourceAnn td
-declSourceAnn (ValueDeclaration vd) = valdeclSourceAnn vd
+declSourceAnn (ValueDeclaration vd) = fromMaybe (valdeclSourceAnn vd) (valdeclTypeDeclAnn vd)
 declSourceAnn (BoundValueDeclaration sa _ _) = sa
-declSourceAnn (BindingGroupDeclaration ds) = let ((sa, _), _, _) = NEL.head ds in sa
+declSourceAnn (BindingGroupDeclaration ds) = let ((sa, ta, _), _, _) = NEL.head ds in fromMaybe sa ta
 declSourceAnn (ExternDeclaration sa _ _) = sa
 declSourceAnn (ExternDataDeclaration sa _ _) = sa
 declSourceAnn (FixityDeclaration sa _) = sa
