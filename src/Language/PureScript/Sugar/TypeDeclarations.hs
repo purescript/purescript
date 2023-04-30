@@ -11,8 +11,8 @@ import Prelude
 import Control.Monad (unless)
 import Control.Monad.Error.Class (MonadError(..))
 
-import Language.PureScript.AST (Declaration(..), ErrorMessageHint(..), Expr(..), GuardedExpr(..), KindSignatureFor(..), pattern MkUnguarded, Module(..), RoleDeclarationData(..), TypeDeclarationData(..), TypeInstanceBody(..), pattern ValueDecl, declSourceSpan, everywhereOnValuesTopDownM)
-import Language.PureScript.Names (Ident, coerceProperName)
+import Language.PureScript.AST (Declaration(..), ErrorMessageHint(..), Expr(..), GuardedExpr(..), KindSignatureFor(..), pattern MkUnguarded, Module(..), RoleDeclarationData(..), TypeDeclarationData(..), TypeInstanceBody(..), pattern ValueDecl, declSourceSpan, everywhereOnValuesTopDownM, SourceAnn, widenSourceAnn)
+import Language.PureScript.Names (coerceProperName)
 import Language.PureScript.Environment (DataDeclType(..), NameKind)
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage', rethrow)
 
@@ -33,17 +33,17 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
 
   desugarTypeDeclarations :: [Declaration] -> m [Declaration]
   desugarTypeDeclarations (TypeDeclaration (TypeDeclarationData sa name' ty) : d : rest) = do
-    (_, nameKind, val) <- fromValueDeclaration d
-    desugarTypeDeclarations (ValueDecl sa name' nameKind [] [MkUnguarded (TypedValue True val ty)] : rest)
+    (sa', nameKind, val) <- fromValueDeclaration d
+    desugarTypeDeclarations (ValueDecl (widenSourceAnn sa sa') name' nameKind [] [MkUnguarded (TypedValue True val ty)] : rest)
     where
-    fromValueDeclaration :: Declaration -> m (Ident, NameKind, Expr)
-    fromValueDeclaration (ValueDecl _ name'' nameKind [] [MkUnguarded val])
-      | name' == name'' = return (name'', nameKind, val)
+    fromValueDeclaration :: Declaration -> m (SourceAnn, NameKind, Expr)
+    fromValueDeclaration (ValueDecl sa' name'' nameKind [] [MkUnguarded val])
+      | name' == name'' = return (sa', nameKind, val)
     fromValueDeclaration d' =
       throwError . errorMessage' (declSourceSpan d') $ OrphanTypeDeclaration name'
   desugarTypeDeclarations [TypeDeclaration (TypeDeclarationData (ss, _) name' _)] =
     throwError . errorMessage' ss $ OrphanTypeDeclaration name'
-  desugarTypeDeclarations (ValueDecl sa name' nameKind bs val : rest) = do
+  desugarTypeDeclarations (ValueDecl sa@(_, _) name' nameKind bs val : rest) = do
     let (_, f, _) = everywhereOnValuesTopDownM return go return
         f' = mapM (\(GuardedExpr g e) -> GuardedExpr g <$> f e)
     (:) <$> (ValueDecl sa name' nameKind bs <$> f' val)

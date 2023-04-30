@@ -114,5 +114,14 @@ widenSourceSpan (SourceSpan n1 s1 e1) (SourceSpan n2 s2 e2) =
   n | n1 == ""  = n2
     | otherwise = n1
 
+containsSpan :: SourceSpan -> SourceSpan -> Bool
+containsSpan i o = (spanStart i <= spanStart o) && (spanEnd i >= spanEnd o)
+
+rightOf :: SourceSpan -> SourceSpan -> Bool
+rightOf i o = spanStart i >= spanEnd o
+
+leftOf :: SourceSpan -> SourceSpan -> Bool
+leftOf i o = spanEnd i <= spanStart o
+
 widenSourceAnn :: SourceAnn -> SourceAnn -> SourceAnn
 widenSourceAnn (s1, _) (s2, _) = (widenSourceSpan s1 s2, [])
