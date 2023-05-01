@@ -15,8 +15,13 @@ import Language.PureScript.Sugar.Names.Env (primEnv)
 import Language.PureScript.TypeChecker (typeCheckModule, emptyCheckState, debugType)
 import Text.Pretty.Simple (pPrint)
 import Data.String (String)
+import Language.PureScript.AST.Binders (Binder (..))
+import Debug.Pretty.Simple (pTraceShow)
 
-data NodeContext = DeclarationNode | ExpressionNode
+data NodeContext 
+  = DeclarationNode
+  | BinderNode
+  | ExpressionNode
   deriving (Show)
 
 data NodeInfo a = NodeInfo
@@ -69,8 +74,8 @@ mergeASTs xs@(x : xr) ys@(y : yr)
 source :: Text
 source = unlines
   [ "module Main where"
-  , "values :: Array Int"
-  , "values = [0, 1]"
+  , "values :: Int -> Array Int"
+  , "values x = [x]"
   ]
 
 main :: IO ()
@@ -90,21 +95,32 @@ main = do
 
   where
   declarationToAST :: Declaration -> [InterfaceAST String]
-  (declarationToAST, _, _, _, _) = everythingOnValues mergeASTs onDecl onExpr noAST noAST noAST 
+  (declarationToAST, _, _, _, _) = everythingOnValues mergeASTs onDecl onExpr onBinder noAST noAST 
     where
     noAST :: forall a. a -> [InterfaceAST String]
     noAST = const []
 
     onDecl :: Declaration -> [InterfaceAST String]
     onDecl = \case
-      ValueDecl (s, _) _ _ _ [MkUnguarded (TypedValue _ (PositionedValue _ _ _) t)] ->
-        [ makeNode (NodeInfo (debugType t) DeclarationNode) s ]
-      _ ->
-        []
+      -- ValueDecl (s, _) _ _ _ [MkUnguarded (TypedValue _ (PositionedValue _ _ _) t)] ->
+      --   [ makeNode (NodeInfo (debugType t) DeclarationNode) s ]
+      e ->
+        pTraceShow e []
 
     onExpr :: Expr -> [InterfaceAST String]
     onExpr = \case
       TypedValue _ (PositionedValue s _ _) t ->
         [ makeNode (NodeInfo (debugType t) ExpressionNode) s ]
       _ ->
+        []
+
+    onBinder :: Binder -> [InterfaceAST String]
+    onBinder = \case
+      TypedBinder t (LiteralBinder s _) ->
+        [ makeNode (NodeInfo (debugType t) BinderNode) s ]
+      TypedBinder t (VarBinder s _) ->
+        [ makeNode (NodeInfo (debugType t) BinderNode) s ]
+      TypedBinder t (ConstructorBinder s _ _) ->
+        [ makeNode (NodeInfo (debugType t) BinderNode) s ]
+      _ -> 
         []

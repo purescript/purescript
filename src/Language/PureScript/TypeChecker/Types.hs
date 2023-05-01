@@ -683,8 +683,9 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
   guardWith (errorMessage $ OverlappingArgNames Nothing) $
     let ns = concatMap binderNames binders in length (ordNub ns) == length ns
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
+  let binders' = zipWith TypedBinder nvals binders
   r <- bindLocalVariables [ (ss, name, ty, Defined) | (name, (ss, ty)) <- M.toList m1 ] $
-       CaseAlternative binders <$> forM result (\ge -> checkGuardedRhs ge ret)
+       CaseAlternative binders' <$> forM result (\ge -> checkGuardedRhs ge ret)
   rs <- checkBinders nvals ret bs
   return $ r : rs
 
@@ -707,7 +708,7 @@ checkGuardedRhs (GuardedExpr (PatternGuard binder expr : guards) rhs) ret = do
                                                  | (name, (ss, bty)) <- M.toList variables
                                                  ] $
     checkGuardedRhs (GuardedExpr guards rhs) ret
-  return $ GuardedExpr (PatternGuard binder (tvToExpr tv) : guards') rhs'
+  return $ GuardedExpr (PatternGuard (TypedBinder ty binder) (tvToExpr tv) : guards') rhs'
 
 -- |
 -- Check the type of a value, rethrowing errors to provide a better error message
@@ -779,7 +780,7 @@ check' (Abs binder ret) ty@(TypeApp _ (TypeApp _ t argTy) retTy)
   | VarBinder ss arg <- binder = do
       unifyTypes t tyFunction
       ret' <- withBindingGroupVisible $ bindLocalVariables [(ss, arg, argTy, Defined)] $ check ret retTy
-      return $ TypedValue' True (Abs (VarBinder ss arg) (tvToExpr ret')) ty
+      return $ TypedValue' True (Abs (TypedBinder argTy (VarBinder ss arg)) (tvToExpr ret')) ty
   | otherwise = internalError "Binder was not desugared"
 check' (App f arg) ret = do
   f'@(TypedValue' _ _ ft) <- infer f
