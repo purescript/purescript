@@ -263,7 +263,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
               return $ Just "./foreign.js"
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return Nothing
-      rawJs <- J.moduleToJs m foreignInclude
+      rawJs <- J.moduleToJs (J.optimizeCoreFn m) foreignInclude
       dir <- lift $ makeIO "get the current directory" getCurrentDirectory
       let sourceMaps = S.member JSSourceMap codegenTargets
           (pjs, mappings) = if sourceMaps then prettyPrintJSWithSourceMaps rawJs else (prettyPrintJS rawJs, [])

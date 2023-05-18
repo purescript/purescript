@@ -233,6 +233,7 @@ library
     Language.PureScript.CodeGen.JS
     Language.PureScript.CodeGen.JS.Common
     Language.PureScript.CodeGen.JS.Printer
+    Language.PureScript.CodeGen.JS.CoreFnOptimizer
     Language.PureScript.Constants.Libs
     Language.PureScript.CoreFn
     Language.PureScript.CoreFn.Ann

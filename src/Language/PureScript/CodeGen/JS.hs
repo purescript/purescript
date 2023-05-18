@@ -3,6 +3,7 @@
 module Language.PureScript.CodeGen.JS
   ( module AST
   , module Common
+  , module Optimizer
   , moduleToJs
   ) where
 
@@ -45,6 +46,7 @@ import Language.PureScript.Options (CodegenTarget(..), Options(..))
 import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.Traversals (sndM)
 import Language.PureScript.Constants.Prim qualified as C
+import  Language.PureScript.CodeGen.JS.CoreFnOptimizer as Optimizer
 
 import System.FilePath.Posix ((</>))
 
