@@ -1,24 +1,21 @@
-module  Language.PureScript.CodeGen.JS.CoreFnOptimizer (optimizeCoreFn) where
+module Language.PureScript.CodeGen.JS.CoreFnOptimizer (optimizeCoreFn) where
 
-import Protolude ( Maybe(..), (<$>), identity, map )
+import Protolude (Maybe (..), identity, map, (<$>))
 
 import Data.List (lookup)
-import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.AST.Literals (Literal (..))
 import Language.PureScript.AST.SourcePos (nullSourceSpan)
-import Language.PureScript.CoreFn.Ann (Ann)
-import Language.PureScript.CoreFn.Expr ( Bind, Expr(Literal, ObjectUpdate, Accessor) )
-import Language.PureScript.Label (Label(..))
-import Language.PureScript.Types (pattern REmptyKinded, Type(..))
 import Language.PureScript.Constants.Prim qualified as C
-import Language.PureScript.CoreFn.Module (Module(..))
+import Language.PureScript.CoreFn.Ann (Ann)
+import Language.PureScript.CoreFn.Expr (Bind, Expr (Accessor, Literal, ObjectUpdate))
+import Language.PureScript.CoreFn.Module (Module (..))
 import Language.PureScript.CoreFn.Traversals (everywhereOnValues)
+import Language.PureScript.Label (Label (..))
+import Language.PureScript.Types (Type (..), pattern REmptyKinded)
 
-------
--- CoreFn Optimization for JS Codegen
---
---
+-- CoreFn optimizations that are getting used at the JS codegen level
 optimizeCoreFn :: Module Ann -> Module Ann
-optimizeCoreFn m = m { moduleDecls = optimizeModuleDecls m.moduleDecls}
+optimizeCoreFn m = m {moduleDecls = optimizeModuleDecls m.moduleDecls}
 
 optimizeModuleDecls :: [Bind Ann] -> [Bind Ann]
 optimizeModuleDecls = map transformBinds
