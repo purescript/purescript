@@ -119,7 +119,7 @@ insertValueTypesAndAdjustKinds env m =
     where
       countParams :: Int -> Type' -> Int
       countParams acc = \case
-        P.ForAll _ _ _ rest _ ->
+        P.ForAll _ _ _ _ rest _ ->
           countParams acc rest
 
         P.TypeApp _ f a | isFunctionApplication f ->
@@ -232,8 +232,8 @@ insertValueTypesAndAdjustKinds env m =
           -- changes `forall (k :: Type). k -> ...`
           -- to      `forall k          . k -> ...`
           dropTypeSortAnnotation = \case
-            P.ForAll sa txt (Just (P.TypeConstructor _ Prim.Type)) rest skol ->
-              P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol
+            P.ForAll sa vis txt (Just (P.TypeConstructor _ Prim.Type)) rest skol ->
+              P.ForAll sa vis txt Nothing (dropTypeSortAnnotation rest) skol
             rest -> rest
 
       Nothing ->

@@ -269,7 +269,7 @@ constraintRange = \case
 typeVarBindingRange :: TypeVarBinding a -> TokenRange
 typeVarBindingRange = \case
   TypeVarKinded a -> wrappedRange a
-  TypeVarName a -> nameRange a
+  TypeVarName (atSign, a) -> (fromMaybe (nameTok a) atSign, nameTok a)
 
 exprRange :: Expr a -> TokenRange
 exprRange = \case
@@ -292,6 +292,7 @@ exprRange = \case
   ExprRecordAccessor _ (RecordAccessor a _ b) -> (fst $ exprRange a, lblTok $ sepLast b)
   ExprRecordUpdate _ a b -> (fst $ exprRange a, snd $ wrappedRange b)
   ExprApp _ a b -> (fst $ exprRange a, snd $ exprRange b)
+  ExprVisibleTypeApp _ a _ b -> (fst $ exprRange a, snd $ typeRange b)
   ExprLambda _ (Lambda a _ _ b) -> (a, snd $ exprRange b)
   ExprIf _ (IfThenElse a _ _ _ _ b) -> (a, snd $ exprRange b)
   ExprCase _ (CaseOf a _ _ c) -> (a, snd . guardedRange . snd $ NE.last c)

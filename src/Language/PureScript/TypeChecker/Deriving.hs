@@ -499,7 +499,7 @@ validateParamsInTypeConstructors derivingClass utc isBi CovariantClasses{..} con
     headOfTypeWithSubst = headOfType . replaceAllTypeVars subst
 
     in \case
-      ForAll _ name _ ty _ ->
+      ForAll _ _ name _ ty _ ->
         fmap join . traverse (\params' -> go params' isNegative ty) $ filterThese (/= name) params
 
       ConstrainedType _ _ ty ->

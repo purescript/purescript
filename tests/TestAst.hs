@@ -12,7 +12,7 @@ import Test.QuickCheck (Arbitrary(..), Gen, Property, Testable, counterexample, 
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.Names (pattern ByNullSourcePos, OpName(..), OpNameType(..), ProperName(..), ProperNameType(..), Qualified(..))
 import Language.PureScript.PSString (PSString)
-import Language.PureScript.Types (Constraint, ConstraintData, SkolemScope(..), Type(..), WildcardData, annForType, everythingOnTypes, everythingWithContextOnTypes, everywhereOnTypes, everywhereOnTypesM, everywhereOnTypesTopDownM, getAnnForType)
+import Language.PureScript.Types (Constraint, ConstraintData, SkolemScope(..), Type(..), TypeVarVisibility(..), WildcardData, annForType, everythingOnTypes, everythingWithContextOnTypes, everywhereOnTypes, everywhereOnTypesM, everywhereOnTypesTopDownM, getAnnForType)
 
 spec :: Spec
 spec = do
@@ -65,6 +65,7 @@ genTypeAnnotatedWith genTypeAnn genConstraintAnn = genType where
     :+ listOf' genType
     :+ maybeOf genType
     :+ genWildcardData
+    :+ genVisibility
 
   genConstraint :: Gen (Constraint a)
   genConstraint = genericArbitraryUG (genConstraintAnn :+ generatorEnvironment)
@@ -92,3 +93,6 @@ genTypeAnnotatedWith genTypeAnn genConstraintAnn = genType where
 
   genPSString :: Gen PSString
   genPSString = pure "x" -- Ditto.
+
+  genVisibility :: Gen TypeVarVisibility
+  genVisibility = pure TypeVarInvisible

@@ -25,7 +25,7 @@ import Language.PureScript.Crash (internalError)
 import Language.PureScript.Names (Ident, ProperName(..), ProperNameType(..), Qualified, QualifiedBy, coerceProperName)
 import Language.PureScript.Roles (Role(..))
 import Language.PureScript.TypeClassDictionaries (NamedDict)
-import Language.PureScript.Types (SourceConstraint, SourceType, Type(..), eqType, srcTypeConstructor)
+import Language.PureScript.Types (SourceConstraint, SourceType, Type(..), TypeVarVisibility(..), eqType, srcTypeConstructor)
 import Language.PureScript.Constants.Prim qualified as C
 
 -- | The @Environment@ defines all values and types which are currently in scope:
@@ -341,7 +341,7 @@ tyVar :: Text -> SourceType
 tyVar = TypeVar nullSourceAnn
 
 tyForall :: Text -> SourceType -> SourceType -> SourceType
-tyForall var k ty = ForAll nullSourceAnn var (Just k) ty Nothing
+tyForall var k ty = ForAll nullSourceAnn TypeVarInvisible var (Just k) ty Nothing
 
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
@@ -669,5 +669,5 @@ unapplyKinds :: Type a -> ([Type a], Type a)
 unapplyKinds = go [] where
   go kinds (TypeApp _ (TypeApp _ fn k1) k2)
     | eqType fn tyFunction = go (k1 : kinds) k2
-  go kinds (ForAll _ _ _ k _) = go kinds k
+  go kinds (ForAll _ _ _ _ k _) = go kinds k
   go kinds k = (reverse kinds, k)

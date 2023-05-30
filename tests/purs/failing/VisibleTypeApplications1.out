@@ -1,0 +1,20 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/VisibleTypeApplications1.purs:7:11 - 7:18 (line 7, column 11 - line 7, column 18)
+
+  An expression of polymorphic type
+  with the invisible type variable [33ma[0m:
+  [33m                  [0m
+  [33m  forall a. a -> a[0m
+  [33m                  [0m
+  cannot be applied to:
+  [33m     [0m
+  [33m  Int[0m
+  [33m     [0m
+
+while inferring the type of [33mid[0m
+in value declaration [33mfailOne[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/CannotApplyExpressionOfTypeOnType.md for more information,
+or to contribute content related to this error.
+

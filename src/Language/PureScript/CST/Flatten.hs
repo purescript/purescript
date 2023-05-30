@@ -151,6 +151,7 @@ flattenExpr = \case
   ExprRecordAccessor _ a -> flattenRecordAccessor a
   ExprRecordUpdate _ a b -> flattenExpr a <> flattenWrapped (flattenSeparated flattenRecordUpdate) b
   ExprApp _ a b -> flattenExpr a <> flattenExpr b
+  ExprVisibleTypeApp  _ a b c -> flattenExpr a <> pure b <> flattenType c
   ExprLambda _ a -> flattenLambda a
   ExprIf _ a -> flattenIfThenElse a
   ExprCase _ a -> flattenCaseOf a
@@ -303,8 +304,10 @@ flattenRow (Row lbls tl) =
 
 flattenTypeVarBinding :: TypeVarBinding a -> DList SourceToken
 flattenTypeVarBinding = \case
-  TypeVarKinded a -> flattenWrapped (flattenLabeled (pure . nameTok) flattenType) a
-  TypeVarName a -> pure $ nameTok a
+  TypeVarKinded a -> flattenWrapped (flattenLabeled go flattenType) a
+  TypeVarName a -> go a
+  where
+  go (a, b) = maybe mempty pure a <> pure (nameTok b)
 
 flattenConstraint :: Constraint a -> DList SourceToken
 flattenConstraint = \case

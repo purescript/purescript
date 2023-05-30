@@ -47,7 +47,7 @@ import Language.PureScript.Pretty.Common (endWith)
 import Language.PureScript.PSString (decodeStringWithReplacement)
 import Language.PureScript.Roles (Role, displayRole)
 import Language.PureScript.Traversals (sndM)
-import Language.PureScript.Types (Constraint(..), ConstraintData(..), RowListItem(..), SourceConstraint, SourceType, Type(..), eraseForAllKindAnnotations, eraseKindApps, everywhereOnTypesTopDownM, getAnnForType, overConstraintArgs, rowFromList, rowToList, srcTUnknown)
+import Language.PureScript.Types (Constraint(..), ConstraintData(..), RowListItem(..), SourceConstraint, SourceType, Type(..), eraseForAllKindAnnotations, eraseKindApps, everywhereOnTypesTopDownM, getAnnForType, isMonoType, overConstraintArgs, rowFromList, rowToList, srcTUnknown)
 import Language.PureScript.Publish.BoxesHelpers qualified as BoxHelpers
 import System.Console.ANSI qualified as ANSI
 import System.FilePath (makeRelative)
@@ -196,6 +196,8 @@ data SimpleErrorMessage
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
   | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName)) [Qualified (ProperName 'ClassName)] Bool
+  | CannotSkipTypeApplication SourceType
+  | CannotApplyExpressionOfTypeOnType SourceType SourceType
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -364,6 +366,8 @@ errorCode em = case unwrapErrorMessage em of
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
   CannotDeriveInvalidConstructorArg{} -> "CannotDeriveInvalidConstructorArg"
+  CannotSkipTypeApplication{} -> "CannotSkipTypeApplication"
+  CannotApplyExpressionOfTypeOnType{} -> "CannotApplyExpressionOfTypeOnType"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1393,6 +1397,32 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
           <> (if checkVariance then "that their variance matches the variance of " <> markCode (runProperName $ disqualify className) <> ", " else "")
           <> "and that those type constructors themselves have instances of " <> commasAndConjunction "or" (markCode . showQualified runProperName <$> relatedClasses) <> "."
         ]
+
+    renderSimpleErrorMessage (CannotSkipTypeApplication tyFn) =
+      paras
+        [ "An expression of type:"
+        , markCodeBox $ indent $ prettyType tyFn
+        , "cannot be skipped."
+        ]
+
+    renderSimpleErrorMessage (CannotApplyExpressionOfTypeOnType tyFn tyAr) =
+      paras $ infoLine <>
+        [ markCodeBox $ indent $ prettyType tyFn
+        , "cannot be applied to:"
+        , markCodeBox $ indent $ prettyType tyAr
+        ]
+      where
+      infoLine =
+        if isMonoType tyFn then
+          [ "An expression of monomorphic type:" ]
+        else
+          [ "An expression of polymorphic type"
+          , line $ "with the invisible type variable " <> markCode typeVariable <> ":"
+          ]
+
+      typeVariable = case tyFn of
+        ForAll _ _ v _ _ _ -> v
+        _ -> internalError "renderSimpleErrorMessage: Impossible!"
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
