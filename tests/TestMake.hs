@@ -1,7 +1,7 @@
 -- Tests for the compiler's handling of incremental builds, i.e. the code in
 -- Language.PureScript.Make.
 
-module TestMake where
+module TestMake (spec) where
 
 import Prelude hiding (writeFile)
 
@@ -38,9 +38,6 @@ timestampD = utcMidnightOnDate 2019 1 4
 
 oneSecond :: Int
 oneSecond = 10 ^ (6::Int) -- microseconds.
-
-someMs :: Int
-someMs = 10 ^ (3::Int) -- microseconds.
 
 spec :: Spec
 spec = do

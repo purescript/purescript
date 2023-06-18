@@ -5,7 +5,6 @@ module Language.PureScript.Make
   , rebuildModule'
   , make
   , make'
-  , makeImp
   , inferForeignModules
   , module Monad
   , module Actions
