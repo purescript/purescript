@@ -7,7 +7,7 @@ import Control.Monad (when)
 import Data.Aeson qualified as A
 import Data.Bool (bool)
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
-import Data.List (intercalate)
+import Data.List (intercalate, (\\))
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
@@ -26,6 +26,7 @@ import System.IO.UTF8 (readUTF8FilesT)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
+  , pscmExclude      :: [FilePath]
   , pscmOutputDir    :: FilePath
   , pscmOpts         :: P.Options
   , pscmUsePrefix    :: Bool
@@ -53,7 +54,9 @@ printWarningsAndErrors verbose True files warnings errors = do
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
-  input <- globWarningOnMisses warnFileTypeNotFound pscmInput
+  included <- globWarningOnMisses warnFileTypeNotFound pscmInput
+  excluded <- globWarningOnMisses warnFileTypeNotFound pscmExclude
+  let input = included \\ excluded
   when (null input) $ do
     hPutStr stderr $ unlines [ "purs compile: No input files."
                              , "Usage: For basic information, try the `--help' option."
@@ -85,6 +88,12 @@ inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
      Opts.metavar "FILE"
   <> Opts.help "The input .purs file(s)."
+
+excludedFiles :: Opts.Parser FilePath
+excludedFiles = Opts.strOption $
+     Opts.short 'x'
+  <> Opts.long "exclude-files"
+  <> Opts.help "Glob of .purs files to exclude from the supplied files."
 
 outputDirectory :: Opts.Parser FilePath
 outputDirectory = Opts.strOption $
@@ -153,6 +162,7 @@ options =
 
 pscMakeOptions :: Opts.Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile
+                                <*> many excludedFiles
                                 <*> outputDirectory
                                 <*> options
                                 <*> (not <$> noPrefix)
