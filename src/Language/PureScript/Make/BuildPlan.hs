@@ -36,24 +36,35 @@ import Language.PureScript.Names (ModuleName)
 import Language.PureScript.Sugar.Names.Env (Env, primEnv)
 import System.Directory (getCurrentDirectory)
 
+-- This status tells if a module's exiting build artifacts are up to date with a
+-- current module's content. It would be safe to re-use them, but only if
+-- changes in its dependencies do require the module's rebuild.
 newtype UpToDateStatus = UpToDateStatus Bool
 
 isUpToDate :: UpToDateStatus -> Bool
 isUpToDate (UpToDateStatus b) = b
 
+data Prebuilt = Prebuilt
+  { pbExternsFile :: ExternsFile
+  }
+
 -- | The BuildPlan tracks information about our build progress, and holds all
 -- prebuilt modules for incremental builds.
 data BuildPlan = BuildPlan
   { bpPrebuilt :: M.Map ModuleName Prebuilt
+  -- ^ Valid prebuilt results for modules, that are needed for rebuild, but
+  -- their rebuild is not required.
   , bpPreviousBuilt :: M.Map ModuleName (UpToDateStatus, Prebuilt)
+  -- ^ Previously built results for modules that are potentially required to be
+  -- rebuilt. We will always rebuild not up to date modules. But we will only
+  -- rebuild up to date modules, if their deps' externs have effectively
+  -- changed. Previously built result is needed to compare previous and newly
+  -- built externs to know what have changed.
   , bpBuildJobs :: M.Map ModuleName BuildJob
   , bpEnv :: C.MVar Env
   , bpIndex :: C.MVar Int
   }
 
-data Prebuilt = Prebuilt
-  { pbExternsFile :: ExternsFile
-  }
 
 newtype BuildJob = BuildJob
   { bjResult :: C.MVar BuildJobResult
@@ -151,7 +162,6 @@ getResult buildPlan moduleName =
 getPrevResult :: BuildPlan -> ModuleName -> Maybe (UpToDateStatus, ExternsFile)
 getPrevResult buildPlan moduleName =
   fmap pbExternsFile <$> M.lookup moduleName (bpPreviousBuilt buildPlan)
-
 
 data Options = Options
   { optPreloadAllExterns :: Bool
@@ -278,24 +288,33 @@ construct Options{..} MakeActions{..} cacheDb (sorted, graph) = do
     splitModules :: [RebuildStatus] -> (M.Map ModuleName (Maybe (UpToDateStatus, UTCTime)), M.Map ModuleName UTCTime)
     splitModules = foldl' collectByStatus (M.empty, M.empty)
 
-    collectByStatus (build, prev) (RebuildStatus mn rebuildNever _ mbPb upToDate)
-      | Nothing <- mbPb = (M.insert mn Nothing build, prev)
+    collectByStatus (build, prebuilt) (RebuildStatus mn rebuildNever _ mbPb upToDate)
+      -- To build if no prebuilt result exits.
+      | Nothing <- mbPb = (M.insert mn Nothing build, prebuilt)
+      -- To build if not up to date.
       | Just pb <- mbPb, not upToDate = toRebuild (False, pb)
+      -- To prebuilt because of policy.
       | Just pb <- mbPb, rebuildNever = toPrebuilt pb
+      -- In other case analyze compilation times of dependencies.
       | Just pb <- mbPb = do
           let deps = moduleDeps mn
-          let modTimes = map (flip M.lookup prev) deps
+          let modTimes = map (flip M.lookup prebuilt) deps
 
           case maximumMaybe (catMaybes modTimes) of
                 -- Check if any of deps where build later. This means we should
-                -- recompile even if the source is up-to-date.
+                -- recompile even if the module's source is up-to-date. This may
+                -- happen due to some partial builds or ide compilation
+                -- workflows involved that do not assume full project
+                -- compilation. We should treat those modules as NOT up to date
+                -- to ensure they are rebuilt.
                 Just depModTime | pb < depModTime -> toRebuild (False, pb)
-                -- If one of the deps is not in the prebuilt, we should rebuild.
+                -- If one of the deps is not in the prebuilt, though the module
+                -- is up to date, we should add it in the rebuild queue.
                 _ | any isNothing modTimes -> toRebuild (upToDate, pb)
                 _ -> toPrebuilt pb
         where
-          toRebuild (up, t) = (M.insert mn (Just (UpToDateStatus up, t)) build, prev)
-          toPrebuilt v = (build, M.insert mn v prev)
+          toRebuild (up, t) = (M.insert mn (Just (UpToDateStatus up, t)) build, prebuilt)
+          toPrebuilt v = (build, M.insert mn v prebuilt)
 
 maximumMaybe :: Ord a => [a] -> Maybe a
 maximumMaybe [] = Nothing
