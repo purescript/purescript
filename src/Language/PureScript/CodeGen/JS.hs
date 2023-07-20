@@ -240,7 +240,7 @@ moduleBindToJs mn = bindToJs
   where
   -- Generate code in the simplified JavaScript intermediate representation for a declaration
   bindToJs :: Bind Ann -> m [AST]
-  bindToJs (NonRec (_, _, _, Just IsTypeClassConstructor) _ _) = pure []
+  bindToJs (NonRec (_, _, Just IsTypeClassConstructor) _ _) = pure []
     -- Unlike other newtype constructors, type class constructors are only
     -- ever applied; it's not possible to use them as values. So it's safe to
     -- erase them.
@@ -252,20 +252,20 @@ moduleBindToJs mn = bindToJs
   --
   -- The main purpose of this function is to handle code generation for comments.
   nonRecToJS :: Ann -> Ident -> Expr Ann -> m AST
-  nonRecToJS a i e@(extractAnn -> (_, com, _, _)) | not (null com) = do
+  nonRecToJS a i e@(extractAnn -> (_, com, _)) | not (null com) = do
     withoutComment <- asks optionsNoComments
     if withoutComment
        then nonRecToJS a i (modifyAnn removeComments e)
        else AST.Comment (AST.SourceComments com) <$> nonRecToJS a i (modifyAnn removeComments e)
-  nonRecToJS (ss, _, _, _) ident val = do
+  nonRecToJS (ss, _, _) ident val = do
     js <- valueToJs val
     withPos ss $ AST.VariableIntroduction Nothing (identToJs ident) (Just (guessEffects val, js))
 
   guessEffects :: Expr Ann -> AST.InitializerEffects
   guessEffects = \case
-    Var _ (Qualified (BySourcePos _) _)    -> NoEffects
-    App (_, _, _, Just IsSyntheticApp) _ _ -> NoEffects
-    _                                      -> UnknownEffects
+    Var _ (Qualified (BySourcePos _) _) -> NoEffects
+    App (_, _, Just IsSyntheticApp) _ _ -> NoEffects
+    _                                   -> UnknownEffects
 
   withPos :: SourceSpan -> AST -> m AST
   withPos ss js = do
@@ -282,22 +282,25 @@ moduleBindToJs mn = bindToJs
   -- Generate code in the simplified JavaScript intermediate representation for a value or expression.
   valueToJs :: Expr Ann -> m AST
   valueToJs e =
-    let (ss, _, _, _) = extractAnn e in
+    let (ss, _, _) = extractAnn e in
     withPos ss =<< valueToJs' e
 
   valueToJs' :: Expr Ann -> m AST
-  valueToJs' (Literal (pos, _, _, _) l) =
+  valueToJs' (Literal (pos, _, _) l) =
     rethrowWithPosition pos $ literalToValueJS pos l
-  valueToJs' (Var (_, _, _, Just (IsConstructor _ [])) name) =
+  valueToJs' (Var (_, _, Just (IsConstructor _ [])) name) =
     return $ accessorString "value" $ qualifiedToJS id name
-  valueToJs' (Var (_, _, _, Just (IsConstructor _ _)) name) =
+  valueToJs' (Var (_, _, Just (IsConstructor _ _)) name) =
     return $ accessorString "create" $ qualifiedToJS id name
   valueToJs' (Accessor _ prop val) =
     accessorString prop <$> valueToJs val
-  valueToJs' (ObjectUpdate _ o ps) = do
+  valueToJs' (ObjectUpdate (pos, _, _) o copy ps) = do
     obj <- valueToJs o
     sts <- mapM (sndM valueToJs) ps
-    extendObj obj sts
+    case copy of
+      Nothing -> extendObj obj sts
+      Just names -> pure $ AST.ObjectLiteral (Just pos) (map f names ++ sts)
+        where f name = (name, accessorString name obj)
   valueToJs' (Abs _ arg val) = do
     ret <- valueToJs val
     let jsArg = case arg of
@@ -308,29 +311,29 @@ moduleBindToJs mn = bindToJs
     let (f, args) = unApp e []
     args' <- mapM valueToJs args
     case f of
-      Var (_, _, _, Just IsNewtype) _ -> return (head args')
-      Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
+      Var (_, _, Just IsNewtype) _ -> return (head args')
+      Var (_, _, Just (IsConstructor _ fields)) name | length args == length fields ->
         return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
       _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args' <$> valueToJs f
     where
     unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
     unApp (App _ val arg) args = unApp val (arg : args)
     unApp other args = (other, args)
-  valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (ByModuleName mn') ident)) =
+  valueToJs' (Var (_, _, Just IsForeign) qi@(Qualified (ByModuleName mn') ident)) =
     return $ if mn' == mn
              then foreignIdent ident
              else varToJs qi
-  valueToJs' (Var (_, _, _, Just IsForeign) ident) =
+  valueToJs' (Var (_, _, Just IsForeign) ident) =
     internalError $ "Encountered an unqualified reference to a foreign ident " ++ T.unpack (showQualified showIdent ident)
   valueToJs' (Var _ ident) = return $ varToJs ident
-  valueToJs' (Case (ss, _, _, _) values binders) = do
+  valueToJs' (Case (ss, _, _) values binders) = do
     vals <- mapM valueToJs values
     bindersToJs ss binders vals
   valueToJs' (Let _ ds val) = do
     ds' <- concat <$> mapM bindToJs ds
     ret <- valueToJs val
     return $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing (ds' ++ [AST.Return Nothing ret]))) []
-  valueToJs' (Constructor (_, _, _, Just IsNewtype) _ ctor _) =
+  valueToJs' (Constructor (_, _, Just IsNewtype) _ ctor _) =
     return $ AST.VariableIntroduction Nothing (properToJs ctor) (Just . (UnknownEffects, ) $
                 AST.ObjectLiteral Nothing [("create",
                   AST.Function Nothing Nothing ["value"]
@@ -442,7 +445,7 @@ moduleBindToJs mn = bindToJs
 
   binderToJs :: Text -> [AST] -> Binder Ann -> m [AST]
   binderToJs s done binder =
-    let (ss, _, _, _) = extractBinderAnn binder in
+    let (ss, _, _) = extractBinderAnn binder in
     traverse (withPos ss) =<< binderToJs' s done binder
 
   -- Generate code in the simplified JavaScript intermediate representation for a pattern match
@@ -453,9 +456,9 @@ moduleBindToJs mn = bindToJs
     literalToBinderJS varName done l
   binderToJs' varName done (VarBinder _ ident) =
     return (AST.VariableIntroduction Nothing (identToJs ident) (Just (NoEffects, AST.Var Nothing varName)) : done)
-  binderToJs' varName done (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
+  binderToJs' varName done (ConstructorBinder (_, _, Just IsNewtype) _ _ [b]) =
     binderToJs varName done b
-  binderToJs' varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
+  binderToJs' varName done (ConstructorBinder (_, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
     js <- go (zip fields bs) done
     return $ case ctorType of
       ProductType -> js

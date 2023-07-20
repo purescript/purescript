@@ -128,6 +128,7 @@ spec = context "CoreFnFromJson" $ do
                 [ NonRec ann (Ident "objectUpdate") $
                     ObjectUpdate ann
                       (Literal ann $ ObjectLiteral [(mkString "field", Literal ann (StringLiteral (mkString "abc")))])
+                      (Just [mkString "unchangedField"])
                       [(mkString "field", Literal ann (StringLiteral (mkString "xyz")))]
                 ]
       parseMod m `shouldSatisfy` isSuccess
@@ -191,28 +192,28 @@ spec = context "CoreFnFromJson" $ do
   context "Meta" $ do
     specify "should parse IsConstructor" $ do
       let m = Module ss [] mn mp [] [] M.empty []
-                [ NonRec (ss, [], Nothing, Just (IsConstructor ProductType [Ident "x"])) (Ident "x") $
-                  Literal (ss, [], Nothing, Just (IsConstructor SumType [])) (CharLiteral 'a')
+                [ NonRec (ss, [], Just (IsConstructor ProductType [Ident "x"])) (Ident "x") $
+                  Literal (ss, [], Just (IsConstructor SumType [])) (CharLiteral 'a')
                 ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse IsNewtype" $ do
       let m = Module ss [] mn mp [] [] M.empty []
-                [ NonRec (ss, [], Nothing, Just IsNewtype) (Ident "x") $
+                [ NonRec (ss, [], Just IsNewtype) (Ident "x") $
                   Literal ann (CharLiteral 'a')
                 ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse IsTypeClassConstructor" $ do
       let m = Module ss [] mn mp [] [] M.empty []
-                [ NonRec (ss, [], Nothing, Just IsTypeClassConstructor) (Ident "x") $
+                [ NonRec (ss, [], Just IsTypeClassConstructor) (Ident "x") $
                   Literal ann (CharLiteral 'a')
                 ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse IsForeign" $ do
       let m = Module ss [] mn mp [] [] M.empty []
-                [ NonRec (ss, [], Nothing, Just IsForeign) (Ident "x") $
+                [ NonRec (ss, [], Just IsForeign) (Ident "x") $
                   Literal ann (CharLiteral 'a')
                 ]
       parseMod m `shouldSatisfy` isSuccess

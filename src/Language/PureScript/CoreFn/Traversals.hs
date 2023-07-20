@@ -23,7 +23,7 @@ everywhereOnValues f g h = (f', g', h')
 
   g' (Literal ann e) = g (Literal ann (handleLiteral g' e))
   g' (Accessor ann prop e) = g (Accessor ann prop (g' e))
-  g' (ObjectUpdate ann obj vs) = g (ObjectUpdate ann (g' obj) (map (fmap g') vs))
+  g' (ObjectUpdate ann obj copy vs) = g (ObjectUpdate ann (g' obj) copy (map (fmap g') vs))
   g' (Abs ann name e) = g (Abs ann name (g' e))
   g' (App ann v1 v2) = g (App ann (g' v1) (g' v2))
   g' (Case ann vs alts) = g (Case ann (map g' vs) (map handleCaseAlternative alts))
@@ -66,7 +66,7 @@ traverseCoreFn f g h i = (f', g', h', i')
 
   g' (Literal ann e) = Literal ann <$> handleLiteral g e
   g' (Accessor ann prop e) = Accessor ann prop <$> g e
-  g' (ObjectUpdate ann obj vs) = ObjectUpdate ann <$> g obj <*> traverse (traverse g) vs
+  g' (ObjectUpdate ann obj copy vs) = (\obj' -> ObjectUpdate ann obj' copy) <$> g obj <*> traverse (traverse g) vs
   g' (Abs ann name e) = Abs ann name <$> g e
   g' (App ann v1 v2) = App ann <$> g v1 <*> g v2
   g' (Case ann vs alts) = Case ann <$> traverse g vs <*> traverse i alts

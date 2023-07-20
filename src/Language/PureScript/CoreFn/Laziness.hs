@@ -142,7 +142,7 @@ onVarsWithDelayAndForce f = snd . go 0 $ Just 0
 
     handleApp len args = \case
       App a e1 e2 -> handleApp (len + 1) ((a, e2) : args) e1
-      Var a@(_, _, _, Just meta) i | isConstructorLike meta
+      Var a@(_, _, Just meta) i | isConstructorLike meta
         -> foldl (\e1 (a2, e2) -> App a2 <$> e1 <*> handleExpr' e2) (f delay force a i) args
       e -> foldl (\e1 (a2, e2) -> App a2 <$> e1 <*> snd (go delay Nothing) e2) (snd (go delay (fmap (+ len) force)) e) args
     isConstructorLike = \case
@@ -540,7 +540,7 @@ applyLazinessTransform mn rawItems = let
     _ -> internalError "Unexpected argument to lazifyIdent"
 
   makeForceCall :: Ann -> Ident -> Expr Ann
-  makeForceCall (ss, _, _, _) ident
+  makeForceCall (ss, _, _) ident
     -- We expect the functions produced by `runtimeLazy` to accept one
     -- argument: the line number on which this reference is made. The runtime
     -- code uses this number to generate a message that identifies where the

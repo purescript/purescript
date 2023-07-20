@@ -54,9 +54,9 @@ sourceSpanToJSON (SourceSpan _ spanStart spanEnd) =
          ]
 
 annToJSON :: Ann -> Value
-annToJSON (ss, _, _, m) = object [ "sourceSpan"  .= sourceSpanToJSON ss
-                                 , "meta"        .= maybe Null metaToJSON m
-                                 ]
+annToJSON (ss, _, m) = object [ "sourceSpan"  .= sourceSpanToJSON ss
+                              , "meta"        .= maybe Null metaToJSON m
+                              ]
 
 literalToJSON :: (a -> Value) -> Literal a -> Value
 literalToJSON _ (NumericLiteral (Left n))
@@ -181,9 +181,11 @@ exprToJSON (Accessor ann f r)       = object [ "type"        .= "Accessor"
                                              , "fieldName"   .= f
                                              , "expression"  .= exprToJSON r
                                              ]
-exprToJSON (ObjectUpdate ann r fs)  = object [ "type"        .= "ObjectUpdate"
+exprToJSON (ObjectUpdate ann r copy fs)
+                                    = object [ "type"        .= "ObjectUpdate"
                                              , "annotation"  .= annToJSON ann
                                              , "expression"  .= exprToJSON r
+                                             , "copy"        .= toJSON copy
                                              , "updates"     .= recordToJSON exprToJSON fs
                                              ]
 exprToJSON (Abs ann p b)            = object [ "type"        .= "Abs"
