@@ -98,7 +98,13 @@ ident :: Ident -> N.Ident
 ident = N.Ident . getIdent
 
 convertType :: String -> Type a -> T.SourceType
-convertType fileName = go
+convertType = convertType' False
+
+convertVtaType :: String -> Type a -> T.SourceType
+convertVtaType = convertType' True
+
+convertType' :: Bool -> String -> Type a -> T.SourceType
+convertType' isVtaType fileName = go
   where
   goRow (Row labels tl) b = do
     let
@@ -120,7 +126,7 @@ convertType fileName = go
     TypeConstructor _ a ->
       T.TypeConstructor (sourceQualName fileName a) $ qualified a
     TypeWildcard _ a ->
-      T.TypeWildcard (sourceAnnCommented fileName a a) T.UnnamedWildcard
+      T.TypeWildcard (sourceAnnCommented fileName a a) $ if isVtaType then T.IgnoredWildcard else T.UnnamedWildcard
     TypeHole _ a ->
       T.TypeWildcard (sourceName fileName a) . T.HoleWildcard . getIdent $ nameValue a
     TypeString _ a b ->
@@ -337,7 +343,7 @@ convertExpr fileName = go
       positioned ann $ AST.App (go a) (go b)
     expr@(ExprVisibleTypeApp _ a _ b) -> do
       let ann = uncurry (sourceAnn fileName) $ exprRange expr
-      positioned ann $ AST.VisibleTypeApp (go a) (convertType fileName b)
+      positioned ann $ AST.VisibleTypeApp (go a) (convertVtaType fileName b)
     expr@(ExprLambda _ (Lambda _ as _ b)) -> do
       let ann = uncurry (sourceAnnCommented fileName) $ exprRange expr
       positioned ann
