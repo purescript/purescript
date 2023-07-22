@@ -166,8 +166,8 @@ renameInValue (Literal ann l) =
 renameInValue c@Constructor{} = return c
 renameInValue (Accessor ann prop v) =
   Accessor ann prop <$> renameInValue v
-renameInValue (ObjectUpdate ann obj vs) =
-  ObjectUpdate ann <$> renameInValue obj <*> traverse (\(name, v) -> (name, ) <$> renameInValue v) vs
+renameInValue (ObjectUpdate ann obj copy vs) =
+  (\obj' -> ObjectUpdate ann obj' copy) <$> renameInValue obj <*> traverse (\(name, v) -> (name, ) <$> renameInValue v) vs
 renameInValue (Abs ann name v) =
   newScope $ Abs ann <$> updateScope name <*> renameInValue v
 renameInValue (App ann v1 v2) =

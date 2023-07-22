@@ -262,7 +262,7 @@ generateIdentFor d e = at d . non mempty . at e %%<~ \case
     _ -> "ref"
 
 nullAnn :: Ann
-nullAnn = (nullSourceSpan, [], Nothing, Nothing)
+nullAnn = (nullSourceSpan, [], Nothing)
 
 -- |
 -- Use a map to substitute local Vars in a list of Binds.
@@ -386,8 +386,8 @@ optimizeCommonSubexpressions mn
   -- common subexpression elimination pass.
   shouldFloatExpr :: Expr Ann -> Bool
   shouldFloatExpr = \case
-    App (_, _, _, Just IsSyntheticApp) e _ -> isSimple e
-    _                                      -> False
+    App (_, _, Just IsSyntheticApp) e _ -> isSimple e
+    _                                   -> False
 
   isSimple :: Expr Ann -> Bool
   isSimple = \case

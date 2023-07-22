@@ -70,7 +70,7 @@ annFromJSON modulePath = withObject "Ann" annFromObj
   annFromObj o = do
     ss <- o .: "sourceSpan" >>= sourceSpanFromJSON modulePath
     mm <- o .: "meta" >>= metaFromJSON
-    return (ss, [], Nothing, mm)
+    return (ss, [], mm)
 
 sourceSpanFromJSON :: FilePath -> Value -> Parser SourceSpan
 sourceSpanFromJSON modulePath = withObject "SourceSpan" $ \o ->
@@ -228,8 +228,9 @@ exprFromJSON modulePath = withObject "Expr" exprFromObj
   objectUpdateFromObj o = do
     ann <- o .: "annotation" >>= annFromJSON modulePath
     e   <- o .: "expression" >>= exprFromJSON modulePath
+    copy <- o .: "copy" >>= parseJSON
     us  <- o .: "updates" >>= recordFromJSON (exprFromJSON modulePath)
-    return $ ObjectUpdate ann e us
+    return $ ObjectUpdate ann e copy us
 
   absFromObj o = do
     ann <- o .: "annotation" >>= annFromJSON modulePath
