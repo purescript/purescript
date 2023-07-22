@@ -11,6 +11,7 @@ module Language.PureScript.Sugar.TypeClasses
 import Prelude
 
 import Control.Arrow (first, second)
+import Control.Monad (unless)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State (MonadState(..), StateT, evalStateT, modify)
 import Control.Monad.Supply.Class (MonadSupply)
@@ -336,26 +337,33 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
 
   let declaredMembers = S.fromList $ mapMaybe declIdent decls
 
-  case filter (\(ident, _) -> not $ S.member ident declaredMembers) memberTypes of
-    hd : tl -> throwError . errorMessage' ss $ MissingClassMember (hd NEL.:| tl)
-    [] -> do
-      -- Create values for the type instance members
-      members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
+  -- Instance declarations with a Fail constraint are unreachable code, so
+  -- we allow them to be empty.
+  let unreachable = any ((C.Fail ==) . constraintClass) deps && null decls
 
-      -- Create the type of the dictionary
-      -- The type is a record type, but depending on type instance dependencies, may be constrained.
-      -- The dictionary itself is a record literal.
-      superclassesDicts <- for typeClassSuperclasses $ \(Constraint _ superclass _ suTyArgs _) -> do
-        let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
-        pure $ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
-      let superclasses = superClassDictionaryNames typeClassSuperclasses `zip` superclassesDicts
+  unless unreachable $
+    case filter (\(ident, _) -> not $ S.member ident declaredMembers) memberTypes of
+      hd : tl -> throwError . errorMessage' ss $ MissingClassMember (hd NEL.:| tl)
+      [] -> pure ()
 
-      let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
-          dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictTypeName) className)) tys
-          constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
-          dict = App (Constructor ss (fmap (coerceProperName . dictTypeName) className)) props
-          result = ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
-      return result
+  -- Create values for the type instance members
+  members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
+
+  -- Create the type of the dictionary
+  -- The type is a record type, but depending on type instance dependencies, may be constrained.
+  -- The dictionary itself is a record literal (unless unreachable, in which case it's undefined).
+  superclassesDicts <- for typeClassSuperclasses $ \(Constraint _ superclass _ suTyArgs _) -> do
+    let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
+    pure $ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
+  let superclasses = superClassDictionaryNames typeClassSuperclasses `zip` superclassesDicts
+
+  let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
+      dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictTypeName) className)) tys
+      constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
+      dict = App (Constructor ss (fmap (coerceProperName . dictTypeName) className)) props
+      mkTV = if unreachable then TypedValue False (Var nullSourceSpan C.I_undefined) else TypedValue True dict
+      result = ValueDecl sa name Private [] [MkUnguarded (mkTV constrainedTy)]
+  return result
 
   where
 
