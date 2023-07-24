@@ -180,15 +180,11 @@ jobs:
 
       - name: "(Release only) Publish bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
-        # Astonishingly, GitHub doesn't currently maintain a first-party action
-        # for uploading assets to GitHub releases! This is the best third-party
-        # one I could find, but as this step handles a token, it seems
-        # particularly important that we lock it down to a specific audited
-        # version, instead of a tag like the other steps.
-        uses: "AButler/upload-release-assets@ec6d3263266dc57eb6645b5f75e827987f7c217d"
-        with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
-          files: "sdist-test/bundle/*.{tar.gz,sha}"
+        # This requires the gh command line tool to be installed on our
+        # self-hosted runners
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        run: "gh release upload --clobber ${{ github.ref_name }} sdist-test/bundle/*.{tar.gz,sha}"
 
   lint:
     runs-on: "ubuntu-latest"
