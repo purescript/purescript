@@ -23,6 +23,35 @@ singletonWorks = do
     right = singleton @String
   pure if left /= right then Nothing else Just "Singleton failed"
 
+class ConflictingIdent :: Type -> Constraint
+class ConflictingIdent a where
+  -- The `a` in the type below should refer to the `a`
+  -- introduced by the `forall`, not the class head.
+  conflictingIdent :: forall a. a -> Int
+
+instance ConflictingIdent String where
+  conflictingIdent _ = 1
+
+conflictingIdentWorks :: Effect (Maybe String)
+conflictingIdentWorks = do
+  pure if (1 == conflictingIdent @String 4) then Nothing else Just "ConflictingIdent failed"
+
+type M :: Type -> Type
+type M x = forall a. a -> Int
+
+class ConflictingIdentSynonym :: Type -> Constraint
+class ConflictingIdentSynonym a where
+  -- The `a` in the type below should refer to the `a`
+  -- introduced by the `forall`, not the class head.
+  conflictingIdentSynonym :: M a
+
+instance ConflictingIdentSynonym String where
+  conflictingIdentSynonym _ = 1
+
+conflictingIdentSynonymWorks :: Effect (Maybe String)
+conflictingIdentSynonymWorks = do
+  pure if (1 == conflictingIdentSynonym @String 4) then Nothing else Just "ConflictingIdentSynonym failed"
+
 class MultiNoFDs a b where
   multiNoFds :: Int
 
@@ -82,6 +111,8 @@ multiWithBidiFDsRightWorks = do
 main = do
   arr' <- sequence
     [ singletonWorks
+    , conflictingIdentWorks
+    , conflictingIdentSynonymWorks
     -- , multiNoFdsWorks
     , multiWithFdsWorks
     , multiWithBidiFDsLeftWorks
