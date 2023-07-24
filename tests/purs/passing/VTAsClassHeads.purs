@@ -58,22 +58,12 @@ class MultiNoFDs a b where
 instance MultiNoFDs Int Int where multiNoFds = 0
 instance MultiNoFDs String Int where multiNoFds = 1
 
--- multiNoFdsWorks :: Effect (Maybe String)
--- multiNoFdsWorks = do
---   let
---     {-
---      No type class instance was found for
-                              
---            Main.MultiNoFDs Int
---                            t1 
-                              
---          The instance head contains unknown type variables. Consider adding a type annotation.
-       
---        while checking that expression left
---     -}
---     left = multiNoFds @Int @Int
---     right = multiNoFds @String @Int
---   pure if left /= right then Nothing else Just "MultiNoFDs failed"
+multiNoFdsWorks :: Effect (Maybe String)
+multiNoFdsWorks = do
+  let
+    left = multiNoFds @Int @Int
+    right = multiNoFds @String @Int
+  pure if left /= right then Nothing else Just "MultiNoFDs failed"
 
 class MultiWithFDs a b | a -> b where
   multiWithFDs :: Int
@@ -113,7 +103,7 @@ main = do
     [ singletonWorks
     , conflictingIdentWorks
     , conflictingIdentSynonymWorks
-    -- , multiNoFdsWorks
+    , multiNoFdsWorks
     , multiWithFdsWorks
     , multiWithBidiFDsLeftWorks
     , multiWithBidiFDsRightWorks
