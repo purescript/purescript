@@ -1,0 +1,21 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ClassHeadNoVTA1.purs:12:10 - 12:19 (line 12, column 10 - line 12, column 19)
+
+  No type class instance was found for
+  [33m                [0m
+  [33m  Main.Single t0[0m
+  [33m                [0m
+  The instance head contains unknown type variables. Consider adding a type annotation.
+
+while checking that type [33mforall (t16 :: Type) (@tyNotAppearInBody :: t16). Single @t16 tyNotAppearInBody => Int[0m
+  is at least as general as type [33mInt[0m
+while checking that expression [33museSingle[0m
+  has type [33mInt[0m
+in value declaration [33msingle[0m
+
+where [33mt0[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+
