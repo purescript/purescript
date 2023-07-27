@@ -98,15 +98,35 @@ multiWithBidiFDsRightWorks = do
     right = multiWithBidiFDs @_ @String
   pure if left /= right then Nothing else Just "MultiWithFds failed"
 
+class Superclass a where superClassValue :: a
+class Superclass a <= MainClass a where mainClassInt :: Int
+
+data A2 = A2
+derive instance Eq A2
+
+instance Superclass A2 where superClassValue = A2
+instance MainClass A2 where mainClassInt = 0
+
+mainClassWorks :: Effect (Maybe String)
+mainClassWorks = do
+  let
+    test1 = 0 == mainClassInt @A2
+    test2 = A2 == superClassValue @A2
+  pure if not (test1 && test2) then Nothing else Just "MainClass failed"
+
+bar = foo @A2
+
 main = do
   arr' <- sequence
     [ singletonWorks
+    , singletonWorks'
     , conflictingIdentWorks
     , conflictingIdentSynonymWorks
     , multiNoFdsWorks
     , multiWithFdsWorks
     , multiWithBidiFDsLeftWorks
     , multiWithBidiFDsRightWorks
+    , mainClassWorks
     ]
   case NEA.fromArray $ Array.catMaybes arr' of
     Just errs ->
