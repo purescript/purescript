@@ -7,7 +7,6 @@ module Language.PureScript.TypeChecker.Synonyms
   ( SynonymMap
   , KindMap
   , replaceAllTypeSynonyms
-  , replaceAllTypeSynonymsM
   ) where
 
 import Prelude
@@ -28,6 +27,7 @@ type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Source
 
 type KindMap = M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 
+-- | Replace fully applied type synonyms by explicitly providing a 'SynonymMap'.
 replaceAllTypeSynonyms'
   :: SynonymMap
   -> KindMap
@@ -61,12 +61,3 @@ replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadErr
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either throwError return $ replaceAllTypeSynonyms' (typeSynonyms env) (types env) d
-
--- | Replace fully applied type synonyms by explicitly providing a 'SynonymMap'.
-replaceAllTypeSynonymsM
-  :: MonadError MultipleErrors m
-  => SynonymMap
-  -> KindMap
-  -> SourceType
-  -> m SourceType
-replaceAllTypeSynonymsM syns kinds = either throwError pure . replaceAllTypeSynonyms' syns kinds
