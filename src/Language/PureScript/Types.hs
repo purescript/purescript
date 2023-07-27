@@ -598,10 +598,15 @@ quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) TypeVarInvisible arg No
 
 -- | Move all universal quantifiers to the front of a type
 moveQuantifiersToFront :: Type a -> Type a
-moveQuantifiersToFront = go [] [] where
-  go qs cs (ForAll ann vis q mbK ty sco) = go ((ann, q, sco, mbK, vis) : qs) cs ty
-  go qs cs (ConstrainedType ann c ty) = go qs ((ann, c) : cs) ty
-  go qs cs ty = foldl (\ty' (ann, q, sco, mbK, vis) -> ForAll ann vis q mbK ty' sco) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
+moveQuantifiersToFront = go [] [] 
+  where
+  go qs cs = \case
+    ForAll ann vis q mbK ty sco ->
+      go ((ann, q, sco, mbK, vis) : qs) cs ty
+    ConstrainedType ann c ty ->
+      go qs ((ann, c) : cs) ty
+    ty -> 
+      foldl (\ty' (ann, q, sco, mbK, vis) -> ForAll ann vis q mbK ty' sco) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
 
 -- | Check if a type contains `forall`
 containsForAll :: Type a -> Bool
