@@ -98,7 +98,13 @@ ident :: Ident -> N.Ident
 ident = N.Ident . getIdent
 
 convertType :: String -> Type a -> T.SourceType
-convertType fileName = go
+convertType = convertType' False
+
+convertVtaType :: String -> Type a -> T.SourceType
+convertVtaType = convertType' True
+
+convertType' :: Bool -> String -> Type a -> T.SourceType
+convertType' withinVta fileName = go
   where
   goRow (Row labels tl) b = do
     let
@@ -120,7 +126,7 @@ convertType fileName = go
     TypeConstructor _ a ->
       T.TypeConstructor (sourceQualName fileName a) $ qualified a
     TypeWildcard _ a ->
-      T.TypeWildcard (sourceAnnCommented fileName a a) T.UnnamedWildcard
+      T.TypeWildcard (sourceAnnCommented fileName a a) $ if withinVta then T.IgnoredWildcard else T.UnnamedWildcard
     TypeHole _ a ->
       T.TypeWildcard (sourceName fileName a) . T.HoleWildcard . getIdent $ nameValue a
     TypeString _ a b ->
@@ -182,7 +188,7 @@ convertType fileName = go
       Env.tyFunction $> sourceAnnCommented fileName a a
     TypeConstrained _ a _ b -> do
       let
-        a' = convertConstraint fileName a
+        a' = convertConstraint withinVta fileName a
         b' = go b
         ann = Pos.widenSourceAnn (T.constraintAnn a') (T.getAnnForType b')
       T.ConstrainedType ann a' b'
@@ -195,13 +201,13 @@ convertType fileName = go
         ann = uncurry (sourceAnnCommented fileName) rng
       T.setAnnForType ann $ Env.kindRow a'
 
-convertConstraint :: String -> Constraint a -> T.SourceConstraint
-convertConstraint fileName = go
+convertConstraint :: Bool -> String -> Constraint a -> T.SourceConstraint
+convertConstraint withinVta fileName = go
   where
   go = \case
     cst@(Constraint _ name args) -> do
       let ann = uncurry (sourceAnnCommented fileName) $ constraintRange cst
-      T.Constraint ann (qualified name) [] (convertType fileName <$> args) Nothing
+      T.Constraint ann (qualified name) [] (convertType' withinVta fileName <$> args) Nothing
     ConstraintParens _ (Wrapped _ c _) -> go c
 
 convertGuarded :: String -> Guarded a -> [AST.GuardedExpr]
@@ -337,7 +343,7 @@ convertExpr fileName = go
       positioned ann $ AST.App (go a) (go b)
     expr@(ExprVisibleTypeApp _ a _ b) -> do
       let ann = uncurry (sourceAnn fileName) $ exprRange expr
-      positioned ann $ AST.VisibleTypeApp (go a) (convertType fileName b)
+      positioned ann $ AST.VisibleTypeApp (go a) (convertVtaType fileName b)
     expr@(ExprLambda _ (Lambda _ as _ b)) -> do
       let ann = uncurry (sourceAnnCommented fileName) $ exprRange expr
       positioned ann
@@ -472,7 +478,7 @@ convertDeclaration fileName decl = case decl of
     pure $ AST.TypeClassDeclaration ann
       (nameValue name)
       (goTypeVar <$> vars)
-      (convertConstraint fileName <$> maybe [] (toList . fst) sup)
+      (convertConstraint False fileName <$> maybe [] (toList . fst) sup)
       (goFundep <$> maybe [] (toList . snd) fdeps)
       (goSig <$> maybe [] (NE.toList . snd) bd)
   DeclInstanceChain _ insts -> do
@@ -483,7 +489,7 @@ convertDeclaration fileName decl = case decl of
             clsAnn = findInstanceAnn cls args
         AST.TypeInstanceDeclaration ann' clsAnn chainId ix
           (mkPartialInstanceName nameSep cls args)
-          (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
+          (convertConstraint False fileName <$> maybe [] (toList . fst) ctrs)
           (qualified cls)
           (convertType fileName <$> args)
           (AST.ExplicitInstance $ goInstanceBinding <$> maybe [] (NE.toList . snd) bd)
@@ -497,7 +503,7 @@ convertDeclaration fileName decl = case decl of
         | otherwise = AST.DerivedInstance
       clsAnn = findInstanceAnn cls args
     pure $ AST.TypeInstanceDeclaration ann clsAnn chainId 0 name'
-      (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
+      (convertConstraint False fileName <$> maybe [] (toList . fst) ctrs)
       (qualified cls)
       (convertType fileName <$> args)
       instTy
