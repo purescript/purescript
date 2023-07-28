@@ -25,6 +25,7 @@ module Language.PureScript.TypeChecker.Types
 
 import Prelude
 import Protolude (ordNub, fold, atMay)
+import Debug.Trace (traceM)
 
 import Control.Arrow (first, second, (***))
 import Control.Monad (forM, forM_, guard, replicateM, unless, when, zipWithM, (<=<))
@@ -48,7 +49,7 @@ import Data.IntSet qualified as IS
 import Language.PureScript.AST
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
-import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage', escalateWarningWhen, internalCompilerError, onErrorMessages, onTypesInErrorMessage, parU)
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage', escalateWarningWhen, internalCompilerError, onErrorMessages, onTypesInErrorMessage, parU, isVtaHint)
 import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), byMaybeModuleName, coerceProperName, freshIdent)
 import Language.PureScript.TypeChecker.Deriving (deriveInstance)
 import Language.PureScript.TypeChecker.Entailment (InstanceContext, newDictionaries, replaceTypeClassDictionaries)
@@ -988,16 +989,21 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   unifyTypes tyFunction' tyFunction
   arg' <- tvToExpr <$> check arg argTy
   return (retTy, App fn arg')
-checkFunctionApplication' fn (ForAll _ _ ident mbK ty _) arg = do
+checkFunctionApplication' fn (ForAll _ vis ident mbK ty _) arg = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   insertUnkName' u ident
   let replaced = replaceTypeVars ident u ty
-  checkFunctionApplication fn replaced arg
+  let 
+    withVTAHint = case vis of
+      TypeVarVisible -> withErrorMessageHint (ErrorInVisibleTypeApplication fn u)
+      TypeVarInvisible -> id
+  withVTAHint $ checkFunctionApplication fn replaced arg
 checkFunctionApplication' fn (KindedType _ ty _) arg =
   checkFunctionApplication fn ty arg
 checkFunctionApplication' fn (ConstrainedType _ con fnTy) arg = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
+  traceM ("hints have VTA hint? ... " <> show (length (filter isVtaHint hints)))
   checkFunctionApplication' (App fn (TypeClassDictionary con dicts hints)) fnTy arg
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} =
   return (fnTy, App fn dict)

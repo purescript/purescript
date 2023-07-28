@@ -650,6 +650,13 @@ containsUnknowns = everythingOnTypes (||) go . eraseKindApps where
   go TUnknown{} = True
   go _ = False
 
+-- | Same as `containsUnknowns` but accumulates the unknowns.
+getConstraintUnknowns :: Type a -> [Int]
+getConstraintUnknowns = everythingOnTypes (<>) go . eraseKindApps where
+  go :: Type a -> [Int]
+  go (TUnknown _ unk) = [unk]
+  go _ = []
+
 eraseKindApps :: Type a -> Type a
 eraseKindApps = everywhereOnTypes $ \case
   KindApp _ ty _ -> ty

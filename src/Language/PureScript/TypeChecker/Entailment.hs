@@ -23,7 +23,7 @@ import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (delete, findIndices, minimumBy, nubBy, sortOn, tails)
+import Data.List (delete, minimumBy, nubBy, sortOn, tails)
 import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import Data.Map qualified as M
 import Data.Set qualified as S
@@ -34,6 +34,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.List.NonEmpty qualified as NEL
 
 import Language.PureScript.AST (Binder(..), ErrorMessageHint(..), Expr(..), Literal(..), pattern NullSourceSpan, everywhereOnValuesTopDownM, nullSourceSpan)
+import Language.PureScript.AST.Declarations (UnknownsHint(..))
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (Environment(..), FunctionalDependency(..), TypeClassData(..), dictTypeName, kindRow, tyBoolean, tyInt, tyString)
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, addHints, errorMessage, rethrow)
@@ -50,6 +51,7 @@ import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString, mkString, decodeString)
 import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.Constants.Prim qualified as C
+import Data.IntMap qualified as IntMap
 
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence
@@ -354,7 +356,7 @@ entails SolverOptions{..} constraint context hints =
                       (substituteType currentSubst . replaceAllTypeVars (M.toList subst) $ instKind)
                       (substituteType currentSubst tyKind)
 
-            unique :: [SourceType] -> [SourceType] -> [Qualified (Either SourceType Ident)] -> [(a, TypeClassDict)] -> Bool -> m (EntailsResult a)
+            unique :: [SourceType] -> [SourceType] -> [Qualified (Either SourceType Ident)] -> [(a, TypeClassDict)] -> UnknownsHint -> m (EntailsResult a)
             unique kindArgs tyArgs ambiguous [] unks
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
@@ -421,9 +423,32 @@ entails SolverOptions{..} constraint context hints =
               let fields = [ ("reflectType", Abs (VarBinder nullSourceSpan UnusedIdent) (asExpression ref)) ] in
               pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
-            unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
-            unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)
-              where unkIndices = findIndices containsUnknowns tyArgs
+            unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
+            unknownsInAllCoveringSets tyArgs coveringSets = 
+              if all (\s -> any (`S.member` s) unkIndices) coveringSets then do
+                let unkToFn = IntMap.fromList $ vtaErrorHints hints
+                let 
+                  -- name generation counts up from 0,
+                  -- so if we get the lowest unknown,
+                  -- we should get a version of the expression
+                  -- that contains the most amount of information
+                  keepLowestValid acc unk = case IntMap.lookup unk unkToFn of
+                    Nothing -> acc
+                    Just fn -> case acc of
+                      Nothing -> Just (unk, fn)
+                      Just (prev, _)
+                        | unk < prev -> Just (unk, fn)
+                        | otherwise -> acc
+                case foldl keepLowestValid Nothing $ ordNub $ join unksList of
+                  Nothing -> Unknowns
+                  Just (_, fn) -> UnknownsFromVTAs fn
+              else NoUnknowns
+              where 
+                (unkIndices, unksList :: [[Int]]) = unzip $ catMaybes $ zipWith getUnknowns [0..] tyArgs
+
+                getUnknowns idx tyArg = case getConstraintUnknowns tyArg of
+                  [] -> Nothing
+                  unks -> Just (idx, unks)
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
@@ -848,6 +873,11 @@ newDictionaries path name (Constraint _ className instanceKinds instanceTy _) = 
 mkContext :: [NamedDict] -> InstanceContext
 mkContext = foldr combineContexts M.empty . map fromDict where
   fromDict d = M.singleton ByNullSourcePos (M.singleton (tcdClassName d) (M.singleton (tcdValue d) (pure d)))
+
+vtaErrorHints :: [ErrorMessageHint] -> [(Int, Expr)]
+vtaErrorHints = mapMaybe $ \case
+  ErrorInVisibleTypeApplication fn (TUnknown _ unk) -> Just (unk, fn)
+  _ -> Nothing
 
 -- | Check all pairs of values in a list match a predicate
 pairwiseAll :: Monoid m => (a -> a -> m) -> [a] -> m

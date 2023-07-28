@@ -74,6 +74,7 @@ data ErrorMessageHint
   | ErrorInferringType Expr
   | ErrorInferringKind SourceType
   | ErrorInApplication Expr SourceType Expr
+  | ErrorInVisibleTypeApplication Expr SourceType
   | ErrorInDataConstructor (ProperName 'ConstructorName)
   | ErrorInTypeConstructor (ProperName 'TypeName)
   | ErrorInBindingGroup (NEL.NonEmpty Ident)
@@ -102,6 +103,15 @@ data HintCategory
   | DeclarationHint
   | OtherHint
   deriving (Show, Eq)
+
+-- |
+-- In constraint solving, indicates whether there were `TyUnknown`s that prevented
+-- an instance from being found, and whether type annotations or VTAs might help. 
+data UnknownsHint
+  = NoUnknowns
+  | Unknowns
+  | UnknownsFromVTAs Expr
+  deriving (Show)
 
 -- |
 -- A module declaration, consisting of comments about the module, a module name,
