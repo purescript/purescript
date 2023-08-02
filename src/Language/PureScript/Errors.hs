@@ -934,15 +934,17 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                   Nothing ->
                     [ line "The instance head contains unknown type variables. Consider using visible type application(s)" ]
                   Just expr ->
-                    line "The instance head contains unknown type variables. Consider using visible type application(s):"
-                      : NEL.toList (fmap (\tyOrIdents' ->
-                          markCodeBox $ indent $ Box.hsep 1 Box.left
-                            $ prettyPrintValue prettyDepth expr
-                            : fmap (\case
-                                Left ty -> Box.hsep 0 Box.left [ Box.text "@", typeAtomAsBox prettyDepth ty ]
-                                Right txt -> Box.text $ T.unpack $ T.append "@" txt
-                              ) tyOrIdents'
-                        ) tyOrIdents)
+                    [ line "The instance head contains unknown type variables. Consider using visible type application(s):"
+                    , markCodeBox $ indent $ paras $ NEL.toList 
+                        $ fmap (\tyOrIdents' ->
+                            Box.hsep 1 Box.left
+                              $ prettyPrintValue prettyDepth expr
+                              : fmap (\case
+                                  Left ty -> Box.hsep 0 Box.left [ Box.text "@", typeAtomAsBox prettyDepth ty ]
+                                  Right txt -> Box.text $ T.unpack $ T.append "@" txt
+                                ) tyOrIdents'
+                        ) tyOrIdents
+                    ]
             ]
     renderSimpleErrorMessage (AmbiguousTypeVariables t uis) =
       paras [ line "The inferred type"

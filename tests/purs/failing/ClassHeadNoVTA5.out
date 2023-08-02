@@ -10,10 +10,8 @@ at tests/purs/failing/ClassHeadNoVTA5.purs:8:15 - 8:29 (line 8, column 15 - line
   The instance head contains unknown type variables. Consider using visible type application(s):
   [33m                                   [0m
   [33m  useMultiFdBidi @tyNotAppearInBody[0m
+  [33m  useMultiFdBidi @_ @norThisOne    [0m
   [33m                                   [0m
-  [33m                               [0m
-  [33m  useMultiFdBidi @_ @norThisOne[0m
-  [33m                               [0m
 
 while checking that expression [33museMultiFdBidi[0m
   has type [33mInt[0m
