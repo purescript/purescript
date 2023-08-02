@@ -447,9 +447,9 @@ entails SolverOptions{..} constraint context hints =
                           NEL.singleton tyArgOrTexts
                         Just fds' -> 
                           fmap (\(FunctionalDependency determiners _) ->
-                            mapMaybe (\(idx, tyOrIdent) -> 
-                              if idx `elem` determiners then Just tyOrIdent 
-                              else Nothing
+                            map (\(idx, tyOrIdent) -> 
+                              if idx `elem` determiners then tyOrIdent 
+                              else Right "_" -- use wildcards for determined args
                             ) indexedTyArgOrTexts
                           ) fds'
               else NoUnknowns
