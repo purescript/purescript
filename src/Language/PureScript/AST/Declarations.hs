@@ -33,6 +33,7 @@ import Language.PureScript.TypeClassDictionaries (NamedDict)
 import Language.PureScript.Comments (Comment)
 import Language.PureScript.Environment (DataDeclType, Environment, FunctionalDependency, NameKind)
 import Language.PureScript.Constants.Prim qualified as C
+import Data.List.NonEmpty (NonEmpty)
 
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, SourceType)]
@@ -110,7 +111,7 @@ data HintCategory
 data UnknownsHint
   = NoUnknowns
   | Unknowns
-  | UnknownsFromVTAs (Maybe Expr) [Either SourceType Text]
+  | UnknownsFromVTAs (Maybe Expr) (NonEmpty [Either SourceType Text])
   deriving (Show)
 
 -- |

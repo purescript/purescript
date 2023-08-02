@@ -278,7 +278,7 @@ entails SolverOptions{..} constraint context hints =
                                     else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
 
                   lefts [found]
-            solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets latestSubst tys'' typeClassCoveringSets)
+            solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets latestSubst tys'' typeClassCoveringSets typeClassDependencies)
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
@@ -423,19 +423,35 @@ entails SolverOptions{..} constraint context hints =
               let fields = [ ("reflectType", Abs (VarBinder nullSourceSpan UnusedIdent) (asExpression ref)) ] in
               pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
-            unknownsInAllCoveringSets :: Substitution -> [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
-            unknownsInAllCoveringSets subs tyArgs coveringSets = 
+            unknownsInAllCoveringSets :: Substitution -> [SourceType] -> S.Set (S.Set Int) -> [FunctionalDependency] -> UnknownsHint
+            unknownsInAllCoveringSets subs tyArgs coveringSets fds = 
               if all (\s -> any (`S.member` s) unkIndices) coveringSets then do
                 let 
                   unkToTextMap = IntMap.fromList $ vtaErrorHints subs hints
                   
-                  unknownToText :: (Int, SourceType, [Int]) -> Either SourceType Text
-                  unknownToText (_, tyArg, unks) = case mapMaybe (flip IntMap.lookup unkToTextMap) unks of
-                    [] -> Left tyArg
-                    idents -> maybe (Left tyArg) Right $ headMay idents
-                  tyArgOrTexts = fmap unknownToText args
+                  unknownToText :: (Int, SourceType, [Int]) -> (Int, Either SourceType Text)
+                  unknownToText (idx, tyArg, unks) = (idx,) $
+                    case mapMaybe (flip IntMap.lookup unkToTextMap) unks of
+                      [] -> Left tyArg
+                      idents -> maybe (Left tyArg) Right $ headMay idents
+                  indexedTyArgOrTexts :: [(Int, Either SourceType Text)]
+                  indexedTyArgOrTexts = fmap unknownToText args
+
+                  tyArgOrTexts :: [Either SourceType Text]
+                  tyArgOrTexts = map snd indexedTyArgOrTexts
                 if null $ rights tyArgOrTexts then Unknowns
-                else UnknownsFromVTAs (errorCheckingTypeHint hints) tyArgOrTexts
+                else 
+                  UnknownsFromVTAs (errorCheckingTypeHint hints)
+                    $ case NEL.nonEmpty fds of
+                        Nothing -> 
+                          NEL.singleton tyArgOrTexts
+                        Just fds' -> 
+                          fmap (\(FunctionalDependency determiners _) ->
+                            mapMaybe (\(idx, tyOrIdent) -> 
+                              if idx `elem` determiners then Just tyOrIdent 
+                              else Nothing
+                            ) indexedTyArgOrTexts
+                          ) fds'
               else NoUnknowns
               where 
                 unkIndices = mapMaybe (\(idx, _, unks) -> if null unks then Nothing else Just idx) args

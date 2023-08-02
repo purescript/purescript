@@ -938,20 +938,21 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                         [_] -> useMessage "The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:"
                         _ -> useMessage "The following instances partially overlap the above constraint, which means the rest of their instance chains will not be considered:"
             , paras $ case unks of
-                NoUnknowns -> [] 
+                NoUnknowns -> []
                 Unknowns -> [ line "The instance head contains unknown type variables. Consider adding a type annotation." ]
                 UnknownsFromVTAs mbExpr tyOrIdents -> case mbExpr of
                   Nothing ->
                     [ line "The instance head contains unknown type variables. Consider using visible type application(s)" ]
                   Just expr ->
-                    [ line "The instance head contains unknown type variables. Consider using visible type application(s):" 
-                    , markCodeBox $ indent $ Box.hsep 1 Box.left 
-                        $ prettyPrintValue prettyDepth expr 
-                        : map (\case
-                            Left ty -> Box.hsep 0 Box.left [ Box.text "@", typeAtomAsBox prettyDepth ty ]
-                            Right txt -> Box.text $ T.unpack $ T.append "@" txt
-                          ) tyOrIdents
-                    ]
+                    line "The instance head contains unknown type variables. Consider using visible type application(s):"
+                      : NEL.toList (fmap (\tyOrIdents' ->
+                          markCodeBox $ indent $ Box.hsep 1 Box.left
+                            $ prettyPrintValue prettyDepth expr
+                            : fmap (\case
+                                Left ty -> Box.hsep 0 Box.left [ Box.text "@", typeAtomAsBox prettyDepth ty ]
+                                Right txt -> Box.text $ T.unpack $ T.append "@" txt
+                              ) tyOrIdents'
+                        ) tyOrIdents)
             ]
     renderSimpleErrorMessage (AmbiguousTypeVariables t uis) =
       paras [ line "The inferred type"

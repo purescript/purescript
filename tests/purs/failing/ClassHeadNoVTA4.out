@@ -8,9 +8,9 @@ at tests/purs/failing/ClassHeadNoVTA4.purs:8:11 - 8:21 (line 8, column 11 - line
   [33m               t1[0m
   [33m                 [0m
   The instance head contains unknown type variables. Consider using visible type application(s):
-  [33m                                           [0m
-  [33m  useMultiFd @tyNotAppearInBody @norThisOne[0m
-  [33m                                           [0m
+  [33m                               [0m
+  [33m  useMultiFd @tyNotAppearInBody[0m
+  [33m                               [0m
 
 while checking that expression [33museMultiFd[0m
   has type [33mInt[0m
