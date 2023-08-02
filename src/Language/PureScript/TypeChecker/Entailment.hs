@@ -451,12 +451,13 @@ entails SolverOptions{..} constraint context hints =
                             snd
                             $ List.foldr (\next acc@(hitJust, acc') -> case next of
                                 Nothing
-                                  | hitJust -> (hitJust, Right "_" : acc') -- use wildcard for determined args
+                                   -- use wildcard for determined args
+                                   -- if they appear on the left of all undetermined one.
+                                  | hitJust -> (hitJust, Right "_" : acc')
                                   | otherwise -> acc
                                 Just x -> (True, x : acc')
                               ) (False,[]) 
                             $ fmap (\(idx, tyOrIdent) -> 
-                              -- use wildcards for determined args
                               if idx `elem` determined then Nothing
                               else Just tyOrIdent
                             ) indexedTyArgOrTexts
