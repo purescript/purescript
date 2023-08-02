@@ -74,7 +74,7 @@ data ErrorMessageHint
   | ErrorInferringType Expr
   | ErrorInferringKind SourceType
   | ErrorInApplication Expr SourceType Expr
-  | ErrorInVisibleTypeApplication Expr SourceType
+  | ErrorInVisibleTypeApplication Text SourceType
   | ErrorInDataConstructor (ProperName 'ConstructorName)
   | ErrorInTypeConstructor (ProperName 'TypeName)
   | ErrorInBindingGroup (NEL.NonEmpty Ident)
@@ -110,7 +110,7 @@ data HintCategory
 data UnknownsHint
   = NoUnknowns
   | Unknowns
-  | UnknownsFromVTAs Expr
+  | UnknownsFromVTAs (Maybe Expr) [Text]
   deriving (Show)
 
 -- |

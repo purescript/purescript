@@ -989,15 +989,11 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   unifyTypes tyFunction' tyFunction
   arg' <- tvToExpr <$> check arg argTy
   return (retTy, App fn arg')
-checkFunctionApplication' fn (ForAll _ vis ident mbK ty _) arg = do
+checkFunctionApplication' fn (ForAll _ _ ident mbK ty _) arg = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   insertUnkName' u ident
   let replaced = replaceTypeVars ident u ty
-  let 
-    withVTAHint = case vis of
-      TypeVarVisible -> withErrorMessageHint (ErrorInVisibleTypeApplication fn u)
-      TypeVarInvisible -> id
-  withVTAHint $ checkFunctionApplication fn replaced arg
+  checkFunctionApplication fn replaced arg
 checkFunctionApplication' fn (KindedType _ ty _) arg =
   checkFunctionApplication fn ty arg
 checkFunctionApplication' fn (ConstrainedType _ con fnTy) arg = do

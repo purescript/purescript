@@ -1,23 +1,22 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/failing/ClassHeadNoVTA3.purs:13:16 - 13:36 (line 13, column 16 - line 13, column 36)
+at tests/purs/failing/ClassHeadNoVTA3.purs:8:16 - 8:36 (line 8, column 16 - line 8, column 36)
 
   No type class instance was found for
   [33m                       [0m
   [33m  Main.MultiMissing Int[0m
-  [33m                    t2 [0m
+  [33m                    t0 [0m
   [33m                       [0m
-  The instance head contains unknown type variables. Consider adding a type annotation.
+  The instance head contains unknown type variables. Consider using visible type application(s):
+  [33m                             [0m
+  [33m  useMultiMissing @norThisOne[0m
+  [33m                             [0m
 
-while checking that type [33mforall (@norThisOne :: t0). MultiMissing @t1 @t0 Int norThisOne => Int[0m
-  is at least as general as type [33mInt[0m
 while checking that expression [33museMultiMissing[0m
   has type [33mInt[0m
 in value declaration [33mmultiMissing[0m
 
-where [33mt1[0m is an unknown type
-      [33mt0[0m is an unknown type
-      [33mt2[0m is an unknown type
+where [33mt0[0m is an unknown type
 
 See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
 or to contribute content related to this error.

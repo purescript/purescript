@@ -42,7 +42,7 @@ import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName
 import Language.PureScript.TypeChecker.Entailment.Coercible (GivenSolverState(..), WantedSolverState(..), initialGivenSolverState, initialWantedSolverState, insoluble, solveGivens, solveWanteds)
 import Language.PureScript.TypeChecker.Entailment.IntCompare (mkFacts, mkRelation, solveRelation)
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
-import Language.PureScript.TypeChecker.Monad (CheckState(..), withErrorMessageHint)
+import Language.PureScript.TypeChecker.Monad (CheckState(..), Substitution, withErrorMessageHint)
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
 import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, substituteType, unifyTypes)
 import Language.PureScript.TypeClassDictionaries (NamedDict, TypeClassDictionaryInScope(..), superclassName)
@@ -278,7 +278,7 @@ entails SolverOptions{..} constraint context hints =
                                     else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
 
                   lefts [found]
-            solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
+            solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets latestSubst tys'' typeClassCoveringSets)
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
@@ -423,29 +423,21 @@ entails SolverOptions{..} constraint context hints =
               let fields = [ ("reflectType", Abs (VarBinder nullSourceSpan UnusedIdent) (asExpression ref)) ] in
               pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
-            unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
-            unknownsInAllCoveringSets tyArgs coveringSets = 
+            unknownsInAllCoveringSets :: Substitution -> [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
+            unknownsInAllCoveringSets subs tyArgs coveringSets = 
               if all (\s -> any (`S.member` s) unkIndices) coveringSets then do
-                let unkToFn = IntMap.fromList $ vtaErrorHints hints
                 let 
-                  -- name generation counts up from 0,
-                  -- so if we get the lowest unknown,
-                  -- we should get a version of the expression
-                  -- that contains the most amount of information
-                  keepLowestValid acc unk = case IntMap.lookup unk unkToFn of
-                    Nothing -> acc
-                    Just fn -> case acc of
-                      Nothing -> Just (unk, fn)
-                      Just (prev, _)
-                        | unk < prev -> Just (unk, fn)
-                        | otherwise -> acc
-                case foldl keepLowestValid Nothing $ ordNub $ join unksList of
-                  Nothing -> Unknowns
-                  Just (_, fn) -> UnknownsFromVTAs fn
+                  unkToText = IntMap.fromList $ vtaErrorHints subs hints
+                case mapMaybe (flip IntMap.lookup unkToText) $ ordNub $ join $ unksList of
+                  [] -> 
+                    Unknowns
+                  texts -> 
+                    UnknownsFromVTAs (errorCheckingTypeHint hints) texts
               else NoUnknowns
               where 
                 (unkIndices, unksList :: [[Int]]) = unzip $ catMaybes $ zipWith getUnknowns [0..] tyArgs
 
+                getUnknowns :: Int -> SourceType -> Maybe (Int, [Int])
                 getUnknowns idx tyArg = case getConstraintUnknowns tyArg of
                   [] -> Nothing
                   unks -> Just (idx, unks)
@@ -874,10 +866,22 @@ mkContext :: [NamedDict] -> InstanceContext
 mkContext = foldr combineContexts M.empty . map fromDict where
   fromDict d = M.singleton ByNullSourcePos (M.singleton (tcdClassName d) (M.singleton (tcdValue d) (pure d)))
 
-vtaErrorHints :: [ErrorMessageHint] -> [(Int, Expr)]
-vtaErrorHints = mapMaybe $ \case
-  ErrorInVisibleTypeApplication fn (TUnknown _ unk) -> Just (unk, fn)
+vtaErrorHints :: Substitution -> [ErrorMessageHint] -> [(Int, Text)]
+vtaErrorHints subs = mapMaybe $ \case
+  ErrorInVisibleTypeApplication txt ty
+    | (TUnknown _ unk) <- substituteType subs ty -> Just (unk, txt)
   _ -> Nothing
+
+errorCheckingTypeHint :: [ErrorMessageHint] -> Maybe Expr
+errorCheckingTypeHint = foldr go Nothing
+  where
+  go next acc = case (acc, next) of
+    (Nothing, ErrorCheckingType expr _) -> Just $ dropPosition expr
+    (_, _) -> acc
+
+  dropPosition = \case
+    PositionedValue _ _ expr -> expr
+    expr -> expr
 
 -- | Check all pairs of values in a list match a predicate
 pairwiseAll :: Monoid m => (a -> a -> m) -> [a] -> m

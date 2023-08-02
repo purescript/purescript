@@ -1,16 +1,17 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/failing/ClassHeadNoVTA2.purs:12:9 - 12:17 (line 12, column 9 - line 12, column 17)
+at tests/purs/failing/ClassHeadNoVTA2.purs:10:9 - 10:17 (line 10, column 9 - line 10, column 17)
 
   No type class instance was found for
   [33m               [0m
   [33m  Main.Multi t0[0m
   [33m             t1[0m
   [33m               [0m
-  The instance head contains unknown type variables. Consider adding a type annotation.
+  The instance head contains unknown type variables. Consider using visible type application(s):
+  [33m                                         [0m
+  [33m  useMulti @tyNotAppearInBody @norThisOne[0m
+  [33m                                         [0m
 
-while checking that type [33mforall (t28 :: Type) (t29 :: Type) (@tyNotAppearInBody :: t28) (@norThisOne :: t29). Multi @t28 @t29 tyNotAppearInBody norThisOne => Int[0m
-  is at least as general as type [33mInt[0m
 while checking that expression [33museMulti[0m
   has type [33mInt[0m
 in value declaration [33mmulti[0m

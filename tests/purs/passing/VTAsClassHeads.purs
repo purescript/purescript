@@ -112,14 +112,11 @@ mainClassWorks = do
   let
     test1 = 0 == mainClassInt @A2
     test2 = A2 == superClassValue @A2
-  pure if not (test1 && test2) then Nothing else Just "MainClass failed"
-
-bar = foo @A2
+  pure if test1 && test2 then Nothing else Just "MainClass failed"
 
 main = do
   arr' <- sequence
     [ singletonWorks
-    , singletonWorks'
     , conflictingIdentWorks
     , conflictingIdentSynonymWorks
     , multiNoFdsWorks

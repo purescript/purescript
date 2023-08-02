@@ -503,7 +503,6 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorCheckingKind t k) = ErrorCheckingKind <$> f t <*> f k
   gHint (ErrorInferringKind t) = ErrorInferringKind <$> f t
   gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
-  gHint (ErrorInVisibleTypeApplication fn ty) = ErrorInVisibleTypeApplication fn <$> f ty
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintArgs (traverse f) con
   gHint other = pure other
@@ -941,10 +940,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , paras $ case unks of
                 NoUnknowns -> [] 
                 Unknowns -> [ line "The instance head contains unknown type variables. Consider adding a type annotation." ]
-                UnknownsFromVTAs fn -> 
-                  [ line "The instance head contains unknown type variables.    Consider using visible type application(s)" 
-                  , markCodeBox $ indent $ prettyPrintValue prettyDepth fn
-                  ]
+                UnknownsFromVTAs mbExpr texts -> case mbExpr of
+                  Nothing ->
+                    [ line "The instance head contains unknown type variables. Consider using visible type application(s)" ]
+                  Just expr ->
+                    [ line "The instance head contains unknown type variables. Consider using visible type application(s):" 
+                    , markCodeBox $ indent $ Box.hsep 1 Box.left 
+                        $ prettyPrintValue prettyDepth expr : map (Box.text . T.unpack . T.append "@") texts
+                    ]
             ]
     renderSimpleErrorMessage (AmbiguousTypeVariables t uis) =
       paras [ line "The inferred type"
@@ -1525,11 +1528,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                                                    , markCodeBox $ prettyPrintValue prettyDepth a
                                                    ]
             ]
-    renderHint (ErrorInVisibleTypeApplication f _) detail =
+    -- Note: this hint isn't rendered. Rather it is used to improve the message for `NoInstanceFound`.
+    renderHint (ErrorInVisibleTypeApplication{}) detail =
       paras [ detail
-            , Box.hsep 1 Box.top [ line "while applying a function in which visible type application(s) can be used"
-                                 , markCodeBox $ prettyPrintValue prettyDepth f
-                                 ]
             ]
     renderHint (ErrorInDataConstructor nm) detail =
       paras [ detail

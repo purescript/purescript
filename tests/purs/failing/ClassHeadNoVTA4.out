@@ -1,16 +1,17 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/failing/ClassHeadNoVTA4.purs:12:11 - 12:21 (line 12, column 11 - line 12, column 21)
+at tests/purs/failing/ClassHeadNoVTA4.purs:8:11 - 8:21 (line 8, column 11 - line 8, column 21)
 
   No type class instance was found for
   [33m                 [0m
   [33m  Main.MultiFd t0[0m
   [33m               t1[0m
   [33m                 [0m
-  The instance head contains unknown type variables. Consider adding a type annotation.
+  The instance head contains unknown type variables. Consider using visible type application(s):
+  [33m                                           [0m
+  [33m  useMultiFd @tyNotAppearInBody @norThisOne[0m
+  [33m                                           [0m
 
-while checking that type [33mforall (t28 :: Type) (t29 :: Type) (@tyNotAppearInBody :: t28) (@norThisOne :: t29). MultiFd @t28 @t29 tyNotAppearInBody norThisOne => Int[0m
-  is at least as general as type [33mInt[0m
 while checking that expression [33museMultiFd[0m
   has type [33mInt[0m
 in value declaration [33mmultiFd[0m
