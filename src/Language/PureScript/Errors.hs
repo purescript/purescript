@@ -456,16 +456,6 @@ replaceUnknowns = everywhereOnTypesTopDownM replaceTypes where
       Just (_, s', _) -> return (Skolem ann name Nothing s' sko)
   replaceTypes other = return other
 
-isVtaHint :: ErrorMessageHint -> Bool
-isVtaHint = \case
-  ErrorInVisibleTypeApplication _ _ -> True
-  _ -> False
-
-keepVtaHint :: ErrorMessageHint -> Maybe ErrorMessageHint
-keepVtaHint = \case
-  self@(ErrorInVisibleTypeApplication _ _) -> Just self
-  _ -> Nothing
-
 onTypesInErrorMessage :: (SourceType -> SourceType) -> ErrorMessage -> ErrorMessage
 onTypesInErrorMessage f = runIdentity . onTypesInErrorMessageM (Identity . f)
 
