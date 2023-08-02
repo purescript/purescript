@@ -428,7 +428,7 @@ entails SolverOptions{..} constraint context hints =
               if all (\s -> any (`S.member` s) unkIndices) coveringSets then do
                 let 
                   unkToText = IntMap.fromList $ vtaErrorHints subs hints
-                case mapMaybe (flip IntMap.lookup unkToText) $ ordNub $ join $ unksList of
+                case mapMaybe (flip IntMap.lookup unkToText) $ ordNub $ join unksList of
                   [] -> 
                     Unknowns
                   texts -> 
