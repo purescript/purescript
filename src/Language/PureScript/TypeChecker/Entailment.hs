@@ -11,7 +11,7 @@ module Language.PureScript.TypeChecker.Entailment
   ) where
 
 import Prelude
-import Protolude (ordNub)
+import Protolude (ordNub, rights, headMay)
 
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
@@ -427,20 +427,24 @@ entails SolverOptions{..} constraint context hints =
             unknownsInAllCoveringSets subs tyArgs coveringSets = 
               if all (\s -> any (`S.member` s) unkIndices) coveringSets then do
                 let 
-                  unkToText = IntMap.fromList $ vtaErrorHints subs hints
-                case mapMaybe (flip IntMap.lookup unkToText) $ ordNub $ join unksList of
-                  [] -> 
-                    Unknowns
-                  texts -> 
-                    UnknownsFromVTAs (errorCheckingTypeHint hints) texts
+                  unkToTextMap = IntMap.fromList $ vtaErrorHints subs hints
+                  
+                  unknownToText :: (Int, SourceType, [Int]) -> Either SourceType Text
+                  unknownToText (_, tyArg, unks) = case mapMaybe (flip IntMap.lookup unkToTextMap) unks of
+                    [] -> Left tyArg
+                    idents -> maybe (Left tyArg) Right $ headMay idents
+                  tyArgOrTexts = fmap unknownToText args
+                if null $ rights tyArgOrTexts then Unknowns
+                else UnknownsFromVTAs (errorCheckingTypeHint hints) tyArgOrTexts
               else NoUnknowns
               where 
-                (unkIndices, unksList :: [[Int]]) = unzip $ catMaybes $ zipWith getUnknowns [0..] tyArgs
+                unkIndices = mapMaybe (\(idx, _, unks) -> if null unks then Nothing else Just idx) args
 
-                getUnknowns :: Int -> SourceType -> Maybe (Int, [Int])
-                getUnknowns idx tyArg = case getConstraintUnknowns tyArg of
-                  [] -> Nothing
-                  unks -> Just (idx, unks)
+                args :: [(Int, SourceType, [Int])]
+                args = zipWith toArgInfo [0..] tyArgs
+
+                toArgInfo :: Int -> SourceType -> (Int, SourceType, [Int])
+                toArgInfo idx tyArg = (idx, tyArg, getConstraintUnknowns tyArg)
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr

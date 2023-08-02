@@ -110,7 +110,7 @@ data HintCategory
 data UnknownsHint
   = NoUnknowns
   | Unknowns
-  | UnknownsFromVTAs (Maybe Expr) [Text]
+  | UnknownsFromVTAs (Maybe Expr) [Either SourceType Text]
   deriving (Show)
 
 -- |

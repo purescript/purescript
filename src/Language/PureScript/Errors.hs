@@ -940,13 +940,17 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , paras $ case unks of
                 NoUnknowns -> [] 
                 Unknowns -> [ line "The instance head contains unknown type variables. Consider adding a type annotation." ]
-                UnknownsFromVTAs mbExpr texts -> case mbExpr of
+                UnknownsFromVTAs mbExpr tyOrIdents -> case mbExpr of
                   Nothing ->
                     [ line "The instance head contains unknown type variables. Consider using visible type application(s)" ]
                   Just expr ->
                     [ line "The instance head contains unknown type variables. Consider using visible type application(s):" 
                     , markCodeBox $ indent $ Box.hsep 1 Box.left 
-                        $ prettyPrintValue prettyDepth expr : map (Box.text . T.unpack . T.append "@") texts
+                        $ prettyPrintValue prettyDepth expr 
+                        : map (\case
+                            Left ty -> Box.hsep 0 Box.left [ Box.text "@", typeAtomAsBox prettyDepth ty ]
+                            Right txt -> Box.text $ T.unpack $ T.append "@" txt
+                          ) tyOrIdents
                     ]
             ]
     renderSimpleErrorMessage (AmbiguousTypeVariables t uis) =
