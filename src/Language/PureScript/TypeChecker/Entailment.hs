@@ -52,6 +52,7 @@ import Language.PureScript.PSString (PSString, mkString, decodeString)
 import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.Constants.Prim qualified as C
 import Data.IntMap qualified as IntMap
+import Data.List qualified as List
 
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence
@@ -446,10 +447,18 @@ entails SolverOptions{..} constraint context hints =
                         Nothing -> 
                           NEL.singleton tyArgOrTexts
                         Just fds' -> 
-                          fmap (\(FunctionalDependency determiners _) ->
-                            map (\(idx, tyOrIdent) -> 
-                              if idx `elem` determiners then tyOrIdent 
-                              else Right "_" -- use wildcards for determined args
+                          fmap (\(FunctionalDependency _ determined) ->
+                            snd
+                            $ List.foldr (\next acc@(hitJust, acc') -> case next of
+                                Nothing
+                                  | hitJust -> (hitJust, Right "_" : acc') -- use wildcard for determined args
+                                  | otherwise -> acc
+                                Just x -> (True, x : acc')
+                              ) (False,[]) 
+                            $ fmap (\(idx, tyOrIdent) -> 
+                              -- use wildcards for determined args
+                              if idx `elem` determined then Nothing
+                              else Just tyOrIdent
                             ) indexedTyArgOrTexts
                           ) fds'
               else NoUnknowns
