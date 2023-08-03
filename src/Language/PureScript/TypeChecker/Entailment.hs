@@ -279,7 +279,9 @@ entails SolverOptions{..} constraint context hints =
                                     else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
 
                   lefts [found]
-            solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets latestSubst tys'' typeClassCoveringSets typeClassDependencies)
+            solution <- lift . lift 
+              $ unique kinds'' tys'' ambiguous instances 
+              $ unknownsInAllCoveringSets latestSubst tys'' typeClassCoveringSets typeClassDependencies
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
