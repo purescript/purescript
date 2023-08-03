@@ -435,7 +435,10 @@ entails SolverOptions{..} constraint context hints =
 
                 eachSetHasOneUnknown = all (\s -> any (`S.member` s) unkIndices) coveringSets
 
-              if eachSetHasOneUnknown then do
+              -- at least one set has no unknowns
+              if not eachSetHasOneUnknown then 
+                NoUnknowns
+              else do
                 let 
                   vtaErrorHint :: ErrorMessageHint -> Maybe (Int, Text)
                   vtaErrorHint = \case
@@ -457,7 +460,8 @@ entails SolverOptions{..} constraint context hints =
 
                   tyArgOrIdents :: [Either SourceType Text]
                   tyArgOrIdents = map snd indexedTyArgOrIdents
-                if null $ rights tyArgOrIdents then Unknowns
+                if null $ rights tyArgOrIdents then 
+                  Unknowns
                 else do
                   let
                     exprFromErrorCheckingTypeHint :: [ErrorMessageHint] -> Maybe Expr
@@ -502,8 +506,6 @@ entails SolverOptions{..} constraint context hints =
                           fds'
 
                   UnknownsFromVTAs (exprFromErrorCheckingTypeHint hints) vtaPossibilities
-              else 
-                NoUnknowns
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
