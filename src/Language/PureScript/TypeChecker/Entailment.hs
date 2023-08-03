@@ -23,6 +23,7 @@ import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
+import Data.IntMap qualified as IntMap
 import Data.List (delete, minimumBy, nubBy, sortOn, tails)
 import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import Data.Map qualified as M
@@ -30,6 +31,7 @@ import Data.Set qualified as S
 import Data.Traversable (for)
 import Data.Text (Text, stripPrefix, stripSuffix)
 import Data.Text qualified as T
+import Data.List qualified as List
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List.NonEmpty qualified as NEL
 
@@ -51,8 +53,6 @@ import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString, mkString, decodeString)
 import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.Constants.Prim qualified as C
-import Data.IntMap qualified as IntMap
-import Data.List qualified as List
 
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence
