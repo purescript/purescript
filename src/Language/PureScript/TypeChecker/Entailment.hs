@@ -11,7 +11,7 @@ module Language.PureScript.TypeChecker.Entailment
   ) where
 
 import Prelude
-import Protolude (ordNub, rights, headMay)
+import Protolude (ordNub, rights)
 
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
@@ -432,9 +432,9 @@ entails SolverOptions{..} constraint context hints =
                   
                   unknownToText :: (Int, SourceType, [Int]) -> (Int, Either SourceType Text)
                   unknownToText (idx, tyArg, unks) = (idx,) $
-                    case mapMaybe (flip IntMap.lookup unkToTextMap) unks of
-                      [] -> Left tyArg
-                      idents -> maybe (Left tyArg) Right $ headMay idents
+                    case NEL.nonEmpty $ mapMaybe (flip IntMap.lookup unkToTextMap) unks of
+                      Nothing -> Left tyArg
+                      Just idents -> Right $ NEL.head idents
                   indexedTyArgOrTexts :: [(Int, Either SourceType Text)]
                   indexedTyArgOrTexts = fmap unknownToText args
 
