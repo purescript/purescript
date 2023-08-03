@@ -433,7 +433,9 @@ entails SolverOptions{..} constraint context hints =
 
                 unkIndices = mapMaybe (\(idx, _, unks) -> if null unks then Nothing else Just idx) args
 
-              if all (\s -> any (`S.member` s) unkIndices) coveringSets then do
+                eachSetHasOneUnknown = all (\s -> any (`S.member` s) unkIndices) coveringSets
+
+              if eachSetHasOneUnknown then do
                 let 
                   vtaErrorHint :: ErrorMessageHint -> Maybe (Int, Text)
                   vtaErrorHint = \case
