@@ -430,7 +430,7 @@ entails SolverOptions{..} constraint context hints =
             unknownsInAllCoveringSets subs tyArgs coveringSets fds = 
               if all (\s -> any (`S.member` s) unkIndices) coveringSets then do
                 let 
-                  unkToTextMap = IntMap.fromList $ vtaErrorHints subs hints
+                  unkToTextMap = IntMap.fromList $ vtaErrorHints hints
                   
                   unknownToText :: (Int, SourceType, [Int]) -> (Int, Either SourceType Text)
                   unknownToText (idx, tyArg, unks) = (idx,) $
@@ -473,6 +473,23 @@ entails SolverOptions{..} constraint context hints =
 
                 toArgInfo :: Int -> SourceType -> (Int, SourceType, [Int])
                 toArgInfo idx tyArg = (idx, tyArg, getConstraintUnknowns tyArg)
+
+                vtaErrorHints :: [ErrorMessageHint] -> [(Int, Text)]
+                vtaErrorHints = mapMaybe $ \case
+                  ErrorInVisibleTypeApplication txt ty
+                    | (TUnknown _ unk) <- substituteType subs ty -> Just (unk, txt)
+                  _ -> Nothing
+
+                errorCheckingTypeHint :: [ErrorMessageHint] -> Maybe Expr
+                errorCheckingTypeHint = foldr goError Nothing
+                  where
+                  goError next acc = case (acc, next) of
+                    (Nothing, ErrorCheckingType expr _) -> Just $ dropPosition expr
+                    (_, _) -> acc
+
+                  dropPosition = \case
+                    PositionedValue _ _ expr -> expr
+                    expr -> expr
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
@@ -897,23 +914,6 @@ newDictionaries path name (Constraint _ className instanceKinds instanceTy _) = 
 mkContext :: [NamedDict] -> InstanceContext
 mkContext = foldr combineContexts M.empty . map fromDict where
   fromDict d = M.singleton ByNullSourcePos (M.singleton (tcdClassName d) (M.singleton (tcdValue d) (pure d)))
-
-vtaErrorHints :: Substitution -> [ErrorMessageHint] -> [(Int, Text)]
-vtaErrorHints subs = mapMaybe $ \case
-  ErrorInVisibleTypeApplication txt ty
-    | (TUnknown _ unk) <- substituteType subs ty -> Just (unk, txt)
-  _ -> Nothing
-
-errorCheckingTypeHint :: [ErrorMessageHint] -> Maybe Expr
-errorCheckingTypeHint = foldr go Nothing
-  where
-  go next acc = case (acc, next) of
-    (Nothing, ErrorCheckingType expr _) -> Just $ dropPosition expr
-    (_, _) -> acc
-
-  dropPosition = \case
-    PositionedValue _ _ expr -> expr
-    expr -> expr
 
 -- | Check all pairs of values in a list match a predicate
 pairwiseAll :: Monoid m => (a -> a -> m) -> [a] -> m
