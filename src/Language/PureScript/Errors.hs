@@ -111,7 +111,7 @@ data SimpleErrorMessage
   | NoInstanceFound
       SourceConstraint -- ^ constraint that could not be solved
       [Qualified (Either SourceType Ident)] -- ^ a list of instances that stopped further progress in instance chains due to ambiguity
-      UnknownsHint -- ^ whether eliminating unknowns with annotations might help
+      UnknownsHint -- ^ whether eliminating unknowns with annotations or VTAs might help
   | AmbiguousTypeVariables SourceType [(Text, Int)]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]

@@ -106,7 +106,7 @@ data HintCategory
   deriving (Show, Eq)
 
 -- |
--- In constraint solving, indicates whether there were `TyUnknown`s that prevented
+-- In constraint solving, indicates whether there were `TypeUnknown`s that prevented
 -- an instance from being found, and whether type annotations or VTAs might help. 
 data UnknownsHint
   = NoUnknowns
