@@ -31,7 +31,6 @@ import Data.Set qualified as S
 import Data.Traversable (for)
 import Data.Text (Text, stripPrefix, stripSuffix)
 import Data.Text qualified as T
-import Data.List qualified as List
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List.NonEmpty qualified as NEL
 
@@ -427,69 +426,82 @@ entails SolverOptions{..} constraint context hints =
               pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
             unknownsInAllCoveringSets :: Substitution -> [SourceType] -> S.Set (S.Set Int) -> [FunctionalDependency] -> UnknownsHint
-            unknownsInAllCoveringSets subs tyArgs coveringSets fds = 
+            unknownsInAllCoveringSets subs tyArgs coveringSets fds = do
+              let
+                args :: [(Int, SourceType, [Int])]
+                args = zipWith (\idx tyArg -> (idx, tyArg, getConstraintUnknowns tyArg)) [0..] tyArgs
+
+                unkIndices = mapMaybe (\(idx, _, unks) -> if null unks then Nothing else Just idx) args
+
               if all (\s -> any (`S.member` s) unkIndices) coveringSets then do
                 let 
-                  unkToTextMap = IntMap.fromList $ vtaErrorHints hints
+                  vtaErrorHint :: ErrorMessageHint -> Maybe (Int, Text)
+                  vtaErrorHint = \case
+                    ErrorInVisibleTypeApplication txt ty
+                      | (TUnknown _ unk) <- substituteType subs ty -> Just (unk, txt)
+                    _ -> Nothing
+
+                  unkToIdentMap :: IntMap.IntMap Text
+                  unkToIdentMap = IntMap.fromList $ mapMaybe vtaErrorHint hints
                   
                   unknownToText :: (Int, SourceType, [Int]) -> (Int, Either SourceType Text)
                   unknownToText (idx, tyArg, unks) = (idx,) $
-                    case NEL.nonEmpty $ mapMaybe (flip IntMap.lookup unkToTextMap) unks of
+                    case NEL.nonEmpty $ mapMaybe (flip IntMap.lookup unkToIdentMap) unks of
                       Nothing -> Left tyArg
                       Just idents -> Right $ NEL.head idents
-                  indexedTyArgOrTexts :: [(Int, Either SourceType Text)]
-                  indexedTyArgOrTexts = fmap unknownToText args
 
-                  tyArgOrTexts :: [Either SourceType Text]
-                  tyArgOrTexts = map snd indexedTyArgOrTexts
-                if null $ rights tyArgOrTexts then Unknowns
-                else 
-                  UnknownsFromVTAs (errorCheckingTypeHint hints)
-                    $ case NEL.nonEmpty fds of
-                        Nothing -> 
-                          NEL.singleton tyArgOrTexts
-                        Just fds' -> 
-                          fmap (\(FunctionalDependency _ determined) ->
-                            snd
-                            $ List.foldr (\next acc@(hitJust, acc') -> case next of
-                                Nothing
-                                   -- use wildcard for determined args
-                                   -- if they appear on the left of all undetermined one.
-                                  | hitJust -> (hitJust, Right "_" : acc')
-                                  | otherwise -> acc
-                                Just x -> (True, x : acc')
-                              ) (False,[]) 
-                            $ fmap (\(idx, tyOrIdent) -> 
-                              if idx `elem` determined then Nothing
-                              else Just tyOrIdent
-                            ) indexedTyArgOrTexts
-                          ) fds'
-              else NoUnknowns
-              where 
-                unkIndices = mapMaybe (\(idx, _, unks) -> if null unks then Nothing else Just idx) args
+                  indexedTyArgOrIdents :: [(Int, Either SourceType Text)]
+                  indexedTyArgOrIdents = fmap unknownToText args
 
-                args :: [(Int, SourceType, [Int])]
-                args = zipWith toArgInfo [0..] tyArgs
+                  tyArgOrIdents :: [Either SourceType Text]
+                  tyArgOrIdents = map snd indexedTyArgOrIdents
+                if null $ rights tyArgOrIdents then Unknowns
+                else do
+                  let
+                    exprFromErrorCheckingTypeHint :: [ErrorMessageHint] -> Maybe Expr
+                    exprFromErrorCheckingTypeHint = foldr goError Nothing
+                      where
+                      goError next acc = case (acc, next) of
+                        (Nothing, ErrorCheckingType expr _) -> Just $ dropPosition expr
+                        (_, _) -> acc
 
-                toArgInfo :: Int -> SourceType -> (Int, SourceType, [Int])
-                toArgInfo idx tyArg = (idx, tyArg, getConstraintUnknowns tyArg)
+                      dropPosition = \case
+                        PositionedValue _ _ expr -> expr
+                        expr -> expr
 
-                vtaErrorHints :: [ErrorMessageHint] -> [(Int, Text)]
-                vtaErrorHints = mapMaybe $ \case
-                  ErrorInVisibleTypeApplication txt ty
-                    | (TUnknown _ unk) <- substituteType subs ty -> Just (unk, txt)
-                  _ -> Nothing
+                    -- Indicates a possible way to resolve the instance by using VTAs for each functional dependency
+                    vtaPossibilities = case NEL.nonEmpty fds of
+                      Nothing -> 
+                        NEL.singleton tyArgOrIdents
+                      Just fds' -> do
+                        let
+                          -- determined args will be replaced with a wildcard
+                          -- but only if they are worth rendering.
+                          undeterminedOrNot :: [Int] -> (Int, Either SourceType Text) -> Maybe (Either SourceType Text)
+                          undeterminedOrNot determined (idx, tyOrIdent)
+                            | idx `elem` determined = Nothing
+                            | otherwise = Just tyOrIdent
 
-                errorCheckingTypeHint :: [ErrorMessageHint] -> Maybe Expr
-                errorCheckingTypeHint = foldr goError Nothing
-                  where
-                  goError next acc = case (acc, next) of
-                    (Nothing, ErrorCheckingType expr _) -> Just $ dropPosition expr
-                    (_, _) -> acc
+                          -- `foo @arg1 @_ @arg3 @_ @_` when the last two wilds are irrelevant
+                          -- is rendered as `foo @arg1 @_ @arg3`.
+                          dropIrrelevantDeterminedArgs = snd . foldr dropArgs (False, [])
+                            where
+                            dropArgs next acc@(hitJust, acc') = case next of
+                              Nothing
+                                | hitJust -> (hitJust, Right "_" : acc')
+                                | otherwise -> acc
+                              Just x -> 
+                                (True, x : acc')
+                        fmap 
+                          (\fd -> do
+                            let determinedArgIndices = fdDetermined fd
+                            dropIrrelevantDeterminedArgs $ fmap (undeterminedOrNot determinedArgIndices) indexedTyArgOrIdents
+                          ) 
+                          fds'
 
-                  dropPosition = \case
-                    PositionedValue _ _ expr -> expr
-                    expr -> expr
+                  UnknownsFromVTAs (exprFromErrorCheckingTypeHint hints) vtaPossibilities
+              else 
+                NoUnknowns
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
