@@ -2,10 +2,10 @@ module TestHierarchy where
 
 import Prelude
 
-import Language.PureScript.Hierarchy
-import qualified Language.PureScript as P
+import Language.PureScript.Hierarchy (Digraph(..), Graph(..), GraphName(..), SuperMap(..), prettyPrint, typeClassGraph)
+import Language.PureScript qualified as P
 
-import Test.Hspec
+import Test.Hspec (Spec, describe, it, shouldBe)
 
 spec :: Spec
 spec = describe "hierarchy" $ do

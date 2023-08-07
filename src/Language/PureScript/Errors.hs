@@ -3,56 +3,56 @@ module Language.PureScript.Errors
   , module Language.PureScript.Errors
   ) where
 
-import           Prelude
-import           Protolude (unsnoc)
+import Prelude
+import Protolude (unsnoc)
 
-import           Control.Arrow ((&&&))
-import           Control.Exception (displayException)
-import           Control.Lens (both, head1, over)
-import           Control.Monad
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Trans.State.Lazy
-import           Control.Monad.Writer
-import           Data.Bifunctor (first, second)
-import           Data.Bitraversable (bitraverse)
-import           Data.Char (isSpace)
-import           Data.Containers.ListUtils (nubOrdOn)
-import           Data.Either (partitionEithers)
-import           Data.Foldable (fold)
-import           Data.Function (on)
-import           Data.Functor (($>))
-import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn, uncons)
-import qualified Data.List.NonEmpty as NEL
-import           Data.List.NonEmpty (NonEmpty((:|)))
-import           Data.Maybe (maybeToList, fromMaybe, isJust, mapMaybe)
-import qualified Data.Map as M
-import           Data.Ord (Down(..))
-import qualified Data.Set as S
-import qualified Data.Text as T
-import           Data.Text (Text)
-import           Data.Traversable (for)
-import qualified GHC.Stack
-import           Language.PureScript.AST
-import qualified Language.PureScript.Bundle as Bundle
-import qualified Language.PureScript.Constants.Libs as C
-import qualified Language.PureScript.Constants.Prim as C
-import           Language.PureScript.Crash
-import qualified Language.PureScript.CST.Errors as CST
-import qualified Language.PureScript.CST.Print as CST
-import           Language.PureScript.Label (Label(..))
-import           Language.PureScript.Names
-import           Language.PureScript.Pretty
-import           Language.PureScript.Pretty.Common (endWith)
-import           Language.PureScript.PSString (decodeStringWithReplacement)
-import           Language.PureScript.Roles
-import           Language.PureScript.Traversals
-import           Language.PureScript.Types
-import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
-import qualified System.Console.ANSI as ANSI
-import           System.FilePath (makeRelative)
-import qualified Text.PrettyPrint.Boxes as Box
-import           Witherable (wither)
+import Control.Arrow ((&&&))
+import Control.Exception (displayException)
+import Control.Lens (both, head1, over)
+import Control.Monad (forM, unless)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Trans.State.Lazy (State, evalState, get, put)
+import Control.Monad.Writer (Last(..), MonadWriter(..), censor)
+import Data.Bifunctor (first, second)
+import Data.Bitraversable (bitraverse)
+import Data.Char (isSpace)
+import Data.Containers.ListUtils (nubOrdOn)
+import Data.Either (partitionEithers)
+import Data.Foldable (fold)
+import Data.Function (on)
+import Data.Functor (($>))
+import Data.Functor.Identity (Identity(..))
+import Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn, uncons)
+import Data.List.NonEmpty qualified as NEL
+import Data.List.NonEmpty (NonEmpty((:|)))
+import Data.Maybe (maybeToList, fromMaybe, isJust, mapMaybe)
+import Data.Map qualified as M
+import Data.Ord (Down(..))
+import Data.Set qualified as S
+import Data.Text qualified as T
+import Data.Text (Text)
+import Data.Traversable (for)
+import GHC.Stack qualified
+import Language.PureScript.AST
+import Language.PureScript.Bundle qualified as Bundle
+import Language.PureScript.Constants.Libs qualified as C
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.CST.Errors qualified as CST
+import Language.PureScript.CST.Print qualified as CST
+import Language.PureScript.Label (Label(..))
+import Language.PureScript.Names
+import Language.PureScript.Pretty (prettyPrintBinderAtom, prettyPrintLabel, prettyPrintObjectKey, prettyPrintSuggestedType, prettyPrintValue, typeAsBox, typeAtomAsBox, typeDiffAsBox)
+import Language.PureScript.Pretty.Common (endWith)
+import Language.PureScript.PSString (decodeStringWithReplacement)
+import Language.PureScript.Roles (Role, displayRole)
+import Language.PureScript.Traversals (sndM)
+import Language.PureScript.Types (Constraint(..), ConstraintData(..), RowListItem(..), SourceConstraint, SourceType, Type(..), eraseForAllKindAnnotations, eraseKindApps, everywhereOnTypesTopDownM, getAnnForType, isMonoType, overConstraintArgs, rowFromList, rowToList, srcTUnknown)
+import Language.PureScript.Publish.BoxesHelpers qualified as BoxHelpers
+import System.Console.ANSI qualified as ANSI
+import System.FilePath (makeRelative)
+import Text.PrettyPrint.Boxes qualified as Box
+import Witherable (wither)
 
 -- | A type of error messages
 data SimpleErrorMessage
@@ -196,6 +196,8 @@ data SimpleErrorMessage
   | RoleDeclarationArityMismatch (ProperName 'TypeName) Int Int
   | DuplicateRoleDeclaration (ProperName 'TypeName)
   | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName)) [Qualified (ProperName 'ClassName)] Bool
+  | CannotSkipTypeApplication SourceType
+  | CannotApplyExpressionOfTypeOnType SourceType SourceType
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -364,6 +366,8 @@ errorCode em = case unwrapErrorMessage em of
   RoleDeclarationArityMismatch {} -> "RoleDeclarationArityMismatch"
   DuplicateRoleDeclaration {} -> "DuplicateRoleDeclaration"
   CannotDeriveInvalidConstructorArg{} -> "CannotDeriveInvalidConstructorArg"
+  CannotSkipTypeApplication{} -> "CannotSkipTypeApplication"
+  CannotApplyExpressionOfTypeOnType{} -> "CannotApplyExpressionOfTypeOnType"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1394,6 +1398,32 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
           <> "and that those type constructors themselves have instances of " <> commasAndConjunction "or" (markCode . showQualified runProperName <$> relatedClasses) <> "."
         ]
 
+    renderSimpleErrorMessage (CannotSkipTypeApplication tyFn) =
+      paras
+        [ "An expression of type:"
+        , markCodeBox $ indent $ prettyType tyFn
+        , "cannot be skipped."
+        ]
+
+    renderSimpleErrorMessage (CannotApplyExpressionOfTypeOnType tyFn tyAr) =
+      paras $ infoLine <>
+        [ markCodeBox $ indent $ prettyType tyFn
+        , "cannot be applied to:"
+        , markCodeBox $ indent $ prettyType tyAr
+        ]
+      where
+      infoLine =
+        if isMonoType tyFn then
+          [ "An expression of monomorphic type:" ]
+        else
+          [ "An expression of polymorphic type"
+          , line $ "with the invisible type variable " <> markCode typeVariable <> ":"
+          ]
+
+      typeVariable = case tyFn of
+        ForAll _ _ v _ _ _ -> v
+        _ -> internalError "renderSimpleErrorMessage: Impossible!"
+
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
       let (row1Box, row2Box) = printRows t1 t2
@@ -1676,7 +1706,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
   paras :: forall f. Foldable f => f Box.Box -> Box.Box
   paras = Box.vcat Box.left
 
-  -- | Simplify an error message
+  -- Simplify an error message
   simplifyErrorMessage :: ErrorMessage -> ErrorMessage
   simplifyErrorMessage (ErrorMessage hints simple) = ErrorMessage (simplifyHints hints) simple
     where
@@ -1692,7 +1722,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
         (_, OtherHint) -> False
         (c1, c2) -> c1 == c2
 
-    -- | See https://github.com/purescript/purescript/issues/1802
+    -- See https://github.com/purescript/purescript/issues/1802
     stripRedundantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
     stripRedundantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
       where
@@ -1764,7 +1794,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
         Box.<> (line . displayStartEndPos . fst $ getAnnForType ty)
     Qualified mn (Right inst) -> line . markCode . showQualified showIdent $ Qualified mn inst
 
-  -- | As of this writing, this function assumes that all provided SourceSpans
+  -- As of this writing, this function assumes that all provided SourceSpans
   -- are non-overlapping (except for exact duplicates) and span no line breaks. A
   -- more sophisticated implementation without this limitation would be possible
   -- but isn't yet needed.
@@ -1845,7 +1875,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     lineNumberStyle :: String -> Box.Box
     lineNumberStyle = colorCodeBox (codeColor $> (ANSI.Vivid, ANSI.Black)) . Box.alignHoriz Box.right 5 . lineS
 
-  -- | Lookup the nth element of a list, but without retraversing the list every
+  -- Lookup the nth element of a list, but without retraversing the list every
   -- time, by instead keeping a tail of the list and the current element number
   -- in State. Only works if the argument provided is strictly ascending over
   -- the life of the State.

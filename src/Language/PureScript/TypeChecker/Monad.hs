@@ -9,23 +9,23 @@ import Prelude
 
 import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
+import Control.Monad.State (MonadState(..), StateT(..), forM_, gets, guard, join, modify, when, (<=<))
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
-import Data.Maybe
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Maybe (fromMaybe)
+import Data.Map qualified as M
+import Data.Set qualified as S
 import Data.Text (Text, isPrefixOf, unpack)
-import qualified Data.List.NonEmpty as NEL
+import Data.List.NonEmpty qualified as NEL
 
 import Language.PureScript.Crash (internalError)
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.Pretty.Types
-import Language.PureScript.Pretty.Values
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Types
+import Language.PureScript.Environment (Environment(..), NameKind(..), NameVisibility(..), TypeClassData(..), TypeKind(..))
+import Language.PureScript.Errors (Context, ErrorMessageHint, ExportSource, Expr, ImportDeclarationType, MultipleErrors, SimpleErrorMessage(..), SourceAnn, SourceSpan(..), addHint, errorMessage, positionedError, rethrow, warnWithPosition)
+import Language.PureScript.Names (Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, disqualify, runIdent, runModuleName, showQualified, toMaybeModuleName)
+import Language.PureScript.Pretty.Types (prettyPrintType)
+import Language.PureScript.Pretty.Values (prettyPrintValue)
+import Language.PureScript.TypeClassDictionaries (NamedDict, TypeClassDictionaryInScope(..))
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), srcKindedType, srcTypeVar)
 import Text.PrettyPrint.Boxes (render)
 
 newtype UnkLevel = UnkLevel (NEL.NonEmpty Unknown)

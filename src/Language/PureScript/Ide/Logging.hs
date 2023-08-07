@@ -7,13 +7,13 @@ module Language.PureScript.Ide.Logging
        , labelTimespec
        ) where
 
-import           Protolude
+import Protolude
 
-import           "monad-logger" Control.Monad.Logger
-import qualified Data.Text as T
-import           Language.PureScript.Ide.Types
-import           System.Clock
-import           Text.Printf
+import "monad-logger" Control.Monad.Logger (LogLevel(..), LoggingT, MonadLogger, filterLogger, logOtherN, runStdoutLoggingT)
+import Data.Text qualified as T
+import Language.PureScript.Ide.Types (IdeLogLevel(..))
+import System.Clock (Clock(..), TimeSpec, diffTimeSpec, getTime, toNanoSecs)
+import Text.Printf (printf)
 
 runLogger :: MonadIO m => IdeLogLevel -> LoggingT m a -> m a
 runLogger logLevel' =

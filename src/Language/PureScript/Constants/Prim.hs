@@ -3,8 +3,8 @@
 -- | Various constants which refer to things in Prim
 module Language.PureScript.Constants.Prim where
 
-import Language.PureScript.Names
-import qualified Language.PureScript.Constants.TH as TH
+import Language.PureScript.Names (ModuleName)
+import Language.PureScript.Constants.TH qualified as TH
 
 $(TH.declare do
   TH.mod "Prim" do

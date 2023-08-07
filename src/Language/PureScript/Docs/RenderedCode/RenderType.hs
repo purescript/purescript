@@ -21,16 +21,16 @@ import Data.List (uncons)
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
-import Language.PureScript.Crash
-import Language.PureScript.Label
-import Language.PureScript.Names
-import Language.PureScript.Pretty.Types
-import Language.PureScript.Roles
-import Language.PureScript.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Label (Label)
+import Language.PureScript.Names (coerceProperName)
+import Language.PureScript.Pretty.Types (PrettyPrintConstraint, PrettyPrintType(..), convertPrettyPrintType, prettyPrintLabel)
+import Language.PureScript.Roles (Role, displayRole)
+import Language.PureScript.Types (Type, TypeVarVisibility, typeVarVisibilityPrefix)
 import Language.PureScript.PSString (prettyPrintString)
 
-import Language.PureScript.Docs.RenderedCode.Types
-import Language.PureScript.Docs.Utils.MonoidExtras
+import Language.PureScript.Docs.RenderedCode.Types (RenderedCode, keywordForall, roleAnn, sp, syntax, typeCtor, typeOp, typeVar)
+import Language.PureScript.Docs.Utils.MonoidExtras (mintersperse)
 
 typeLiterals :: Pattern () PrettyPrintType RenderedCode
 typeLiterals = mkPattern match
@@ -149,7 +149,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
-forall_ :: Pattern () PrettyPrintType ([(Text, Maybe PrettyPrintType)], PrettyPrintType)
+forall_ :: Pattern () PrettyPrintType ([(TypeVarVisibility, Text, Maybe PrettyPrintType)], PrettyPrintType)
 forall_ = mkPattern match
   where
   match (PPForAll mbKindedIdents ty) = Just (mbKindedIdents, ty)
@@ -235,13 +235,13 @@ renderType'
   = fromMaybe (internalError "Incomplete pattern")
   . PA.pattern matchType ()
 
-renderTypeVars :: [(Text, Maybe PrettyPrintType)] -> RenderedCode
+renderTypeVars :: [(TypeVarVisibility, Text, Maybe PrettyPrintType)] -> RenderedCode
 renderTypeVars tyVars = mintersperse sp (map renderTypeVar tyVars)
 
-renderTypeVar :: (Text, Maybe PrettyPrintType) -> RenderedCode
-renderTypeVar (v, mbK) = case mbK of
-  Nothing -> typeVar v
-  Just k -> mintersperse sp [ mconcat [syntax "(", typeVar v], syntax "::", mconcat [renderType' k, syntax ")"] ]
+renderTypeVar :: (TypeVarVisibility, Text, Maybe PrettyPrintType) -> RenderedCode
+renderTypeVar (vis, v, mbK) = case mbK of
+  Nothing -> syntax (typeVarVisibilityPrefix vis) <> typeVar v
+  Just k -> mintersperse sp [ mconcat [syntax "(", syntax $ typeVarVisibilityPrefix vis, typeVar v], syntax "::", mconcat [renderType' k, syntax ")"] ]
 
 -- |
 -- Render code representing a Type, as it should appear inside parentheses

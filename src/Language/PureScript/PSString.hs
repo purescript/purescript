@@ -15,24 +15,24 @@ import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Control.Exception (try, evaluate)
 import Control.Applicative ((<|>))
-import qualified Data.Char as Char
+import Data.Char qualified as Char
 import Data.Bits (shiftR)
 import Data.Either (fromRight)
 import Data.List (unfoldr)
 import Data.Scientific (toBoundedInteger)
 import Data.String (IsString(..))
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
+import Data.ByteString qualified as BS
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.Text.Encoding (decodeUtf16BE)
 import Data.Text.Encoding.Error (UnicodeException)
-import qualified Data.Vector as V
+import Data.Vector qualified as V
 import Data.Word (Word16, Word8)
 import Numeric (showHex)
 import System.IO.Unsafe (unsafePerformIO)
-import qualified Data.Aeson as A
-import qualified Data.Aeson.Types as A
+import Data.Aeson qualified as A
+import Data.Aeson.Types qualified as A
 
 -- |
 -- Strings in PureScript are sequences of UTF-16 code units, which do not

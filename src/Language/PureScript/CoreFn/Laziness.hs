@@ -6,21 +6,21 @@ import Protolude hiding (force)
 import Protolude.Unsafe (unsafeHead)
 
 import Control.Arrow ((&&&))
-import qualified Data.Array as A
+import Data.Array qualified as A
 import Data.Coerce (coerce)
 import Data.Graph (SCC(..), stronglyConnComp)
 import Data.List (foldl1', (!!))
-import qualified Data.IntMap.Monoidal as IM
-import qualified Data.IntSet as IS
-import qualified Data.Map.Monoidal as M
+import Data.IntMap.Monoidal qualified as IM
+import Data.IntSet qualified as IS
+import Data.Map.Monoidal qualified as M
 import Data.Semigroup (Max(..))
-import qualified Data.Set as S
+import Data.Set qualified as S
 
-import Language.PureScript.AST.SourcePos
-import qualified Language.PureScript.Constants.Libs as C
-import Language.PureScript.CoreFn
-import Language.PureScript.Crash
-import Language.PureScript.Names
+import Language.PureScript.AST.SourcePos (SourcePos(..), SourceSpan(..), nullSourceSpan)
+import Language.PureScript.Constants.Libs qualified as C
+import Language.PureScript.CoreFn (Ann, Bind, Expr(..), Literal(..), Meta(..), ssAnn, traverseCoreFn)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), InternalIdentData(..), ModuleName, Qualified(..), QualifiedBy(..), runIdent, runModuleName, toMaybeModuleName)
 import Language.PureScript.PSString (mkString)
 
 -- This module is responsible for ensuring that the bindings in recursive
@@ -142,7 +142,7 @@ onVarsWithDelayAndForce f = snd . go 0 $ Just 0
 
     handleApp len args = \case
       App a e1 e2 -> handleApp (len + 1) ((a, e2) : args) e1
-      Var a@(_, _, _, Just meta) i | isConstructorLike meta
+      Var a@(_, _, Just meta) i | isConstructorLike meta
         -> foldl (\e1 (a2, e2) -> App a2 <$> e1 <*> handleExpr' e2) (f delay force a i) args
       e -> foldl (\e1 (a2, e2) -> App a2 <$> e1 <*> snd (go delay Nothing) e2) (snd (go delay (fmap (+ len) force)) e) args
     isConstructorLike = \case
@@ -540,7 +540,7 @@ applyLazinessTransform mn rawItems = let
     _ -> internalError "Unexpected argument to lazifyIdent"
 
   makeForceCall :: Ann -> Ident -> Expr Ann
-  makeForceCall (ss, _, _, _) ident
+  makeForceCall (ss, _, _) ident
     -- We expect the functions produced by `runtimeLazy` to accept one
     -- argument: the line number on which this reference is made. The runtime
     -- code uses this number to generate a message that identifies where the

@@ -11,27 +11,27 @@ module Language.PureScript.Linter.Exhaustive
 import Prelude
 import Protolude (ordNub)
 
-import Control.Applicative
+import Control.Applicative (Applicative(..))
 import Control.Arrow (first, second)
 import Control.Monad (unless)
-import Control.Monad.Writer.Class
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe)
-import qualified Data.Map as M
-import qualified Data.Text as T
+import Data.Map qualified as M
+import Data.Text qualified as T
 
-import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Declarations
-import Language.PureScript.AST.Literals
-import Language.PureScript.Crash
-import Language.PureScript.Environment hiding (tyVar)
-import Language.PureScript.Errors
+import Language.PureScript.AST.Binders (Binder(..))
+import Language.PureScript.AST.Declarations (CaseAlternative(..), Expr(..), Guard(..), GuardedExpr(..), pattern MkUnguarded, isTrueExpr)
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.AST.Traversals (everywhereOnValuesM)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType, Environment(..), TypeKind(..))
+import Language.PureScript.Errors (MultipleErrors, pattern NullSourceAnn, SimpleErrorMessage(..), SourceSpan, errorMessage')
 import Language.PureScript.Names as P
 import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)
-import Language.PureScript.Traversals
 import Language.PureScript.Types as P
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Constants.Prim qualified as C
 
 -- | There are two modes of failure for the redundancy check:
 --
@@ -273,7 +273,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
       tellRedundant = tell . errorMessage' ss . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
       tellIncomplete = tell . errorMessage' ss $ IncompleteExhaustivityCheck
 
-  -- | We add a Partial constraint by annotating the expression to have type `Partial => _`.
+  -- We add a Partial constraint by annotating the expression to have type `Partial => _`.
   --
   -- The binder information is provided so that it can be embedded in the constraint,
   -- and then included in the error message.
@@ -297,36 +297,13 @@ checkExhaustiveExpr
    -> ModuleName
    -> Expr
    -> m Expr
-checkExhaustiveExpr initSS env mn = onExpr initSS
+checkExhaustiveExpr ss env mn = onExpr'
   where
-  onDecl :: Declaration -> m Declaration
-  onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (\(sai@((ss, _), _), nk, expr) -> (sai, nk,) <$> onExpr ss expr) bs
-  onDecl (ValueDecl sa@(ss, _) name x y [MkUnguarded e]) =
-     ValueDecl sa name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr ss e)
-  onDecl decl = return decl
+  (_, onExpr', _) = everywhereOnValuesM pure onExpr pure
 
-  onExpr :: SourceSpan -> Expr -> m Expr
-  onExpr _ (UnaryMinus ss e) = UnaryMinus ss <$> onExpr ss e
-  onExpr _ (Literal ss (ArrayLiteral es)) = Literal ss . ArrayLiteral <$> mapM (onExpr ss) es
-  onExpr _ (Literal ss (ObjectLiteral es)) = Literal ss . ObjectLiteral <$> mapM (sndM (onExpr ss)) es
-  onExpr ss (Accessor x e) = Accessor x <$> onExpr ss e
-  onExpr ss (ObjectUpdate o es) = ObjectUpdate <$> onExpr ss o <*> mapM (sndM (onExpr ss)) es
-  onExpr ss (Abs x e) = Abs x <$> onExpr ss e
-  onExpr ss (App e1 e2) = App <$> onExpr ss e1 <*> onExpr ss e2
-  onExpr ss (IfThenElse e1 e2 e3) = IfThenElse <$> onExpr ss e1 <*> onExpr ss e2 <*> onExpr ss e3
-  onExpr ss (Case es cas) = do
-    case' <- Case <$> mapM (onExpr ss) es <*> mapM (onCaseAlternative ss) cas
-    checkExhaustive ss env mn (length es) cas case'
-  onExpr ss (TypedValue x e y) = TypedValue x <$> onExpr ss e <*> pure y
-  onExpr ss (Let w ds e) = Let w <$> mapM onDecl ds <*> onExpr ss e
-  onExpr _ (PositionedValue ss x e) = PositionedValue ss x <$> onExpr ss e
-  onExpr _ expr = return expr
-
-  onCaseAlternative :: SourceSpan -> CaseAlternative -> m CaseAlternative
-  onCaseAlternative ss (CaseAlternative x [MkUnguarded e]) = CaseAlternative x . mkUnguardedExpr <$> onExpr ss e
-  onCaseAlternative ss (CaseAlternative x es) = CaseAlternative x <$> mapM (onGuardedExpr ss) es
-
-  onGuardedExpr :: SourceSpan -> GuardedExpr -> m GuardedExpr
-  onGuardedExpr ss (GuardedExpr guard rhs) = GuardedExpr guard <$> onExpr ss rhs
-
-  mkUnguardedExpr = pure . MkUnguarded
+  onExpr :: Expr -> m Expr
+  onExpr e = case e of
+    Case es cas ->
+      checkExhaustive ss env mn (length es) cas e
+    _ ->
+      pure e

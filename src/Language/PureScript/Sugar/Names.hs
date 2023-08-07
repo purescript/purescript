@@ -13,27 +13,27 @@ import Prelude
 import Protolude (sortOn, swap, foldl')
 
 import Control.Arrow (first, second, (&&&))
-import Control.Monad
+import Control.Monad (foldM, when, (>=>))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Lazy
+import Control.Monad.State.Lazy (MonadState, StateT(..), gets, modify)
 import Control.Monad.Writer (MonadWriter(..))
 
-import qualified Data.List.NonEmpty as NEL
+import Data.List.NonEmpty qualified as NEL
 import Data.Maybe (fromMaybe, mapMaybe)
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.Externs
-import Language.PureScript.Linter.Imports
-import Language.PureScript.Names
-import Language.PureScript.Sugar.Names.Env
-import Language.PureScript.Sugar.Names.Exports
-import Language.PureScript.Sugar.Names.Imports
-import Language.PureScript.Traversals
-import Language.PureScript.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, errorMessage'', nonEmpty, parU, warnAndRethrow, warnAndRethrowWithPosition)
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..), ExternsImport(..))
+import Language.PureScript.Linter.Imports (Name(..), UsedImports)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident, OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..))
+import Language.PureScript.Sugar.Names.Env (Env, Exports(..), ImportProvenance(..), ImportRecord(..), Imports(..), checkImportConflicts, nullImports, primEnv)
+import Language.PureScript.Sugar.Names.Exports (findExportable, resolveExports)
+import Language.PureScript.Sugar.Names.Imports (resolveImports, resolveModuleImport)
+import Language.PureScript.Traversals (defS, sndM)
+import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), everywhereOnTypesM)
 
 -- |
 -- Replaces all local names with qualified names.
@@ -289,6 +289,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     ((ss, bound), ) <$> (Constructor ss <$> updateDataConstructorName name ss)
   updateValue s (TypedValue check val ty) =
     (s, ) <$> (TypedValue check val <$> updateTypesEverywhere ty)
+  updateValue s (VisibleTypeApp val ty) =
+    (s, ) <$> VisibleTypeApp val <$> updateTypesEverywhere ty
   updateValue s v = return (s, v)
 
   updateBinder

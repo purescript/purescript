@@ -18,31 +18,31 @@ module Language.PureScript.Ide
        ( handleCommand
        ) where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
-import           "monad-logger" Control.Monad.Logger
-import qualified Data.Map                           as Map
-import qualified Data.Text                          as T
-import qualified Language.PureScript                as P
-import qualified Language.PureScript.Ide.CaseSplit  as CS
-import           Language.PureScript.Ide.Command
-import           Language.PureScript.Ide.Completion
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Externs
-import           Language.PureScript.Ide.Filter
-import           Language.PureScript.Ide.Imports hiding (Import)
-import           Language.PureScript.Ide.Imports.Actions
-import           Language.PureScript.Ide.Matcher
-import           Language.PureScript.Ide.Prim
-import           Language.PureScript.Ide.Rebuild
-import           Language.PureScript.Ide.SourceFile
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           Language.PureScript.Ide.Usage (findUsages)
-import           System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
-import           System.FilePath ((</>), normalise)
-import           System.FilePath.Glob (glob)
+import "monad-logger" Control.Monad.Logger (MonadLogger, logWarnN)
+import Data.Map qualified as Map
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.Ide.CaseSplit qualified as CS
+import Language.PureScript.Ide.Command (Command(..), ImportCommand(..), ListType(..))
+import Language.PureScript.Ide.Completion (CompletionOptions, completionFromMatch, getCompletions, getExactCompletions, simpleExport)
+import Language.PureScript.Ide.Error (IdeError(..))
+import Language.PureScript.Ide.Externs (readExternFile)
+import Language.PureScript.Ide.Filter (Filter)
+import Language.PureScript.Ide.Imports (parseImportsFromFile)
+import Language.PureScript.Ide.Imports.Actions (addImplicitImport, addImportForIdentifier, addQualifiedImport, answerRequest)
+import Language.PureScript.Ide.Matcher (Matcher)
+import Language.PureScript.Ide.Prim (idePrimDeclarations)
+import Language.PureScript.Ide.Rebuild (rebuildFileAsync, rebuildFileSync)
+import Language.PureScript.Ide.SourceFile (parseModulesFromFiles)
+import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState)
+import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..))
+import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, namespaceForDeclaration, withEmptyAnn)
+import Language.PureScript.Ide.Usage (findUsages)
+import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
+import System.FilePath ((</>), normalise)
+import System.FilePath.Glob (glob)
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.

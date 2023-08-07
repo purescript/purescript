@@ -32,21 +32,21 @@ import Data.Maybe (fromMaybe, isJust)
 import Data.Monoid (Any(..))
 import Data.Text (Text)
 
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors hiding (inScope)
-import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Kinds hiding (kindOf)
-import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Roles
-import Language.PureScript.TypeChecker.Synonyms
-import Language.PureScript.TypeChecker.Unify
-import Language.PureScript.Roles
-import Language.PureScript.Types
-import qualified Language.PureScript.Constants.Prim as Prim
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType(..), Environment(..), TypeKind(..), unapplyKinds)
+import Language.PureScript.Errors (DeclarationRef(..), ErrorMessageHint(..), ExportSource, ImportDeclarationType(..), MultipleErrors, SimpleErrorMessage(..), SourceAnn, errorMessage)
+import Language.PureScript.Names (ModuleName, ProperName, ProperNameType(..), Qualified(..), byMaybeModuleName, toMaybeModuleName)
+import Language.PureScript.TypeChecker.Kinds (elaborateKind, freshKindWithKind, unifyKinds')
+import Language.PureScript.TypeChecker.Monad (CheckState(..))
+import Language.PureScript.TypeChecker.Roles (lookupRoles)
+import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
+import Language.PureScript.TypeChecker.Unify (alignRowsWith, freshTypeWithKind, substituteType)
+import Language.PureScript.Roles (Role(..))
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), completeBinderList, containsUnknowns, everythingOnTypes, isMonoType, replaceAllTypeVars, rowFromList, srcConstraint, srcTypeApp, unapplyTypes)
+import Language.PureScript.Constants.Prim qualified as Prim
 
 -- | State of the given constraints solver.
 data GivenSolverState =
@@ -383,7 +383,7 @@ rewrite env (Skolem _ _ _ s1 _, ty1) | not $ occurs s1 ty1 = go where
          | (TypeConstructor _ tyName, _, _) <- unapplyTypes ty2 = do
     rewriteTyConApp go (lookupRoles env tyName) ty2
   go (KindApp sa ty k) = KindApp sa <$> go ty <*> pure k
-  go (ForAll sa tv k ty scope) = ForAll sa tv k <$> go ty <*> pure scope
+  go (ForAll sa vis tv k ty scope) = ForAll sa vis tv k <$> go ty <*> pure scope
   go (ConstrainedType sa Constraint{..} ty) | s1 `S.notMember` foldMap skolems constraintArgs =
     ConstrainedType sa Constraint{..} <$> go ty
   go (RCons sa label ty rest) = RCons sa label <$> go ty <*> go rest

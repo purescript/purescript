@@ -37,25 +37,25 @@ module Language.PureScript.Ide.State
   , resolveDataConstructorsForModule
   ) where
 
-import           Protolude hiding (moduleName, unzip)
+import Protolude hiding (moduleName, unzip)
 
-import           Control.Concurrent.STM
-import           Control.Lens                       hiding (anyOf, op, (&))
-import           "monad-logger" Control.Monad.Logger
-import           Data.IORef
-import qualified Data.Map.Lazy                      as Map
-import           Data.Time.Clock (UTCTime)
-import           Data.Zip (unzip)
-import qualified Language.PureScript                as P
-import           Language.PureScript.Docs.Convert.Single (convertComments)
-import           Language.PureScript.Externs
-import           Language.PureScript.Make.Actions (cacheDbFile)
-import           Language.PureScript.Ide.Externs
-import           Language.PureScript.Ide.Reexports
-import           Language.PureScript.Ide.SourceFile
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           System.Directory (getModificationTime)
+import Control.Concurrent.STM (TVar, modifyTVar, readTVar, readTVarIO, writeTVar)
+import Control.Lens (Ixed(..), preview, view, (%~), (.~), (^.))
+import "monad-logger" Control.Monad.Logger (MonadLogger, logWarnN)
+import Data.IORef (readIORef, writeIORef)
+import Data.Map.Lazy qualified as Map
+import Data.Time.Clock (UTCTime)
+import Data.Zip (unzip)
+import Language.PureScript qualified as P
+import Language.PureScript.Docs.Convert.Single (convertComments)
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
+import Language.PureScript.Make.Actions (cacheDbFile)
+import Language.PureScript.Ide.Externs (convertExterns)
+import Language.PureScript.Ide.Reexports (ReexportResult(..), prettyPrintReexportResult, reexportHasFailures, resolveReexports)
+import Language.PureScript.Ide.SourceFile (extractAstInformation)
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util (discardAnn, displayTimeSpec, logPerf, opNameT, properNameT, runLogger)
+import System.Directory (getModificationTime)
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()

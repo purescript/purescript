@@ -9,47 +9,47 @@ module Language.PureScript.Make
   , module Actions
   ) where
 
-import           Prelude
+import Prelude
 
-import           Control.Concurrent.Lifted as C
-import           Control.Exception.Base (onException)
-import           Control.Monad hiding (sequence)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.IO.Class
-import           Control.Monad.Supply
-import           Control.Monad.Trans.Control (MonadBaseControl(..), control)
-import           Control.Monad.Trans.State (runStateT)
-import           Control.Monad.Writer.Class (MonadWriter(..), censor)
-import           Control.Monad.Writer.Strict (runWriterT)
-import           Data.Function (on)
-import           Data.Foldable (fold, for_)
-import           Data.List (foldl', sortOn)
-import qualified Data.List.NonEmpty as NEL
-import           Data.Maybe (fromMaybe)
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.Text as T
-import           Language.PureScript.AST
-import           Language.PureScript.Crash
-import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.Docs.Convert as Docs
-import           Language.PureScript.Environment
-import           Language.PureScript.Errors
-import           Language.PureScript.Externs
-import           Language.PureScript.Linter
-import           Language.PureScript.ModuleDependencies
-import           Language.PureScript.Names
-import           Language.PureScript.Renamer
-import           Language.PureScript.Sugar
-import           Language.PureScript.TypeChecker
-import           Language.PureScript.Make.BuildPlan
-import qualified Language.PureScript.Make.BuildPlan as BuildPlan
-import qualified Language.PureScript.Make.Cache as Cache
-import           Language.PureScript.Make.Actions as Actions
-import           Language.PureScript.Make.Monad as Monad
-import qualified Language.PureScript.CoreFn as CF
-import           System.Directory (doesFileExist)
-import           System.FilePath (replaceExtension)
+import Control.Concurrent.Lifted as C
+import Control.Exception.Base (onException)
+import Control.Monad (foldM, unless, when)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.IO.Class (MonadIO(..))
+import Control.Monad.Supply (evalSupplyT, runSupply, runSupplyT)
+import Control.Monad.Trans.Control (MonadBaseControl(..), control)
+import Control.Monad.Trans.State (runStateT)
+import Control.Monad.Writer.Class (MonadWriter(..), censor)
+import Control.Monad.Writer.Strict (runWriterT)
+import Data.Function (on)
+import Data.Foldable (fold, for_)
+import Data.List (foldl', sortOn)
+import Data.List.NonEmpty qualified as NEL
+import Data.Maybe (fromMaybe)
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text qualified as T
+import Language.PureScript.AST (ErrorMessageHint(..), Module(..), SourceSpan(..), getModuleName, getModuleSourceSpan, importPrim)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Docs.Convert qualified as Docs
+import Language.PureScript.Environment (initEnvironment)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, defaultPPEOptions, errorMessage', errorMessage'', prettyPrintMultipleErrors)
+import Language.PureScript.Externs (ExternsFile, applyExternsFileToEnvironment, moduleToExternsFile)
+import Language.PureScript.Linter (Name(..), lint, lintImports)
+import Language.PureScript.ModuleDependencies (DependencyDepth(..), moduleSignature, sortModules)
+import Language.PureScript.Names (ModuleName, isBuiltinModuleName, runModuleName)
+import Language.PureScript.Renamer (renameInModule)
+import Language.PureScript.Sugar (Env, collapseBindingGroups, createBindingGroups, desugar, desugarCaseGuards, externsEnv, primEnv)
+import Language.PureScript.TypeChecker (CheckState(..), emptyCheckState, typeCheckModule)
+import Language.PureScript.Make.BuildPlan (BuildJobResult(..), BuildPlan(..), getResult)
+import Language.PureScript.Make.BuildPlan qualified as BuildPlan
+import Language.PureScript.Make.Cache qualified as Cache
+import Language.PureScript.Make.Actions as Actions
+import Language.PureScript.Make.Monad as Monad
+import Language.PureScript.CoreFn qualified as CF
+import System.Directory (doesFileExist)
+import System.FilePath (replaceExtension)
 
 -- | Rebuild a single module.
 --

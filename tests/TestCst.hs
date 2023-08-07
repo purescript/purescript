@@ -5,17 +5,17 @@ import Prelude
 import Control.Monad (when, forM_)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import qualified Data.Text.IO as Text
-import Test.Hspec
-import Test.QuickCheck
-import TestUtils
+import Data.Text qualified as Text
+import Data.Text.Encoding qualified as Text
+import Data.Text.IO qualified as Text
+import Test.Hspec (Spec, describe, it, runIO, specify)
+import Test.QuickCheck (Arbitrary(..), Gen, Testable(..), arbitrarySizedNatural, arbitraryUnicodeChar, discard, elements, frequency, listOf, listOf1, oneof, resize)
+import TestUtils (getTestFiles, goldenVsString)
 import Text.Read (readMaybe)
 import Language.PureScript.CST.Errors as CST
 import Language.PureScript.CST.Lexer as CST
 import Language.PureScript.CST.Print as CST
-import Language.PureScript.CST.Types
+import Language.PureScript.CST.Types (SourceToken(..), Token(..))
 import System.FilePath (takeBaseName, replaceExtension)
 
 spec :: Spec

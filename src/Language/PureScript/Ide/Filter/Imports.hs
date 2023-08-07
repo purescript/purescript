@@ -1,12 +1,12 @@
 module Language.PureScript.Ide.Filter.Imports where
 
 
-import           Protolude                     hiding (isPrefixOf)
+import Protolude                     hiding (isPrefixOf)
 
-import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Imports
+import Language.PureScript.Ide.Types (IdeDataConstructor(..), IdeDeclaration(..), IdeDeclarationAnn(..), IdeType(..), IdeTypeClass(..), IdeTypeOperator(..), IdeTypeSynonym(..), IdeValue(..), IdeValueOperator(..))
+import Language.PureScript.Ide.Imports (Import(..))
 
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 
 matchImport :: Maybe P.ModuleName -> P.ModuleName -> IdeDeclarationAnn -> Import -> Bool
 matchImport matchQualifier declMod (IdeDeclarationAnn _ decl) (Import importMod declTy qualifier) | declMod == importMod && matchQualifier == qualifier =

@@ -9,12 +9,12 @@ import Prelude
 
 import Control.Monad (filterM)
 import Data.Monoid (Any(..))
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Text (Text)
 
-import Language.PureScript.CoreImp.AST
-import Language.PureScript.CoreImp.Optimizer.Common
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.CoreImp.AST (AST(..), InitializerEffects(..), everything, everywhere)
+import Language.PureScript.CoreImp.Optimizer.Common (removeFromBlock)
+import Language.PureScript.Constants.Prim qualified as C
 
 removeCodeAfterReturnStatements :: AST -> AST
 removeCodeAfterReturnStatements = everywhere (removeFromBlock go)

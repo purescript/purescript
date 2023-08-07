@@ -6,17 +6,17 @@ import Control.Monad (unless)
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
 import Data.Functor (($>))
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.Set qualified as Set
 import Data.Text (Text)
-import qualified Data.Text as Text
-import Language.PureScript.CST.Errors
-import Language.PureScript.CST.Monad
-import Language.PureScript.CST.Positions
-import Language.PureScript.CST.Traversals.Type
+import Data.Text qualified as Text
+import Language.PureScript.CST.Errors (ParserErrorType(..))
+import Language.PureScript.CST.Monad (Parser, addFailure, parseFail, pushBack)
+import Language.PureScript.CST.Positions (TokenRange, binderRange, importDeclRange, recordUpdateRange, typeRange)
+import Language.PureScript.CST.Traversals.Type (everythingOnTypes)
 import Language.PureScript.CST.Types
-import qualified Language.PureScript.Names as N
+import Language.PureScript.Names qualified as N
 import Language.PureScript.PSString (PSString, mkString)
 
 -- |
@@ -248,8 +248,8 @@ checkFundeps :: ClassHead a -> Parser ()
 checkFundeps (ClassHead _ _ _ _ Nothing) = pure ()
 checkFundeps (ClassHead _ _ _ vars (Just (_, fundeps))) = do
   let
-    k (TypeVarKinded (Wrapped _ (Labeled a _ _) _)) = getIdent $ nameValue a
-    k (TypeVarName a) = getIdent $ nameValue a
+    k (TypeVarKinded (Wrapped _ (Labeled (_, a) _ _) _)) = getIdent $ nameValue a
+    k (TypeVarName (_, a)) = getIdent $ nameValue a
     names = k <$> vars
     check a
       | getIdent (nameValue a) `elem` names = pure ()

@@ -11,28 +11,28 @@ import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
-import Data.Functor.Identity
+import Data.Functor.Identity (Identity(..))
 
-import Data.Aeson.TH
-import qualified Data.Map as M
+import Data.Aeson.TH (Options(..), SumEncoding(..), defaultOptions, deriveJSON)
+import Data.Map qualified as M
 import Data.Text (Text)
-import qualified Data.List.NonEmpty as NEL
+import Data.List.NonEmpty qualified as NEL
 import GHC.Generics (Generic)
 
-import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Literals
-import Language.PureScript.AST.Operators
-import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.Binders (Binder)
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.AST.Operators (Fixity)
+import Language.PureScript.AST.SourcePos (SourceAnn, SourceSpan)
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
-import Language.PureScript.Types
+import Language.PureScript.Types (SourceConstraint, SourceType)
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Label (Label)
-import Language.PureScript.Names
-import Language.PureScript.Roles
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Comments
-import Language.PureScript.Environment
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName(..), Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), toMaybeModuleName)
+import Language.PureScript.Roles (Role)
+import Language.PureScript.TypeClassDictionaries (NamedDict)
+import Language.PureScript.Comments (Comment)
+import Language.PureScript.Environment (DataDeclType, Environment, FunctionalDependency, NameKind)
+import Language.PureScript.Constants.Prim qualified as C
 
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, SourceType)]
@@ -42,14 +42,14 @@ data TypeSearch
   = TSBefore Environment
   -- ^ An Environment captured for later consumption by type directed search
   | TSAfter
+  -- ^ Results of applying type directed search to the previously captured
+  -- Environment
     { tsAfterIdentifiers :: [(Qualified Text, SourceType)]
     -- ^ The identifiers that fully satisfy the subsumption check
     , tsAfterRecordFields :: Maybe [(Label, SourceType)]
     -- ^ Record fields that are available on the first argument to the typed
     -- hole
     }
-  -- ^ Results of applying type directed search to the previously captured
-  -- Environment
   deriving Show
 
 onTypeSearchTypes :: (SourceType -> SourceType) -> TypeSearch -> TypeSearch
@@ -675,6 +675,10 @@ data Expr
   -- Function application
   --
   | App Expr Expr
+  -- |
+  -- A type application (e.g. `f @Int`)
+  --
+  | VisibleTypeApp Expr SourceType
   -- |
   -- Hint that an expression is unused.
   -- This is used to ignore type class dictionaries that are necessarily empty.

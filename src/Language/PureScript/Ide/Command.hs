@@ -14,18 +14,18 @@
 
 module Language.PureScript.Ide.Command where
 
-import           Protolude
+import Protolude
 
-import           Control.Monad.Fail (fail)
-import           Data.Aeson
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Language.PureScript               as P
-import           Language.PureScript.Ide.CaseSplit
-import           Language.PureScript.Ide.Completion
-import           Language.PureScript.Ide.Filter
-import           Language.PureScript.Ide.Matcher
-import           Language.PureScript.Ide.Types
+import Control.Monad.Fail (fail)
+import Data.Aeson (FromJSON(..), withObject, (.!=), (.:), (.:?))
+import Data.Map qualified as Map
+import Data.Set qualified as Set
+import Language.PureScript qualified as P
+import Language.PureScript.Ide.CaseSplit (WildcardAnnotations, explicitAnnotations, noAnnotations)
+import Language.PureScript.Ide.Completion (CompletionOptions, defaultCompletionOptions)
+import Language.PureScript.Ide.Filter (Filter)
+import Language.PureScript.Ide.Matcher (Matcher)
+import Language.PureScript.Ide.Types (IdeDeclarationAnn, IdeNamespace)
 
 data Command
     = Load [P.ModuleName]

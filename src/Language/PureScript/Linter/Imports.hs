@@ -8,7 +8,7 @@ import Prelude
 import Protolude (ordNub)
 
 import Control.Monad (join, unless, foldM, (<=<))
-import Control.Monad.Writer.Class
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Function (on)
 import Data.Foldable (for_)
@@ -16,18 +16,18 @@ import Data.List (find, intersect, groupBy, sort, sortOn, (\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid (Sum(..))
 import Data.Traversable (forM)
-import qualified Data.Text as T
-import qualified Data.Map as M
+import Data.Text qualified as T
+import Data.Map qualified as M
 
-import Language.PureScript.AST.Declarations
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Crash
-import Language.PureScript.Errors
+import Language.PureScript.AST.Declarations (Declaration(..), DeclarationRef(..), ExportSource, ImportDeclarationType(..), Module(..), getTypeRef, isExplicit)
+import Language.PureScript.AST.SourcePos (SourceSpan)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage')
 import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Common (warnDuplicateRefs)
-import Language.PureScript.Sugar.Names.Env
-import Language.PureScript.Sugar.Names.Imports
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Sugar.Names.Env (Env, Exports(..), ImportRecord(..), Imports(..), envModuleExports, nullImports)
+import Language.PureScript.Sugar.Names.Imports (ImportDef, findImports)
+import Language.PureScript.Constants.Prim qualified as C
 
 -- |
 -- Map of module name to list of imported names from that module which have

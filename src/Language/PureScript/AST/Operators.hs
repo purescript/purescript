@@ -9,9 +9,9 @@ import Codec.Serialise (Serialise)
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Data.Aeson ((.=))
-import qualified Data.Aeson as A
+import Data.Aeson qualified as A
 
-import Language.PureScript.Crash
+import Language.PureScript.Crash (internalError)
 
 -- |
 -- A precedence level for an infix operator

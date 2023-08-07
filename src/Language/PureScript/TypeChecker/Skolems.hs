@@ -16,12 +16,12 @@ import Data.Foldable (traverse_)
 import Data.Functor.Identity (Identity(), runIdentity)
 import Data.Set (Set, fromList, notMember)
 import Data.Text (Text)
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
+import Language.PureScript.AST (Binder(..), ErrorMessageHint(..), Expr(..), SourceAnn, SourceSpan, everythingWithContextOnValues, everywhereWithContextOnValuesM, nonEmptySpan)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), positionedError, singleError)
 import Language.PureScript.Traversals (defS)
-import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.Types
+import Language.PureScript.TypeChecker.Monad (CheckState(..))
+import Language.PureScript.Types (SkolemScope(..), SourceType, Type(..), everythingOnTypes, everywhereOnTypesM, replaceTypeVars)
 
 -- | Generate a new skolem constant
 newSkolemConstant :: MonadState CheckState m => m Int
@@ -34,7 +34,7 @@ newSkolemConstant = do
 introduceSkolemScope :: MonadState CheckState m => Type a -> m (Type a)
 introduceSkolemScope = everywhereOnTypesM go
   where
-  go (ForAll ann ident mbK ty Nothing) = ForAll ann ident mbK ty <$> (Just <$> newSkolemScope)
+  go (ForAll ann vis ident mbK ty Nothing) = ForAll ann vis ident mbK ty <$> (Just <$> newSkolemScope)
   go other = return other
 
 -- | Generate a new skolem scope
@@ -63,6 +63,8 @@ skolemizeTypesInValue ann ident mbK sko scope =
       | ident `notElem` sco = return (sco, DeferredDictionary c (map (skolemize ann ident mbK sko scope) ts))
     onExpr sco (TypedValue check val ty)
       | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ann ident mbK sko scope ty))
+    onExpr sco (VisibleTypeApp val ty)
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, VisibleTypeApp val (skolemize ann ident mbK sko scope ty))
     onExpr sco other = return (sco, other)
 
     onBinder :: [Text] -> Binder -> Identity ([Text], Binder)
@@ -71,7 +73,7 @@ skolemizeTypesInValue ann ident mbK sko scope =
     onBinder sco other = return (sco, other)
 
     peelTypeVars :: SourceType -> [Text]
-    peelTypeVars (ForAll _ i _ ty _) = i : peelTypeVars ty
+    peelTypeVars (ForAll _ _ i _ ty _) = i : peelTypeVars ty
     peelTypeVars _ = []
 
 -- | Ensure skolem variables do not escape their scope
@@ -116,7 +118,7 @@ skolemEscapeCheck expr@TypedValue{} =
 
         -- Collect any scopes appearing in quantifiers at the top level
         collectScopes :: SourceType -> [SkolemScope]
-        collectScopes (ForAll _ _ _ t (Just sco)) = sco : collectScopes t
+        collectScopes (ForAll _ _ _ _ t (Just sco)) = sco : collectScopes t
         collectScopes ForAll{} = internalError "skolemEscapeCheck: No skolem scope"
         collectScopes _ = []
 

@@ -9,39 +9,39 @@ module Language.PureScript.Interactive
   , runMake
   ) where
 
-import           Prelude
-import           Protolude (ordNub)
+import Prelude
+import Protolude (ordNub)
 
-import           Data.List (sort, find, foldl')
-import           Data.Maybe (fromMaybe, mapMaybe)
-import qualified Data.Map as M
-import qualified Data.Set as S
-import           Data.Text (Text)
-import qualified Data.Text as T
+import Data.List (sort, find, foldl')
+import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text (Text)
+import Data.Text qualified as T
 
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.State.Class
-import           Control.Monad.Reader.Class
-import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import           Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT)
-import           Control.Monad.Writer.Strict (Writer(), runWriter)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.State.Class (MonadState(..), gets, modify)
+import Control.Monad.Reader.Class (MonadReader, asks)
+import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
+import Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT)
+import Control.Monad.Writer.Strict (Writer(), runWriter)
 
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.Names as N
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Names qualified as N
+import Language.PureScript.Constants.Prim qualified as C
 
-import           Language.PureScript.Interactive.Completion   as Interactive
-import           Language.PureScript.Interactive.IO           as Interactive
-import           Language.PureScript.Interactive.Message      as Interactive
-import           Language.PureScript.Interactive.Module       as Interactive
-import           Language.PureScript.Interactive.Parser       as Interactive
-import           Language.PureScript.Interactive.Printer      as Interactive
-import           Language.PureScript.Interactive.Types        as Interactive
+import Language.PureScript.Interactive.Completion   as Interactive
+import Language.PureScript.Interactive.IO           as Interactive
+import Language.PureScript.Interactive.Message      as Interactive
+import Language.PureScript.Interactive.Module       as Interactive
+import Language.PureScript.Interactive.Parser       as Interactive
+import Language.PureScript.Interactive.Printer      as Interactive
+import Language.PureScript.Interactive.Types        as Interactive
 
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath ((</>))
-import           System.FilePath.Glob (glob)
+import System.Directory (getCurrentDirectory)
+import System.FilePath ((</>))
+import System.FilePath.Glob (glob)
 
 -- | Pretty-print errors
 printErrors :: MonadIO m => P.MultipleErrors -> m ()

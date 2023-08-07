@@ -10,24 +10,24 @@ import Protolude hiding (check)
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (runWriterT)
 import Control.Monad.Supply (evalSupplyT)
-import qualified Data.List.NonEmpty as NE
-import qualified Data.Map as Map
+import Data.List.NonEmpty qualified as NE
+import Data.Map qualified as Map
 import Data.String (String)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
-import Language.PureScript.Docs.Types
-import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.AST as P
-import qualified Language.PureScript.Crash as P
-import qualified Language.PureScript.Errors as P
-import qualified Language.PureScript.Externs as P
-import qualified Language.PureScript.Environment as P
-import qualified Language.PureScript.Names as P
-import qualified Language.PureScript.Roles as P
-import qualified Language.PureScript.Sugar as P
-import qualified Language.PureScript.Types as P
-import qualified Language.PureScript.Constants.Prim as Prim
+import Language.PureScript.Docs.Types (Declaration(..), DeclarationInfo(..), KindInfo(..), Module(..), Type')
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.AST qualified as P
+import Language.PureScript.Crash qualified as P
+import Language.PureScript.Errors qualified as P
+import Language.PureScript.Externs qualified as P
+import Language.PureScript.Environment qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Roles qualified as P
+import Language.PureScript.Sugar qualified as P
+import Language.PureScript.Types qualified as P
+import Language.PureScript.Constants.Prim qualified as Prim
 import Language.PureScript.Sugar (RebracketCaller(CalledByDocs))
 
 -- |
@@ -66,7 +66,6 @@ insertValueTypesAndAdjustKinds ::
 insertValueTypesAndAdjustKinds env m =
   m { modDeclarations = map (go . insertInferredRoles . convertFFIDecl) (modDeclarations m) }
   where
-  -- |
   -- Convert FFI declarations into data declaration
   -- by generating the type parameters' names based on its kind signature.
   -- Note: `Prim` modules' docs don't go through this conversion process
@@ -99,7 +98,6 @@ insertValueTypesAndAdjustKinds env m =
   insertInferredRoles other =
     other
 
-  -- |
   -- Given an FFI declaration like this
   -- ```
   -- foreign import data Foo
@@ -121,7 +119,7 @@ insertValueTypesAndAdjustKinds env m =
     where
       countParams :: Int -> Type' -> Int
       countParams acc = \case
-        P.ForAll _ _ _ rest _ ->
+        P.ForAll _ _ _ _ rest _ ->
           countParams acc rest
 
         P.TypeApp _ f a | isFunctionApplication f ->
@@ -171,7 +169,6 @@ insertValueTypesAndAdjustKinds env m =
       Nothing ->
         err ("name not found: " ++ show key)
 
-  -- |
   -- Extracts the keyword for a declaration (if there is one)
   extractKeyword :: DeclarationInfo -> Maybe P.KindSignatureFor
   extractKeyword = \case
@@ -182,7 +179,6 @@ insertValueTypesAndAdjustKinds env m =
     TypeClassDeclaration _ _ _ -> Just P.ClassSig
     _ -> Nothing
 
-  -- |
   -- Returns True if the kind signature is "uninteresting", which
   -- is a kind that follows this form:
   -- - `Type`
@@ -236,8 +232,8 @@ insertValueTypesAndAdjustKinds env m =
           -- changes `forall (k :: Type). k -> ...`
           -- to      `forall k          . k -> ...`
           dropTypeSortAnnotation = \case
-            P.ForAll sa txt (Just (P.TypeConstructor _ Prim.Type)) rest skol ->
-              P.ForAll sa txt Nothing (dropTypeSortAnnotation rest) skol
+            P.ForAll sa vis txt (Just (P.TypeConstructor _ Prim.Type)) rest skol ->
+              P.ForAll sa vis txt Nothing (dropTypeSortAnnotation rest) skol
             rest -> rest
 
       Nothing ->

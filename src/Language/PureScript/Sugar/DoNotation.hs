@@ -3,18 +3,18 @@
 
 module Language.PureScript.Sugar.DoNotation (desugarDoModule) where
 
-import           Prelude
+import Prelude
 
-import           Control.Applicative ((<|>))
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Supply.Class
-import           Data.Maybe (fromMaybe)
-import           Data.Monoid (First(..))
-import           Language.PureScript.AST
-import           Language.PureScript.Crash
-import           Language.PureScript.Errors
-import           Language.PureScript.Names
-import qualified Language.PureScript.Constants.Libs as C
+import Control.Applicative ((<|>))
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class (MonadSupply)
+import Data.Maybe (fromMaybe)
+import Data.Monoid (First(..))
+import Language.PureScript.AST (Binder(..), CaseAlternative(..), Declaration, DoNotationElement(..), Expr(..), pattern MkUnguarded, Module(..), SourceSpan, pattern ValueDecl, WhereProvenance(..), binderNames, declSourceSpan, everywhereOnValuesM)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage', parU, rethrowWithPosition)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Qualified(..), byMaybeModuleName, freshIdent')
+import Language.PureScript.Constants.Libs qualified as C
 
 -- | Replace all @DoNotationBind@ and @DoNotationValue@ constructors with
 -- applications of the bind function in scope, and all @DoNotationLet@

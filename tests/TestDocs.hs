@@ -4,25 +4,25 @@ import Prelude
 
 import Data.Bifunctor (first)
 import Data.List (findIndex)
-import Data.Foldable
+import Data.Foldable (find, forM_)
 import Safe (headMay)
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 import Data.Maybe (fromMaybe, isNothing, mapMaybe)
-import Data.Monoid
+import Data.Monoid (Any(..), First(..))
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Text.PrettyPrint.Boxes as Boxes
+import Data.Text qualified as T
+import Text.PrettyPrint.Boxes qualified as Boxes
 
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Docs as Docs
+import Language.PureScript qualified as P
+import Language.PureScript.Docs qualified as Docs
 import Language.PureScript.Docs.AsMarkdown (codeToString)
-import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
+import Language.PureScript.Publish.ErrorsWarnings qualified as Publish
 
 import Web.Bower.PackageMeta (parsePackageName, runPackageName)
 
 import TestPscPublish (preparePackage)
 
-import Test.Hspec
+import Test.Hspec (Spec, beforeAll, context, expectationFailure, it)
 
 spec :: Spec
 spec = beforeAll (handleDocPrepFailure <$> preparePackage "tests/purs/docs" "purs.json" "resolutions.json") $
@@ -647,7 +647,7 @@ checkConstrained ty tyClass =
     P.ConstrainedType _ c ty'
       | matches tyClass c -> True
       | otherwise -> checkConstrained ty' tyClass
-    P.ForAll _ _ _ ty' _ ->
+    P.ForAll _ _ _ _ ty' _ ->
       checkConstrained ty' tyClass
     _ ->
       False

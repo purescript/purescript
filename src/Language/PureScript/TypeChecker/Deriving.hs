@@ -12,26 +12,26 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Align (align, unalign)
 import Data.Foldable (foldl1, foldr1)
 import Data.List (init, last, zipWith3, (!!))
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.These (These(..), mergeTheseWith, these)
 
-import Control.Monad.Supply.Class
-import Language.PureScript.AST
-import Language.PureScript.AST.Utils
-import qualified Language.PureScript.Constants.Libs as Libs
-import qualified Language.PureScript.Constants.Prim as Prim
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors hiding (nonEmpty)
+import Control.Monad.Supply.Class (MonadSupply)
+import Language.PureScript.AST (Binder(..), CaseAlternative(..), ErrorMessageHint(..), Expr(..), InstanceDerivationStrategy(..), Literal(..), SourceSpan, nullSourceSpan)
+import Language.PureScript.AST.Utils (UnwrappedTypeConstructor(..), lam, lamCase, lamCase2, mkBinder, mkCtor, mkCtorBinder, mkLit, mkRef, mkVar, unguarded, unwrapTypeConstructor, utcQTyCon)
+import Language.PureScript.Constants.Libs qualified as Libs
+import Language.PureScript.Constants.Prim qualified as Prim
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType(..), Environment(..), FunctionalDependency(..), TypeClassData(..), TypeKind(..), kindType, (-:>))
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, internalCompilerError)
 import Language.PureScript.Label (Label(..))
-import Language.PureScript.Names
-import Language.PureScript.PSString
-import Language.PureScript.Sugar.TypeClasses
-import Language.PureScript.TypeChecker.Entailment
-import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Synonyms
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Types
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName(..), Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, freshIdent, qualify)
+import Language.PureScript.PSString (PSString, mkString)
+import Language.PureScript.Sugar.TypeClasses (superClassDictionaryNames)
+import Language.PureScript.TypeChecker.Entailment (InstanceContext, findDicts)
+import Language.PureScript.TypeChecker.Monad (CheckState, getEnv, getTypeClassDictionaries, unsafeCheckCurrentModule)
+import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
+import Language.PureScript.TypeClassDictionaries (TypeClassDictionaryInScope(..))
+import Language.PureScript.Types (Constraint(..), pattern REmptyKinded, SourceType, Type(..), completeBinderList, eqType, everythingOnTypes, replaceAllTypeVars, srcTypeVar, usedTypeVariables)
 
 -- | Extract the name of the newtype appearing in the last type argument of
 -- a derived newtype instance.
@@ -499,7 +499,7 @@ validateParamsInTypeConstructors derivingClass utc isBi CovariantClasses{..} con
     headOfTypeWithSubst = headOfType . replaceAllTypeVars subst
 
     in \case
-      ForAll _ name _ ty _ ->
+      ForAll _ _ name _ ty _ ->
         fmap join . traverse (\params' -> go params' isNegative ty) $ filterThese (/= name) params
 
       ConstrainedType _ _ ty ->
@@ -533,10 +533,10 @@ validateParamsInTypeConstructors derivingClass utc isBi CovariantClasses{..} con
     where
     tcdAppliesToType tcd = case tcdInstanceTypes tcd of
       [headOfType -> ht'] -> ht == ht'
-      -- ^ It's possible that, if ht and ht' are Lefts, this might require
-      -- verifying that the name isn't shadowed by something in tcdForAll. I
-      -- can't devise a legal program that causes this issue, but if in the
-      -- future it seems like a good idea, it probably is.
+        -- It's possible that, if ht and ht' are Lefts, this might require
+        -- verifying that the name isn't shadowed by something in tcdForAll. I
+        -- can't devise a legal program that causes this issue, but if in the
+        -- future it seems like a good idea, it probably is.
       _ -> False
 
   headOfType :: SourceType -> Qualified (Either Text (ProperName 'TypeName))

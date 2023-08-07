@@ -21,18 +21,18 @@ module Language.PureScript.Ide.CaseSplit
        , caseSplit
        ) where
 
-import           Protolude                     hiding (Constructor)
+import Protolude                     hiding (Constructor)
 
-import qualified Data.List.NonEmpty            as NE
-import qualified Data.Map                      as M
-import qualified Data.Text                     as T
-import qualified Language.PureScript           as P
-import qualified Language.PureScript.CST       as CST
+import Data.List.NonEmpty qualified as NE
+import Data.Map qualified as M
+import Data.Text qualified as T
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
 
-import           Language.PureScript.Externs
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Types
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
+import Language.PureScript.Ide.Error (IdeError(..))
+import Language.PureScript.Ide.State (cachedRebuild, getExternFiles)
+import Language.PureScript.Ide.Types (Ide)
 
 type Constructor = (P.ProperName 'P.ConstructorName, [P.SourceType])
 
@@ -148,7 +148,7 @@ splitFunctionType t = fromMaybe [] arguments
   where
     arguments = initMay splitted
     splitted = splitType' t
-    splitType' (P.ForAll _ _ _ t' _) = splitType' t'
+    splitType' (P.ForAll _ _ _ _ t' _) = splitType' t'
     splitType' (P.ConstrainedType _ _ t') = splitType' t'
     splitType' (P.TypeApp _ (P.TypeApp _ t' lhs) rhs)
           | P.eqType t' P.tyFunction = lhs : splitType' rhs

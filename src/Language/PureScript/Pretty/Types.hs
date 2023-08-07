@@ -1,6 +1,3 @@
--- HLint is confused by the identifier `pattern` if PatternSynonyms is enabled.
-{-# LANGUAGE NoPatternSynonyms #-}
-
 -- |
 -- Pretty printer for Types
 --
@@ -22,22 +19,22 @@ module Language.PureScript.Pretty.Types
 import Prelude hiding ((<>))
 
 import Control.Arrow ((<+>))
+import Control.Lens (_2, (%~))
 import Control.PatternArrows as PA
 
-import Data.Bifunctor (first)
 import Data.Maybe (fromMaybe, catMaybes)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Names
-import Language.PureScript.Pretty.Common
-import Language.PureScript.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (tyFunction, tyRecord)
+import Language.PureScript.Names (OpName(..), OpNameType(..), ProperName(..), ProperNameType(..), Qualified, coerceProperName, disqualify, showQualified)
+import Language.PureScript.Pretty.Common (before, objectKeyRequiresQuoting)
+import Language.PureScript.Types (Constraint(..), pattern REmptyKinded, RowListItem(..), Type(..), TypeVarVisibility(..), WildcardData(..), eqType, rowToSortedList, typeVarVisibilityPrefix)
 import Language.PureScript.PSString (PSString, prettyPrintString, decodeString)
 import Language.PureScript.Label (Label(..))
 
-import Text.PrettyPrint.Boxes hiding ((<+>))
+import Text.PrettyPrint.Boxes (Box(..), hcat, hsep, left, moveRight, nullBox, render, text, top, vcat, (<>))
 
 data PrettyPrintType
   = PPTUnknown Int
@@ -54,7 +51,7 @@ data PrettyPrintType
   | PPKindedType PrettyPrintType PrettyPrintType
   | PPBinaryNoParensType PrettyPrintType PrettyPrintType PrettyPrintType
   | PPParensInType PrettyPrintType
-  | PPForAll [(Text, Maybe PrettyPrintType)] PrettyPrintType
+  | PPForAll [(TypeVarVisibility, Text, Maybe PrettyPrintType)] PrettyPrintType
   | PPFunction PrettyPrintType PrettyPrintType
   | PPRecord [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
   | PPRow [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
@@ -84,11 +81,11 @@ convertPrettyPrintType = go
   go d (BinaryNoParensType _ ty1 ty2 ty3) = PPBinaryNoParensType (go (d-1) ty1) (go (d-1) ty2) (go (d-1) ty3)
   go d (ParensInType _ ty) = PPParensInType (go (d-1) ty)
   go d ty@RCons{} = uncurry PPRow (goRow d ty)
-  go d (ForAll _ v mbK ty _) = goForAll d [(v, fmap (go (d-1)) mbK)] ty
+  go d (ForAll _ vis v mbK ty _) = goForAll d [(vis, v, fmap (go (d-1)) mbK)] ty
   go d (TypeApp _ a b) = goTypeApp d a b
   go d (KindApp _ a b) = PPTypeApp (go (d-1) a) (PPKindArg (go (d-1) b))
 
-  goForAll d vs (ForAll _ v mbK ty _) = goForAll d ((v, fmap (go (d-1)) mbK) : vs) ty
+  goForAll d vs (ForAll _ vis v mbK ty _) = goForAll d ((vis, v, fmap (go (d-1)) mbK) : vs) ty
   goForAll d vs ty = PPForAll (reverse vs) (go (d-1) ty)
 
   goRow d ty =
@@ -222,8 +219,8 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   forall' = if troUnicode tro then "∀" else "forall"
   doubleColon = if troUnicode tro then "∷" else "::"
 
-  printMbKindedType (v, Nothing) = text v
-  printMbKindedType (v, Just k) = text ("(" ++ v ++ " " ++ doubleColon ++ " ") <> typeAsBox' k <> text ")"
+  printMbKindedType (vis, v, Nothing) = text (T.unpack $ typeVarVisibilityPrefix vis) <> text v
+  printMbKindedType (vis, v, Just k) = text ("(" ++ T.unpack (typeVarVisibilityPrefix vis) ++ v ++ " " ++ doubleColon ++ " ") <> typeAsBox' k <> text ")"
 
   -- If both boxes span a single line, keep them on the same line, or else
   -- use the specified function to modify the second box, then combine vertically.
@@ -232,10 +229,10 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
     | rows b1 > 1 || rows b2 > 1 = vcat left [ b1, f b2 ]
     | otherwise = hcat top [ b1, text " ", b2]
 
-forall_ :: Pattern () PrettyPrintType ([(String, Maybe PrettyPrintType)], PrettyPrintType)
+forall_ :: Pattern () PrettyPrintType ([(TypeVarVisibility, String, Maybe PrettyPrintType)], PrettyPrintType)
 forall_ = mkPattern match
   where
-  match (PPForAll idents ty) = Just (map (first T.unpack) idents, ty)
+  match (PPForAll idents ty) = Just ((_2 %~ T.unpack) <$> idents, ty)
   match _ = Nothing
 
 typeAtomAsBox' :: PrettyPrintType -> Box

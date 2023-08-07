@@ -1,11 +1,11 @@
 module TestIde where
 
-import           Prelude
+import Prelude
 
-import           Control.Monad (unless)
-import           Language.PureScript.Ide.Test
-import qualified PscIdeSpec
-import           Test.Hspec
+import Control.Monad (unless)
+import Language.PureScript.Ide.Test
+import PscIdeSpec qualified
+import Test.Hspec
 
 spec :: Spec
 spec =

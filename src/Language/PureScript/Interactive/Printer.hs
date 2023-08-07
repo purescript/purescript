@@ -1,14 +1,14 @@
 module Language.PureScript.Interactive.Printer where
 
-import           Prelude
+import Prelude
 
-import           Data.List (intersperse)
-import qualified Data.Map as M
-import           Data.Maybe (mapMaybe)
-import qualified Data.Text as T
-import           Data.Text (Text)
-import qualified Language.PureScript as P
-import qualified Text.PrettyPrint.Boxes as Box
+import Data.List (intersperse)
+import Data.Map qualified as M
+import Data.Maybe (mapMaybe)
+import Data.Text qualified as T
+import Data.Text (Text)
+import Language.PureScript qualified as P
+import Text.PrettyPrint.Boxes qualified as Box
 
 -- TODO (Christoph): Text version of boxes
 textT :: Text -> Box.Box

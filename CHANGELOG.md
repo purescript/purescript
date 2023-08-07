@@ -2,6 +2,307 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.10
+
+New features:
+
+* Implement visible type applications
+
+  The compiler now supports visible type applications, allowing the user to instantiate one or more "visible" type variables to a specific type.
+
+  A "visible" type variable is a type variable in a `forall` binder that appears prefixed with an `@`, like the following example:
+
+  ```purescript
+  id :: forall @a. a -> a  -- or with kinds: `forall (@a :: Type). a -> a`
+  id a = a
+  ```
+
+  We can then use type application syntax to instantiate this binding to a specific type:
+
+  ```purescript
+  idInt :: Int -> Int
+  idInt = id @Int
+
+  example :: Int
+  example = id @Int 0
+  ```
+
+  Type variables appearing in `class` or `data` are automatically visible, meaning that they do not require annotations:
+
+  ```purescript
+  data Maybe a = Just a | Nothing
+
+  nothingInt :: Maybe Int
+  nothingInt = Nothing @Int
+
+  class Identity a where
+    identity :: a -> a
+
+  instance Identity Int where
+    identity a = a
+  
+  identityInt = identity @Int
+
+  -- This throws a `NoInstanceFound` error.
+  identityNumber = identity @Number
+  ```
+
+  Lastly, visible type variables can also be skipped with a wildcard (i.e. `_`)
+
+  ```purescript
+  data Either a b = Left a | Right b
+
+  example = Left @_ @Number 0
+  ```
+
+  Note that performing a type application with a type that has no visible type variables throws an error:
+
+  ```purescript
+  module Main where
+
+  id :: forall a. a -> a
+  id a = a
+
+  idInt = id @Int
+
+  {-
+  Error found:
+  in module Main
+  at Main.purs:6:9 - 6:16 (line 6, column 9 - line 6, column 16)
+
+    An expression of polymorphic type
+    with the invisible type variable a:
+                    
+      forall a. a -> a
+                    
+    cannot be applied to:
+       
+      Int
+       
+
+  while inferring the type of id
+  in value declaration idInt
+
+  See https://github.com/purescript/documentation/blob/master/errors/CannotApplyExpressionOfTypeOnType.md for more information,
+  or to contribute content related to this error.
+  -}
+  ```
+
+  Similarly, monomorphic types also cannot be used for type applications:
+
+  ```purescript
+  module Main where
+
+  idInt :: Int -> Int
+  idInt a = a
+
+  example = idInt @Int
+
+  {-
+  Error found:
+  in module Main
+  at Main.purs:6:11 - 6:21 (line 6, column 11 - line 6, column 21)
+
+    An expression of monomorphic type:
+              
+      Int -> Int
+              
+    cannot be applied to:
+       
+      Int
+       
+
+  while inferring the type of idInt
+  in value declaration example
+
+  See https://github.com/purescript/documentation/blob/master/errors/CannotApplyExpressionOfTypeOnType.md for more information,
+  or to contribute content related to this error.
+  -}
+  ```
+
+* Exclude files from compiler input (#4480 by @i-am-the-slime)
+
+  The compiler now supports excluding files from the globs given to it as input.
+  This means there's now a new option for `purs compile`, namely
+  `--exclude-files` (or the short version `-x`):
+
+  ```sh
+  > purs compile --help
+  Usage: purs compile [FILE] [-x|--exclude-files ARG] [-o|--output ARG] ...
+
+    Compile PureScript source files
+
+  Available options:
+    -h,--help                Show this help text
+    FILE                     The input .purs file(s).
+    -x,--exclude-files ARG   Glob of .purs files to exclude from the supplied
+                            files.
+    ...
+  ```
+
+  This allows you to keep related files closer together (that is, [colocate](https://kentcdodds.com/blog/colocation) them).
+
+  Consider a setup like the following:
+
+  ```sh
+  src/
+      Main.purs
+      View/
+          LoginPage.purs
+          LoginPageTest.purs
+          LoginPageStories.purs
+  ```
+
+  In order to exclude the files in the example above you can now invoke `purs`
+  like this and it will only compile `LoginPage.purs`:
+
+  ```sh
+  purs compile "src/**/*.purs" --exclude-files "src/**/*Stories.purs" -x "src/**/*Test.purs"
+  ```
+
+  With `spago`, the equivalent command is:
+
+  ```sh
+  spago build --purs-args '-x "src/**/*Test.purs" -x "src/**/*Stories.purs"'
+  ```
+
+## 0.15.9
+
+New features:
+
+* Add release artifacts for Linux and macOS running on the ARM64 architecture. (#4455 by @f-f)
+
+Bugfixes:
+
+* Fix prerelease version number on macOS (#4461 by @rhendric)
+
+* Consider fixity declarations during linting (#4462 by @ozkutuk)
+
+* Defer monomorphization for data constructors (#4376 by @purefunctor)
+
+  In `0.15.4` and earlier, the compiler monomorphizes type
+  constructors early, yielding the following type:
+
+  ```purs
+  > :t Nothing
+  forall (a1 :: Type). Maybe a1
+
+  > :t { a : Nothing }
+  forall (a1 :: Type).
+    { a :: Maybe a1
+    }
+  ```
+
+  With this change, the monomorphization introduced in
+  [#835](https://github.com/purescript/purescript/pull/835) is
+  deferred to only when it's needed, such as when constructors are
+  used as values inside of records.
+
+  ```purs
+  > :t Nothing
+  forall a. Maybe a
+
+  > :t { a : Nothing }
+  forall (a1 :: Type).
+    { a :: Maybe a1
+    }
+  ```
+
+  Also as a consequence, record updates should not throw
+  `ConstrainedTypeUnified` in cases such as:
+
+  ```purs
+  v1 :: { a :: Maybe Unit }
+  v1 = { a : Just Unit }
+
+  v2 :: { a :: Maybe Unit }
+  v2 = let v3 = v1 { a = mempty } in v3
+  ```
+
+* Update installer to version 0.3.5 to support ARM builds (#4468 and #4469 by @rhendric)
+
+* Fix exhaustiveness checking to account for case guards (#4467 by @purefunctor)
+
+Internal:
+
+* Refactor module imports to make identifiers' origins obvious (#4451 by @JordanMartinez)
+
+* Require comments not to cause Haddock warnings (#4456 by @rhendric)
+
+## 0.15.8
+
+New features:
+
+* Generated documentation now supports dark mode (#4438 by @sometimes-i-send-pull-requests)
+
+  PureScript documentation has a new dark theme available. It will
+  automatically be used based on your browser or system's color scheme
+  preferences.
+
+Bugfixes:
+
+* Fix instance deriving regression (#4432 by @rhendric)
+
+* Outputs what label the type-error occurred on when types don't match (#4411 by @FredTheDino)
+
+* Account for typed holes when checking value declarations (#4437 by @purefunctor)
+
+  The compiler now takes into account typed holes when ordering value declarations
+  for type checking, allowing more top-level values to be suggested instead of
+  being limited by reverse lexicographical ordering.
+
+  Given:
+  ```purescript
+  module Main where
+
+  newtype K = K Int
+
+  aRinku :: Int -> K
+  aRinku = K
+
+  bMaho :: K
+  bMaho = ?help 0
+
+  cMuni :: Int -> K
+  cMuni = K
+
+  dRei :: Int -> K
+  dRei _ = bMaho
+  ```
+
+  Before:
+  ```
+    Hole 'help' has the inferred type
+            
+      Int -> K
+            
+    You could substitute the hole with one of these values:
+                           
+      Main.cMuni  :: Int -> K
+      Main.K      :: Int -> K
+  ```
+
+  After:
+  ```
+    Hole 'help' has the inferred type
+            
+      Int -> K
+            
+    You could substitute the hole with one of these values:
+                            
+      Main.aRinku  :: Int -> K
+      Main.cMuni   :: Int -> K
+      Main.K       :: Int -> K
+  ```
+
+Other improvements:
+
+* Bump Stackage snapshot to lts-20.9 and GHC to 9.2.5 (#4422, #4428, and #4433 by @purefunctor, @JordanMartinez, and @andys8)
+
+Internal:
+
+* Update license/changelog scrips to latest Stack resolver (#4445 by @JordanMartinez)
+
 ## 0.15.7
 
 New features:

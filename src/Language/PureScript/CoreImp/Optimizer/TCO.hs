@@ -7,9 +7,9 @@ import Control.Applicative (empty, liftA2)
 import Control.Monad (guard)
 import Control.Monad.State (State, evalState, get, modify)
 import Data.Functor (($>), (<&>))
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Text (Text, pack)
-import Language.PureScript.CoreImp.AST
+import Language.PureScript.CoreImp.AST (AST(..), InitializerEffects(..), UnaryOperator(..), everything, everywhereTopDownM)
 import Language.PureScript.AST.SourcePos (SourceSpan)
 import Safe (headDef, tailSafe)
 
@@ -40,8 +40,8 @@ tco = flip evalState 0 . everywhereTopDownM convert where
       innerArgs = headDef [] argss
       outerArgs = concat . reverse $ tailSafe argss
       arity = length argss
-      -- ^ this is the number of calls, not the number of arguments, if there's
-      -- ever a practical difference.
+        -- this is the number of calls, not the number of arguments, if there's
+        -- ever a practical difference.
       (argss, body', replace) = topCollectAllFunctionArgs [] id fn
   convert js = pure js
 

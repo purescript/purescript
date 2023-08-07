@@ -6,24 +6,24 @@ module Language.PureScript.AST.Traversals where
 import Prelude
 import Protolude (swap)
 
-import Control.Monad
-import Control.Monad.Trans.State
+import Control.Monad ((<=<), (>=>))
+import Control.Monad.Trans.State (StateT(..))
 
 import Data.Foldable (fold)
 import Data.Functor.Identity (runIdentity)
 import Data.List (mapAccumL)
 import Data.Maybe (mapMaybe)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.List.NonEmpty qualified as NEL
+import Data.Map qualified as M
+import Data.Set qualified as S
 
-import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Declarations
-import Language.PureScript.AST.Literals
-import Language.PureScript.Names
-import Language.PureScript.Traversals
+import Language.PureScript.AST.Binders (Binder(..), binderNames)
+import Language.PureScript.AST.Declarations (CaseAlternative(..), DataConstructorDeclaration(..), Declaration(..), DoNotationElement(..), Expr(..), Guard(..), GuardedExpr(..), TypeDeclarationData(..), TypeInstanceBody(..), pattern ValueDecl, ValueDeclarationData(..), mapTypeInstanceBody, traverseTypeInstanceBody)
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident)
+import Language.PureScript.Traversals (sndM, sndM', thirdM)
 import Language.PureScript.TypeClassDictionaries (TypeClassDictionaryInScope(..))
-import Language.PureScript.Types
+import Language.PureScript.Types (Constraint(..), SourceType, mapConstraintArgs)
 
 guardedExprM :: Applicative m
              => (Guard -> m Guard)
@@ -75,6 +75,7 @@ everywhereOnValues f g h = (f', g', h')
   g' (ObjectUpdateNested obj vs) = g (ObjectUpdateNested (g' obj) (fmap g' vs))
   g' (Abs binder v) = g (Abs (h' binder) (g' v))
   g' (App v1 v2) = g (App (g' v1) (g' v2))
+  g' (VisibleTypeApp v ty) = g (VisibleTypeApp (g' v) ty)
   g' (Unused v) = g (Unused (g' v))
   g' (IfThenElse v1 v2 v3) = g (IfThenElse (g' v1) (g' v2) (g' v3))
   g' (Case vs alts) = g (Case (fmap g' vs) (fmap handleCaseAlternative alts))
@@ -149,6 +150,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (ObjectUpdateNested obj vs) = ObjectUpdateNested <$> (g obj >>= g') <*> traverse (g' <=< g) vs
   g' (Abs binder v) = Abs <$> (h binder >>= h') <*> (g v >>= g')
   g' (App v1 v2) = App <$> (g v1 >>= g') <*> (g v2 >>= g')
+  g' (VisibleTypeApp v ty) = VisibleTypeApp <$> (g v >>= g') <*> pure ty
   g' (Unused v) = Unused <$> (g v >>= g')
   g' (IfThenElse v1 v2 v3) = IfThenElse <$> (g v1 >>= g') <*> (g v2 >>= g') <*> (g v3 >>= g')
   g' (Case vs alts) = Case <$> traverse (g' <=< g) vs <*> traverse handleCaseAlternative alts
@@ -218,6 +220,7 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (ObjectUpdateNested obj vs) = (ObjectUpdateNested <$> g' obj <*> traverse g' vs) >>= g
   g' (Abs binder v) = (Abs <$> h' binder <*> g' v) >>= g
   g' (App v1 v2) = (App <$> g' v1 <*> g' v2) >>= g
+  g' (VisibleTypeApp v ty) = (VisibleTypeApp <$> g' v <*> pure ty) >>= g
   g' (Unused v) = (Unused <$> g' v) >>= g
   g' (IfThenElse v1 v2 v3) = (IfThenElse <$> g' v1 <*> g' v2 <*> g' v3) >>= g
   g' (Case vs alts) = (Case <$> traverse g' vs <*> traverse handleCaseAlternative alts) >>= g
@@ -290,6 +293,7 @@ everythingOnValues (<>.) f g h i j = (f', g', h', i', j')
   g' v@(ObjectUpdateNested obj vs) = foldl (<>.) (g v <>. g' obj) (fmap g' vs)
   g' v@(Abs b v1) = g v <>. h' b <>. g' v1
   g' v@(App v1 v2) = g v <>. g' v1 <>. g' v2
+  g' v@(VisibleTypeApp v' _) = g v <>. g' v'
   g' v@(Unused v1) = g v <>. g' v1
   g' v@(IfThenElse v1 v2 v3) = g v <>. g' v1 <>. g' v2 <>. g' v3
   g' v@(Case vs alts) = foldl (<>.) (foldl (<>.) (g v) (fmap g' vs)) (fmap i' alts)
@@ -371,6 +375,7 @@ everythingWithContextOnValues s0 r0 (<>.) f g h i j = (f'' s0, g'' s0, h'' s0, i
   g' s (ObjectUpdateNested obj vs) = foldl (<>.) (g'' s obj) (fmap (g'' s) vs)
   g' s (Abs binder v1) = h'' s binder <>. g'' s v1
   g' s (App v1 v2) = g'' s v1 <>. g'' s v2
+  g' s (VisibleTypeApp v _) = g'' s v
   g' s (Unused v) = g'' s v
   g' s (IfThenElse v1 v2 v3) = g'' s v1 <>. g'' s v2 <>. g'' s v3
   g' s (Case vs alts) = foldl (<>.) (foldl (<>.) r0 (fmap (g'' s) vs)) (fmap (i'' s) alts)
@@ -479,6 +484,7 @@ everywhereWithContextOnValuesM s0 f g h i j k = (f'' s0, g'' s0, h'' s0, i'' s0,
   g' s (ObjectUpdateNested obj vs) = ObjectUpdateNested <$> g'' s obj <*> traverse (g'' s) vs
   g' s (Abs binder v) = Abs <$> h' s binder <*> g'' s v
   g' s (App v1 v2) = App <$> g'' s v1 <*> g'' s v2
+  g' s (VisibleTypeApp v ty) = VisibleTypeApp <$> g'' s v <*> pure ty
   g' s (Unused v) = Unused <$> g'' s v
   g' s (IfThenElse v1 v2 v3) = IfThenElse <$> g'' s v1 <*> g'' s v2 <*> g'' s v3
   g' s (Case vs alts) = Case <$> traverse (g'' s) vs <*> traverse (i'' s) alts
@@ -587,6 +593,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
     let s' = S.union (S.fromList (localBinderNames b)) s
     in h'' s b <> g'' s' v1
   g' s (App v1 v2) = g'' s v1 <> g'' s v2
+  g' s (VisibleTypeApp v _) = g'' s v
   g' s (Unused v) = g'' s v
   g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
   g' s (Case vs alts) = foldMap (g'' s) vs <> foldMap (i'' s) alts
@@ -689,6 +696,7 @@ accumTypes f = everythingOnValues mappend forDecls forValues forBinders (const m
   forValues (TypeClassDictionary c _ _) = foldMap f (constraintArgs c)
   forValues (DeferredDictionary _ tys) = foldMap f tys
   forValues (TypedValue _ _ ty) = f ty
+  forValues (VisibleTypeApp _ ty) = f ty
   forValues _ = mempty
 
   forBinders (TypedBinder ty _) = f ty

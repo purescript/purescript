@@ -347,8 +347,14 @@ rowLabel :: { Labeled Label (Type ()) }
   : label '::' type { Labeled $1 $2 $3 }
 
 typeVarBinding :: { TypeVarBinding () }
-  : ident { TypeVarName $1 }
-  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded (Wrapped $1 (Labeled $2 $3 $4) $5)) }
+  : ident { TypeVarName (Nothing, $1) }
+  | '@' ident { TypeVarName (Just $1, $2) }
+  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded (Wrapped $1 (Labeled (Nothing, $2) $3 $4) $5)) }
+  | '(' '@' ident '::' type ')' {% checkNoWildcards $5 *> pure (TypeVarKinded (Wrapped $1 (Labeled (Just $2, $3) $4 $5) $6)) }
+
+typeVarBindingPlain :: { TypeVarBinding () }
+  : ident { TypeVarName (Nothing, $1) }
+  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded (Wrapped $1 (Labeled (Nothing, $2) $3 $4) $5)) }
 
 forall :: { SourceToken }
   : 'forall' { $1 }
@@ -388,6 +394,7 @@ expr4 :: { Expr () }
             ExprApp () (ExprApp () $1 lhs) rhs
           _ -> ExprApp () $1 $2
       }
+  | expr4 '@' typeAtom { ExprVisibleTypeApp () $1 $2 $3 }
 
 expr5 :: { Expr () }
   : expr6 { $1 }
@@ -675,13 +682,13 @@ decl :: { Declaration () }
   | 'type' 'role' properName many(role) { DeclRole () $1 $2 (getProperName $3) $4 }
 
 dataHead :: { DataHead () }
-  : 'data' properName manyOrEmpty(typeVarBinding) { DataHead $1 (getProperName $2) $3 }
+  : 'data' properName manyOrEmpty(typeVarBindingPlain) { DataHead $1 (getProperName $2) $3 }
 
 typeHead :: { DataHead () }
-  : 'type' properName manyOrEmpty(typeVarBinding) { DataHead $1 (getProperName $2) $3 }
+  : 'type' properName manyOrEmpty(typeVarBindingPlain) { DataHead $1 (getProperName $2) $3 }
 
 newtypeHead :: { DataHead () }
-  : 'newtype' properName manyOrEmpty(typeVarBinding) { DataHead $1 (getProperName $2) $3 }
+  : 'newtype' properName manyOrEmpty(typeVarBindingPlain) { DataHead $1 (getProperName $2) $3 }
 
 dataCtor :: { DataCtor () }
   : properName manyOrEmpty(typeAtom)

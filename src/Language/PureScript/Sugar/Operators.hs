@@ -16,15 +16,15 @@ module Language.PureScript.Sugar.Operators
 import Prelude
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.Externs
-import Language.PureScript.Names
-import Language.PureScript.Sugar.Operators.Binders
-import Language.PureScript.Sugar.Operators.Expr
-import Language.PureScript.Sugar.Operators.Types
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, errorMessage', parU, rethrow, rethrowWithPosition)
+import Language.PureScript.Externs (ExternsFile(..), ExternsFixity(..), ExternsTypeFixity(..))
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), freshIdent')
+import Language.PureScript.Sugar.Operators.Binders (matchBinderOperators)
+import Language.PureScript.Sugar.Operators.Expr (matchExprOperators)
+import Language.PureScript.Sugar.Operators.Types (matchTypeOperators)
 import Language.PureScript.Traversals (defS, sndM)
-import Language.PureScript.Types
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), everywhereOnTypesTopDownM, overConstraintArgs)
 
 import Control.Monad (unless, (<=<))
 import Control.Monad.Error.Class (MonadError(..))
@@ -37,10 +37,10 @@ import Data.Functor (($>))
 import Data.Functor.Identity (Identity(..), runIdentity)
 import Data.List (groupBy, sortOn)
 import Data.Maybe (mapMaybe, listToMaybe)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Ord (Down(..))
 
-import qualified Language.PureScript.Constants.Libs as C
+import Language.PureScript.Constants.Libs qualified as C
 
 -- |
 -- Removes unary negation operators and replaces them with calls to `negate`.
@@ -212,7 +212,7 @@ rebracketModule !caller pred_ valueOpTable typeOpTable (Module ss coms mn ds ext
     fmap (map (\d -> if pred_ d then removeParens d else d)) .
     flip parU (usingPredicate pred_ h)
 
-  -- | The AST will run through all the desugar passes when compiling
+  -- The AST will run through all the desugar passes when compiling
   -- and only some of the desugar passes when generating docs.
   -- When generating docs, `case _ of` syntax used in an instance declaration
   -- can trigger the `IncorrectAnonymousArgument` error because it does not

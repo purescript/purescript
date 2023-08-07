@@ -16,14 +16,14 @@ import Data.List (uncons)
 import Data.List.Ordered (minusBy')
 import Data.Ord (comparing)
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Skolems
-import Language.PureScript.TypeChecker.Unify
-import Language.PureScript.Types
+import Language.PureScript.AST (ErrorMessageHint(..), Expr(..), pattern NullSourceAnn)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (tyFunction, tyRecord)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, internalCompilerError)
+import Language.PureScript.TypeChecker.Monad (CheckState, getHints, getTypeClassDictionaries, withErrorMessageHint)
+import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, skolemize)
+import Language.PureScript.TypeChecker.Unify (alignRowsWith, freshTypeWithKind, unifyTypes)
+import Language.PureScript.Types (RowListItem(..), SourceType, Type(..), eqType, isREmpty, replaceTypeVars, rowFromList)
 
 -- | Subsumption can operate in two modes:
 --
@@ -74,11 +74,11 @@ subsumes'
   -> SourceType
   -> SourceType
   -> m (Coercion mode)
-subsumes' mode (ForAll _ ident mbK ty1 _) ty2 = do
+subsumes' mode (ForAll _ _ ident mbK ty1 _) ty2 = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   let replaced = replaceTypeVars ident u ty1
   subsumes' mode replaced ty2
-subsumes' mode ty1 (ForAll _ ident mbK ty2 sco) =
+subsumes' mode ty1 (ForAll _ _ ident mbK ty2 sco) =
   case sco of
     Just sco' -> do
       sko <- newSkolemConstant
