@@ -13,12 +13,12 @@ Error 1 of 2:
     [33m     [0m
 
   while matching label [33ma[0m
-  while trying to match type [33m               [0m
-                             [33m  ( a :: String[0m
-                             [33m  , b :: String[0m
-                             [33m  ...          [0m
-                             [33m  )            [0m
-                             [33m               [0m
+  while trying to match type [33m                [0m
+                             [33m  ( a :: String [0m
+                             [33m  , b :: Boolean[0m
+                             [33m  ...           [0m
+                             [33m  )             [0m
+                             [33m                [0m
     with type [33m            [0m
               [33m  ( a :: Int[0m
               [33m  , b :: Int[0m
@@ -26,10 +26,10 @@ Error 1 of 2:
               [33m  | t0      [0m
               [33m  )         [0m
               [33m            [0m
-  while checking that expression [33mcase $0 of           [0m
-                                 [33m  { a: 0, b: 0 } -> 0[0m
-                                 [33m  {  } -> 0          [0m
-    has type [33mInt[0m
+  while checking that expression [33mcase $0 of             [0m
+                                 [33m  { a: 0, b: 0 } -> 'a'[0m
+                                 [33m  {  } -> 'b'          [0m
+    has type [33mChar[0m
   in value declaration [33mf[0m
 
   where [33mt0[0m is an unknown type
@@ -43,21 +43,21 @@ Error 2 of 2:
   at tests/purs/failing/MultipleErrorsInOneRow.purs:7:3 - 7:17 (line 7, column 3 - line 7, column 17)
 
     Could not match type
-    [33m        [0m
-    [33m  String[0m
-    [33m        [0m
+    [33m         [0m
+    [33m  Boolean[0m
+    [33m         [0m
     with type
     [33m     [0m
     [33m  Int[0m
     [33m     [0m
 
   while matching label [33mb[0m
-  while trying to match type [33m               [0m
-                             [33m  ( a :: String[0m
-                             [33m  , b :: String[0m
-                             [33m  ...          [0m
-                             [33m  )            [0m
-                             [33m               [0m
+  while trying to match type [33m                [0m
+                             [33m  ( a :: String [0m
+                             [33m  , b :: Boolean[0m
+                             [33m  ...           [0m
+                             [33m  )             [0m
+                             [33m                [0m
     with type [33m            [0m
               [33m  ( a :: Int[0m
               [33m  , b :: Int[0m
@@ -65,10 +65,10 @@ Error 2 of 2:
               [33m  | t0      [0m
               [33m  )         [0m
               [33m            [0m
-  while checking that expression [33mcase $0 of           [0m
-                                 [33m  { a: 0, b: 0 } -> 0[0m
-                                 [33m  {  } -> 0          [0m
-    has type [33mInt[0m
+  while checking that expression [33mcase $0 of             [0m
+                                 [33m  { a: 0, b: 0 } -> 'a'[0m
+                                 [33m  {  } -> 'b'          [0m
+    has type [33mChar[0m
   in value declaration [33mf[0m
 
   where [33mt0[0m is an unknown type

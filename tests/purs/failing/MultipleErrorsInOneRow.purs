@@ -3,6 +3,6 @@
 module A where
 
 -- Find both these errors
-f :: { a :: String, b :: String } -> Int
-f { a: 0, b: 0 } = 0
-f { } = 0
+f :: { a :: String, b :: Boolean } -> Char
+f { a: 0, b: 0 } = 'a'
+f {} = 'b'
