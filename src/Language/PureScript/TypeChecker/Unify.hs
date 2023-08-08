@@ -161,7 +161,16 @@ unifyTypes t1 t2 = do
 -- Common labels are identified and unified. Remaining labels and types are unified with a
 -- trailing row unification variable, if appropriate.
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
-unifyRows r1 r2 = parU matches id *> uncurry unifyTails rest where
+unifyRows r1 r2 = do
+  let tryError ma = catchError (Nothing <$ ma) (pure . Just)
+  matchesErr <- tryError $ parU matches id
+  tailsErr <- tryError $ uncurry unifyTails rest
+  case (matchesErr, tailsErr) of
+    (Just l1, Just l2) -> throwError $ l1 <> l2
+    (Just l1, _) -> throwError l1
+    (_, Just l2) -> throwError l2
+    (_, _) -> pure ()
+  where
   unifyTypesWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ unifyTypes t1 t2
 
   (matches, rest) = alignRowsWith unifyTypesWithLabel r1 r2
