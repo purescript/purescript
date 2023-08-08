@@ -162,14 +162,22 @@ unifyTypes t1 t2 = do
 -- trailing row unification variable, if appropriate.
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
 unifyRows r1 r2 = 
-  -- If we are unifying two rows with nested rows where some labels only appear in one row...
-  --    r1 = ( shared :: { a :: Int } )
-  --    r2 = ( shared :: { a :: Char }, inSecond :: String )
-  -- ... then doing `sequence_ matches *> uncurry unifyTails rest` will report the error with
-  -- label 'a', but miss the error with label 'inSecond' because the first computatoon throws,
-  -- causing the second to not be evaluated. We want to report all errors.
+  -- The two usages of `parU` serve different purposes here:
+  -- Outer `parU`:
+  --   If we are unifying two rows with nested rows where some labels only appear in one row...
+  --      r1 = ( shared :: { a :: Int } )
+  --      r2 = ( shared :: { a :: Char }, inSecond :: String )
+  --   ... then doing `parU matches id *> uncurry unifyTails rest` will report the error with
+  --   label 'a', but miss the error with label 'inSecond' because the first computatoon throws,
+  --   causing the second to not be evaluated. We want to report all errors.
+  -- Inner `parU` (i.e. `parU matches id`):
+  --   If we are unifying two rows with shared labels that each have a problem...
+  --      r1 = ( a :: Int, b :: String )
+  --      r2 = ( a :: Unit, b :: Char )
+  --   ... then doing `sequence_ matches` here would only report one error on the first label
+  --   (i.e. 'a' in this case), not all of the labels with problems. We want to report all errors.
   void $ parU
-    [ void $ sequence_ matches
+    [ void $ parU matches id
     , uncurry unifyTails rest
     ]
     id
