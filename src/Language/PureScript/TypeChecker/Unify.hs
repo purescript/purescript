@@ -16,19 +16,21 @@ module Language.PureScript.TypeChecker.Unify
 
 import Prelude
 
-import Control.Monad (forM_, void)
+import Control.Monad (forM, forM_, void, when)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify, state)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
-import Data.Foldable (traverse_)
+import Data.Either (lefts)
+import Data.Foldable (fold, traverse_)
+import Data.Functor (($>))
 import Data.Maybe (fromMaybe)
 import Data.Map qualified as M
 import Data.Text qualified as T
 
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment qualified as E
-import Language.PureScript.Errors (ErrorMessageHint(..), MultipleErrors, SimpleErrorMessage(..), SourceAnn, errorMessage, internalCompilerError, onErrorMessages, parU, rethrow, warnWithPosition, withoutPosition)
+import Language.PureScript.Errors (ErrorMessage(..), ErrorMessageHint(..), MultipleErrors(..), SimpleErrorMessage(..), SourceAnn, errorMessage, internalCompilerError, nonEmpty, onErrorMessages, rethrow, warnWithPosition, withoutPosition)
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, instantiateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad (CheckState(..), Substitution(..), UnkLevel(..), Unknown, getLocalContext, guardWith, lookupUnkName, withErrorMessageHint)
 import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, skolemize)
@@ -161,46 +163,56 @@ unifyTypes t1 t2 = do
 -- Common labels are identified and unified. Remaining labels and types are unified with a
 -- trailing row unification variable, if appropriate.
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
-unifyRows r1 r2 = 
-  -- The two usages of `parU` serve different purposes here:
-  -- Outer `parU`:
-  --   If we are unifying two rows with nested rows where some labels only appear in one row...
-  --      r1 = ( shared :: { a :: Int } )
-  --      r2 = ( shared :: { a :: Char }, inSecond :: String )
-  --   ... then doing `parU matches id *> uncurry unifyTails rest` will report the error with
-  --   label 'a', but miss the error with label 'inSecond' because the first computation throws,
-  --   causing the second to not be evaluated. We want to report all errors.
-  -- Inner `parU` (i.e. `parU matches id`):
-  --   If we are unifying two rows with shared labels that each have a problem...
-  --      r1 = ( a :: Int, b :: String )
-  --      r2 = ( a :: Unit, b :: Char )
-  --   ... then doing `sequence_ matches` here would only report one error on the first label
-  --   (i.e. 'a' in this case), not all of the labels with problems (i.e. 'a' and 'b' labels). 
-  --   We want to report all errors.
-  void $ parU
-    [ void $ parU matches id
-    , uncurry unifyTails rest
-    ]
-    id
+unifyRows r1 r2 = do
+  -- First, unify the types in aligned labels, but don't throw any errors yet.
+  alignedErr <- fold . lefts <$> forM matches withError
+  -- Now unify the tails; this must happen after matching the types in aligned
+  -- labels, so that any unknowns solved from the aligned labels don't appear
+  -- in the error message produced if the tails don't unify.
+  tailErr <- withError (uncurry unifyTails rest) >>= \case
+    -- If an error was raised during unification, return that.
+    Left err -> pure err
+    -- If tails did unify, return an empty error (will be filtered below).
+    Right True -> pure mempty
+    -- If tails didn't unify, then suppress any TypesDoNotUnify errors produced
+    -- during unification of aligned labels. The TypesDoNotUnify created here
+    -- will include any such mismatches.
+    Right False -> do
+      subst <- gets checkSubstitution
+      -- Throw immediately; we're including the aligned-label errors we want to
+      -- include.
+      throwError $
+        MultipleErrors (filter isNotTDNU $ runMultipleErrors alignedErr) <>
+          errorMessage (TypesDoNotUnify (substituteType subst r1) (substituteType subst r2))
+  let combinedErr = alignedErr <> tailErr
+  when (nonEmpty combinedErr) $ throwError combinedErr
   where
+  withError :: forall a. m a -> m (Either MultipleErrors a)
+  withError u = catchError (Right <$> u) (pure . Left)
+
   unifyTypesWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ unifyTypes t1 t2
 
   (matches, rest) = alignRowsWith unifyTypesWithLabel r1 r2
 
-  unifyTails :: ([RowListItem SourceAnn], SourceType) -> ([RowListItem SourceAnn], SourceType) -> m ()
-  unifyTails ([], TUnknown _ u)    (sd, r)               = solveType u (rowFromList (sd, r))
-  unifyTails (sd, r)               ([], TUnknown _ u)    = solveType u (rowFromList (sd, r))
-  unifyTails ([], REmptyKinded _ _) ([], REmptyKinded _ _) = return ()
-  unifyTails ([], TypeVar _ v1)    ([], TypeVar _ v2)    | v1 == v2 = return ()
-  unifyTails ([], Skolem _ _ _ s1 _) ([], Skolem _ _ _ s2 _) | s1 == s2 = return ()
-  unifyTails (sd1, TUnknown a u1)  (sd2, TUnknown _ u2)  | u1 /= u2 = do
+  unifyTails :: ([RowListItem SourceAnn], SourceType) -> ([RowListItem SourceAnn], SourceType) -> m Bool
+  unifyTails ([], TUnknown _ u)      (sd, r)                            = solveType u (rowFromList (sd, r)) $> True
+  unifyTails (sd, r)                 ([], TUnknown _ u)                 = solveType u (rowFromList (sd, r)) $> True
+  unifyTails ([], REmptyKinded _ _)  ([], REmptyKinded _ _)             = pure True
+  unifyTails ([], TypeVar _ v1)      ([], TypeVar _ v2)      | v1 == v2 = pure True
+  unifyTails ([], Skolem _ _ _ s1 _) ([], Skolem _ _ _ s2 _) | s1 == s2 = pure True
+  unifyTails (sd1, TUnknown a u1)    (sd2, TUnknown _ u2)    | u1 /= u2 = do
     forM_ sd1 $ occursCheck u2 . rowListType
     forM_ sd2 $ occursCheck u1 . rowListType
     rest' <- freshTypeWithKind =<< elaborateKind (TUnknown a u1)
     solveType u1 (rowFromList (sd2, rest'))
     solveType u2 (rowFromList (sd1, rest'))
-  unifyTails r1' r2' =
-    throwError . errorMessage $ TypesDoNotUnify (rowFromList r1') (rowFromList r2')
+    pure True
+  unifyTails _ _ = pure False
+
+  isNotTDNU :: ErrorMessage -> Bool
+  isNotTDNU = \case
+    ErrorMessage _ (TypesDoNotUnify _ _) -> False
+    _ -> True
 
 -- |
 -- Replace type wildcards with unknowns

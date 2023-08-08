@@ -1,5 +1,4 @@
 -- @shouldFailWith TypesDoNotUnify
--- @shouldFailWith TypesDoNotUnify
 module A where
 
 -- Some labels are missing, these should be pointed out in the error 
