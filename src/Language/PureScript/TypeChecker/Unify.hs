@@ -28,7 +28,7 @@ import Data.Text qualified as T
 
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment qualified as E
-import Language.PureScript.Errors (ErrorMessageHint(..), MultipleErrors, SimpleErrorMessage(..), SourceAnn, errorMessage, internalCompilerError, onErrorMessages, parU, rethrow, warnWithPosition, withoutPosition)
+import Language.PureScript.Errors (ErrorMessageHint(..), MultipleErrors, SimpleErrorMessage(..), SourceAnn, errorMessage, internalCompilerError, onErrorMessages, rethrow, warnWithPosition, withoutPosition)
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, instantiateKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad (CheckState(..), Substitution(..), UnkLevel(..), Unknown, getLocalContext, guardWith, lookupUnkName, withErrorMessageHint)
 import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, skolemize)
@@ -163,7 +163,7 @@ unifyTypes t1 t2 = do
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
 unifyRows r1 r2 = do
   let tryError ma = catchError (Nothing <$ ma) (pure . Just)
-  matchesErr <- tryError $ parU matches id
+  matchesErr <- tryError $ sequence_ matches
   tailsErr <- tryError $ uncurry unifyTails rest
   case (matchesErr, tailsErr) of
     (Just l1, Just l2) -> throwError $ l1 <> l2
