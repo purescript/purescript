@@ -47,15 +47,31 @@ Error 2 of 2:
   at tests/purs/failing/NestedRecordTypeError.purs:7:3 - 7:34 (line 7, column 3 - line 7, column 34)
 
     Could not match type
-    [33m    [0m
-    [33m  ()[0m
-    [33m    [0m
+    [33m                          [0m
+    [33m  ( a :: { c :: { d :: Int[0m
+    [33m                }         [0m
+    [33m         }                [0m
+    [33m  , d :: Int              [0m
+    [33m  , e :: Int              [0m
+    [33m  , f :: Int              [0m
+    [33m  ...                     [0m
+    [33m  )                       [0m
+    [33m                          [0m
     with type
-    [33m           [0m
-    [33m  ( g :: t1[0m
-    [33m  | t2     [0m
-    [33m  )        [0m
-    [33m           [0m
+    [33m                         [0m
+    [33m  ( a :: { b :: { z :: t5[0m
+    [33m                | t6     [0m
+    [33m                }        [0m
+    [33m         | t7            [0m
+    [33m         }               [0m
+    [33m  , d :: t4              [0m
+    [33m  , e :: t3              [0m
+    [33m  , f :: t2              [0m
+    [33m  , g :: t1              [0m
+    [33m  ...                    [0m
+    [33m  | t8                   [0m
+    [33m  )                      [0m
+    [33m                         [0m
 
   while trying to match type [33m{ a :: { c :: { d :: Int[0m
                              [33m              }         [0m
@@ -71,6 +87,12 @@ Error 2 of 2:
   in value declaration [33mf[0m
 
   where [33mt0[0m is an unknown type
+        [33mt8[0m is an unknown type
+        [33mt7[0m is an unknown type
+        [33mt6[0m is an unknown type
+        [33mt5[0m is an unknown type
+        [33mt4[0m is an unknown type
+        [33mt3[0m is an unknown type
         [33mt2[0m is an unknown type
         [33mt1[0m is an unknown type
 
