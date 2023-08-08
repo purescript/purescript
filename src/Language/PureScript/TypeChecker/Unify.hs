@@ -187,9 +187,8 @@ unifyRows r1 r2 = do
     rest' <- freshTypeWithKind =<< elaborateKind (TUnknown a u1)
     solveType u1 (rowFromList (sd2, rest'))
     solveType u2 (rowFromList (sd1, rest'))
-  unifyTails _ _ = do
-    subst <- gets checkSubstitution
-    throwError . errorMessage $ TypesDoNotUnify (substituteType subst r1) (substituteType subst r2)
+  unifyTails r1' r2' =
+    throwError . errorMessage $ TypesDoNotUnify (rowFromList r1') (rowFromList r2')
 
 -- |
 -- Replace type wildcards with unknowns
