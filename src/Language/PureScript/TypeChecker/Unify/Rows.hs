@@ -1,6 +1,7 @@
 module Language.PureScript.TypeChecker.Unify.Rows
   ( unifyishRows
   , isTypesDoNotUnify
+  , isKindsDoNotUnify
   ) where
 
 import Control.Monad (forM, when)
@@ -69,4 +70,9 @@ unifyishRows onRecurse onUnifyTails isExpectedError buildError r1 r2 = do
 isTypesDoNotUnify :: SimpleErrorMessage -> Bool
 isTypesDoNotUnify = \case
   TypesDoNotUnify {} -> True
+  _ -> False
+
+isKindsDoNotUnify :: SimpleErrorMessage -> Bool
+isKindsDoNotUnify = \case
+  KindsDoNotUnify {} -> True
   _ -> False

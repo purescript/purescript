@@ -54,6 +54,7 @@ import Language.PureScript.Names (pattern ByNullSourcePos, ModuleName, Name(..),
 import Language.PureScript.TypeChecker.Monad (CheckState(..), Substitution(..), UnkLevel(..), Unknown, bindLocalTypeVariables, debugType, getEnv, lookupTypeVariable, unsafeCheckCurrentModule, withErrorMessageHint, withFreshSubstitution)
 import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, newSkolemScope, skolemize)
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
+import Language.PureScript.TypeChecker.Unify.Rows (unifyishRows, isKindsDoNotUnify)
 import Language.PureScript.Types
 import Language.PureScript.Pretty.Types (prettyPrintType)
 
@@ -384,9 +385,9 @@ unifyKinds
   => SourceType
   -> SourceType
   -> m ()
-unifyKinds = unifyKindsWithFailure $ \w1 w2 ->
-  throwError
-    . errorMessage''' (fst . getAnnForType <$> [w1, w2])
+unifyKinds = unifyKindsWithFailure $ UseUnifyishRows isKindsDoNotUnify $ \w1 w2 ->
+  pure
+    $ errorMessage''' (fst . getAnnForType <$> [w1, w2])
     $ KindsDoNotUnify w1 w2
 
 -- | Does not attach positions to the error node, instead relies on the
@@ -397,9 +398,9 @@ unifyKinds'
   => SourceType
   -> SourceType
   -> m ()
-unifyKinds' = unifyKindsWithFailure $ \w1 w2 ->
-  throwError
-    . errorMessage
+unifyKinds' = unifyKindsWithFailure $ UseUnifyishRows isKindsDoNotUnify $ \w1 w2 ->
+  pure
+    $ errorMessage
     $ KindsDoNotUnify w1 w2
 
 -- | Check the kind of a type, failing if it is not of kind *.
@@ -409,17 +410,41 @@ checkTypeKind
   -> SourceType
   -> m ()
 checkTypeKind ty kind =
-  unifyKindsWithFailure (\_ _ -> throwError . errorMessage $ ExpectedType ty kind) kind E.kindType
+  -- In this case, if any failure occurs, we ignore it and throw our own error.
+  -- So, rather than use `unifyishRows` here and pay for its overhead,
+  -- we'll use the approach that was used before we migrated to `unifyishRows`
+  -- because the original approach fails faster.
+  unifyKindsWithFailure (UseSequential ty kind) kind E.kindType
+
+data UnifyRowOptions m
+  -- type kind
+  = UseSequential SourceType SourceType
+  -- isExpectedError onFailure
+  | UseUnifyishRows (SimpleErrorMessage -> Bool) (SourceType -> SourceType -> m MultipleErrors)
 
 unifyKindsWithFailure
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
-  => (SourceType -> SourceType -> m ())
+  => UnifyRowOptions m
   -> SourceType
   -> SourceType
   -> m ()
-unifyKindsWithFailure onFailure = go
+unifyKindsWithFailure opts = go
   where
-  goWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ go t1 t2
+  (unifyRows, onFailure) = case opts of
+    UseSequential ty kind ->
+      ( \r1 r2 -> do
+          let (matches, rest) = alignRowsWith (\_ -> go) r1 r2
+          sequence_ matches
+          void $ unifyTails rest
+
+      , \_ _ -> 
+          pure $ errorMessage $ ExpectedType ty kind
+      )
+    UseUnifyishRows isExpectedError buildError ->
+      ( unifyishRows go unifyTails isExpectedError buildError
+      , buildError
+      )
+
   go = curry $ \case
     (TypeApp _ p1 p2, TypeApp _ p3 p4) -> do
       go p1 p3
@@ -442,26 +467,24 @@ unifyKindsWithFailure onFailure = go
     (p1, TUnknown _ a') ->
       solveUnknown a' p1
     (w1, w2) ->
-      onFailure w1 w2
-
-  unifyRows r1 r2 = do
-    let (matches, rest) = alignRowsWith goWithLabel r1 r2
-    sequence_ matches
-    unifyTails rest
+      throwError =<< onFailure w1 w2
 
   unifyTails = \case
-    (([], TUnknown _ a'), (rs, p1)) ->
+    (([], TUnknown _ a'), (rs, p1)) -> do
       solveUnknown a' $ rowFromList (rs, p1)
-    ((rs, p1), ([], TUnknown _ a')) ->
+      pure True
+    ((rs, p1), ([], TUnknown _ a')) -> do
       solveUnknown a' $ rowFromList (rs, p1)
+      pure True
     (([], w1), ([], w2)) | eqType w1 w2 ->
-      pure ()
+      pure True
     ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) | u1 /= u2 -> do
       rest <- freshKind nullSourceSpan
       solveUnknown u1 $ rowFromList (rs2, rest)
       solveUnknown u2 $ rowFromList (rs1, rest)
-    (w1, w2) ->
-      onFailure (rowFromList w1) (rowFromList w2)
+      pure True
+    (_, _) ->
+      pure False
 
 solveUnknown
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
