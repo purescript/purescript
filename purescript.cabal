@@ -386,6 +386,7 @@ library
     Language.PureScript.TypeChecker.Types
     Language.PureScript.TypeChecker.TypeSearch
     Language.PureScript.TypeChecker.Unify
+    Language.PureScript.TypeChecker.Unify.Rows
     Language.PureScript.TypeClassDictionaries
     Language.PureScript.Types
     System.IO.UTF8
