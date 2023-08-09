@@ -1,4 +1,4 @@
--- @shouldFailWith PropertyIsMissing
+-- @shouldFailWith TypesDoNotUnify
 module A where
 
 -- Currently only reports on the missing `c` label

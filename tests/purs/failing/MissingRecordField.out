@@ -2,7 +2,20 @@ Error found:
 in module [33mMissingRecordField[0m
 at tests/purs/failing/MissingRecordField.purs:10:19 - 10:23 (line 10, column 19 - line 10, column 23)
 
-  Type of expression lacks required label [33mage[0m.
+  Could not match type
+  [33m                   [0m
+  [33m  ( first :: String[0m
+  [33m  , last :: String [0m
+  [33m  ...              [0m
+  [33m  )                [0m
+  [33m                   [0m
+  with type
+  [33m                 [0m
+  [33m  ( age :: Number[0m
+  [33m  ...            [0m
+  [33m  | t0           [0m
+  [33m  )              [0m
+  [33m                 [0m
 
 while checking that type [33m{ first :: String[0m
                          [33m, last :: String [0m
@@ -18,6 +31,6 @@ in value declaration [33mresult[0m
 
 where [33mt0[0m is an unknown type
 
-See https://github.com/purescript/documentation/blob/master/errors/PropertyIsMissing.md for more information,
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
 or to contribute content related to this error.
 

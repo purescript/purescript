@@ -7,23 +7,18 @@ module Language.PureScript.TypeChecker.Subsumption
 
 import Prelude
 
-import Control.Monad (when)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..))
-
-import Data.Foldable (for_)
-import Data.List (uncons)
-import Data.List.Ordered (minusBy')
-import Data.Ord (comparing)
+import Control.Monad.State.Class (MonadState(..), gets)
 
 import Language.PureScript.AST (ErrorMessageHint(..), Expr(..), pattern NullSourceAnn)
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (tyFunction, tyRecord)
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, internalCompilerError)
-import Language.PureScript.TypeChecker.Monad (CheckState, getHints, getTypeClassDictionaries, withErrorMessageHint)
+import Language.PureScript.TypeChecker.Monad (CheckState(..), getHints, getTypeClassDictionaries, withErrorMessageHint)
 import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, skolemize)
-import Language.PureScript.TypeChecker.Unify (alignRowsWith, freshTypeWithKind, unifyTypes)
-import Language.PureScript.Types (RowListItem(..), SourceType, Type(..), eqType, isREmpty, replaceTypeVars, rowFromList)
+import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, substituteType, unifyTypes)
+import Language.PureScript.TypeChecker.Unify.Rows (unifyishRows, isTypesDoNotUnify)
+import Language.PureScript.Types (SourceType, Type(..), eqType, replaceTypeVars, rowFromList)
 
 -- | Subsumption can operate in two modes:
 --
@@ -69,7 +64,8 @@ subsumes ty1 ty2 =
 
 -- | Check that one type subsumes another
 subsumes'
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  :: forall m mode
+   . (MonadError MultipleErrors m, MonadState CheckState m)
   => ModeSing mode
   -> SourceType
   -> SourceType
@@ -103,25 +99,23 @@ subsumes' SElaborate (ConstrainedType _ con ty1) ty2 = do
   let addDicts val = App val (TypeClassDictionary con dicts hints)
   return (elaborate . addDicts)
 subsumes' mode (TypeApp _ f1 r1) (TypeApp _ f2 r2) | eqType f1 tyRecord && eqType f2 tyRecord = do
-    let goWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ subsumes' SNoElaborate t1 t2
-    let (common, ((ts1', r1'), (ts2', r2'))) = alignRowsWith goWithLabel r1 r2
-    -- For { ts1 | r1 } to subsume { ts2 | r2 } when r1 is empty (= we're working with a closed row),
-    -- every property in ts2 must appear in ts1. If not, then the candidate expression is missing a required property.
-    -- Conversely, when r2 is empty, every property in ts1 must appear in ts2, or else the expression has
-    -- an additional property which is not allowed.
-    when (isREmpty r1')
-      (for_ (firstMissingProp ts2' ts1') (throwError . errorMessage . PropertyIsMissing . rowListLabel))
-    when (isREmpty r2')
-      (for_ (firstMissingProp ts1' ts2') (throwError . errorMessage . AdditionalProperty . rowListLabel))
+  let 
+    withBoolError :: forall a. m a -> m Bool
+    withBoolError u = catchError (True <$ u) (pure . const False)
+  unifyishRows
     -- Check subsumption for common labels
-    sequence_ common
+    (subsumes' SNoElaborate) 
     -- Inject the info here
-    unifyTypes (rowFromList (ts1', r1')) (rowFromList (ts2', r2'))
-    -- Nothing was elaborated, return the default coercion
-    return (defaultCoercion mode)
-  where
-    -- Find the first property that's in the first list (of tuples) but not in the second
-    firstMissingProp t1 t2 = fst <$> uncons (minusBy' (comparing rowListLabel) t1 t2)
+    (uncurry $ \(ts1', r1') (ts2', r2') ->
+      withBoolError $ unifyTypes (rowFromList (ts1', r1')) (rowFromList (ts2', r2')))
+    isTypesDoNotUnify
+    (\r1' r2' -> do
+      subst <- gets checkSubstitution
+      pure $ errorMessage $ TypesDoNotUnify (substituteType subst r1') (substituteType subst r2'))
+    r1
+    r2
+  -- Nothing was elaborated, return the default coercion
+  return (defaultCoercion mode)
 subsumes' mode ty1 ty2@(TypeApp _ obj _) | obj == tyRecord =
   subsumes' mode ty2 ty1
 subsumes' mode ty1 ty2 = do

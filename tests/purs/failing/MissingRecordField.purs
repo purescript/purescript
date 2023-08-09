@@ -1,4 +1,4 @@
--- @shouldFailWith PropertyIsMissing
+-- @shouldFailWith TypesDoNotUnify
 module MissingRecordField where
 
 import Prelude ((>))
