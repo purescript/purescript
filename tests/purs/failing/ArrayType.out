@@ -2,7 +2,7 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/ArrayType.purs:10:7 - 10:8 (line 10, column 7 - line 10, column 8)
 
-  The type
+  The actual type
   [33m     [0m
   [33m  Int[0m
   [33m     [0m

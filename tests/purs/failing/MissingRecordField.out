@@ -2,7 +2,7 @@ Error found:
 in module [33mMissingRecordField[0m
 at tests/purs/failing/MissingRecordField.purs:10:19 - 10:23 (line 10, column 19 - line 10, column 23)
 
-  The type
+  The actual type
   [33m                   [0m
   [33m  { first :: String[0m
   [33m  , last :: String [0m

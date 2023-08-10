@@ -2,7 +2,7 @@ Error found:
 in module [33mDoNotSuggestComposition[0m
 at tests/purs/failing/DoNotSuggestComposition.purs:13:11 - 13:12 (line 13, column 11 - line 13, column 12)
 
-  The type
+  The actual type
   [33m            [0m
   [33m  { y :: Int[0m
   [33m  }         [0m

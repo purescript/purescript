@@ -2,7 +2,7 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/Rank2Types.purs:8:25 - 8:26 (line 8, column 25 - line 8, column 26)
 
-  The type
+  The actual type
   [33m     [0m
   [33m  Int[0m
   [33m     [0m

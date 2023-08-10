@@ -2,7 +2,7 @@ Error found:
 in module [33mExtraRecordField[0m
 at tests/purs/failing/ExtraRecordField.purs:9:13 - 9:54 (line 9, column 13 - line 9, column 54)
 
-  The type
+  The actual type
   [33m              [0m
   [33m  { age :: Int[0m
   [33m  ...         [0m
