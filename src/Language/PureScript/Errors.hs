@@ -104,7 +104,10 @@ data SimpleErrorMessage
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
   | EscapedSkolem Text (Maybe SourceSpan) SourceType
-  | TypesDoNotUnify SourceType SourceType
+  | TypesDoNotUnify
+      Bool -- ^ if this error is known to be a case where the first type is used but the second type is expected
+      SourceType
+      SourceType
   | KindsDoNotUnify SourceType SourceType
   | ConstrainedTypeUnified SourceType SourceType
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified (Either SourceType Ident)]
@@ -466,7 +469,7 @@ onTypesInErrorMessageM :: Applicative m => (SourceType -> m SourceType) -> Error
 onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse gHint hints <*> gSimple simple
   where
   gSimple (InfiniteType t) = InfiniteType <$> f t
-  gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
+  gSimple (TypesDoNotUnify isOrdered t1 t2) = TypesDoNotUnify isOrdered <$> f t1 <*> f t2
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
@@ -858,14 +861,21 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , line "has escaped its scope, appearing in the type"
             , markCodeBox $ indent $ prettyType ty
             ]
-    renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
+    renderSimpleErrorMessage (TypesDoNotUnify isOrdered u1 u2)
       = let (row1Box, row2Box) = printRows u1 u2
 
-        in paras [ line "Could not match type"
-                 , row1Box
-                 , line "with type"
-                 , row2Box
-                 ]
+        in if isOrdered then
+          paras [ line "The type"
+                , row1Box
+                , line "does not match the expected type"
+                , row2Box
+                ]
+        else
+          paras [ line "Could not match type"
+                , row1Box
+                , line "with type"
+                , row2Box
+                ]
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
       paras [ line "Could not match kind"

@@ -2,11 +2,11 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/Rank2Types.purs:8:25 - 8:26 (line 8, column 25 - line 8, column 26)
 
-  Could not match type
+  The type
   [33m     [0m
   [33m  Int[0m
   [33m     [0m
-  with type
+  does not match the expected type
   [33m    [0m
   [33m  a0[0m
   [33m    [0m

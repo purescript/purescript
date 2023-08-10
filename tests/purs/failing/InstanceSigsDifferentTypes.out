@@ -2,11 +2,11 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/InstanceSigsDifferentTypes.purs:10:9 - 10:12 (line 10, column 9 - line 10, column 12)
 
-  Could not match type
+  The type
   [33m        [0m
   [33m  Number[0m
   [33m        [0m
-  with type
+  does not match the expected type
   [33m     [0m
   [33m  Int[0m
   [33m     [0m

@@ -2,11 +2,11 @@ Error found:
 in module [33mX[0m
 at tests/purs/failing/1175.purs:11:11 - 11:12 (line 11, column 11 - line 11, column 12)
 
-  Could not match type
+  The type
   [33m     [0m
   [33m  Int[0m
   [33m     [0m
-  with type
+  does not match the expected type
   [33m        [0m
   [33m  String[0m
   [33m        [0m

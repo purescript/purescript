@@ -13,11 +13,11 @@ import Control.Monad.State.Class (MonadState(..), gets)
 import Language.PureScript.AST (ErrorMessageHint(..), Expr(..), pattern NullSourceAnn)
 import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.Crash (internalError)
-import Language.PureScript.Environment (tyFunction, tyRecord)
+import Language.PureScript.Environment (tyFunction)
 import Language.PureScript.Errors (MultipleErrors, internalCompilerError)
 import Language.PureScript.TypeChecker.Monad (CheckState(..), getHints, getTypeClassDictionaries, withErrorMessageHint)
 import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, skolemize)
-import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, substituteType, unifyishRowTypes, unifyTypes)
+import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, substituteType, unifyishRowTypes, unifyTypesOrdered)
 import Language.PureScript.Types (SourceType, Type(..), eqType, replaceTypeVars)
 
 -- | Subsumption can operate in two modes:
@@ -100,12 +100,10 @@ subsumes' SElaborate (ConstrainedType _ con ty1) ty2 = do
   return (elaborate . addDicts)
 subsumes' mode (TypeApp s1 f1@(TypeConstructor _ C.Record) r1) (TypeApp s2 f2@(TypeConstructor _ C.Record) r2) = do
   subst <- gets checkSubstitution
-  unifyishRowTypes (TypeApp s1 f1) (TypeApp s2 f2) (subsumes' SNoElaborate) (substituteType subst r1) (substituteType subst r2)
+  unifyishRowTypes True (TypeApp s1 f1) (TypeApp s2 f2) (subsumes' SNoElaborate) (substituteType subst r1) (substituteType subst r2)
   -- Nothing was elaborated, return the default coercion
   return (defaultCoercion mode)
-subsumes' mode ty1 ty2@(TypeApp _ obj _) | obj == tyRecord =
-  subsumes' mode ty2 ty1
 subsumes' mode ty1 ty2 = do
-  unifyTypes ty1 ty2
+  unifyTypesOrdered ty1 ty2
   -- Nothing was elaborated, return the default coercion
   return (defaultCoercion mode)

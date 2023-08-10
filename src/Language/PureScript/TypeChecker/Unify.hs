@@ -8,6 +8,7 @@ module Language.PureScript.TypeChecker.Unify
   , substituteType
   , unknownsInType
   , unifyTypes
+  , unifyTypesOrdered
   , unifyRows
   , unifyishRowTypes
   , alignRowsWith
@@ -110,7 +111,15 @@ unknownsInType t = everythingOnTypes (.) go t []
 
 -- | Unify two types, updating the current substitution
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
-unifyTypes t1 t2 = do
+unifyTypes = unifyTypesGeneral False
+
+-- | Unify two types (in a context where the second type is expected to subsume
+-- the first), updating the current substitution
+unifyTypesOrdered :: (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
+unifyTypesOrdered = unifyTypesGeneral True
+
+unifyTypesGeneral :: (MonadError MultipleErrors m, MonadState CheckState m) => Bool -> SourceType -> SourceType -> m ()
+unifyTypesGeneral isOrdered t1 t2 = do
   sub <- gets checkSubstitution
   withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
   where
@@ -123,17 +132,17 @@ unifyTypes t1 t2 = do
         sko <- newSkolemConstant
         let sk1 = skolemize ann1 ident1 mbK1 sko sc1' ty1
         let sk2 = skolemize ann2 ident2 mbK2 sko sc2' ty2
-        sk1 `unifyTypes` sk2
+        sk1 `unifyTypesCovariant` sk2
       _ -> internalError "unifyTypes: unspecified skolem scope"
   unifyTypes' (ForAll ann _ ident mbK ty1 (Just sc)) ty2 = do
     sko <- newSkolemConstant
     let sk = skolemize ann ident mbK sko sc ty1
-    sk `unifyTypes` ty2
+    sk `unifyTypesCovariant` ty2
   unifyTypes' ForAll{} _ = internalError "unifyTypes: unspecified skolem scope"
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
   unifyTypes' (TypeVar _ v1) (TypeVar _ v2) | v1 == v2 = return ()
   unifyTypes' ty1@(TypeConstructor _ c1) ty2@(TypeConstructor _ c2) =
-    guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
+    guardWith (errorMessage (TypesDoNotUnify isOrdered ty1 ty2)) (c1 == c2)
   unifyTypes' (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = return ()
   unifyTypes' (TypeLevelInt    _ n1) (TypeLevelInt    _ n2) | n1 == n2 = return ()
   unifyTypes' (TypeApp _ t3 t4) (TypeApp _ t5 t6) = do
@@ -141,10 +150,10 @@ unifyTypes t1 t2 = do
     t4 `unifyTypes` t6
   unifyTypes' (KindApp _ t3 t4) (KindApp _ t5 t6) = do
     t3 `unifyKinds'` t5
-    t4 `unifyTypes` t6
+    t4 `unifyTypesCovariant` t6
   unifyTypes' (Skolem _ _ _ s1 _) (Skolem _ _ _ s2 _) | s1 == s2 = return ()
-  unifyTypes' (KindedType _ ty1 _) ty2 = ty1 `unifyTypes` ty2
-  unifyTypes' ty1 (KindedType _ ty2 _) = ty1 `unifyTypes` ty2
+  unifyTypes' (KindedType _ ty1 _) ty2 = ty1 `unifyTypesCovariant` ty2
+  unifyTypes' ty1 (KindedType _ ty2 _) = ty1 `unifyTypesCovariant` ty2
   unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmptyKinded{} r2 = unifyRows r1 r2
@@ -152,35 +161,39 @@ unifyTypes t1 t2 = do
   unifyTypes' (ConstrainedType _ c1 ty1) (ConstrainedType _ c2 ty2)
     | constraintClass c1 == constraintClass c2 && constraintData c1 == constraintData c2 = do
         traverse_ (uncurry unifyTypes) (constraintArgs c1 `zip` constraintArgs c2)
-        ty1 `unifyTypes` ty2
+        ty1 `unifyTypesCovariant` ty2
   unifyTypes' ty1@ConstrainedType{} ty2 =
     throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
-  unifyTypes' t3 t4@ConstrainedType{} = unifyTypes' t4 t3
+  unifyTypes' ty1 ty2@ConstrainedType{} =
+    throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
   unifyTypes' t3 t4 =
-    throwError . errorMessage $ TypesDoNotUnify t3 t4
+    throwError . errorMessage $ TypesDoNotUnify isOrdered t3 t4
+
+  unifyTypesCovariant = unifyTypesGeneral isOrdered
 
 -- | Unify two rows, updating the current substitution
 --
 -- Common labels are identified and unified. Remaining labels and types are unified with a
 -- trailing row unification variable, if appropriate.
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
-unifyRows = unifyishRowTypes id id unifyTypes
+unifyRows = unifyishRowTypes False id id unifyTypes
 
 -- | Sits between unifyRows and unifyishRows in generality. These names are
 -- getting ridiculous.
 unifyishRowTypes
   :: forall m
    . (MonadError MultipleErrors m, MonadState CheckState m)
-  => (SourceType -> SourceType) -- ^ how to wrap the first type when reporting an overall type error
+  => Bool -- ^ is the first type being used where the second type is expected
+  -> (SourceType -> SourceType) -- ^ how to wrap the first type when reporting an overall type error
   -> (SourceType -> SourceType) -- ^ ditto the second type
   -> (SourceType -> SourceType -> m ()) -- ^ function to use to check types at common labels
   -> SourceType
   -> SourceType
   -> m ()
-unifyishRowTypes errorTypeWrapper1 errorTypeWrapper2 =
+unifyishRowTypes isOrdered errorTypeWrapper1 errorTypeWrapper2 =
   unifyishRows (uncurry unifyTails) isTypesDoNotUnify $ \r1 r2 -> do
     subst <- gets checkSubstitution
-    pure $ errorMessage $ TypesDoNotUnify
+    pure $ errorMessage $ TypesDoNotUnify isOrdered
       (errorTypeWrapper1 $ substituteType subst r1)
       (errorTypeWrapper2 $ substituteType subst r2)
   where

@@ -2,11 +2,11 @@ Error found:
 in module [33mNestedRecordLabelOnTypeError[0m
 at tests/purs/failing/NestedRecordLabelOnTypeError.purs:8:9 - 8:15 (line 8, column 9 - line 8, column 15)
 
-  Could not match type
+  The type
   [33m     [0m
   [33m  Int[0m
   [33m     [0m
-  with type
+  does not match the expected type
   [33m        [0m
   [33m  String[0m
   [33m        [0m
