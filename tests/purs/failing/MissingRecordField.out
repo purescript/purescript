@@ -17,19 +17,18 @@ at tests/purs/failing/MissingRecordField.purs:10:19 - 10:23 (line 10, column 19 
   [33m  }                  [0m
   [33m                     [0m
 
-while checking that type [33m{ first :: String  [0m
-                         [33m, last :: String   [0m
-                         [33m, mortal :: Boolean[0m
-                         [33m}                  [0m
-  is at least as general as type [33m{ age :: Number    [0m
-                                 [33m, mortal :: Boolean[0m
-                                 [33m| t0               [0m
-                                 [33m}                  [0m
 while checking that expression [33mjohn[0m
   has type [33m{ age :: Number    [0m
            [33m, mortal :: Boolean[0m
            [33m| t0               [0m
            [33m}                  [0m
+while applying a function [33misOver50[0m
+  of type [33m{ age :: Number    [0m
+          [33m, mortal :: Boolean[0m
+          [33m| t0               [0m
+          [33m}                  [0m
+          [33m-> Boolean         [0m
+  to argument [33mjohn[0m
 in value declaration [33mresult[0m
 
 where [33mt0[0m is an unknown type

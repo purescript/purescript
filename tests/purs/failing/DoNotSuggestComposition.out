@@ -12,11 +12,11 @@ at tests/purs/failing/DoNotSuggestComposition.purs:13:11 - 13:12 (line 13, colum
   [33m  String[0m
   [33m        [0m
 
-while checking that type [33m{ y :: Int[0m
-                         [33m}         [0m
-  is at least as general as type [33mString[0m
 while checking that expression [33mx[0m
   has type [33mString[0m
+while applying a function [33mfoo[0m
+  of type [33mString -> String[0m
+  to argument [33mx[0m
 in value declaration [33mbar[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,

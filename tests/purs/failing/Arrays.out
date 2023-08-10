@@ -11,10 +11,11 @@ at tests/purs/failing/Arrays.purs:6:26 - 6:27 (line 6, column 26 - line 6, colum
   [33m  Array t0[0m
   [33m          [0m
 
-while checking that type [33mInt[0m
-  is at least as general as type [33mArray t0[0m
 while checking that expression [33m0[0m
   has type [33mArray t0[0m
+while applying a function [33mix[0m
+  of type [33mArray t0 -> Int -> t0[0m
+  to argument [33m0[0m
 in value declaration [33mtest[0m
 
 where [33mt0[0m is an unknown type

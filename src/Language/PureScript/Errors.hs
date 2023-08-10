@@ -47,7 +47,7 @@ import Language.PureScript.Pretty.Common (endWith)
 import Language.PureScript.PSString (decodeStringWithReplacement)
 import Language.PureScript.Roles (Role, displayRole)
 import Language.PureScript.Traversals (sndM)
-import Language.PureScript.Types (Constraint(..), ConstraintData(..), RowListItem(..), SourceConstraint, SourceType, Type(..), eraseForAllKindAnnotations, eraseKindApps, everywhereOnTypesTopDownM, getAnnForType, isMonoType, overConstraintArgs, rowFromList, rowToList, srcTUnknown)
+import Language.PureScript.Types (Constraint(..), ConstraintData(..), RowListItem(..), SourceConstraint, SourceType, Type(..), eqType, eraseForAllKindAnnotations, eraseKindApps, everywhereOnTypesTopDownM, getAnnForType, isMonoType, overConstraintArgs, rowFromList, rowToList, srcTUnknown)
 import Language.PureScript.Publish.BoxesHelpers qualified as BoxHelpers
 import System.Console.ANSI qualified as ANSI
 import System.FilePath (makeRelative)
@@ -1717,10 +1717,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
 
     -- See https://github.com/purescript/purescript/issues/1802
     stripRedundantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
-    stripRedundantHints TypesDoNotUnify{} = stripFirst isUnifyHint
+    stripRedundantHints (TypesDoNotUnify _ t1 t2) = stripFirst isMatchingSubsumptionHint . stripFirst isUnifyHint
       where
       isUnifyHint ErrorUnifyingTypes{} = True
       isUnifyHint _ = False
+      isMatchingSubsumptionHint (ErrorInSubsumption t1' t2') = t1 `eqType` t1' && t2 `eqType` t2'
+      isMatchingSubsumptionHint _ = False
     stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _) _ _) = filter (not . isSolverHint)
       where
       isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
