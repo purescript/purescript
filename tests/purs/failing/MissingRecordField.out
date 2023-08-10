@@ -3,19 +3,19 @@ in module [33mMissingRecordField[0m
 at tests/purs/failing/MissingRecordField.purs:10:19 - 10:23 (line 10, column 19 - line 10, column 23)
 
   The type
-  [33m                     [0m
-  [33m  { first :: String  [0m
-  [33m  , last :: String   [0m
-  [33m  , mortal :: Boolean[0m
-  [33m  }                  [0m
-  [33m                     [0m
+  [33m                   [0m
+  [33m  { first :: String[0m
+  [33m  , last :: String [0m
+  [33m  ...              [0m
+  [33m  }                [0m
+  [33m                   [0m
   does not match the expected type
-  [33m                     [0m
-  [33m  { age :: Number    [0m
-  [33m  , mortal :: Boolean[0m
-  [33m  | t0               [0m
-  [33m  }                  [0m
-  [33m                     [0m
+  [33m                 [0m
+  [33m  { age :: Number[0m
+  [33m  ...            [0m
+  [33m  | t0           [0m
+  [33m  }              [0m
+  [33m                 [0m
 
 while checking that expression [33mjohn[0m
   has type [33m{ age :: Number    [0m

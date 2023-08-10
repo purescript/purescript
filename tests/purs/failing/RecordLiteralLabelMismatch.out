@@ -4,18 +4,16 @@ at tests/purs/failing/RecordLiteralLabelMismatch.purs:8:14 - 8:40 (line 8, colum
 
   The type
   [33m            [0m
-  [33m  { a :: Int[0m
-  [33m  , b :: Int[0m
-  [33m  , y :: Int[0m
+  [33m  { y :: Int[0m
   [33m  , z :: Int[0m
+  [33m  ...       [0m
   [33m  }         [0m
   [33m            [0m
   does not match the expected type
   [33m            [0m
-  [33m  { a :: Int[0m
-  [33m  , b :: Int[0m
-  [33m  , c :: Int[0m
+  [33m  { c :: Int[0m
   [33m  , d :: Int[0m
+  [33m  ...       [0m
   [33m  }         [0m
   [33m            [0m
 

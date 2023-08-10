@@ -1607,6 +1607,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
         let (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
         in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
 
+      (_, TypeApp s1 f1@(TypeConstructor _ C.Record) r1'@RCons{}, TypeApp s2 f2@(TypeConstructor _ C.Record) r2'@RCons{}) ->
+        let (sorted1, sorted2) = filterRows (rowToList r1') (rowToList r2')
+        in (printRow typeDiffAsBox $ TypeApp s1 f1 sorted1, printRow typeDiffAsBox $ TypeApp s2 f2 sorted2)
+
       (_, _, _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
 
 
