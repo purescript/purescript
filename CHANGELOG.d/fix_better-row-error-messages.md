@@ -106,24 +106,60 @@
     )
   ```
 
-  **Case 5: printing `Record ()` using native syntax**
+  **Case 5: reporting only the first `TypesDoNotUnify` error rather than all such errors on record pattern matches whose labels are a subset of the expected record's labels**
 
-  Before:
-  ```
-  Record ()
-  ```
-  After:
-  ```
-  {}
+  The following behavior is unchanged, but it is explained to clarify
+  the next summary.
+ 
+  When pattern matching on a record where the pattern match's labels
+  differ from the labels of the expected record (e.g. from a type signature),
+  a `TypesDoNotUnify` error is thrown showing a diff between the two records' labels,
+  regardless of whether their corresponding types unify.
+
+  ```purs
+  data ExpectedType = ExpectedValue
+  data SomeOtherType = DifferentValue
+
+  {-  
+  Produces one error for the entire record; behavior unchanged.
+
+    The type
+      ( a :: ExpectedValue
+      , b :: String
+      )
+    does not unify with type
+      ( x :: SomeOtherType
+      , y :: Int
+      )
+  -}
+  test :: { a :: ExpectedType, b :: String } -> Int
+  test { x: DifferentValue, y: 7 } = 1
   ```
 
-  **Case 6: printing `Record (...)` using native syntax**
+  However, if the labels in the pattern match are a subset of the labels
+  in the expected record, then previously a `TypesDoNotUnify` error is thrown
+  for only the _first_ detected error. Now, such an error is thrown
+  _for each_ type that fails to unify.
 
-  Before:
+  ```purs
+  data ExpectedType = ExpectedValue
+  data SomeOtherType = DifferentValue
+
+  data A = A
+
+  -- Errors thrown in previous behavior:
+  -- - under label sameLabel1, `TypesDoNotUnify ExpectedType SomeOtherType`
+  --
+  -- Errors thrown in new behavior:
+  -- - under label sameLabel1, `TypesDoNotUnify ExpectedType SomeOtherType`
+  -- - under label sameLabel2, `TypesDoNotUnify String Int`
+  test :: { sameLabel1 :: ExpectedType, sameLabel2 :: String, sameLabel3 :: A } -> Int
+  test { sameLabel1: DifferentValue, sameLabel2: 7, sameLabel3: A } = 1
   ```
-  Record (...)
-  ```
-  After:
-  ```
-  { ... }
-  ```
+
+  **Case 6: printing `Record row` using native syntax**
+
+  | Before | After |
+  | - | - |
+  | `Record ()` | `{}` |
+  | `Record (...)` | `{ ... }` |
