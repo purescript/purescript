@@ -2049,10 +2049,11 @@ parU
   -> (a -> m b)
   -> m [b]
 parU xs f =
-    forM xs (withError . f) >>= collectErrors
+    forM xs (tryError . f) >>= collectErrors
   where
-    withError :: m b -> m (Either MultipleErrors b)
-    withError u = catchError (Right <$> u) (return . Left)
+    -- exported from Control.Monad.Error.Class in mtl >= 2.3
+    tryError :: m b -> m (Either MultipleErrors b)
+    tryError u = catchError (Right <$> u) (return . Left)
 
     collectErrors :: [Either MultipleErrors b] -> m [b]
     collectErrors es = case partitionEithers es of

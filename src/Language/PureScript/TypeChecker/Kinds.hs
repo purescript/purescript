@@ -385,7 +385,7 @@ unifyKinds
   => SourceType
   -> SourceType
   -> m ()
-unifyKinds = unifyKindsWithFailure $ UseUnifyishRows isKindsDoNotUnify $ \w1 w2 ->
+unifyKinds = unifyKindsWithFailure UseUnifyishRows $ \w1 w2 ->
   pure
     $ errorMessage''' (fst . getAnnForType <$> [w1, w2])
     $ KindsDoNotUnify w1 w2
@@ -398,7 +398,7 @@ unifyKinds'
   => SourceType
   -> SourceType
   -> m ()
-unifyKinds' = unifyKindsWithFailure $ UseUnifyishRows isKindsDoNotUnify $ \w1 w2 ->
+unifyKinds' = unifyKindsWithFailure UseUnifyishRows $ \w1 w2 ->
   pure
     $ errorMessage
     $ KindsDoNotUnify w1 w2
@@ -414,36 +414,31 @@ checkTypeKind ty kind =
   -- So, rather than use `unifyishRows` here and pay for its overhead,
   -- we'll use the approach that was used before we migrated to `unifyishRows`
   -- because the original approach fails faster.
-  unifyKindsWithFailure (UseSequential ty kind) kind E.kindType
+  unifyKindsWithFailure UseSequential
+    (\_ _ -> pure $ errorMessage $ ExpectedType ty kind)
+    kind
+    E.kindType
 
-data UnifyRowOptions m
-  -- type kind
-  = UseSequential SourceType SourceType
-  -- isExpectedError onFailure
-  | UseUnifyishRows (SimpleErrorMessage -> Bool) (SourceType -> SourceType -> m MultipleErrors)
+data UnifyRowOptions
+  = UseSequential
+  | UseUnifyishRows
 
 unifyKindsWithFailure
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
-  => UnifyRowOptions m
+  => UnifyRowOptions
+  -> (SourceType -> SourceType -> m MultipleErrors)
   -> SourceType
   -> SourceType
   -> m ()
-unifyKindsWithFailure opts = go
+unifyKindsWithFailure opts onFailure = go
   where
-  (unifyRows, onFailure) = case opts of
-    UseSequential ty kind ->
-      ( \r1 r2 -> do
-          let (matches, rest) = alignRowsWith (\_ -> go) r1 r2
-          sequence_ matches
-          void $ unifyTails rest
-
-      , \_ _ -> 
-          pure $ errorMessage $ ExpectedType ty kind
-      )
-    UseUnifyishRows isExpectedError buildError ->
-      ( unifyishRows go unifyTails isExpectedError buildError
-      , buildError
-      )
+  unifyRows = case opts of
+    UseSequential -> \r1 r2 -> do
+      let (matches, rest) = alignRowsWith (const go) r1 r2
+      sequence_ matches
+      void $ unifyTails rest
+    UseUnifyishRows ->
+      unifyishRows go unifyTails isKindsDoNotUnify onFailure
 
   go = curry $ \case
     (TypeApp _ p1 p2, TypeApp _ p3 p4) -> do
@@ -470,12 +465,10 @@ unifyKindsWithFailure opts = go
       throwError =<< onFailure w1 w2
 
   unifyTails = \case
-    (([], TUnknown _ a'), (rs, p1)) -> do
-      solveUnknown a' $ rowFromList (rs, p1)
-      pure True
-    ((rs, p1), ([], TUnknown _ a')) -> do
-      solveUnknown a' $ rowFromList (rs, p1)
-      pure True
+    (([], TUnknown _ a'), (rs, p1)) ->
+      solveUnknown a' (rowFromList (rs, p1)) $> True
+    ((rs, p1), ([], TUnknown _ a')) ->
+      solveUnknown a' (rowFromList (rs, p1)) $> True
     (([], w1), ([], w2)) | eqType w1 w2 ->
       pure True
     ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) | u1 /= u2 -> do

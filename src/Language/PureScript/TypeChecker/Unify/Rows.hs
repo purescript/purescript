@@ -4,16 +4,18 @@ module Language.PureScript.TypeChecker.Unify.Rows
   , isKindsDoNotUnify
   ) where
 
+import Prelude
+
 import Control.Monad (forM, when)
 import Control.Monad.Error.Class (MonadError (..))
 import Control.Monad.State.Class (MonadState (..))
 import Data.Either (lefts)
 import Data.Foldable (fold)
+
 import Language.PureScript.Errors (ErrorMessage (..), ErrorMessageHint (..), MultipleErrors (..), SimpleErrorMessage (..), SourceAnn, nonEmpty)
 import Language.PureScript.Label (Label)
 import Language.PureScript.TypeChecker.Monad (CheckState (..), withErrorMessageHint)
 import Language.PureScript.Types (RowListItem (..), SourceType, alignRowsWith)
-import Prelude
 
 -- | Do a unify-like operation on two rows, updating the current substitution
 --
@@ -31,12 +33,12 @@ unifyishRows ::
   m ()
 unifyishRows onRecurse onUnifyTails isExpectedError buildError r1 r2 = do
   -- First, `onRecurse` the types in aligned labels, but don't throw any errors yet.
-  alignedErr <- fold . lefts <$> forM matches withError
+  alignedErr <- fold . lefts <$> forM matches tryError
   -- Now `onTails` the tails; this must happen after matching the types in aligned
   -- labels, so that any unknowns solved from the aligned labels don't appear
   -- in the error message produced if the tails don't unify.
   tailErr <-
-    withError (onUnifyTails rest) >>= \case
+    tryError (onUnifyTails rest) >>= \case
       -- If an error was raised during unification, return that.
       Left err -> pure err
       -- If tails did unify, return an empty error (will be filtered below).
@@ -54,8 +56,9 @@ unifyishRows onRecurse onUnifyTails isExpectedError buildError r1 r2 = do
   let combinedErr = alignedErr <> tailErr
   when (nonEmpty combinedErr) $ throwError combinedErr
   where
-    withError :: forall a. m a -> m (Either MultipleErrors a)
-    withError u = catchError (Right <$> u) (pure . Left)
+    -- exported from Control.Monad.Error.Class in mtl >= 2.3
+    tryError :: forall a. m a -> m (Either MultipleErrors a)
+    tryError u = catchError (Right <$> u) (pure . Left)
 
     onRecurseWithLabel :: Label -> SourceType -> SourceType -> m ()
     onRecurseWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ onRecurse t1 t2
@@ -69,10 +72,10 @@ unifyishRows onRecurse onUnifyTails isExpectedError buildError r1 r2 = do
 
 isTypesDoNotUnify :: SimpleErrorMessage -> Bool
 isTypesDoNotUnify = \case
-  TypesDoNotUnify {} -> True
+  TypesDoNotUnify{} -> True
   _ -> False
 
 isKindsDoNotUnify :: SimpleErrorMessage -> Bool
 isKindsDoNotUnify = \case
-  KindsDoNotUnify {} -> True
+  KindsDoNotUnify{} -> True
   _ -> False
