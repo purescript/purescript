@@ -2,17 +2,17 @@ Error found:
 in module [33mA[0m
 at tests/purs/failing/RecordLiteralLabelMismatch.purs:8:14 - 8:40 (line 8, column 14 - line 8, column 40)
 
-  The actual type
-  [33m            [0m
-  [33m  { y :: Int[0m
-  [33m  , z :: Int[0m
-  [33m  ...       [0m
-  [33m  }         [0m
-  [33m            [0m
-  does not match the expected type
+  Expected type
   [33m            [0m
   [33m  { c :: Int[0m
   [33m  , d :: Int[0m
+  [33m  ...       [0m
+  [33m  }         [0m
+  [33m            [0m
+  but found type
+  [33m            [0m
+  [33m  { y :: Int[0m
+  [33m  , z :: Int[0m
   [33m  ...       [0m
   [33m  }         [0m
   [33m            [0m

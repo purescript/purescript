@@ -2,16 +2,16 @@ Error found:
 in module [33mExtraRecordField[0m
 at tests/purs/failing/ExtraRecordField.purs:9:13 - 9:54 (line 9, column 13 - line 9, column 54)
 
-  The actual type
+  Expected type
+  [33m         [0m
+  [33m  { ... }[0m
+  [33m         [0m
+  but found type
   [33m              [0m
   [33m  { age :: Int[0m
   [33m  ...         [0m
   [33m  }           [0m
   [33m              [0m
-  does not match the expected type
-  [33m         [0m
-  [33m  { ... }[0m
-  [33m         [0m
 
 while checking that expression [33m{ first: "Jane"[0m
                                [33m, last: "Smith"[0m

@@ -2,14 +2,14 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/Rank2Types.purs:8:25 - 8:26 (line 8, column 25 - line 8, column 26)
 
-  The actual type
-  [33m     [0m
-  [33m  Int[0m
-  [33m     [0m
-  does not match the expected type
+  Expected type
   [33m    [0m
   [33m  a1[0m
   [33m    [0m
+  but found type
+  [33m     [0m
+  [33m  Int[0m
+  [33m     [0m
 
 while checking that expression [33m1[0m
   has type [33ma1[0m

@@ -2,15 +2,15 @@ Error found:
 in module [33mDoNotSuggestComposition[0m
 at tests/purs/failing/DoNotSuggestComposition.purs:13:11 - 13:12 (line 13, column 11 - line 13, column 12)
 
-  The actual type
+  Expected type
+  [33m        [0m
+  [33m  String[0m
+  [33m        [0m
+  but found type
   [33m            [0m
   [33m  { y :: Int[0m
   [33m  }         [0m
   [33m            [0m
-  does not match the expected type
-  [33m        [0m
-  [33m  String[0m
-  [33m        [0m
 
 while checking that expression [33mx[0m
   has type [33mString[0m

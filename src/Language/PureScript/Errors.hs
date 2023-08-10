@@ -858,10 +858,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       = let (row1Box, row2Box) = printRows u1 u2
 
         in if isOrdered then
-          paras [ line "The actual type"
-                , row1Box
-                , line "does not match the expected type"
+          paras [ line "Expected type"
                 , row2Box
+                , line "but found type"
+                , row1Box
                 ]
         else
           paras [ line "Could not match type"

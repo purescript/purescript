@@ -2,14 +2,14 @@ Error found:
 in module [33mX[0m
 at tests/purs/failing/1175.purs:11:11 - 11:12 (line 11, column 11 - line 11, column 12)
 
-  The actual type
-  [33m     [0m
-  [33m  Int[0m
-  [33m     [0m
-  does not match the expected type
+  Expected type
   [33m        [0m
   [33m  String[0m
   [33m        [0m
+  but found type
+  [33m     [0m
+  [33m  Int[0m
+  [33m     [0m
 
 while checking that expression [33m1[0m
   has type [33mString[0m

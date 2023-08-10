@@ -2,14 +2,14 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/Arrays.purs:6:26 - 6:27 (line 6, column 26 - line 6, column 27)
 
-  The actual type
-  [33m     [0m
-  [33m  Int[0m
-  [33m     [0m
-  does not match the expected type
+  Expected type
   [33m          [0m
   [33m  Array t0[0m
   [33m          [0m
+  but found type
+  [33m     [0m
+  [33m  Int[0m
+  [33m     [0m
 
 while checking that expression [33m0[0m
   has type [33mArray t0[0m

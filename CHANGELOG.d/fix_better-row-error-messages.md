@@ -23,10 +23,10 @@
   ```
   After:
   ```
-  The actual type
-    X
-  does not match the expected type
+  Expected type
     Y
+  but found type
+    X
   ```
 
   **Case 2: reporting only the first additional label**
@@ -37,12 +37,12 @@
   ```
   After:
   ```
-  The actual type
+  Expected type
+    { ... }
+  but found type
     { extraLabel1 :: Int
     , extraLabel2 :: Int
     }
-  does not match the expected type
-    { ... }
   ```
 
   **Case 3: reporting only the first missing label**
@@ -53,15 +53,15 @@
   ```
   After:
   ```
-  The actual type
-    { first :: String
-    , last :: String
-    ...
-    }
-  does not match the expected type
+  Expected type
     { age :: Number
     ...
     | t0
+    }
+  but found type
+    { first :: String
+    , last :: String
+    ...
     }
   ```
 
