@@ -10,7 +10,7 @@ import Control.Arrow ((&&&))
 import Control.Exception (displayException)
 import Control.Lens (both, head1, over)
 import Control.Monad (forM, unless)
-import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Error.Class (MonadError(..), liftEither)
 import Control.Monad.Trans.State.Lazy (State, evalState, get, put)
 import Control.Monad.Writer (Last(..), MonadWriter(..), censor)
 import Data.Bifunctor (first, second)
@@ -135,9 +135,6 @@ data SimpleErrorMessage
   | ExpectedType SourceType SourceType
   -- | constructor name, expected argument count, actual argument count
   | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName)) Int Int
-  | ExprDoesNotHaveType Expr SourceType
-  | PropertyIsMissing Label
-  | AdditionalProperty Label
   | OrphanInstance Ident (Qualified (ProperName 'ClassName)) (S.Set ModuleName) [SourceType]
   | InvalidNewtype (ProperName 'TypeName)
   | InvalidInstanceHead SourceType
@@ -312,9 +309,6 @@ errorCode em = case unwrapErrorMessage em of
   ExtraneousClassMember{} -> "ExtraneousClassMember"
   ExpectedType{} -> "ExpectedType"
   IncorrectConstructorArity{} -> "IncorrectConstructorArity"
-  ExprDoesNotHaveType{} -> "ExprDoesNotHaveType"
-  PropertyIsMissing{} -> "PropertyIsMissing"
-  AdditionalProperty{} -> "AdditionalProperty"
   OrphanInstance{} -> "OrphanInstance"
   InvalidNewtype{} -> "InvalidNewtype"
   InvalidInstanceHead{} -> "InvalidInstanceHead"
@@ -471,7 +465,6 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (InfiniteType t) = InfiniteType <$> f t
   gSimple (TypesDoNotUnify isOrdered t1 t2) = TypesDoNotUnify isOrdered <$> f t1 <*> f t2
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
-  gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con ambig unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure ambig <*> pure unks
   gSimple (AmbiguousTypeVariables t uis) = AmbiguousTypeVariables <$> f t <*> pure uis
@@ -1058,16 +1051,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       paras [ line $ "Data constructor " <> markCode (showQualified runProperName nm) <> " was given " <> T.pack (show actual) <> " arguments in a case expression, but expected " <> T.pack (show expected) <> " arguments."
             , line $ "This problem can be fixed by giving " <> markCode (showQualified runProperName nm) <> " " <> T.pack (show expected) <> " arguments."
             ]
-    renderSimpleErrorMessage (ExprDoesNotHaveType expr ty) =
-      paras [ line "Expression"
-            , markCodeBox $ indent $ prettyPrintValue prettyDepth expr
-            , line "does not have type"
-            , markCodeBox $ indent $ prettyType ty
-            ]
-    renderSimpleErrorMessage (PropertyIsMissing prop) =
-      line $ "Type of expression lacks required label " <> markCode (prettyPrintLabel prop) <> "."
-    renderSimpleErrorMessage (AdditionalProperty prop) =
-      line $ "Type of expression contains additional label " <> markCode (prettyPrintLabel prop) <> "."
     renderSimpleErrorMessage (OrphanInstance nm cnm nonOrphanModules ts) =
       paras [ line $ "Orphan instance" <> prettyPrintPlainIdent nm <> " found for "
             , markCodeBox $ indent $ Box.hsep 1 Box.left
@@ -1734,10 +1717,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
 
     -- See https://github.com/purescript/purescript/issues/1802
     stripRedundantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
-    stripRedundantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
-      where
-      isCheckHint ErrorCheckingType{} = True
-      isCheckHint _ = False
     stripRedundantHints TypesDoNotUnify{} = stripFirst isUnifyHint
       where
       isUnifyHint ErrorUnifyingTypes{} = True
@@ -2069,6 +2048,25 @@ parU xs f =
     collectErrors es = case partitionEithers es of
       ([], rs) -> return rs
       (errs, _) -> throwError $ fold errs
+
+-- | Collect errors in parallel, using a function to combine results
+liftParU2
+  :: forall m a b c
+   . MonadError MultipleErrors m
+  => (a -> b -> c)
+  -> m a
+  -> m b
+  -> m c
+liftParU2 f ma mb = f' <$> tryError ma <*> tryError mb >>= liftEither
+  where
+  -- exported from Control.Monad.Error.Class in mtl >= 2.3
+  tryError :: forall d. m d -> m (Either MultipleErrors d)
+  tryError u = catchError (Right <$> u) (return . Left)
+
+  f' (Left e) (Left e') = Left $ e <> e'
+  f' (Left e) (Right _) = Left e
+  f' (Right _) (Left e) = Left e
+  f' (Right a) (Right b) = Right $ f a b
 
 internalCompilerError
   :: (MonadError MultipleErrors m, GHC.Stack.HasCallStack)

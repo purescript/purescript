@@ -36,8 +36,9 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Bifunctor (bimap)
 import Data.Either (partitionEithers)
 import Data.Functor (($>))
-import Data.List (transpose, (\\), partition, delete)
+import Data.List (transpose, (\\), partition)
 import Data.Maybe (fromMaybe)
+import Data.Monoid (Endo(..))
 import Data.Text (Text)
 import Data.Traversable (for)
 import Data.List.NonEmpty qualified as NEL
@@ -48,7 +49,7 @@ import Data.IntSet qualified as IS
 import Language.PureScript.AST
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
-import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage', escalateWarningWhen, internalCompilerError, onErrorMessages, onTypesInErrorMessage, parU)
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage', escalateWarningWhen, internalCompilerError, liftParU2, onErrorMessages, onTypesInErrorMessage, parU)
 import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), byMaybeModuleName, coerceProperName, freshIdent)
 import Language.PureScript.TypeChecker.Deriving (deriveInstance)
 import Language.PureScript.TypeChecker.Entailment (InstanceContext, newDictionaries, replaceTypeClassDictionaries)
@@ -58,7 +59,7 @@ import Language.PureScript.TypeChecker.Skolems (introduceSkolemScope, newSkolemC
 import Language.PureScript.TypeChecker.Subsumption (subsumes)
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
 import Language.PureScript.TypeChecker.TypeSearch (typeSearch)
-import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, replaceTypeWildcards, substituteType, unifyTypes, unknownsInType, varIfUnknown)
+import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, replaceTypeWildcards, substituteType, unifyTypes, unifyishRowTypes, unifyTypesOrdered, unknownsInType, varIfUnknown)
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
@@ -865,15 +866,15 @@ check' (IfThenElse cond th el) ty = do
   th' <- tvToExpr <$> check th ty
   el' <- tvToExpr <$> check el ty
   return $ TypedValue' True (IfThenElse cond' th' el') ty
-check' e@(Literal ss (ObjectLiteral ps)) t@(TypeApp _ obj row) | obj == tyRecord = do
+check' (Literal ss (ObjectLiteral ps)) t@(TypeApp _ obj row) | obj == tyRecord = do
   ensureNoDuplicateProperties ps
-  ps' <- checkProperties e ps row False
+  ps' <- checkProperties ps row False
   return $ TypedValue' True (Literal ss (ObjectLiteral ps')) t
 check' (DerivedInstancePlaceholder name strategy) t = do
   d <- deriveInstance t name strategy
   d' <- tvToExpr <$> check' d t
   return $ TypedValue' True d' t
-check' e@(ObjectUpdate obj ps) t@(TypeApp _ o row) | o == tyRecord = do
+check' (ObjectUpdate obj ps) t@(TypeApp _ o row) | o == tyRecord = do
   ensureNoDuplicateProperties ps
   -- We need to be careful to avoid duplicate labels here.
   -- We check _obj_ against the type _t_ with the types in _ps_ replaced with unknowns.
@@ -881,7 +882,7 @@ check' e@(ObjectUpdate obj ps) t@(TypeApp _ o row) | o == tyRecord = do
       (removedProps, remainingProps) = partition (\(RowListItem _ p _) -> p `elem` map (Label . fst) ps) propsToCheck
   us <- zipWith srcRowListItem (map rowListLabel removedProps) <$> replicateM (length ps) (freshTypeWithKind kindType)
   obj' <- tvToExpr <$> check obj (srcTypeApp tyRecord (rowFromList (us ++ remainingProps, rest)))
-  ps' <- checkProperties e ps row True
+  ps' <- checkProperties ps row True
   return $ TypedValue' True (ObjectUpdate obj' ps') t
 check' (Accessor prop val) ty = withErrorMessageHint (ErrorCheckingAccessor val prop) $ do
   rest <- freshTypeWithKind (kindRow kindType)
@@ -918,37 +919,43 @@ check' val ty = do
 --
 checkProperties
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => Expr
-  -> [(PSString, Expr)]
+  => [(PSString, Expr)]
   -> SourceType
   -> Bool
   -> m [(PSString, Expr)]
-checkProperties expr ps row lax = convert <$> go ps (toRowPair <$> ts') r' where
-  convert = fmap (fmap tvToExpr)
-  (ts', r') = rowToList row
+checkProperties ps row lax = do
+  subst <- gets checkSubstitution
+  let row' = substituteType subst row
+  let (ts, r') = rowToList row'
+  -- Going to some lengths to make this go through unifyishRowTypes, in order
+  -- to take advantage of the all-in-one error reporting there. The checking
+  -- and inference of individual properties has to be done on the specific
+  -- expressions, but if there is a mismatch between the labels provided and
+  -- expected, unifyishRowTypes will report that nicely.
+  let (common, extraProperties) = appEndo (foldMap (Endo . go) ps) mempty where
+      typeAssocList = toRowPair <$> ts
+      go (p, v) = case lookup (Label p) typeAssocList of
+        Just ty -> first ((p, v, ty) :)
+        Nothing -> second ((p, v) :)
+  typedProps <- liftParU2 (++)
+    (parU common $ \(p, v, ty) -> (p, ) <$> withErrorMessageHint (ErrorInRowLabel $ Label p) (check v ty))
+    (parU extraProperties $ \(p, v) -> (p, ) . pairToTV <$> withErrorMessageHint (ErrorInRowLabel $ Label p) (inferWithinRecord v))
+  rest <-
+    if not lax && canBeMadeEmpty r' then
+      pure $ srcKindApp srcREmpty kindType
+    else
+      freshTypeWithKind $ kindRow kindType
+  let givenRow = rowFromList ((\(p, tv) -> srcRowListItem (Label p) (tvToType tv)) <$> typedProps, rest)
+  unifyishRowTypes True (srcTypeApp tyRecord) (srcTypeApp tyRecord) unifyTypesOrdered givenRow row'
+  pure $ second tvToExpr <$> typedProps
+  where
   toRowPair (RowListItem _ lbl ty) = (lbl, ty)
-  go [] [] (REmptyKinded _ _) = return []
-  go [] [] u@(TUnknown _ _)
-    | lax = return []
-    | otherwise = do unifyTypes u srcREmpty
-                     return []
-  go [] [] Skolem{} | lax = return []
-  go [] ((p, _): _) _ | lax = return []
-                      | otherwise = throwError . errorMessage $ PropertyIsMissing p
-  go ((p,_):_) [] (REmptyKinded _ _) = throwError . errorMessage $ AdditionalProperty $ Label p
-  go ((p,v):ps') ts r =
-    case lookup (Label p) ts of
-      Nothing -> do
-        (v', ty) <- inferWithinRecord v
-        rest <- freshTypeWithKind (kindRow kindType)
-        unifyTypes r (srcRCons (Label p) ty rest)
-        ps'' <- go ps' ts rest
-        return $ (p, TypedValue' True v' ty) : ps''
-      Just ty -> do
-        v' <- check v ty
-        ps'' <- go ps' (delete (Label p, ty) ts) r
-        return $ (p, v') : ps''
-  go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (srcTypeApp tyRecord row)
+  tvToType (TypedValue' _ _ ty) = ty
+  pairToTV (v, ty) = TypedValue' True v ty
+  canBeMadeEmpty = \case
+    TUnknown{} -> True
+    REmptyKinded{} -> True
+    _ -> False
 
 -- | Check the type of a function application, rethrowing errors to provide a better error message.
 --

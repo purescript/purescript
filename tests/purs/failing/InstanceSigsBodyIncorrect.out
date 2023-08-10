@@ -15,6 +15,7 @@ while checking that type [33mBoolean[0m
   is at least as general as type [33mNumber[0m
 while checking that expression [33mtrue[0m
   has type [33mNumber[0m
+while matching label [33mfoo[0m
 in value declaration [33mfooNumber[0m
 
 See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
