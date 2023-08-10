@@ -570,6 +570,7 @@ propertyShouldInstantiate :: Expr -> Bool
 propertyShouldInstantiate = \case
   Var{} -> True
   Constructor{} -> True
+  VisibleTypeApp e _ -> propertyShouldInstantiate e
   PositionedValue _ _ e -> propertyShouldInstantiate e
   _ -> False
 

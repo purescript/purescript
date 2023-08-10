@@ -5,6 +5,23 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+    paths:
+      - .github/workflows/**/*.yml
+      - app/**/*
+      - bundle/**/*
+      - ci/**/*
+      - license-generator/**/*
+      - src/**/*
+      - test/**/*
+      - .gitignore
+      - .hlint.yaml
+      - .hspec
+      - cabal.project
+      - purescript.cabal
+      - Setup.hs
+      - stack.yaml
+      - update-changelog.hs
+      - weeder.dhall
   release:
     types: [ "published" ]
 
