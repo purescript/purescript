@@ -9,6 +9,7 @@ module Language.PureScript.TypeChecker.Unify
   , unknownsInType
   , unifyTypes
   , unifyRows
+  , unifyishRowTypes
   , alignRowsWith
   , replaceTypeWildcards
   , varIfUnknown
@@ -163,9 +164,25 @@ unifyTypes t1 t2 = do
 -- Common labels are identified and unified. Remaining labels and types are unified with a
 -- trailing row unification variable, if appropriate.
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
-unifyRows = unifyishRows unifyTypes (uncurry unifyTails) isTypesDoNotUnify $ \r1 r2 -> do
-  subst <- gets checkSubstitution
-  pure $ errorMessage $ TypesDoNotUnify (substituteType subst r1) (substituteType subst r2)
+unifyRows = unifyishRowTypes id id unifyTypes
+
+-- | Sits between unifyRows and unifyishRows in generality. These names are
+-- getting ridiculous.
+unifyishRowTypes
+  :: forall m
+   . (MonadError MultipleErrors m, MonadState CheckState m)
+  => (SourceType -> SourceType) -- ^ how to wrap the first type when reporting an overall type error
+  -> (SourceType -> SourceType) -- ^ ditto the second type
+  -> (SourceType -> SourceType -> m ()) -- ^ function to use to check types at common labels
+  -> SourceType
+  -> SourceType
+  -> m ()
+unifyishRowTypes errorTypeWrapper1 errorTypeWrapper2 =
+  unifyishRows (uncurry unifyTails) isTypesDoNotUnify $ \r1 r2 -> do
+    subst <- gets checkSubstitution
+    pure $ errorMessage $ TypesDoNotUnify
+      (errorTypeWrapper1 $ substituteType subst r1)
+      (errorTypeWrapper2 $ substituteType subst r2)
   where
   unifyTails :: ([RowListItem SourceAnn], SourceType) -> ([RowListItem SourceAnn], SourceType) -> m Bool
   unifyTails ([], TUnknown _ u)      (sd, r)                            = solveType u (rowFromList (sd, r)) $> True

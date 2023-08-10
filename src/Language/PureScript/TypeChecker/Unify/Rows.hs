@@ -24,14 +24,14 @@ import Language.PureScript.Types (RowListItem (..), SourceType, alignRowsWith)
 unifyishRows ::
   forall m.
   (MonadError MultipleErrors m, MonadState CheckState m) =>
-  (SourceType -> SourceType -> m ()) ->
   ((([RowListItem SourceAnn], SourceType), ([RowListItem SourceAnn], SourceType)) -> m Bool) ->
   (SimpleErrorMessage -> Bool) ->
   (SourceType -> SourceType -> m MultipleErrors) ->
+  (SourceType -> SourceType -> m ()) ->
   SourceType ->
   SourceType ->
   m ()
-unifyishRows onRecurse onUnifyTails isExpectedError buildError r1 r2 = do
+unifyishRows onUnifyTails isExpectedError buildError onRecurse r1 r2 = do
   -- First, `onRecurse` the types in aligned labels, but don't throw any errors yet.
   alignedErr <- fold . lefts <$> forM matches tryError
   -- Now `onTails` the tails; this must happen after matching the types in aligned

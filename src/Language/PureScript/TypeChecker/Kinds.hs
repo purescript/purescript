@@ -438,7 +438,7 @@ unifyKindsWithFailure opts onFailure = go
       sequence_ matches
       void $ unifyTails rest
     UseUnifyishRows ->
-      unifyishRows go unifyTails isKindsDoNotUnify onFailure
+      unifyishRows unifyTails isKindsDoNotUnify onFailure go
 
   go = curry $ \case
     (TypeApp _ p1 p2, TypeApp _ p3 p4) -> do
