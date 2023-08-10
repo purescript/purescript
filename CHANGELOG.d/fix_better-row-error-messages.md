@@ -29,45 +29,23 @@
     X
   ```
 
-  **Case 2: reporting only the first additional label**
-
+  **Case 2: reporting all label differences (and only those differences) together**
+  
   Before:
   ```
   Type of expression contains additional label extraLabel1
   ```
-  After:
+  (without any messages about more extra labels)
+  
+  or
+  
   ```
-  Expected type
-    { ... }
-  but found type
-    { extraLabel1 :: Int
-    , extraLabel2 :: Int
-    }
+  Type of expression lacks required label requiredLabel1
   ```
-
-  **Case 3: reporting only the first missing label**
-
-  Before:
-  ```
-  Type of expression lacks required label age
-  ```
-  After:
-  ```
-  Expected type
-    { age :: Number
-    ...
-    | t0
-    }
-  but found type
-    { first :: String
-    , last :: String
-    ...
-    }
-  ```
-
-  **Case 4: reporting all of two large records rather than just their differences**
-
-  Before:
+  (without any messages about more required labels)
+  
+  or
+  
   ```
   Could not match type
     ( a :: Int
@@ -76,8 +54,8 @@
     , d :: Int
     , e :: Int
     , f :: Int
-    , h :: Int
-    , j :: Int
+    , extraLabel1 :: Int
+    , extraLabel2 :: Int
     ...
     )
   with type
@@ -87,26 +65,27 @@
     , d :: t4
     , e :: t3
     , f :: t2
-    , g :: t1
+    , requiredLabel1 :: t1
     ...
     | t8
     )
   ```
+  
   After:
   ```
-  Could not match type
-    ( h :: Int
-    , j :: Int
+  Expected type
+    { requiredLabel1 :: t1
     ...
-    )
-  with type
-    ( g :: t1
+    | t2
+    }
+  but found type
+    { extraLabel1 :: Int
+    , extraLabel2 :: Int
     ...
-    | t8
-    )
+    }
   ```
 
-  **Case 5: reporting only the first `TypesDoNotUnify` error rather than all such errors on record pattern matches whose labels are a subset of the expected record's labels**
+  **Case 3: reporting only the first `TypesDoNotUnify` error rather than all such errors on record pattern matches whose labels are a subset of the expected record's labels**
 
   The following behavior is unchanged, but it is explained to clarify
   the next summary.
@@ -157,7 +136,7 @@
   test { sameLabel1: DifferentValue, sameLabel2: 7, sameLabel3: A } = 1
   ```
 
-  **Case 6: printing `Record row` using native syntax**
+  **Case 4: printing `Record row` using native syntax**
 
   | Before | After |
   | - | - |
