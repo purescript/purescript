@@ -956,6 +956,7 @@ checkProperties ps row lax = do
     TUnknown{} -> True
     REmptyKinded{} -> True
     _ -> False
+{- HLINT ignore checkProperties "Redundant where" -}
 
 -- | Check the type of a function application, rethrowing errors to provide a better error message.
 --
