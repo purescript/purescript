@@ -385,10 +385,7 @@ unifyKinds
   => SourceType
   -> SourceType
   -> m ()
-unifyKinds = unifyKindsWithFailure UseUnifyishRows $ \w1 w2 ->
-  pure
-    $ errorMessage''' (fst . getAnnForType <$> [w1, w2])
-    $ KindsDoNotUnify w1 w2
+unifyKinds = unifyKindsWithFailure AttachSourceSpans
 
 -- | Does not attach positions to the error node, instead relies on the
 -- | local position context. This is useful when invoking kind unification
@@ -398,10 +395,7 @@ unifyKinds'
   => SourceType
   -> SourceType
   -> m ()
-unifyKinds' = unifyKindsWithFailure UseUnifyishRows $ \w1 w2 ->
-  pure
-    $ errorMessage
-    $ KindsDoNotUnify w1 w2
+unifyKinds' = unifyKindsWithFailure UseLocalContext
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind
@@ -410,35 +404,29 @@ checkTypeKind
   -> SourceType
   -> m ()
 checkTypeKind ty kind =
-  -- In this case, if any failure occurs, we ignore it and throw our own error.
-  -- So, rather than use `unifyishRows` here and pay for its overhead,
-  -- we'll use the approach that was used before we migrated to `unifyishRows`
-  -- because the original approach fails faster.
-  unifyKindsWithFailure UseSequential
-    (\_ _ -> pure $ errorMessage $ ExpectedType ty kind)
-    kind
-    E.kindType
+  catchError (unifyKinds' kind E.kindType) $ \_ ->
+    throwError $ errorMessage $ ExpectedType ty kind
 
-data UnifyRowOptions
-  = UseSequential
-  | UseUnifyishRows
+data SourceSpanOptions
+  = UseLocalContext
+  | AttachSourceSpans
 
 unifyKindsWithFailure
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
-  => UnifyRowOptions
-  -> (SourceType -> SourceType -> m MultipleErrors)
+  => SourceSpanOptions
   -> SourceType
   -> SourceType
   -> m ()
-unifyKindsWithFailure opts onFailure = go
+unifyKindsWithFailure sourceSpanOptions = go
   where
-  unifyRows = case opts of
-    UseSequential -> \r1 r2 -> do
-      let (matches, rest) = alignRowsWith (const go) r1 r2
-      sequence_ matches
-      void $ unifyTails rest
-    UseUnifyishRows ->
-      unifyishRows unifyTails isKindsDoNotUnify onFailure go
+  mkErrorMessage = case sourceSpanOptions of
+    UseLocalContext -> 
+      \w1 w2 -> errorMessage $ KindsDoNotUnify w1 w2
+    AttachSourceSpans ->
+      \w1 w2 -> errorMessage''' (fst . getAnnForType <$> [w1, w2]) $ KindsDoNotUnify w1 w2
+
+  unifyRows = 
+    unifyishRows unifyTails isKindsDoNotUnify (\w1 w2 -> pure $ mkErrorMessage w1 w2) go
 
   go = curry $ \case
     (TypeApp _ p1 p2, TypeApp _ p3 p4) -> do
@@ -462,7 +450,7 @@ unifyKindsWithFailure opts onFailure = go
     (p1, TUnknown _ a') ->
       solveUnknown a' p1
     (w1, w2) ->
-      throwError =<< onFailure w1 w2
+      throwError $ mkErrorMessage w1 w2
 
   unifyTails = \case
     (([], TUnknown _ a'), (rs, p1)) ->
