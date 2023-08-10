@@ -3,9 +3,9 @@ in module [33mMain[0m
 at tests/purs/failing/Object.purs:8:14 - 8:16 (line 8, column 14 - line 8, column 16)
 
   The type
-  [33m           [0m
-  [33m  Record ()[0m
-  [33m           [0m
+  [33m    [0m
+  [33m  {}[0m
+  [33m    [0m
   does not match the expected type
   [33m             [0m
   [33m  { foo :: t0[0m

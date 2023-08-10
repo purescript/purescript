@@ -9,9 +9,9 @@ at tests/purs/failing/ExtraRecordField.purs:9:13 - 9:54 (line 9, column 13 - lin
   [33m  }           [0m
   [33m              [0m
   does not match the expected type
-  [33m                [0m
-  [33m  Record ( ... )[0m
-  [33m                [0m
+  [33m         [0m
+  [33m  { ... }[0m
+  [33m         [0m
 
 while checking that expression [33m{ first: "Jane"[0m
                                [33m, last: "Smith"[0m
