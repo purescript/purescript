@@ -8,11 +8,14 @@
   and `AdditionalProperty` have been removed, being replaced
   with `TypesDoNotUnify` instead.
 
-  **Case 1: lack of expected/actual text when that is known**
+  **Case 1: lack of "expected type" distinction when it is known**
 
-  The expected/actual distinction is not possible to determine in all cases,
-  but it can be known in some cases. Previously, it was not reported even 
-  if it was known. Now the compiler reports this distinction if known.
+  Previously, the message would not indicate which
+  of the two types was the expected type, even
+  if it could be determined.
+  
+  Now, when this distinction is known, it is reported. 
+  Note: this distinction cannot be known in all circumstances.
 
   Before:
   ```
