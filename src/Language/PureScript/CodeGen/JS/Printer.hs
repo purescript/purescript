@@ -121,26 +121,6 @@ literals = mkPattern' match'
     , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
-  match (Import _ ident from) = return . emit $
-    "import * as " <> ident <> " from " <> prettyPrintStringJS from
-  match (Export _ idents from) = mconcat <$> sequence
-    [ return $ emit "export {\n"
-    , withIndent $ do
-        let exportsStrings = emit . exportedIdentToString from <$> idents
-        indentString <- currentIndent
-        return . intercalate (emit ",\n") . NEL.toList $ (indentString <>) <$> exportsStrings
-    , return $ emit "\n"
-    , currentIndent
-    , return . emit $ "}" <> maybe "" ((" from " <>) . prettyPrintStringJS) from
-    ]
-    where
-    exportedIdentToString Nothing ident
-      | nameIsJsReserved ident || nameIsJsBuiltIn ident
-      = "$$" <> ident <> " as " <> ident
-    exportedIdentToString _ "$main"
-      = T.concatMap identCharToText "$main" <> " as $main"
-    exportedIdentToString _ ident
-      = T.concatMap identCharToText ident
   match (Comment PureAnnotation js) = mconcat <$> sequence
     [ return $ emit "/* #__PURE__ */ "
     , prettyPrintJS' js
@@ -175,13 +155,13 @@ comment (BlockComment com) = fmap mconcat $ sequence $
         Just (x, xs) -> x `T.cons` removeComments xs
         Nothing      -> ""
 
-prettyImport :: (Emit gen) => AST.Import -> StateT PrinterState Maybe gen
-prettyImport (AST.Import ident from) =
+prettyImport :: (Emit gen) => Import -> StateT PrinterState Maybe gen
+prettyImport (Import ident from) =
   return . emit $
     "import * as " <> ident <> " from " <> prettyPrintStringJS from <> ";"
 
-prettyExport :: (Emit gen) => AST.Export -> StateT PrinterState Maybe gen
-prettyExport (AST.Export idents from) =
+prettyExport :: (Emit gen) => Export -> StateT PrinterState Maybe gen
+prettyExport (Export idents from) =
   mconcat <$> sequence
     [ return $ emit "export {\n"
     , withIndent $ do

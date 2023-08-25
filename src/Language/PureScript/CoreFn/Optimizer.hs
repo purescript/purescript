@@ -23,31 +23,6 @@ optimizeModuleDecls = map transformBinds
   transformExprs
     = optimizeDataFunctionApply
 
--- | Optimize
--- `Data_Record.getField(Data_Record.hasFieldRecord(new Data_Symbol.IsSymbol(function() { return "f"; }))())(Type_Proxy.Proxy.value)(x)`
--- into
--- `x.f`
-optimizeRecordGetField :: Expr a -> Expr a
-optimizeRecordGetField
-  (App ann
-    (App _
-      (App _
-        (Var _ C.GetField)
-        (App _
-          (App _
-            (Var _ C.HasFieldRecord)
-            (App _
-              (Var _ C.IsSymbolDict)
-              (Literal _ (ObjectLiteral
-                [ ("reflectSymbol", Abs _ _
-                    (Literal _ (StringLiteral label)))
-                ]))))
-          _))
-      (Var _ C.ProxyIdent))
-    object) =
-  Accessor ann label object
-optimizeRecordGetField e = e
-
 optimizeDataFunctionApply :: Expr a -> Expr a
 optimizeDataFunctionApply e = case e of
   (App a (App _ (Var _ fn) x) y)

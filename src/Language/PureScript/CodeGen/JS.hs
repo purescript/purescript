@@ -166,12 +166,12 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
 
   -- Generates JavaScript code for exporting at least one identifier,
   -- eventually from another module.
-  exportsToJs :: Maybe PSString -> [Ident] -> Maybe Mod.Export
-  exportsToJs from = fmap (flip Mod.Export from) . NEL.nonEmpty . fmap runIdent
+  exportsToJs :: Maybe PSString -> [Ident] -> Maybe AST.Export
+  exportsToJs from = fmap (flip AST.Export from) . NEL.nonEmpty . fmap runIdent
 
   -- Generates JavaScript code for re-exporting at least one identifier from
   -- from another module.
-  reExportsToJs :: (ModuleName, [Ident]) -> Maybe Mod.Export
+  reExportsToJs :: (ModuleName, [Ident]) -> Maybe AST.Export
   reExportsToJs = uncurry exportsToJs . first (Just . moduleImportPath)
 
   moduleImportPath :: ModuleName -> PSString
