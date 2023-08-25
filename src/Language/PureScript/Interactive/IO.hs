@@ -4,22 +4,24 @@ module Language.PureScript.Interactive.IO (findNodeProcess, readNodeProcessWithE
 
 import Prelude
 
-import Control.Monad (msum, void)
-import Control.Monad.Error.Class (throwError)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
-import Data.Functor ((<&>))
-import Data.List (isInfixOf)
-import System.Directory (XdgDirectory (..), createDirectoryIfMissing,
-                         getAppUserDataDirectory, getXdgDirectory,
-                         findExecutable, doesFileExist)
-import System.Exit (ExitCode(ExitFailure, ExitSuccess))
-import System.FilePath (takeDirectory, (</>))
-import System.Process (readProcessWithExitCode)
-import Text.Parsec ((<?>), many1, parse, sepBy)
-import Text.Parsec.Char (char, digit)
-import Protolude (note)
+import           Control.Monad              (msum, void)
+import           Control.Monad.Error.Class  (throwError)
+import           Control.Monad.Trans.Class  (lift)
+import           Control.Monad.Trans.Except (ExceptT (..), runExceptT)
+import           Control.Monad.Trans.Maybe  (MaybeT (..), runMaybeT)
+import           Data.Functor               ((<&>))
+import           Data.List                  (isInfixOf)
+import           Protolude                  (note)
+import           System.Directory           (XdgDirectory (..),
+                                             createDirectoryIfMissing,
+                                             doesFileExist, findExecutable,
+                                             getAppUserDataDirectory,
+                                             getXdgDirectory)
+import           System.Exit                (ExitCode (ExitFailure, ExitSuccess))
+import           System.FilePath            (takeDirectory, (</>))
+import           System.Process             (readProcessWithExitCode)
+import           Text.Parsec                (many1, parse, sepBy, (<?>))
+import           Text.Parsec.Char           (char, digit)
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -42,7 +44,7 @@ findNodeVersion node = do
   result <- readProcessWithExitCode node ["--version"] ""
   return $ case result of
     (ExitSuccess, version, _) -> Just version
-    (ExitFailure _, _, _) -> Nothing
+    (ExitFailure _, _, _)     -> Nothing
 
 readNodeProcessWithExitCode :: Maybe FilePath -> [String] -> String -> IO (Either String (ExitCode, String, String))
 readNodeProcessWithExitCode nodePath nodeArgs stdin = runExceptT $ do

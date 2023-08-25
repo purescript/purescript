@@ -40,7 +40,7 @@ readExternFile fp = do
         _ ->
           throwError (GeneralError ("Parsing the extern at: " <> toS fp <> " failed"))
     where
-      version = toS (showVersion P.version)
+      version = toS Externs.currentVersion
 
 convertExterns :: P.ExternsFile -> ([IdeDeclarationAnn], [(P.ModuleName, P.DeclarationRef)])
 convertExterns ef =

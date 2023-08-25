@@ -3,9 +3,10 @@ module Language.PureScript.CoreImp.AST where
 
 import Prelude
 
-import Control.Monad ((>=>))
-import Control.Monad.Identity (Identity(..), runIdentity)
-import Data.Text (Text)
+import           Control.Monad                  ((>=>))
+import           Control.Monad.Identity         (Identity (..), runIdentity)
+import qualified Data.List.NonEmpty             as NEL (NonEmpty)
+import           Data.Text                      (Text)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments (Comment)
@@ -108,6 +109,10 @@ data AST
   -- ^ instanceof check
   | Comment CIComments AST
   -- ^ Commented JavaScript
+  | Import (Maybe SourceSpan) Text PSString
+  -- ^ Imported identifier and path to its module
+  | Export (Maybe SourceSpan) (NEL.NonEmpty Text) (Maybe PSString)
+  -- ^ Exported identifiers and optional path to their module (for re-exports)
   deriving (Show, Eq)
 
 withSourceSpan :: SourceSpan -> AST -> AST
@@ -130,16 +135,18 @@ withSourceSpan withSpan = go where
   go (ModuleAccessor _ s1 s2) = ModuleAccessor ss s1 s2
   go (Block _ js) = Block ss js
   go (VariableIntroduction _ name j) = VariableIntroduction ss name j
-  go (Assignment _ j1 j2) = Assignment ss j1 j2
-  go (While _ j1 j2) = While ss j1 j2
-  go (For _ name j1 j2 j3) = For ss name j1 j2 j3
-  go (ForIn _ name j1 j2) = ForIn ss name j1 j2
-  go (IfElse _ j1 j2 j3) = IfElse ss j1 j2 j3
-  go (Return _ js) = Return ss js
-  go (ReturnNoResult _) = ReturnNoResult ss
-  go (Throw _ js) = Throw ss js
-  go (InstanceOf _ j1 j2) = InstanceOf ss j1 j2
-  go c@Comment{} = c
+  go (Assignment _ j1 j2)            = Assignment ss j1 j2
+  go (While _ j1 j2)                 = While ss j1 j2
+  go (For _ name j1 j2 j3)           = For ss name j1 j2 j3
+  go (ForIn _ name j1 j2)            = ForIn ss name j1 j2
+  go (IfElse _ j1 j2 j3)             = IfElse ss j1 j2 j3
+  go (Return _ js)                   = Return ss js
+  go (ReturnNoResult _)              = ReturnNoResult ss
+  go (Throw _ js)                    = Throw ss js
+  go (InstanceOf _ j1 j2)            = InstanceOf ss j1 j2
+  go c@Comment {}                    = c
+  go (Import _ ident from)           = Import ss ident from
+  go (Export _ idents from)          = Export ss idents from
 
 getSourceSpan :: AST -> Maybe SourceSpan
 getSourceSpan = go where
@@ -158,16 +165,18 @@ getSourceSpan = go where
   go (ModuleAccessor ss _ _) = ss
   go (Block ss _) = ss
   go (VariableIntroduction ss _ _) = ss
-  go (Assignment ss _ _) = ss
-  go (While ss _ _) = ss
-  go (For ss _ _ _ _) = ss
-  go (ForIn ss _ _ _) = ss
-  go (IfElse ss _ _ _) = ss
-  go (Return ss _) = ss
-  go (ReturnNoResult ss) = ss
-  go (Throw ss _) = ss
-  go (InstanceOf ss _ _) = ss
-  go (Comment _ _) = Nothing
+  go (Assignment ss _ _)           = ss
+  go (While ss _ _)                = ss
+  go (For ss _ _ _ _)              = ss
+  go (ForIn ss _ _ _)              = ss
+  go (IfElse ss _ _ _)             = ss
+  go (Return ss _)                 = ss
+  go (ReturnNoResult ss)           = ss
+  go (Throw ss _)                  = ss
+  go (InstanceOf ss _ _)           = ss
+  go (Comment _ _)                 = Nothing
+  go (Import ss _ _)               = ss
+  go (Export ss _ _)               = ss
 
 everywhere :: (AST -> AST) -> AST -> AST
 everywhere f = go where

@@ -121,9 +121,29 @@ literals = mkPattern' match'
     , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
-  match (Comment PureAnnotation js) = mconcat <$> sequence 
+  match (Import _ ident from) = return . emit $
+    "import * as " <> ident <> " from " <> prettyPrintStringJS from
+  match (Export _ idents from) = mconcat <$> sequence
+    [ return $ emit "export {\n"
+    , withIndent $ do
+        let exportsStrings = emit . exportedIdentToString from <$> idents
+        indentString <- currentIndent
+        return . intercalate (emit ",\n") . NEL.toList $ (indentString <>) <$> exportsStrings
+    , return $ emit "\n"
+    , currentIndent
+    , return . emit $ "}" <> maybe "" ((" from " <>) . prettyPrintStringJS) from
+    ]
+    where
+    exportedIdentToString Nothing ident
+      | nameIsJsReserved ident || nameIsJsBuiltIn ident
+      = "$$" <> ident <> " as " <> ident
+    exportedIdentToString _ "$main"
+      = T.concatMap identCharToText "$main" <> " as $main"
+    exportedIdentToString _ ident
+      = T.concatMap identCharToText ident
+  match (Comment PureAnnotation js) = mconcat <$> sequence
     [ return $ emit "/* #__PURE__ */ "
-    , prettyPrintJS' js 
+    , prettyPrintJS' js
     ]
   match _ = mzero
 
@@ -153,15 +173,15 @@ comment (BlockComment com) = fmap mconcat $ sequence $
       Just rest -> removeComments rest
       Nothing -> case T.uncons t of
         Just (x, xs) -> x `T.cons` removeComments xs
-        Nothing -> ""
+        Nothing      -> ""
 
-prettyImport :: (Emit gen) => Import -> StateT PrinterState Maybe gen
-prettyImport (Import ident from) =
+prettyImport :: (Emit gen) => AST.Import -> StateT PrinterState Maybe gen
+prettyImport (AST.Import ident from) =
   return . emit $
     "import * as " <> ident <> " from " <> prettyPrintStringJS from <> ";"
 
-prettyExport :: (Emit gen) => Export -> StateT PrinterState Maybe gen
-prettyExport (Export idents from) =
+prettyExport :: (Emit gen) => AST.Export -> StateT PrinterState Maybe gen
+prettyExport (AST.Export idents from) =
   mconcat <$> sequence
     [ return $ emit "export {\n"
     , withIndent $ do
@@ -187,20 +207,20 @@ accessor = mkPattern match
   match (Indexer _ (StringLiteral _ prop) val) =
     case decodeString prop of
       Just s | isValidJsIdentifier s -> Just (s, val)
-      _ -> Nothing
+      _                              -> Nothing
   match _ = Nothing
 
 indexer :: (Emit gen) => Pattern PrinterState AST (gen, AST)
 indexer = mkPattern' match
   where
   match (Indexer _ index val) = (,) <$> prettyPrintJS' index <*> pure val
-  match _ = mzero
+  match _                     = mzero
 
 lam :: Pattern PrinterState AST ((Maybe Text, [Text], Maybe SourceSpan), AST)
 lam = mkPattern match
   where
   match (Function ss name args ret) = Just ((name, args, ss), ret)
-  match _ = Nothing
+  match _                           = Nothing
 
 app :: (Emit gen) => Pattern PrinterState AST (gen, AST)
 app = mkPattern' match
@@ -214,7 +234,7 @@ instanceOf :: Pattern PrinterState AST (AST, AST)
 instanceOf = mkPattern match
   where
   match (InstanceOf _ val ty) = Just (val, ty)
-  match _ = Nothing
+  match _                     = Nothing
 
 unary' :: (Emit gen) => UnaryOperator -> (AST -> Text) -> Operator PrinterState AST gen
 unary' op mkStr = Wrap match (<>)
@@ -232,7 +252,7 @@ negateOperator :: (Emit gen) => Operator PrinterState AST gen
 negateOperator = unary' Negate (\v -> if isNegate v then "- " else "-")
   where
   isNegate (Unary _ Negate _) = True
-  isNegate _ = False
+  isNegate _                  = False
 
 binary :: (Emit gen) => BinaryOperator -> Text -> Operator PrinterState AST gen
 binary op str = AssocL match (\v1 v2 -> v1 <> emit (" " <> str <> " ") <> v2)

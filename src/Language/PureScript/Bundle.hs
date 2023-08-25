@@ -216,7 +216,7 @@ printErrorMessage (MissingMainModule mName) =
 -- String literals include the quote chars
 fromStringLiteral :: JSExpression -> Maybe String
 fromStringLiteral (JSStringLiteral _ str) = Just $ strValue str
-fromStringLiteral _ = Nothing
+fromStringLiteral _                       = Nothing
 
 strValue :: String -> String
 strValue str = go $ drop 1 str
@@ -245,17 +245,17 @@ strValue str = go $ drop 1 str
   go "" = ""
 
 commaList :: JSCommaList a -> [a]
-commaList JSLNil = []
-commaList (JSLOne x) = [x]
+commaList JSLNil          = []
+commaList (JSLOne x)      = [x]
 commaList (JSLCons l _ x) = commaList l ++ [x]
 
 trailingCommaList :: JSCommaTrailingList a -> [a]
 trailingCommaList (JSCTLComma l _) = commaList l
-trailingCommaList (JSCTLNone l) = commaList l
+trailingCommaList (JSCTLNone l)    = commaList l
 
 identName :: JSIdent -> Maybe String
 identName (JSIdentName _ ident) = Just ident
-identName _ = Nothing
+identName _                     = Nothing
 
 exportStatementIdentifiers :: JSStatement -> [String]
 exportStatementIdentifiers (JSVariable _ jsExpressions _) =
@@ -276,12 +276,12 @@ varNames :: JSCommaList JSExpression -> [String]
 varNames = mapMaybe varName . commaList
   where
   varName (JSVarInitExpression (JSIdentifier _ ident) _) = Just ident
-  varName _ = Nothing
+  varName _                                              = Nothing
 
 data ForeignModuleExports =
   ForeignModuleExports
     { cjsExports :: [String]
-    , esExports :: [String]
+    , esExports  :: [String]
     } deriving (Show)
 
 instance Semigroup ForeignModuleExports where
@@ -334,13 +334,13 @@ getExportedIdentifiers mname top
   exportClauseIdentifiers (JSExportClause _ jsExportsSpecifiers _) =
     mapMaybe exportSpecifierName $ commaList jsExportsSpecifiers
 
-  exportSpecifierName (JSExportSpecifier jsIdent) = identName jsIdent
+  exportSpecifierName (JSExportSpecifier jsIdent)         = identName jsIdent
   exportSpecifierName (JSExportSpecifierAs _ _ jsIdentAs) = identName jsIdentAs
 
 data ForeignModuleImports =
   ForeignModuleImports
     { cjsImports :: [String]
-    , esImports :: [String]
+    , esImports  :: [String]
     } deriving (Show)
 
 instance Semigroup ForeignModuleImports where
@@ -440,5 +440,5 @@ matchExportsAssignment stmt
 
 extractLabel :: JSPropertyName -> Maybe String
 extractLabel (JSPropertyString _ nm) = Just $ strValue nm
-extractLabel (JSPropertyIdent _ nm) = Just nm
-extractLabel _ = Nothing
+extractLabel (JSPropertyIdent _ nm)  = Just nm
+extractLabel _                       = Nothing

@@ -2,7 +2,7 @@ name: "CI"
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "restaumatic" ]
   pull_request:
     branches: [ "master" ]
     paths:
@@ -81,6 +81,7 @@ jobs:
       - uses: "actions/setup-node@v2"
         with:
           node-version: "16"
+
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
