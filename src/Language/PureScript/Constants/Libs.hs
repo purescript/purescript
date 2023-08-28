@@ -166,6 +166,7 @@ $(TH.declare do
 
   TH.mod "Data.Symbol" do
     TH.cls "IsSymbol"
+    TH.asIdent do TH.var "IsSymbolDict"
 
   -- purescript-arrays
 
@@ -268,4 +269,6 @@ $(TH.declare do
   TH.mod "Data.Record" do
     TH.asIdent do
       TH.var "getField"
+      TH.var "hasFieldRecord"
+      
   )
