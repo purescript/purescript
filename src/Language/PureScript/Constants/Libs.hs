@@ -261,4 +261,11 @@ $(TH.declare do
   TH.mod "Unsafe.Coerce" do
     TH.asPair do TH.var "unsafeCoerce"
 
+  TH.mod "Type.Proxy" do
+    TH.dty "Proxy" ["Proxy"]
+    TH.asIdent do
+      TH.var "Proxy"
+  TH.mod "Data.Record" do
+    TH.asIdent do
+      TH.var "getField"
   )
