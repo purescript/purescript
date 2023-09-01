@@ -1,5 +1,5 @@
 {-# LANGUAGE DoAndIfThenElse #-}
-{-# LANGUAGE GADTs           #-}
+{-# LANGUAGE GADTs #-}
 
 module Command.REPL (command) where
 
@@ -27,8 +27,8 @@ import System.IO (hPutStrLn, stderr)
 
 -- | Command line options
 data PSCiOptions = PSCiOptions
-  { psciInputGlob :: [String]
-  , psciBackend   :: Backend
+  { psciInputGlob         :: [String]
+  , psciBackend           :: Backend
   }
 
 inputFile :: Opts.Parser FilePath
@@ -84,11 +84,11 @@ pasteMode =
 
 -- | All of the functions required to implement a PSCi backend
 data Backend = forall state. Backend
-  { _backendSetup    :: IO state
+  { _backendSetup :: IO state
   -- ^ Initialize, and call the continuation when the backend is ready
-  , _backendEval     :: state -> String -> IO ()
+  , _backendEval :: state -> String -> IO ()
   -- ^ Evaluate JavaScript code
-  , _backendReload   :: state -> IO ()
+  , _backendReload :: state -> IO ()
   -- ^ Reload the compiled code
   , _backendShutdown :: state -> IO ()
   -- ^ Shut down the backend
