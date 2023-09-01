@@ -114,7 +114,7 @@ getSupportModuleTuples = do
   fileContents <- readInput pursFiles
   modules <- runExceptT $ ExceptT . return $ CST.parseFromFiles id fileContents
   case modules of
-    Right ms  -> return (fmap (fmap snd) ms)
+    Right ms -> return (fmap (fmap snd) ms)
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
 
 getSupportModuleNames :: IO [T.Text]
@@ -136,8 +136,8 @@ createOutputFile logfileName = do
   openFile (tmp </> logpath </> logfileName) WriteMode
 
 data SupportModules = SupportModules
-  { supportModules  :: [P.Module]
-  , supportExterns  :: [P.ExternsFile]
+  { supportModules :: [P.Module]
+  , supportExterns :: [P.ExternsFile]
   , supportForeigns :: M.Map P.ModuleName FilePath
   }
 
