@@ -416,11 +416,11 @@ addHints hints = onErrorMessages $ \(ErrorMessage hints' se) -> ErrorMessage (hi
 
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
 data TypeMap = TypeMap
-  { umSkolemMap  :: M.Map Int (String, Int, Maybe SourceSpan)
+  { umSkolemMap   :: M.Map Int (String, Int, Maybe SourceSpan)
   -- ^ a map from skolems to their new names, including source and naming info
-  , umUnknownMap :: M.Map Int Int
+  , umUnknownMap  :: M.Map Int Int
   -- ^ a map from unification variables to their new names
-  , umNextIndex  :: Int
+  , umNextIndex   :: Int
   -- ^ unknowns and skolems share a source of names during renaming, to
   -- avoid overlaps in error messages. This is the next label for either case.
   } deriving Show
