@@ -121,9 +121,9 @@ literals = mkPattern' match'
     , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
-  match (Comment PureAnnotation js) = mconcat <$> sequence
+  match (Comment PureAnnotation js) = mconcat <$> sequence 
     [ return $ emit "/* #__PURE__ */ "
-    , prettyPrintJS' js
+    , prettyPrintJS' js 
     ]
   match _ = mzero
 
@@ -153,7 +153,7 @@ comment (BlockComment com) = fmap mconcat $ sequence $
       Just rest -> removeComments rest
       Nothing -> case T.uncons t of
         Just (x, xs) -> x `T.cons` removeComments xs
-        Nothing      -> ""
+        Nothing -> ""
 
 prettyImport :: (Emit gen) => Import -> StateT PrinterState Maybe gen
 prettyImport (Import ident from) =
@@ -187,20 +187,20 @@ accessor = mkPattern match
   match (Indexer _ (StringLiteral _ prop) val) =
     case decodeString prop of
       Just s | isValidJsIdentifier s -> Just (s, val)
-      _                              -> Nothing
+      _ -> Nothing
   match _ = Nothing
 
 indexer :: (Emit gen) => Pattern PrinterState AST (gen, AST)
 indexer = mkPattern' match
   where
   match (Indexer _ index val) = (,) <$> prettyPrintJS' index <*> pure val
-  match _                     = mzero
+  match _ = mzero
 
 lam :: Pattern PrinterState AST ((Maybe Text, [Text], Maybe SourceSpan), AST)
 lam = mkPattern match
   where
   match (Function ss name args ret) = Just ((name, args, ss), ret)
-  match _                           = Nothing
+  match _ = Nothing
 
 app :: (Emit gen) => Pattern PrinterState AST (gen, AST)
 app = mkPattern' match
@@ -214,7 +214,7 @@ instanceOf :: Pattern PrinterState AST (AST, AST)
 instanceOf = mkPattern match
   where
   match (InstanceOf _ val ty) = Just (val, ty)
-  match _                     = Nothing
+  match _ = Nothing
 
 unary' :: (Emit gen) => UnaryOperator -> (AST -> Text) -> Operator PrinterState AST gen
 unary' op mkStr = Wrap match (<>)
@@ -232,7 +232,7 @@ negateOperator :: (Emit gen) => Operator PrinterState AST gen
 negateOperator = unary' Negate (\v -> if isNegate v then "- " else "-")
   where
   isNegate (Unary _ Negate _) = True
-  isNegate _                  = False
+  isNegate _ = False
 
 binary :: (Emit gen) => BinaryOperator -> Text -> Operator PrinterState AST gen
 binary op str = AssocL match (\v1 v2 -> v1 <> emit (" " <> str <> " ") <> v2)

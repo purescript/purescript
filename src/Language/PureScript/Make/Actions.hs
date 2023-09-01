@@ -201,10 +201,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   targetFilename :: ModuleName -> CodegenTarget -> FilePath
   targetFilename mn = \case
-    JS          -> outputFilename mn "index.js"
+    JS -> outputFilename mn "index.js"
     JSSourceMap -> outputFilename mn "index.js.map"
-    CoreFn      -> outputFilename mn "corefn.json"
-    Docs        -> outputFilename mn "docs.json"
+    CoreFn -> outputFilename mn "corefn.json"
+    Docs -> outputFilename mn "docs.json"
 
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
@@ -334,12 +334,10 @@ checkForeignDecls :: CF.Module ann -> FilePath -> Make (Either MultipleErrors (F
 checkForeignDecls m path = do
   jsStr <- T.unpack <$> readTextFile path
 
-
   let
     parseResult :: Either MultipleErrors JS.JSAST
     parseResult = first (errorParsingModule . Bundle.UnableToParseModule) $ JS.parseModule jsStr path
   traverse checkFFI parseResult
-
 
   where
   mname = CF.moduleName m
@@ -369,9 +367,9 @@ checkForeignDecls m path = do
                 pure (ESModule, esExports)
 
     foreignIdents <- either
-                     errorInvalidForeignIdentifiers
-                     (pure . S.fromList)
-                     (parseIdents foreignIdentsStrs)
+                      errorInvalidForeignIdentifiers
+                      (pure . S.fromList)
+                      (parseIdents foreignIdentsStrs)
     let importedIdents = S.fromList (CF.moduleForeign m)
 
     let unusedFFI = foreignIdents S.\\ importedIdents
@@ -383,7 +381,6 @@ checkForeignDecls m path = do
     unless (null missingFFI) $
       throwError . errorMessage' modSS . MissingFFIImplementations mname $
         S.toList missingFFI
-
     pure (foreignModuleType, foreignIdents)
 
   errorParsingModule :: Bundle.ErrorMessage -> MultipleErrors

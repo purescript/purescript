@@ -46,7 +46,7 @@ import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.Traversals (sndM)
 import Language.PureScript.Constants.Prim qualified as C
 
-import           System.FilePath.Posix                 ((</>))
+import System.FilePath.Posix ((</>))
 
 -- | Generate code in the simplified JavaScript intermediate representation for all declarations in a
 -- module.
@@ -134,7 +134,7 @@ moduleToJs (Module _ coms mn _ imps exps reExps foreigns decls) foreignInclude =
   -- Extracts all declaration names from a binding group.
   getNames :: Bind Ann -> [Ident]
   getNames (NonRec _ ident _) = [ident]
-  getNames (Rec vals)         = map (snd . fst) vals
+  getNames (Rec vals) = map (snd . fst) vals
 
   -- Creates alternative names for each module to ensure they don't collide
   -- with declaration names.

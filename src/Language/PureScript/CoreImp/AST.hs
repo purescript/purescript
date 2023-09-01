@@ -3,10 +3,9 @@ module Language.PureScript.CoreImp.AST where
 
 import Prelude
 
-import           Control.Monad                  ((>=>))
-import           Control.Monad.Identity         (Identity (..), runIdentity)
-  -- import           Data.List.NonEmpty qualified as NEL (NonEmpty)
-import           Data.Text                      (Text)
+import Control.Monad ((>=>))
+import Control.Monad.Identity (Identity(..), runIdentity)
+import Data.Text (Text)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments (Comment)
