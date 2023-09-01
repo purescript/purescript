@@ -221,7 +221,7 @@ errorModule :: ErrorMessage -> Maybe ModuleName
 errorModule = findHint matchModule
   where
   matchModule (ErrorInModule mn) = Just mn
-  matchModule _                  = Nothing
+  matchModule _ = Nothing
 
 findHint :: (ErrorMessageHint -> Maybe a) -> ErrorMessage -> Maybe a
 findHint f (ErrorMessage hints _) = getLast . foldMap (Last . f) $ hints
@@ -230,9 +230,9 @@ findHint f (ErrorMessage hints _) = getLast . foldMap (Last . f) $ hints
 stripModuleAndSpan :: ErrorMessage -> ErrorMessage
 stripModuleAndSpan (ErrorMessage hints e) = ErrorMessage (filter (not . shouldStrip) hints) e
   where
-  shouldStrip (ErrorInModule _)   = True
+  shouldStrip (ErrorInModule _) = True
   shouldStrip (PositionedError _) = True
-  shouldStrip _                   = False
+  shouldStrip _ = False
 
 -- | Get the error code for a particular error type
 errorCode :: ErrorMessage -> Text
@@ -544,7 +544,7 @@ errorSuggestion err =
 
     qstr :: Maybe ModuleName -> Text
     qstr (Just mn) = " as " <> runModuleName mn
-    qstr Nothing   = ""
+    qstr Nothing = ""
 
 suggestionSpan :: ErrorMessage -> Maybe SourceSpan
 suggestionSpan e =
@@ -559,12 +559,12 @@ suggestionSpan e =
       case simple of
         MissingTypeDeclaration{} -> startOnly ss
         MissingKindDeclaration{} -> startOnly ss
-        _                        -> ss
+        _ -> ss
 
 showSuggestion :: SimpleErrorMessage -> Text
 showSuggestion suggestion = case errorSuggestion suggestion of
   Just (ErrorSuggestion x) -> x
-  _                        -> ""
+  _ -> ""
 
 ansiColor :: (ANSI.ColorIntensity, ANSI.Color) -> String
 ansiColor (intensity, color) =
@@ -1655,13 +1655,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     printName qn = nameType (disqualify qn) <> " " <> markCode (runName qn)
 
     nameType :: Name -> Text
-    nameType (IdentName _)   = "value"
-    nameType (ValOpName _)   = "operator"
-    nameType (TyName _)      = "type"
-    nameType (TyOpName _)    = "type operator"
-    nameType (DctorName _)   = "data constructor"
+    nameType (IdentName _) = "value"
+    nameType (ValOpName _) = "operator"
+    nameType (TyName _) = "type"
+    nameType (TyOpName _) = "type operator"
+    nameType (DctorName _) = "data constructor"
     nameType (TyClassName _) = "type class"
-    nameType (ModName _)     = "module"
+    nameType (ModName _) = "module"
 
     runName :: Qualified Name -> Text
     runName (Qualified qb (IdentName name)) =
@@ -1700,7 +1700,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
 
   levelText :: Text
   levelText = case level of
-    Error   -> "error"
+    Error -> "error"
     Warning -> "warning"
 
   paras :: forall f. Foldable f => f Box.Box -> Box.Box
@@ -1720,18 +1720,18 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       case (hintCategory x, hintCategory y) of
         (OtherHint, _) -> False
         (_, OtherHint) -> False
-        (c1, c2)       -> c1 == c2
+        (c1, c2) -> c1 == c2
 
     -- See https://github.com/purescript/purescript/issues/1802
     stripRedundantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
     stripRedundantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
       where
       isCheckHint ErrorCheckingType{} = True
-      isCheckHint _                   = False
+      isCheckHint _ = False
     stripRedundantHints TypesDoNotUnify{} = stripFirst isUnifyHint
       where
       isUnifyHint ErrorUnifyingTypes{} = True
-      isUnifyHint _                    = False
+      isUnifyHint _ = False
     stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _) _ _) = filter (not . isSolverHint)
       where
       isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
@@ -1739,7 +1739,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     stripRedundantHints NoInstanceFound{} = stripFirst isSolverHint
       where
       isSolverHint ErrorSolvingConstraint{} = True
-      isSolverHint _                        = False
+      isSolverHint _ = False
     stripRedundantHints _ = id
 
     stripFirst :: (ErrorMessageHint -> Bool) -> [ErrorMessageHint] -> [ErrorMessageHint]
@@ -1751,27 +1751,27 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
     stripFirst _ [] = []
 
   hintCategory :: ErrorMessageHint -> HintCategory
-  hintCategory ErrorCheckingType{}           = ExprHint
-  hintCategory ErrorInferringType{}          = ExprHint
-  hintCategory ErrorInExpression{}           = ExprHint
-  hintCategory ErrorUnifyingTypes{}          = CheckHint
-  hintCategory ErrorInSubsumption{}          = CheckHint
-  hintCategory ErrorInApplication{}          = CheckHint
-  hintCategory ErrorCheckingKind{}           = CheckHint
-  hintCategory ErrorSolvingConstraint{}      = SolverHint
-  hintCategory PositionedError{}             = PositionHint
-  hintCategory ErrorInDataConstructor{}      = DeclarationHint
-  hintCategory ErrorInTypeConstructor{}      = DeclarationHint
-  hintCategory ErrorInBindingGroup{}         = DeclarationHint
-  hintCategory ErrorInDataBindingGroup{}     = DeclarationHint
-  hintCategory ErrorInTypeSynonym{}          = DeclarationHint
-  hintCategory ErrorInValueDeclaration{}     = DeclarationHint
-  hintCategory ErrorInTypeDeclaration{}      = DeclarationHint
-  hintCategory ErrorInTypeClassDeclaration{} = DeclarationHint
-  hintCategory ErrorInKindDeclaration{}      = DeclarationHint
-  hintCategory ErrorInRoleDeclaration{}      = DeclarationHint
-  hintCategory ErrorInForeignImport{}        = DeclarationHint
-  hintCategory _                             = OtherHint
+  hintCategory ErrorCheckingType{}                  = ExprHint
+  hintCategory ErrorInferringType{}                 = ExprHint
+  hintCategory ErrorInExpression{}                  = ExprHint
+  hintCategory ErrorUnifyingTypes{}                 = CheckHint
+  hintCategory ErrorInSubsumption{}                 = CheckHint
+  hintCategory ErrorInApplication{}                 = CheckHint
+  hintCategory ErrorCheckingKind{}                  = CheckHint
+  hintCategory ErrorSolvingConstraint{}             = SolverHint
+  hintCategory PositionedError{}                    = PositionHint
+  hintCategory ErrorInDataConstructor{}             = DeclarationHint
+  hintCategory ErrorInTypeConstructor{}             = DeclarationHint
+  hintCategory ErrorInBindingGroup{}                = DeclarationHint
+  hintCategory ErrorInDataBindingGroup{}            = DeclarationHint
+  hintCategory ErrorInTypeSynonym{}                 = DeclarationHint
+  hintCategory ErrorInValueDeclaration{}            = DeclarationHint
+  hintCategory ErrorInTypeDeclaration{}             = DeclarationHint
+  hintCategory ErrorInTypeClassDeclaration{}        = DeclarationHint
+  hintCategory ErrorInKindDeclaration{}             = DeclarationHint
+  hintCategory ErrorInRoleDeclaration{}             = DeclarationHint
+  hintCategory ErrorInForeignImport{}               = DeclarationHint
+  hintCategory _                                    = OtherHint
 
   prettyPrintPlainIdent :: Ident -> Text
   prettyPrintPlainIdent ident =
@@ -1923,10 +1923,10 @@ prettyPrintRef ReExportRef{} =
   Nothing
 
 prettyPrintKindSignatureFor :: KindSignatureFor -> Text
-prettyPrintKindSignatureFor DataSig        = "data"
-prettyPrintKindSignatureFor NewtypeSig     = "newtype"
+prettyPrintKindSignatureFor DataSig = "data"
+prettyPrintKindSignatureFor NewtypeSig = "newtype"
 prettyPrintKindSignatureFor TypeSynonymSig = "type"
-prettyPrintKindSignatureFor ClassSig       = "class"
+prettyPrintKindSignatureFor ClassSig = "class"
 
 prettyPrintSuggestedTypeSimplified :: Type a -> String
 prettyPrintSuggestedTypeSimplified = prettyPrintSuggestedType . eraseForAllKindAnnotations . eraseKindApps
@@ -2022,7 +2022,7 @@ withoutPosition :: ErrorMessage -> ErrorMessage
 withoutPosition (ErrorMessage hints se) = ErrorMessage (filter go hints) se
   where
   go (PositionedError _) = False
-  go _                   = True
+  go _ = True
 
 positionedError :: SourceSpan -> ErrorMessageHint
 positionedError = PositionedError . pure
@@ -2056,7 +2056,7 @@ parU xs f =
 
     collectErrors :: [Either MultipleErrors b] -> m [b]
     collectErrors es = case partitionEithers es of
-      ([], rs)  -> return rs
+      ([], rs) -> return rs
       (errs, _) -> throwError $ fold errs
 
 internalCompilerError
