@@ -9,6 +9,7 @@ import Protolude qualified as P
 import Data.String (IsString)
 import Language.PureScript.Constants.TH qualified as TH
 import Language.PureScript.PSString (PSString)
+import Language.PureScript.Names (Ident (..), Qualified (..), QualifiedBy (..))
 
 -- Core lib values
 
@@ -273,3 +274,6 @@ $(TH.declare do
       TH.var "hasFieldRecord"
       
   )
+
+pattern IsSymbolDict :: Qualified Ident
+pattern IsSymbolDict = Qualified (ByModuleName M_Data_Symbol) (Ident "IsSymbol$Dict")
