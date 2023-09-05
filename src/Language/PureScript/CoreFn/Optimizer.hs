@@ -39,7 +39,7 @@ optimizeRecordGetField
           (App _
             (Var _ C.I_hasFieldRecord)
             (App _
-              (Var _ C.I_IsSymbolDict)
+              (Var _ C.I_IsSymbol)
               (Literal _ (ObjectLiteral
                 [ ("reflectSymbol", Abs _ _
                     (Literal _ (StringLiteral label)))

@@ -1,13 +1,14 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 -- | Various constants which refer to things in the Prelude and other core libraries
 module Language.PureScript.Constants.Libs where
 
 import Protolude qualified as P
 
 import Data.String (IsString)
-import Language.PureScript.PSString (PSString)
 import Language.PureScript.Constants.TH qualified as TH
+import Language.PureScript.PSString (PSString)
 
 -- Core lib values
 
@@ -166,7 +167,7 @@ $(TH.declare do
 
   TH.mod "Data.Symbol" do
     TH.cls "IsSymbol"
-    TH.asIdent do TH.var "IsSymbolDict"
+    TH.asIdent do TH.var "IsSymbol"
 
   -- purescript-arrays
 
