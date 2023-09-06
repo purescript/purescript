@@ -167,7 +167,7 @@ currentVersion = showVersion Paths.version ++ "-restaumatic1"
 -- version.
 externsIsCurrentVersion :: ExternsFile -> Bool
 externsIsCurrentVersion ef =
-  T.unpack (efVersion ef) == showVersion Paths.version
+  T.unpack (efVersion ef) == currentVersion
 
 -- | Convert an externs file back into a module
 applyExternsFileToEnvironment :: ExternsFile -> Environment -> Environment
@@ -210,7 +210,7 @@ moduleToExternsFile :: Module -> Environment -> M.Map Ident Ident -> ExternsFile
 moduleToExternsFile (Module _ _ _ _ Nothing) _ _ = internalError "moduleToExternsFile: module exports were not elaborated"
 moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsFile{..}
   where
-  efVersion       = T.pack (showVersion Paths.version)
+  efVersion       = T.pack currentVersion
   efModuleName    = mn
   efExports       = map renameRef exps
   efImports       = mapMaybe importDecl ds
