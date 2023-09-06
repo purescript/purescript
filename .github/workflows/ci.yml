@@ -269,7 +269,7 @@ jobs:
 
       - run: "ci/fix-home stack exec weeder"
 
-;13u  # make-prerelease:
+  # make-prerelease:
   #   runs-on: "ubuntu-latest"
   #   needs:
   #     - "build"
