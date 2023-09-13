@@ -2,7 +2,7 @@ name: "CI"
 
 on:
   push:
-    branches: ["master", "restaumatic", "restaumatic-0.15.10"]
+    branches: ["master", "restaumatic"]
   pull_request:
     branches: ["master", "restaumatic"]
     paths:
