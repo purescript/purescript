@@ -18,25 +18,26 @@ module Language.PureScript.Sugar.Names.Env
   , checkImportConflicts
   ) where
 
-import Prelude.Compat
+import Prelude
 
-import Control.Monad
+import Control.Monad (forM_, when)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Function (on)
 import Data.Foldable (find)
 import Data.List (groupBy, sortOn, delete)
-import Data.Maybe (fromJust, mapMaybe)
+import Data.Maybe (mapMaybe)
 import Safe (headMay)
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Data.Map qualified as M
+import Data.Set qualified as S
 
-import qualified Language.PureScript.Constants.Prim as C
-import Language.PureScript.AST
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.AST (ExportSource(..), SourceSpan, internalModuleSourceSpan, nullSourceSpan)
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage')
+import Language.PureScript.Names (Ident, ModuleName, Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, disqualify, getQual)
 
 -- |
 -- The details for an import: the name of the thing that is being imported
@@ -228,43 +229,48 @@ mkPrimExports ts cs =
     , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys cs
     }
   where
-  mkTypeEntry (Qualified mn name) = (name, ([], primExportSource mn))
-  mkClassEntry (Qualified mn name) = (name, primExportSource mn)
+  mkTypeEntry (Qualified (ByModuleName mn) name) = (name, ([], primExportSource mn))
+  mkTypeEntry _ = internalError
+    "mkPrimExports.mkTypeEntry: a name is qualified BySourcePos instead of ByModuleName"
+
+  mkClassEntry (Qualified (ByModuleName mn) name) = (name, primExportSource mn)
+  mkClassEntry _ = internalError
+    "mkPrimExports.mkClassEntry: a name is qualified BySourcePos instead of ByModuleName"
 
   primExportSource mn =
     ExportSource
       { exportSourceImportedFrom = Nothing
-      , exportSourceDefinedIn = fromJust mn
+      , exportSourceDefinedIn = mn
       }
 
 -- | Environment which only contains the Prim modules.
 primEnv :: Env
 primEnv = M.fromList
-  [ ( C.Prim
+  [ ( C.M_Prim
     , (internalModuleSourceSpan "<Prim>", nullImports, primExports)
     )
-  , ( C.PrimBoolean
+  , ( C.M_Prim_Boolean
     , (internalModuleSourceSpan "<Prim.Boolean>", nullImports, primBooleanExports)
     )
-  , ( C.PrimCoerce
+  , ( C.M_Prim_Coerce
     , (internalModuleSourceSpan "<Prim.Coerce>", nullImports, primCoerceExports)
     )
-  , ( C.PrimOrdering
+  , ( C.M_Prim_Ordering
     , (internalModuleSourceSpan "<Prim.Ordering>", nullImports, primOrderingExports)
     )
-  , ( C.PrimRow
+  , ( C.M_Prim_Row
     , (internalModuleSourceSpan "<Prim.Row>", nullImports, primRowExports)
     )
-  , ( C.PrimRowList
+  , ( C.M_Prim_RowList
     , (internalModuleSourceSpan "<Prim.RowList>", nullImports, primRowListExports)
     )
-  , ( C.PrimSymbol
+  , ( C.M_Prim_Symbol
     , (internalModuleSourceSpan "<Prim.Symbol>", nullImports, primSymbolExports)
     )
-  , ( C.PrimInt
+  , ( C.M_Prim_Int
     , (internalModuleSourceSpan "<Prim.Int>", nullImports, primIntExports)
     )
-  , ( C.PrimTypeError
+  , ( C.M_Prim_TypeError
     , (internalModuleSourceSpan "<Prim.TypeError>", nullImports, primTypeErrorExports)
     )
   ]
@@ -457,7 +463,7 @@ throwExportConflict'
   -> m a
 throwExportConflict' ss new existing newName existingName =
   throwError . errorMessage' ss $
-    ExportConflict (Qualified (Just new) newName) (Qualified (Just existing) existingName)
+    ExportConflict (Qualified (ByModuleName new) newName) (Qualified (ByModuleName existing) existingName)
 
 -- |
 -- When reading a value from the imports, check that there are no conflicts in
@@ -481,12 +487,15 @@ checkImportConflicts ss currentModule toName xs =
   in
     if length groups > 1
     then case nonImplicit of
-      [ImportRecord (Qualified (Just mnNew) _) mnOrig _ _] -> do
+      [ImportRecord (Qualified (ByModuleName mnNew) _) mnOrig _ _] -> do
         let warningModule = if mnNew == currentModule then Nothing else Just mnNew
             ss' = maybe nullSourceSpan importSourceSpan . headMay . filter ((== FromImplicit) . importProvenance) $ xs
         tell . errorMessage' ss' $ ScopeShadowing name warningModule $ delete mnNew conflictModules
         return (mnNew, mnOrig)
       _ -> throwError . errorMessage' ss $ ScopeConflict name conflictModules
     else
-      let ImportRecord (Qualified (Just mnNew) _) mnOrig _ _ = head byOrig
-      in return (mnNew, mnOrig)
+      case head byOrig of
+        ImportRecord (Qualified (ByModuleName mnNew) _) mnOrig _ _ ->
+          return (mnNew, mnOrig)
+        _ ->
+          internalError "checkImportConflicts: ImportRecord should be qualified"

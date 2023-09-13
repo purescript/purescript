@@ -1,14 +1,14 @@
 module Language.PureScript.TypeClassDictionaries where
 
-import Prelude.Compat
+import Prelude
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Data.Text (Text, pack)
 
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
-import Language.PureScript.Names
-import Language.PureScript.Types
+import Language.PureScript.Names (Ident, ProperName(..), ProperNameType(..), Qualified, disqualify)
+import Language.PureScript.Types (SourceConstraint, SourceType)
 
 --
 -- Data representing a type class dictionary which is in scope

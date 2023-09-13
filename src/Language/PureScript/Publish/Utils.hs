@@ -1,8 +1,8 @@
 module Language.PureScript.Publish.Utils where
 
-import Prelude.Compat
+import Prelude
 
-import System.Directory
+import System.Directory (getCurrentDirectory)
 import System.FilePath.Glob (Pattern, compile, globDir1)
 
 -- | Glob relative to the current directory, and produce relative pathnames.

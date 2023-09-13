@@ -8,32 +8,33 @@ module Language.PureScript.Sugar.TypeClasses
   , superClassDictionaryNames
   ) where
 
-import Prelude.Compat
+import Prelude
 
-import           Control.Arrow (first, second)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.State
-import           Control.Monad.Supply.Class
-import           Data.Graph
-import           Data.List (find, partition)
-import           Data.List.NonEmpty (nonEmpty)
-import qualified Data.Map as M
-import           Data.Maybe (catMaybes, mapMaybe, isJust)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Set as S
-import           Data.Text (Text)
-import           Data.Traversable (for)
-import qualified Language.PureScript.Constants.Prim as C
-import           Language.PureScript.Crash
-import           Language.PureScript.Environment
-import           Language.PureScript.Errors hiding (isExported, nonEmpty)
-import           Language.PureScript.Externs
-import           Language.PureScript.Label (Label(..))
-import           Language.PureScript.Names
-import           Language.PureScript.PSString (mkString)
-import           Language.PureScript.Sugar.CaseDeclarations
-import           Language.PureScript.TypeClassDictionaries (superclassName)
-import           Language.PureScript.Types
+import Control.Arrow (first, second)
+import Control.Monad (unless)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State (MonadState(..), StateT, evalStateT, modify)
+import Control.Monad.Supply.Class (MonadSupply)
+import Data.Graph (SCC(..), stronglyConnComp)
+import Data.List (find, partition)
+import Data.List.NonEmpty (nonEmpty)
+import Data.Map qualified as M
+import Data.Maybe (catMaybes, mapMaybe, isJust)
+import Data.List.NonEmpty qualified as NEL
+import Data.Set qualified as S
+import Data.Text (Text)
+import Data.Traversable (for)
+import Language.PureScript.Constants.Prim qualified as C
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (DataDeclType(..), NameKind(..), TypeClassData(..), dictTypeName, function, makeTypeClassData, primClasses, primCoerceClasses, primIntClasses, primRowClasses, primRowListClasses, primSymbolClasses, primTypeErrorClasses, tyRecord)
+import Language.PureScript.Errors hiding (isExported, nonEmpty)
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
+import Language.PureScript.Label (Label(..))
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, freshIdent, qualify, runIdent)
+import Language.PureScript.PSString (mkString)
+import Language.PureScript.Sugar.CaseDeclarations (desugarCases)
+import Language.PureScript.TypeClassDictionaries (superclassName)
+import Language.PureScript.Types
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
 
@@ -53,13 +54,13 @@ desugarTypeClasses externs = flip evalStateT initialState . desugarModule
   initialState :: MemberMap
   initialState =
     mconcat
-      [ M.mapKeys (qualify C.Prim) primClasses
-      , M.mapKeys (qualify C.PrimCoerce) primCoerceClasses
-      , M.mapKeys (qualify C.PrimRow) primRowClasses
-      , M.mapKeys (qualify C.PrimRowList) primRowListClasses
-      , M.mapKeys (qualify C.PrimSymbol) primSymbolClasses
-      , M.mapKeys (qualify C.PrimInt) primIntClasses
-      , M.mapKeys (qualify C.PrimTypeError) primTypeErrorClasses
+      [ M.mapKeys (qualify C.M_Prim) primClasses
+      , M.mapKeys (qualify C.M_Prim_Coerce) primCoerceClasses
+      , M.mapKeys (qualify C.M_Prim_Row) primRowClasses
+      , M.mapKeys (qualify C.M_Prim_RowList) primRowListClasses
+      , M.mapKeys (qualify C.M_Prim_Symbol) primSymbolClasses
+      , M.mapKeys (qualify C.M_Prim_Int) primIntClasses
+      , M.mapKeys (qualify C.M_Prim_TypeError) primTypeErrorClasses
       , M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
       ]
 
@@ -100,7 +101,7 @@ desugarModule (Module ss coms name decls (Just exps)) = do
   constraintName (Constraint _ cName _ _ _) = cName
 
   classDeclName :: Declaration -> Qualified (ProperName 'ClassName)
-  classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (Just name) pn
+  classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (ByModuleName name) pn
   classDeclName _ = internalError "Expected TypeClassDeclaration"
 
 desugarModule _ = internalError "Exports should have been elaborated in name desugaring"
@@ -206,25 +207,29 @@ desugarDecl mn exps = go
   go d@(TypeClassDeclaration sa name args implies deps members) = do
     modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
-  go (TypeInstanceDeclaration _ _ _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
-  go (TypeInstanceDeclaration sa chainId idx name deps className tys (ExplicitInstance members))
-    | className == C.Coercible
-    = throwError . errorMessage' (fst sa) $ InvalidCoercibleInstanceDeclaration tys
-    | otherwise = do
-    desugared <- desugarCases members
+  go (TypeInstanceDeclaration sa na chainId idx name deps className tys body) = do
     name' <- desugarInstName name
-    dictDecl <- typeInstanceDictionaryDeclaration sa name' mn deps className tys desugared
-    let d = TypeInstanceDeclaration sa chainId idx (Right name') deps className tys (ExplicitInstance members)
+    let d = TypeInstanceDeclaration sa na chainId idx (Right name') deps className tys body
+    let explicitOrNot = case body of
+          DerivedInstance -> Left $ DerivedInstancePlaceholder className KnownClassStrategy
+          NewtypeInstance -> Left $ DerivedInstancePlaceholder className NewtypeStrategy
+          ExplicitInstance members -> Right members
+    dictDecl <- case explicitOrNot of
+      Right members
+        | className == C.Coercible ->
+          throwError . errorMessage' (fst sa) $ InvalidCoercibleInstanceDeclaration tys
+        | otherwise -> do
+          desugared <- desugarCases members
+          typeInstanceDictionaryDeclaration sa name' mn deps className tys desugared
+      Left dict ->
+        let
+          dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictTypeName) className)) tys
+          constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
+        in
+          return $ ValueDecl sa name' Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
     return (expRef name' className tys, [d, dictDecl])
-  go (TypeInstanceDeclaration sa chainId idx name deps className tys (NewtypeInstanceWithDictionary dict)) = do
-    name' <- desugarInstName name
-    let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictTypeName) className)) tys
-        constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
-        d = TypeInstanceDeclaration sa chainId idx (Right name') deps className tys (NewtypeInstanceWithDictionary dict)
-    return (expRef name' className tys, [d, ValueDecl sa name' Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
 
-  -- |
   -- Completes the name generation for type class instances that do not have
   -- a unique name defined in source code.
   desugarInstName :: MonadSupply m => Either Text Ident -> Desugar m Ident
@@ -245,7 +250,7 @@ desugarDecl mn exps = go
     :: (ProperName a -> [DeclarationRef] -> Bool)
     -> Qualified (ProperName a)
     -> Bool
-  isExported test (Qualified (Just mn') pn) = mn /= mn' || test pn exps
+  isExported test (Qualified (ByModuleName mn') pn) = mn /= mn' || test pn exps
   isExported _ _ = internalError "Names should have been qualified in name desugaring"
 
   matchesTypeRef :: ProperName 'TypeName -> DeclarationRef -> Bool
@@ -291,15 +296,16 @@ typeClassMemberToDictionaryAccessor
   -> Declaration
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa@(ss, _) ident ty)) =
-  let className = Qualified (Just mn) name
+  let className = Qualified (ByModuleName mn) name
       dictIdent = Ident "dict"
       dictObjIdent = Ident "v"
       ctor = ConstructorBinder ss (coerceProperName . dictTypeName <$> className) [VarBinder ss dictObjIdent]
-      acsr = Accessor (mkString $ runIdent ident) (Var ss (Qualified Nothing dictObjIdent))
+      acsr = Accessor (mkString $ runIdent ident) (Var ss (Qualified ByNullSourcePos dictObjIdent))
+      visibility = second (const TypeVarVisible) <$> args
   in ValueDecl sa ident Private []
     [MkUnguarded (
-     TypedValue False (Abs (VarBinder ss dictIdent) (Case [Var ss $ Qualified Nothing dictIdent] [CaseAlternative [ctor] [MkUnguarded acsr]])) $
-       moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty))
+     TypedValue False (Abs (VarBinder ss dictIdent) (Case [Var ss $ Qualified ByNullSourcePos dictIdent] [CaseAlternative [ctor] [MkUnguarded acsr]])) $
+       addVisibility visibility (moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty)))
     )]
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 
@@ -331,26 +337,33 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
 
   let declaredMembers = S.fromList $ mapMaybe declIdent decls
 
-  case filter (\(ident, _) -> not $ S.member ident declaredMembers) memberTypes of
-    hd : tl -> throwError . errorMessage' ss $ MissingClassMember (hd NEL.:| tl)
-    [] -> do
-      -- Create values for the type instance members
-      members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
+  -- Instance declarations with a Fail constraint are unreachable code, so
+  -- we allow them to be empty.
+  let unreachable = any ((C.Fail ==) . constraintClass) deps && null decls
 
-      -- Create the type of the dictionary
-      -- The type is a record type, but depending on type instance dependencies, may be constrained.
-      -- The dictionary itself is a record literal.
-      superclassesDicts <- for typeClassSuperclasses $ \(Constraint _ superclass _ suTyArgs _) -> do
-        let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
-        pure $ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
-      let superclasses = superClassDictionaryNames typeClassSuperclasses `zip` superclassesDicts
+  unless unreachable $
+    case filter (\(ident, _) -> not $ S.member ident declaredMembers) memberTypes of
+      hd : tl -> throwError . errorMessage' ss $ MissingClassMember (hd NEL.:| tl)
+      [] -> pure ()
 
-      let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
-          dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictTypeName) className)) tys
-          constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
-          dict = App (Constructor ss (fmap (coerceProperName . dictTypeName) className)) props
-          result = ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
-      return result
+  -- Create values for the type instance members
+  members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
+
+  -- Create the type of the dictionary
+  -- The type is a record type, but depending on type instance dependencies, may be constrained.
+  -- The dictionary itself is a record literal (unless unreachable, in which case it's undefined).
+  superclassesDicts <- for typeClassSuperclasses $ \(Constraint _ superclass _ suTyArgs _) -> do
+    let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
+    pure $ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
+  let superclasses = superClassDictionaryNames typeClassSuperclasses `zip` superclassesDicts
+
+  let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
+      dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictTypeName) className)) tys
+      constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
+      dict = App (Constructor ss (fmap (coerceProperName . dictTypeName) className)) props
+      mkTV = if unreachable then TypedValue False (Var nullSourceSpan C.I_undefined) else TypedValue True dict
+      result = ValueDecl sa name Private [] [MkUnguarded (mkTV constrainedTy)]
+  return result
 
   where
 

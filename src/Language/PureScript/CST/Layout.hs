@@ -82,7 +82,7 @@
 --    ] of
 -- @
 --
--- Which of the above 13 commas function as the separaters between the
+-- Which of the above 13 commas function as the separators between the
 -- case binders (e.g. @one@) in the outermost @case ... of@ context?
 --
 -- ### The Solution
@@ -171,10 +171,10 @@ module Language.PureScript.CST.Layout where
 import Prelude
 
 import Data.DList (snoc)
-import qualified Data.DList as DList
+import Data.DList qualified as DList
 import Data.Foldable (find)
 import Data.Function ((&))
-import Language.PureScript.CST.Types
+import Language.PureScript.CST.Types (Comment, LineFeed, SourcePos(..), SourceRange(..), SourceToken(..), Token(..), TokenAnn(..))
 
 type LayoutStack = [(SourcePos, LayoutDelim)]
 

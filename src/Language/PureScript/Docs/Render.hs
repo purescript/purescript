@@ -9,20 +9,20 @@
 
 module Language.PureScript.Docs.Render where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Maybe (maybeToList)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 import Language.PureScript.Docs.RenderedCode
-import Language.PureScript.Docs.Types
-import Language.PureScript.Docs.Utils.MonoidExtras
+import Language.PureScript.Docs.Types (ChildDeclaration(..), ChildDeclarationInfo(..), Constraint', Declaration(..), DeclarationInfo(..), KindInfo(..), Type', isTypeClassMember, kindSignatureForKeyword)
+import Language.PureScript.Docs.Utils.MonoidExtras (mintersperse)
 
-import qualified Language.PureScript.AST as P
-import qualified Language.PureScript.Environment as P
-import qualified Language.PureScript.Names as P
-import qualified Language.PureScript.Types as P
+import Language.PureScript.AST qualified as P
+import Language.PureScript.Environment qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Types qualified as P
 
 renderKindSig :: Text -> KindInfo -> RenderedCode
 renderKindSig declTitle KindInfo{..} =
@@ -123,10 +123,10 @@ renderConstraints constraints
                  (map renderConstraint constraints)
 
 notQualified :: Text -> P.Qualified (P.ProperName a)
-notQualified = P.Qualified Nothing . P.ProperName
+notQualified = P.Qualified P.ByNullSourcePos . P.ProperName
 
 ident' :: Text -> RenderedCode
-ident' = ident . P.Qualified Nothing . P.Ident
+ident' = ident . P.Qualified P.ByNullSourcePos . P.Ident
 
 dataCtor' :: Text -> RenderedCode
 dataCtor' = dataCtor . notQualified

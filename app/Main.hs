@@ -2,21 +2,21 @@ module Main where
 
 import Prelude
 
-import qualified Command.Bundle as Bundle
-import qualified Command.Compile as Compile
-import qualified Command.Docs as Docs
-import qualified Command.Graph as Graph
-import qualified Command.Hierarchy as Hierarchy
-import qualified Command.Ide as Ide
-import qualified Command.Publish as Publish
-import qualified Command.REPL as REPL
-import           Control.Monad (join)
-import           Data.Foldable (fold)
-import qualified Options.Applicative as Opts
-import           System.Environment (getArgs)
-import qualified System.IO as IO
-import qualified Text.PrettyPrint.ANSI.Leijen as Doc
-import           Version (versionString)
+import Command.Bundle qualified as Bundle
+import Command.Compile qualified as Compile
+import Command.Docs qualified as Docs
+import Command.Graph qualified as Graph
+import Command.Hierarchy qualified as Hierarchy
+import Command.Ide qualified as Ide
+import Command.Publish qualified as Publish
+import Command.REPL qualified as REPL
+import Control.Monad (join)
+import Data.Foldable (fold)
+import Options.Applicative qualified as Opts
+import System.Environment (getArgs)
+import System.IO qualified as IO
+import Text.PrettyPrint.ANSI.Leijen qualified as Doc
+import Version (versionString)
 
 
 main :: IO ()

@@ -22,13 +22,13 @@ module Language.PureScript.Ide.Reexports
   , resolveReexports'
   ) where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName)
 
-import qualified Data.Map                      as Map
-import qualified Language.PureScript           as P
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           Lens.Micro.Platform           hiding ((&))
+import Control.Lens (set)
+import Data.Map qualified as Map
+import Language.PureScript qualified as P
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util (discardAnn)
 
 -- | Contains the module with resolved reexports, and possible failures
 data ReexportResult a
@@ -85,7 +85,7 @@ resolveReexports' modules refs =
       Nothing -> Left x
       Just decls' ->
         let
-          setExportedFrom = set (idaAnnotation.annExportedFrom) . Just
+          setExportedFrom = set (idaAnnotation . annExportedFrom) . Just
         in
           bimap (mn,) (map (setExportedFrom mn)) (resolveRef decls' r)
 

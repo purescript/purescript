@@ -13,8 +13,8 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Data.Void (Void)
 import GHC.Generics (Generic)
-import qualified Language.PureScript.Names as N
-import qualified Language.PureScript.Roles as R
+import Language.PureScript.Names qualified as N
+import Language.PureScript.Roles qualified as R
 import Language.PureScript.PSString (PSString)
 
 data SourcePos = SourcePos
@@ -153,8 +153,8 @@ data Type a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data TypeVarBinding a
-  = TypeVarKinded (Wrapped (Labeled (Name Ident) (Type a)))
-  | TypeVarName (Name Ident)
+  = TypeVarKinded (Wrapped (Labeled (Maybe SourceToken, Name Ident) (Type a)))
+  | TypeVarName (Maybe SourceToken, Name Ident)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data Constraint a
@@ -337,6 +337,7 @@ data Expr a
   | ExprRecordAccessor a (RecordAccessor a)
   | ExprRecordUpdate a (Expr a) (DelimitedNonEmpty (RecordUpdate a))
   | ExprApp a (Expr a) (Expr a)
+  | ExprVisibleTypeApp a (Expr a) SourceToken (Type a)
   | ExprLambda a (Lambda a)
   | ExprIf a (IfThenElse a)
   | ExprCase a (CaseOf a)

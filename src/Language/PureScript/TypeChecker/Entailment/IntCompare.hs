@@ -6,12 +6,12 @@ module Language.PureScript.TypeChecker.Entailment.IntCompare where
 
 import Protolude
 
-import qualified Data.Graph as G
-import qualified Data.Map as M
+import Data.Graph qualified as G
+import Data.Map qualified as M
 
-import qualified Language.PureScript.Names as P
-import qualified Language.PureScript.Types as P
-import qualified Language.PureScript.Constants.Prim as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Types qualified as P
+import Language.PureScript.Constants.Prim qualified as P
 
 data Relation a
   = Equal a a
@@ -46,18 +46,18 @@ type PSOrdering = P.Qualified (P.ProperName 'P.TypeName)
 solveRelation :: forall a. Ord a => Context a -> a -> a -> Maybe PSOrdering
 solveRelation context lhs rhs =
   if lhs == rhs then
-    pure P.orderingEQ
+    pure P.EQ
   else do
     let (graph, search) = inequalities
     lhs' <- search lhs
     rhs' <- search rhs
     case (G.path graph lhs' rhs', G.path graph rhs' lhs') of
       (True, True) ->
-        pure P.orderingEQ
+        pure P.EQ
       (True, False) ->
-        pure P.orderingLT
+        pure P.LT
       (False, True) ->
-        pure P.orderingGT
+        pure P.GT
       _ ->
         Nothing
   where
@@ -79,9 +79,9 @@ solveRelation context lhs rhs =
 mkRelation :: P.Type a -> P.Type a -> P.Type a -> Maybe (Relation (P.Type a))
 mkRelation lhs rhs rel = case rel of
   P.TypeConstructor _ ordering
-    | ordering == P.orderingEQ -> pure $ Equal lhs rhs
-    | ordering == P.orderingLT -> pure $ LessThan lhs rhs
-    | ordering == P.orderingGT -> pure $ LessThan rhs lhs
+    | ordering == P.EQ -> pure $ Equal lhs rhs
+    | ordering == P.LT -> pure $ LessThan lhs rhs
+    | ordering == P.GT -> pure $ LessThan rhs lhs
   _ ->
     Nothing
 

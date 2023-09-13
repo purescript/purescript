@@ -7,24 +7,24 @@ module Language.PureScript.Pretty.Values
   , prettyPrintBinderAtom
   ) where
 
-import Prelude.Compat hiding ((<>))
+import Prelude hiding ((<>))
 
 import Control.Arrow (second)
 
 import Data.Text (Text)
-import qualified Data.List.NonEmpty as NEL
-import qualified Data.Monoid as Monoid ((<>))
-import qualified Data.Text as T
+import Data.List.NonEmpty qualified as NEL
+import Data.Monoid qualified as Monoid ((<>))
+import Data.Text qualified as T
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Names
-import Language.PureScript.Pretty.Common
+import Language.PureScript.AST (AssocList(..), Binder(..), CaseAlternative(..), Declaration(..), DoNotationElement(..), Expr(..), Guard(..), GuardedExpr(..), Literal(..), PathNode(..), PathTree(..), TypeDeclarationData(..), pattern ValueDecl, WhereProvenance(..))
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Names (OpName(..), ProperName(..), Qualified(..), disqualify, runModuleName, showIdent)
+import Language.PureScript.Pretty.Common (before, beforeWithSpace, parensT)
 import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox, prettyPrintObjectKey)
 import Language.PureScript.Types (Constraint(..))
 import Language.PureScript.PSString (PSString, prettyPrintString)
 
-import Text.PrettyPrint.Boxes
+import Text.PrettyPrint.Boxes (Box, left, moveRight, text, vcat, vsep, (//), (<>))
 
 -- TODO(Christoph): remove T.unpack s
 
@@ -66,6 +66,7 @@ prettyPrintValue d (ObjectUpdateNested o ps) = prettyPrintValueAtom (d - 1) o `b
     printNode (key, Leaf val) = prettyPrintUpdateEntry d key val
     printNode (key, Branch val) = textT (prettyPrintObjectKey key) `beforeWithSpace` prettyPrintUpdate val
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
+prettyPrintValue d (VisibleTypeApp val _) = prettyPrintValueAtom (d - 1) val
 prettyPrintValue d (Unused val) = prettyPrintValue d val
 prettyPrintValue d (Abs arg val) = text ('\\' : T.unpack (prettyPrintBinder arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (Case values binders) =
@@ -87,6 +88,7 @@ prettyPrintValue d (Ado m els yield) =
 -- TODO: constraint kind args
 prettyPrintValue d (TypeClassDictionary (Constraint _ name _ tys _) _ _) = foldl1 beforeWithSpace $ text ("#dict " ++ T.unpack (runProperName (disqualify name))) : map (typeAtomAsBox d) tys
 prettyPrintValue _ (DeferredDictionary name _) = text $ "#dict " ++ T.unpack (runProperName (disqualify name))
+prettyPrintValue _ (DerivedInstancePlaceholder name _) = text $ "#derived " ++ T.unpack (runProperName (disqualify name))
 prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val
 prettyPrintValue d (Literal _ l) = prettyPrintLiteralValue d l

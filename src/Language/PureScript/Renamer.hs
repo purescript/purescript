@@ -3,20 +3,20 @@
 --
 module Language.PureScript.Renamer (renameInModule) where
 
-import Prelude.Compat
+import Prelude
 
-import Control.Monad.State
+import Control.Monad.State (MonadState(..), State, gets, modify, runState, (>=>))
 
 import Data.Functor ((<&>))
 import Data.List (find)
-import Data.Maybe (fromJust, fromMaybe, isNothing)
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.Text as T
+import Data.Maybe (fromJust, fromMaybe)
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text qualified as T
 
-import Language.PureScript.CoreFn
-import Language.PureScript.Names
-import Language.PureScript.Traversals
+import Language.PureScript.CoreFn (Ann, Bind(..), Binder(..), CaseAlternative(..), Expr(..), Literal(..), Module(..))
+import Language.PureScript.Names (Ident(..), Qualified(..), isBySourcePos, isPlainIdent, runIdent, showIdent)
+import Language.PureScript.Traversals (eitherM, pairM, sndM)
 
 -- |
 -- The state object used in this module
@@ -166,18 +166,18 @@ renameInValue (Literal ann l) =
 renameInValue c@Constructor{} = return c
 renameInValue (Accessor ann prop v) =
   Accessor ann prop <$> renameInValue v
-renameInValue (ObjectUpdate ann obj vs) =
-  ObjectUpdate ann <$> renameInValue obj <*> traverse (\(name, v) -> (name, ) <$> renameInValue v) vs
+renameInValue (ObjectUpdate ann obj copy vs) =
+  (\obj' -> ObjectUpdate ann obj' copy) <$> renameInValue obj <*> traverse (\(name, v) -> (name, ) <$> renameInValue v) vs
 renameInValue (Abs ann name v) =
   newScope $ Abs ann <$> updateScope name <*> renameInValue v
 renameInValue (App ann v1 v2) =
   App ann <$> renameInValue v1 <*> renameInValue v2
-renameInValue (Var ann (Qualified mn name)) | isNothing mn || not (isPlainIdent name) =
+renameInValue (Var ann (Qualified qb name)) | isBySourcePos qb || not (isPlainIdent name) =
   -- This should only rename identifiers local to the current module: either
   -- they aren't qualified, or they are but they have a name that should not
   -- have appeared in a module's externs, so they must be from this module's
   -- top-level scope.
-  Var ann . Qualified mn <$> lookupIdent name
+  Var ann . Qualified qb <$> lookupIdent name
 renameInValue v@Var{} = return v
 renameInValue (Case ann vs alts) =
   newScope $ Case ann <$> traverse renameInValue vs <*> traverse renameInCaseAlternative alts

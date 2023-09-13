@@ -122,7 +122,7 @@
    =ide= makes sure to not run into deadlocks or data races.
 
    However the current implementation of =purs ide server= runs all the commands
-   sequentially, because the commmands run fast enough at this point, and a
+   sequentially, because the commands run fast enough at this point, and a
    users interaction with his editor are mostly sequential anyway.
 * Commands
   The three most involved commands are completion, adding imports and rebuilding.

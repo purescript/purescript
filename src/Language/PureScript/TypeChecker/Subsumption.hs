@@ -5,7 +5,7 @@ module Language.PureScript.TypeChecker.Subsumption
   ( subsumes
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Monad (when)
 import Control.Monad.Error.Class (MonadError(..))
@@ -16,14 +16,14 @@ import Data.List (uncons)
 import Data.List.Ordered (minusBy')
 import Data.Ord (comparing)
 
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Skolems
-import Language.PureScript.TypeChecker.Unify
-import Language.PureScript.Types
+import Language.PureScript.AST (ErrorMessageHint(..), Expr(..), pattern NullSourceAnn)
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Environment (tyFunction, tyRecord)
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, internalCompilerError)
+import Language.PureScript.TypeChecker.Monad (CheckState, getHints, getTypeClassDictionaries, withErrorMessageHint)
+import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, skolemize)
+import Language.PureScript.TypeChecker.Unify (alignRowsWith, freshTypeWithKind, unifyTypes)
+import Language.PureScript.Types (RowListItem(..), SourceType, Type(..), eqType, isREmpty, replaceTypeVars, rowFromList)
 
 -- | Subsumption can operate in two modes:
 --
@@ -74,11 +74,11 @@ subsumes'
   -> SourceType
   -> SourceType
   -> m (Coercion mode)
-subsumes' mode (ForAll _ ident mbK ty1 _) ty2 = do
+subsumes' mode (ForAll _ _ ident mbK ty1 _) ty2 = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   let replaced = replaceTypeVars ident u ty1
   subsumes' mode replaced ty2
-subsumes' mode ty1 (ForAll _ ident mbK ty2 sco) =
+subsumes' mode ty1 (ForAll _ _ ident mbK ty2 sco) =
   case sco of
     Just sco' -> do
       sko <- newSkolemConstant
@@ -103,7 +103,8 @@ subsumes' SElaborate (ConstrainedType _ con ty1) ty2 = do
   let addDicts val = App val (TypeClassDictionary con dicts hints)
   return (elaborate . addDicts)
 subsumes' mode (TypeApp _ f1 r1) (TypeApp _ f2 r2) | eqType f1 tyRecord && eqType f2 tyRecord = do
-    let (common, ((ts1', r1'), (ts2', r2'))) = alignRowsWith (subsumes' SNoElaborate) r1 r2
+    let goWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ subsumes' SNoElaborate t1 t2
+    let (common, ((ts1', r1'), (ts2', r2'))) = alignRowsWith goWithLabel r1 r2
     -- For { ts1 | r1 } to subsume { ts2 | r2 } when r1 is empty (= we're working with a closed row),
     -- every property in ts2 must appear in ts1. If not, then the candidate expression is missing a required property.
     -- Conversely, when r2 is empty, every property in ts1 must appear in ts2, or else the expression has
@@ -114,6 +115,7 @@ subsumes' mode (TypeApp _ f1 r1) (TypeApp _ f2 r2) | eqType f1 tyRecord && eqTyp
       (for_ (firstMissingProp ts1' ts2') (throwError . errorMessage . AdditionalProperty . rowListLabel))
     -- Check subsumption for common labels
     sequence_ common
+    -- Inject the info here
     unifyTypes (rowFromList (ts1', r1')) (rowFromList (ts2', r2'))
     -- Nothing was elaborated, return the default coercion
     return (defaultCoercion mode)

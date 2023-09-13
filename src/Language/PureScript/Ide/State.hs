@@ -37,25 +37,25 @@ module Language.PureScript.Ide.State
   , resolveDataConstructorsForModule
   ) where
 
-import           Protolude hiding (moduleName)
+import Protolude hiding (moduleName, unzip)
 
-import           Control.Arrow
-import           Control.Concurrent.STM
-import           "monad-logger" Control.Monad.Logger
-import           Data.IORef
-import qualified Data.Map.Lazy                      as Map
-import           Data.Time.Clock (UTCTime)
-import qualified Language.PureScript                as P
-import           Language.PureScript.Docs.Convert.Single (convertComments)
-import           Language.PureScript.Externs
-import           Language.PureScript.Make.Actions (cacheDbFile)
-import           Language.PureScript.Ide.Externs
-import           Language.PureScript.Ide.Reexports
-import           Language.PureScript.Ide.SourceFile
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
-import           Lens.Micro.Platform                hiding ((&))
-import           System.Directory (getModificationTime)
+import Control.Concurrent.STM (TVar, modifyTVar, readTVar, readTVarIO, writeTVar)
+import Control.Lens (Ixed(..), preview, view, (%~), (.~), (^.))
+import "monad-logger" Control.Monad.Logger (MonadLogger, logWarnN)
+import Data.IORef (readIORef, writeIORef)
+import Data.Map.Lazy qualified as Map
+import Data.Time.Clock (UTCTime)
+import Data.Zip (unzip)
+import Language.PureScript qualified as P
+import Language.PureScript.Docs.Convert.Single (convertComments)
+import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
+import Language.PureScript.Make.Actions (cacheDbFile)
+import Language.PureScript.Ide.Externs (convertExterns)
+import Language.PureScript.Ide.Reexports (ReexportResult(..), prettyPrintReexportResult, reexportHasFailures, resolveReexports)
+import Language.PureScript.Ide.SourceFile (extractAstInformation)
+import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.Util (discardAnn, displayTimeSpec, logPerf, opNameT, properNameT, runLogger)
+import System.Directory (getModificationTime)
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
@@ -207,7 +207,7 @@ populateVolatileStateSync = do
     (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
     (Map.filter reexportHasFailures results)
 
-populateVolatileState :: (Ide m, MonadLogger m) => m (Async ())
+populateVolatileState :: Ide m => m (Async ())
 populateVolatileState = do
   env <- ask
   let ll = confLogLevel (ideConfiguration env)
@@ -225,7 +225,7 @@ populateVolatileStateSTM ref = do
   -- through the repopulation
   rebuildCache <- vsCachedRebuild <$> getVolatileStateSTM ref
   let asts = map (extractAstInformation . fst) modules
-  let (moduleDeclarations, reexportRefs) = (map fst &&& map snd) (Map.map convertExterns externs)
+  let (moduleDeclarations, reexportRefs) = unzip (Map.map convertExterns externs)
       results =
         moduleDeclarations
         & map resolveDataConstructorsForModule
@@ -360,7 +360,7 @@ resolveInstances externs declarations =
   where
     extractInstances mn P.EDInstance{..} =
       case edInstanceClassName of
-          P.Qualified (Just classModule) className ->
+          P.Qualified (P.ByModuleName classModule) className ->
             Just (IdeInstance mn
                   edInstanceName
                   edInstanceTypes
@@ -401,18 +401,17 @@ resolveOperatorsForModule modules = map (idaDeclaration %~ resolveOperator)
     getDeclarations :: P.ModuleName -> [IdeDeclaration]
     getDeclarations moduleName =
       Map.lookup moduleName modules
-      & fromMaybe []
-      & map discardAnn
+      & foldMap (map discardAnn)
 
     resolveOperator (IdeDeclValueOperator op)
-      | (P.Qualified (Just mn) (Left ident)) <- op ^. ideValueOpAlias =
+      | (P.Qualified (P.ByModuleName mn) (Left ident)) <- op ^. ideValueOpAlias =
           let t = getDeclarations mn
                   & mapMaybe (preview _IdeDeclValue)
                   & filter (anyOf ideValueIdent (== ident))
                   & map (view ideValueType)
                   & listToMaybe
           in IdeDeclValueOperator (op & ideValueOpType .~ t)
-      | (P.Qualified (Just mn) (Right dtor)) <- op ^. ideValueOpAlias =
+      | (P.Qualified (P.ByModuleName mn) (Right dtor)) <- op ^. ideValueOpAlias =
           let t = getDeclarations mn
                   & mapMaybe (preview _IdeDeclDataConstructor)
                   & filter (anyOf ideDtorName (== dtor))
@@ -420,7 +419,7 @@ resolveOperatorsForModule modules = map (idaDeclaration %~ resolveOperator)
                   & listToMaybe
           in IdeDeclValueOperator (op & ideValueOpType .~ t)
     resolveOperator (IdeDeclTypeOperator op)
-      | P.Qualified (Just mn) properName <- op ^. ideTypeOpAlias =
+      | P.Qualified (P.ByModuleName mn) properName <- op ^. ideTypeOpAlias =
           let k = getDeclarations mn
                   & mapMaybe (preview _IdeDeclType)
                   & filter (anyOf ideTypeName (== properName))
@@ -442,12 +441,12 @@ resolveDataConstructorsForModule decls =
     resolveDataConstructors :: IdeDeclaration -> IdeDeclaration
     resolveDataConstructors decl = case decl of
       IdeDeclType ty ->
-        IdeDeclType (ty & ideTypeDtors .~ fromMaybe [] (Map.lookup (ty^.ideTypeName) dtors))
+        IdeDeclType (ty & ideTypeDtors .~ fromMaybe [] (Map.lookup (ty ^. ideTypeName) dtors))
       _ ->
         decl
 
     dtors =
       decls
-      & mapMaybe (preview (idaDeclaration._IdeDeclDataConstructor))
+      & mapMaybe (preview (idaDeclaration . _IdeDeclDataConstructor))
       & foldr (\(IdeDataConstructor name typeName type') ->
                   Map.insertWith (<>) typeName [(name, type')]) Map.empty

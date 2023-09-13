@@ -3,13 +3,12 @@ module Language.PureScript.Sugar.Accessor
   ( desugarAccessorModule
   ) where
 
-import           Prelude.Compat
+import           Prelude
 
 import           Control.Monad.Writer
 
 import           Language.PureScript.AST
-import qualified Language.PureScript.Constants.Prelude
-                                               as C
+import Language.PureScript.Constants.Libs qualified as C
 import           Language.PureScript.Externs
 import           Language.PureScript.Names
 import           Language.PureScript.Types
@@ -22,8 +21,8 @@ desugarAccessorModule externs m
 desugarAccessorModule _externs (Module ss coms mn ds exts) =
   let (ds', Any used) = runWriter $ traverse desugarAccessor ds
       extraImports    = if used
-        then addDefaultImport (Qualified (Just C.DataRecord) C.DataRecord)
-          . addDefaultImport (Qualified (Just C.TypeProxy) C.TypeProxy)
+        then addDefaultImport (Qualified (ByModuleName C.M_Data_Record) C.M_Data_Record)
+          . addDefaultImport (Qualified (ByModuleName C.M_Type_Proxy) C.M_Type_Proxy)
         else id
   in  extraImports $ Module ss coms mn ds' exts
 
@@ -37,12 +36,12 @@ desugarAccessor decl =
     tell (Any True)
     pure $ App
       (App
-        (Var nullSourceSpan C.GetField)
+        (Var nullSourceSpan C.I_getField)
         (TypedValue
           False
-          (Constructor nullSourceSpan C.Proxy)
+          (Constructor nullSourceSpan C.C_Proxy)
           (TypeApp nullSourceAnn
-                   (TypeConstructor nullSourceAnn C.ProxyType)
+                   (TypeConstructor nullSourceAnn C.Proxy)
                    (TypeLevelString nullSourceAnn label)
           )
         )

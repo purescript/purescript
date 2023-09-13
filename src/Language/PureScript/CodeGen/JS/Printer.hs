@@ -4,29 +4,27 @@ module Language.PureScript.CodeGen.JS.Printer
   , prettyPrintJSWithSourceMaps
   ) where
 
-import           Prelude.Compat
+import Prelude
 
-import           Control.Arrow                         ((<+>))
-import qualified Control.Arrow                         as A
-import           Control.Monad                         (forM, mzero)
-import           Control.Monad.State                   (StateT, evalStateT)
-import           Control.PatternArrows
+import Control.Arrow ((<+>))
+import Control.Monad (forM, mzero)
+import Control.Monad.State (StateT, evalStateT)
+import Control.PatternArrows (Operator(..), OperatorTable(..), Pattern(..), buildPrettyPrinter, mkPattern, mkPattern')
+import Control.Arrow qualified as A
 
-import qualified Data.List.NonEmpty                    as NEL (toList)
-import           Data.Maybe                            (fromMaybe)
-import           Data.Text                             (Text)
-import qualified Data.Text                             as T
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import Data.Text qualified as T
+import Data.List.NonEmpty qualified as NEL (toList)
 
-import           Language.PureScript.AST               (SourceSpan (..))
-import           Language.PureScript.CodeGen.JS.Common
-import           Language.PureScript.Comments
-import           Language.PureScript.CoreImp.AST
-import           Language.PureScript.CoreImp.Module    hiding (Export, Import)
-import qualified Language.PureScript.CoreImp.Module    as AST
-import           Language.PureScript.Crash
-import           Language.PureScript.PSString          (PSString, decodeString,
-                                                        prettyPrintStringJS)
-import           Language.PureScript.Pretty.Common
+import Language.PureScript.AST (SourceSpan(..))
+import Language.PureScript.CodeGen.JS.Common (identCharToText, isValidJsIdentifier, nameIsJsBuiltIn, nameIsJsReserved)
+import Language.PureScript.CoreImp.AST (AST(..), BinaryOperator(..), CIComments(..), UnaryOperator(..), getSourceSpan)
+import Language.PureScript.CoreImp.Module (Export(..), Import(..), Module(..))
+import Language.PureScript.Comments (Comment(..))
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Pretty.Common (Emit(..), PrinterState(..), SMap, StrPos(..), addMapping', currentIndent, intercalate, parensPos, runPlainString, withIndent)
+import Language.PureScript.PSString (PSString, decodeString, prettyPrintStringJS)
 
 -- TODO (Christoph): Get rid of T.unpack / pack
 
@@ -75,7 +73,7 @@ literals = mkPattern' match'
   match (Var _ ident) = return $ emit ident
   match (VariableIntroduction _ ident value) = mconcat <$> sequence
     [ return $ emit $ "var " <> ident
-    , maybe (return mempty) (fmap (emit " = " <>) . prettyPrintJS') value
+    , maybe (return mempty) (fmap (emit " = " <>) . prettyPrintJS' . snd) value
     ]
   match (Assignment _ target value) = mconcat <$> sequence
     [ prettyPrintJS' target
@@ -123,29 +121,9 @@ literals = mkPattern' match'
     , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
-  match (Import _ ident from) = return . emit $
-    "import * as " <> ident <> " from " <> prettyPrintStringJS from
-  match (Export _ idents from) = mconcat <$> sequence
-    [ return $ emit "export {\n"
-    , withIndent $ do
-        let exportsStrings = emit . exportedIdentToString from <$> idents
-        indentString <- currentIndent
-        return . intercalate (emit ",\n") . NEL.toList $ (indentString <>) <$> exportsStrings
-    , return $ emit "\n"
-    , currentIndent
-    , return . emit $ "}" <> maybe "" ((" from " <>) . prettyPrintStringJS) from
-    ]
-    where
-    exportedIdentToString Nothing ident
-      | nameIsJsReserved ident || nameIsJsBuiltIn ident
-      = "$$" <> ident <> " as " <> ident
-    exportedIdentToString _ "$main"
-      = T.concatMap identCharToText "$main" <> " as $main"
-    exportedIdentToString _ ident
-      = T.concatMap identCharToText ident
-  match (Comment PureAnnotation js) = mconcat <$> sequence
+  match (Comment PureAnnotation js) = mconcat <$> sequence 
     [ return $ emit "/* #__PURE__ */ "
-    , prettyPrintJS' js
+    , prettyPrintJS' js 
     ]
   match _ = mzero
 
@@ -175,15 +153,15 @@ comment (BlockComment com) = fmap mconcat $ sequence $
       Just rest -> removeComments rest
       Nothing -> case T.uncons t of
         Just (x, xs) -> x `T.cons` removeComments xs
-        Nothing      -> ""
+        Nothing -> ""
 
-prettyImport :: (Emit gen) => AST.Import -> StateT PrinterState Maybe gen
-prettyImport (AST.Import ident from) =
+prettyImport :: (Emit gen) => Import -> StateT PrinterState Maybe gen
+prettyImport (Import ident from) =
   return . emit $
     "import * as " <> ident <> " from " <> prettyPrintStringJS from <> ";"
 
-prettyExport :: (Emit gen) => AST.Export -> StateT PrinterState Maybe gen
-prettyExport (AST.Export idents from) =
+prettyExport :: (Emit gen) => Export -> StateT PrinterState Maybe gen
+prettyExport (Export idents from) =
   mconcat <$> sequence
     [ return $ emit "export {\n"
     , withIndent $ do
@@ -209,20 +187,20 @@ accessor = mkPattern match
   match (Indexer _ (StringLiteral _ prop) val) =
     case decodeString prop of
       Just s | isValidJsIdentifier s -> Just (s, val)
-      _                              -> Nothing
+      _ -> Nothing
   match _ = Nothing
 
 indexer :: (Emit gen) => Pattern PrinterState AST (gen, AST)
 indexer = mkPattern' match
   where
   match (Indexer _ index val) = (,) <$> prettyPrintJS' index <*> pure val
-  match _                     = mzero
+  match _ = mzero
 
 lam :: Pattern PrinterState AST ((Maybe Text, [Text], Maybe SourceSpan), AST)
 lam = mkPattern match
   where
   match (Function ss name args ret) = Just ((name, args, ss), ret)
-  match _                           = Nothing
+  match _ = Nothing
 
 app :: (Emit gen) => Pattern PrinterState AST (gen, AST)
 app = mkPattern' match
@@ -236,7 +214,7 @@ instanceOf :: Pattern PrinterState AST (AST, AST)
 instanceOf = mkPattern match
   where
   match (InstanceOf _ val ty) = Just (val, ty)
-  match _                     = Nothing
+  match _ = Nothing
 
 unary' :: (Emit gen) => UnaryOperator -> (AST -> Text) -> Operator PrinterState AST gen
 unary' op mkStr = Wrap match (<>)
@@ -254,7 +232,7 @@ negateOperator :: (Emit gen) => Operator PrinterState AST gen
 negateOperator = unary' Negate (\v -> if isNegate v then "- " else "-")
   where
   isNegate (Unary _ Negate _) = True
-  isNegate _                  = False
+  isNegate _ = False
 
 binary :: (Emit gen) => BinaryOperator -> Text -> Operator PrinterState AST gen
 binary op str = AssocL match (\v1 v2 -> v1 <> emit (" " <> str <> " ") <> v2)

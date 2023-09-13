@@ -3,23 +3,23 @@
 --
 module Language.PureScript.Linter (lint, module L) where
 
-import Prelude.Compat
+import Prelude
 
-import Control.Monad.Writer.Class
+import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Maybe (mapMaybe)
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 import Control.Monad ((<=<))
 
 import Language.PureScript.AST
-import Language.PureScript.Errors
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage')
 import Language.PureScript.Linter.Exhaustive as L
 import Language.PureScript.Linter.Imports as L
-import Language.PureScript.Names
-import Language.PureScript.Types
-import qualified Language.PureScript.Constants.Prelude as C
+import Language.PureScript.Names (Ident(..), Qualified(..), QualifiedBy(..), getIdentName, runIdent)
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), everythingWithContextOnTypes)
+import Language.PureScript.Constants.Libs qualified as C
 
 -- | Lint the PureScript AST.
 -- |
@@ -86,7 +86,7 @@ lint modl@(Module _ _ mn ds _) = do
     where
 
     step :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
-    step s (ForAll _ tv _ _ _) = bindVar s tv
+    step s (ForAll _ _ tv _ _ _) = bindVar s tv
     step s _ = (s, mempty)
 
     bindVar :: S.Set Text -> Text -> (S.Set Text, MultipleErrors)
@@ -97,7 +97,7 @@ lint modl@(Module _ _ mn ds _) = do
       -- Recursively walk the type and prune used variables from `unused`
       go :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
       go unused (TypeVar _ v) = (S.delete v unused, mempty)
-      go unused (ForAll _ tv mbK t1 _) =
+      go unused (ForAll _ _ tv mbK t1 _) =
         let (nowUnused, errors)
               | Just k <- mbK = go unused k `combine` go (S.insert tv unused) t1
               | otherwise = go (S.insert tv unused) t1
@@ -162,7 +162,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
   thisModuleRef _ = False
 
   rebindable :: S.Set Ident
-  rebindable = S.fromList [ Ident C.bind, Ident C.discard ]
+  rebindable = S.fromList [ Ident C.S_bind, Ident C.S_discard ]
 
   getDeclIdent :: Declaration -> Maybe Ident
   getDeclIdent = getIdentName <=< declName
@@ -183,11 +183,13 @@ lintUnused (Module modSS _ mn modDecls exports) =
         in
           (vars, errs')
 
-    goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
+    goDecl (ValueFixityDeclaration _ _ (Qualified _ (Left v)) _) = (S.singleton v, mempty)
+
+    goDecl (TypeInstanceDeclaration _ _ _ _ _ _ _ _ (ExplicitInstance decls)) = mconcat $ map goDecl decls
     goDecl _ = mempty
 
     go :: Expr -> (S.Set Ident, MultipleErrors)
-    go (Var _ (Qualified Nothing v)) = (S.singleton v, mempty)
+    go (Var _ (Qualified (BySourcePos _) v)) = (S.singleton v, mempty)
     go (Var _ _) = (S.empty, mempty)
 
     go (Let _ ds e) = onDecls ds (go e)
@@ -210,6 +212,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
         goNode (Branch val) = goTree val
 
     go (App v1 v2) = go v1 <> go v2
+    go (VisibleTypeApp v _) = go v
     go (Unused v) = go v
     go (IfThenElse v1 v2 v3) = go v1 <> go v2 <> go v3
     go (Case vs alts) =
@@ -235,6 +238,7 @@ lintUnused (Module modSS _ mn modDecls exports) =
     go (Constructor _ _) = mempty
     go (TypeClassDictionary _ _ _) = mempty
     go (DeferredDictionary _ _) = mempty
+    go (DerivedInstancePlaceholder _ _) = mempty
     go AnonymousArgument = mempty
     go (Hole _) = mempty
 

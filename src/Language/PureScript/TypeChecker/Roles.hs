@@ -11,24 +11,24 @@ module Language.PureScript.TypeChecker.Roles
   , inferDataBindingGroupRoles
   ) where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((&&&))
 import Control.Monad (unless, when, zipWithM_)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State (MonadState(..), runState, state)
 import Data.Coerce (coerce)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Maybe (fromMaybe)
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Semigroup (Any(..))
 import Data.Text (Text)
 
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.Roles
-import Language.PureScript.Types
+import Language.PureScript.Environment (Environment(..), TypeKind(..))
+import Language.PureScript.Errors (DataConstructorDeclaration(..), MultipleErrors, RoleDeclarationData(..), SimpleErrorMessage(..), errorMessage)
+import Language.PureScript.Names (ModuleName, ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..))
+import Language.PureScript.Roles (Role(..))
+import Language.PureScript.Types (Constraint(..), SourceType, Type(..), freeTypeVariables, unapplyTypes)
 
 -- |
 -- A map of a type's formal parameter names to their roles. This type's
@@ -140,12 +140,12 @@ inferDataBindingGroupRoles
   -> [(Text, Maybe SourceType)]
   -> [Role]
 inferDataBindingGroupRoles env moduleName roleDeclarations group =
-  let declaredRoleEnv = M.fromList $ map (Qualified (Just moduleName) . rdeclIdent &&& rdeclRoles) roleDeclarations
+  let declaredRoleEnv = M.fromList $ map (Qualified (ByModuleName moduleName) . rdeclIdent &&& rdeclRoles) roleDeclarations
       inferredRoleEnv = getRoleEnv env
       initialRoleEnv = declaredRoleEnv `M.union` inferredRoleEnv
       inferredRoleEnv' = inferDataBindingGroupRoles' moduleName group initialRoleEnv
   in \tyName tyArgs ->
-        let qualTyName = Qualified (Just moduleName) tyName
+        let qualTyName = Qualified (ByModuleName moduleName) tyName
             inferredRoles = M.lookup qualTyName inferredRoleEnv'
         in fromMaybe (Phantom <$ tyArgs) inferredRoles
 
@@ -177,7 +177,7 @@ inferDataDeclarationRoles
   -> RoleEnv
   -> (Any, RoleEnv)
 inferDataDeclarationRoles moduleName (tyName, tyArgs, ctors) roleEnv =
-  let qualTyName = Qualified (Just moduleName) tyName
+  let qualTyName = Qualified (ByModuleName moduleName) tyName
       ctorRoles = getRoleMap . foldMap (walk mempty . snd) $ ctors >>= dataCtorFields
       inferredRoles = map (\(arg, _) -> fromMaybe Phantom (M.lookup arg ctorRoles)) tyArgs
   in updateRoleEnv qualTyName inferredRoles roleEnv
@@ -195,7 +195,7 @@ inferDataDeclarationRoles moduleName (tyName, tyArgs, ctors) roleEnv =
         mempty
     | otherwise =
         RoleMap $ M.singleton v Representational
-  walk btvs (ForAll _ tv _ t _) =
+  walk btvs (ForAll _ _ tv _ t _) =
     -- We can walk under universal quantifiers as long as we make note of the
     -- variables that they bind. For instance, given a definition
     -- @data T z = T (forall z. z -> z)@, we will make note that @z@ is bound

@@ -1,0 +1,15 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/TypeSynonyms9.purs:7:19 - 7:29 (line 7, column 19 - line 7, column 29)
+
+  Type synonym [33mData.NaturalTransformation.NaturalTransformation[0m is partially applied.
+  Type synonyms must be applied to all of their type arguments.
+
+while checking that type [33mNaturalTransformation Array[0m
+  has kind [33m(Type -> Type) -> Type -> Type[0m
+while inferring the kind of [33mA (NaturalTransformation Array)[0m
+in type constructor [33mB[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/PartiallyAppliedSynonym.md for more information,
+or to contribute content related to this error.
+

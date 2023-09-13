@@ -2,30 +2,31 @@ module Command.Compile (command) where
 
 import Prelude
 
-import           Control.Applicative
-import           Control.Monad
-import qualified Data.Aeson as A
-import           Data.Bool (bool)
-import qualified Data.ByteString.Lazy.UTF8 as LBU8
-import           Data.List (intercalate)
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.Text as T
-import           Data.Traversable (for)
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
-import           Language.PureScript.Errors.JSON
-import           Language.PureScript.Make
-import qualified Options.Applicative as Opts
-import qualified System.Console.ANSI as ANSI
-import           System.Exit (exitSuccess, exitFailure)
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath.Glob (glob)
-import           System.IO (hPutStr, hPutStrLn, stderr, stdout)
-import           System.IO.UTF8 (readUTF8FilesT)
+import Control.Applicative (Alternative(..))
+import Control.Monad (when)
+import Data.Aeson qualified as A
+import Data.Bool (bool)
+import Data.ByteString.Lazy.UTF8 qualified as LBU8
+import Data.List (intercalate, (\\))
+import Data.Map qualified as M
+import Data.Set qualified as S
+import Data.Text qualified as T
+import Data.Traversable (for)
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
+import Language.PureScript.Make (buildMakeActions, inferForeignModules, runMake)
+import Options.Applicative qualified as Opts
+import System.Console.ANSI qualified as ANSI
+import System.Exit (exitSuccess, exitFailure)
+import System.Directory (getCurrentDirectory)
+import System.FilePath.Glob (glob)
+import System.IO (hPutStr, hPutStrLn, stderr, stdout)
+import System.IO.UTF8 (readUTF8FilesT)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
+  , pscmExclude      :: [FilePath]
   , pscmOutputDir    :: FilePath
   , pscmOpts         :: P.Options
   , pscmUsePrefix    :: Bool
@@ -33,11 +34,11 @@ data PSCMakeOptions = PSCMakeOptions
   }
 
 -- | Arguments: verbose, use JSON, warnings, errors
-printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
-printWarningsAndErrors verbose False warnings errors = do
+printWarningsAndErrors :: Bool -> Bool -> [(FilePath, T.Text)] -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
+printWarningsAndErrors verbose False files warnings errors = do
   pwd <- getCurrentDirectory
   cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stdout
-  let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd }
+  let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd, P.ppeFileContents = files }
   when (P.nonEmpty warnings) $
     putStrLn (P.prettyPrintMultipleWarnings ppeOpts warnings)
   case errors of
@@ -45,15 +46,17 @@ printWarningsAndErrors verbose False warnings errors = do
       putStrLn (P.prettyPrintMultipleErrors ppeOpts errs)
       exitFailure
     Right _ -> return ()
-printWarningsAndErrors verbose True warnings errors = do
+printWarningsAndErrors verbose True files warnings errors = do
   putStrLn . LBU8.toString . A.encode $
-    JSONResult (toJSONErrors verbose P.Warning warnings)
-               (either (toJSONErrors verbose P.Error) (const []) errors)
+    JSONResult (toJSONErrors verbose P.Warning files warnings)
+               (either (toJSONErrors verbose P.Error files) (const []) errors)
   either (const exitFailure) (const (return ())) errors
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
-  input <- globWarningOnMisses warnFileTypeNotFound pscmInput
+  included <- globWarningOnMisses warnFileTypeNotFound pscmInput
+  excluded <- globWarningOnMisses warnFileTypeNotFound pscmExclude
+  let input = included \\ excluded
   when (null input) $ do
     hPutStr stderr $ unlines [ "purs compile: No input files."
                              , "Usage: For basic information, try the `--help' option."
@@ -66,7 +69,7 @@ compile PSCMakeOptions{..} = do
     foreigns <- inferForeignModules filePathMap
     let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
     P.make makeActions (map snd ms)
-  printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings makeErrors
+  printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors moduleFiles makeWarnings makeErrors
   exitSuccess
 
 warnFileTypeNotFound :: String -> IO ()
@@ -85,6 +88,12 @@ inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
      Opts.metavar "FILE"
   <> Opts.help "The input .purs file(s)."
+
+excludedFiles :: Opts.Parser FilePath
+excludedFiles = Opts.strOption $
+     Opts.short 'x'
+  <> Opts.long "exclude-files"
+  <> Opts.help "Glob of .purs files to exclude from the supplied files."
 
 outputDirectory :: Opts.Parser FilePath
 outputDirectory = Opts.strOption $
@@ -153,6 +162,7 @@ options =
 
 pscMakeOptions :: Opts.Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile
+                                <*> many excludedFiles
                                 <*> outputDirectory
                                 <*> options
                                 <*> (not <$> noPrefix)

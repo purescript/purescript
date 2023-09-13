@@ -25,4 +25,6 @@ fst =
 test1 :: forall a b c. Lens (Pair (Pair a b) c) a
 test1 = composeLenses fst fst
 
+newtype N = N (Array ~> Array)
+
 main = log "Done"

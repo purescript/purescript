@@ -1,16 +1,12 @@
 module TestGraph where
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
-import Test.Hspec
-import System.IO.UTF8 (readUTF8FileT)
+import Test.Hspec (Spec, it, shouldBe, shouldSatisfy)
 import Data.Either (isLeft)
 
-import qualified Data.ByteString.Lazy as ByteString
-import qualified Data.Text.Encoding as Text
-import qualified Data.Aeson as Json
-import qualified Language.PureScript as P
+import Data.Aeson qualified as Json
+import Language.PureScript qualified as P
 
 spec :: Spec
 spec = do
@@ -20,13 +16,11 @@ spec = do
     let modulePaths = (sourcesDir <>) <$> ["Module.purs", "Module2.purs", "Module3.purs"]
     let graphFixtureName = "graph.json"
 
-    graphFixture <- readUTF8FileT (baseDir <> graphFixtureName)
+    graphFixture <- Json.decodeFileStrict' (baseDir <> graphFixtureName)
     eitherGraph <- fst <$> P.graph modulePaths
     case eitherGraph of
       Left err -> error $ "Graph creation failed. Errors: " <> show err
-      Right res ->
-        let textRes = Text.decodeUtf8 $ ByteString.toStrict $ Json.encode res
-        in graphFixture `shouldBe` textRes
+      Right res -> graphFixture `shouldBe` Just res
 
   it "should fail when trying to include non-existing modules in the graph" $ do
     let modulePath = sourcesDir <> "ModuleFailing.purs"

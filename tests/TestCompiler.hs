@@ -22,33 +22,32 @@ module TestCompiler where
 -- missing, and can be updated by setting the "HSPEC_ACCEPT" environment
 -- variable, e.g. by running `HSPEC_ACCEPT=true stack test`.
 
-import Prelude ()
-import Prelude.Compat
+import Prelude
 
-import qualified Language.PureScript as P
+import Language.PureScript qualified as P
 import Language.PureScript.Interactive.IO (readNodeProcessWithExitCode)
 
 import Control.Arrow ((>>>))
-import qualified Data.ByteString as BS
+import Data.ByteString qualified as BS
 import Data.Function (on)
 import Data.List (sort, stripPrefix, minimumBy)
 import Data.Maybe (mapMaybe)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as T
 
 
-import Control.Monad
+import Control.Monad (forM_, when)
 
-import System.Exit
-import System.FilePath
-import System.IO
+import System.Exit (ExitCode(..))
+import System.FilePath (pathSeparator, replaceExtension, takeFileName, (</>))
+import System.IO (Handle, hPutStr, hPutStrLn)
 import System.IO.UTF8 (readUTF8File)
 
-import Text.Regex.Base
+import Text.Regex.Base (RegexContext(..), RegexMaker(..))
 import Text.Regex.TDFA (Regex)
 
-import TestUtils
-import Test.Hspec
+import TestUtils (ExpectedModuleName(..), SupportModules, compile, createOutputFile, getTestFiles, goldenVsString, modulesDir, trim)
+import Test.Hspec (Expectation, SpecWith, beforeAllWith, describe, expectationFailure, it, runIO)
 
 spec :: SpecWith SupportModules
 spec = do
@@ -135,9 +134,10 @@ assertCompiles
   -> Handle
   -> Expectation
 assertCompiles support inputFiles outputFile = do
-  (result, _) <- compile True support inputFiles
+  (fileContents, (result, _)) <- compile (Just IsMain) support inputFiles
+  let errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
   case result of
-    Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+    Left errs -> expectationFailure . P.prettyPrintMultipleErrors errorOptions $ errs
     Right _ -> do
       let entryPoint = modulesDir </> "index.js"
       writeFile entryPoint "import('./Main/index.js').then(({ main }) => main());"
@@ -157,15 +157,16 @@ assertCompilesWithWarnings
   -> [String]
   -> Expectation
 assertCompilesWithWarnings support inputFiles shouldWarnWith = do
-  result'@(result, warnings) <- compile False support inputFiles
+  (fileContents, result'@(result, warnings)) <- compile Nothing support inputFiles
+  let errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
   case result of
     Left errs ->
-      expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+      expectationFailure . P.prettyPrintMultipleErrors errorOptions $ errs
     Right _ -> do
-      checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings P.defaultPPEOptions) warnings
+      checkShouldReport shouldWarnWith (P.prettyPrintMultipleWarnings errorOptions) warnings
       goldenVsString
         (replaceExtension (getTestMain inputFiles) ".out")
-        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest result')
+        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest fileContents result')
 
 assertDoesNotCompile
   :: SupportModules
@@ -173,7 +174,8 @@ assertDoesNotCompile
   -> [String]
   -> Expectation
 assertDoesNotCompile support inputFiles shouldFailWith = do
-  result <- compile False support inputFiles
+  (fileContents, result) <- compile Nothing support inputFiles
+  let errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
   case fst result of
     Left errs -> do
       when (null shouldFailWith)
@@ -181,10 +183,10 @@ assertDoesNotCompile support inputFiles shouldFailWith = do
           "shouldFailWith declaration is missing (errors were: "
           ++ show (map P.errorCode (P.runMultipleErrors errs))
           ++ ")")
-      checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors P.defaultPPEOptions) errs
+      checkShouldReport shouldFailWith (P.prettyPrintMultipleErrors errorOptions) errs
       goldenVsString
         (replaceExtension (getTestMain inputFiles) ".out")
-        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest result)
+        (return . T.encodeUtf8 . T.pack $ printDiagnosticsForGoldenTest fileContents result)
     Right _ ->
       expectationFailure "Should not have compiled"
 
@@ -193,9 +195,10 @@ assertCompilesToExpectedOutput
   -> [FilePath]
   -> Expectation
 assertCompilesToExpectedOutput support inputFiles = do
-  (result, _) <- compile False support inputFiles
+  (fileContents, (result, _)) <- compile Nothing support inputFiles
+  let errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
   case result of
-    Left errs -> expectationFailure . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+    Left errs -> expectationFailure . P.prettyPrintMultipleErrors errorOptions $ errs
     Right _ ->
       goldenVsString
         (replaceExtension (getTestMain inputFiles) ".out.js")
@@ -203,14 +206,16 @@ assertCompilesToExpectedOutput support inputFiles = do
 
 -- Prints a set of diagnostics (i.e. errors or warnings) as a string, in order
 -- to compare it to the contents of a golden test file.
-printDiagnosticsForGoldenTest :: (Either P.MultipleErrors a, P.MultipleErrors) -> String
-printDiagnosticsForGoldenTest (result, warnings) =
+printDiagnosticsForGoldenTest :: [(FilePath, T.Text)] -> (Either P.MultipleErrors a, P.MultipleErrors) -> String
+printDiagnosticsForGoldenTest fileContents (result, warnings) =
   normalizePaths $ case result of
     Left errs ->
       -- TODO: should probably include warnings when failing?
-      P.prettyPrintMultipleErrors P.defaultPPEOptions errs
+      P.prettyPrintMultipleErrors errorOptions errs
     Right _ ->
-      P.prettyPrintMultipleWarnings P.defaultPPEOptions warnings
+      P.prettyPrintMultipleWarnings errorOptions warnings
+  where
+  errorOptions = P.defaultPPEOptions { P.ppeFileContents = fileContents }
 
 -- Replaces Windows-style paths in an error or warning with POSIX paths
 normalizePaths :: String -> String

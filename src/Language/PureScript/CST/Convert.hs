@@ -21,19 +21,19 @@ import Data.Bifunctor (bimap, first)
 import Data.Char (toLower)
 import Data.Foldable (foldl', toList)
 import Data.Functor (($>))
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Data.Maybe (isJust, fromJust, mapMaybe)
-import qualified Data.Text as Text
-import qualified Language.PureScript.AST as AST
+import Data.Text qualified as Text
+import Language.PureScript.AST qualified as AST
 import Language.PureScript.AST.Declarations.ChainId (mkChainId)
-import qualified Language.PureScript.AST.SourcePos as Pos
-import qualified Language.PureScript.Comments as C
+import Language.PureScript.AST.SourcePos qualified as Pos
+import Language.PureScript.Comments qualified as C
 import Language.PureScript.Crash (internalError)
-import qualified Language.PureScript.Environment as Env
-import qualified Language.PureScript.Label as L
-import qualified Language.PureScript.Names as N
+import Language.PureScript.Environment qualified as Env
+import Language.PureScript.Label qualified as L
+import Language.PureScript.Names qualified as N
 import Language.PureScript.PSString (mkString, prettyPrintStringJS)
-import qualified Language.PureScript.Types as T
+import Language.PureScript.Types qualified as T
 import Language.PureScript.CST.Positions
 import Language.PureScript.CST.Print (printToken)
 import Language.PureScript.CST.Types
@@ -90,13 +90,21 @@ moduleName = \case
   go ns = Just $ N.ModuleName $ Text.intercalate "." ns
 
 qualified :: QualifiedName a -> N.Qualified a
-qualified q = N.Qualified (qualModule q) (qualName q)
+qualified q = N.Qualified qb (qualName q)
+  where
+  qb = maybe N.ByNullSourcePos N.ByModuleName $ qualModule q
 
 ident :: Ident -> N.Ident
 ident = N.Ident . getIdent
 
 convertType :: String -> Type a -> T.SourceType
-convertType fileName = go
+convertType = convertType' False
+
+convertVtaType :: String -> Type a -> T.SourceType
+convertVtaType = convertType' True
+
+convertType' :: Bool -> String -> Type a -> T.SourceType
+convertType' withinVta fileName = go
   where
   goRow (Row labels tl) b = do
     let
@@ -118,7 +126,7 @@ convertType fileName = go
     TypeConstructor _ a ->
       T.TypeConstructor (sourceQualName fileName a) $ qualified a
     TypeWildcard _ a ->
-      T.TypeWildcard (sourceAnnCommented fileName a a) T.UnnamedWildcard
+      T.TypeWildcard (sourceAnnCommented fileName a a) $ if withinVta then T.IgnoredWildcard else T.UnnamedWildcard
     TypeHole _ a ->
       T.TypeWildcard (sourceName fileName a) . T.HoleWildcard . getIdent $ nameValue a
     TypeString _ a b ->
@@ -134,11 +142,11 @@ convertType fileName = go
       T.TypeApp ann (Env.tyRecord $> annRec) $ goRow row b
     TypeForall _ kw bindings _ ty -> do
       let
-        mkForAll a b t = do
+        mkForAll a b v t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
-          T.ForAll ann' (getIdent $ nameValue a) b t Nothing
-        k (TypeVarKinded (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b))
-        k (TypeVarName a) = mkForAll a Nothing
+          T.ForAll ann' (maybe T.TypeVarInvisible (const T.TypeVarVisible) v) (getIdent $ nameValue a) b t Nothing
+        k (TypeVarKinded (Wrapped _ (Labeled (v, a) _ b) _)) = mkForAll a (Just (go b)) v
+        k (TypeVarName (v, a)) = mkForAll a Nothing v
         ty' = foldr k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
       T.setAnnForType ann ty'
@@ -180,7 +188,7 @@ convertType fileName = go
       Env.tyFunction $> sourceAnnCommented fileName a a
     TypeConstrained _ a _ b -> do
       let
-        a' = convertConstraint fileName a
+        a' = convertConstraint withinVta fileName a
         b' = go b
         ann = Pos.widenSourceAnn (T.constraintAnn a') (T.getAnnForType b')
       T.ConstrainedType ann a' b'
@@ -193,13 +201,13 @@ convertType fileName = go
         ann = uncurry (sourceAnnCommented fileName) rng
       T.setAnnForType ann $ Env.kindRow a'
 
-convertConstraint :: String -> Constraint a -> T.SourceConstraint
-convertConstraint fileName = go
+convertConstraint :: Bool -> String -> Constraint a -> T.SourceConstraint
+convertConstraint withinVta fileName = go
   where
   go = \case
     cst@(Constraint _ name args) -> do
       let ann = uncurry (sourceAnnCommented fileName) $ constraintRange cst
-      T.Constraint ann (qualified name) [] (convertType fileName <$> args) Nothing
+      T.Constraint ann (qualified name) [] (convertType' withinVta fileName <$> args) Nothing
     ConstraintParens _ (Wrapped _ c _) -> go c
 
 convertGuarded :: String -> Guarded a -> [AST.GuardedExpr]
@@ -333,6 +341,9 @@ convertExpr fileName = go
     expr@(ExprApp _ a b) -> do
       let ann = uncurry (sourceAnn fileName) $ exprRange expr
       positioned ann $ AST.App (go a) (go b)
+    expr@(ExprVisibleTypeApp _ a _ b) -> do
+      let ann = uncurry (sourceAnn fileName) $ exprRange expr
+      positioned ann $ AST.VisibleTypeApp (go a) (convertVtaType fileName b)
     expr@(ExprLambda _ (Lambda _ as _ b)) -> do
       let ann = uncurry (sourceAnnCommented fileName) $ exprRange expr
       positioned ann
@@ -453,8 +464,8 @@ convertDeclaration fileName decl = case decl of
     pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
-      goTyVar (TypeVarKinded (Wrapped _ (Labeled a _ _) _)) = nameValue a
-      goTyVar (TypeVarName a) = nameValue a
+      goTyVar (TypeVarKinded (Wrapped _ (Labeled (_, a) _ _) _)) = nameValue a
+      goTyVar (TypeVarName (_, a)) = nameValue a
       vars' = zip (toList $ goTyVar <$> vars) [0..]
       goName = fromJust . flip lookup vars' . nameValue
       goFundep (FundepDetermined _ bs) = Env.FunctionalDependency [] (goName <$> NE.toList bs)
@@ -467,7 +478,7 @@ convertDeclaration fileName decl = case decl of
     pure $ AST.TypeClassDeclaration ann
       (nameValue name)
       (goTypeVar <$> vars)
-      (convertConstraint fileName <$> maybe [] (toList . fst) sup)
+      (convertConstraint False fileName <$> maybe [] (toList . fst) sup)
       (goFundep <$> maybe [] (toList . snd) fdeps)
       (goSig <$> maybe [] (NE.toList . snd) bd)
   DeclInstanceChain _ insts -> do
@@ -475,9 +486,10 @@ convertDeclaration fileName decl = case decl of
       chainId = mkChainId fileName $ startSourcePos $ instKeyword $ instHead $ sepHead insts
       goInst ix inst@(Instance (InstanceHead _ nameSep ctrs cls args) bd) = do
         let ann' = uncurry (sourceAnnCommented fileName) $ instanceRange inst
-        AST.TypeInstanceDeclaration ann' chainId ix
+            clsAnn = findInstanceAnn cls args
+        AST.TypeInstanceDeclaration ann' clsAnn chainId ix
           (mkPartialInstanceName nameSep cls args)
-          (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
+          (convertConstraint False fileName <$> maybe [] (toList . fst) ctrs)
           (qualified cls)
           (convertType fileName <$> args)
           (AST.ExplicitInstance $ goInstanceBinding <$> maybe [] (NE.toList . snd) bd)
@@ -489,8 +501,9 @@ convertDeclaration fileName decl = case decl of
       instTy
         | isJust new = AST.NewtypeInstance
         | otherwise = AST.DerivedInstance
-    pure $ AST.TypeInstanceDeclaration ann chainId 0 name'
-      (convertConstraint fileName <$> maybe [] (toList . fst) ctrs)
+      clsAnn = findInstanceAnn cls args
+    pure $ AST.TypeInstanceDeclaration ann clsAnn chainId 0 name'
+      (convertConstraint False fileName <$> maybe [] (toList . fst) ctrs)
       (qualified cls)
       (convertType fileName <$> args)
       instTy
@@ -589,8 +602,8 @@ convertDeclaration fileName decl = case decl of
         TypeUnaryRow{} -> "Row"
 
   goTypeVar = \case
-    TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
-    TypeVarName x -> (getIdent $ nameValue x, Nothing)
+    TypeVarKinded (Wrapped _ (Labeled (_, x) _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
+    TypeVarName (_, x) -> (getIdent $ nameValue x, Nothing)
 
   goInstanceBinding = \case
     InstanceBindingSignature _ lbl ->
@@ -598,6 +611,12 @@ convertDeclaration fileName decl = case decl of
     binding@(InstanceBindingName _ fields) -> do
       let ann' = uncurry (sourceAnnCommented fileName) $ instanceBindingRange binding
       convertValueBindingFields fileName ann' fields
+
+  findInstanceAnn cls args = uncurry (sourceAnnCommented fileName) $
+    if null args then
+      qualRange cls
+    else
+      (fst $ qualRange cls, snd $ typeRange $ last args)
 
 convertSignature :: String -> Labeled (Name Ident) (Type a) -> AST.Declaration
 convertSignature fileName (Labeled a _ b) = do

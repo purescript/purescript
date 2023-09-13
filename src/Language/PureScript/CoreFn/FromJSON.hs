@@ -7,24 +7,26 @@ module Language.PureScript.CoreFn.FromJSON
   , parseVersion'
   ) where
 
-import Prelude.Compat
+import Prelude
 
-import           Data.Aeson
-import           Data.Aeson.Types (Parser, listParser)
-import qualified Data.Map.Strict as M
-import           Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Vector as V
-import           Data.Version (Version, parseVersion)
+import Control.Applicative ((<|>))
 
-import           Language.PureScript.AST.SourcePos (SourceSpan(SourceSpan))
-import           Language.PureScript.AST.Literals
-import           Language.PureScript.CoreFn.Ann
-import           Language.PureScript.CoreFn
-import           Language.PureScript.Names
-import           Language.PureScript.PSString (PSString)
+import Data.Aeson (FromJSON(..), Object, Value(..), withObject, withText, (.:))
+import Data.Aeson.Types (Parser, listParser)
+import Data.Map.Strict qualified as M
+import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Vector qualified as V
+import Data.Version (Version, parseVersion)
 
-import           Text.ParserCombinators.ReadP (readP_to_S)
+import Language.PureScript.AST.SourcePos (SourceSpan(..))
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.CoreFn.Ann (Ann)
+import Language.PureScript.CoreFn (Bind(..), Binder(..), CaseAlternative(..), ConstructorType(..), Expr(..), Guard, Meta(..), Module(..))
+import Language.PureScript.Names (Ident(..), ModuleName(..), ProperName(..), Qualified(..), QualifiedBy(..), unusedIdent)
+import Language.PureScript.PSString (PSString)
+
+import Text.ParserCombinators.ReadP (readP_to_S)
 
 parseVersion' :: String -> Maybe Version
 parseVersion' str =
@@ -53,6 +55,8 @@ metaFromJSON v = withObject "Meta" metaFromObj v
                         -> return $ Just IsTypeClassConstructor
         "IsForeign"     -> return $ Just IsForeign
         "IsWhere"       -> return $ Just IsWhere
+        "IsSyntheticApp"
+                        -> return $ Just IsSyntheticApp
         _               -> fail ("not recognized Meta: " ++ T.unpack type_)
 
     isConstructorFromJSON o = do
@@ -66,7 +70,7 @@ annFromJSON modulePath = withObject "Ann" annFromObj
   annFromObj o = do
     ss <- o .: "sourceSpan" >>= sourceSpanFromJSON modulePath
     mm <- o .: "meta" >>= metaFromJSON
-    return (ss, [], Nothing, mm)
+    return (ss, [], mm)
 
 sourceSpanFromJSON :: FilePath -> Value -> Parser SourceSpan
 sourceSpanFromJSON modulePath = withObject "SourceSpan" $ \o ->
@@ -109,10 +113,16 @@ properNameFromJSON = fmap ProperName . parseJSON
 qualifiedFromJSON :: (Text -> a) -> Value -> Parser (Qualified a)
 qualifiedFromJSON f = withObject "Qualified" qualifiedFromObj
   where
-  qualifiedFromObj o = do
-    mn <- o .:? "moduleName" >>= traverse moduleNameFromJSON
+  qualifiedFromObj o =
+    qualifiedByModuleFromObj o <|> qualifiedBySourcePosFromObj o
+  qualifiedByModuleFromObj o = do
+    mn <- o .: "moduleName" >>= moduleNameFromJSON
     i  <- o .: "identifier" >>= withText "Ident" (return . f)
-    return $ Qualified mn i
+    pure $ Qualified (ByModuleName mn) i
+  qualifiedBySourcePosFromObj o = do
+    ss <- o .: "sourcePos"
+    i  <- o .: "identifier" >>= withText "Ident" (return . f)
+    pure $ Qualified (BySourcePos ss) i
 
 moduleNameFromJSON :: Value -> Parser ModuleName
 moduleNameFromJSON v = ModuleName . T.intercalate "." <$> listParser parseJSON v
@@ -218,8 +228,9 @@ exprFromJSON modulePath = withObject "Expr" exprFromObj
   objectUpdateFromObj o = do
     ann <- o .: "annotation" >>= annFromJSON modulePath
     e   <- o .: "expression" >>= exprFromJSON modulePath
+    copy <- o .: "copy" >>= parseJSON
     us  <- o .: "updates" >>= recordFromJSON (exprFromJSON modulePath)
-    return $ ObjectUpdate ann e us
+    return $ ObjectUpdate ann e copy us
 
   absFromObj o = do
     ann <- o .: "annotation" >>= annFromJSON modulePath

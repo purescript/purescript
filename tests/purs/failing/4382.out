@@ -1,0 +1,55 @@
+Error 1 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/failing/4382.purs:10:7 - 10:14 (line 10, column 7 - line 10, column 14)
+
+    Unknown type class [33mRinku[0m
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+  or to contribute content related to this error.
+
+Error 2 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/failing/4382.purs:13:10 - 13:17 (line 13, column 10 - line 13, column 17)
+
+    Unknown type class [33mRinku[0m
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+  or to contribute content related to this error.
+
+Error 3 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/failing/4382.purs:16:10 - 16:17 (line 16, column 10 - line 16, column 17)
+
+    Unknown type class [33mRinku[0m
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+  or to contribute content related to this error.
+
+Error 4 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/failing/4382.purs:18:17 - 18:28 (line 18, column 17 - line 18, column 28)
+
+    Unknown type class [33mRinku[0m
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+  or to contribute content related to this error.
+
+Error 5 of 5:
+
+  in module [33mMain[0m
+  at tests/purs/failing/4382.purs:20:25 - 20:36 (line 20, column 25 - line 20, column 36)
+
+    Unknown type class [33mRinku[0m
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnknownName.md for more information,
+  or to contribute content related to this error.
+

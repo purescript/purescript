@@ -3,10 +3,10 @@
 --
 module Language.PureScript.CoreFn.Binders where
 
-import Prelude.Compat
+import Prelude
 
-import Language.PureScript.AST.Literals
-import Language.PureScript.Names
+import Language.PureScript.AST.Literals (Literal)
+import Language.PureScript.Names (Ident, ProperName, ProperNameType(..), Qualified)
 
 -- |
 -- Data type for binders
@@ -31,7 +31,7 @@ data Binder a
   -- |
   -- A binder which binds its input to an identifier
   --
-  | NamedBinder a Ident (Binder a) deriving (Eq, Show, Functor)
+  | NamedBinder a Ident (Binder a) deriving (Eq, Ord, Show, Functor)
 
 
 extractBinderAnn :: Binder a -> a

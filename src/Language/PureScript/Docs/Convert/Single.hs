@@ -7,16 +7,16 @@ import Protolude hiding (moduleName)
 
 import Control.Category ((>>>))
 
-import qualified Data.Text as T
+import Data.Text qualified as T
 
-import Language.PureScript.Docs.Types
+import Language.PureScript.Docs.Types (ChildDeclaration(..), ChildDeclarationInfo(..), Declaration(..), DeclarationInfo(..), KindInfo(..), Module(..), Type', convertFundepsToStrings, isType, isTypeClass)
 
-import qualified Language.PureScript.AST as P
-import qualified Language.PureScript.Comments as P
-import qualified Language.PureScript.Crash as P
-import qualified Language.PureScript.Names as P
-import qualified Language.PureScript.Roles as P
-import qualified Language.PureScript.Types as P
+import Language.PureScript.AST qualified as P
+import Language.PureScript.Comments qualified as P
+import Language.PureScript.Crash qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Roles qualified as P
+import Language.PureScript.Types qualified as P
 
 -- |
 -- Convert a single Module, but ignore re-exports; any re-exported types or
@@ -134,7 +134,7 @@ getDeclarationTitle (P.DataDeclaration _ _ name _ _) = Just (P.runProperName nam
 getDeclarationTitle (P.ExternDataDeclaration _ name _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeSynonymDeclaration _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ name _ _ _ _) = Just $ either (const "<anonymous>") P.showIdent name
+getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ _ name _ _ _ _) = Just $ either (const "<anonymous>") P.showIdent name
 getDeclarationTitle (P.TypeFixityDeclaration _ _ _ op) = Just ("type " <> P.showOp op)
 getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (P.showOp op)
 getDeclarationTitle (P.KindDeclaration _ _ n _) = Just (P.runProperName n)
@@ -187,7 +187,7 @@ convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
     ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember (ty $> ()))
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."
-convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ constraints className tys _) title =
+convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ _ constraints className tys _) title =
   Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className

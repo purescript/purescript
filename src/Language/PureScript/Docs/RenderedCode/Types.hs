@@ -32,20 +32,20 @@ module Language.PureScript.Docs.RenderedCode.Types
  , aliasName
  ) where
 
-import Prelude.Compat
+import Prelude
 import GHC.Generics (Generic)
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Aeson.BetterErrors (Parse, nth, withText, withValue, toAesonParser, perhaps, asText)
-import qualified Data.Aeson as A
+import Data.Aeson qualified as A
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.Text.Encoding as TE
+import Data.Text qualified as T
+import Data.ByteString.Lazy qualified as BS
+import Data.Text.Encoding qualified as TE
 
-import Language.PureScript.Names
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, OpName(..), OpNameType(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), moduleNameFromString, runIdent, runModuleName)
 import Language.PureScript.AST (Associativity(..))
 
 -- | Given a list of actions, attempt them all, returning the first success.
@@ -117,8 +117,8 @@ maybeToContainingModule Nothing = ThisModule
 maybeToContainingModule (Just mn) = OtherModule mn
 
 fromQualified :: Qualified a -> (ContainingModule, a)
-fromQualified (Qualified mn x) =
-  (maybeToContainingModule mn, x)
+fromQualified (Qualified (ByModuleName mn) x) = (OtherModule mn, x)
+fromQualified (Qualified _ x) = (ThisModule, x)
 
 data Link
   = NoLink
@@ -296,9 +296,9 @@ aliasName for name' =
   in
     case ns of
       ValueLevel ->
-        ident (Qualified Nothing (Ident name))
+        ident (Qualified ByNullSourcePos (Ident name))
       TypeLevel ->
-        typeCtor (Qualified Nothing (ProperName name))
+        typeCtor (Qualified ByNullSourcePos (ProperName name))
 
 -- | Converts a FixityAlias into a different representation which is more
 -- useful to other functions in this module.

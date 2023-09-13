@@ -10,29 +10,30 @@ import Prelude (String, unlines, lookup)
 import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
+import Data.Aeson.Key qualified as A.Key
 import Data.Aeson.BetterErrors
   (Parse, keyOrDefault, throwCustomError, key, asText,
    keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser',
    fromAesonParser, perhaps, withText, asIntegral, nth, eachInObjectWithKey,
    asString)
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 import Data.Time.Clock (UTCTime)
-import qualified Data.Time.Format as TimeFormat
-import Data.Version
-import qualified Data.Aeson as A
-import qualified Data.Text as T
-import qualified Data.Vector as V
+import Data.Time.Format qualified as TimeFormat
+import Data.Version (Version(..), showVersion)
+import Data.Aeson qualified as A
+import Data.Text qualified as T
+import Data.Vector qualified as V
 
-import qualified Language.PureScript.AST as P
-import qualified Language.PureScript.CoreFn.FromJSON as P
-import qualified Language.PureScript.Crash as P
-import qualified Language.PureScript.Environment as P
-import qualified Language.PureScript.Names as P
-import qualified Language.PureScript.Roles as P
-import qualified Language.PureScript.Types as P
-import qualified Paths_purescript as Paths
+import Language.PureScript.AST qualified as P
+import Language.PureScript.CoreFn.FromJSON qualified as P
+import Language.PureScript.Crash qualified as P
+import Language.PureScript.Environment qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Roles qualified as P
+import Language.PureScript.Types qualified as P
+import Paths_purescript qualified as Paths
 
-import Web.Bower.PackageMeta hiding (Version, displayError)
+import Web.Bower.PackageMeta (BowerError, PackageMeta(..), PackageName, asPackageMeta, parsePackageName, runPackageName, showBowerError)
 
 import Language.PureScript.Docs.RenderedCode as ReExports
   (RenderedCode,
@@ -776,10 +777,10 @@ instance A.ToJSON a => A.ToJSON (Package a) where
       , "version"              .= showVersion pkgVersion
       , "versionTag"           .= pkgVersionTag
       , "modules"              .= pkgModules
-      , "moduleMap"            .= assocListToJSON P.runModuleName
+      , "moduleMap"            .= assocListToJSON (A.Key.fromText . P.runModuleName)
                                                   runPackageName
                                                   (Map.toList pkgModuleMap)
-      , "resolvedDependencies" .= assocListToJSON runPackageName
+      , "resolvedDependencies" .= assocListToJSON (A.Key.fromText . runPackageName)
                                                   (T.pack . showVersion)
                                                   pkgResolvedDependencies
       , "github"               .= pkgGithub
@@ -865,7 +866,7 @@ instance A.ToJSON GithubRepo where
 --
 -- For example:
 -- @assocListToJSON T.pack T.pack [("a", "b")]@ will give @{"a": "b"}@.
-assocListToJSON :: (a -> Text) -> (b -> Text) -> [(a, b)] -> A.Value
+assocListToJSON :: (a -> A.Key) -> (b -> Text) -> [(a, b)] -> A.Value
 assocListToJSON f g xs = A.object (map (uncurry (.=) . (f *** g)) xs)
 
 instance A.ToJSON a => A.ToJSON (InPackage a) where

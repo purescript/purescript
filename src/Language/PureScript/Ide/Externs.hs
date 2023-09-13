@@ -5,18 +5,17 @@ module Language.PureScript.Ide.Externs
   , convertExterns
   ) where
 
-import           Protolude hiding (to, from, (&))
+import Protolude hiding (to, from, (&))
 
-import           Codec.CBOR.Term as Term
-import           "monad-logger" Control.Monad.Logger
-import qualified Data.Text as Text
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Externs as Externs
-import qualified Language.PureScript.Make.Monad as Make
-import           Language.PureScript.Ide.Error (IdeError (..))
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util (properNameT)
-import           Lens.Micro.Platform
+import Codec.CBOR.Term as Term
+import Control.Lens (preview, view, (&), (^.))
+import "monad-logger" Control.Monad.Logger (MonadLogger, logErrorN)
+import Data.Text qualified as Text
+import Language.PureScript qualified as P
+import Language.PureScript.Make.Monad qualified as Make
+import Language.PureScript.Ide.Error (IdeError (..))
+import Language.PureScript.Ide.Types (IdeDataConstructor(..), IdeDeclaration(..), IdeDeclarationAnn(..), IdeType(..), IdeTypeClass(..), IdeTypeOperator(..), IdeTypeSynonym(..), IdeValue(..), IdeValueOperator(..), _IdeDeclType, anyOf, emptyAnn, ideTypeKind, ideTypeName)
+import Language.PureScript.Ide.Util (properNameT)
 
 readExternFile
   :: (MonadIO m, MonadError IdeError m, MonadLogger m)
@@ -40,7 +39,7 @@ readExternFile fp = do
         _ ->
           throwError (GeneralError ("Parsing the extern at: " <> toS fp <> " failed"))
     where
-      version = toS Externs.currentVersion
+      version = toS P.currentVersion
 
 convertExterns :: P.ExternsFile -> ([IdeDeclarationAnn], [(P.ModuleName, P.DeclarationRef)])
 convertExterns ef =
@@ -69,15 +68,15 @@ resolveSynonymsAndClasses trs decls = foldr go decls trs
           Nothing ->
             acc
           Just tyDecl -> IdeDeclTypeClass
-            (IdeTypeClass tcn (tyDecl^.ideTypeKind) [])
-            : filter (not . anyOf (_IdeDeclType.ideTypeName) (== P.coerceProperName tcn)) acc
+            (IdeTypeClass tcn (tyDecl ^. ideTypeKind) [])
+            : filter (not . anyOf (_IdeDeclType . ideTypeName) (== P.coerceProperName tcn)) acc
       SynonymToResolve tn ty ->
         case findType tn acc of
           Nothing ->
             acc
           Just tyDecl ->
-            IdeDeclTypeSynonym (IdeTypeSynonym tn ty (tyDecl^.ideTypeKind))
-            : filter (not . anyOf (_IdeDeclType.ideTypeName) (== tn)) acc
+            IdeDeclTypeSynonym (IdeTypeSynonym tn ty (tyDecl ^. ideTypeKind))
+            : filter (not . anyOf (_IdeDeclType . ideTypeName) (== tn)) acc
 
 findType :: P.ProperName 'P.TypeName -> [IdeDeclaration] -> Maybe IdeType
 findType tn decls =
@@ -103,14 +102,14 @@ convertDecl ed = case ed of
   -- because those are typechecker internal definitions that shouldn't
   -- be user facing
   P.EDType{..} -> Right do
-    guard (isNothing (Text.find (== '$') (edTypeName^.properNameT)))
+    guard (isNothing (Text.find (== '$') (edTypeName ^. properNameT)))
     Just (IdeDeclType (IdeType edTypeName edTypeKind []))
   P.EDTypeSynonym{..} ->
-    if isNothing (Text.find (== '$') (edTypeSynonymName^.properNameT))
+    if isNothing (Text.find (== '$') (edTypeSynonymName ^. properNameT))
       then Left (SynonymToResolve edTypeSynonymName edTypeSynonymType)
       else Right Nothing
   P.EDDataConstructor{..} -> Right do
-    guard (isNothing (Text.find (== '$') (edDataCtorName^.properNameT)))
+    guard (isNothing (Text.find (== '$') (edDataCtorName ^. properNameT)))
     Just
       (IdeDeclDataConstructor
         (IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType))

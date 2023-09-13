@@ -1,13 +1,13 @@
 module Language.PureScript.CoreFn.Module where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Map.Strict (Map)
 
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Comments
-import Language.PureScript.CoreFn.Expr
-import Language.PureScript.Names
+import Language.PureScript.AST.SourcePos (SourceSpan)
+import Language.PureScript.Comments (Comment)
+import Language.PureScript.CoreFn.Expr (Bind)
+import Language.PureScript.Names (Ident, ModuleName)
 
 -- |
 -- The CoreFn module representation

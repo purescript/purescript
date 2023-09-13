@@ -2,6 +2,659 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.10
+
+New features:
+
+* Implement visible type applications
+
+  The compiler now supports visible type applications, allowing the user to instantiate one or more "visible" type variables to a specific type.
+
+  A "visible" type variable is a type variable in a `forall` binder that appears prefixed with an `@`, like the following example:
+
+  ```purescript
+  id :: forall @a. a -> a  -- or with kinds: `forall (@a :: Type). a -> a`
+  id a = a
+  ```
+
+  We can then use type application syntax to instantiate this binding to a specific type:
+
+  ```purescript
+  idInt :: Int -> Int
+  idInt = id @Int
+
+  example :: Int
+  example = id @Int 0
+  ```
+
+  Type variables appearing in `class` or `data` are automatically visible, meaning that they do not require annotations:
+
+  ```purescript
+  data Maybe a = Just a | Nothing
+
+  nothingInt :: Maybe Int
+  nothingInt = Nothing @Int
+
+  class Identity a where
+    identity :: a -> a
+
+  instance Identity Int where
+    identity a = a
+  
+  identityInt = identity @Int
+
+  -- This throws a `NoInstanceFound` error.
+  identityNumber = identity @Number
+  ```
+
+  Lastly, visible type variables can also be skipped with a wildcard (i.e. `_`)
+
+  ```purescript
+  data Either a b = Left a | Right b
+
+  example = Left @_ @Number 0
+  ```
+
+  Note that performing a type application with a type that has no visible type variables throws an error:
+
+  ```purescript
+  module Main where
+
+  id :: forall a. a -> a
+  id a = a
+
+  idInt = id @Int
+
+  {-
+  Error found:
+  in module Main
+  at Main.purs:6:9 - 6:16 (line 6, column 9 - line 6, column 16)
+
+    An expression of polymorphic type
+    with the invisible type variable a:
+                    
+      forall a. a -> a
+                    
+    cannot be applied to:
+       
+      Int
+       
+
+  while inferring the type of id
+  in value declaration idInt
+
+  See https://github.com/purescript/documentation/blob/master/errors/CannotApplyExpressionOfTypeOnType.md for more information,
+  or to contribute content related to this error.
+  -}
+  ```
+
+  Similarly, monomorphic types also cannot be used for type applications:
+
+  ```purescript
+  module Main where
+
+  idInt :: Int -> Int
+  idInt a = a
+
+  example = idInt @Int
+
+  {-
+  Error found:
+  in module Main
+  at Main.purs:6:11 - 6:21 (line 6, column 11 - line 6, column 21)
+
+    An expression of monomorphic type:
+              
+      Int -> Int
+              
+    cannot be applied to:
+       
+      Int
+       
+
+  while inferring the type of idInt
+  in value declaration example
+
+  See https://github.com/purescript/documentation/blob/master/errors/CannotApplyExpressionOfTypeOnType.md for more information,
+  or to contribute content related to this error.
+  -}
+  ```
+
+* Exclude files from compiler input (#4480 by @i-am-the-slime)
+
+  The compiler now supports excluding files from the globs given to it as input.
+  This means there's now a new option for `purs compile`, namely
+  `--exclude-files` (or the short version `-x`):
+
+  ```sh
+  > purs compile --help
+  Usage: purs compile [FILE] [-x|--exclude-files ARG] [-o|--output ARG] ...
+
+    Compile PureScript source files
+
+  Available options:
+    -h,--help                Show this help text
+    FILE                     The input .purs file(s).
+    -x,--exclude-files ARG   Glob of .purs files to exclude from the supplied
+                            files.
+    ...
+  ```
+
+  This allows you to keep related files closer together (that is, [colocate](https://kentcdodds.com/blog/colocation) them).
+
+  Consider a setup like the following:
+
+  ```sh
+  src/
+      Main.purs
+      View/
+          LoginPage.purs
+          LoginPageTest.purs
+          LoginPageStories.purs
+  ```
+
+  In order to exclude the files in the example above you can now invoke `purs`
+  like this and it will only compile `LoginPage.purs`:
+
+  ```sh
+  purs compile "src/**/*.purs" --exclude-files "src/**/*Stories.purs" -x "src/**/*Test.purs"
+  ```
+
+  With `spago`, the equivalent command is:
+
+  ```sh
+  spago build --purs-args '-x "src/**/*Test.purs" -x "src/**/*Stories.purs"'
+  ```
+
+## 0.15.9
+
+New features:
+
+* Add release artifacts for Linux and macOS running on the ARM64 architecture. (#4455 by @f-f)
+
+Bugfixes:
+
+* Fix prerelease version number on macOS (#4461 by @rhendric)
+
+* Consider fixity declarations during linting (#4462 by @ozkutuk)
+
+* Defer monomorphization for data constructors (#4376 by @purefunctor)
+
+  In `0.15.4` and earlier, the compiler monomorphizes type
+  constructors early, yielding the following type:
+
+  ```purs
+  > :t Nothing
+  forall (a1 :: Type). Maybe a1
+
+  > :t { a : Nothing }
+  forall (a1 :: Type).
+    { a :: Maybe a1
+    }
+  ```
+
+  With this change, the monomorphization introduced in
+  [#835](https://github.com/purescript/purescript/pull/835) is
+  deferred to only when it's needed, such as when constructors are
+  used as values inside of records.
+
+  ```purs
+  > :t Nothing
+  forall a. Maybe a
+
+  > :t { a : Nothing }
+  forall (a1 :: Type).
+    { a :: Maybe a1
+    }
+  ```
+
+  Also as a consequence, record updates should not throw
+  `ConstrainedTypeUnified` in cases such as:
+
+  ```purs
+  v1 :: { a :: Maybe Unit }
+  v1 = { a : Just Unit }
+
+  v2 :: { a :: Maybe Unit }
+  v2 = let v3 = v1 { a = mempty } in v3
+  ```
+
+* Update installer to version 0.3.5 to support ARM builds (#4468 and #4469 by @rhendric)
+
+* Fix exhaustiveness checking to account for case guards (#4467 by @purefunctor)
+
+Internal:
+
+* Refactor module imports to make identifiers' origins obvious (#4451 by @JordanMartinez)
+
+* Require comments not to cause Haddock warnings (#4456 by @rhendric)
+
+## 0.15.8
+
+New features:
+
+* Generated documentation now supports dark mode (#4438 by @sometimes-i-send-pull-requests)
+
+  PureScript documentation has a new dark theme available. It will
+  automatically be used based on your browser or system's color scheme
+  preferences.
+
+Bugfixes:
+
+* Fix instance deriving regression (#4432 by @rhendric)
+
+* Outputs what label the type-error occurred on when types don't match (#4411 by @FredTheDino)
+
+* Account for typed holes when checking value declarations (#4437 by @purefunctor)
+
+  The compiler now takes into account typed holes when ordering value declarations
+  for type checking, allowing more top-level values to be suggested instead of
+  being limited by reverse lexicographical ordering.
+
+  Given:
+  ```purescript
+  module Main where
+
+  newtype K = K Int
+
+  aRinku :: Int -> K
+  aRinku = K
+
+  bMaho :: K
+  bMaho = ?help 0
+
+  cMuni :: Int -> K
+  cMuni = K
+
+  dRei :: Int -> K
+  dRei _ = bMaho
+  ```
+
+  Before:
+  ```
+    Hole 'help' has the inferred type
+            
+      Int -> K
+            
+    You could substitute the hole with one of these values:
+                           
+      Main.cMuni  :: Int -> K
+      Main.K      :: Int -> K
+  ```
+
+  After:
+  ```
+    Hole 'help' has the inferred type
+            
+      Int -> K
+            
+    You could substitute the hole with one of these values:
+                            
+      Main.aRinku  :: Int -> K
+      Main.cMuni   :: Int -> K
+      Main.K       :: Int -> K
+  ```
+
+Other improvements:
+
+* Bump Stackage snapshot to lts-20.9 and GHC to 9.2.5 (#4422, #4428, and #4433 by @purefunctor, @JordanMartinez, and @andys8)
+
+Internal:
+
+* Update license/changelog scrips to latest Stack resolver (#4445 by @JordanMartinez)
+
+## 0.15.7
+
+New features:
+
+* Allow IDE module rebuilds eschewing the filesystem (#4399 by @i-am-the-slime)
+
+  This allows IDE clients to typecheck the module the user is currently typing in without modifying the output.
+  This allows for faster feedback cycles in editors and avoids producing a broken `/output` before the user actually saves the file.
+
+* Add `purs ide` dependency/imports filter (#4412 by @nwolverson)
+
+  This allows IDE tooling to filter type searches according to the imports of a given module,
+  restricting to identifiers in scope.
+
+* Shorten custom user-defined error message's prefix (#4418 by @i-am-the-slime)
+  
+  Improves clarity and gets to the relevant information faster.
+
+* The compiler can now derive instances for more types and type classes (#4420 by @rhendric)
+  
+  New type classes that the compiler can derive: 
+  - `Bifunctor`
+  - `Bifoldable`
+  - `Bitraversable`
+  - `Contravariant`
+  - `Profunctor`
+  
+  Moreover, the compiler can also use these classes when deriving
+  `Functor`, `Foldable`, and `Traversable`, enabling more instances to be derived
+  whereas before such instances would need to be written manually.
+
+Bugfixes:
+
+* Update installer to `0.3.3` to fix a few installation issues (#4425 by @JordanMartinez)
+
+Other improvements:
+
+* Improve `DuplicateDeclarationsInLet` error so that it mentions what variable names were duplicated, reporting several in separate errors as necessary. (#4405 by @MonoidMusician)
+
+* Fix various typos in documentation and source comments. (#4415 by @Deltaspace0)
+
+* Bump Stackage snapshot to 2022-11-12 and GHC to 9.2.4 (#4422 by @purefunctor)
+
+Internal:
+
+* Organize the compiler's internal constants files (#4406 by @rhendric)
+
+* Enable more GHC warnings (#4429 by @rhendric)
+
+## 0.15.6
+
+Bugfixes:
+
+* Make `FromJSON` instance for `Qualified` backwards compatible (#4403 by @ptrfrncsmrph)
+
+  Prior to #4293, `Qualified` was encoded to JSON such that
+
+  ```haskell
+  >>> encode $ Qualified Nothing "foo"
+  [null,"foo"]
+  >>> encode $ Qualified (Just $ ModuleName "A") "bar"
+  ["A","bar"]
+  ```
+
+  The type of `Qualified` has changed so that `null` no longer appears in JSON output, but for sake of backwards-compatibility with JSON that was produced prior to those changes (pre-`v0.15.2`), we need to accept `null`, which will be interpreted as `Qualified ByNullSourcePos`.
+
+* Fix extraneous qualifiers added to references to floated expressions (#4401 by @rhendric)
+
+## 0.15.5
+
+New features:
+
+* Increases the max number of typed holes displayed from 5 up to 30 (#4341 by @JordanMartinez)
+
+* Add a compiler optimization for `ST` functions with up to 10 arity, similar to `Effect` optimizations. (#4386 by @mikesol)
+
+* Enable the compiler to derive `Foldable` and `Traversable` instances (#4392 by @rhendric)
+
+  These instances follow the same rules as derived `Functor` instances.
+  For details, see [the PureScript language reference](https://github.com/purescript/documentation/blob/master/language/Type-Classes.md#functor-foldable-and-traversable).
+
+Bugfixes:
+
+* Qualify references to expressions floated to the top level of a module by the compiler (#4364 by @rhendric)
+
+* Fix replicated type hole suggestions due to malformed source spans (#4374 by @PureFunctor)
+
+  In PureScript `0.15.4`, the following code will produce multiple entries in
+  the type hole suggestions. This is due to malformed source spans that are
+  generated when desugaring value declarations into case expressions.
+
+  ```purs
+  module Main where
+
+  data F = X | Y
+
+  f :: forall a. F -> a -> a
+  f X b = ?help
+  f Y b = ?help
+  ```
+
+* Improve error spans for class and instance declarations (#4383 and #4391 by @PureFunctor and @rhendric)
+
+  This improves the error spans for class and instance
+  declarations. Instead of highlighting the entire class or instance
+  declaration when `UnknownName` is thrown, the compiler now
+  highlights the class name and its arguments.
+
+  Before:
+  ```purs
+  [1/2 UnknownName]
+
+    5  class G a <= F a
+       ^^^^^^^^^^^^^^^^
+
+    Unknown type class G
+
+  [2/2 UnknownName]
+
+    7  instance G a => F a
+       ^^^^^^^^^^^^^^^^^^^
+
+    Unknown type class G
+  ```
+
+  After:
+  ```purs
+  [1/2 UnknownName]
+
+    5  class G a <= F a
+             ^^^
+
+    Unknown type class G
+
+  [2/2 UnknownName]
+
+    7  instance G a => F a
+                ^^^
+
+    Unknown type class G
+  ```
+
+* Fix a bug where the compiler did not consider interactions of all functional dependencies in classes. (#4195 by @MonoidMusician)
+  In particular, combinations of multiple parameters determining other parameter(s) were not handled properly,
+  affecting overlapping instance checks and the selection of which parameters are fully determined.
+
+Other improvements:
+
+* Bump actions environment to `macOS-11` (#4372 by @PureFunctor)
+
+Internal:
+
+* Enable `OverloadedRecordDot` extension throughout codebase (#4355 by @JordanMartinez)
+
+* Ensure order of args remain unchanged in `freeTypeVariables` (#4369 by @JordanMartinez)
+
+* Bump HLint to version 3.5 and address most of the new hints (#4391 by @rhendric)
+
+* Remove `purescript-cst` from Makefile (#4389 by @ptrfrncsmrph)
+
+* Bump depend NPM purescript-installer to ^0.3.1 (#4353 by @imcotton)
+
+* Remove base-compat as a dependency (#4384 by @PureFunctor)
+
+## 0.15.4
+
+Bugfixes:
+
+* Fix name clash in guard clauses introduced in #4293 (#4385 by @PureFunctor)
+
+  As a consequence, a problem with the compiler not being able to see
+  imported names if they're shadowed by a guard binder is also solved.
+  ```purs
+  import Data.Foldable (fold)
+  import Data.Maybe (Maybe(..))
+  import Data.Monoid.Additive (Additive(..))
+
+  test :: Maybe Int -> Int
+  test = case _ of
+    m | Just fold <- m -> fold
+      -- Previously would complain about `fold` being undefined
+      | otherwise -> case fold [] of Additive x -> x
+  ```
+
+Internal:
+
+* Add `Guard` handler for the `everywhereWithContextOnValuesM` traversal. (#4385 by @PureFunctor)
+
+## 0.15.3
+
+New features:
+
+* Float compiler-synthesized function applications (#3915 by @rhendric)
+
+  This is a limited implementation of common subexpression elimination for
+  expressions created by the compiler in the process of creating and using
+  typeclass dictionaries. Users can expect code that heavily uses typeclasses
+  to produce JavaScript that is shorter, simpler, and faster.
+
+  Common subexpression elimination is not applied to any expressions explicitly
+  written by users. If you want those floated to a higher scope, you have to do
+  so manually.
+
+* Add support for optional shebang lines (#4214 by @colinwahl and @JordanMartinez)
+
+  One or more shebang line are only allowed as the first lines of a file
+
+  ```purs
+  #! a shebang line
+  #! another shebang line
+  -- | module doc comment
+  -- other comment
+  module MyModule where
+
+  #! Using a shebang here will fail to parse
+  foo :: String
+  foo = ""
+  ```
+
+Bugfixes:
+
+* Stop requiring `bower.json` `devDependencies` when publishing (#4332 by @JordanMartinez)
+
+* Stop emitting source spans with negative line/column numbers (#4343 by @j-nava and @JordanMartinez)
+
+Internal:
+
+* Accommodate internally-generated identifiers that start with digits (#4334 by @rhendric)
+
+* Enable `-Wincomplete-uni-patterns` and `-Wincomplete-record-updates` by default (#4336 by @hdgarrood)
+
+  Update `purescript.cabal` so that the PureScript compiler is built with the
+  flags `-Wincomplete-uni-patterns` and `-Wincomplete-record-updates`
+  enabled by default.
+
+* Setup infrastructure for testing source maps (#4335 by @JordanMartinez)
+
+* Removed a couple of unused `SimpleErrorMessage` constructors (#4344 by @hdgarrood)
+
+* Compare json files through `aeson` in tests (#4354 by @PureFunctor)
+
+  This fixes the tests for the graph and source map outputs, as the
+  ordering is inconsistent between `stack test` and `cabal test`.
+
+* Add version bounds to the test suite's `build-depends`. (#4354 by @PureFunctor)
+
+* Update GHC to 9.2.3 (#4351 by @hdgarrood and @JordanMartinez)
+
+* Add qualification for locally-bound names (#4293 by @PureFunctor)
+
+  This change makes it so that `Qualified` names can now be qualified by either
+  a `ModuleName` for module-level declarations or the starting `SourcePos` for
+  bindings introduced locally. This makes disambiguation between references to
+  local bindings much easier in AST-driven analysis.
+
+## 0.15.2
+
+New features:
+
+* Check for partially applied synonyms in kinds, ctors (#4169 by @rhendric)
+
+  This check doesn't prevent any programs from compiling; it just makes
+  sure that a more specific `PartiallyAppliedSynonym` error is raised
+  instead of a `KindsDoNotUnify` error, which could be interpreted as
+  implying that a partially applied synonym has a valid kind and would be
+  supported elsewhere if that kind is expected.
+
+* Support deriving instances for type synonyms (#4315 by @rhendric)
+
+Bugfixes:
+
+* Do not emit warnings about type wildcards used in binders (patterns). (#4309 by @fsoikin)
+
+  Type wildcards in the following examples no longer trigger a warning:
+
+  ```
+  f :: Int
+  f = 42 # \(x :: _) -> x
+
+  g :: Maybe Int
+  g = do
+    x :: _ <- getX
+    pure $ x + 5
+  ```
+
+* Fix issue with unnamed instances using type operators (#4311 by @rhendric)
+
+* Fix incorrect `Prim.Int (class Compare)` docs: `Int` & `Ordering`, not `Symbol` (#4313 by @JordanMartinez)
+
+* Fix bad interaction between module renaming and inliner (#4322 by @rhendric)
+
+  This bug was triggered when modules that the compiler handles specially
+  are shadowed by local constructors. For example, a constructor named
+  `Prim` could have caused references to `Prim_1["undefined"]` to be
+  produced in the compiled code, leading to a reference error at run time.
+  Less severely, a constructor named `Control_Bind` would have caused the
+  compiler not to inline known monadic functions, leading to slower and
+  less readable compiled code.
+
+* Update `Prim` docs for Boolean, Int, String/Symbol, Number, Record, and Row (#4317 by @JordanMartinez)
+
+* Fix crash caused by polykinded instances (#4325 by @rhendric)
+
+  A polykinded instance is a class instance where one or more of the type
+  parameters has an indeterminate kind. For example, the kind of `a` in
+
+  ```purs
+  instance SomeClass (Proxy a) where ...
+  ```
+
+  is indeterminate unless it's somehow used in a constraint or functional
+  dependency of the instance in a way that determines it.
+
+  The above instance would not have caused the crash; instead, instances needed
+  to be of the form
+
+  ```purs
+  instance SomeClass (f a) where ...
+  ```
+
+  in order to cause it.
+
+* Fix bad interaction between newtype deriving and type synonyms (#4315 by @rhendric)
+
+  See #3453.
+
+* Fix bad interaction between instance deriving and type synonyms (#4315 by @rhendric)
+
+  See #4105.
+
+* Fix spurious kind unification error triggered by newtype deriving, type synonyms, and polykinds (#4315 by @rhendric)
+
+  See #4200.
+
+Internal:
+
+* Deploy builds continuously to GitHub and npm (#4306 and #4324 by @rhendric)
+
+  (Builds triggered by changes that shouldn't affect the published package are
+  not deployed.)
+
+* Fix incomplete type traversals (#4155 by @rhendric)
+
+  This corrects oversights in some compiler internals that are not known to be
+  the cause of any user-facing issues.
+
+* Drop dependency on microlens libraries (#4327 by @rhendric)
+
+## 0.15.1
+
+Release skipped; use [0.15.2](#0152).
+
 ## 0.15.0
 
 Breaking changes:
@@ -2891,14 +3544,14 @@ The way names are resolved has now been updated in a way that may result in some
 
 Some examples:
 
-| Import statement | Exposed members |
-| --- | --- |
-| `import X` | `A`, `f` |
-| `import X as Y` | `Y.A` `Y.f` |
-| `import X (A)` | `A` |
-| `import X (A) as Y` | `Y.A` |
-| `import X hiding (f)` | `A` |
-| `import Y hiding (f) as Y` | `Y.A` |
+| Import statement           | Exposed members |
+| -------------------------- | --------------- |
+| `import X`                 | `A`, `f`        |
+| `import X as Y`            | `Y.A` `Y.f`     |
+| `import X (A)`             | `A`             |
+| `import X (A) as Y`        | `Y.A`           |
+| `import X hiding (f)`      | `A`             |
+| `import Y hiding (f) as Y` | `Y.A`           |
 
 Qualified references like `Control.Monad.Eff.Console.log` will no longer resolve unless there is a corresponding `import Control.Monad.Eff.Console as Control.Monad.Eff.Console`. Importing a module unqualified does not allow you to reference it with qualification, so `import X` does not allow references to `X.A` unless there is also an `import X as X`.
 

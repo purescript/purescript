@@ -3,13 +3,13 @@
 --
 module Language.PureScript.Interactive.Directive where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Maybe (fromJust)
 import Data.List (isPrefixOf)
 import Data.Tuple (swap)
 
-import Language.PureScript.Interactive.Types
+import Language.PureScript.Interactive.Types (Directive(..))
 
 -- |
 -- A mapping of directives to the different strings that can be used to invoke

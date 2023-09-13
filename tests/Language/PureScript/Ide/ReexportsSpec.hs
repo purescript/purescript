@@ -1,13 +1,13 @@
 module Language.PureScript.Ide.ReexportsSpec where
 
-import           Protolude
+import Protolude
 
-import qualified Data.Map as Map
-import           Language.PureScript.Ide.Reexports
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Test
-import qualified Language.PureScript as P
-import           Test.Hspec
+import Data.Map qualified as Map
+import Language.PureScript.Ide.Reexports (ReexportResult(..), reexportHasFailures, resolveReexports')
+import Language.PureScript.Ide.Types (IdeDeclarationAnn, ModuleMap)
+import Language.PureScript.Ide.Test (annExp, ideDtor, ideKind, ideSynonym, ideType, ideTypeClass, ideValue, mn)
+import Language.PureScript qualified as P
+import Test.Hspec (Spec, describe, it, shouldBe, shouldSatisfy)
 
 valueA, typeA, synonymA, classA, dtorA1, dtorA2, kindA :: IdeDeclarationAnn
 valueA = ideValue "valueA" Nothing

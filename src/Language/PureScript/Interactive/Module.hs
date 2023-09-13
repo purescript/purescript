@@ -1,13 +1,13 @@
 module Language.PureScript.Interactive.Module where
 
-import           Prelude.Compat
+import Prelude
 
-import qualified Language.PureScript as P
-import qualified Language.PureScript.CST as CST
-import           Language.PureScript.Interactive.Types
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath (pathSeparator, makeRelative)
-import           System.IO.UTF8 (readUTF8FilesT)
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Interactive.Types (ImportedModule, PSCiState, initialInteractivePrint, psciImportedModules, psciInteractivePrint, psciLetBindings)
+import System.Directory (getCurrentDirectory)
+import System.FilePath (pathSeparator, makeRelative)
+import System.IO.UTF8 (readUTF8FilesT)
 
 -- * Support Module
 
@@ -40,14 +40,14 @@ createTemporaryModule exec st val =
     effModuleName = P.ModuleName "Effect"
     effImport     = (effModuleName, P.Implicit, Just (P.ModuleName "$Effect"))
     supportImport = (fst (psciInteractivePrint st), P.Implicit, Just (P.ModuleName "$Support"))
-    eval          = P.Var internalSpan (P.Qualified (Just (P.ModuleName "$Support")) (snd (psciInteractivePrint st)))
-    mainValue     = P.App eval (P.Var internalSpan (P.Qualified Nothing (P.Ident "it")))
+    eval          = P.Var internalSpan (P.Qualified (P.ByModuleName (P.ModuleName "$Support")) (snd (psciInteractivePrint st)))
+    mainValue     = P.App eval (P.Var internalSpan (P.Qualified P.ByNullSourcePos (P.Ident "it")))
     itDecl        = P.ValueDecl (internalSpan, []) (P.Ident "it") P.Public [] [P.MkUnguarded val]
     typeDecl      = P.TypeDeclaration
                       (P.TypeDeclarationData (internalSpan, []) (P.Ident "$main")
                         (P.srcTypeApp
                           (P.srcTypeConstructor
-                            (P.Qualified (Just (P.ModuleName "$Effect")) (P.ProperName "Effect")))
+                            (P.Qualified (P.ByModuleName (P.ModuleName "$Effect")) (P.ProperName "Effect")))
                                   P.srcTypeWildcard))
     mainDecl      = P.ValueDecl (internalSpan, []) (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]

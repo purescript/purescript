@@ -53,7 +53,7 @@ assertBundles support inputFiles outputFile = do
     Right _ -> do
       jsFiles <- concat <$> Glob.globDir [Glob.compile "*/*.js", Glob.compile "*/foreign.cjs"] modulesDir
       let entryPoint = modulesDir </> "index.cjs"
-      let entryModule = map (`ModuleIdentifier` Regular) ["Main"]
+      let entryModule = [(`ModuleIdentifier` Regular) "Main"]
       bundled <- runExceptT $ do
         input <- forM jsFiles $ \filename -> do
           js <- liftIO $ readUTF8File filename

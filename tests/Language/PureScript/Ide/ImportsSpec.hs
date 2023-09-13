@@ -1,18 +1,19 @@
 module Language.PureScript.Ide.ImportsSpec where
 
-import           Protolude hiding (moduleName)
-import           Data.Maybe (fromJust)
-import qualified Data.Set as Set
+import Protolude hiding (moduleName)
+import Data.Maybe (fromJust)
+import Data.Set qualified as Set
 
-import qualified Language.PureScript as P
-import           Language.PureScript.Ide.Command as Command
-import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Imports
-import           Language.PureScript.Ide.Filter (moduleFilter)
-import qualified Language.PureScript.Ide.Test as Test
-import           Language.PureScript.Ide.Types
-import           System.FilePath
-import           Test.Hspec
+import Language.PureScript qualified as P
+import Language.PureScript.Ide.Command as Command
+import Language.PureScript.Ide.Error (IdeError)
+import Language.PureScript.Ide.Imports (Import, parseImport, prettyPrintImport', prettyPrintImportSection, sliceImportSection)
+import Language.PureScript.Ide.Imports.Actions (addExplicitImport', addImplicitImport', addQualifiedImport')
+import Language.PureScript.Ide.Filter (moduleFilter)
+import Language.PureScript.Ide.Test qualified as Test
+import Language.PureScript.Ide.Types (IdeDeclarationAnn(..), Success(..))
+import System.FilePath ((</>))
+import Test.Hspec (Expectation, Spec, describe, it, shouldBe, shouldSatisfy)
 
 noImportsFile :: [Text]
 noImportsFile =
@@ -113,7 +114,7 @@ spec = do
         addValueImport i mn q is =
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValue i Nothing)) mn q is)
         addOpImport op mn q is =
-          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValueOp op (P.Qualified q (Left "")) 2 Nothing Nothing)) mn q is)
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValueOp op (P.Qualified (P.byMaybeModuleName q) (Left "")) 2 Nothing Nothing)) mn q is)
         addDtorImport i t mn q is =
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideDtor i t Nothing)) mn q is)
         addTypeImport i mn q is =

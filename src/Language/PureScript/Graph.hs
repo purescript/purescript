@@ -1,27 +1,28 @@
 module Language.PureScript.Graph (graph) where
 
-import Prelude.Compat
+import Prelude
 
-import qualified Data.Aeson as Json
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Map as Map
+import Data.Aeson qualified as Json
+import Data.Aeson.Key qualified as Json.Key
+import Data.Aeson.KeyMap qualified as Json.Map
+import Data.Map qualified as Map
 
-import           Control.Monad (forM)
-import           Data.Aeson ((.=))
-import           Data.Foldable (foldl')
-import           Data.Map (Map)
-import           Data.Maybe (fromMaybe)
-import           Data.Text (Text)
-import           System.IO.UTF8 (readUTF8FileT)
+import Control.Monad (forM)
+import Data.Aeson ((.=))
+import Data.Foldable (foldl')
+import Data.Map (Map)
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import System.IO.UTF8 (readUTF8FileT)
 
-import qualified Language.PureScript.Crash as Crash
-import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.Make as Make
-import qualified Language.PureScript.ModuleDependencies as Dependencies
-import qualified Language.PureScript.Options as Options
+import Language.PureScript.Crash qualified as Crash
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Make qualified as Make
+import Language.PureScript.ModuleDependencies qualified as Dependencies
+import Language.PureScript.Options qualified as Options
 
-import           Language.PureScript.Errors (MultipleErrors)
-import           Language.PureScript.Names (ModuleName, runModuleName)
+import Language.PureScript.Errors (MultipleErrors)
+import Language.PureScript.Names (ModuleName, runModuleName)
 
 
 -- | Given a set of filepaths, try to build the dependency graph and return
@@ -44,7 +45,7 @@ moduleGraphToJSON
 moduleGraphToJSON paths = Json.Object . foldl' insert mempty
   where
   insert :: Json.Object -> (ModuleName, [ModuleName]) -> Json.Object
-  insert obj (mn, depends) = HashMap.insert (runModuleName mn) value obj
+  insert obj (mn, depends) = Json.Map.insert (Json.Key.fromText (runModuleName mn)) value obj
     where
       path = fromMaybe (Crash.internalError "missing module name in graph") $ Map.lookup mn paths
       value = Json.object

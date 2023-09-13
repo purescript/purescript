@@ -6,33 +6,33 @@
 --
 module Language.PureScript.AST.Declarations where
 
-import Prelude.Compat
+import Prelude
 import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
-import Data.Functor.Identity
+import Data.Functor.Identity (Identity(..))
 
-import Data.Aeson.TH
-import qualified Data.Map as M
+import Data.Aeson.TH (Options(..), SumEncoding(..), defaultOptions, deriveJSON)
+import Data.Map qualified as M
 import Data.Text (Text)
-import qualified Data.List.NonEmpty as NEL
+import Data.List.NonEmpty qualified as NEL
 import GHC.Generics (Generic)
 
-import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Literals
-import Language.PureScript.AST.Operators
-import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.Binders (Binder)
+import Language.PureScript.AST.Literals (Literal(..))
+import Language.PureScript.AST.Operators (Fixity)
+import Language.PureScript.AST.SourcePos (SourceAnn, SourceSpan)
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
-import Language.PureScript.Types
+import Language.PureScript.Types (SourceConstraint, SourceType)
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Label (Label)
-import Language.PureScript.Names
-import Language.PureScript.Roles
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Comments
-import Language.PureScript.Environment
-import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName(..), Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), toMaybeModuleName)
+import Language.PureScript.Roles (Role)
+import Language.PureScript.TypeClassDictionaries (NamedDict)
+import Language.PureScript.Comments (Comment)
+import Language.PureScript.Environment (DataDeclType, Environment, FunctionalDependency, NameKind)
+import Language.PureScript.Constants.Prim qualified as C
 
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, SourceType)]
@@ -42,14 +42,14 @@ data TypeSearch
   = TSBefore Environment
   -- ^ An Environment captured for later consumption by type directed search
   | TSAfter
+  -- ^ Results of applying type directed search to the previously captured
+  -- Environment
     { tsAfterIdentifiers :: [(Qualified Text, SourceType)]
     -- ^ The identifiers that fully satisfy the subsumption check
     , tsAfterRecordFields :: Maybe [(Label, SourceType)]
     -- ^ Record fields that are available on the first argument to the typed
     -- hole
     }
-  -- ^ Results of applying type directed search to the previously captured
-  -- Environment
   deriving Show
 
 onTypeSearchTypes :: (SourceType -> SourceType) -> TypeSearch -> TypeSearch
@@ -66,6 +66,7 @@ data ErrorMessageHint
   | ErrorInModule ModuleName
   | ErrorInInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | ErrorInSubsumption SourceType SourceType
+  | ErrorInRowLabel Label
   | ErrorCheckingAccessor Expr PSString
   | ErrorCheckingType Expr SourceType
   | ErrorCheckingKind SourceType SourceType
@@ -88,6 +89,7 @@ data ErrorMessageHint
   | ErrorSolvingConstraint SourceConstraint
   | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   | PositionedError (NEL.NonEmpty SourceSpan)
+  | RelatedPositions (NEL.NonEmpty SourceSpan)
   deriving (Show)
 
 -- | Categories of hints
@@ -130,13 +132,15 @@ getModuleDeclarations (Module _ _ _ declarations _) = declarations
 addDefaultImport :: Qualified ModuleName -> Module -> Module
 addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps) =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit toImportAs : decls) exps
+  else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit toImportAs' : decls) exps
   where
+  toImportAs' = toMaybeModuleName toImportAs
+
   isExistingImport (ImportDeclaration _ mn' _ as')
     | mn' == toImport =
-        case toImportAs of
+        case toImportAs' of
           Nothing -> True
-          _ -> as' == toImportAs
+          _ -> as' == toImportAs'
   isExistingImport _ = False
 
 -- | Adds import declarations to a module for an implicit Prim import and Prim
@@ -144,10 +148,10 @@ addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps
 importPrim :: Module -> Module
 importPrim =
   let
-    primModName = C.Prim
+    primModName = C.M_Prim
   in
-    addDefaultImport (Qualified (Just primModName) primModName)
-      . addDefaultImport (Qualified Nothing primModName)
+    addDefaultImport (Qualified (ByModuleName primModName) primModName)
+      . addDefaultImport (Qualified ByNullSourcePos primModName)
 
 data NameSource = UserNamed | CompilerNamed
   deriving (Show, Generic, NFData, Serialise)
@@ -426,7 +430,10 @@ data Declaration
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
   --
-  | TypeInstanceDeclaration SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
+  -- The first @SourceAnn@ serves as the annotation for the entire
+  -- declaration, while the second @SourceAnn@ serves as the
+  -- annotation for the type class and its arguments.
+  | TypeInstanceDeclaration SourceAnn SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
   deriving (Show)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -441,15 +448,17 @@ pattern ValueFixityDeclaration sa fixity name op = FixityDeclaration sa (Left (V
 pattern TypeFixityDeclaration :: SourceAnn -> Fixity -> Qualified (ProperName 'TypeName) -> OpName 'TypeOpName -> Declaration
 pattern TypeFixityDeclaration sa fixity name op = FixityDeclaration sa (Right (TypeFixity fixity name op))
 
+data InstanceDerivationStrategy
+  = KnownClassStrategy
+  | NewtypeStrategy
+  deriving (Show)
+
 -- | The members of a type class instance declaration
 data TypeInstanceBody
   = DerivedInstance
   -- ^ This is a derived instance
   | NewtypeInstance
   -- ^ This is an instance derived from a newtype
-  | NewtypeInstanceWithDictionary Expr
-  -- ^ This is an instance derived from a newtype, desugared to include a
-  -- dictionary for the type under the newtype.
   | ExplicitInstance [Declaration]
   -- ^ This is a regular (explicit) instance
   deriving (Show)
@@ -487,7 +496,7 @@ declSourceAnn (ExternDataDeclaration sa _ _) = sa
 declSourceAnn (FixityDeclaration sa _) = sa
 declSourceAnn (ImportDeclaration sa _ _ _) = sa
 declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
-declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _) = sa
+declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
@@ -504,7 +513,7 @@ declName (ExternDataDeclaration _ n _) = Just (TyName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
-declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = IdentName <$> hush n
+declName (TypeInstanceDeclaration _ _ _ _ n _ _ _ _) = IdentName <$> hush n
 declName (RoleDeclaration RoleDeclarationData{..}) = Just (TyName rdeclIdent)
 declName ImportDeclaration{} = Nothing
 declName BindingGroupDeclaration{} = Nothing
@@ -667,6 +676,10 @@ data Expr
   --
   | App Expr Expr
   -- |
+  -- A type application (e.g. `f @Int`)
+  --
+  | VisibleTypeApp Expr SourceType
+  -- |
   -- Hint that an expression is unused.
   -- This is used to ignore type class dictionaries that are necessarily empty.
   -- The inner expression lets us solve subgoals before eliminating the whole expression.
@@ -718,12 +731,16 @@ data Expr
   -- instance type, and the type class dictionaries in scope.
   --
   | TypeClassDictionary SourceConstraint
-                        (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
+                        (M.Map QualifiedBy (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
                         [ErrorMessageHint]
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
   | DeferredDictionary (Qualified (ProperName 'ClassName)) [SourceType]
+  -- |
+  -- A placeholder for a type class instance to be derived during typechecking
+  --
+  | DerivedInstancePlaceholder (Qualified (ProperName 'ClassName)) InstanceDerivationStrategy
   -- |
   -- A placeholder for an anonymous function argument
   --
@@ -822,14 +839,14 @@ newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
   deriving (Show, Eq, Ord, Foldable, Functor, Traversable)
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''NameSource)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)
 
 isTrueExpr :: Expr -> Bool
 isTrueExpr (Literal _ (BooleanLiteral True)) = True
-isTrueExpr (Var _ (Qualified (Just (ModuleName "Prelude")) (Ident "otherwise"))) = True
-isTrueExpr (Var _ (Qualified (Just (ModuleName "Data.Boolean")) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (ByModuleName (ModuleName "Prelude")) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (ByModuleName (ModuleName "Data.Boolean")) (Ident "otherwise"))) = True
 isTrueExpr (TypedValue _ e _) = isTrueExpr e
 isTrueExpr (PositionedValue _ _ e) = isTrueExpr e
 isTrueExpr _ = False

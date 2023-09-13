@@ -1,36 +1,34 @@
 {-# LANGUAGE DoAndIfThenElse #-}
-{-# LANGUAGE GADTs           #-}
+{-# LANGUAGE GADTs #-}
 
 module Command.REPL (command) where
 
-import           Control.Applicative              (many, (<|>))
-import           Control.Monad
-import           Control.Monad.Catch              (MonadMask)
-import           Control.Monad.IO.Class           (MonadIO, liftIO)
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Except       (ExceptT (..), runExceptT)
-import           Control.Monad.Trans.Reader       (ReaderT, runReaderT)
-import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
-import           Data.Foldable                    (for_)
-import qualified Language.PureScript              as P
-import qualified Language.PureScript.CST          as CST
-import           Language.PureScript.Interactive
-import qualified Options.Applicative              as Opts
-import           Prelude                          ()
-import           Prelude.Compat
-import           System.Console.Haskeline
-import           System.Directory                 (doesFileExist,
-                                                   getCurrentDirectory)
-import           System.Exit
-import           System.FilePath                  ((</>))
-import qualified System.FilePath.Glob             as Glob
-import           System.IO                        (hPutStrLn, stderr)
-import           System.IO.UTF8                   (readUTF8File)
+import Prelude
+import Control.Applicative (many, (<|>))
+import Control.Monad (unless, when)
+import Control.Monad.Catch (MonadMask)
+import Control.Monad.IO.Class (liftIO, MonadIO)
+import Control.Monad.Trans.Class (MonadTrans(..))
+import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
+import Control.Monad.Trans.State.Strict (StateT, evalStateT)
+import Control.Monad.Trans.Reader (ReaderT, runReaderT)
+import Data.Foldable (for_)
+import Language.PureScript qualified as P
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Interactive
+import Options.Applicative qualified as Opts
+import System.Console.Haskeline (InputT, Settings(..), defaultSettings, getInputLine, handleInterrupt, outputStrLn, runInputT, setComplete, withInterrupt)
+import System.IO.UTF8 (readUTF8File)
+import System.Exit (ExitCode(..), exitFailure)
+import System.Directory (doesFileExist, getCurrentDirectory)
+import System.FilePath ((</>))
+import System.FilePath.Glob qualified as Glob
+import System.IO (hPutStrLn, stderr)
 
 -- | Command line options
 data PSCiOptions = PSCiOptions
-  { psciInputGlob :: [String]
-  , psciBackend   :: Backend
+  { psciInputGlob         :: [String]
+  , psciBackend           :: Backend
   }
 
 inputFile :: Opts.Parser FilePath
@@ -86,11 +84,11 @@ pasteMode =
 
 -- | All of the functions required to implement a PSCi backend
 data Backend = forall state. Backend
-  { _backendSetup    :: IO state
+  { _backendSetup :: IO state
   -- ^ Initialize, and call the continuation when the backend is ready
-  , _backendEval     :: state -> String -> IO ()
+  , _backendEval :: state -> String -> IO ()
   -- ^ Evaluate JavaScript code
-  , _backendReload   :: state -> IO ()
+  , _backendReload :: state -> IO ()
   -- ^ Reload the compiled code
   , _backendShutdown :: state -> IO ()
   -- ^ Shut down the backend

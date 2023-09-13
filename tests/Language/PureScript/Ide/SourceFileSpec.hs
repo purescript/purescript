@@ -1,13 +1,13 @@
 module Language.PureScript.Ide.SourceFileSpec where
 
-import           Protolude
+import Protolude
 
-import qualified Language.PureScript as P
-import           Language.PureScript.Ide.Command
-import           Language.PureScript.Ide.SourceFile
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Test
-import           Test.Hspec
+import Language.PureScript qualified as P
+import Language.PureScript.Ide.Command (Command(..))
+import Language.PureScript.Ide.SourceFile (extractSpans, extractTypeAnnotations)
+import Language.PureScript.Ide.Types (Completion(..), IdeNamespace(..), IdeNamespaced(..), Success(..), emptyIdeState)
+import Language.PureScript.Ide.Test
+import Test.Hspec (Spec, describe, it, shouldBe)
 
 span1, span2 :: P.SourceSpan
 span1 = P.SourceSpan "" (P.SourcePos 1 1) (P.SourcePos 2 2)
@@ -29,13 +29,13 @@ valueFixity =
   P.ValueFixityDeclaration
     ann1
     (P.Fixity P.Infix 0)
-    (P.Qualified Nothing (Left (P.Ident "")))
+    (P.Qualified P.ByNullSourcePos (Left (P.Ident "")))
     (P.OpName "<$>")
 typeFixity =
   P.TypeFixityDeclaration
     ann1
     (P.Fixity P.Infix 0)
-    (P.Qualified Nothing (P.ProperName ""))
+    (P.Qualified P.ByNullSourcePos (P.ProperName ""))
     (P.OpName "~>")
 foreign1 = P.ExternDeclaration ann1 (P.Ident "foreign1") P.srcREmpty
 foreign2 = P.ExternDataDeclaration ann1 (P.ProperName "Foreign2") P.kindType
@@ -106,9 +106,9 @@ getLocation s = do
          , ideDtor "SFTwo" "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFThree" "SFData" Nothing `annLoc` typeSS
          , ideTypeClass "SFClass" P.kindType [] `annLoc` classSS
-         , ideValueOp "<$>" (P.Qualified Nothing (Left "")) 0 Nothing Nothing
+         , ideValueOp "<$>" (P.Qualified P.ByNullSourcePos (Left "")) 0 Nothing Nothing
            `annLoc` valueOpSS
-         , ideTypeOp "~>" (P.Qualified Nothing "") 0 Nothing Nothing
+         , ideTypeOp "~>" (P.Qualified P.ByNullSourcePos "") 0 Nothing Nothing
            `annLoc` typeOpSS
          ])
       ]

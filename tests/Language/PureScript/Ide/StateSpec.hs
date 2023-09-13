@@ -1,25 +1,25 @@
 module Language.PureScript.Ide.StateSpec where
 
-import           Protolude
-import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.State
-import           Language.PureScript.Ide.Test
-import qualified Language.PureScript as P
-import           Lens.Micro.Platform hiding ((&))
-import           Test.Hspec
-import qualified Data.Map as Map
+import Protolude
+import Control.Lens (Ixed(..), folded)
+import Language.PureScript.Ide.Types (IdeDeclarationAnn, IdeInstance(..), ModuleMap, _IdeDeclTypeClass, anyOf, idaDeclaration, ideTCInstances)
+import Language.PureScript.Ide.State (resolveDataConstructorsForModule, resolveInstances, resolveOperatorsForModule)
+import Language.PureScript.Ide.Test (ideDtor, ideType, ideTypeClass, ideTypeOp, ideValue, ideValueOp, mn)
+import Language.PureScript qualified as P
+import Test.Hspec (Spec, describe, it, shouldSatisfy)
+import Data.Map qualified as Map
 
 valueOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 valueOperator =
-  ideValueOp "<$>" (P.Qualified (Just (mn "Test")) (Left "function")) 2 Nothing
+  ideValueOp "<$>" (P.Qualified (P.ByModuleName (mn "Test")) (Left "function")) 2 Nothing
 
 ctorOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 ctorOperator =
-  ideValueOp ":" (P.Qualified (Just (mn "Test")) (Right "Cons")) 2 Nothing
+  ideValueOp ":" (P.Qualified (P.ByModuleName (mn "Test")) (Right "Cons")) 2 Nothing
 
 typeOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 typeOperator =
-  ideTypeOp ":" (P.Qualified (Just (mn "Test")) "List") 2 Nothing
+  ideTypeOp ":" (P.Qualified (P.ByModuleName (mn "Test")) "List") 2 Nothing
 
 testModule :: (P.ModuleName, [IdeDeclarationAnn])
 testModule =
@@ -53,7 +53,7 @@ ef = P.ExternsFile
   --, efDeclarations =
     [ P.EDInstance
       -- { edInstanceClassName =
-      (P.Qualified (Just (mn "ClassModule")) (P.ProperName "MyClass"))
+      (P.Qualified (P.ByModuleName (mn "ClassModule")) (P.ProperName "MyClass"))
       -- , edInstanceName =
       (P.Ident "myClassInstance")
       -- . edInstanceForAll =

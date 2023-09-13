@@ -3,16 +3,16 @@
 
 module Language.PureScript.Sugar.AdoNotation (desugarAdoModule) where
 
-import           Prelude.Compat hiding (abs)
+import Prelude hiding (abs)
 
-import           Control.Monad (foldM)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Supply.Class
-import           Data.List (foldl')
-import           Language.PureScript.AST
-import           Language.PureScript.Errors
-import           Language.PureScript.Names
-import qualified Language.PureScript.Constants.Prelude as C
+import Control.Monad (foldM)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class (MonadSupply)
+import Data.List (foldl')
+import Language.PureScript.AST (Binder(..), CaseAlternative(..), Declaration, DoNotationElement(..), Expr(..), pattern MkUnguarded, Module(..), SourceSpan, WhereProvenance(..), declSourceSpan, everywhereOnValuesM)
+import Language.PureScript.Errors (MultipleErrors, parU, rethrowWithPosition)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Qualified(..), byMaybeModuleName, freshIdent')
+import Language.PureScript.Constants.Libs qualified as C
 
 -- | Replace all @AdoNotationBind@ and @AdoNotationValue@ constructors with
 -- applications of the pure and apply functions in scope, and all @AdoNotationLet@
@@ -28,13 +28,13 @@ desugarAdo d =
   in rethrowWithPosition ss $ f d
   where
   pure' :: SourceSpan -> Maybe ModuleName -> Expr
-  pure' ss m = Var ss (Qualified m (Ident C.pure'))
+  pure' ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.S_pure))
 
   map' :: SourceSpan -> Maybe ModuleName -> Expr
-  map' ss m = Var ss (Qualified m (Ident C.map))
+  map' ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.S_map))
 
   apply :: SourceSpan -> Maybe ModuleName -> Expr
-  apply ss m = Var ss (Qualified m (Ident C.apply))
+  apply ss m = Var ss (Qualified (byMaybeModuleName m) (Ident C.S_apply))
 
   replace :: SourceSpan -> Expr -> m Expr
   replace pos (Ado m els yield) = do
@@ -53,7 +53,7 @@ desugarAdo d =
   go ss (yield, args) (DoNotationBind binder val) = do
     ident <- freshIdent'
     let abs = Abs (VarBinder ss ident)
-                  (Case [Var ss (Qualified Nothing ident)]
+                  (Case [Var ss (Qualified ByNullSourcePos ident)]
                         [CaseAlternative [binder] [MkUnguarded yield]])
     return (abs, val : args)
   go _ (yield, args) (DoNotationLet ds) = do

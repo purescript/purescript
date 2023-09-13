@@ -1,14 +1,15 @@
 -- | Common functions used by the various optimizer phases
 module Language.PureScript.CoreImp.Optimizer.Common where
 
-import Prelude.Compat
+import Prelude
 
 import Data.Text (Text)
 import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 
-import Language.PureScript.Crash
-import Language.PureScript.CoreImp.AST
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.CoreImp.AST (AST(..), everything, everywhere)
+import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString)
 
 applyAll :: [a -> a] -> a -> a
@@ -59,10 +60,13 @@ removeFromBlock :: ([AST] -> [AST]) -> AST -> AST
 removeFromBlock go (Block ss sts) = Block ss (go sts)
 removeFromBlock _  js = js
 
-isDict :: (Text, PSString) -> AST -> Bool
-isDict (moduleName, dictName) (Indexer _ (StringLiteral _ x) (Var _ y)) =
-  x == dictName && y == moduleName
-isDict _ _ = False
+pattern Ref :: (ModuleName, PSString) -> AST
+pattern Ref pair <- (refPatternHelper -> Just pair)
+-- ideally: pattern Ref (moduleName, refName) <- ModuleAccessor _ moduleName refName
+-- but: https://gitlab.haskell.org/ghc/ghc/-/issues/12203
+--      https://github.com/ghc-proposals/ghc-proposals/pull/138
 
-isDict' :: [(Text, PSString)] -> AST -> Bool
-isDict' xs js = any (`isDict` js) xs
+refPatternHelper :: AST -> Maybe (ModuleName, PSString)
+refPatternHelper = \case
+  ModuleAccessor _ moduleName refName -> Just (moduleName, refName)
+  _ -> Nothing

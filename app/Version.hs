@@ -9,7 +9,7 @@ import Data.Version (showVersion)
 import Paths_purescript as Paths
 
 #ifndef RELEASE
-import qualified Development.GitRev as GitRev
+import Development.GitRev qualified as GitRev
 #endif
 
 -- Unfortunately, Cabal doesn't support prerelease identifiers on versions. To
@@ -26,7 +26,8 @@ versionString = showVersion Paths.version ++ prerelease ++ extra
   extra = ""
 #else
   extra = " [development build; commit: " ++ $(GitRev.gitHash) ++ dirty ++ "]"
-  dirty
-    | $(GitRev.gitDirty) = " DIRTY"
-    | otherwise = ""
+  dirty =
+    if $(GitRev.gitDirty)
+      then " DIRTY"
+      else ""
 #endif

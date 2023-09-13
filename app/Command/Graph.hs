@@ -2,20 +2,20 @@ module Command.Graph (command) where
 
 import Prelude
 
-import           Control.Applicative (many)
-import           Control.Monad (unless, when)
-import qualified Data.Aeson as Json
-import           Data.Bool (bool)
-import qualified Data.ByteString.Lazy as LB
-import qualified Data.ByteString.Lazy.UTF8 as LBU8
-import qualified Language.PureScript as P
-import           Language.PureScript.Errors.JSON
-import qualified Options.Applicative as Opts
-import qualified System.Console.ANSI as ANSI
-import           System.Exit (exitFailure)
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath.Glob (glob)
-import           System.IO (hPutStr, hPutStrLn, stderr)
+import Control.Applicative (many)
+import Control.Monad (unless, when)
+import Data.Aeson qualified as Json
+import Data.Bool (bool)
+import Data.ByteString.Lazy qualified as LB
+import Data.ByteString.Lazy.UTF8 qualified as LBU8
+import Language.PureScript qualified as P
+import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
+import Options.Applicative qualified as Opts
+import System.Console.ANSI qualified as ANSI
+import System.Exit (exitFailure)
+import System.Directory (getCurrentDirectory)
+import System.FilePath.Glob (glob)
+import System.IO (hPutStr, hPutStrLn, stderr)
 
 data GraphOptions = GraphOptions
   { graphInput      :: [FilePath]
@@ -79,8 +79,8 @@ printWarningsAndErrors False warnings errors = do
 printWarningsAndErrors True warnings errors = do
   let verbose = True
   hPutStrLn stderr . LBU8.toString . Json.encode $
-    JSONResult (toJSONErrors verbose P.Warning warnings)
-               (either (toJSONErrors verbose P.Error) (const []) errors)
+    JSONResult (toJSONErrors verbose P.Warning [] warnings)
+               (either (toJSONErrors verbose P.Error []) (const []) errors)
   case errors of
     Left _errs -> exitFailure
     Right res -> pure res

@@ -8,58 +8,56 @@ module Language.PureScript.Make.Actions
   , cacheDbFile
   , readCacheDb'
   , writeCacheDb'
+  , ffiCodegen'
   ) where
 
-import           Prelude
+import Prelude
 
-import           Control.Monad                          hiding (sequence)
-import           Control.Monad.Error.Class              (MonadError (..))
-import           Control.Monad.IO.Class
-import           Control.Monad.Reader                   (asks)
-import           Control.Monad.Supply
-import           Control.Monad.Trans.Class              (MonadTrans (..))
-import           Control.Monad.Writer.Class             (MonadWriter (..))
-import           Data.Aeson                             (Value (String), object,
-                                                         (.=))
-import           Data.Bifunctor                         (bimap, first)
-import           Data.Either                            (partitionEithers)
-import           Data.Foldable                          (for_)
-import qualified Data.List.NonEmpty                     as NEL
-import qualified Data.Map                               as M
-import           Data.Maybe                             (fromMaybe, maybeToList)
-import qualified Data.Set                               as S
-import qualified Data.Text                              as T
-import qualified Data.Text.Encoding                     as TE
-import qualified Data.Text.IO                           as TIO
-import           Data.Time.Clock                        (UTCTime)
-import           Data.Version                           (showVersion)
-import qualified Language.JavaScript.Parser             as JS
-import           Language.PureScript.AST
-import qualified Language.PureScript.Bundle             as Bundle
-import qualified Language.PureScript.CST                as CST
-import qualified Language.PureScript.CodeGen.JS         as J
-import           Language.PureScript.CodeGen.JS.Printer
-import qualified Language.PureScript.CoreFn             as CF
-import qualified Language.PureScript.CoreFn.ToJSON      as CFJ
-import           Language.PureScript.Crash
-import qualified Language.PureScript.Docs.Prim          as Docs.Prim
-import qualified Language.PureScript.Docs.Types         as Docs
-import           Language.PureScript.Errors
-import           Language.PureScript.Externs            (ExternsFile,
-                                                         externsFileName)
-import           Language.PureScript.Make.Cache
-import           Language.PureScript.Make.Monad
-import           Language.PureScript.Names
-import           Language.PureScript.Options            hiding (codegenTargets)
-import           Language.PureScript.Pretty.Common      (SMap (..))
-import qualified Paths_purescript                       as Paths
-import           SourceMap
-import           SourceMap.Types
-import           System.Directory                       (getCurrentDirectory)
-import           System.FilePath                        (makeRelative,
-                                                         normalise, splitPath,
-                                                         (</>))
-import           System.IO                              (stderr)
+import Control.Monad (unless, when)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.IO.Class (MonadIO(..))
+import Control.Monad.Reader (asks)
+import Control.Monad.Supply (SupplyT)
+import Control.Monad.Trans.Class (MonadTrans(..))
+import Control.Monad.Writer.Class (MonadWriter(..))
+import Data.Aeson (Value(String), (.=), object)
+import Data.Bifunctor (bimap, first)
+import Data.Either (partitionEithers)
+import Data.Foldable (for_)
+import Data.List.NonEmpty qualified as NEL
+import Data.Map qualified as M
+import Data.Maybe (fromMaybe, maybeToList)
+import Data.Set qualified as S
+import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
+import Data.Text.Encoding qualified as TE
+import Data.Time.Clock (UTCTime)
+import Data.Version (showVersion)
+import Language.JavaScript.Parser qualified as JS
+import Language.PureScript.AST (SourcePos(..))
+import Language.PureScript.Bundle qualified as Bundle
+import Language.PureScript.CodeGen.JS qualified as J
+import Language.PureScript.CodeGen.JS.Printer (prettyPrintJS, prettyPrintJSWithSourceMaps)
+import Language.PureScript.CoreFn qualified as CF
+import Language.PureScript.CoreFn.ToJSON qualified as CFJ
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.CST qualified as CST
+import Language.PureScript.Docs.Prim qualified as Docs.Prim
+import Language.PureScript.Docs.Types qualified as Docs
+import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage')
+import Language.PureScript.Externs (ExternsFile, externsFileName)
+import Language.PureScript.Make.Monad (Make, copyFile, getTimestamp, getTimestampMaybe, hashFile, makeIO, readExternsFile, readJSONFile, readTextFile, writeCborFile, writeJSONFile, writeTextFile)
+import Language.PureScript.Make.Cache (CacheDb, ContentHash, normaliseForCache)
+import Language.PureScript.Names (Ident(..), ModuleName, runModuleName)
+import Language.PureScript.Options (CodegenTarget(..), Options(..))
+import Language.PureScript.Pretty.Common (SMap(..))
+import Paths_purescript qualified as Paths
+import SourceMap (generate)
+import SourceMap.Types (Mapping(..), Pos(..), SourceMapping(..))
+import System.Directory (getCurrentDirectory)
+import System.FilePath ((</>), makeRelative, splitPath, normalise, splitDirectories)
+import System.FilePath.Posix qualified as Posix
+import System.IO (stderr)
 
 -- | Determines when to rebuild a module
 data RebuildPolicy
@@ -203,10 +201,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   targetFilename :: ModuleName -> CodegenTarget -> FilePath
   targetFilename mn = \case
-    JS          -> outputFilename mn "index.js"
+    JS -> outputFilename mn "index.js"
     JSSourceMap -> outputFilename mn "index.js.map"
-    CoreFn      -> outputFilename mn "corefn.json"
-    Docs        -> outputFilename mn "docs.json"
+    CoreFn -> outputFilename mn "corefn.json"
+    Docs -> outputFilename mn "docs.json"
 
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
@@ -283,35 +281,19 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   ffiCodegen :: CF.Module CF.Ann -> Make ()
   ffiCodegen m = do
     codegenTargets <- asks optionsCodegenTargets
-    when (S.member JS codegenTargets) $ do
-      let mn = CF.moduleName m
-      case mn `M.lookup` foreigns of
-        Just path
-          | not $ requiresForeign m ->
-              tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
-          | otherwise -> do
-              checkResult <- checkForeignDecls m path
-              case checkResult of
-                Left _ -> copyFile path (outputFilename mn "foreign.js")
-                Right (ESModule, _) -> copyFile path (outputFilename mn "foreign.js")
-                Right (CJSModule, _) -> do
-                  throwError $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
-
-        Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
-                | otherwise -> return ()
-
+    ffiCodegen' foreigns codegenTargets (Just outputFilename) m
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
-    let pathToDir = iterate (".." </>) ".." !! length (splitPath $ normalise outputDir)
+    let pathToDir = iterate (".." Posix.</>) ".." !! length (splitPath $ normalise outputDir)
         sourceFile = case mappings of
-                      (SMap file _ _ : _) -> Just $ pathToDir </> makeRelative dir (T.unpack file)
+                      (SMap file _ _ : _) -> Just $ pathToDir Posix.</> normalizeSMPath (makeRelative dir (T.unpack file))
                       _ -> Nothing
     let rawMapping = SourceMapping { smFile = "index.js", smSourceRoot = Nothing, smMappings =
       map (\(SMap _ orig gen) -> Mapping {
           mapOriginal = Just $ convertPos $ add 0 (-1) orig
         , mapSourceFile = sourceFile
-        , mapGenerated = convertPos $ add (extraLines+1) 0 gen
+        , mapGenerated = convertPos $ add (extraLines + 1) 0 gen
         , mapName = Nothing
         }) mappings
     }
@@ -319,11 +301,14 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     writeJSONFile mapFile mapping
     where
     add :: Int -> Int -> SourcePos -> SourcePos
-    add n m (SourcePos n' m') = SourcePos (n+n') (m+m')
+    add n m (SourcePos n' m') = SourcePos (n + n') (m + m')
 
     convertPos :: SourcePos -> Pos
     convertPos SourcePos { sourcePosLine = l, sourcePosColumn = c } =
       Pos { posLine = fromIntegral l, posColumn = fromIntegral c }
+
+    normalizeSMPath :: FilePath -> FilePath
+    normalizeSMPath = Posix.joinPath . splitDirectories
 
   requiresForeign :: CF.Module a -> Bool
   requiresForeign = not . null . CF.moduleForeign
@@ -349,12 +334,10 @@ checkForeignDecls :: CF.Module ann -> FilePath -> Make (Either MultipleErrors (F
 checkForeignDecls m path = do
   jsStr <- T.unpack <$> readTextFile path
 
-
   let
     parseResult :: Either MultipleErrors JS.JSAST
     parseResult = first (errorParsingModule . Bundle.UnableToParseModule) $ JS.parseModule jsStr path
   traverse checkFFI parseResult
-
 
   where
   mname = CF.moduleName m
@@ -384,9 +367,9 @@ checkForeignDecls m path = do
                 pure (ESModule, esExports)
 
     foreignIdents <- either
-                     errorInvalidForeignIdentifiers
-                     (pure . S.fromList)
-                     (parseIdents foreignIdentsStrs)
+                      errorInvalidForeignIdentifiers
+                      (pure . S.fromList)
+                      (parseIdents foreignIdentsStrs)
     let importedIdents = S.fromList (CF.moduleForeign m)
 
     let unusedFFI = foreignIdents S.\\ importedIdents
@@ -398,7 +381,6 @@ checkForeignDecls m path = do
     unless (null missingFFI) $
       throwError . errorMessage' modSS . MissingFFIImplementations mname $
         S.toList missingFFI
-
     pure (foreignModuleType, foreignIdents)
 
   errorParsingModule :: Bundle.ErrorMessage -> MultipleErrors
@@ -442,3 +424,33 @@ checkForeignDecls m path = do
       . CST.runTokenParser CST.parseIdent
       . CST.lex
       $ T.pack str
+
+-- | FFI check and codegen action.
+-- If path maker is supplied copies foreign module to the output.
+ffiCodegen'
+  :: M.Map ModuleName FilePath
+  -> S.Set CodegenTarget
+  -> Maybe (ModuleName -> String -> FilePath)
+  -> CF.Module CF.Ann
+  -> Make ()
+ffiCodegen' foreigns codegenTargets makeOutputPath m = do
+  when (S.member JS codegenTargets) $ do
+    let mn = CF.moduleName m
+    case mn `M.lookup` foreigns of
+      Just path
+        | not $ requiresForeign m ->
+            tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
+        | otherwise -> do
+            checkResult <- checkForeignDecls m path
+            case checkResult of
+              Left _ -> copyForeign path mn
+              Right (ESModule, _) -> copyForeign path mn
+              Right (CJSModule, _) -> do
+                throwError $ errorMessage' (CF.moduleSourceSpan m) $ DeprecatedFFICommonJSModule mn path
+      Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
+              | otherwise -> return ()
+  where
+  requiresForeign = not . null . CF.moduleForeign
+
+  copyForeign path mn =
+    for_ makeOutputPath (\outputFilename -> copyFile path (outputFilename mn "foreign.js"))

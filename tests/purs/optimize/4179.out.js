@@ -52,8 +52,8 @@ var alpha = function (v) {
     };
     if (v === 2) {
         return function (y) {
-            var $7 = y > 0;
-            if ($7) {
+            var $13 = y > 0;
+            if ($13) {
                 return bravo(y);
             };
             return charlie(y);
@@ -81,8 +81,8 @@ var $lazy_delta = /* #__PURE__ */ $runtime_lazy("delta", "Main", function () {
     })({});
     return function (x) {
         return function (y) {
-            var $8 = x === y;
-            if ($8) {
+            var $14 = x === y;
+            if ($14) {
                 return b(0);
             };
             return 1.0;

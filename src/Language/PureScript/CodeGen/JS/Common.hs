@@ -1,14 +1,14 @@
 -- | Common code generation utility functions
 module Language.PureScript.CodeGen.JS.Common where
 
-import Prelude.Compat
+import Prelude
 
-import Data.Char
+import Data.Char (isAlpha, isAlphaNum, isDigit, ord)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
-import Language.PureScript.Crash
-import Language.PureScript.Names
+import Language.PureScript.Crash (internalError)
+import Language.PureScript.Names (Ident(..), InternalIdentData(..), ModuleName(..), ProperName(..), unusedIdent)
 
 moduleNameToJs :: ModuleName -> Text
 moduleNameToJs (ModuleName mn) =
@@ -19,9 +19,12 @@ moduleNameToJs (ModuleName mn) =
 --
 --  * Alphanumeric characters are kept unmodified.
 --
---  * Reserved javascript identifiers are prefixed with '$$'.
+--  * Reserved javascript identifiers and identifiers starting with digits are
+--    prefixed with '$$'.
 identToJs :: Ident -> Text
-identToJs (Ident name) = anyNameToJs name
+identToJs (Ident name)
+  | not (T.null name) && isDigit (T.head name) = "$$" <> T.concatMap identCharToText name
+  | otherwise = anyNameToJs name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
 identToJs UnusedIdent = unusedIdent
 identToJs (InternalIdent RuntimeLazyFactory) = "$runtime_lazy"

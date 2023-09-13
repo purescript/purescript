@@ -3,13 +3,13 @@
 --
 module Language.PureScript.CoreFn.Expr where
 
-import Prelude.Compat
+import Prelude
 
 import Control.Arrow ((***))
 
-import Language.PureScript.AST.Literals
-import Language.PureScript.CoreFn.Binders
-import Language.PureScript.Names
+import Language.PureScript.AST.Literals (Literal)
+import Language.PureScript.CoreFn.Binders (Binder)
+import Language.PureScript.Names (Ident, ProperName, ProperNameType(..), Qualified)
 import Language.PureScript.PSString (PSString)
 
 -- |
@@ -29,9 +29,9 @@ data Expr a
   --
   | Accessor a PSString (Expr a)
   -- |
-  -- Partial record update
+  -- Partial record update (original value, fields to copy (if known), fields to update)
   --
-  | ObjectUpdate a (Expr a) [(PSString, Expr a)]
+  | ObjectUpdate a (Expr a) (Maybe [PSString]) [(PSString, Expr a)]
   -- |
   -- Function introduction
   --
@@ -52,7 +52,7 @@ data Expr a
   -- A let binding
   --
   | Let a [Bind a] (Expr a)
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Ord, Show, Functor)
 
 -- |
 -- A let or module binding.
@@ -65,7 +65,7 @@ data Bind a
   -- |
   -- Mutually recursive binding group for several values
   --
-  | Rec [((a, Ident), Expr a)] deriving (Eq, Show, Functor)
+  | Rec [((a, Ident), Expr a)] deriving (Eq, Ord, Show, Functor)
 
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
@@ -84,7 +84,7 @@ data CaseAlternative a = CaseAlternative
     -- The result expression or a collect of guarded expressions
     --
   , caseAlternativeResult :: Either [(Guard a, Expr a)] (Expr a)
-  } deriving (Eq, Show)
+  } deriving (Eq, Ord, Show)
 
 instance Functor CaseAlternative where
 
@@ -99,7 +99,7 @@ extractAnn :: Expr a -> a
 extractAnn (Literal a _) = a
 extractAnn (Constructor a _ _ _) = a
 extractAnn (Accessor a _ _) = a
-extractAnn (ObjectUpdate a _ _) = a
+extractAnn (ObjectUpdate a _ _ _) = a
 extractAnn (Abs a _ _) = a
 extractAnn (App a _ _) = a
 extractAnn (Var a _) = a
@@ -111,12 +111,12 @@ extractAnn (Let a _ _) = a
 -- Modify the annotation on a term
 --
 modifyAnn :: (a -> a) -> Expr a -> Expr a
-modifyAnn f (Literal a b)         = Literal (f a) b
-modifyAnn f (Constructor a b c d) = Constructor (f a) b c d
-modifyAnn f (Accessor a b c)      = Accessor (f a) b c
-modifyAnn f (ObjectUpdate a b c)  = ObjectUpdate (f a) b c
-modifyAnn f (Abs a b c)           = Abs (f a) b c
-modifyAnn f (App a b c)           = App (f a) b c
-modifyAnn f (Var a b)             = Var (f a) b
-modifyAnn f (Case a b c)          = Case (f a) b c
-modifyAnn f (Let a b c)           = Let (f a) b c
+modifyAnn f (Literal a b)          = Literal (f a) b
+modifyAnn f (Constructor a b c d)  = Constructor (f a) b c d
+modifyAnn f (Accessor a b c)       = Accessor (f a) b c
+modifyAnn f (ObjectUpdate a b c d) = ObjectUpdate (f a) b c d
+modifyAnn f (Abs a b c)            = Abs (f a) b c
+modifyAnn f (App a b c)            = App (f a) b c
+modifyAnn f (Var a b)              = Var (f a) b
+modifyAnn f (Case a b c)           = Case (f a) b c
+modifyAnn f (Let a b c)            = Let (f a) b c

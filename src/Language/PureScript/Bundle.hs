@@ -16,22 +16,20 @@ module Language.PureScript.Bundle
   , Module
   ) where
 
-import           Prelude.Compat
+import Prelude
 
-import           Control.Monad.Error.Class
+import Control.Monad.Error.Class (MonadError(..))
 
-import           Data.Aeson                         ((.=))
-import qualified Data.Aeson                         as A
-import           Data.Char                          (chr, digitToInt)
-import           Data.Foldable                      (fold)
+import Data.Aeson ((.=))
+import Data.Char (chr, digitToInt)
+import Data.Foldable (fold)
+import Data.Maybe (mapMaybe, maybeToList)
+import Data.Aeson qualified as A
+import Data.Text.Lazy qualified as LT
 
-import           Data.Maybe                         (mapMaybe, maybeToList)
-import qualified Data.Text.Lazy                     as LT
-
-import           Language.JavaScript.Parser
-import           Language.JavaScript.Parser.AST
-import           Language.JavaScript.Process.Minify
-
+import Language.JavaScript.Parser (JSAST(..), JSAnnot(..), JSAssignOp(..), JSExpression(..), JSStatement(..), renderToText)
+import Language.JavaScript.Parser.AST (JSCommaList(..), JSCommaTrailingList(..), JSExportClause(..), JSExportDeclaration(..), JSExportSpecifier(..), JSFromClause(..), JSIdent(..), JSImportDeclaration(..), JSModuleItem(..), JSObjectProperty(..), JSObjectPropertyList, JSPropertyName(..), JSVarInitializer(..))
+import Language.JavaScript.Process.Minify (minifyJS)
 
 -- | The type of error messages. We separate generation and rendering of errors using a data
 -- type, in case we need to match on error types later.
@@ -218,7 +216,7 @@ printErrorMessage (MissingMainModule mName) =
 -- String literals include the quote chars
 fromStringLiteral :: JSExpression -> Maybe String
 fromStringLiteral (JSStringLiteral _ str) = Just $ strValue str
-fromStringLiteral _                       = Nothing
+fromStringLiteral _ = Nothing
 
 strValue :: String -> String
 strValue str = go $ drop 1 str
@@ -247,17 +245,17 @@ strValue str = go $ drop 1 str
   go "" = ""
 
 commaList :: JSCommaList a -> [a]
-commaList JSLNil          = []
-commaList (JSLOne x)      = [x]
+commaList JSLNil = []
+commaList (JSLOne x) = [x]
 commaList (JSLCons l _ x) = commaList l ++ [x]
 
 trailingCommaList :: JSCommaTrailingList a -> [a]
 trailingCommaList (JSCTLComma l _) = commaList l
-trailingCommaList (JSCTLNone l)    = commaList l
+trailingCommaList (JSCTLNone l) = commaList l
 
 identName :: JSIdent -> Maybe String
 identName (JSIdentName _ ident) = Just ident
-identName _                     = Nothing
+identName _ = Nothing
 
 exportStatementIdentifiers :: JSStatement -> [String]
 exportStatementIdentifiers (JSVariable _ jsExpressions _) =
@@ -278,12 +276,12 @@ varNames :: JSCommaList JSExpression -> [String]
 varNames = mapMaybe varName . commaList
   where
   varName (JSVarInitExpression (JSIdentifier _ ident) _) = Just ident
-  varName _                                              = Nothing
+  varName _ = Nothing
 
 data ForeignModuleExports =
   ForeignModuleExports
     { cjsExports :: [String]
-    , esExports  :: [String]
+    , esExports :: [String]
     } deriving (Show)
 
 instance Semigroup ForeignModuleExports where
@@ -336,13 +334,13 @@ getExportedIdentifiers mname top
   exportClauseIdentifiers (JSExportClause _ jsExportsSpecifiers _) =
     mapMaybe exportSpecifierName $ commaList jsExportsSpecifiers
 
-  exportSpecifierName (JSExportSpecifier jsIdent)         = identName jsIdent
+  exportSpecifierName (JSExportSpecifier jsIdent) = identName jsIdent
   exportSpecifierName (JSExportSpecifierAs _ _ jsIdentAs) = identName jsIdentAs
 
 data ForeignModuleImports =
   ForeignModuleImports
     { cjsImports :: [String]
-    , esImports  :: [String]
+    , esImports :: [String]
     } deriving (Show)
 
 instance Semigroup ForeignModuleImports where
@@ -442,5 +440,5 @@ matchExportsAssignment stmt
 
 extractLabel :: JSPropertyName -> Maybe String
 extractLabel (JSPropertyString _ nm) = Just $ strValue nm
-extractLabel (JSPropertyIdent _ nm)  = Just nm
-extractLabel _                       = Nothing
+extractLabel (JSPropertyIdent _ nm) = Just nm
+extractLabel _ = Nothing

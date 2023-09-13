@@ -4,11 +4,12 @@
 
 module Control.Monad.Supply.Class where
 
-import Prelude.Compat
+import Prelude
 
-import Control.Monad.Supply
-import Control.Monad.State
-import Control.Monad.Writer
+import Control.Monad.RWS (MonadState(..), MonadTrans(..), RWST)
+import Control.Monad.State (StateT)
+import Control.Monad.Supply (SupplyT(..))
+import Control.Monad.Writer (WriterT)
 import Data.Text (Text, pack)
 
 class Monad m => MonadSupply m where
@@ -28,6 +29,7 @@ instance Monad m => MonadSupply (SupplyT m) where
 
 instance MonadSupply m => MonadSupply (StateT s m)
 instance (Monoid w, MonadSupply m) => MonadSupply (WriterT w m)
+instance (Monoid w, MonadSupply m) => MonadSupply (RWST r w s m)
 
 freshName :: MonadSupply m => m Text
 freshName = fmap (("$" <> ) . pack . show) fresh
