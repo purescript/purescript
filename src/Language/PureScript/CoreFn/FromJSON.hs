@@ -12,7 +12,7 @@ import Prelude
 import Control.Applicative ((<|>))
 
 import Data.Aeson (FromJSON(..), Object, Value(..), withObject, withText, (.:))
-import Data.Aeson.Types (Parser, listParser)
+import Data.Aeson.Types (Parser, listParser, parseFail)
 import Data.Map.Strict qualified as M
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -27,6 +27,7 @@ import Language.PureScript.Names (Ident(..), ModuleName(..), ProperName(..), Qua
 import Language.PureScript.PSString (PSString)
 
 import Text.ParserCombinators.ReadP (readP_to_S)
+import Numeric (readDec)
 
 parseVersion' :: String -> Maybe Version
 parseVersion' str =
@@ -84,7 +85,7 @@ literalFromJSON t = withObject "Literal" literalFromObj
   literalFromObj o = do
     type_ <- o .: "literalType" :: Parser Text
     case type_ of
-      "IntLiteral"      -> NumericLiteral . Left <$> o .: "value"
+      "IntLiteral"      -> NumericLiteral . Left <$> (o .: "valueAsString" >>= parseTextToInt)
       "NumberLiteral"   -> NumericLiteral . Right <$> o .: "value"
       "StringLiteral"   -> StringLiteral <$> o .: "value"
       "CharLiteral"     -> CharLiteral <$> o .: "value"
@@ -92,6 +93,16 @@ literalFromJSON t = withObject "Literal" literalFromObj
       "ArrayLiteral"    -> parseArrayLiteral o
       "ObjectLiteral"   -> parseObjectLiteral o
       _                 -> fail ("error parsing Literal: " ++ show o)
+
+  parseTextToInt :: Text -> Parser Integer
+  parseTextToInt txt
+    | ("-", rest) <- T.splitAt 1 txt = negate <$> decodeUnsignedInt rest
+    | otherwise = decodeUnsignedInt txt
+
+  decodeUnsignedInt :: Text -> Parser Integer
+  decodeUnsignedInt txt = case readDec $ T.unpack txt of
+    [ (int :: Integer, "") ] -> pure int
+    _ -> parseFail $ "Could not decode integer: '" <> T.unpack txt <> "'"
 
   parseArrayLiteral o = do
     val <- o .: "value"

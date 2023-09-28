@@ -103,10 +103,11 @@ spec = context "CoreFnFromJson" $ do
     specify "should parse literals" $ do
       let m = Module ss [] mn mp [] [] M.empty []
                 [ NonRec ann (Ident "x1") $ Literal ann (NumericLiteral (Left 1))
-                , NonRec ann (Ident "x2") $ Literal ann (NumericLiteral (Right 1.0))
-                , NonRec ann (Ident "x3") $ Literal ann (StringLiteral (mkString "abc"))
-                , NonRec ann (Ident "x4") $ Literal ann (CharLiteral 'c')
-                , NonRec ann (Ident "x5") $ Literal ann (BooleanLiteral True)
+                , NonRec ann (Ident "x2") $ Literal ann (NumericLiteral (Left (-1)))
+                , NonRec ann (Ident "x3") $ Literal ann (NumericLiteral (Right 1.0))
+                , NonRec ann (Ident "x4") $ Literal ann (StringLiteral (mkString "abc"))
+                , NonRec ann (Ident "x5") $ Literal ann (CharLiteral 'c')
+                , NonRec ann (Ident "x6") $ Literal ann (BooleanLiteral True)
                 , NonRec ann (Ident "x6") $ Literal ann (ArrayLiteral [Literal ann (CharLiteral 'a')])
                 , NonRec ann (Ident "x7") $ Literal ann (ObjectLiteral [(mkString "a", Literal ann (CharLiteral 'a'))])
                 ]

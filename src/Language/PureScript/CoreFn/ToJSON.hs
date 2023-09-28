@@ -25,6 +25,7 @@ import Language.PureScript.AST.SourcePos (SourceSpan(..))
 import Language.PureScript.CoreFn (Ann, Bind(..), Binder(..), CaseAlternative(..), ConstructorType(..), Expr(..), Meta(..), Module(..))
 import Language.PureScript.Names (Ident, ModuleName(..), ProperName(..), Qualified(..), QualifiedBy(..), runIdent)
 import Language.PureScript.PSString (PSString)
+import Numeric (showInt)
 
 constructorTypeToJSON :: ConstructorType -> Value
 constructorTypeToJSON ProductType = toJSON "ProductType"
@@ -61,8 +62,9 @@ annToJSON (ss, _, m) = object [ "sourceSpan"  .= sourceSpanToJSON ss
 literalToJSON :: (a -> Value) -> Literal a -> Value
 literalToJSON _ (NumericLiteral (Left n))
   = object
-    [ "literalType" .= "IntLiteral"
-    , "value"       .= n
+    [ "literalType"   .= "IntLiteral"
+    , "value"         .= n
+    , "valueAsString" .= T.pack ((if n < 0 then "-" else "") <> showInt (abs n) "")
     ]
 literalToJSON _ (NumericLiteral (Right n))
   = object
