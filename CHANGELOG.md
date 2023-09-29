@@ -2,6 +2,62 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.11
+
+New features:
+
+* Move the closed record update optimization (#4489 by @rhendric)
+
+  For consumers of CoreFn like alternate backends, the optimization of
+  replacing a closed record update with an object literal has now been moved to
+  the point of desugaring CoreFn into JS. The `ObjectUpdate` expression
+  constructor now contains a `Maybe` field holding a list of record labels to
+  be copied as-is, for backends that want to perform this optimization also.
+
+* Allow instances that require `Fail` to be empty (#4490 by @rhendric)
+
+  A class instance declaration that has `Prim.TypeError.Fail` as a constraint
+  will never be used. In light of this, such instances are now allowed to have
+  empty bodies even if the class has members.
+
+  (Such instances are still allowed to declare all of their members, and it is
+  still an error to specify some but not all members.)
+
+Bugfixes:
+
+* Stop emitting warnings for wildcards in Visible Type Applications (#4492 by @JordanMartinez)
+
+  Previously, the below usage of a wildcard (i.e. `_`) would
+  incorrectly cause the compiler to emit a warning.
+  
+  ```purs
+  f :: forall @a. a -> a
+  f = identity
+
+  x :: { x :: Int }
+  x = f @{ x :: _ } { x: 42 }
+  ```
+
+* Infer types using VTA inside a record (#4501 by @JordanMartinez)
+
+  Previously, `use` would fail to compile
+  because the `v` type variable would not be inferred
+  to `String`. Now the below code compiles:
+
+  ```purs
+  reflect :: forall @t v . Reflectable t v => v
+  reflect = reflectType (Proxy @t)
+
+  use :: String
+  use = show { asdf: reflect @"asdf" }
+  ```
+
+Internal:
+
+* Use `gh` for release artifacts (#4493 by @rhendric)
+
+* Stop triggering CI on non-code-related changes (e.g. Readme) (#4502 by @JordanMartinez)
+
 ## 0.15.10
 
 New features:
