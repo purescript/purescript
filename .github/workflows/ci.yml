@@ -77,6 +77,14 @@ jobs:
           . /etc/os-release
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
+
+      - # We need `gh` installed on the Linux version. Otherwise, release artifacts won't be uploaded.
+        name: "(Linux only) Install gh"
+        if: "contains(matrix.os, 'ubuntu-latest')"
+        run: |
+          sudo apt update
+          sudo apt install gh
+
       - uses: "actions/checkout@v2"
       - uses: "actions/setup-node@v2"
         with:
