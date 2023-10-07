@@ -77,6 +77,17 @@ jobs:
           . /etc/os-release
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
+
+      - # We need `gh` installed on the Linux version. Otherwise, release artifacts won't be uploaded.
+        name: "(Linux only) Install gh"
+        if: "contains(matrix.os, 'ubuntu-latest')"
+        run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          apt-get update
+          apt-get install gh
+
       - uses: "actions/checkout@v2"
       - uses: "actions/setup-node@v2"
         with:
