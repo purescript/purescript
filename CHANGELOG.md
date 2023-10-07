@@ -2,7 +2,7 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.15.11
+## 0.15.12
 
 New features:
 
@@ -54,9 +54,14 @@ Bugfixes:
 
 Internal:
 
-* Use `gh` for release artifacts (#4493 by @rhendric)
+* Use `gh` for release artifacts (#4493 by @rhendric, #4509 by @JordanMartinez)
 
 * Stop triggering CI on non-code-related changes (e.g. Readme) (#4502 by @JordanMartinez)
+
+
+## 0.15.11
+
+Please use `0.15.12` instead of this release. There was an issue with the Linux build. This release notes were moved into `0.15.12`'s release notes.
 
 ## 0.15.10
 
