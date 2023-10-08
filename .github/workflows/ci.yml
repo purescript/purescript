@@ -108,8 +108,14 @@ jobs:
       - name: "(Linux only) Check Stack version and fix working directory ownership"
         if: "contains(matrix.os, 'ubuntu-latest')"
         run: |
-          [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
-          chown root:root .
+          actual_stack_version=$(stack --numeric-version)
+          if [[ "$actual_stack_version" = "$STACK_VERSION" ]]
+          then
+            chown root:root .
+          else
+            echo "Actual stack version ${actual_stack_version} does not match specified stack version ${STACK_VERSION}"
+            exit 1
+          fi
 
       - uses: "actions/cache@v2"
         with:
