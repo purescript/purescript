@@ -111,7 +111,7 @@ data SimpleErrorMessage
   | NoInstanceFound
       SourceConstraint -- ^ constraint that could not be solved
       [Qualified (Either SourceType Ident)] -- ^ a list of instances that stopped further progress in instance chains due to ambiguity
-      Bool -- ^ whether eliminating unknowns with annotations might help
+      UnknownsHint -- ^ whether eliminating unknowns with annotations might help or with visible type applications are required
   | AmbiguousTypeVariables SourceType [(Text, Int)]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
@@ -914,7 +914,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _) ambiguous unks) =
-      paras [ line "No type class instance was found for"
+      paras $
+            [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map prettyTypeAtom ts)
@@ -927,10 +928,32 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                         [] -> []
                         [_] -> useMessage "The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:"
                         _ -> useMessage "The following instances partially overlap the above constraint, which means the rest of their instance chains will not be considered:"
-            , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
-                    | unks
-                    ]
-            ]
+            ] <> case unks of
+                  NoUnknowns ->
+                    []
+                  Unknowns ->
+                    [ line "The instance head contains unknown type variables. Consider adding a type annotation." ]
+                  UnknownsFromVTAs tyClassMembersRequiringVtas ->
+                    let
+                      renderSingleTyClassMember (tyClassMember, argsRequiringVtas) =
+                        Box.moveRight 2 $ paras $
+                          [ line $ markCode (showQualified showIdent tyClassMember) ]
+                          <> case argsRequiringVtas of
+                              [required] ->
+                                [ Box.moveRight 2 $ line $ T.intercalate ", " required ]
+                              options -> 
+                                [ Box.moveRight 2 $ line "One of the following sets of type variables:"
+                                , Box.moveRight 2 $ paras $
+                                    map (\set -> Box.moveRight 2 $ line $ T.intercalate ", " set) options
+                                ]
+                    in
+                      [ paras
+                        [ line "The instance head contains unknown type variables."
+                        , Box.moveDown 1 $ paras $
+                            [ line $ "Note: The following type class members found in the expression require specifying their corresponding type variables by using Visible Type Applications (e.g. " <> markCode "tyClassMember @Int" <> ")."]
+                            <> map renderSingleTyClassMember (NEL.toList tyClassMembersRequiringVtas)
+                        ]
+                      ]
     renderSimpleErrorMessage (AmbiguousTypeVariables t uis) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ prettyType t

@@ -33,7 +33,8 @@ import Data.Text qualified as T
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List.NonEmpty qualified as NEL
 
-import Language.PureScript.AST (Binder(..), ErrorMessageHint(..), Expr(..), Literal(..), pattern NullSourceSpan, everywhereOnValuesTopDownM, nullSourceSpan)
+import Language.PureScript.AST (Binder(..), ErrorMessageHint(..), Expr(..), Literal(..), pattern NullSourceSpan, everywhereOnValuesTopDownM, nullSourceSpan, everythingOnValues)
+import Language.PureScript.AST.Declarations (UnknownsHint(..))
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (Environment(..), FunctionalDependency(..), TypeClassData(..), dictTypeName, kindRow, tyBoolean, tyInt, tyString)
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, addHints, errorMessage, rethrow)
@@ -253,6 +254,7 @@ entails SolverOptions{..} constraint context hints =
               { typeClassDependencies
               , typeClassIsEmpty
               , typeClassCoveringSets
+              , typeClassMembers 
               } <- case M.lookup className' classesInScope of
                 Nothing -> throwError . errorMessage $ UnknownClass className'
                 Just tcd -> pure tcd
@@ -276,7 +278,9 @@ entails SolverOptions{..} constraint context hints =
                                     else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
 
                   lefts [found]
-            solution <- lift . lift $ unique kinds'' tys'' ambiguous instances (unknownsInAllCoveringSets tys'' typeClassCoveringSets)
+            solution <- lift . lift 
+              $ unique kinds'' tys'' ambiguous instances 
+              $ unknownsInAllCoveringSets typeClassMembers tys'' typeClassCoveringSets
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
@@ -354,7 +358,7 @@ entails SolverOptions{..} constraint context hints =
                       (substituteType currentSubst . replaceAllTypeVars (M.toList subst) $ instKind)
                       (substituteType currentSubst tyKind)
 
-            unique :: [SourceType] -> [SourceType] -> [Qualified (Either SourceType Ident)] -> [(a, TypeClassDict)] -> Bool -> m (EntailsResult a)
+            unique :: [SourceType] -> [SourceType] -> [Qualified (Either SourceType Ident)] -> [(a, TypeClassDict)] -> UnknownsHint -> m (EntailsResult a)
             unique kindArgs tyArgs ambiguous [] unks
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
@@ -421,9 +425,41 @@ entails SolverOptions{..} constraint context hints =
               let fields = [ ("reflectType", Abs (VarBinder nullSourceSpan UnusedIdent) (asExpression ref)) ] in
               pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
-            unknownsInAllCoveringSets :: [SourceType] -> S.Set (S.Set Int) -> Bool
-            unknownsInAllCoveringSets tyArgs = all (\s -> any (`S.member` s) unkIndices)
-              where unkIndices = findIndices containsUnknowns tyArgs
+            unknownsInAllCoveringSets :: [(Ident, SourceType, Maybe [[Text]])] -> [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
+            unknownsInAllCoveringSets tyClassMembers tyArgs converingSets = do
+              let unkIndices = findIndices containsUnknowns tyArgs
+              if all (\s -> any (`S.member` s) unkIndices) converingSets then do
+                case getQual className' of
+                  Nothing -> 
+                    Unknowns
+                  Just tyClassModName -> do
+                    let 
+                      exprFromHint = fromMaybe (internalError "expected an ErrorCheckingType to be within hint context") 
+                        $ foldr goError Nothing hints
+                        where
+                        goError next acc = case (acc, next) of
+                          (Nothing, ErrorCheckingType expr _) -> Just expr
+                          (_, _) -> acc
+                      
+                      varsInExpr :: [Qualified Ident]
+                      varsInExpr = getVars exprFromHint
+                        where
+                          (_, getVars, _, _, _) = everythingOnValues (++) ignore getVarIdents ignore ignore ignore
+                          ignore = const []
+                          getVarIdents = \case
+                            Var _ ident -> [ident]
+                            _ -> []
+
+                      tyClassMemberVta :: M.Map (Qualified Ident) [[Text]]
+                      tyClassMemberVta = M.fromList $ mapMaybe qualifyAndFilter tyClassMembers
+                        where
+                          -- Only keep type class members that need VTAs to resolve their type class instances
+                          qualifyAndFilter (ident, _, mbVtas) = (Qualified (ByModuleName tyClassModName) ident,) <$> mbVtas
+
+                    case NEL.nonEmpty $ mapMaybe (\i -> (i,) <$> M.lookup i tyClassMemberVta) varsInExpr of
+                      Just varsWithVtas -> UnknownsFromVTAs varsWithVtas
+                      _ -> Unknowns
+              else NoUnknowns
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr

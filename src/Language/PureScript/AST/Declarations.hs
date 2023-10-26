@@ -104,6 +104,15 @@ data HintCategory
   deriving (Show, Eq)
 
 -- |
+-- In constraint solving, indicates whether there were `TypeUnknown`s that prevented
+-- an instance from being found, and whether type annotations or VTAs might help. 
+data UnknownsHint
+  = NoUnknowns
+  | Unknowns
+  | UnknownsFromVTAs (NEL.NonEmpty (Qualified Ident, [[Text]]))
+  deriving (Show)
+
+-- |
 -- A module declaration, consisting of comments about the module, a module name,
 -- a list of declarations, and a list of the declarations that are
 -- explicitly exported. If the export list is Nothing, everything is exported.
