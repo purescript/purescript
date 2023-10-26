@@ -388,6 +388,5 @@ superClassDictionaryNames supers =
   | (index, Constraint _ pn _ _ _) <- zip [0..] supers
   ]
 
-
 tuple3To2 :: (a, b, c) -> (a, b)
 tuple3To2 (a, b, _) = (a, b)
