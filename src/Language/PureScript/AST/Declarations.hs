@@ -105,11 +105,13 @@ data HintCategory
 
 -- |
 -- In constraint solving, indicates whether there were `TypeUnknown`s that prevented
--- an instance from being found, and whether type annotations or VTAs might help. 
+-- an instance from being found, and whether type annotations might help or
+-- whether VTAs are required due to type class members not referencing all the type class
+-- head's type variables.
 data UnknownsHint
   = NoUnknowns
   | Unknowns
-  | UnknownsFromVTAs (NEL.NonEmpty (Qualified Ident, [[Text]]))
+  | UnknownsWithVtaRequiringArgs (NEL.NonEmpty (Qualified Ident, [[Text]]))
   deriving (Show)
 
 -- |

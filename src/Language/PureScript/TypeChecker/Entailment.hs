@@ -457,7 +457,7 @@ entails SolverOptions{..} constraint context hints =
                           qualifyAndFilter (ident, _, mbVtas) = (Qualified (ByModuleName tyClassModName) ident,) <$> mbVtas
 
                     case NEL.nonEmpty $ mapMaybe (\i -> (i,) <$> M.lookup i tyClassMemberVta) varsInExpr of
-                      Just varsWithVtas -> UnknownsFromVTAs varsWithVtas
+                      Just varsWithVtas -> UnknownsWithVtaRequiringArgs varsWithVtas
                       _ -> Unknowns
               else NoUnknowns
 

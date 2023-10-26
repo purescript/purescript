@@ -933,7 +933,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                     []
                   Unknowns ->
                     [ line "The instance head contains unknown type variables. Consider adding a type annotation." ]
-                  UnknownsFromVTAs tyClassMembersRequiringVtas ->
+                  UnknownsWithVtaRequiringArgs tyClassMembersRequiringVtas ->
                     let
                       renderSingleTyClassMember (tyClassMember, argsRequiringVtas) =
                         Box.moveRight 2 $ paras $
