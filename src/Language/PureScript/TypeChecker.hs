@@ -18,7 +18,7 @@ import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter, tell)
 
 import Data.Foldable (for_, traverse_, toList)
-import Data.List (nub, nubBy, (\\), sort, group)
+import Data.List (nubBy, (\\), sort, group)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Either (partitionEithers)
 import Data.Text (Text)
@@ -31,7 +31,7 @@ import Language.PureScript.AST
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Constants.Libs qualified as Libs
 import Language.PureScript.Crash (internalError)
-import Language.PureScript.Environment (DataDeclType(..), Environment(..), FunctionalDependency, NameKind(..), NameVisibility(..), TypeClassData(..), TypeKind(..), isDictTypeName, kindArity, makeTypeClassData, nominalRolesForKind, tyFunction)
+import Language.PureScript.Environment (DataDeclType(..), Environment(..), FunctionalDependency, NameKind(..), NameVisibility(..), TypeClassData(..), TypeKind(..), isDictTypeName, kindArity, nominalRolesForKind, tyFunction, computeCoveringSets)
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, errorMessage', positionedError, rethrow, warnAndRethrow)
 import Language.PureScript.Linter (checkExhaustiveExpr)
 import Language.PureScript.Linter.Wildcards (ignoreWildcardsUnderCompleteTypeSignatures)
@@ -161,7 +161,6 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
       hasSig = qualName `M.member` types env
   unless (hasSig || not (containsForAll kind)) $ do
     tell . errorMessage $ MissingKindDeclaration ClassSig (disqualify qualName) kind
-  traverse_ (checkMemberIsUsable newClass (typeSynonyms env) (types env)) classMembers
   putEnv $ env { types = M.insert qualName (kind, ExternData (nominalRolesForKind kind)) (types env)
                , typeClasses = M.insert qualifiedClassName newClass (typeClasses env) }
   where
@@ -173,35 +172,42 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
       env <- getEnv
       implies' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms implies
       let ctIsEmpty = null classMembers && all (typeClassIsEmpty . findSuperClass env) implies'
-      pure $ makeTypeClassData args classMembers implies' dependencies ctIsEmpty
+      let (determinedArgs, coveringSets) = computeCoveringSets (length args) dependencies
+      classMembers' <- traverse (computeVtasNeededForMember args (S.toList coveringSets) (typeSynonyms env) (types env)) classMembers
+      pure $ TypeClassData args classMembers' implies' dependencies determinedArgs coveringSets ctIsEmpty
       where
       findSuperClass env c = case M.lookup (constraintClass c) (typeClasses env) of
         Just tcd -> tcd
         Nothing -> internalError "Unknown super class in TypeClassDeclaration"
 
-    coveringSets :: TypeClassData -> [S.Set Int]
-    coveringSets = S.toList . typeClassCoveringSets
-
-    argToIndex :: Text -> Maybe Int
-    argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
-
     toPair (TypeDeclaration (TypeDeclarationData _ ident ty)) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
-    -- Currently we are only checking usability based on the type class currently
-    -- being defined.  If the mentioned arguments don't include a covering set,
-    -- then we won't be able to find a instance.
-    checkMemberIsUsable :: TypeClassData -> T.SynonymMap -> T.KindMap -> (Ident, SourceType) -> m ()
-    checkMemberIsUsable newClass syns kinds (ident, memberTy) = do
-      memberTy' <- T.replaceAllTypeSynonymsM syns kinds memberTy
-      let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
-      let leftovers = map (`S.difference` mentionedArgIndexes) (coveringSets newClass)
 
-      unless (any null leftovers) . throwError . errorMessage $
-        let
-          solutions = map (map (fst . (args !!)) . S.toList) leftovers
-        in
-          UnusableDeclaration ident (nub solutions)
+-- | 
+-- Before Visible Type Applications (VTAs) were introduced, if a type class member
+-- did not reference all of the type variables in the type class head,
+-- we would throw an UnusableDeclaration error. With the advent of VTAs,
+-- we can remove this error and instead inform the user that these type class members
+-- can only have their corresponding type class instance found if one uses VTAs
+-- for one of the given sets.
+computeVtasNeededForMember 
+  :: forall m
+   . (MonadState CheckState m, MonadError MultipleErrors m)
+  => [(Text, Maybe SourceType)] 
+  -> [S.Set Int]
+  -> SynonymMap 
+  -> KindMap 
+  -> (Ident, SourceType) 
+  -> m (Ident, SourceType, Maybe [[Text]])
+computeVtasNeededForMember args coveringSets syns kinds (ident, memberTy) = do
+  memberTy' <- replaceAllTypeSynonymsM syns kinds memberTy
+  let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
+  let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets
+  pure (ident, memberTy, if any null leftovers then Nothing else Just $ map (map (fst . (args !!)) . S.toList) leftovers)
+  where
+    argToIndex :: Text -> Maybe Int
+    argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)

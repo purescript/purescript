@@ -205,7 +205,8 @@ desugarDecl
 desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration sa name args implies deps members) = do
-    modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
+    let addNullVtaArgs (a, b) = (a, b, Nothing)
+    modify (M.insert (mn, name) (makeTypeClassData args (map (addNullVtaArgs . memberToNameAndType) members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration sa na chainId idx name deps className tys body) = do
     name' <- desugarInstName name
@@ -333,7 +334,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
       M.lookup (qualify mn className) m
 
   -- Replace the type arguments with the appropriate types in the member types
-  let memberTypes = map (second (replaceAllTypeVars (zip (map fst typeClassArguments) tys))) typeClassMembers
+  let memberTypes = map (second (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) . tuple3To2) typeClassMembers
 
   let declaredMembers = S.fromList $ mapMaybe declIdent decls
 
@@ -386,3 +387,7 @@ superClassDictionaryNames supers =
   [ superclassName pn index
   | (index, Constraint _ pn _ _ _) <- zip [0..] supers
   ]
+
+
+tuple3To2 :: (a, b, c) -> (a, b)
+tuple3To2 (a, b, _) = (a, b)

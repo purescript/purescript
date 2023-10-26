@@ -137,7 +137,7 @@ data ExternsDeclaration =
   | EDClass
       { edClassName               :: ProperName 'ClassName
       , edClassTypeArguments      :: [(Text, Maybe SourceType)]
-      , edClassMembers            :: [(Ident, SourceType)]
+      , edClassMembers            :: [(Ident, SourceType, Maybe [[Text]])]
       , edClassConstraints        :: [SourceConstraint]
       , edFunctionalDependencies  :: [FunctionalDependency]
       , edIsEmpty                 :: Bool

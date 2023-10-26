@@ -177,8 +177,6 @@ data SimpleErrorMessage
   | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
   -- | a user-defined warning raised by using the Warn type class
   | UserDefinedWarning SourceType
-  -- | a declaration couldn't be used because it contained free variables
-  | UnusableDeclaration Ident [[Text]]
   | CannotDefinePrimModules ModuleName
   | MixedAssociativityError (NEL.NonEmpty (Qualified (OpName 'AnyOpName), Associativity))
   | NonAssociativeError (NEL.NonEmpty (Qualified (OpName 'AnyOpName)))
@@ -352,7 +350,6 @@ errorCode em = case unwrapErrorMessage em of
   CannotUseBindWithDo{} -> "CannotUseBindWithDo"
   ClassInstanceArityMismatch{} -> "ClassInstanceArityMismatch"
   UserDefinedWarning{} -> "UserDefinedWarning"
-  UnusableDeclaration{} -> "UnusableDeclaration"
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
   MixedAssociativityError{} -> "MixedAssociativityError"
   NonAssociativeError{} -> "NonAssociativeError"
@@ -1275,22 +1272,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       let msg = fromMaybe (prettyType msgTy) (toTypelevelString msgTy) in
       paras [ line "A custom warning occurred while solving type class constraints:"
             , indent msg
-            ]
-
-    renderSimpleErrorMessage (UnusableDeclaration ident unexplained) =
-      paras $
-        [ line $ "The declaration " <> markCode (showIdent ident) <> " contains arguments that couldn't be determined."
-        ] <>
-
-        case unexplained of
-          [required] ->
-            [ line $ "These arguments are: { " <> T.intercalate ", " required <> " }"
-            ]
-
-          options  ->
-            [ line "To fix this, one of the following sets of variables must be determined:"
-            , Box.moveRight 2 . Box.vsep 0 Box.top $
-                map (\set -> line $ "{ " <> T.intercalate ", " set <> " }") options
             ]
 
     renderSimpleErrorMessage (CannotDefinePrimModules mn) =

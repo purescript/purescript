@@ -54,9 +54,10 @@ data TypeClassData = TypeClassData
   { typeClassArguments :: [(Text, Maybe SourceType)]
   -- ^ A list of type argument names, and their kinds, where kind annotations
   -- were provided.
-  , typeClassMembers :: [(Ident, SourceType)]
-  -- ^ A list of type class members and their types. Type arguments listed above
-  -- are considered bound in these types.
+  , typeClassMembers :: [(Ident, SourceType, Maybe [[Text]])]
+  -- ^ A list of type class members and their types and whether or not
+  -- they have type variables that must be defined using Visible Type Applications.
+  -- Type arguments listed above are considered bound in these types.
   , typeClassSuperclasses :: [SourceConstraint]
   -- ^ A list of superclasses of this type class. Type arguments listed above
   -- are considered bound in the types appearing in these constraints.
@@ -124,7 +125,7 @@ initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPr
 -- in its SCC, and everything determining X is either before it in an SCC path, or in the same SCC.
 makeTypeClassData
   :: [(Text, Maybe SourceType)]
-  -> [(Ident, SourceType)]
+  -> [(Ident, SourceType, Maybe [[Text]])]
   -> [SourceConstraint]
   -> [FunctionalDependency]
   -> Bool
