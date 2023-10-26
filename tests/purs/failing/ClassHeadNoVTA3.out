@@ -9,7 +9,7 @@ at tests/purs/failing/ClassHeadNoVTA3.purs:8:16 - 8:36 (line 8, column 16 - line
   [33m                       [0m
   The instance head contains unknown type variables.
 
-  Note: The following type class members found in the expression require specifying their corresponding type variables by using Visible Type Applications (e.g. [33mtyClassMember @Int[0m).
+  Note: The following type class members found in the expression require specifying their corresponding type class' type variables by using Visible Type Applications (e.g. [33mtyClassMember @Int[0m).
     [33mMain.useMultiMissing[0m
       tyNotAppearInBody, norThisOne
 
