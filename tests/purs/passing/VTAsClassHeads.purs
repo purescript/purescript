@@ -35,6 +35,9 @@ class ConflictingIdent a where
 instance ConflictingIdent String where
   conflictingIdent _ = 1
 
+instance ConflictingIdent Int where
+  conflictingIdent _ = 2
+
 conflictingIdentWorks :: Effect (Maybe String)
 conflictingIdentWorks = do
   pure if (1 == conflictingIdent @String 4) then Nothing else Just "ConflictingIdent failed"
@@ -50,6 +53,9 @@ class ConflictingIdentSynonym a where
 
 instance ConflictingIdentSynonym String where
   conflictingIdentSynonym _ = 1
+
+instance ConflictingIdentSynonym Int where
+  conflictingIdentSynonym _ = 2
 
 conflictingIdentSynonymWorks :: Effect (Maybe String)
 conflictingIdentSynonymWorks = do
@@ -125,6 +131,16 @@ instance Superclass A2 where
 
 instance MainClass A2 where
   mainClassInt = 0
+
+data B2 = B2
+
+derive instance Eq B2
+
+instance Superclass B2 where
+  superClassValue = B2
+
+instance MainClass B2 where
+  mainClassInt = 3
 
 mainClassWorks :: Effect (Maybe String)
 mainClassWorks = do
