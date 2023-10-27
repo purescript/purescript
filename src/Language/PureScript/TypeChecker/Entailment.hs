@@ -11,7 +11,7 @@ module Language.PureScript.TypeChecker.Entailment
   ) where
 
 import Prelude
-import Protolude (ordNub)
+import Protolude (ordNub, headMay)
 
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
@@ -442,7 +442,7 @@ entails SolverOptions{..} constraint context hints =
                         -- Only keep type class members that need VTAs to resolve their type class instances
                         qualifyAndFilter (ident, _, vtaRequiredArgs) 
                           | vtaRequiredArgs == [[]] = Nothing
-                          | otherwise = Just $ (Qualified (ByModuleName tyClassModuleName) ident, vtaRequiredArgs)
+                          | otherwise = Just (Qualified (ByModuleName tyClassModuleName) ident, vtaRequiredArgs)
 
                     tyClassMembersInExpr :: Expr -> [(Qualified Ident, [[Text]])]
                     tyClassMembersInExpr = getVars
