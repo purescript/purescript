@@ -428,39 +428,42 @@ entails SolverOptions{..} constraint context hints =
             unknownsInAllCoveringSets :: [(Ident, SourceType, Maybe [[Text]])] -> [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
             unknownsInAllCoveringSets tyClassMembers tyArgs converingSets = do
               let unkIndices = findIndices containsUnknowns tyArgs
-              if all (\s -> any (`S.member` s) unkIndices) converingSets then do
-                case getQual className' of
-                  Nothing -> 
-                    Unknowns
-                  Just tyClassModName -> do
-                    let
-                      tyClassMemberVta :: M.Map (Qualified Ident) [[Text]]
-                      tyClassMemberVta = M.fromList $ mapMaybe qualifyAndFilter tyClassMembers
-                        where
-                          -- Only keep type class members that need VTAs to resolve their type class instances
-                          qualifyAndFilter (ident, _, mbVtas) = (Qualified (ByModuleName tyClassModName) ident,) <$> mbVtas
+              if all (\s -> any (`S.member` s) unkIndices) converingSets then 
+                fromMaybe Unknowns unknownsRequiringVtas
+              else 
+                NoUnknowns
+              where
+                unknownsRequiringVtas = do
+                  tyClassModuleName <- getQual className'
+                  let
+                    tyClassMemberVta :: M.Map (Qualified Ident) [[Text]]
+                    tyClassMemberVta = M.fromList $ mapMaybe qualifyAndFilter tyClassMembers
+                      where
+                        -- Only keep type class members that need VTAs to resolve their type class instances
+                        qualifyAndFilter (ident, _, mbVtas) = (Qualified (ByModuleName tyClassModuleName) ident,) <$> mbVtas
 
-                      mbExprFromHint = foldr goError Nothing hints
-                        where
-                        goError next acc = case (acc, next) of
-                          (Nothing, ErrorCheckingType expr _) -> Just expr
-                          (_, _) -> acc
-                      
-                      varsInExpr :: Maybe [(Qualified Ident, [[Text]])]
-                      varsInExpr = getVars <$> mbExprFromHint
-                        where
-                          (_, getVars, _, _, _) = everythingOnValues (++) ignore getVarIdents ignore ignore ignore
-                          ignore = const []
-                          getVarIdents = \case
-                            Var _ ident | Just vtas <- M.lookup ident tyClassMemberVta -> 
-                              [(ident, vtas)]
-                            _ -> 
-                              []
+                    tyClassMembersInExpr :: Expr -> [(Qualified Ident, [[Text]])]
+                    tyClassMembersInExpr = getVars
+                      where
+                        (_, getVars, _, _, _) = everythingOnValues (++) ignore getVarIdents ignore ignore ignore
+                        ignore = const []
+                        getVarIdents = \case
+                          Var _ ident | Just vtas <- M.lookup ident tyClassMemberVta -> 
+                            [(ident, vtas)]
+                          _ -> 
+                            []
 
-                    case varsInExpr >>= NEL.nonEmpty  of
-                      Just varsWithVtas -> UnknownsWithVtaRequiringArgs varsWithVtas
-                      _ -> Unknowns
-              else NoUnknowns
+                    findTyClassMembersInExprHint
+                      :: ErrorMessageHint
+                      -> Maybe [(Qualified Ident, [[Text]])]
+                      -> Maybe [(Qualified Ident, [[Text]])]
+                    findTyClassMembersInExprHint next acc = case (acc, next) of
+                      (Nothing, ErrorCheckingType expr _) -> Just $ tyClassMembersInExpr expr
+                      (_, _) -> acc
+                  
+                  tyClassMembers' <- foldr findTyClassMembersInExprHint Nothing hints
+                  membersWithVtas <- NEL.nonEmpty tyClassMembers'
+                  pure $ UnknownsWithVtaRequiringArgs membersWithVtas
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
