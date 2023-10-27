@@ -105,10 +105,6 @@ initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPr
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
---
--- Note: this function assumes VTA-requiring type class members have already been determined.
--- If that's not the case, use 'Language.PureScript.TypeChecker.mkTypeClassDataWithVtaInfo'.
---
 -- Fully determined means that this argument cannot be used when selecting a type class instance.
 -- A covering set is a minimal collection of arguments that can be used to find an instance and
 -- therefore determine all other type arguments.

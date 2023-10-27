@@ -25,7 +25,7 @@ import Data.Text (Text)
 import Data.Traversable (for)
 import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.Crash (internalError)
-import Language.PureScript.Environment (DataDeclType(..), NameKind(..), TypeClassData(..), dictTypeName, function, makeTypeClassData, primClasses, primCoerceClasses, primIntClasses, primRowClasses, primRowListClasses, primSymbolClasses, primTypeErrorClasses, tyRecord)
+import Language.PureScript.Environment (DataDeclType(..), NameKind(..), TypeClassData(..), dictTypeName, function, makeTypeClassData, primClasses, primCoerceClasses, primIntClasses, primRowClasses, primRowListClasses, primSymbolClasses, primTypeErrorClasses, tyRecord, computeCoveringSets)
 import Language.PureScript.Errors hiding (isExported, nonEmpty)
 import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
 import Language.PureScript.Label (Label(..))
@@ -34,7 +34,7 @@ import Language.PureScript.PSString (mkString)
 import Language.PureScript.Sugar.CaseDeclarations (desugarCases)
 import Language.PureScript.Types
 import Language.PureScript.TypeChecker.Synonyms (SynonymMap, KindMap)
-import Language.PureScript.TypeChecker (mkTypeClassDataWithVtaInfo)
+import Language.PureScript.TypeChecker (computeVtasNeededForMember)
 import Language.PureScript.TypeChecker.Utils (superClassDictionaryNames)
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
@@ -210,8 +210,9 @@ desugarDecl envVals mn exps = go
   where
   go d@(TypeClassDeclaration sa name args implies deps members) = do
     let (typeSynonyms, types) = envVals
-    tyClassData <- mkTypeClassDataWithVtaInfo typeSynonyms types args (map memberToNameAndType members) implies deps False
-    modify (M.insert (mn, name) tyClassData)
+    let (determinedArgs, coveringSets) = computeCoveringSets (length args) deps
+    classMembers' <- traverse (computeVtasNeededForMember args (S.toList coveringSets) typeSynonyms types . memberToNameAndType) members
+    modify (M.insert (mn, name) (TypeClassData args classMembers' implies deps determinedArgs coveringSets False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration sa na chainId idx name deps className tys body) = do
     name' <- desugarInstName name
