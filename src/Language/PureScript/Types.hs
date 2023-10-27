@@ -557,7 +557,7 @@ genPureName orig inUse = try' 0
   where
   try' :: Integer -> Text
   try' n | (orig <> T.pack (show n)) `elem` inUse = try' (n + 1)
-          | otherwise = orig <> T.pack (show n)
+         | otherwise = orig <> T.pack (show n)
 
 -- | Add visible type abstractions to top-level foralls.
 addVisibility :: [(Text, TypeVarVisibility)] -> Type a -> Type a
