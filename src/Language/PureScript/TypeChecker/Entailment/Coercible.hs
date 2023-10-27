@@ -37,7 +37,7 @@ import Data.Set qualified as S
 
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (DataDeclType(..), Environment(..), TypeKind(..), unapplyKinds)
-import Language.PureScript.Errors (DeclarationRef(..), ErrorMessageHint(..), ExportSource, ImportDeclarationType(..), MultipleErrors, SimpleErrorMessage(..), SourceAnn, errorMessage, UnknownsHint (Unknowns, NoUnknowns))
+import Language.PureScript.Errors (DeclarationRef(..), ErrorMessageHint(..), ExportSource, ImportDeclarationType(..), MultipleErrors, SimpleErrorMessage(..), SourceAnn, errorMessage, UnknownsHint(..))
 import Language.PureScript.Names (ModuleName, ProperName, ProperNameType(..), Qualified(..), byMaybeModuleName, toMaybeModuleName)
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, freshKindWithKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad (CheckState(..))
