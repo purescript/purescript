@@ -31,7 +31,7 @@ import Language.PureScript.AST
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Constants.Libs qualified as Libs
 import Language.PureScript.Crash (internalError)
-import Language.PureScript.Environment (DataDeclType(..), Environment(..), FunctionalDependency, NameKind(..), NameVisibility(..), TypeClassData(..), TypeKind(..), isDictTypeName, kindArity, nominalRolesForKind, tyFunction, computeCoveringSets)
+import Language.PureScript.Environment (DataDeclType(..), Environment(..), FunctionalDependency, NameKind(..), NameVisibility(..), TypeClassData(..), TypeKind(..), isDictTypeName, kindArity, nominalRolesForKind, tyFunction, makeTypeClassData)
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, errorMessage', positionedError, rethrow, warnAndRethrow)
 import Language.PureScript.Linter (checkExhaustiveExpr)
 import Language.PureScript.Linter.Wildcards (ignoreWildcardsUnderCompleteTypeSignatures)
@@ -45,7 +45,7 @@ import Language.PureScript.TypeChecker.Synonyms as T
 import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Unify (varIfUnknown)
 import Language.PureScript.TypeClassDictionaries (NamedDict, TypeClassDictionaryInScope(..))
-import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), containsForAll, eqType, everythingOnTypes, freeTypeVariables, overConstraintArgs, srcInstanceType, unapplyTypes)
+import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), containsForAll, eqType, everythingOnTypes, overConstraintArgs, srcInstanceType, unapplyTypes)
 
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -172,34 +172,11 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
       env <- getEnv
       implies' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms implies
       let ctIsEmpty = null classMembers && all (typeClassIsEmpty . findSuperClass env) implies'
-      let (determinedArgs, coveringSets) = computeCoveringSets (length args) dependencies
-      classMembers' <- traverse (computeVtasNeededForMember (S.toList coveringSets) (typeSynonyms env) (types env)) classMembers
-      pure $ TypeClassData args classMembers' implies' dependencies determinedArgs coveringSets ctIsEmpty
+      pure $ makeTypeClassData args classMembers implies' dependencies ctIsEmpty
       where
       findSuperClass env c = case M.lookup (constraintClass c) (typeClasses env) of
         Just tcd -> tcd
         Nothing -> internalError "Unknown super class in TypeClassDeclaration"
-
-    -- Before Visible Type Applications (VTAs) were introduced, if a type class member
-    -- did not reference all of the type variables in the type class head,
-    -- we would throw an UnusableDeclaration error. With the advent of VTAs,
-    -- we can remove this error and instead inform the user that these type class members
-    -- can only have their corresponding type class instance found if one uses VTAs
-    -- for one of the given sets.
-    computeVtasNeededForMember 
-      :: [S.Set Int]
-      -> SynonymMap 
-      -> KindMap 
-      -> (Ident, SourceType) 
-      -> m (Ident, SourceType, [[Text]])
-    computeVtasNeededForMember coveringSets syns kinds (ident, memberTy) = do
-      memberTy' <- replaceAllTypeSynonymsM syns kinds memberTy
-      let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
-      let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets
-      pure (ident, memberTy, map (map (fst . (args !!)) . S.toList) leftovers)
-      where
-        argToIndex :: Text -> Maybe Int
-        argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
 
     toPair (TypeDeclaration (TypeDeclarationData _ ident ty)) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"

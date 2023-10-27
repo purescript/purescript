@@ -14,7 +14,7 @@ import Data.IntMap qualified as IM
 import Data.IntSet qualified as IS
 import Data.Map qualified as M
 import Data.Set qualified as S
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Semigroup (First(..))
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -25,7 +25,7 @@ import Language.PureScript.Crash (internalError)
 import Language.PureScript.Names (Ident, ProperName(..), ProperNameType(..), Qualified, QualifiedBy, coerceProperName)
 import Language.PureScript.Roles (Role(..))
 import Language.PureScript.TypeClassDictionaries (NamedDict)
-import Language.PureScript.Types (SourceConstraint, SourceType, Type(..), TypeVarVisibility(..), eqType, srcTypeConstructor)
+import Language.PureScript.Types (SourceConstraint, SourceType, Type(..), TypeVarVisibility(..), eqType, srcTypeConstructor, freeTypeVariables)
 import Language.PureScript.Constants.Prim qualified as C
 
 -- | The @Environment@ defines all values and types which are currently in scope:
@@ -125,14 +125,27 @@ initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPr
 -- in its SCC, and everything determining X is either before it in an SCC path, or in the same SCC.
 makeTypeClassData
   :: [(Text, Maybe SourceType)]
-  -> [(Ident, SourceType, [[Text]])]
+  -> [(Ident, SourceType)]
   -> [SourceConstraint]
   -> [FunctionalDependency]
   -> Bool
   -> TypeClassData
-makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
+makeTypeClassData args m s deps = TypeClassData args m' s deps determinedArgs coveringSets
   where
     ( determinedArgs, coveringSets ) = computeCoveringSets (length args) deps
+
+    coveringSets' = S.toList coveringSets
+
+    m' = map (\(a, b) -> (a, b, addVtaInfo b)) m
+    
+    addVtaInfo :: SourceType -> [[Text]]
+    addVtaInfo memberTy = do
+      let mentionedArgIndexes = S.fromList (mapMaybe argToIndex $ freeTypeVariables memberTy)
+      let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets'
+      map (map (fst . (args !!)) . S.toList) leftovers
+
+    argToIndex :: Text -> Maybe Int
+    argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
 
 -- A moving frontier of sets to consider, along with the fundeps that can be
 -- applied in each case. At each stage, all sets in the frontier will be the

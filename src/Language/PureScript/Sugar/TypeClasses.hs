@@ -205,8 +205,7 @@ desugarDecl
 desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration sa name args implies deps members) = do
-    let addNullVtaArgs (a, b) = (a, b, [[]])
-    modify (M.insert (mn, name) (makeTypeClassData args (map (addNullVtaArgs . memberToNameAndType) members) implies deps False))
+    modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration sa na chainId idx name deps className tys body) = do
     name' <- desugarInstName name
