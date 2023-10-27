@@ -455,15 +455,11 @@ entails SolverOptions{..} constraint context hints =
                           _ -> 
                             []
 
-                    findTyClassMembersInExprHint
-                      :: ErrorMessageHint
-                      -> Maybe [(Qualified Ident, [[Text]])]
-                      -> Maybe [(Qualified Ident, [[Text]])]
-                    findTyClassMembersInExprHint next acc = case (acc, next) of
-                      (Nothing, ErrorCheckingType expr _) -> Just $ tyClassMembersInExpr expr
-                      (_, _) -> acc
-                  
-                  tyClassMembers' <- foldr findTyClassMembersInExprHint Nothing hints
+                    getECTExpr = \case
+                      ErrorCheckingType expr _ -> Just expr
+                      _ -> Nothing
+                      
+                  tyClassMembers' <- headMay $ mapMaybe (fmap tyClassMembersInExpr . getECTExpr) hints
                   membersWithVtas <- NEL.nonEmpty tyClassMembers'
                   pure $ UnknownsWithVtaRequiringArgs membersWithVtas
 
