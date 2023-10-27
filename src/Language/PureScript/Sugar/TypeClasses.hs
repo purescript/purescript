@@ -25,7 +25,7 @@ import Data.Text (Text)
 import Data.Traversable (for)
 import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.Crash (internalError)
-import Language.PureScript.Environment (DataDeclType(..), NameKind(..), TypeClassData(..), dictTypeName, function, makeTypeClassData, primClasses, primCoerceClasses, primIntClasses, primRowClasses, primRowListClasses, primSymbolClasses, primTypeErrorClasses, tyRecord)
+import Language.PureScript.Environment (DataDeclType(..), NameKind(..), TypeClassData(..), dictTypeName, function, makeTypeClassData, primClasses, primCoerceClasses, primIntClasses, primRowClasses, primRowListClasses, primSymbolClasses, primTypeErrorClasses, tyRecord, computeCoveringSets)
 import Language.PureScript.Errors hiding (isExported, nonEmpty)
 import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
 import Language.PureScript.Label (Label(..))
@@ -33,6 +33,8 @@ import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName
 import Language.PureScript.PSString (mkString)
 import Language.PureScript.Sugar.CaseDeclarations (desugarCases)
 import Language.PureScript.Types
+import Language.PureScript.TypeChecker.Synonyms (SynonymMap, KindMap)
+import Language.PureScript.TypeChecker (computeVtasNeededForMember)
 import Language.PureScript.TypeChecker.Utils (superClassDictionaryNames)
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
@@ -46,9 +48,10 @@ type Desugar = StateT MemberMap
 desugarTypeClasses
   :: (MonadSupply m, MonadError MultipleErrors m)
   => [ExternsFile]
+  -> (SynonymMap, KindMap)
   -> Module
   -> m Module
-desugarTypeClasses externs = flip evalStateT initialState . desugarModule
+desugarTypeClasses externs envVals = flip evalStateT initialState . desugarModule envVals
   where
   initialState :: MemberMap
   initialState =
@@ -73,13 +76,14 @@ desugarTypeClasses externs = flip evalStateT initialState . desugarModule
 
 desugarModule
   :: (MonadSupply m, MonadError MultipleErrors m)
-  => Module
+  => (SynonymMap, KindMap)
+  -> Module
   -> Desugar m Module
-desugarModule (Module ss coms name decls (Just exps)) = do
+desugarModule envVals (Module ss coms name decls (Just exps)) = do
   let (classDecls, restDecls) = partition isTypeClassDecl decls
       classVerts = fmap (\d -> (d, classDeclName d, superClassesNames d)) classDecls
   (classNewExpss, classDeclss) <- unzip <$> parU (stronglyConnComp classVerts) (desugarClassDecl name exps)
-  (restNewExpss, restDeclss) <- unzip <$> parU restDecls (desugarDecl name exps)
+  (restNewExpss, restDeclss) <- unzip <$> parU restDecls (desugarDecl envVals name exps)
   return $ Module ss coms name (concat restDeclss ++ concat classDeclss) $ Just (exps ++ catMaybes restNewExpss ++ catMaybes classNewExpss)
   where
   desugarClassDecl :: (MonadSupply m, MonadError MultipleErrors m)
@@ -87,7 +91,7 @@ desugarModule (Module ss coms name decls (Just exps)) = do
     -> [DeclarationRef]
     -> SCC Declaration
     -> Desugar m (Maybe DeclarationRef, [Declaration])
-  desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl name' exps' d
+  desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl envVals name' exps' d
   desugarClassDecl _ _ (CyclicSCC ds')
     | Just ds'' <- nonEmpty ds' = throwError . errorMessage' (declSourceSpan (NEL.head ds'')) $ CycleInTypeClassDeclaration (NEL.map classDeclName ds'')
     | otherwise = internalError "desugarClassDecl: empty CyclicSCC"
@@ -103,7 +107,7 @@ desugarModule (Module ss coms name decls (Just exps)) = do
   classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (ByModuleName name) pn
   classDeclName _ = internalError "Expected TypeClassDeclaration"
 
-desugarModule _ = internalError "Exports should have been elaborated in name desugaring"
+desugarModule _ _ = internalError "Exports should have been elaborated in name desugaring"
 
 {- Desugar type class and type class instance declarations
 --
@@ -197,15 +201,18 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 -}
 desugarDecl
   :: (MonadSupply m, MonadError MultipleErrors m)
-  => ModuleName
+  => (SynonymMap, KindMap)
+  -> ModuleName
   -> [DeclarationRef]
   -> Declaration
   -> Desugar m (Maybe DeclarationRef, [Declaration])
-desugarDecl mn exps = go
+desugarDecl envVals mn exps = go
   where
   go d@(TypeClassDeclaration sa name args implies deps members) = do
-    let addNullVtaArgs (a, b) = (a, b, Nothing)
-    modify (M.insert (mn, name) (makeTypeClassData args (map (addNullVtaArgs . memberToNameAndType) members) implies deps False))
+    let (typeSynonyms, types) = envVals
+    let (determinedArgs, coveringSets) = computeCoveringSets (length args) deps
+    classMembers' <- traverse (computeVtasNeededForMember args (S.toList coveringSets) typeSynonyms types . memberToNameAndType) members
+    modify (M.insert (mn, name) (TypeClassData args classMembers' implies deps determinedArgs coveringSets False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration sa na chainId idx name deps className tys body) = do
     name' <- desugarInstName name

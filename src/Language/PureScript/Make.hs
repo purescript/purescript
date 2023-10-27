@@ -33,7 +33,7 @@ import Language.PureScript.AST (ErrorMessageHint(..), Module(..), SourceSpan(..)
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Docs.Convert qualified as Docs
-import Language.PureScript.Environment (initEnvironment)
+import Language.PureScript.Environment (initEnvironment, Environment (typeSynonyms, types))
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, defaultPPEOptions, errorMessage', errorMessage'', prettyPrintMultipleErrors)
 import Language.PureScript.Externs (ExternsFile, applyExternsFileToEnvironment, moduleToExternsFile)
 import Language.PureScript.Linter (Name(..), lint, lintImports)
@@ -50,6 +50,7 @@ import Language.PureScript.Make.Monad as Monad
 import Language.PureScript.CoreFn qualified as CF
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
+import Control.Monad.Reader (ReaderT(runReaderT))
 
 -- | Rebuild a single module.
 --
@@ -91,7 +92,7 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
   lint withPrim
 
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
-    (desugared, (exEnv', usedImports)) <- runStateT (desugar externs withPrim) (exEnv, mempty)
+    (desugared, (exEnv', usedImports)) <- runStateT (desugar externs (typeSynonyms env, types env) withPrim) (exEnv, mempty) 
     let modulesExports = (\(_, _, exports) -> exports) <$> exEnv'
     (checked, CheckState{..}) <- runStateT (typeCheckModule modulesExports desugared) $ emptyCheckState env
     let usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
