@@ -45,7 +45,8 @@
   The instance head contains unknown type variables.
   
 
-  Note: The following type class members found in the expression require specifying their corresponding type class' type variables by using Visible Type Applications (e.g. tyClassMember @Int).
+  Note: The following type class members found in the expression require visible type applications 
+  to be unambiguous (e.g. tyClassMember @Int).
     Main.useSingle
       tyNotAppearInBody
   ```
@@ -53,17 +54,21 @@
   For a multiparameter typeclass with functional dependencies...
   
   ```purs
-  class Multi a b c d e f | a c -> d f, b c -> a d where
-    useMulti :: Int
-  
-  multi = useMulti
+  class MultiFdBidi a b | a -> b, b -> a where
+    useMultiFdBidi :: Int
+
+  multiFdBidi :: Int
+  multiFdBidi = useMultiFdBidi
   ```
 
   ...the "Note" part is updated to read
   ```
-  Note: The following type class members found in the expression require specifying their corresponding type class' type variables by using Visible Type Applications (e.g. tyClassMember @Int).
-  Main.useMulti
-    b, c, e
+  Note: The following type class members found in the expression require visible type applications 
+  to be unambiguous (e.g. tyClassMember @Int).
+    Main.useMultiFdBidi
+      One of the following sets of type variables:
+        a
+        b
   ```
 
   In both cases above, the `NoInstanceFound` error will not include 
