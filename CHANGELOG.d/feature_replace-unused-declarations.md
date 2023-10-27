@@ -23,7 +23,9 @@
   However, failing to provide a VTA to direct the instance selection
   will still produce an `InstanceNotFound` error, but this error 
   has been updated to note which type variables in the class head
-  must be specified via Visible Type Applications. Given the following code
+  must be specified via Visible Type Applications 
+  (except for one situation involving type synonyms).
+  Given the following code
 
   ```purs
   class Single tyVarDoesNotAppearInBody where 
@@ -62,4 +64,13 @@
   Note: The following type class members found in the expression require specifying their corresponding type class' type variables by using Visible Type Applications (e.g. tyClassMember @Int).
   Main.useMulti
     b, c, e
+  ```
+
+  In both cases above, the `NoInstanceFound` error will not include 
+  the VTA-required-args info when the type class member's type signature uses a type synonym.
+  For example,
+  ```purs
+  type Synonym = Array
+  class MyClass a b c where
+    tyClassMember :: Synonym a
   ```
