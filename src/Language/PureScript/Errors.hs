@@ -950,7 +950,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                       [ paras
                         [ line "The instance head contains unknown type variables."
                         , Box.moveDown 1 $ paras $
-                            [ line $ "Note: The following type class members found in the expression require specifying their corresponding type class' type variables by using Visible Type Applications (e.g. " <> markCode "tyClassMember @Int" <> ")."]
+                            [ line $ "Note: The following type class members found in the expression require visible type applications to be unambiguous (e.g. " <> markCode "tyClassMember @Int" <> ")."]
                             <> map renderSingleTyClassMember (NEL.toList tyClassMembersRequiringVtas)
                         ]
                       ]
