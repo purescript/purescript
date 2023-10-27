@@ -50,6 +50,7 @@ import Language.PureScript.Make.Monad as Monad
 import Language.PureScript.CoreFn qualified as CF
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
+import Control.Monad.Reader (ReaderT(runReaderT))
 
 -- | Rebuild a single module.
 --
