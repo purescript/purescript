@@ -5,7 +5,6 @@ module Language.PureScript.TypeChecker
   ( module T
   , typeCheckModule
   , checkNewtype
-  , computeVtasNeededForMember
   ) where
 
 import Prelude
@@ -174,40 +173,36 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
       implies' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms implies
       let ctIsEmpty = null classMembers && all (typeClassIsEmpty . findSuperClass env) implies'
       let (determinedArgs, coveringSets) = computeCoveringSets (length args) dependencies
-      classMembers' <- traverse (computeVtasNeededForMember args (S.toList coveringSets) (typeSynonyms env) (types env)) classMembers
+      classMembers' <- traverse (computeVtasNeededForMember (S.toList coveringSets) (typeSynonyms env) (types env)) classMembers
       pure $ TypeClassData args classMembers' implies' dependencies determinedArgs coveringSets ctIsEmpty
       where
       findSuperClass env c = case M.lookup (constraintClass c) (typeClasses env) of
         Just tcd -> tcd
         Nothing -> internalError "Unknown super class in TypeClassDeclaration"
 
+    -- Before Visible Type Applications (VTAs) were introduced, if a type class member
+    -- did not reference all of the type variables in the type class head,
+    -- we would throw an UnusableDeclaration error. With the advent of VTAs,
+    -- we can remove this error and instead inform the user that these type class members
+    -- can only have their corresponding type class instance found if one uses VTAs
+    -- for one of the given sets.
+    computeVtasNeededForMember 
+      :: [S.Set Int]
+      -> SynonymMap 
+      -> KindMap 
+      -> (Ident, SourceType) 
+      -> m (Ident, SourceType, Maybe [[Text]])
+    computeVtasNeededForMember coveringSets syns kinds (ident, memberTy) = do
+      memberTy' <- replaceAllTypeSynonymsM syns kinds memberTy
+      let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
+      let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets
+      pure (ident, memberTy, if any null leftovers then Nothing else Just $ map (map (fst . (args !!)) . S.toList) leftovers)
+      where
+        argToIndex :: Text -> Maybe Int
+        argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
+
     toPair (TypeDeclaration (TypeDeclarationData _ ident ty)) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
-
--- |
--- Before Visible Type Applications (VTAs) were introduced, if a type class member
--- did not reference all of the type variables in the type class head,
--- we would throw an UnusableDeclaration error. With the advent of VTAs,
--- we can remove this error and instead inform the user that these type class members
--- can only have their corresponding type class instance found if one uses VTAs
--- for one of the given sets.
-computeVtasNeededForMember 
-  :: forall m
-   . (MonadError MultipleErrors m)
-  => [(Text, Maybe SourceType)]
-  -> [S.Set Int]
-  -> SynonymMap 
-  -> KindMap 
-  -> (Ident, SourceType) 
-  -> m (Ident, SourceType, Maybe [[Text]])
-computeVtasNeededForMember args coveringSets syns kinds (ident, memberTy) = do
-  memberTy' <- replaceAllTypeSynonymsM syns kinds memberTy
-  let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
-  let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets
-  pure (ident, memberTy, if any null leftovers then Nothing else Just $ map (map (fst . (args !!)) . S.toList) leftovers)
-  where
-    argToIndex :: Text -> Maybe Int
-    argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)

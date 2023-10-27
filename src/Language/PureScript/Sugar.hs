@@ -25,7 +25,6 @@ import Language.PureScript.Sugar.Operators as S
 import Language.PureScript.Sugar.TypeClasses as S
 import Language.PureScript.Sugar.TypeClasses.Deriving as S
 import Language.PureScript.Sugar.TypeDeclarations as S
-import Language.PureScript.TypeChecker.Synonyms (SynonymMap, KindMap)
 
 -- |
 -- The desugaring pipeline proceeds as follows:
@@ -58,10 +57,9 @@ desugar
   => MonadWriter MultipleErrors m
   => MonadState (Env, UsedImports) m
   => [ExternsFile]
-  -> (SynonymMap, KindMap)
   -> Module
   -> m Module
-desugar externs envVals =
+desugar externs =
   desugarSignedLiterals
     >>> desugarObjectConstructors
     >=> desugarDoModule
@@ -73,5 +71,5 @@ desugar externs envVals =
     >=> rebracket externs
     >=> checkFixityExports
     >=> deriveInstances
-    >=> desugarTypeClasses externs envVals
+    >=> desugarTypeClasses externs
     >=> createBindingGroupsModule
