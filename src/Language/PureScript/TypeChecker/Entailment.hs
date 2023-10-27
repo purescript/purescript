@@ -433,30 +433,31 @@ entails SolverOptions{..} constraint context hints =
                   Nothing -> 
                     Unknowns
                   Just tyClassModName -> do
-                    let 
-                      exprFromHint = fromMaybe (internalError "expected an ErrorCheckingType to be within hint context") 
-                        $ foldr goError Nothing hints
-                        where
-                        goError next acc = case (acc, next) of
-                          (Nothing, ErrorCheckingType expr _) -> Just expr
-                          (_, _) -> acc
-                      
-                      varsInExpr :: [Qualified Ident]
-                      varsInExpr = getVars exprFromHint
-                        where
-                          (_, getVars, _, _, _) = everythingOnValues (++) ignore getVarIdents ignore ignore ignore
-                          ignore = const []
-                          getVarIdents = \case
-                            Var _ ident -> [ident]
-                            _ -> []
-
+                    let
                       tyClassMemberVta :: M.Map (Qualified Ident) [[Text]]
                       tyClassMemberVta = M.fromList $ mapMaybe qualifyAndFilter tyClassMembers
                         where
                           -- Only keep type class members that need VTAs to resolve their type class instances
                           qualifyAndFilter (ident, _, mbVtas) = (Qualified (ByModuleName tyClassModName) ident,) <$> mbVtas
 
-                    case NEL.nonEmpty $ mapMaybe (\i -> (i,) <$> M.lookup i tyClassMemberVta) varsInExpr of
+                      mbExprFromHint = foldr goError Nothing hints
+                        where
+                        goError next acc = case (acc, next) of
+                          (Nothing, ErrorCheckingType expr _) -> Just expr
+                          (_, _) -> acc
+                      
+                      varsInExpr :: Maybe [(Qualified Ident, [[Text]])]
+                      varsInExpr = getVars <$> mbExprFromHint
+                        where
+                          (_, getVars, _, _, _) = everythingOnValues (++) ignore getVarIdents ignore ignore ignore
+                          ignore = const []
+                          getVarIdents = \case
+                            Var _ ident | Just vtas <- M.lookup ident tyClassMemberVta -> 
+                              [(ident, vtas)]
+                            _ -> 
+                              []
+
+                    case varsInExpr >>= NEL.nonEmpty  of
                       Just varsWithVtas -> UnknownsWithVtaRequiringArgs varsWithVtas
                       _ -> Unknowns
               else NoUnknowns
