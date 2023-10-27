@@ -26,7 +26,7 @@ import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHi
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName(..), Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, freshIdent, qualify)
 import Language.PureScript.PSString (PSString, mkString)
-import Language.PureScript.Sugar.TypeClasses (superClassDictionaryNames)
+import Language.PureScript.TypeChecker.Utils (superClassDictionaryNames)
 import Language.PureScript.TypeChecker.Entailment (InstanceContext, findDicts)
 import Language.PureScript.TypeChecker.Monad (CheckState, getEnv, getTypeClassDictionaries, unsafeCheckCurrentModule)
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)

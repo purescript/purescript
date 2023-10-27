@@ -5,7 +5,6 @@
 module Language.PureScript.Sugar.TypeClasses
   ( desugarTypeClasses
   , typeClassMemberName
-  , superClassDictionaryNames
   ) where
 
 import Prelude
@@ -33,8 +32,8 @@ import Language.PureScript.Label (Label(..))
 import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, freshIdent, qualify, runIdent)
 import Language.PureScript.PSString (mkString)
 import Language.PureScript.Sugar.CaseDeclarations (desugarCases)
-import Language.PureScript.TypeClassDictionaries (superclassName)
 import Language.PureScript.Types
+import Language.PureScript.TypeChecker.Utils (superClassDictionaryNames)
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
 
@@ -381,12 +380,6 @@ declIdent _ = Nothing
 
 typeClassMemberName :: Declaration -> Text
 typeClassMemberName = maybe (internalError "typeClassMemberName: Invalid declaration in type class definition") runIdent . declIdent
-
-superClassDictionaryNames :: [Constraint a] -> [Text]
-superClassDictionaryNames supers =
-  [ superclassName pn index
-  | (index, Constraint _ pn _ _ _) <- zip [0..] supers
-  ]
 
 tuple3To2 :: (a, b, c) -> (a, b)
 tuple3To2 (a, b, _) = (a, b)
