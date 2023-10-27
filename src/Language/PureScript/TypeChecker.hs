@@ -191,12 +191,12 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
       -> SynonymMap 
       -> KindMap 
       -> (Ident, SourceType) 
-      -> m (Ident, SourceType, Maybe [[Text]])
+      -> m (Ident, SourceType, [[Text]])
     computeVtasNeededForMember coveringSets syns kinds (ident, memberTy) = do
       memberTy' <- replaceAllTypeSynonymsM syns kinds memberTy
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
       let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets
-      pure (ident, memberTy, if any null leftovers then Nothing else Just $ map (map (fst . (args !!)) . S.toList) leftovers)
+      pure (ident, memberTy, map (map (fst . (args !!)) . S.toList) leftovers)
       where
         argToIndex :: Text -> Maybe Int
         argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])

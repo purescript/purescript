@@ -425,7 +425,7 @@ entails SolverOptions{..} constraint context hints =
               let fields = [ ("reflectType", Abs (VarBinder nullSourceSpan UnusedIdent) (asExpression ref)) ] in
               pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
-            unknownsInAllCoveringSets :: [(Ident, SourceType, Maybe [[Text]])] -> [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
+            unknownsInAllCoveringSets :: [(Ident, SourceType, [[Text]])] -> [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
             unknownsInAllCoveringSets tyClassMembers tyArgs converingSets = do
               let unkIndices = findIndices containsUnknowns tyArgs
               if all (\s -> any (`S.member` s) unkIndices) converingSets then 
@@ -440,7 +440,9 @@ entails SolverOptions{..} constraint context hints =
                     tyClassMemberVta = M.fromList $ mapMaybe qualifyAndFilter tyClassMembers
                       where
                         -- Only keep type class members that need VTAs to resolve their type class instances
-                        qualifyAndFilter (ident, _, mbVtas) = (Qualified (ByModuleName tyClassModuleName) ident,) <$> mbVtas
+                        qualifyAndFilter (ident, _, vtaRequiredArgs) 
+                          | vtaRequiredArgs == [[]] = Nothing
+                          | otherwise = Just $ (Qualified (ByModuleName tyClassModuleName) ident, vtaRequiredArgs)
 
                     tyClassMembersInExpr :: Expr -> [(Qualified Ident, [[Text]])]
                     tyClassMembersInExpr = getVars
