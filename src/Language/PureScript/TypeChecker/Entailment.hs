@@ -426,9 +426,9 @@ entails SolverOptions{..} constraint context hints =
               pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
             unknownsInAllCoveringSets :: [(Ident, SourceType, [[Text]])] -> [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
-            unknownsInAllCoveringSets tyClassMembers tyArgs converingSets = do
+            unknownsInAllCoveringSets tyClassMembers tyArgs coveringSets = do
               let unkIndices = findIndices containsUnknowns tyArgs
-              if all (\s -> any (`S.member` s) unkIndices) converingSets then 
+              if all (\s -> any (`S.member` s) unkIndices) coveringSets then 
                 fromMaybe Unknowns unknownsRequiringVtas
               else 
                 NoUnknowns
