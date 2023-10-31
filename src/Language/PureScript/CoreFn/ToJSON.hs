@@ -45,7 +45,6 @@ metaToJSON IsNewtype              = object [ "metaType"  .= "IsNewtype" ]
 metaToJSON IsTypeClassConstructor = object [ "metaType"  .= "IsTypeClassConstructor" ]
 metaToJSON IsForeign              = object [ "metaType"  .= "IsForeign" ]
 metaToJSON IsWhere                = object [ "metaType"  .= "IsWhere" ]
-metaToJSON IsSyntheticApp         = object [ "metaType"  .= "IsSyntheticApp" ]
 
 sourceSpanToJSON :: SourceSpan -> Value
 sourceSpanToJSON (SourceSpan _ spanStart spanEnd) =
@@ -205,7 +204,7 @@ exprToJSON (Case ann ss cs)         = object [ "type"        .= "Case"
                                              , "caseAlternatives"
                                                                     .= map caseAlternativeToJSON cs
                                              ]
-exprToJSON (Let ann bs e)           = object [ "type"        .= "Let" 
+exprToJSON (Let ann bs e)           = object [ "type"        .= "Let"
                                              , "annotation"  .= annToJSON ann
                                              , "binds"       .= map bindToJSON bs
                                              , "expression"  .= exprToJSON e
