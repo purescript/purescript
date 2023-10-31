@@ -4,7 +4,7 @@
 module Language.PureScript.Types where
 
 import Prelude
-import Protolude (ordNub, mapMaybe)
+import Protolude (ordNub)
 
 import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
@@ -612,7 +612,7 @@ moveQuantifiersToFront = go [] []
   go qs cs = \case
     ForAll ann vis q mbK ty sco -> do
       let 
-        cArgs :: [Text] = cs >>= mapMaybe tyVarText . constraintArgs . snd
+        cArgs :: [Text] = cs >>= constraintArgs . snd >>= freeTypeVariables
         (q'', ty')
           | q `elem` cArgs = do
               let q' = genPureName q cArgs
@@ -624,10 +624,6 @@ moveQuantifiersToFront = go [] []
       go qs ((ann, c) : cs) ty
     ty -> 
       foldl (\ty' (ann, q, sco, mbK, vis) -> ForAll ann vis q mbK ty' sco) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
-
-  tyVarText = \case
-    TypeVar _ t -> Just t
-    _ -> Nothing
 
 -- | Check if a type contains `forall`
 containsForAll :: Type a -> Bool
