@@ -149,6 +149,35 @@ mainClassWorks = do
     test2 = A2 == superClassValue @A2
   pure if test1 && test2 then Nothing else Just "MainClass failed"
 
+class MultiCoveringSets a b c d e f | a b -> c d e f, f e -> a b c d where
+  noneOfSets :: Int
+
+  partialOfABSet :: a -> { c :: c, d :: d }
+
+  partialOfFESet :: f -> { c :: c, d :: d }
+
+instance MultiCoveringSets Boolean Boolean String String Int Int where
+  noneOfSets = 1
+  partialOfABSet a = { c: if a then "101" else "100", d: "1" }
+  partialOfFESet f = { c: show f, d: "1" }
+
+instance MultiCoveringSets Int Int String String Boolean Boolean where
+  noneOfSets = 2
+  partialOfABSet a = { c: show a, d: "2" }
+  partialOfFESet f = { c: show f, d: "2" }
+
+multiCoveringSetsWorks :: Effect (Maybe String)
+multiCoveringSetsWorks = do
+  let
+    test1a = 1 == noneOfSets @Boolean @Boolean
+    test1b = "101" == (partialOfABSet @Boolean @Boolean true).c
+    test1c = show 3 == (partialOfFESet @_ @_ @_ @_ @Int @Int 3).c
+    test2a = 2 == noneOfSets @_ @_ @_ @_ @Boolean @Boolean
+    test2b = show 20 == (partialOfABSet @_ @_ @_ @_ @Boolean @Boolean 20).c
+    test2c = show false == (partialOfFESet @_ @_ @_ @_ @Boolean @Boolean false).c
+    passes = test1a && test1b && test1c && test2a && test2b && test2c
+  pure if passes then Nothing else Just "MultiCoveringSets failed"
+
 main = do
   arr' <- sequence
     [ singletonWorks
