@@ -22,7 +22,7 @@ import Control.Monad.Writer (Any(..), MonadWriter(..), WriterT(..))
 import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
-import Data.Functor (($>))
+import Data.Functor (($>), (<&>))
 import Data.List (delete, findIndices, minimumBy, nubBy, sortOn, tails)
 import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import Data.Map qualified as M
@@ -441,7 +441,7 @@ entails SolverOptions{..} constraint context hints =
                     tyClassMemberVta = M.fromList $ mapMaybe qualifyAndFilter tyClassMembers
                       where
                         -- Only keep type class members that need VTAs to resolve their type class instances
-                        qualifyAndFilter (ident, _, mbVtaRequiredArgs) = flip fmap mbVtaRequiredArgs $ \vtaRequiredArgs ->
+                        qualifyAndFilter (ident, _, mbVtaRequiredArgs) = mbVtaRequiredArgs <&> \vtaRequiredArgs ->
                           (Qualified (ByModuleName tyClassModuleName) ident, map (map indexToArgText . NEL.toList) $ S.toList vtaRequiredArgs)
 
                     tyClassMembersInExpr :: Expr -> [(Qualified Ident, [[Text]])]

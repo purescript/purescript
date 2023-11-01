@@ -105,8 +105,8 @@ data HintCategory
 
 -- |
 -- In constraint solving, indicates whether there were `TypeUnknown`s that prevented
--- an instance from being found, and whether type annotations might help or
--- whether VTAs are required due to type class members not referencing all the type class
+-- an instance from being found, and whether VTAs are required 
+-- due to type class members not referencing all the type class
 -- head's type variables.
 data UnknownsHint
   = NoUnknowns
