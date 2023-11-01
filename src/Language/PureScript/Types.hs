@@ -615,7 +615,7 @@ moveQuantifiersToFront = go [] []
         cArgs :: [Text] = cs >>= constraintArgs . snd >>= freeTypeVariables
         (q'', ty')
           | q `elem` cArgs = do
-              let q' = genPureName q cArgs
+              let q' = genPureName q $ cArgs <> freeTypeVariables ty
               (q', renameTypeVar q q' ty)
           | otherwise =
               (q, ty)
