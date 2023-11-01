@@ -4,7 +4,7 @@
 module Language.PureScript.Types where
 
 import Prelude
-import Protolude (ordNub)
+import Protolude (ordNub, fromMaybe)
 
 import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
@@ -516,35 +516,28 @@ isMonoType _        = True
 mkForAll :: [(a, (Text, Maybe (Type a)))] -> Type a -> Type a
 mkForAll args ty = foldr (\(ann, (arg, mbK)) t -> ForAll ann TypeVarInvisible arg mbK t Nothing) ty args
 
--- | Rename a type variable, taking into account variable shadowing
-renameTypeVar :: Text -> Text -> Type a -> Type a
-renameTypeVar original replacement = replaceAllTypeVars' [(original, Left replacement)]
-
 -- | Replace a type variable, taking into account variable shadowing
 replaceTypeVars :: Text -> Type a -> Type a -> Type a
 replaceTypeVars v r = replaceAllTypeVars [(v, r)]
 
 -- | Replace named type variables with types
 replaceAllTypeVars :: [(Text, Type a)] -> Type a -> Type a
-replaceAllTypeVars rs = replaceAllTypeVars' (fmap (fmap Right) rs)
-
-replaceAllTypeVars' :: [(Text, Either Text (Type a))] -> Type a -> Type a
-replaceAllTypeVars' = go [] where
-  go :: [Text] -> [(Text, Either Text (Type a))] -> Type a -> Type a
-  go _  m (TypeVar ann v) = maybe (TypeVar ann v) (either (TypeVar ann) id) (v `lookup` m)
+replaceAllTypeVars = go [] where
+  go :: [Text] -> [(Text, Type a)] -> Type a -> Type a
+  go _  m (TypeVar ann v) = fromMaybe (TypeVar ann v) (v `lookup` m)
   go bs m (TypeApp ann t1 t2) = TypeApp ann (go bs m t1) (go bs m t2)
   go bs m (KindApp ann t1 t2) = KindApp ann (go bs m t1) (go bs m t2)
   go bs m (ForAll ann vis v mbK t sco)
     | v `elem` keys = go bs (filter ((/= v) . fst) m) $ ForAll ann vis v mbK' t sco
     | v `elem` usedVars =
       let v' = genPureName v (keys ++ bs ++ usedVars)
-          t' = go bs [(v, Right $ TypeVar ann v')] t
+          t' = go bs [(v, TypeVar ann v')] t
       in ForAll ann vis v' mbK' (go (v' : bs) m t') sco
     | otherwise = ForAll ann vis v mbK' (go (v : bs) m t) sco
     where
       mbK' = go bs m <$> mbK
       keys = map fst m
-      usedVars = concatMap (either pure usedTypeVariables . snd) m
+      usedVars = concatMap (usedTypeVariables . snd) m
   go bs m (ConstrainedType ann c t) = ConstrainedType ann (mapConstraintArgsAll (map (go bs m)) c) (go bs m t)
   go bs m (RCons ann name' t r) = RCons ann name' (go bs m t) (go bs m r)
   go bs m (KindedType ann t k) = KindedType ann (go bs m t) (go bs m k)
@@ -606,8 +599,8 @@ quantify :: Type a -> Type a
 quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) TypeVarInvisible arg Nothing t Nothing) ty $ freeTypeVariables ty
 
 -- | Move all universal quantifiers to the front of a type
-moveQuantifiersToFront :: Type a -> Type a
-moveQuantifiersToFront = go [] [] 
+moveQuantifiersToFront :: a -> Type a -> Type a
+moveQuantifiersToFront syntheticAnn = go [] [] 
   where
   go qs cs = \case
     ForAll ann vis q mbK ty sco -> do
@@ -616,7 +609,7 @@ moveQuantifiersToFront = go [] []
         (q'', ty')
           | q `elem` cArgs = do
               let q' = genPureName q $ cArgs <> freeTypeVariables ty
-              (q', renameTypeVar q q' ty)
+              (q', replaceTypeVars q (TypeVar syntheticAnn q') ty)
           | otherwise =
               (q, ty)
       go ((ann, q'', sco, mbK, vis) : qs) cs ty'
