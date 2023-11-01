@@ -142,8 +142,7 @@ makeTypeClassData args m s deps = TypeClassData args m' s deps determinedArgs co
     addVtaInfo memberTy = do
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex $ freeTypeVariables memberTy)
       let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets'
-      let vtaRequiredArgs = S.fromList $ mapMaybe (NEL.nonEmpty . S.toList) leftovers
-      if S.null vtaRequiredArgs then Nothing else Just vtaRequiredArgs
+      S.fromList <$> traverse (NEL.nonEmpty . S.toList) leftovers
 
     argToIndex :: Text -> Maybe Int
     argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
