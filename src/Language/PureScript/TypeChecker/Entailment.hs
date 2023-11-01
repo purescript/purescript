@@ -251,7 +251,8 @@ entails SolverOptions{..} constraint context hints =
             env <- lift . lift $ gets checkEnv
             let classesInScope = typeClasses env
             TypeClassData
-              { typeClassDependencies
+              { typeClassArguments
+              , typeClassDependencies
               , typeClassIsEmpty
               , typeClassCoveringSets
               , typeClassMembers 
@@ -280,7 +281,7 @@ entails SolverOptions{..} constraint context hints =
                   lefts [found]
             solution <- lift . lift 
               $ unique kinds'' tys'' ambiguous instances 
-              $ unknownsInAllCoveringSets typeClassMembers tys'' typeClassCoveringSets
+              $ unknownsInAllCoveringSets (fst . (typeClassArguments !!)) typeClassMembers tys'' typeClassCoveringSets
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
@@ -425,8 +426,8 @@ entails SolverOptions{..} constraint context hints =
               let fields = [ ("reflectType", Abs (VarBinder nullSourceSpan UnusedIdent) (asExpression ref)) ] in
               pure $ App (Constructor nullSourceSpan (coerceProperName . dictTypeName <$> C.Reflectable)) (Literal nullSourceSpan (ObjectLiteral fields))
 
-            unknownsInAllCoveringSets :: [(Ident, SourceType, Maybe (S.Set (NEL.NonEmpty Text)))] -> [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
-            unknownsInAllCoveringSets tyClassMembers tyArgs coveringSets = do
+            unknownsInAllCoveringSets :: (Int -> Text) -> [(Ident, SourceType, Maybe (S.Set (NEL.NonEmpty Int)))] -> [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
+            unknownsInAllCoveringSets indexToArgText tyClassMembers tyArgs coveringSets = do
               let unkIndices = findIndices containsUnknowns tyArgs
               if all (\s -> any (`S.member` s) unkIndices) coveringSets then 
                 fromMaybe Unknowns unknownsRequiringVtas
@@ -441,7 +442,7 @@ entails SolverOptions{..} constraint context hints =
                       where
                         -- Only keep type class members that need VTAs to resolve their type class instances
                         qualifyAndFilter (ident, _, mbVtaRequiredArgs) = flip fmap mbVtaRequiredArgs $ \vtaRequiredArgs ->
-                          (Qualified (ByModuleName tyClassModuleName) ident, map NEL.toList $ S.toList vtaRequiredArgs)
+                          (Qualified (ByModuleName tyClassModuleName) ident, map (map indexToArgText . NEL.toList) $ S.toList vtaRequiredArgs)
 
                     tyClassMembersInExpr :: Expr -> [(Qualified Ident, [[Text]])]
                     tyClassMembersInExpr = getVars

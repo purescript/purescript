@@ -54,7 +54,7 @@ data TypeClassData = TypeClassData
   { typeClassArguments :: [(Text, Maybe SourceType)]
   -- ^ A list of type argument names, and their kinds, where kind annotations
   -- were provided.
-  , typeClassMembers :: [(Ident, SourceType, Maybe (S.Set (NEL.NonEmpty Text)))]
+  , typeClassMembers :: [(Ident, SourceType, Maybe (S.Set (NEL.NonEmpty Int)))]
   -- ^ A list of type class members and their types and whether or not
   -- they have type variables that must be defined using Visible Type Applications.
   -- Type arguments listed above are considered bound in these types.
@@ -138,11 +138,11 @@ makeTypeClassData args m s deps = TypeClassData args m' s deps determinedArgs co
 
     m' = map (\(a, b) -> (a, b, addVtaInfo b)) m
     
-    addVtaInfo :: SourceType -> Maybe (S.Set (NEL.NonEmpty Text))
+    addVtaInfo :: SourceType -> Maybe (S.Set (NEL.NonEmpty Int))
     addVtaInfo memberTy = do
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex $ freeTypeVariables memberTy)
       let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets'
-      let vtaRequiredArgs = S.fromList $ mapMaybe (NEL.nonEmpty . map (fst . (args !!)) . S.toList) leftovers
+      let vtaRequiredArgs = S.fromList $ mapMaybe (NEL.nonEmpty . S.toList) leftovers
       if S.null vtaRequiredArgs then Nothing else Just vtaRequiredArgs
 
     argToIndex :: Text -> Maybe Int

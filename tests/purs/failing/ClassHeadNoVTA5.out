@@ -12,8 +12,8 @@ at tests/purs/failing/ClassHeadNoVTA5.purs:8:15 - 8:29 (line 8, column 15 - line
   Note: The following type class members found in the expression require visible type applications to be unambiguous (e.g. [33mtyClassMember @Int[0m).
     [33mMain.useMultiFdBidi[0m
       One of the following sets of type variables:
-        norThisOne
         tyNotAppearInBody
+        norThisOne
 
 while checking that type [33mforall (t20 :: Type) (t21 :: Type) (@tyNotAppearInBody :: t20) (@norThisOne :: t21). MultiFdBidi @t20 @t21 tyNotAppearInBody norThisOne => Int[0m
   is at least as general as type [33mInt[0m
