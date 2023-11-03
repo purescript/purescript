@@ -23,8 +23,7 @@
   Without VTAs, the compiler
   will still produce an `InstanceNotFound` error, but this error 
   has been updated to note which type variables in the class head
-  can only be disambiguated via visible type applications 
-  (except for one situation involving type synonyms).
+  can only be disambiguated via visible type applications.
   Given the following code
 
   ```purs
@@ -69,13 +68,4 @@
       One of the following sets of type variables:
         a
         b
-  ```
-
-  In both cases above, the `NoInstanceFound` error will not include 
-  the VTA-required-args info when the type class member's type signature uses a type synonym.
-  For example,
-  ```purs
-  type Synonym = Array
-  class MyClass a b c where
-    tyClassMember :: Synonym a
   ```
