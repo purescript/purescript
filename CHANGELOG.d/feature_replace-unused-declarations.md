@@ -11,8 +11,8 @@
     bar :: Int
   ```
 
-  With the advent of Visible Type Applications (VTAs), 
-  one can inform the compiler via VTAs:
+  The recently-added visible type applications (VTAs)
+  can now be used to guide the compiler in such cases:
   
   ```purs
   class Foo a where bar :: Int
@@ -20,10 +20,10 @@
   someInt = bar @String -- use the `String` instance
   ```
 
-  However, failing to provide a VTA to direct the instance selection
+  Without VTAs, the compiler
   will still produce an `InstanceNotFound` error, but this error 
   has been updated to note which type variables in the class head
-  must be specified via Visible Type Applications 
+  can only be disambiguated via visible type applications 
   (except for one situation involving type synonyms).
   Given the following code
 
