@@ -1,0 +1,50 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ClassHeadNoVTA6b.purs:16:19 - 16:33 (line 16, column 19 - line 16, column 33)
+
+  No type class instance was found for
+  [33m                           [0m
+  [33m  Main.MultiCoveringSets a0[0m
+  [33m                         t3[0m
+  [33m                         c1[0m
+  [33m                         d2[0m
+  [33m                         t4[0m
+  [33m                         t5[0m
+  [33m                           [0m
+  The instance head contains unknown type variables.
+
+  Note: The following type class members found in the expression require visible type applications to be unambiguous (e.g. [33mtyClassMember @Int[0m).
+    [33mMain.partialOfABSet[0m
+      One of the following sets of type variables:
+        b
+        e, f
+
+while checking that type [33mforall (t70 :: Type) (t71 :: Type) (@a :: Type) (@b :: t70) (@c :: Type) (@d :: Type) (@e :: t71) (@f :: Type).[0m
+                         [33m  MultiCoveringSets @t70 @t71 a b c d e f => a                                                                 [0m
+                         [33m                                             -> { c :: c                                                       [0m
+                         [33m                                                , d :: d                                                       [0m
+                         [33m                                                }                                                              [0m
+  is at least as general as type [33ma0          [0m
+                                 [33m-> { c :: c1[0m
+                                 [33m   , d :: d2[0m
+                                 [33m   }        [0m
+while checking that expression [33mpartialOfABSet[0m
+  has type [33ma0          [0m
+           [33m-> { c :: c1[0m
+           [33m   , d :: d2[0m
+           [33m   }        [0m
+in value declaration [33mpartialOfABSet'[0m
+
+where [33ma0[0m is a rigid type variable
+        bound at (line 16, column 19 - line 16, column 33)
+      [33mc1[0m is a rigid type variable
+        bound at (line 16, column 19 - line 16, column 33)
+      [33md2[0m is a rigid type variable
+        bound at (line 16, column 19 - line 16, column 33)
+      [33mt3[0m is an unknown type
+      [33mt4[0m is an unknown type
+      [33mt5[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

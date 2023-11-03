@@ -18,7 +18,7 @@ import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter, tell)
 
 import Data.Foldable (for_, traverse_, toList)
-import Data.List (nub, nubBy, (\\), sort, group)
+import Data.List (nubBy, (\\), sort, group)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Either (partitionEithers)
 import Data.Text (Text)
@@ -45,7 +45,7 @@ import Language.PureScript.TypeChecker.Synonyms as T
 import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeChecker.Unify (varIfUnknown)
 import Language.PureScript.TypeClassDictionaries (NamedDict, TypeClassDictionaryInScope(..))
-import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), containsForAll, eqType, everythingOnTypes, freeTypeVariables, overConstraintArgs, srcInstanceType, unapplyTypes)
+import Language.PureScript.Types (Constraint(..), SourceConstraint, SourceType, Type(..), containsForAll, eqType, everythingOnTypes, overConstraintArgs, srcInstanceType, unapplyTypes)
 
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -161,7 +161,6 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
       hasSig = qualName `M.member` types env
   unless (hasSig || not (containsForAll kind)) $ do
     tell . errorMessage $ MissingKindDeclaration ClassSig (disqualify qualName) kind
-  traverse_ (checkMemberIsUsable newClass (typeSynonyms env) (types env)) classMembers
   putEnv $ env { types = M.insert qualName (kind, ExternData (nominalRolesForKind kind)) (types env)
                , typeClasses = M.insert qualifiedClassName newClass (typeClasses env) }
   where
@@ -179,29 +178,8 @@ addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
         Just tcd -> tcd
         Nothing -> internalError "Unknown super class in TypeClassDeclaration"
 
-    coveringSets :: TypeClassData -> [S.Set Int]
-    coveringSets = S.toList . typeClassCoveringSets
-
-    argToIndex :: Text -> Maybe Int
-    argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
-
     toPair (TypeDeclaration (TypeDeclarationData _ ident ty)) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
-
-    -- Currently we are only checking usability based on the type class currently
-    -- being defined.  If the mentioned arguments don't include a covering set,
-    -- then we won't be able to find a instance.
-    checkMemberIsUsable :: TypeClassData -> T.SynonymMap -> T.KindMap -> (Ident, SourceType) -> m ()
-    checkMemberIsUsable newClass syns kinds (ident, memberTy) = do
-      memberTy' <- T.replaceAllTypeSynonymsM syns kinds memberTy
-      let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
-      let leftovers = map (`S.difference` mentionedArgIndexes) (coveringSets newClass)
-
-      unless (any null leftovers) . throwError . errorMessage $
-        let
-          solutions = map (map (fst . (args !!)) . S.toList) leftovers
-        in
-          UnusableDeclaration ident (nub solutions)
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)

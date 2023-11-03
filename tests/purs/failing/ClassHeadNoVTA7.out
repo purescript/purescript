@@ -1,0 +1,25 @@
+Error found:
+in module [33mClassHeadNoVTA7[0m
+at tests/purs/failing/ClassHeadNoVTA7.purs:12:8 - 12:26 (line 12, column 8 - line 12, column 26)
+
+  No type class instance was found for
+  [33m                              [0m
+  [33m  ClassHeadNoVTA7.TestClass t1[0m
+  [33m                            t2[0m
+  [33m                              [0m
+  The instance head contains unknown type variables. Consider adding a type annotation.
+
+while applying a function [33mtestMethod[0m
+  of type [33mTestClass @t0 t1 t2 => Maybe t1 -> Int[0m
+  to argument [33mNothing[0m
+while checking that expression [33mtestMethod Nothing[0m
+  has type [33mInt[0m
+in value declaration [33mtest[0m
+
+where [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
+      [33mt2[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+
