@@ -93,7 +93,7 @@ data ErrorMessageHint
   deriving (Show)
 
 instance NFData ErrorMessageHint where
-  rnf x = ()
+  rnf _ = ()
 
 -- | Categories of hints
 data HintCategory
