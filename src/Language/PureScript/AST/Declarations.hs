@@ -10,7 +10,7 @@ import Prelude
 import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
-import Control.DeepSeq (NFData)
+import Control.DeepSeq (NFData (rnf))
 import Data.Functor.Identity (Identity(..))
 
 import Data.Aeson.TH (Options(..), SumEncoding(..), defaultOptions, deriveJSON)
@@ -91,6 +91,9 @@ data ErrorMessageHint
   | PositionedError (NEL.NonEmpty SourceSpan)
   | RelatedPositions (NEL.NonEmpty SourceSpan)
   deriving (Show)
+
+instance NFData ErrorMessageHint where
+  rnf x = ()
 
 -- | Categories of hints
 data HintCategory

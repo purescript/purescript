@@ -4,7 +4,7 @@ module Language.PureScript.Errors
   ) where
 
 import Prelude
-import Protolude (unsnoc)
+import Protolude (unsnoc, NFData (rnf), Generic)
 
 import Control.Arrow ((&&&))
 import Control.Exception (displayException)
@@ -200,10 +200,15 @@ data SimpleErrorMessage
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
   deriving (Show)
 
+instance NFData SimpleErrorMessage where
+  rnf x = rnf (show x)
+
 data ErrorMessage = ErrorMessage
   [ErrorMessageHint]
   SimpleErrorMessage
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance NFData ErrorMessage
 
 newtype ErrorSuggestion = ErrorSuggestion Text
 
@@ -372,7 +377,9 @@ errorCode em = case unwrapErrorMessage em of
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage]
-  } deriving (Show, Semigroup, Monoid)
+  } deriving (Show, Semigroup, Monoid, Generic)
+
+instance NFData MultipleErrors
 
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool
