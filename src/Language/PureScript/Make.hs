@@ -257,7 +257,7 @@ make ma@MakeActions{..} ms = do
           -- Force the externs (shallowly is enough) and warnings (deeply) to
           -- avoid retaining excess module data after the module is finished
           -- compiling
-          exts `seq` warnings `deepseq`
+          exts `deepseq` warnings `deepseq`
             return (BuildJobSucceeded (pwarnings' <> warnings) exts)
         Nothing -> return BuildJobSkipped
 
