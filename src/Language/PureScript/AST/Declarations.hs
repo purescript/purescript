@@ -93,7 +93,7 @@ data ErrorMessageHint
   deriving (Show)
 
 instance NFData ErrorMessageHint where
-  rnf _ = ()
+  rnf x = seq x ()
 
 -- | Categories of hints
 data HintCategory
@@ -298,7 +298,7 @@ data ImportDeclarationType
   -- An import with a list of references to hide: `import M hiding (foo)`
   --
   | Hiding [DeclarationRef]
-  deriving (Eq, Show, Generic, Serialise)
+  deriving (Eq, Show, Generic, Serialise, NFData)
 
 isExplicit :: ImportDeclarationType -> Bool
 isExplicit (Explicit _) = True

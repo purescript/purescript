@@ -254,9 +254,10 @@ make ma@MakeActions{..} ms = do
           idx <- C.takeMVar (bpIndex buildPlan)
           C.putMVar (bpIndex buildPlan) (idx + 1)
           (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
-          -- Force the warnings (somewhat deeply) to avoid retaining excess
-          -- module data after the module is finished compiling
-          warnings `deepseq`
+          -- Force the externs (shallowly is enough) and warnings (deeply) to
+          -- avoid retaining excess module data after the module is finished
+          -- compiling
+          exts `seq` warnings `deepseq`
             return (BuildJobSucceeded (pwarnings' <> warnings) exts)
         Nothing -> return BuildJobSkipped
 
