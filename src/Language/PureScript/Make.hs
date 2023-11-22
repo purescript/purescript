@@ -51,6 +51,8 @@ import Language.PureScript.CoreFn qualified as CF
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
 import Control.DeepSeq (deepseq)
+import Control.Monad.Base (MonadBase(liftBase))
+import Debug.Trace (traceMarker, traceMarkerIO)
 
 -- | Rebuild a single module.
 --
@@ -253,7 +255,9 @@ make ma@MakeActions{..} ms = do
           env <- C.readMVar (bpEnv buildPlan)
           idx <- C.takeMVar (bpIndex buildPlan)
           C.putMVar (bpIndex buildPlan) (idx + 1)
+          liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " start"
           (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
+          liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " end"
           -- Force the externs (shallowly is enough) and warnings (deeply) to
           -- avoid retaining excess module data after the module is finished
           -- compiling
