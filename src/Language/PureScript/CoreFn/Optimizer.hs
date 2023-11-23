@@ -14,7 +14,7 @@ import Language.PureScript.Constants.Libs qualified as C
 -- CoreFn optimization pass.
 --
 optimizeCoreFn :: Module Ann -> Supply (Module Ann)
-optimizeCoreFn m = fmap (\md -> m {moduleDecls = md}) . pure . optimizeModuleDecls $ moduleDecls m
+optimizeCoreFn m = fmap (\md -> m {moduleDecls = md}) . optimizeCommonSubexpressions (moduleName m) . optimizeModuleDecls $ moduleDecls m
 
 optimizeModuleDecls :: [Bind Ann] -> [Bind Ann]
 optimizeModuleDecls = map transformBinds
