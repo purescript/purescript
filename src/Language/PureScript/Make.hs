@@ -13,6 +13,7 @@ import Prelude
 
 import Control.Concurrent.Lifted as C
 import Control.Exception.Base (onException)
+import Control.Exception.Lifted (bracket_)
 import Control.Monad (foldM, unless, when)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
@@ -51,15 +52,15 @@ import Language.PureScript.CoreFn qualified as CF
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
 import Control.DeepSeq (deepseq)
+import Debug.Trace (traceMarkerIO)
 import Control.Monad.Base (MonadBase(liftBase))
-import Debug.Trace (traceMarker, traceMarkerIO)
 
 -- | Rebuild a single module.
 --
 -- This function is used for fast-rebuild workflows (PSCi and psc-ide are examples).
 rebuildModule
   :: forall m
-   . (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> [ExternsFile]
   -> Module
@@ -70,7 +71,7 @@ rebuildModule actions externs m = do
 
 rebuildModule'
   :: forall m
-   . (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> Env
   -> [ExternsFile]
@@ -80,7 +81,7 @@ rebuildModule' act env ext mdl = rebuildModuleWithIndex act env ext mdl Nothing
 
 rebuildModuleWithIndex
   :: forall m
-   . (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> Env
   -> [ExternsFile]
@@ -153,10 +154,13 @@ make ma@MakeActions{..} ms = do
 
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
   let totalModuleCount = length toBeRebuilt
+  capabilities <- getNumCapabilities
+  let concurrency = max 1 capabilities
+  lock <- C.newQSem concurrency
   for_ toBeRebuilt $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-    buildModule buildPlan moduleName totalModuleCount
+    buildModule lock buildPlan moduleName totalModuleCount
       (spanName . getModuleSourceSpan . CST.resPartial $ m)
       (fst $ CST.resFull m)
       (fmap importPrim . snd $ CST.resFull m)
@@ -230,8 +234,8 @@ make ma@MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: BuildPlan -> ModuleName -> Int -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
-  buildModule buildPlan moduleName cnt fp pwarnings mres deps = do
+  buildModule :: QSem -> BuildPlan -> ModuleName -> Int -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
+  buildModule lock buildPlan moduleName cnt fp pwarnings mres deps = do
     result <- flip catchError (return . BuildJobFailed) $ do
       let pwarnings' = CST.toMultipleWarnings fp pwarnings
       tell pwarnings'
@@ -255,14 +259,17 @@ make ma@MakeActions{..} ms = do
           env <- C.readMVar (bpEnv buildPlan)
           idx <- C.takeMVar (bpIndex buildPlan)
           C.putMVar (bpIndex buildPlan) (idx + 1)
-          liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " start"
-          (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
-          liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " end"
-          -- Force the externs (shallowly is enough) and warnings (deeply) to
-          -- avoid retaining excess module data after the module is finished
-          -- compiling
-          exts `deepseq` warnings `deepseq`
-            return (BuildJobSucceeded (pwarnings' <> warnings) exts)
+
+          (exts, warnings) <- bracket_ (C.waitQSem lock) (C.signalQSem lock) $ do
+            liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " start"
+            (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
+            liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " end"
+            -- Force the externs (shallowly is enough) and warnings (deeply) to
+            -- avoid retaining excess module data after the module is finished
+            -- compiling
+            exts `deepseq` warnings `deepseq`
+              return (exts, warnings)
+          return (BuildJobSucceeded (pwarnings' <> warnings) exts)
         Nothing -> return BuildJobSkipped
 
     BuildPlan.markComplete buildPlan moduleName result
