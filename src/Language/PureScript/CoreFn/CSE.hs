@@ -12,7 +12,7 @@ import Data.Bitraversable (bitraverse)
 import Data.Functor.Compose (Compose(..))
 import Data.IntMap.Monoidal qualified as IM
 import Data.IntSet qualified as IS
-import Data.Map qualified as M
+import Data.Map.Strict qualified as M
 import Data.Maybe (fromJust)
 import Data.Semigroup (Min(..))
 import Data.Semigroup.Generic (GenericSemigroupMonoid(..))
@@ -216,7 +216,7 @@ newScope isTopLevel body = local goDeeper $ do
     if isTopLevel
     then env{ _depth = depth', _deepestTopLevelScope = depth' }
     else env{ _depth = depth' }
-    where 
+    where
     depth' = succ _depth
 
 -- |
