@@ -107,13 +107,25 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     Abs (ss, com, Nothing) name (exprToCoreFn ss [] Nothing v)
   exprToCoreFn _ _ _ (A.Abs _ _) =
     internalError "Abs with Binder argument was not desugared before exprToCoreFn mn"
-  exprToCoreFn ss com ty (A.App v1 v2) =
-    App (ss, com, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
-  exprToCoreFn ss com ty (A.Unused _) =
+  exprToCoreFn ss com _ (A.App v1 v2) =
+    App (ss, com, (isDictCtor v1 || isSynthetic v2) `orEmpty` IsSyntheticApp) v1' v2'
+    where
+    v1' = exprToCoreFn ss [] Nothing v1
+    v2' = exprToCoreFn ss [] Nothing v2
+    isDictCtor = \case
+      A.Constructor _ (Qualified _ name) -> isDictTypeName name
+      _ -> False
+    isSynthetic = \case
+      A.App v3 v4            -> isDictCtor v3 || isSynthetic v3 && isSynthetic v4
+      A.Accessor _ v3        -> isSynthetic v3
+      A.Var NullSourceSpan _ -> True
+      A.Unused{}             -> True
+      _                      -> False
+  exprToCoreFn ss com _ (A.Unused _) =
     Var (ss, com, Nothing) C.I_undefined
-  exprToCoreFn _ com ty (A.Var ss ident) =
+  exprToCoreFn _ com _ (A.Var ss ident) =
     Var (ss, com, getValueMeta ident) ident
-  exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =
+  exprToCoreFn ss com _ (A.IfThenElse v1 v2 v3) =
     Case (ss, com, Nothing) [exprToCoreFn ss [] Nothing v1]
       [ CaseAlternative [LiteralBinder (ssAnn ss) $ BooleanLiteral True]
                         (Right $ exprToCoreFn ss [] Nothing v2)

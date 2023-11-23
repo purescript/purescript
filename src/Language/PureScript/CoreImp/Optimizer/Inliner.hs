@@ -23,7 +23,7 @@ import Data.Text qualified as T
 
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (PSString, mkString)
-import Language.PureScript.CoreImp.AST (AST(..), BinaryOperator(..), UnaryOperator(..), everywhere, everywhereTopDown, everywhereTopDownM, getSourceSpan)
+import Language.PureScript.CoreImp.AST (AST(..), BinaryOperator(..), InitializerEffects(..), UnaryOperator(..), everywhere, everywhereTopDown, everywhereTopDownM, getSourceSpan)
 import Language.PureScript.CoreImp.Optimizer.Common (pattern Ref, applyAll, isReassigned, isRebound, isUpdated, removeFromBlock, replaceIdent, replaceIdents)
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Constants.Libs qualified as C
@@ -79,31 +79,31 @@ inlineVariables = everywhere $ removeFromBlock go
   where
   go :: [AST] -> [AST]
   go [] = []
-  go (VariableIntroduction _ var (Just js) : sts)
+  go (VariableIntroduction _ var (Just (_, js)) : sts)
     | shouldInline js && not (any (isReassigned var) sts) && not (any (isRebound js) sts) && not (any (isUpdated var) sts) =
       go (map (replaceIdent var js) sts)
   go (s:sts) = s : go sts
 
-inlineCommonValues :: AST -> AST
-inlineCommonValues = everywhere convert
+inlineCommonValues :: (AST -> AST) -> AST -> AST
+inlineCommonValues expander = everywhere convert
   where
   convert :: AST -> AST
-  convert (App ss (Ref fn) [Ref dict])
+  convert (expander -> App ss (Ref fn) [Ref dict])
     | dict `elem` [C.P_semiringNumber, C.P_semiringInt], C.P_zero <- fn = NumericLiteral ss (Left 0)
     | dict `elem` [C.P_semiringNumber, C.P_semiringInt], C.P_one <- fn = NumericLiteral ss (Left 1)
     | C.P_boundedBoolean <- dict, C.P_bottom <- fn = BooleanLiteral ss False
     | C.P_boundedBoolean <- dict, C.P_top <- fn = BooleanLiteral ss True
-  convert (App ss (App _ (Ref C.P_negate) [Ref C.P_ringInt]) [x])
+  convert (App ss (expander -> App _ (Ref C.P_negate) [Ref C.P_ringInt]) [x])
     = Binary ss BitwiseOr (Unary ss Negate x) (NumericLiteral ss (Left 0))
-  convert (App ss (App _ (App _ (Ref fn) [Ref dict]) [x]) [y])
+  convert (App ss (App _ (expander -> App _ (Ref fn) [Ref dict]) [x]) [y])
     | C.P_semiringInt <- dict, C.P_add <- fn = intOp ss Add x y
     | C.P_semiringInt <- dict, C.P_mul <- fn = intOp ss Multiply x y
     | C.P_ringInt <- dict, C.P_sub <- fn = intOp ss Subtract x y
   convert other = other
   intOp ss op x y = Binary ss BitwiseOr (Binary ss op x y) (NumericLiteral ss (Left 0))
 
-inlineCommonOperators :: AST -> AST
-inlineCommonOperators = everywhereTopDown $ applyAll $
+inlineCommonOperators :: (AST -> AST) -> AST -> AST
+inlineCommonOperators expander = everywhereTopDown $ applyAll $
   [ binary C.P_semiringNumber C.P_add Add
   , binary C.P_semiringNumber C.P_mul Multiply
 
@@ -168,7 +168,7 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   binary :: (ModuleName, PSString) -> (ModuleName, PSString) -> BinaryOperator -> AST -> AST
   binary dict fn op = convert where
     convert :: AST -> AST
-    convert (App ss (App _ (App _ (Ref fn') [Ref dict']) [x]) [y]) | dict == dict', fn == fn' = Binary ss op x y
+    convert (App ss (App _ (expander -> App _ (Ref fn') [Ref dict']) [x]) [y]) | dict == dict', fn == fn' = Binary ss op x y
     convert other = other
   binary' :: (ModuleName, PSString) -> BinaryOperator -> AST -> AST
   binary' fn op = convert where
@@ -178,7 +178,7 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   unary :: (ModuleName, PSString) -> (ModuleName, PSString) -> UnaryOperator -> AST -> AST
   unary dict fn op = convert where
     convert :: AST -> AST
-    convert (App ss (App _ (Ref fn') [Ref dict']) [x]) | dict == dict', fn == fn' = Unary ss op x
+    convert (App ss (expander -> App _ (Ref fn') [Ref dict']) [x]) | dict == dict', fn == fn' = Unary ss op x
     convert other = other
   unary' :: (ModuleName, PSString) -> UnaryOperator -> AST -> AST
   unary' fn op = convert where
@@ -245,21 +245,21 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
-inlineFnComposition :: forall m. MonadSupply m => AST -> m AST
-inlineFnComposition = everywhereTopDownM convert
+inlineFnComposition :: forall m. MonadSupply m => (AST -> AST) -> AST -> m AST
+inlineFnComposition expander = everywhereTopDownM convert
   where
   convert :: AST -> m AST
-  convert (App s1 (App s2 (App _ (App _ (Ref fn) [Ref C.P_semigroupoidFn]) [x]) [y]) [z])
+  convert (App s1 (App s2 (App _ (expander -> App _ (Ref fn) [Ref C.P_semigroupoidFn]) [x]) [y]) [z])
     | C.P_compose <- fn = return $ App s1 x [App s2 y [z]]
     | C.P_composeFlipped <- fn = return $ App s2 y [App s1 x [z]]
-  convert app@(App ss (App _ (App _ (Ref fn) [Ref C.P_semigroupoidFn]) _) _)
+  convert app@(App ss (App _ (expander -> App _ (Ref fn) [Ref C.P_semigroupoidFn]) _) _)
     | fn `elem` [C.P_compose, C.P_composeFlipped] = mkApps ss <$> goApps app <*> freshName
   convert other = return other
 
   mkApps :: Maybe SourceSpan -> [Either AST (Text, AST)] -> Text -> AST
   mkApps ss fns a = App ss (Function ss Nothing [] (Block ss $ vars <> [Return Nothing comp])) []
     where
-    vars = uncurry (VariableIntroduction ss) . fmap Just <$> rights fns
+    vars = uncurry (VariableIntroduction ss) . fmap (Just . (UnknownEffects, )) <$> rights fns
     comp = Function ss Nothing [a] (Block ss [Return Nothing apps])
     apps = foldr (\fn acc -> App ss (mkApp fn) [acc]) (Var ss a) fns
 
@@ -267,17 +267,17 @@ inlineFnComposition = everywhereTopDownM convert
   mkApp = either id $ \(name, arg) -> Var (getSourceSpan arg) name
 
   goApps :: AST -> m [Either AST (Text, AST)]
-  goApps (App _ (App _ (App _ (Ref fn) [Ref C.P_semigroupoidFn]) [x]) [y])
+  goApps (App _ (App _ (expander -> App _ (Ref fn) [Ref C.P_semigroupoidFn]) [x]) [y])
     | C.P_compose <- fn = mappend <$> goApps x <*> goApps y
     | C.P_composeFlipped <- fn = mappend <$> goApps y <*> goApps x
   goApps app@App {} = pure . Right . (,app) <$> freshName
   goApps other = pure [Left other]
 
-inlineFnIdentity :: AST -> AST
-inlineFnIdentity = everywhereTopDown convert
+inlineFnIdentity :: (AST -> AST) -> AST -> AST
+inlineFnIdentity expander = everywhereTopDown convert
   where
   convert :: AST -> AST
-  convert (App _ (App _ (Ref C.P_identity) [Ref C.P_categoryFn]) [x]) = x
+  convert (App _ (expander -> App _ (Ref C.P_identity) [Ref C.P_categoryFn]) [x]) = x
   convert other = other
 
 inlineUnsafeCoerce :: AST -> AST

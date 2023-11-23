@@ -7,7 +7,7 @@ import Protolude (ordNub)
 
 import Data.Maybe (fromJust, isJust)
 
-import Language.PureScript.CoreImp.AST (AST(..), UnaryOperator(..), everything, everywhere, everywhereTopDown)
+import Language.PureScript.CoreImp.AST (AST(..), InitializerEffects(..), UnaryOperator(..), everything, everywhere, everywhereTopDown)
 import Language.PureScript.CoreImp.Optimizer.Common (pattern Ref)
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.PSString (mkString)
@@ -27,17 +27,17 @@ import Language.PureScript.Constants.Libs qualified as C
 --    var x = m1();
 --    ...
 --  }
-magicDoEff :: AST -> AST
+magicDoEff :: (AST -> AST) -> AST -> AST
 magicDoEff = magicDo C.M_Control_Monad_Eff C.effDictionaries
 
-magicDoEffect :: AST -> AST
+magicDoEffect :: (AST -> AST) -> AST -> AST
 magicDoEffect = magicDo C.M_Effect C.effectDictionaries
 
-magicDoST :: AST -> AST
+magicDoST :: (AST -> AST) -> AST -> AST
 magicDoST = magicDo C.M_Control_Monad_ST_Internal C.stDictionaries
 
-magicDo :: ModuleName -> C.EffectDictionaries -> AST -> AST
-magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
+magicDo :: ModuleName -> C.EffectDictionaries -> (AST -> AST) -> AST -> AST
+magicDo effectModule C.EffectDictionaries{..} expander = everywhereTopDown convert
   where
   -- The name of the function block which is added to denote a do block
   fnName = "__do"
@@ -54,7 +54,7 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
     Function s1 (Just fnName) [] $ Block s2 (App s2 m [] : map applyReturns js )
   -- Desugar bind
   convert (App _ (App _ bind [m]) [Function s1 Nothing [arg] (Block s2 js)]) | isBind bind =
-    Function s1 (Just fnName) [] $ Block s2 (VariableIntroduction s2 arg (Just (App s2 m [])) : map applyReturns js)
+    Function s1 (Just fnName) [] $ Block s2 (VariableIntroduction s2 arg (Just (UnknownEffects, App s2 m [])) : map applyReturns js)
   -- Desugar untilE
   convert (App s1 (App _ f [arg]) []) | isEffFunc edUntil f =
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (Unary s1 Not (App s1 arg [])) (Block s1 []), Return s1 $ ObjectLiteral s1 []])) []
@@ -68,13 +68,13 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
     App s1 (Function s2 Nothing [] (Block ss (applyReturns `fmap` body))) []
   convert other = other
   -- Check if an expression represents a monomorphic call to >>= for the Eff monad
-  isBind (App _ (Ref C.P_bind) [Ref dict]) = (effectModule, edBindDict) == dict
+  isBind (expander -> App _ (Ref C.P_bind) [Ref dict]) = (effectModule, edBindDict) == dict
   isBind _ = False
   -- Check if an expression represents a call to @discard@
-  isDiscard (App _ (App _ (Ref C.P_discard) [Ref C.P_discardUnit]) [Ref dict]) = (effectModule, edBindDict) == dict
+  isDiscard (expander -> App _ (expander -> App _ (Ref C.P_discard) [Ref C.P_discardUnit]) [Ref dict]) = (effectModule, edBindDict) == dict
   isDiscard _ = False
   -- Check if an expression represents a monomorphic call to pure or return for the Eff applicative
-  isPure (App _ (Ref C.P_pure) [Ref dict]) = (effectModule, edApplicativeDict) == dict
+  isPure (expander -> App _ (Ref C.P_pure) [Ref dict]) = (effectModule, edApplicativeDict) == dict
   isPure _ = False
   -- Check if an expression represents a function in the Effect module
   isEffFunc name (Ref fn) = (effectModule, name) == fn
@@ -118,7 +118,7 @@ inlineST = everywhere convertBlock
   -- Find all ST Refs initialized in this block
   findSTRefsIn = everything (++) isSTRef
     where
-    isSTRef (VariableIntroduction _ ident (Just (App _ (App _ (Ref C.P_new) [_]) []))) = [ident]
+    isSTRef (VariableIntroduction _ ident (Just (_, App _ (App _ (Ref C.P_new) [_]) []))) = [ident]
     isSTRef _ = []
   -- Find all STRefs used as arguments to read, write, modify
   findAllSTUsagesIn = everything (++) isSTUsage
