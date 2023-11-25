@@ -39,8 +39,8 @@ import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage')
 import Language.PureScript.Names (Ident, ModuleName, Name(..), OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, disqualify, getQual)
+import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
-import Protolude (Generic)
 
 -- |
 -- The details for an import: the name of the thing that is being imported

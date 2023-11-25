@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
 -- |
 -- The core functional representation for literal values.
 --
@@ -38,4 +37,6 @@ data Literal a
   -- An object literal
   --
   | ObjectLiteral [(PSString, a)]
-  deriving (Eq, Ord, Show, Functor, Generic, NFData)
+  deriving (Eq, Ord, Show, Functor, Generic)
+
+instance NFData a => NFData (Literal a)

@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
 -- |
 -- Case binders
 --
@@ -64,7 +63,9 @@ data Binder
   -- A binder with a type annotation
   --
   | TypedBinder SourceType Binder
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic)
+
+instance NFData Binder
 
 -- Manual Eq and Ord instances for `Binder` were added on 2018-03-05. Comparing
 -- the `SourceSpan` values embedded in some of the data constructors of `Binder`

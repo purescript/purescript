@@ -4,7 +4,7 @@ module Language.PureScript.Errors
   ) where
 
 import Prelude
-import Protolude (unsnoc, NFData, Generic)
+import Protolude (unsnoc)
 
 import Control.Arrow ((&&&))
 import Control.Lens (both, head1, over)
@@ -52,6 +52,8 @@ import System.Console.ANSI qualified as ANSI
 import System.FilePath (makeRelative)
 import Text.PrettyPrint.Boxes qualified as Box
 import Witherable (wither)
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 -- | A type of error messages
 data SimpleErrorMessage
@@ -946,7 +948,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                           <> case argsRequiringVtas of
                               [required] ->
                                 [ Box.moveRight 2 $ line $ T.intercalate ", " required ]
-                              options -> 
+                              options ->
                                 [ Box.moveRight 2 $ line "One of the following sets of type variables:"
                                 , Box.moveRight 2 $ paras $
                                     map (\set -> Box.moveRight 2 $ line $ T.intercalate ", " set) options
