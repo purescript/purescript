@@ -1,0 +1,37 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ClassHeadNoVTA6a.purs:12:15 - 12:25 (line 12, column 15 - line 12, column 25)
+
+  No type class instance was found for
+  [33m                           [0m
+  [33m  Main.MultiCoveringSets t0[0m
+  [33m                         t1[0m
+  [33m                         t2[0m
+  [33m                         t3[0m
+  [33m                         t4[0m
+  [33m                         t5[0m
+  [33m                           [0m
+  The instance head contains unknown type variables.
+
+  Note: The following type class members found in the expression require visible type applications to be unambiguous (e.g. [33mtyClassMember @Int[0m).
+    [33mMain.noneOfSets[0m
+      One of the following sets of type variables:
+        a, b
+        e, f
+
+while checking that type [33mforall (t82 :: Type) (t83 :: Type) (@a :: Type) (@b :: t82) (@c :: Type) (@d :: Type) (@e :: t83) (@f :: Type). MultiCoveringSets @t82 @t83 a b c d e f => Int[0m
+  is at least as general as type [33mInt[0m
+while checking that expression [33mnoneOfSets[0m
+  has type [33mInt[0m
+in value declaration [33mnoneOfSets'[0m
+
+where [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
+      [33mt2[0m is an unknown type
+      [33mt3[0m is an unknown type
+      [33mt4[0m is an unknown type
+      [33mt5[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

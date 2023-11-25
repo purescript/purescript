@@ -110,7 +110,7 @@ data SimpleErrorMessage
   | NoInstanceFound
       SourceConstraint -- ^ constraint that could not be solved
       [Qualified (Either SourceType Ident)] -- ^ a list of instances that stopped further progress in instance chains due to ambiguity
-      Bool -- ^ whether eliminating unknowns with annotations might help
+      UnknownsHint -- ^ whether eliminating unknowns with annotations might help or if visible type applications are required
   | AmbiguousTypeVariables SourceType [(Text, Int)]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
@@ -176,8 +176,6 @@ data SimpleErrorMessage
   | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
   -- | a user-defined warning raised by using the Warn type class
   | UserDefinedWarning SourceType
-  -- | a declaration couldn't be used because it contained free variables
-  | UnusableDeclaration Ident [[Text]]
   | CannotDefinePrimModules ModuleName
   | MixedAssociativityError (NEL.NonEmpty (Qualified (OpName 'AnyOpName), Associativity))
   | NonAssociativeError (NEL.NonEmpty (Qualified (OpName 'AnyOpName)))
@@ -355,7 +353,6 @@ errorCode em = case unwrapErrorMessage em of
   CannotUseBindWithDo{} -> "CannotUseBindWithDo"
   ClassInstanceArityMismatch{} -> "ClassInstanceArityMismatch"
   UserDefinedWarning{} -> "UserDefinedWarning"
-  UnusableDeclaration{} -> "UnusableDeclaration"
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
   MixedAssociativityError{} -> "MixedAssociativityError"
   NonAssociativeError{} -> "NonAssociativeError"
@@ -922,7 +919,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _) ambiguous unks) =
-      paras [ line "No type class instance was found for"
+      paras $
+            [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map prettyTypeAtom ts)
@@ -935,10 +933,32 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                         [] -> []
                         [_] -> useMessage "The following instance partially overlaps the above constraint, which means the rest of its instance chain will not be considered:"
                         _ -> useMessage "The following instances partially overlap the above constraint, which means the rest of their instance chains will not be considered:"
-            , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
-                    | unks
-                    ]
-            ]
+            ] <> case unks of
+                  NoUnknowns ->
+                    []
+                  Unknowns ->
+                    [ line "The instance head contains unknown type variables. Consider adding a type annotation." ]
+                  UnknownsWithVtaRequiringArgs tyClassMembersRequiringVtas ->
+                    let
+                      renderSingleTyClassMember (tyClassMember, argsRequiringVtas) =
+                        Box.moveRight 2 $ paras $
+                          [ line $ markCode (showQualified showIdent tyClassMember) ]
+                          <> case argsRequiringVtas of
+                              [required] ->
+                                [ Box.moveRight 2 $ line $ T.intercalate ", " required ]
+                              options -> 
+                                [ Box.moveRight 2 $ line "One of the following sets of type variables:"
+                                , Box.moveRight 2 $ paras $
+                                    map (\set -> Box.moveRight 2 $ line $ T.intercalate ", " set) options
+                                ]
+                    in
+                      [ paras
+                        [ line "The instance head contains unknown type variables."
+                        , Box.moveDown 1 $ paras $
+                            [ line $ "Note: The following type class members found in the expression require visible type applications to be unambiguous (e.g. " <> markCode "tyClassMember @Int" <> ")."]
+                            <> map renderSingleTyClassMember (NEL.toList tyClassMembersRequiringVtas)
+                        ]
+                      ]
     renderSimpleErrorMessage (AmbiguousTypeVariables t uis) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ prettyType t
@@ -1280,22 +1300,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       let msg = fromMaybe (prettyType msgTy) (toTypelevelString msgTy) in
       paras [ line "A custom warning occurred while solving type class constraints:"
             , indent msg
-            ]
-
-    renderSimpleErrorMessage (UnusableDeclaration ident unexplained) =
-      paras $
-        [ line $ "The declaration " <> markCode (showIdent ident) <> " contains arguments that couldn't be determined."
-        ] <>
-
-        case unexplained of
-          [required] ->
-            [ line $ "These arguments are: { " <> T.intercalate ", " required <> " }"
-            ]
-
-          options  ->
-            [ line "To fix this, one of the following sets of variables must be determined:"
-            , Box.moveRight 2 . Box.vsep 0 Box.top $
-                map (\set -> line $ "{ " <> T.intercalate ", " set <> " }") options
             ]
 
     renderSimpleErrorMessage (CannotDefinePrimModules mn) =

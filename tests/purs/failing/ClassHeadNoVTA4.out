@@ -1,0 +1,27 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ClassHeadNoVTA4.purs:8:11 - 8:21 (line 8, column 11 - line 8, column 21)
+
+  No type class instance was found for
+  [33m                 [0m
+  [33m  Main.MultiFd t0[0m
+  [33m               t1[0m
+  [33m                 [0m
+  The instance head contains unknown type variables.
+
+  Note: The following type class members found in the expression require visible type applications to be unambiguous (e.g. [33mtyClassMember @Int[0m).
+    [33mMain.useMultiFd[0m
+      tyNotAppearInBody
+
+while checking that type [33mforall (t20 :: Type) (t21 :: Type) (@tyNotAppearInBody :: t20) (@norThisOne :: t21). MultiFd @t20 @t21 tyNotAppearInBody norThisOne => Int[0m
+  is at least as general as type [33mInt[0m
+while checking that expression [33museMultiFd[0m
+  has type [33mInt[0m
+in value declaration [33mmultiFd[0m
+
+where [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

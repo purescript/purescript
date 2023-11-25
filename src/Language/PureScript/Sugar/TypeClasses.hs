@@ -305,7 +305,7 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarati
   in ValueDecl sa ident Private []
     [MkUnguarded (
      TypedValue False (Abs (VarBinder ss dictIdent) (Case [Var ss $ Qualified ByNullSourcePos dictIdent] [CaseAlternative [ctor] [MkUnguarded acsr]])) $
-       addVisibility visibility (moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty)))
+       addVisibility visibility (moveQuantifiersToFront NullSourceAnn (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty)))
     )]
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 
@@ -333,7 +333,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
       M.lookup (qualify mn className) m
 
   -- Replace the type arguments with the appropriate types in the member types
-  let memberTypes = map (second (replaceAllTypeVars (zip (map fst typeClassArguments) tys))) typeClassMembers
+  let memberTypes = map (second (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) . tuple3To2) typeClassMembers
 
   let declaredMembers = S.fromList $ mapMaybe declIdent decls
 
@@ -386,3 +386,6 @@ superClassDictionaryNames supers =
   [ superclassName pn index
   | (index, Constraint _ pn _ _ _) <- zip [0..] supers
   ]
+
+tuple3To2 :: (a, b, c) -> (a, b)
+tuple3To2 (a, b, _) = (a, b)
