@@ -107,14 +107,14 @@ data HintCategory
 
 -- |
 -- In constraint solving, indicates whether there were `TypeUnknown`s that prevented
--- an instance from being found, and whether VTAs are required 
+-- an instance from being found, and whether VTAs are required
 -- due to type class members not referencing all the type class
 -- head's type variables.
 data UnknownsHint
   = NoUnknowns
   | Unknowns
   | UnknownsWithVtaRequiringArgs (NEL.NonEmpty (Qualified Ident, [[Text]]))
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 -- |
 -- A module declaration, consisting of comments about the module, a module name,
