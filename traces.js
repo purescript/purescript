@@ -19,6 +19,7 @@ function summarizeEventlog(filename) {
     var traces = {};
     var minTx = Infinity;
     var maxTx = -Infinity;
+    var maxMem = -Infinity;
     var total = 0;
     var con = [];
     var max_cons = [[]];
@@ -70,6 +71,7 @@ function summarizeEventlog(filename) {
             var mems = eventlog.heap.slice(traces[name].cursor, cursor).map(e => e.y);
             var mem_min = Math.min(...mems);
             var mem_max = Math.max(...mems);
+            var maxMem = Math.max(maxMem, mem_max);
             Object.assign(traces[name], {mem_min,mem_max});
             total += traces[name].time;
         }
@@ -91,7 +93,39 @@ function summarizeEventlog(filename) {
 
     var timespan = maxTx - minTx;
 
-    return { traces, total, minTx, maxTx, timespan, max_cons };
+    return { traces, total, minTx, maxTx, timespan, max_cons, maxMem };
+}
+
+var mainFiles = process.argv.slice(2);
+
+if (mainFiles.length > 1) {
+    for (let file of mainFiles) {
+        console.log(file);
+        var { traces, total, timespan, max_cons, maxMem } = summarizeEventlog(file);
+        if (timespan === -Infinity && total === 0 && max_cons[0].length === 0) continue;
+        var max_con_time = 0;
+        var concurrencies = max_cons.map(max_con => {
+            if (max_con.length !== max_cons[0].length)
+                throw new Error("max_con length error");
+            var modules = max_con.map(name => [name, traces[name]]);
+            var start = Math.max(...modules.map(([name, {start}]) => start));
+            var end = Math.min(...modules.map(([name, {end}]) => end));
+            var time = end - start;
+            max_con_time += time;
+            return {
+                modules,
+                start,
+                end,
+                time,
+            };
+        });
+        console.log("timespan                   ", timespan);
+        console.log("ratio (avg concurrency?)   ", total/timespan);
+        console.log("max concurrency            ", max_cons[0].length);
+        console.log("time at max concurrency (%)", 100*max_con_time/timespan);
+        console.log("peak heap size             ", space(maxMem));
+    }
+    process.exit(0);
 }
 
 var { traces, total, timespan, max_cons } = summarizeEventlog(mainFile);
@@ -139,3 +173,30 @@ for (let [name, time] of timings) {
 
 //require("fs").writeFileSync("concurrencies.json", JSON.stringify(concurrencies, null, 2), "utf-8");
 
+
+function space(v) {
+    if (!isFinite(v)) return "----";
+    if (v === Infinity) return "+Inf";
+    if (v === -Infinity) return "-Inf";
+    if (v !== v) return " NaN";
+    var sizes = [
+        [1_000_000_000, "G"],
+        [1_000_000,     "M"],
+        [1_000,         "K"],
+        [0,             ""],
+    ]
+    for (let [value, suffix] of sizes) {
+        if (v < value) continue;
+        if (!suffix) return (""+v).padStart(4, " ");
+        var adj = v/value;
+        var str = ""+adj;
+        if (adj >= 100) return str.substring(0,3)+suffix;
+        if (adj >= 10) return " "+str.substring(0,2)+suffix;
+        return str.substring(0,3)+suffix;
+    }
+}
+function signed(fmt, v) {
+    if (!isFinite(v)) return " "+fmt(v);
+    if (v < 0) return "-"+fmt(-v);
+    return "+"+fmt(v);
+}
