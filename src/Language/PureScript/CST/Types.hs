@@ -16,16 +16,21 @@ import GHC.Generics (Generic)
 import Language.PureScript.Names qualified as N
 import Language.PureScript.Roles qualified as R
 import Language.PureScript.PSString (PSString)
+import Control.DeepSeq (NFData)
 
 data SourcePos = SourcePos
   { srcLine :: {-# UNPACK #-} !Int
   , srcColumn :: {-# UNPACK #-} !Int
   } deriving (Show, Eq, Ord, Generic)
 
+instance NFData SourcePos
+
 data SourceRange = SourceRange
   { srcStart :: !SourcePos
   , srcEnd :: !SourcePos
   } deriving (Show, Eq, Ord, Generic)
+
+instance NFData SourceRange
 
 data Comment l
   = Comment !Text
@@ -33,8 +38,12 @@ data Comment l
   | Line !l
   deriving (Show, Eq, Ord, Generic, Functor)
 
+instance NFData l => NFData (Comment l)
+
 data LineFeed = LF | CRLF
   deriving (Show, Eq, Ord, Generic)
+
+instance NFData LineFeed
 
 data TokenAnn = TokenAnn
   { tokRange :: !SourceRange
@@ -42,8 +51,12 @@ data TokenAnn = TokenAnn
   , tokTrailingComments :: ![Comment Void]
   } deriving (Show, Eq, Ord, Generic)
 
+instance NFData TokenAnn
+
 data SourceStyle = ASCII | Unicode
   deriving (Show, Eq, Ord, Generic)
+
+instance NFData SourceStyle
 
 data Token
   = TokLeftParen
@@ -81,10 +94,14 @@ data Token
   | TokEof
   deriving (Show, Eq, Ord, Generic)
 
+instance NFData Token
+
 data SourceToken = SourceToken
   { tokAnn :: !TokenAnn
   , tokValue :: !Token
   } deriving (Show, Eq, Ord, Generic)
+
+instance NFData SourceToken
 
 data Ident = Ident
   { getIdent :: Text

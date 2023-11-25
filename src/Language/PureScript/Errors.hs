@@ -4,10 +4,9 @@ module Language.PureScript.Errors
   ) where
 
 import Prelude
-import Protolude (unsnoc, NFData (rnf), Generic)
+import Protolude (unsnoc, NFData, Generic)
 
 import Control.Arrow ((&&&))
-import Control.Exception (displayException)
 import Control.Lens (both, head1, over)
 import Control.Monad (forM, unless)
 import Control.Monad.Error.Class (MonadError(..))
@@ -70,7 +69,7 @@ data SimpleErrorMessage
   | DeprecatedFFICommonJSModule ModuleName FilePath
   | UnsupportedFFICommonJSExports ModuleName [Text]
   | UnsupportedFFICommonJSImports ModuleName [Text]
-  | FileIOError Text IOError -- ^ A description of what we were trying to do, and the error which occurred
+  | FileIOError Text Text -- ^ A description of what we were trying to do, and the error which occurred
   | InfiniteType SourceType
   | InfiniteKind SourceType
   | MultipleValueOpFixities (OpName 'ValueOpName)
@@ -198,10 +197,9 @@ data SimpleErrorMessage
   | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName)) [Qualified (ProperName 'ClassName)] Bool
   | CannotSkipTypeApplication SourceType
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
-  deriving (Show)
+  deriving (Show, Generic)
 
-instance NFData SimpleErrorMessage where
-  rnf x = rnf (show x)
+instance NFData SimpleErrorMessage
 
 data ErrorMessage = ErrorMessage
   [ErrorMessageHint]
@@ -689,7 +687,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             ]
     renderSimpleErrorMessage (FileIOError doWhat err) =
       paras [ line $ "I/O error while trying to " <> doWhat
-            , indent . lineS $ displayException err
+            , indent . line $ err
             ]
     renderSimpleErrorMessage (ErrorParsingFFIModule path extra) =
       paras $ [ line "Unable to parse foreign module:"
