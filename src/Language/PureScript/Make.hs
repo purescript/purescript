@@ -12,13 +12,12 @@ module Language.PureScript.Make
 import Prelude
 
 import Control.Concurrent.Lifted as C
-import Control.Exception.Base (onException)
-import Control.Exception.Lifted (bracket_)
+import Control.Exception.Lifted (onException, bracket_, evaluate)
 import Control.Monad (foldM, unless, when)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Supply (evalSupplyT, runSupply, runSupplyT)
-import Control.Monad.Trans.Control (MonadBaseControl(..), control)
+import Control.Monad.Trans.Control (MonadBaseControl(..))
 import Control.Monad.Trans.State (runStateT)
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 import Control.Monad.Writer.Strict (runWriterT)
@@ -51,7 +50,7 @@ import Language.PureScript.Make.Monad as Monad
 import Language.PureScript.CoreFn qualified as CF
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
-import Control.DeepSeq (deepseq)
+import Control.DeepSeq (force)
 import Debug.Trace (traceMarkerIO)
 import Control.Monad.Base (MonadBase(liftBase))
 
@@ -152,11 +151,17 @@ make ma@MakeActions{..} ms = do
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
-  let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
-  let totalModuleCount = length toBeRebuilt
+  -- Limit concurrent module builds to the number of capabilities as set by
+  -- (by default) inferred from `+RTS -N -RTS` or set explicitly like `-N4`.
+  -- This is to ensure that modules complete fully before moving on, to avoid
+  -- holding excess memory during compilation from modules that were paused
+  -- by the Haskell runtime.
   capabilities <- getNumCapabilities
   let concurrency = max 1 capabilities
   lock <- C.newQSem concurrency
+
+  let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
+  let totalModuleCount = length toBeRebuilt
   for_ toBeRebuilt $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
@@ -168,7 +173,7 @@ make ma@MakeActions{..} ms = do
 
       -- Prevent hanging on other modules when there is an internal error
       -- (the exception is thrown, but other threads waiting on MVars are released)
-      `onExceptionLifted` BuildPlan.markComplete buildPlan moduleName (BuildJobFailed mempty)
+      `onException` BuildPlan.markComplete buildPlan moduleName (BuildJobFailed mempty)
 
   -- Wait for all threads to complete, and collect results (and errors).
   (failures, successes) <-
@@ -260,22 +265,20 @@ make ma@MakeActions{..} ms = do
           idx <- C.takeMVar (bpIndex buildPlan)
           C.putMVar (bpIndex buildPlan) (idx + 1)
 
+          -- Bracket all of the per-module work behind the semaphore, including
+          -- forcing the result. This is done to limit concurrency and keep
+          -- memory usage down; see comments above.
           (exts, warnings) <- bracket_ (C.waitQSem lock) (C.signalQSem lock) $ do
             liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " start"
             (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
             liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " end"
-            -- Force the externs (shallowly is enough) and warnings (deeply) to
-            -- avoid retaining excess module data after the module is finished
-            -- compiling
-            exts `deepseq` warnings `deepseq`
-              return (exts, warnings)
+            -- Force the externs and warnings to avoid retaining excess module
+            -- data after the module is finished compiling.
+            evaluate $ force (exts, warnings)
           return (BuildJobSucceeded (pwarnings' <> warnings) exts)
         Nothing -> return BuildJobSkipped
 
     BuildPlan.markComplete buildPlan moduleName result
-
-  onExceptionLifted :: m a -> m b -> m a
-  onExceptionLifted l r = control $ \runInIO -> runInIO l `onException` runInIO r
 
 -- | Infer the module name for a module by looking for the same filename with
 -- a .js extension.
