@@ -1,9 +1,17 @@
-// Run a command like this to generate purs.eventlog
-// (probably need to build with profiling enabled)
+// Debug compilation times of modules from eventlog profiling
+//
+// Build purs with profiling enabled.
+// Run a command like this to generate purs.eventlog:
 //     purs +RTS -l-agu -i1.5 -hc -RTS compile -g corefn $(spago sources)
+// (If you want accurate stats for individual modules, add -N1.)
 // Process it with
 //     eventlog2html --json purs.eventlog
-//     node trace.js purs.eventlog.json
+//     node eventlog.js purs.eventlog.json
+//
+// See the GHC docs for descriptions of the RTS flags:
+//   - https://downloads.haskell.org/ghc/latest/docs/users_guide/profiling.html#rts-options-for-heap-profiling
+//   - https://downloads.haskell.org/ghc/latest/docs/users_guide/runtime_control.html#rts-eventlog
+//   - https://downloads.haskell.org/ghc/latest/docs/users_guide/using-concurrent.html?highlight=threaded#rts-options-for-smp-parallelism
 var mainFile = process.argv[2];
 if (!mainFile) throw new Error("Provide a file name");
 
