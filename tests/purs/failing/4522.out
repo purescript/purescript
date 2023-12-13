@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/4522.purs:4:11 - 4:12 (line 4, column 11 - line 4, column 12)
+
+  Unable to parse module:
+  Unexpected token '@'
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+
