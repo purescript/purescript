@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 -- | This module contains data types for the entire PureScript surface language. Every
 -- token is represented in the tree, and every token is annotated with
 -- whitespace and comments (both leading and trailing). This means one can write
@@ -9,6 +10,7 @@ module Language.PureScript.CST.Types where
 
 import Prelude
 
+import Control.DeepSeq (NFData)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Data.Void (Void)
@@ -16,47 +18,34 @@ import GHC.Generics (Generic)
 import Language.PureScript.Names qualified as N
 import Language.PureScript.Roles qualified as R
 import Language.PureScript.PSString (PSString)
-import Control.DeepSeq (NFData)
 
 data SourcePos = SourcePos
   { srcLine :: {-# UNPACK #-} !Int
   , srcColumn :: {-# UNPACK #-} !Int
-  } deriving (Show, Eq, Ord, Generic)
-
-instance NFData SourcePos
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data SourceRange = SourceRange
   { srcStart :: !SourcePos
   , srcEnd :: !SourcePos
-  } deriving (Show, Eq, Ord, Generic)
-
-instance NFData SourceRange
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data Comment l
   = Comment !Text
   | Space {-# UNPACK #-} !Int
   | Line !l
-  deriving (Show, Eq, Ord, Generic, Functor)
-
-instance NFData l => NFData (Comment l)
+  deriving (Show, Eq, Ord, Generic, Functor, NFData)
 
 data LineFeed = LF | CRLF
-  deriving (Show, Eq, Ord, Generic)
-
-instance NFData LineFeed
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data TokenAnn = TokenAnn
   { tokRange :: !SourceRange
   , tokLeadingComments :: ![Comment LineFeed]
   , tokTrailingComments :: ![Comment Void]
-  } deriving (Show, Eq, Ord, Generic)
-
-instance NFData TokenAnn
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data SourceStyle = ASCII | Unicode
-  deriving (Show, Eq, Ord, Generic)
-
-instance NFData SourceStyle
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data Token
   = TokLeftParen
@@ -92,16 +81,12 @@ data Token
   | TokLayoutSep
   | TokLayoutEnd
   | TokEof
-  deriving (Show, Eq, Ord, Generic)
-
-instance NFData Token
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data SourceToken = SourceToken
   { tokAnn :: !TokenAnn
   , tokValue :: !Token
-  } deriving (Show, Eq, Ord, Generic)
-
-instance NFData SourceToken
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data Ident = Ident
   { getIdent :: Text

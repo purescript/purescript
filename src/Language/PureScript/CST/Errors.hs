@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module Language.PureScript.CST.Errors
   ( ParserErrorInfo(..)
   , ParserErrorType(..)
@@ -11,14 +12,14 @@ module Language.PureScript.CST.Errors
 
 import Prelude
 
+import Control.DeepSeq (NFData)
 import Data.Text qualified as Text
 import Data.Char (isSpace, toUpper)
+import GHC.Generics (Generic)
 import Language.PureScript.CST.Layout (LayoutStack)
 import Language.PureScript.CST.Print (printToken)
 import Language.PureScript.CST.Types (SourcePos(..), SourceRange(..), SourceToken(..), Token(..))
 import Text.Printf (printf)
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
 
 data ParserErrorType
   = ErrWildcardInType
@@ -58,9 +59,7 @@ data ParserErrorType
   | ErrConstraintInForeignImportSyntax
   | ErrEof
   | ErrCustom String
-  deriving (Show, Eq, Ord, Generic)
-
-instance NFData ParserErrorType
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data ParserWarningType
   = WarnDeprecatedRowSyntax
@@ -68,18 +67,14 @@ data ParserWarningType
   | WarnDeprecatedKindImportSyntax
   | WarnDeprecatedKindExportSyntax
   | WarnDeprecatedCaseOfOffsideSyntax
-  deriving (Show, Eq, Ord, Generic)
-
-instance NFData ParserWarningType
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data ParserErrorInfo a = ParserErrorInfo
   { errRange :: SourceRange
   , errToks :: [SourceToken]
   , errStack :: LayoutStack
   , errType :: a
-  } deriving (Show, Eq, Generic)
-
-instance NFData a => NFData (ParserErrorInfo a)
+  } deriving (Show, Eq, Generic, NFData)
 
 type ParserError = ParserErrorInfo ParserErrorType
 type ParserWarning = ParserErrorInfo ParserWarningType

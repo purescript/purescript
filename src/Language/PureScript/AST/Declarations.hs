@@ -10,7 +10,7 @@ import Prelude
 import Protolude.Exceptions (hush)
 
 import Codec.Serialise (Serialise)
-import Control.DeepSeq (NFData (rnf))
+import Control.DeepSeq (NFData)
 import Data.Functor.Identity (Identity(..))
 
 import Data.Aeson.TH (Options(..), SumEncoding(..), defaultOptions, deriveJSON)
@@ -90,9 +90,7 @@ data ErrorMessageHint
   | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   | PositionedError (NEL.NonEmpty SourceSpan)
   | RelatedPositions (NEL.NonEmpty SourceSpan)
-  deriving (Show, Generic)
-
-instance NFData ErrorMessageHint
+  deriving (Show, Generic, NFData)
 
 -- | Categories of hints
 data HintCategory
@@ -490,9 +488,7 @@ data KindSignatureFor
   | NewtypeSig
   | TypeSynonymSig
   | ClassSig
-  deriving (Eq, Ord, Show, Generic)
-
-instance NFData KindSignatureFor
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 declSourceAnn :: Declaration -> SourceAnn
 declSourceAnn (DataDeclaration sa _ _ _ _) = sa
@@ -844,18 +840,14 @@ data DoNotationElement
 
 newtype PathTree t = PathTree (AssocList PSString (PathNode t))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
-
-instance (NFData t) => NFData (PathTree t) where
-  rnf (PathTree t) = rnf t
+  deriving newtype NFData
 
 data PathNode t = Leaf t | Branch (PathTree t)
   deriving (Show, Eq, Ord, Generic, NFData, Functor, Foldable, Traversable)
 
 newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
   deriving (Show, Eq, Ord, Foldable, Functor, Traversable)
-
-instance (NFData k, NFData t) => NFData (AssocList k t) where
-  rnf (AssocList l) = rnf l
+  deriving newtype NFData
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''NameSource)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)

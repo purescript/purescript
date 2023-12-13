@@ -18,8 +18,8 @@ module Language.PureScript.Externs
 import Prelude
 
 import Codec.Serialise (Serialise)
+import Control.DeepSeq (NFData)
 import Control.Monad (join)
-import GHC.Generics (Generic)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
 import Data.Foldable (fold)
@@ -28,6 +28,7 @@ import Data.Text qualified as T
 import Data.Version (showVersion)
 import Data.Map qualified as M
 import Data.List.NonEmpty qualified as NEL
+import GHC.Generics (Generic)
 
 import Language.PureScript.AST (Associativity, Declaration(..), DeclarationRef(..), Fixity(..), ImportDeclarationType, Module(..), NameSource(..), Precedence, SourceSpan, pattern TypeFixityDeclaration, pattern ValueFixityDeclaration, getTypeOpRef, getValueOpRef)
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
@@ -38,7 +39,6 @@ import Language.PureScript.TypeClassDictionaries (NamedDict, TypeClassDictionary
 import Language.PureScript.Types (SourceConstraint, SourceType, srcInstanceType)
 
 import Paths_purescript as Paths
-import Control.DeepSeq (NFData)
 
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile

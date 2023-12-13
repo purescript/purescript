@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module Language.PureScript.Errors
   ( module Language.PureScript.AST
   , module Language.PureScript.Errors
@@ -7,6 +8,7 @@ import Prelude
 import Protolude (unsnoc)
 
 import Control.Arrow ((&&&))
+import Control.DeepSeq (NFData)
 import Control.Lens (both, head1, over)
 import Control.Monad (forM, unless)
 import Control.Monad.Error.Class (MonadError(..))
@@ -31,6 +33,7 @@ import Data.Set qualified as S
 import Data.Text qualified as T
 import Data.Text (Text)
 import Data.Traversable (for)
+import GHC.Generics (Generic)
 import GHC.Stack qualified
 import Language.PureScript.AST
 import Language.PureScript.Bundle qualified as Bundle
@@ -52,8 +55,6 @@ import System.Console.ANSI qualified as ANSI
 import System.FilePath (makeRelative)
 import Text.PrettyPrint.Boxes qualified as Box
 import Witherable (wither)
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
 
 -- | A type of error messages
 data SimpleErrorMessage
@@ -197,16 +198,12 @@ data SimpleErrorMessage
   | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName)) [Qualified (ProperName 'ClassName)] Bool
   | CannotSkipTypeApplication SourceType
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
-  deriving (Show, Generic)
-
-instance NFData SimpleErrorMessage
+  deriving (Show, Generic, NFData)
 
 data ErrorMessage = ErrorMessage
   [ErrorMessageHint]
   SimpleErrorMessage
-  deriving (Show, Generic)
-
-instance NFData ErrorMessage
+  deriving (Show, Generic, NFData)
 
 newtype ErrorSuggestion = ErrorSuggestion Text
 
@@ -374,9 +371,9 @@ errorCode em = case unwrapErrorMessage em of
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage]
-  } deriving (Show, Semigroup, Monoid, Generic)
-
-instance NFData MultipleErrors
+  }
+  deriving stock (Show)
+  deriving newtype (Semigroup, Monoid, NFData)
 
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool

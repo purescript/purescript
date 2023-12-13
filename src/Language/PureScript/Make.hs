@@ -12,8 +12,10 @@ module Language.PureScript.Make
 import Prelude
 
 import Control.Concurrent.Lifted as C
+import Control.DeepSeq (force)
 import Control.Exception.Lifted (onException, bracket_, evaluate)
 import Control.Monad (foldM, unless, when)
+import Control.Monad.Base (MonadBase(liftBase))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Supply (evalSupplyT, runSupply, runSupplyT)
@@ -29,6 +31,7 @@ import Data.Maybe (fromMaybe)
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
+import Debug.Trace (traceMarkerIO)
 import Language.PureScript.AST (ErrorMessageHint(..), Module(..), SourceSpan(..), getModuleName, getModuleSourceSpan, importPrim)
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.CST qualified as CST
@@ -50,9 +53,6 @@ import Language.PureScript.Make.Monad as Monad
 import Language.PureScript.CoreFn qualified as CF
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
-import Control.DeepSeq (force)
-import Debug.Trace (traceMarkerIO)
-import Control.Monad.Base (MonadBase(liftBase))
 
 -- | Rebuild a single module.
 --
