@@ -1,0 +1,1 @@
+* Fix parsing bug where `@var` was allowed in type class head
