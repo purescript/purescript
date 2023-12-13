@@ -14,7 +14,7 @@ import Prelude
 import Control.Concurrent.Lifted as C
 import Control.DeepSeq (force)
 import Control.Exception.Lifted (onException, bracket_, evaluate)
-import Control.Monad (foldM, unless, when)
+import Control.Monad (foldM, unless, when, (<=<))
 import Control.Monad.Base (MonadBase(liftBase))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
@@ -151,7 +151,7 @@ make ma@MakeActions{..} ms = do
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
-  -- Limit concurrent module builds to the number of capabilities as set by
+  -- Limit concurrent module builds to the number of capabilities as
   -- (by default) inferred from `+RTS -N -RTS` or set explicitly like `-N4`.
   -- This is to ensure that modules complete fully before moving on, to avoid
   -- holding excess memory during compilation from modules that were paused
@@ -269,13 +269,15 @@ make ma@MakeActions{..} ms = do
           -- forcing the result. This is done to limit concurrency and keep
           -- memory usage down; see comments above.
           (exts, warnings) <- bracket_ (C.waitQSem lock) (C.signalQSem lock) $ do
+            -- Eventlog markers for profiling; see debug/eventlog.js
             liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " start"
-            (exts, warnings) <- listen $ rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
-            liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " end"
             -- Force the externs and warnings to avoid retaining excess module
             -- data after the module is finished compiling.
-            evaluate $ force (exts, warnings)
-          return (BuildJobSucceeded (pwarnings' <> warnings) exts)
+            extsAndWarnings <- evaluate . force <=< listen $ do
+              rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
+            liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " end"
+            return extsAndWarnings
+          return $ BuildJobSucceeded (pwarnings' <> warnings) exts
         Nothing -> return BuildJobSkipped
 
     BuildPlan.markComplete buildPlan moduleName result
