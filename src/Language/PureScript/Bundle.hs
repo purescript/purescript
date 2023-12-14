@@ -1,10 +1,10 @@
-{-# LANGUAGE DeriveAnyClass #-}
 -- |
 -- Bundles compiled PureScript modules for the browser.
 --
 -- This module takes as input the individual generated modules from 'Language.PureScript.Make' and
 -- performs dead code elimination, filters empty modules,
 -- and generates the final JavaScript bundle.
+{-# LANGUAGE DeriveAnyClass #-}
 module Language.PureScript.Bundle
   ( ModuleIdentifier(..)
   , ModuleType(..)
