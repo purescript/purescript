@@ -1,6 +1,11 @@
 // Debug compilation times of modules from eventlog profiling
 //
-// Build purs with profiling enabled.
+// Build and run purs with profiling enabled:
+//     cabal build --enable-profiling
+//     cabal exec -- purs ......
+// Or with stack:
+//     stack build --profile
+//     stack --profile exec -- purs ......
 // Run a command like this to generate purs.eventlog:
 //     purs +RTS -l-agu -i1.5 -hc -RTS compile -g corefn $(spago sources)
 // (If you want accurate stats for individual modules, add -N1.)
