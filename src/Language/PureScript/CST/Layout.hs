@@ -166,9 +166,7 @@
 --    "body of a case of expression" by pushing 'LytOf' onto the layout stack.
 --    Insert the @of@ token into the stream of tokens.
 --
-
 {-# LANGUAGE DeriveAnyClass #-}
-
 module Language.PureScript.CST.Layout where
 
 import Prelude
