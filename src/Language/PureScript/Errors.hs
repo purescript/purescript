@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module Language.PureScript.Errors
   ( module Language.PureScript.AST
   , module Language.PureScript.Errors
@@ -7,7 +8,7 @@ import Prelude
 import Protolude (unsnoc)
 
 import Control.Arrow ((&&&))
-import Control.Exception (displayException)
+import Control.DeepSeq (NFData)
 import Control.Lens (both, head1, over)
 import Control.Monad (forM, unless)
 import Control.Monad.Error.Class (MonadError(..))
@@ -32,6 +33,7 @@ import Data.Set qualified as S
 import Data.Text qualified as T
 import Data.Text (Text)
 import Data.Traversable (for)
+import GHC.Generics (Generic)
 import GHC.Stack qualified
 import Language.PureScript.AST
 import Language.PureScript.Bundle qualified as Bundle
@@ -70,7 +72,7 @@ data SimpleErrorMessage
   | DeprecatedFFICommonJSModule ModuleName FilePath
   | UnsupportedFFICommonJSExports ModuleName [Text]
   | UnsupportedFFICommonJSImports ModuleName [Text]
-  | FileIOError Text IOError -- ^ A description of what we were trying to do, and the error which occurred
+  | FileIOError Text Text -- ^ A description of what we were trying to do, and the error which occurred
   | InfiniteType SourceType
   | InfiniteKind SourceType
   | MultipleValueOpFixities (OpName 'ValueOpName)
@@ -196,12 +198,12 @@ data SimpleErrorMessage
   | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName)) [Qualified (ProperName 'ClassName)] Bool
   | CannotSkipTypeApplication SourceType
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 data ErrorMessage = ErrorMessage
   [ErrorMessageHint]
   SimpleErrorMessage
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 newtype ErrorSuggestion = ErrorSuggestion Text
 
@@ -369,7 +371,9 @@ errorCode em = case unwrapErrorMessage em of
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage]
-  } deriving (Show, Semigroup, Monoid)
+  }
+  deriving stock (Show)
+  deriving newtype (Semigroup, Monoid, NFData)
 
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool
@@ -679,7 +683,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             ]
     renderSimpleErrorMessage (FileIOError doWhat err) =
       paras [ line $ "I/O error while trying to " <> doWhat
-            , indent . lineS $ displayException err
+            , indent . line $ err
             ]
     renderSimpleErrorMessage (ErrorParsingFFIModule path extra) =
       paras $ [ line "Unable to parse foreign module:"
@@ -941,7 +945,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                           <> case argsRequiringVtas of
                               [required] ->
                                 [ Box.moveRight 2 $ line $ T.intercalate ", " required ]
-                              options -> 
+                              options ->
                                 [ Box.moveRight 2 $ line "One of the following sets of type variables:"
                                 , Box.moveRight 2 $ paras $
                                     map (\set -> Box.moveRight 2 $ line $ T.intercalate ", " set) options

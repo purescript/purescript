@@ -1,3 +1,4 @@
+{-# Language DeriveAnyClass #-}
 -- |
 -- This module generates code for \"externs\" files, i.e. files containing only
 -- foreign import declarations.
@@ -17,8 +18,8 @@ module Language.PureScript.Externs
 import Prelude
 
 import Codec.Serialise (Serialise)
+import Control.DeepSeq (NFData)
 import Control.Monad (join)
-import GHC.Generics (Generic)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
 import Data.Foldable (fold)
@@ -27,6 +28,7 @@ import Data.Text qualified as T
 import Data.Version (showVersion)
 import Data.Map qualified as M
 import Data.List.NonEmpty qualified as NEL
+import GHC.Generics (Generic)
 
 import Language.PureScript.AST (Associativity, Declaration(..), DeclarationRef(..), Fixity(..), ImportDeclarationType, Module(..), NameSource(..), Precedence, SourceSpan, pattern TypeFixityDeclaration, pattern ValueFixityDeclaration, getTypeOpRef, getValueOpRef)
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
@@ -59,7 +61,7 @@ data ExternsFile = ExternsFile
   -- ^ List of type and value declaration
   , efSourceSpan :: SourceSpan
   -- ^ Source span for error reporting
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 
 instance Serialise ExternsFile
 
@@ -72,7 +74,7 @@ data ExternsImport = ExternsImport
   , eiImportType :: ImportDeclarationType
   -- | The imported-as name, for qualified imports
   , eiImportedAs :: Maybe ModuleName
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 
 instance Serialise ExternsImport
 
@@ -87,7 +89,7 @@ data ExternsFixity = ExternsFixity
   , efOperator :: OpName 'ValueOpName
   -- | The value the operator is an alias for
   , efAlias :: Qualified (Either Ident (ProperName 'ConstructorName))
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 
 instance Serialise ExternsFixity
 
@@ -102,7 +104,7 @@ data ExternsTypeFixity = ExternsTypeFixity
   , efTypeOperator :: OpName 'TypeOpName
   -- | The value the operator is an alias for
   , efTypeAlias :: Qualified (ProperName 'TypeName)
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, NFData)
 
 instance Serialise ExternsTypeFixity
 
@@ -155,7 +157,7 @@ data ExternsDeclaration =
       , edInstanceNameSource      :: NameSource
       , edInstanceSourceSpan      :: SourceSpan
       }
-  deriving (Show, Generic)
+  deriving (Show, Generic, NFData)
 
 instance Serialise ExternsDeclaration
 
