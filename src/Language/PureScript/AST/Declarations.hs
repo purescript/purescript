@@ -165,7 +165,7 @@ importPrim =
       . addDefaultImport (Qualified ByNullSourcePos primModName)
 
 data NameSource = UserNamed | CompilerNamed
-  deriving (Show, Generic, NFData, Serialise)
+  deriving (Eq, Show, Generic, NFData, Serialise)
 
 -- |
 -- An item in a list of explicit imports or exports

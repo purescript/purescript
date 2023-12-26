@@ -90,7 +90,7 @@ data ExternsFixity = ExternsFixity
   , efOperator :: OpName 'ValueOpName
   -- | The value the operator is an alias for
   , efAlias :: Qualified (Either Ident (ProperName 'ConstructorName))
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData)
 
 instance Serialise ExternsFixity
 
@@ -105,7 +105,7 @@ data ExternsTypeFixity = ExternsTypeFixity
   , efTypeOperator :: OpName 'TypeOpName
   -- | The value the operator is an alias for
   , efTypeAlias :: Qualified (ProperName 'TypeName)
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData)
 
 instance Serialise ExternsTypeFixity
 
@@ -158,7 +158,7 @@ data ExternsDeclaration =
       , edInstanceNameSource      :: NameSource
       , edInstanceSourceSpan      :: SourceSpan
       }
-  deriving (Show, Generic, NFData)
+  deriving (Eq, Show, Generic, NFData)
 
 instance Serialise ExternsDeclaration
 

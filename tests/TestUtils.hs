@@ -147,7 +147,7 @@ setupSupportModules = do
   let modules = map snd ms
   supportExterns <- runExceptT $ do
     foreigns <- inferForeignModules ms
-    externs <- ExceptT . fmap fst . runTest $ P.make (makeActions modules foreigns) (CST.pureResult <$> modules)
+    externs <- ExceptT . fmap fst . runTest $ P.make' (makeActions modules foreigns) (CST.pureResult <$> modules)
     return (externs, foreigns)
   case supportExterns of
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)

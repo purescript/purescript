@@ -5,6 +5,8 @@ module Language.PureScript.Make.Monad
   , makeIO
   , getTimestamp
   , getTimestampMaybe
+  , getCurrentTime
+  , setTimestamp
   , readTextFile
   , readJSONFile
   , readJSONFileIO
@@ -35,14 +37,16 @@ import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Aeson qualified as Aeson
 import Data.ByteString qualified as B
+import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time.Clock (UTCTime)
+import Data.Time.Clock qualified as Time
 import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), singleError)
 import Language.PureScript.Externs (ExternsFile, externsIsCurrentVersion)
 import Language.PureScript.Make.Cache (ContentHash, hash)
 import Language.PureScript.Options (Options)
-import System.Directory (createDirectoryIfMissing, getModificationTime)
+import System.Directory (createDirectoryIfMissing, getModificationTime, setModificationTime)
 import System.Directory qualified as Directory
 import System.FilePath (takeDirectory)
 import System.IO.Error (tryIOError, isDoesNotExistError)
@@ -84,6 +88,18 @@ getTimestamp path =
 getTimestampMaybe :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> m (Maybe UTCTime)
 getTimestampMaybe path =
   makeIO ("get a timestamp for file: " <> Text.pack path) $ catchDoesNotExist $ getModificationTime path
+
+-- | Get current system time.
+getCurrentTime :: (MonadIO m) => m UTCTime
+getCurrentTime =
+  liftIO Time.getCurrentTime
+
+-- | Set a file's modification time in the 'Make' monad, returning False if
+-- the file does not exist.
+setTimestamp :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> UTCTime -> m Bool
+setTimestamp path time =
+  makeIO ("set a timestamp for file: " <> Text.pack path) $ (fmap isJust . catchDoesNotExist) $ setModificationTime path time
+
 
 -- | Read a text file strictly in the 'Make' monad, capturing any errors using
 -- the 'MonadError' instance.
