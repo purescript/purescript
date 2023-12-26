@@ -11,8 +11,6 @@ import Data.Graph as G (graphFromEdges, reachable)
 import Data.List qualified as L
 import Data.Map qualified as M
 import Data.Set qualified as S
-import Data.Text qualified as T
-
 import Language.PureScript.AST qualified as P
 import Language.PureScript.AST.Declarations.ChainId (ChainId (..))
 import Language.PureScript.Constants.Prim (primModules)
@@ -22,11 +20,35 @@ import Language.PureScript.Externs qualified as P
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.Names qualified as P
 import Language.PureScript.Types qualified as P
+import Language.PureScript.Environment (isDictTypeName)
 
-type RefStatus = Bool
+-- Refs structure appropriate for storing and checking externs diffs.
+data Ref
+  = TypeClassRef (P.ProperName 'P.ClassName)
+  | TypeOpRef (P.OpName 'P.TypeOpName)
+  | TypeRef (P.ProperName 'P.TypeName)
+  | -- We use separate ref for a data constructor and keep here origin type as well.
+    ConstructorRef (P.ProperName 'P.TypeName) (P.ProperName 'P.ConstructorName)
+  | -- A ad-hoc ref that points to the type with a set of constructors that changed.
+    -- It is needed to correctly handle effects of adding/removing of ctors.
+    CtorsSetRef (P.ProperName 'P.TypeName)
+  | ValueRef P.Ident
+  | ValueOpRef (P.OpName 'P.ValueOpName)
+  | -- Instance ref points to the class and types defined in the same module.
+    TypeInstanceRef P.Ident (ModuleName, P.ProperName 'P.ClassName) [P.ProperName 'P.TypeName]
+  deriving (Show, Eq, Ord)
+
+data RefStatus = Removed | Updated
+  deriving (Show)
+
+type RefWithDeps = (Ref, S.Set (ModuleName, Ref))
+
+type RefsWithStatus = M.Map Ref RefStatus
+
+type ModuleRefsMap = Map ModuleName (Set Ref)
 
 data ExternsDiff = ExternsDiff
-  {edModuleName :: ModuleName, edRefs :: M.Map Ref RefStatus}
+  {edModuleName :: ModuleName, edRefs :: Map Ref RefStatus}
   deriving (Show)
 
 -- | Empty diff means no effective difference between externs.
@@ -34,45 +56,34 @@ emptyDiff :: P.ModuleName -> ExternsDiff
 emptyDiff mn = ExternsDiff mn mempty
 
 isRefRemoved :: RefStatus -> Bool
-isRefRemoved = not
+isRefRemoved Removed = True
+isRefRemoved _ = False
 
--- Refs structure appropriate for storing and checking externs diffs.
-data Ref
-  = TypeClassRef (P.ProperName 'P.ClassName)
-  | TypeOpRef (P.OpName 'P.TypeOpName)
-  | TypeRef (P.ProperName 'P.TypeName)
-  | -- we use separate ref for a data constructor and keep here origin type as well
-    ConstructorRef (P.ProperName 'P.TypeName) (P.ProperName 'P.ConstructorName)
-  | ValueRef P.Ident
-  | ValueOpRef (P.OpName 'P.ValueOpName)
-  | -- instance ref points to the class and types defined in the same module
-    -- TypeInstanceRef P.Ident (Maybe (P.ProperName 'P.ClassName)) [P.ProperName 'P.TypeName]
-    TypeInstanceRef P.Ident (ModuleName, P.ProperName 'P.ClassName) [P.ProperName 'P.TypeName]
-  deriving (Show, Eq, Ord)
-
-diffExterns :: P.ExternsFile -> P.ExternsFile -> [ExternsDiff] -> ExternsDiff
-diffExterns newExts oldExts depsDiffs =
-  ExternsDiff modName $
-    addStatus (changedRefs <> affectedReExported <> allAffectedLocalRefs)
+-- To get changed reexported refs, we take those which were removed (not
+-- present in new extern's exports) or changed in dependencies.
+getReExported :: P.ExternsFile -> P.ExternsFile -> ModuleRefsMap -> RefsWithStatus
+getReExported newExts oldExts depsDiffsMap =
+  -- S.fromList $ map snd $ filter checkRe oldExports
+  M.fromList $ mapMaybe checkRe oldExports
   where
-    modName = P.efModuleName newExts
-    -- Marks if ref was removed
-    addStatus = M.fromSet (flip S.notMember removedSet)
-
-    depsDiffsMap = M.fromList (map (liftM2 (,) edModuleName (M.keysSet . edRefs)) depsDiffs)
-
-    -- To get changed reexported refs, we take those which were removed (not
-    -- present in new extern's exports) or changed in dependencies.
     goRe (P.ReExportRef _ es ref) = (P.exportSourceDefinedIn es,) <$> toRefs ref
     goRe _ = []
 
     oldExports = concatMap goRe (P.efExports oldExts)
     newReExports = concatMap goRe (P.efExports newExts)
     checkRe (mn, ref)
-      | (mn, ref) `notElem` newReExports = True
-      | Just True <- elem ref <$> M.lookup mn depsDiffsMap = True
-      | otherwise = False
-    affectedReExported = S.fromList $ map snd $ filter checkRe oldExports
+      | (mn, ref) `notElem` newReExports = Just (ref, Removed)
+      | Just True <- elem ref <$> M.lookup mn depsDiffsMap = Just (ref, Updated)
+      | otherwise = Nothing
+
+-- Extracts declarations from old and new externs and compares them. Returns a
+-- tuple of changed refs (a form of which have changed) and unchanged refs with
+-- dependencies (refs they depend upon).
+getChanged :: P.ExternsFile -> P.ExternsFile -> ModuleRefsMap -> (RefsWithStatus, [RefWithDeps])
+getChanged newExts oldExts depsDiffsMap =
+  (changedRefs, unchangedRefs)
+  where
+    modName = P.efModuleName newExts
 
     getDecls = map stripDeclaration . P.efDeclarations
     getTypeFixities = P.efTypeFixities
@@ -87,25 +98,31 @@ diffExterns newExts oldExts depsDiffs =
     applyInstances (a, r, c, u) =
       let checkType t (TypeRef t') = t' == t
           checkType _ _ = False
-          uRefs = map fst u
+          uRefs = map fst u -- Unchanged refs.
           go (TypeInstanceRef _ (clsMod, cls) types)
             | clsRef <- TypeClassRef cls =
                 if clsMod == modName
-                  then -- If the class is defined in this module we ensure that is marked as changed
+                  then -- If the class is defined in this module we ensure that is marked as changed.
                     maybe [] pure $ find ((==) clsRef) uRefs
                   else case S.member clsRef <$> M.lookup clsMod depsDiffsMap of
                     Just True ->
-                      -- if the type class is in another module and it has
-                      -- changed we don't need to care about instance types.
+                      -- If the type class is in another module and it has
+                      -- changed we don't need to care about instance types
+                      -- (because the instance change affects modules that use
+                      -- the type class/its methods).
                       []
-                    -- Otherwise mark instance types as changed.
                     _ ->
+                      -- Otherwise mark instance types as changed.
                       foldMap (\t -> filter (checkType t) uRefs) types
           go _ = mempty
+
+          -- Check class instances in added, removed and changed.
           affected = foldMap (S.fromList . go . fst) (a <> r <> c)
           (uc, uu) = L.partition (flip S.member affected . fst) u
        in (a, r, c <> uc, uu)
 
+    -- Group/split exported refs of the module into (added, removed, changed,
+    -- unchanged) - (a, r, c, u).
     declsSplit =
       applyInstances $
         splitRefs (getDecls newExts) (getDecls oldExts) (externsDeclarationToRef modName)
@@ -115,7 +132,9 @@ diffExterns newExts oldExts depsDiffs =
     getRefsSet (a, r, c, u) = S.fromList $ map fst (a <> r <> c <> u)
     fixityCtx = M.insert modName (getRefsSet declsSplit) depsDiffsMap
 
-    -- Determine which  declarations  where directly changed or removed.
+    -- Determine which declarations where directly changed or removed by
+    -- combining Declarations, Fixities and Type Fixities - as they are
+    -- separated in externs we handle them separately. We don't care about added things.
     (_, removed, changed, unchangedRefs) =
       foldl
         zipTuple4
@@ -125,28 +144,46 @@ diffExterns newExts oldExts depsDiffs =
         , splitRefs (getTypeFixities newExts) (getTypeFixities oldExts) (pure . externsTypeFixityToRef)
         ]
 
-    removedSet = S.fromList (map fst removed)
-    changedRefs = S.fromList $ map fst (removed <> changed)
+    changedRefs =
+      M.fromList $
+        map ((,Removed) . fst) removed <> map ((,Updated) . fst) changed
 
-    diffsMapWithLocal
-      | null changedRefs = depsDiffsMap
-      | otherwise = M.insert modName changedRefs depsDiffsMap
+-- Gets set of type constructors from new externs that have changed.
+getCtorsSets :: P.ExternsFile -> P.ExternsFile -> Set Ref
+getCtorsSets newExts oldExts =
+  S.map CtorsSetRef $
+    M.keysSet $
+      M.differenceWith comp (getSets newExts) (getSets oldExts)
+  where
+    getSets = M.fromList . foldMap goDecl . P.efDeclarations
+    goDecl = \case
+      P.EDType n _ (P.DataType _ _ ctors) ->
+        [(n, S.fromList $ fst <$> ctors)]
+      _ -> []
+    comp a b = if a == b then Nothing else Just a
 
-    -- Affected refs here are refs that depend on external or local changed refs.
-    --
-    -- Rest local refs are refs that do not depend on external/local changed, but
-    -- may depend on affected local refs and need to be checked.
+-- Takes a list unchanged local refs with dependencies and finds that are affected by
+-- changed refs. Cyclic dependencies between local refs are searched using
+-- directed graph.
+getAffectedLocal :: ModuleName -> ModuleRefsMap -> [RefWithDeps] -> Set Ref
+getAffectedLocal modName diffsMap unchangedRefs =
+  affectedLocalRefs
+  where
     hasChangedDeps (mn, ref) =
-      Just True == (S.member ref <$> M.lookup mn diffsMapWithLocal)
-    (affectedLocalRefs, restLocalRefs) =
+      Just True == (S.member ref <$> M.lookup mn diffsMap)
+    (affectedByChanged, restLocalRefs) =
       L.partition (any hasChangedDeps . snd) unchangedRefs
 
     -- Use graph to go though local refs and their cyclic dependencies on each other.
     -- The graph includes only local refs that depend on other local refs.
-    toNode (ref, deps) = (ref, ref, map snd $ filter ((== modName) . fst) deps)
+    toNode (ref, deps) = (ref, ref, map snd $ filter ((== modName) . fst) (S.toList deps))
 
-    vtxs = toNode <$> (map (map S.toList) restLocalRefs <> (map (const mempty) <$> affectedLocalRefs))
+    -- Make graph vertexes from the rest local refs with deps and affected refs
+    -- with no deps.
+    vtxs = toNode <$> restLocalRefs <> (map (const mempty) <$> affectedByChanged)
     (graph, fromVtx, toVtx) = G.graphFromEdges vtxs
+
+    -- Graph is a list of refs with (refs) dependencies.
     refsGraph = do
       (_, t, _) <- vtxs
       let v = fromMaybe (internalError "diffExterns: vertex not found") $ toVtx t
@@ -155,11 +192,37 @@ diffExterns newExts oldExts depsDiffs =
       pure (t, map toKey deps)
 
     -- Get local refs that depend on affected refs (affected refs are included
-    -- in the graph too).
-    allAffectedLocalRefs =
+    -- in the graph result because a node's reachable list includes the node
+    -- itself).
+    affectedLocalRefs =
       S.fromList $
         map fst $
-          filter (any (flip elem (fst <$> affectedLocalRefs)) . snd) refsGraph
+          filter (any (flip elem (fst <$> affectedByChanged)) . snd) refsGraph
+
+diffExterns :: P.ExternsFile -> P.ExternsFile -> [ExternsDiff] -> ExternsDiff
+diffExterns newExts oldExts depsDiffs =
+  ExternsDiff modName $
+    affectedReExported <> changedRefs <> affectedLocalRefs
+  where
+    modName = P.efModuleName newExts
+
+    depsDiffsMap = M.fromList (map (liftM2 (,) edModuleName (M.keysSet . edRefs)) depsDiffs)
+
+    -- To get changed reexported refs, we take those which were removed (not
+    -- present in new extern's exports) or changed in dependencies.
+    affectedReExported = getReExported newExts oldExts depsDiffsMap
+
+    (changedRefs, unchangedRefs) = getChanged newExts oldExts depsDiffsMap
+
+    ctorsSets = getCtorsSets newExts oldExts
+
+    -- Extend dependencies' diffs map with local changes.
+    diffsMapWithLocal
+      | null changedRefs && null ctorsSets = depsDiffsMap
+      | otherwise = M.insert modName (M.keysSet changedRefs <> ctorsSets) depsDiffsMap
+
+    affectedLocalRefs =
+      M.fromSet (const Updated) $ getAffectedLocal modName diffsMapWithLocal unchangedRefs
 
 checkDiffs :: P.Module -> [ExternsDiff] -> Bool
 checkDiffs (P.Module _ _ _ decls exports) diffs
@@ -244,8 +307,8 @@ checkUsage searches decls = foldMap findUsage decls /= mempty
 
 -- | Traverses imports and returns a set of refs to be searched though the
 -- module. Returns Nothing if removed refs found in imports (no need to search
--- through the module). If an empty set is returned then no changes apply to the
--- module.
+-- through the module - the module needs to be recompiled). If an empty set is
+-- returned then no changes apply to the module.
 makeSearches :: [P.Declaration] -> [ExternsDiff] -> Maybe (Set (Maybe ModuleName, Ref))
 makeSearches decls depsDiffs =
   foldM go mempty decls
@@ -268,18 +331,18 @@ makeSearches decls depsDiffs =
             P.Explicit dRefs
               | any (flip S.member removed) refs -> Nothing
               | otherwise ->
-                  -- search only refs encountered in the import.
+                  -- Search only refs encountered in the import.
                   Just $ M.filterWithKey (const . flip elem refs) diffs
               where
                 refs = foldMap (getRefs mn) dRefs
             P.Hiding dRefs
               | any (flip S.member removed) refs -> Nothing
               | otherwise ->
-                  -- search only refs not encountered in the import.
+                  -- Search only refs not encountered in the import.
                   Just $ M.filterWithKey (const . not . flip elem refs) diffs
               where
                 refs = foldMap (getRefs mn) dRefs
-            -- search all changed refs
+            -- Search all changed refs.
             P.Implicit -> Just diffs
     go s _ = Just s
 
@@ -340,8 +403,6 @@ qualified :: P.Qualified b -> (ModuleName, b)
 qualified (P.Qualified (P.ByModuleName mn) v) = (mn, v)
 qualified _ = internalError "ExternsDiff: type is not qualified"
 
-type RefWithDeps = (Ref, S.Set (ModuleName, Ref))
-
 -- | To get fixity's data constructor dependency we should provide it with the
 -- context (that contains all known refs) to search in.
 externsFixityToRef :: Map ModuleName (Set Ref) -> P.ExternsFixity -> RefWithDeps
@@ -363,21 +424,25 @@ externsTypeFixityToRef (P.ExternsTypeFixity _ _ n alias) =
 externsDeclarationToRef :: ModuleName -> P.ExternsDeclaration -> Maybe RefWithDeps
 externsDeclarationToRef moduleName = \case
   P.EDType n t tk
-    | isDictName n -> Nothing
+    | isDictTypeName n -> Nothing
     | otherwise -> Just (TypeRef n, typeDeps t <> typeKindDeps tk)
   --
   P.EDTypeSynonym n args t ->
     Just (TypeRef n, typeDeps t <> foldArgs args)
   --
   P.EDDataConstructor n _ tn t _
-    | isDictName n -> Nothing
+    | isDictTypeName n -> Nothing
     | otherwise ->
         Just
           ( ConstructorRef tn n
-          , -- Add the type as a dependency: if the type has changed (e.g.
-            -- constructors removed/added) it should affect all the constructors
-            -- in the type.
-            S.insert (moduleName, TypeRef tn) (typeDeps t)
+          , -- Add the type as a dependency: if the type has changed (e.g. left side
+            -- param is added) we should recompile the module which uses the
+            -- constructor (even if there no the explicit type import).
+            -- Aso add the ad-hoc constructors set ref dependency: if a ctor
+            -- added/removed it should affect all constructors in the type,
+            -- because case statement's validity may be affected by newly added
+            -- or removed constructors.
+            typeDeps t <> S.fromList [(moduleName, TypeRef tn), (moduleName, CtorsSetRef tn)]
           )
   --
   P.EDValue n t ->
@@ -415,12 +480,14 @@ externsDeclarationToRef moduleName = \case
         )
 
 -- | Removes excessive info from declarations before comparing.
+--
+-- TODO: params renaming will be needed to avoid recompilation because of params
+-- name changes.
 stripDeclaration :: P.ExternsDeclaration -> P.ExternsDeclaration
 stripDeclaration = \case
-  P.EDType n t (P.DataType dt args ctors) ->
-    -- Remove data constructors types, we don't need them, we only need to know
-    -- if the list of ctors has changed.
-    P.EDType n t (P.DataType dt args (map (map (const [])) ctors))
+  P.EDType n t (P.DataType dt args _) ->
+    -- Remove the notion of data constructors, we only compare type's left side.
+    P.EDType n t (P.DataType dt args [])
   --
   P.EDInstance cn n fa ks ts cs ch chi ns ss ->
     P.EDInstance cn n fa ks ts cs (map stripChain ch) chi ns ss
@@ -428,13 +495,7 @@ stripDeclaration = \case
   decl -> decl
   where
     emptySP = P.SourcePos 0 0
-    -- emptySS = SourceSpan "" emptySP emptySP
     stripChain (ChainId (n, _)) = ChainId (n, emptySP)
 
 isPrimModule :: ModuleName -> Bool
 isPrimModule = flip S.member (S.fromList primModules)
-
--- | Check if type name is a type class dictionary name.
-isDictName :: P.ProperName a -> Bool
-isDictName =
-  T.isInfixOf "$" . P.runProperName

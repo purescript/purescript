@@ -1,10 +1,8 @@
 module Language.PureScript.Make
-  (
-  -- * Make API
-  rebuildModule
+  ( make
+  , make_
+  , rebuildModule
   , rebuildModule'
-  , make
-  , make'
   , inferForeignModules
   , module Monad
   , module Actions
@@ -15,7 +13,7 @@ import Prelude
 import Control.Concurrent.Lifted as C
 import Control.DeepSeq (force)
 import Control.Exception.Lifted (onException, bracket_, evaluate)
-import Control.Monad (foldM, unless, when, (<=<))
+import Control.Monad (foldM, unless, void, when, (<=<))
 import Control.Monad.Base (MonadBase(liftBase))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
@@ -46,12 +44,31 @@ import Language.PureScript.Names (ModuleName(..), isBuiltinModuleName, runModule
 import Language.PureScript.Renamer (renameInModule)
 import Language.PureScript.Sugar (Env, collapseBindingGroups, createBindingGroups, desugar, desugarCaseGuards, externsEnv, primEnv)
 import Language.PureScript.TypeChecker (CheckState(..), emptyCheckState, typeCheckModule)
-import Language.PureScript.Make.BuildPlan (BuildJobResult(..), BuildPlan(..), getResult)
+import Language.PureScript.Make.BuildPlan (BuildJobResult(..), BuildPlan(..), getResult, isUpToDate)
 import Language.PureScript.Make.BuildPlan qualified as BuildPlan
 import Language.PureScript.Make.ExternsDiff (checkDiffs, emptyDiff, diffExterns)
 import Language.PureScript.Make.Cache qualified as Cache
 import Language.PureScript.Make.Actions as Actions
 import Language.PureScript.Make.Monad as Monad
+    ( Make(..),
+      writeTextFile,
+      writeJSONFile,
+      writeCborFileIO,
+      writeCborFile,
+      setTimestamp,
+      runMake,
+      readTextFile,
+      readJSONFileIO,
+      readJSONFile,
+      readExternsFile,
+      readCborFileIO,
+      readCborFile,
+      makeIO,
+      hashFile,
+      getTimestampMaybe,
+      getTimestamp,
+      getCurrentTime,
+      copyFile )
 import Language.PureScript.CoreFn qualified as CF
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
@@ -134,8 +151,11 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
                Right d -> d
 
   evalSupplyT nextVar'' $ codegen renamed docs exts
-  -- evaluate $ trace ("\n===== externs: " <> show moduleName <> ":\n" <> show exts) ()
   return exts
+
+data MakeOptions = MakeOptions
+  { moCollectAllExterns :: Bool
+  }
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file
 -- and an @externs.cbor@ file.
@@ -144,40 +164,35 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
 -- to provide upstream modules' types without having to typecheck those modules
 -- again.
 --
--- This version will collect an return externs only of modules that were used
--- during the build.
+-- It collects and returns externs for all modules passed.
 make :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [CST.PartialResult Module]
      -> m [ExternsFile]
-make ma ms = makeImp ma ms False
+make  = make' (MakeOptions {moCollectAllExterns = True})
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file
 -- and an @externs.cbor@ file.
 --
--- If timestamps or hashes have not changed, existing externs files can be used
--- to provide upstream modules' types without having to typecheck those modules
--- again.
---
--- This version will collect an return all externs of all passed modules.
-make' :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+-- This version of make returns nothing.
+make_ :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [CST.PartialResult Module]
-     -> m [ExternsFile]
-make' ma ms = makeImp ma ms True
+     -> m ()
+make_ ma ms = void $ make' (MakeOptions {moCollectAllExterns = False}) ma ms
 
-makeImp :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-     => MakeActions m
+make' :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+     => MakeOptions
+     -> MakeActions m
      -> [CST.PartialResult Module]
-     -> Bool
      -> m [ExternsFile]
-makeImp ma@MakeActions{..} ms collectAll = do
+make' MakeOptions{..} ma@MakeActions{..} ms = do
   checkModuleNames
   cacheDb <- readCacheDb
 
   (sorted, graph) <- sortModules Transitive (moduleSignature . CST.resPartial) ms
-
-  (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph) collectAll
+  let opts = BuildPlan.Options {optPreloadAllExterns = moCollectAllExterns}
+  (buildPlan, newCacheDb) <- BuildPlan.construct opts ma cacheDb (sorted, graph)
 
   -- Limit concurrent module builds to the number of capabilities as
   -- (by default) inferred from `+RTS -N -RTS` or set explicitly like `-N4`.
@@ -192,8 +207,6 @@ makeImp ma@MakeActions{..} ms collectAll = do
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
   let totalModuleCount = length toBeRebuilt
   for_ toBeRebuilt $ \m -> fork $ do
-    -- evaluate $ trace ("resPartial:" <> show (CST.resPartial $ m)) ()
-    -- evaluate $ trace ("resFull:" <> show (CST.resFull $ m)) ()
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
     buildModule lock buildPlan moduleName totalModuleCount
@@ -237,10 +250,11 @@ makeImp ma@MakeActions{..} ms collectAll = do
         fromMaybe (internalError $ "make: module not found in results: " <> T.unpack name)
         $ M.lookup mn successes
 
-  if collectAll then
-    pure $ map lookupResult sortedModuleNames
-  else
-    pure $ mapMaybe (flip M.lookup successes) sortedModuleNames
+  pure $
+    if moCollectAllExterns then
+      map lookupResult sortedModuleNames
+    else
+      mapMaybe (flip M.lookup successes) sortedModuleNames
 
   where
   checkModuleNames :: m ()
@@ -287,23 +301,19 @@ makeImp ma@MakeActions{..} ms collectAll = do
       case mexterns of
         Just (_, depsDiffExterns) -> do
           let externs = fst <$> depsDiffExterns
-          --evaluate $ trace ("diff:" <> show moduleName <> ":" <> show (snd <$> depsDiffExterns)) ()
-          --evaluate $ trace ("check diff:" <> show moduleName <> ":" <> show (isNothing $ traverse snd depsDiffExterns)) ()
           let prevResult = BuildPlan.getPrevResult buildPlan moduleName
           let depsDiffs = traverse snd depsDiffExterns
           let maySkipBuild moduleIndex
-                --  Just exts <- BuildPlan.getPrevResult buildPlan moduleName
-                -- we may skip built only for up-to-date modules
-                | Just (True, exts) <- prevResult
-                -- check if no dep's externs have changed
-                -- if one of the diffs is Nothing means we can not check and need to rebuild
-                --, Just False <- checkDiffs m <$> traverse snd depsDiffExterns = do
+                -- We may skip built only for up-to-date modules.
+                | Just (status, exts) <- prevResult
+                , isUpToDate status
+                -- Check if no dep's externs have changed. If any of the diffs
+                -- is Nothing means we can not check and need to rebuild.
                 , Just False <- checkDiffs m <$> depsDiffs = do
                   -- We should update modification times to mark existing
                   -- compilation results as actual. If it fails to update timestamp
                   -- on any of exiting codegen targets, it will run the build process.
                   updated <- updateOutputTimestamp moduleName
-                  --evaluate $ trace ("updated:" <> show updated <> ":" <> show moduleName) ()
                   if updated then do
                     progress $ SkippingModule moduleName moduleIndex
                     pure $ Just (exts, MultipleErrors [], Just (emptyDiff moduleName))
@@ -311,7 +321,7 @@ makeImp ma@MakeActions{..} ms collectAll = do
                     pure Nothing
                 | otherwise = pure Nothing
 
-          -- We need to ensure that all dependencies have been included in Env
+          -- We need to ensure that all dependencies have been included in Env.
           C.modifyMVar_ (bpEnv buildPlan) $ \env -> do
             let
               go :: Env -> ModuleName -> m Env
