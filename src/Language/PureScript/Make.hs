@@ -4,6 +4,8 @@ module Language.PureScript.Make
   rebuildModule
   , rebuildModule'
   , make
+  , make'
+  , makeImp
   , inferForeignModules
   , module Monad
   , module Actions
@@ -27,7 +29,7 @@ import Data.Function (on)
 import Data.Foldable (fold, for_)
 import Data.List (foldl', sortOn)
 import Data.List.NonEmpty qualified as NEL
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
@@ -37,16 +39,17 @@ import Language.PureScript.Crash (internalError)
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Docs.Convert qualified as Docs
 import Language.PureScript.Environment (initEnvironment)
-import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, defaultPPEOptions, errorMessage', errorMessage'', prettyPrintMultipleErrors)
+import Language.PureScript.Errors (MultipleErrors(..), SimpleErrorMessage(..), addHint, defaultPPEOptions, errorMessage', errorMessage'', prettyPrintMultipleErrors)
 import Language.PureScript.Externs (ExternsFile, applyExternsFileToEnvironment, moduleToExternsFile)
 import Language.PureScript.Linter (Name(..), lint, lintImports)
 import Language.PureScript.ModuleDependencies (DependencyDepth(..), moduleSignature, sortModules)
-import Language.PureScript.Names (ModuleName, isBuiltinModuleName, runModuleName)
+import Language.PureScript.Names (ModuleName(..), isBuiltinModuleName, runModuleName)
 import Language.PureScript.Renamer (renameInModule)
 import Language.PureScript.Sugar (Env, collapseBindingGroups, createBindingGroups, desugar, desugarCaseGuards, externsEnv, primEnv)
 import Language.PureScript.TypeChecker (CheckState(..), emptyCheckState, typeCheckModule)
 import Language.PureScript.Make.BuildPlan (BuildJobResult(..), BuildPlan(..), getResult)
 import Language.PureScript.Make.BuildPlan qualified as BuildPlan
+import Language.PureScript.Make.ExternsDiff (checkDiffs, emptyDiff, diffExterns)
 import Language.PureScript.Make.Cache qualified as Cache
 import Language.PureScript.Make.Actions as Actions
 import Language.PureScript.Make.Monad as Monad
@@ -56,7 +59,6 @@ import System.FilePath (replaceExtension)
 
 -- | Rebuild a single module.
 --
--- This function is used for fast-rebuild workflows (PSCi and psc-ide are examples).
 rebuildModule
   :: forall m
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -133,23 +135,50 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
                Right d -> d
 
   evalSupplyT nextVar'' $ codegen renamed docs exts
+  -- evaluate $ trace ("\n===== externs: " <> show moduleName <> ":\n" <> show exts) ()
   return exts
 
--- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.cbor@ file.
+-- | Compiles in "make" mode, compiling each module separately to a @.js@ file
+-- and an @externs.cbor@ file.
 --
--- If timestamps or hashes have not changed, existing externs files can be used to provide upstream modules' types without
--- having to typecheck those modules again.
+-- If timestamps or hashes have not changed, existing externs files can be used
+-- to provide upstream modules' types without having to typecheck those modules
+-- again.
+--
+-- This version will collect an return externs only of modules that were used
+-- during the build.
 make :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [CST.PartialResult Module]
      -> m [ExternsFile]
-make ma@MakeActions{..} ms = do
+make ma ms = makeImp ma ms False
+
+-- | Compiles in "make" mode, compiling each module separately to a @.js@ file
+-- and an @externs.cbor@ file.
+--
+-- If timestamps or hashes have not changed, existing externs files can be used
+-- to provide upstream modules' types without having to typecheck those modules
+-- again.
+--
+-- This version will collect an return all externs of all passed modules.
+make' :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+     => MakeActions m
+     -> [CST.PartialResult Module]
+     -> m [ExternsFile]
+make' ma ms = makeImp ma ms True
+
+makeImp :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+     => MakeActions m
+     -> [CST.PartialResult Module]
+     -> Bool
+     -> m [ExternsFile]
+makeImp ma@MakeActions{..} ms collectAll = do
   checkModuleNames
   cacheDb <- readCacheDb
 
   (sorted, graph) <- sortModules Transitive (moduleSignature . CST.resPartial) ms
 
-  (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
+  (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph) collectAll
 
   -- Limit concurrent module builds to the number of capabilities as
   -- (by default) inferred from `+RTS -N -RTS` or set explicitly like `-N4`.
@@ -160,16 +189,19 @@ make ma@MakeActions{..} ms = do
   let concurrency = max 1 capabilities
   lock <- C.newQSem concurrency
 
+  let sortedModuleNames = getModuleName . CST.resPartial <$> sorted
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
   let totalModuleCount = length toBeRebuilt
   for_ toBeRebuilt $ \m -> fork $ do
+    -- evaluate $ trace ("resPartial:" <> show (CST.resPartial $ m)) ()
+    -- evaluate $ trace ("resFull:" <> show (CST.resFull $ m)) ()
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
     buildModule lock buildPlan moduleName totalModuleCount
       (spanName . getModuleSourceSpan . CST.resPartial $ m)
       (fst $ CST.resFull m)
       (fmap importPrim . snd $ CST.resFull m)
-      (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
+      (deps `inOrderOf` sortedModuleNames)
 
       -- Prevent hanging on other modules when there is an internal error
       -- (the exception is thrown, but other threads waiting on MVars are released)
@@ -179,7 +211,7 @@ make ma@MakeActions{..} ms = do
   (failures, successes) <-
     let
       splitResults = \case
-        BuildJobSucceeded _ exts ->
+        BuildJobSucceeded _ exts _ ->
           Right exts
         BuildJobFailed errs ->
           Left errs
@@ -195,7 +227,6 @@ make ma@MakeActions{..} ms = do
 
   -- If generating docs, also generate them for the Prim modules
   outputPrimDocs
-
   -- All threads have completed, rethrow any caught errors.
   let errors = M.elems failures
   unless (null errors) $ throwError (mconcat errors)
@@ -203,10 +234,14 @@ make ma@MakeActions{..} ms = do
   -- Here we return all the ExternsFile in the ordering of the topological sort,
   -- so they can be folded into an Environment. This result is used in the tests
   -- and in PSCI.
-  let lookupResult mn =
-        fromMaybe (internalError "make: module not found in results")
+  let lookupResult mn@(ModuleName name) =
+        fromMaybe (internalError $ "make: module not found in results: " <> T.unpack name)
         $ M.lookup mn successes
-  return (map (lookupResult . getModuleName . CST.resPartial) sorted)
+
+  if collectAll then
+    pure $ map lookupResult sortedModuleNames
+  else
+    pure $ mapMaybe (flip M.lookup successes) sortedModuleNames
 
   where
   checkModuleNames :: m ()
@@ -251,7 +286,32 @@ make ma@MakeActions{..} ms = do
       mexterns <- fmap unzip . sequence <$> traverse (getResult buildPlan) deps
 
       case mexterns of
-        Just (_, externs) -> do
+        Just (_, depsDiffExterns) -> do
+          let externs = fst <$> depsDiffExterns
+          --evaluate $ trace ("diff:" <> show moduleName <> ":" <> show (snd <$> depsDiffExterns)) ()
+          --evaluate $ trace ("check diff:" <> show moduleName <> ":" <> show (isNothing $ traverse snd depsDiffExterns)) ()
+          let prevResult = BuildPlan.getPrevResult buildPlan moduleName
+          let depsDiffs = traverse snd depsDiffExterns
+          let maySkipBuild moduleIndex
+                --  Just exts <- BuildPlan.getPrevResult buildPlan moduleName
+                -- we may skip built only for up-to-date modules
+                | Just (True, exts) <- prevResult
+                -- check if no dep's externs have changed
+                -- if one of the diffs is Nothing means we can not check and need to rebuild
+                --, Just False <- checkDiffs m <$> traverse snd depsDiffExterns = do
+                , Just False <- checkDiffs m <$> depsDiffs = do
+                  -- We should update modification times to mark existing
+                  -- compilation results as actual. If it fails to update timestamp
+                  -- on any of exiting codegen targets, it will run the build process.
+                  updated <- updateOutputTimestamp moduleName
+                  --evaluate $ trace ("updated:" <> show updated <> ":" <> show moduleName) ()
+                  if updated then do
+                    progress $ SkippingModule moduleName moduleIndex
+                    pure $ Just (exts, MultipleErrors [], Just (emptyDiff moduleName))
+                  else
+                    pure Nothing
+                | otherwise = pure Nothing
+
           -- We need to ensure that all dependencies have been included in Env
           C.modifyMVar_ (bpEnv buildPlan) $ \env -> do
             let
@@ -265,19 +325,25 @@ make ma@MakeActions{..} ms = do
           idx <- C.takeMVar (bpIndex buildPlan)
           C.putMVar (bpIndex buildPlan) (idx + 1)
 
-          -- Bracket all of the per-module work behind the semaphore, including
-          -- forcing the result. This is done to limit concurrency and keep
-          -- memory usage down; see comments above.
-          (exts, warnings) <- bracket_ (C.waitQSem lock) (C.signalQSem lock) $ do
-            -- Eventlog markers for profiling; see debug/eventlog.js
-            liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " start"
-            -- Force the externs and warnings to avoid retaining excess module
-            -- data after the module is finished compiling.
-            extsAndWarnings <- evaluate . force <=< listen $ do
-              rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
-            liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " end"
-            return extsAndWarnings
-          return $ BuildJobSucceeded (pwarnings' <> warnings) exts
+          (exts, warnings, diff) <- do
+            let doBuild = do
+                -- Bracket all of the per-module work behind the semaphore, including
+                -- forcing the result. This is done to limit concurrency and keep
+                -- memory usage down; see comments above.
+                  (exts, warnings) <- bracket_ (C.waitQSem lock) (C.signalQSem lock) $ do
+                    -- Eventlog markers for profiling; see debug/eventlog.js
+                    liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " start"
+                    -- Force the externs and warnings to avoid retaining excess module
+                    -- data after the module is finished compiling.
+                    extsAndWarnings <- evaluate . force <=< listen $ do
+                      rebuildModuleWithIndex ma env externs m (Just (idx, cnt))
+                    liftBase $ traceMarkerIO $ T.unpack (runModuleName moduleName) <> " end"
+                    return extsAndWarnings
+                  let diff = diffExterns exts <$> (snd <$> prevResult) <*> depsDiffs
+                  pure (exts, warnings, diff)
+            maySkipBuild (Just (idx, cnt)) >>= maybe doBuild pure
+          return $ BuildJobSucceeded (pwarnings' <> warnings) exts diff
+
         Nothing -> return BuildJobSkipped
 
     BuildPlan.markComplete buildPlan moduleName result

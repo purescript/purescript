@@ -6,6 +6,9 @@ module Language.PureScript.Make.Cache
   , checkChanged
   , removeModules
   , normaliseForCache
+  , cacheDbIsCurrentVersion
+  , toCacheDbVersioned
+  , fromCacheDbVersioned
   ) where
 
 import Prelude
@@ -23,14 +26,19 @@ import Data.Map qualified as Map
 import Data.Maybe (fromMaybe)
 import Data.Monoid (All(..))
 import Data.Set (Set)
-import Data.Text (Text)
+import Data.Text (Text, pack, unpack)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.These (These(..))
 import Data.Time.Clock (UTCTime)
 import Data.Traversable (for)
 import System.FilePath qualified as FilePath
 
+import Paths_purescript as Paths
+
 import Language.PureScript.Names (ModuleName)
+import Data.Version (showVersion)
+import Data.Aeson ((.=))
+import Data.Aeson.Types ((.:))
 
 digestToHex :: Digest a -> Text
 digestToHex = decodeUtf8 . convertToBase Base16
@@ -62,6 +70,35 @@ hash :: BS.ByteString -> ContentHash
 hash = ContentHash . Hash.hash
 
 type CacheDb = Map ModuleName CacheInfo
+
+data CacheDbVersioned = CacheDbVersioned { cdbVersion :: Text, cdbModules :: CacheDb }
+  --deriving stock (Show)
+  deriving (Eq, Ord)
+
+instance Aeson.FromJSON CacheDbVersioned where
+  parseJSON = Aeson.withObject "CacheDb" $ \v ->
+    CacheDbVersioned
+      <$> v .:  "version"
+      <*> v .: "modules"
+
+instance Aeson.ToJSON CacheDbVersioned where
+  toJSON CacheDbVersioned{..} =
+    Aeson.object
+      [ "version" .= cdbVersion
+      , "modules" .= cdbModules
+      ]
+
+cacheDbIsCurrentVersion :: CacheDbVersioned -> Bool
+cacheDbIsCurrentVersion ef =
+  unpack (cdbVersion ef) == showVersion Paths.version
+
+toCacheDbVersioned :: CacheDb -> CacheDbVersioned
+toCacheDbVersioned =
+  CacheDbVersioned (pack $ showVersion Paths.version)
+
+fromCacheDbVersioned :: CacheDbVersioned -> CacheDb
+fromCacheDbVersioned =
+  cdbModules
 
 -- | A CacheInfo contains all of the information we need to store about a
 -- particular module in the cache database.
