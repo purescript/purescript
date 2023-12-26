@@ -1,6 +1,8 @@
 module Language.PureScript.Make.BuildPlan
   ( BuildPlan(bpEnv, bpIndex)
   , BuildJobResult(..)
+  , Options(..)
+  , isUpToDate
   , construct
   , getResult
   , getPrevResult
@@ -34,11 +36,16 @@ import Language.PureScript.Names (ModuleName)
 import Language.PureScript.Sugar.Names.Env (Env, primEnv)
 import System.Directory (getCurrentDirectory)
 
+newtype UpToDateStatus = UpToDateStatus Bool
+
+isUpToDate :: UpToDateStatus -> Bool
+isUpToDate (UpToDateStatus b) = b
+
 -- | The BuildPlan tracks information about our build progress, and holds all
 -- prebuilt modules for incremental builds.
 data BuildPlan = BuildPlan
   { bpPrebuilt :: M.Map ModuleName Prebuilt
-  , bpPreviousBuilt :: M.Map ModuleName (Bool, Prebuilt)
+  , bpPreviousBuilt :: M.Map ModuleName (UpToDateStatus, Prebuilt)
   , bpBuildJobs :: M.Map ModuleName BuildJob
   , bpEnv :: C.MVar Env
   , bpIndex :: C.MVar Int
@@ -130,7 +137,6 @@ getResult
   -> ModuleName
   -> m (Maybe SuccessResult)
 getResult buildPlan moduleName =
-  -- may bring back first lookup for bpPrebuilt
   case M.lookup moduleName (bpBuildJobs buildPlan) of
     Just bj ->
       buildJobSuccess <$> C.readMVar (bjResult bj)
@@ -142,9 +148,14 @@ getResult buildPlan moduleName =
 
 -- | Gets preloaded previous built result for modules that are going to be built. This
 -- will be used to skip compilation if dep's externs have not changed.
-getPrevResult :: BuildPlan -> ModuleName -> Maybe (Bool, ExternsFile)
+getPrevResult :: BuildPlan -> ModuleName -> Maybe (UpToDateStatus, ExternsFile)
 getPrevResult buildPlan moduleName =
   fmap pbExternsFile <$> M.lookup moduleName (bpPreviousBuilt buildPlan)
+
+
+data Options = Options
+  { optPreloadAllExterns :: Bool
+  }
 
 -- | Constructs a BuildPlan for the given module graph.
 --
@@ -152,14 +163,12 @@ getPrevResult buildPlan moduleName =
 -- determine whether a module needs rebuilding.
 construct
   :: forall m. MonadBaseControl IO m
-  => MakeActions m
+  => Options
+  -> MakeActions m
   -> CacheDb
   -> ([CST.PartialResult Module], [(ModuleName, [ModuleName])])
-  -> Bool
-  -- ^ If True will preload all the externs, otherwise will load only needed for
-  -- the build.
   -> m (BuildPlan, CacheDb)
-construct MakeActions{..} cacheDb (sorted, graph) preloadAll = do
+construct Options{..} MakeActions{..} cacheDb (sorted, graph) = do
   let sortedModuleNames = map (getModuleName . CST.resPartial) sorted
   rebuildStatuses <- A.forConcurrently sortedModuleNames getRebuildStatus
 
@@ -177,19 +186,20 @@ construct MakeActions{..} cacheDb (sorted, graph) preloadAll = do
   let inBuildDeps = flip S.member allBuildDeps
 
   -- We only need prebuilt results for deps of the modules to be build.
-  let toLoadPrebuilt
-        | preloadAll = prebuiltMap
-        | otherwise = M.filterWithKey (const . inBuildDeps) prebuiltMap
+  let toLoadPrebuilt =
+        if optPreloadAllExterns
+          then prebuiltMap
+          else M.filterWithKey (const . inBuildDeps) prebuiltMap
 
-  -- We will need previously built results for modules to be build
+  -- We will need previously built results for modules to be built
   -- to skip rebuilding if deps have not changed.
   let toLoadPrev =
         M.mapMaybeWithKey
           ( \mn prev -> do
               -- We load previous build result for all up-to-date modules, and
               -- also for changed modules that have dependants.
-              upToDate <- fst <$> prev
-              guard (upToDate || inBuildDeps mn)
+              status <- fst <$> prev
+              guard (isUpToDate status || inBuildDeps mn)
               prev
           )
           rebuildMap
@@ -203,8 +213,8 @@ construct MakeActions{..} cacheDb (sorted, graph) preloadAll = do
   let prebuilt = M.mapMaybe id prebuiltLoad
   let previous = M.mapMaybe id prevLoad
 
-  -- If for some reason (wrong version, files corruption) loading fails,
-  -- those modules should be rebuilt too.
+  -- If for some reason (wrong version, files corruption, etc) prebuilt
+  -- externs loading fails, those modules should be rebuilt too.
   let failedLoads = M.keys $ M.filter isNothing prebuiltLoad
   buildJobs <- foldM makeBuildJob M.empty (toBeRebuilt <> failedLoads)
 
@@ -219,8 +229,8 @@ construct MakeActions{..} cacheDb (sorted, graph) preloadAll = do
         foldl' update cacheDb rebuildStatuses
     )
   where
-    -- Timestamp here is just to ensure that we will try to load modules that
-    -- have previous built results available.
+    -- Timestamp here is just to ensure that we will only try to load modules
+    -- that have previous built results available.
     loadPrebuilt :: ModuleName -> UTCTime -> m (Maybe Prebuilt)
     loadPrebuilt = const . fmap (fmap Prebuilt . snd) . readExterns
 
@@ -251,13 +261,13 @@ construct MakeActions{..} cacheDb (sorted, graph) preloadAll = do
             })
         Right cacheInfo -> do
           cwd <- liftBase getCurrentDirectory
-          (newCacheInfo, isUpToDate) <- checkChanged cacheDb moduleName cwd cacheInfo
+          (newCacheInfo, upToDate) <- checkChanged cacheDb moduleName cwd cacheInfo
           timestamp <- getOutputTimestamp moduleName
           pure (RebuildStatus
             { rsModuleName = moduleName
             , rsRebuildNever = False
             , rsPrebuilt = timestamp
-            , rsUpToDate = isUpToDate
+            , rsUpToDate = upToDate
             , rsNewCacheInfo = Just newCacheInfo
             })
 
@@ -265,7 +275,7 @@ construct MakeActions{..} cacheDb (sorted, graph) preloadAll = do
       where
         graphError = internalError "make: module not found in dependency graph."
 
-    splitModules :: [RebuildStatus] -> (M.Map ModuleName (Maybe (Bool, UTCTime)), M.Map ModuleName UTCTime)
+    splitModules :: [RebuildStatus] -> (M.Map ModuleName (Maybe (UpToDateStatus, UTCTime)), M.Map ModuleName UTCTime)
     splitModules = foldl' collectByStatus (M.empty, M.empty)
 
     collectByStatus (build, prev) (RebuildStatus mn rebuildNever _ mbPb upToDate)
@@ -284,7 +294,7 @@ construct MakeActions{..} cacheDb (sorted, graph) preloadAll = do
                 _ | any isNothing modTimes -> toRebuild (upToDate, pb)
                 _ -> toPrebuilt pb
         where
-          toRebuild v = (M.insert mn (Just v) build, prev)
+          toRebuild (up, t) = (M.insert mn (Just (UpToDateStatus up, t)) build, prev)
           toPrebuilt v = (build, M.insert mn v prev)
 
 maximumMaybe :: Ord a => [a] -> Maybe a

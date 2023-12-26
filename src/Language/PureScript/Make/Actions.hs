@@ -155,8 +155,6 @@ readCacheDb'
   -- ^ The path to the output directory
   -> m CacheDb
 readCacheDb' outputDir = do
-  --fromMaybe mempty <$> readJSONFile (cacheDbFile outputDir)
-  --fromMaybe mempty <$> (fmap fromCacheDbVersioned <$> readJSONFile (cacheDbFile outputDir))
   mdb <- readJSONFile (cacheDbFile outputDir)
   pure $ fromMaybe mempty $ do
     db <- mdb
@@ -268,11 +266,12 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   updateOutputTimestamp mn = do
     curTime <- getCurrentTime
     ok <- setTimestamp (outputFilename mn externsFileName) curTime
-    -- then update all actual codegen targets
+    -- Then update timestamps of all actual codegen targets.
     codegenTargets <- asks optionsCodegenTargets
     let outputPaths = fmap (targetFilename mn) (S.toList codegenTargets)
     results <- traverse (flip setTimestamp curTime) outputPaths
-    -- if something goes wrong, something failed to update, return Nothing
+    -- If something goes wrong (any of targets doesn't exit, a file system
+    -- error), return False.
     pure $ and (ok : results)
 
   readExterns :: ModuleName -> Make (FilePath, Maybe ExternsFile)

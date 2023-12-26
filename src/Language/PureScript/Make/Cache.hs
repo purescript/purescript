@@ -72,13 +72,12 @@ hash = ContentHash . Hash.hash
 type CacheDb = Map ModuleName CacheInfo
 
 data CacheDbVersioned = CacheDbVersioned { cdbVersion :: Text, cdbModules :: CacheDb }
-  --deriving stock (Show)
   deriving (Eq, Ord)
 
 instance Aeson.FromJSON CacheDbVersioned where
   parseJSON = Aeson.withObject "CacheDb" $ \v ->
     CacheDbVersioned
-      <$> v .:  "version"
+      <$> v .: "version"
       <*> v .: "modules"
 
 instance Aeson.ToJSON CacheDbVersioned where
