@@ -2,6 +2,31 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.14
+
+Bugfixes:
+
+* Fix a compilation memory regression for very large files (#4521 by @mjrussell)
+
+  When compiling a a very large file (>12K lines)
+  the CSE pass could balloon memory and result in increased
+  compilation times.
+
+  This fix uses a strict Map instead of a lazy Map to avoid
+  building up unnecessary thunks during the optimization pass.
+
+* Fix two space leaks while compiling many modules (#4517 by @MonoidMusician)
+
+  The first would interleave compilation of too many modules at once, which
+  would increase memory usage, especially for single threaded builds with
+  `+RTS -N1 -RTS`. Now the number of concurrent modules is limited to
+  the number of threads available to the
+  [GHC runtime system](https://downloads.haskell.org/ghc/latest/docs/users_guide/using-concurrent.html#rts-options-for-smp-parallelism).
+
+  The second would hold on to memory from modules that compiled with warnings
+  until the end of the build when the warnings were printed and the memory freed.
+  This is now fixed with additional `NFData` instances.
+
 ## 0.15.13
 
 New features:
@@ -77,6 +102,10 @@ New features:
         a
         b
   ```
+
+Bugfixes:
+
+* Fix parsing bug where `@var` was allowed in type class head (#4523 by @JordanMartinez)
 
 ## 0.15.12
 
