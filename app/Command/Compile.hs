@@ -7,7 +7,7 @@ import Control.Monad (when)
 import Data.Aeson qualified as A
 import Data.Bool (bool)
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
-import Data.List (intercalate, (\\))
+import Data.List (intercalate, nub, (\\))
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
@@ -22,15 +22,16 @@ import System.Exit (exitSuccess, exitFailure)
 import System.Directory (getCurrentDirectory)
 import System.FilePath.Glob (glob)
 import System.IO (hPutStr, hPutStrLn, stderr, stdout)
-import System.IO.UTF8 (readUTF8FilesT)
+import System.IO.UTF8 (readUTF8FilesT, readUTF8FileT)
 
 data PSCMakeOptions = PSCMakeOptions
-  { pscmInput        :: [FilePath]
-  , pscmExclude      :: [FilePath]
-  , pscmOutputDir    :: FilePath
-  , pscmOpts         :: P.Options
-  , pscmUsePrefix    :: Bool
-  , pscmJSONErrors   :: Bool
+  { pscmInput         :: [FilePath]
+  , pscmInputFromFile :: Maybe FilePath
+  , pscmExclude       :: [FilePath]
+  , pscmOutputDir     :: FilePath
+  , pscmOpts          :: P.Options
+  , pscmUsePrefix     :: Bool
+  , pscmJSONErrors    :: Bool
   }
 
 -- | Arguments: verbose, use JSON, warnings, errors
@@ -54,7 +55,12 @@ printWarningsAndErrors verbose True files warnings errors = do
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
-  included <- globWarningOnMisses warnFileTypeNotFound pscmInput
+  mbInputsFromFile <- traverse readUTF8FileT pscmInputFromFile
+  let
+    excludeBlankLines = not . T.null . T.strip
+    excludeComments = (==) Nothing . T.stripPrefix "#"
+    toInputs = map (T.unpack . T.strip) . filter (\x -> excludeBlankLines x && excludeComments x) . T.lines
+  included <- globWarningOnMisses warnFileTypeNotFound $ nub $ pscmInput <> maybe [] toInputs mbInputsFromFile
   excluded <- globWarningOnMisses warnFileTypeNotFound pscmExclude
   let input = included \\ excluded
   when (null input) $ do
@@ -88,6 +94,14 @@ inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
      Opts.metavar "FILE"
   <> Opts.help "The input .purs file(s)."
+
+globInputFile :: Opts.Parser (Maybe FilePath)
+globInputFile = optional $ Opts.strOption $
+     Opts.long "source-globs"
+  <> Opts.metavar "FILE"
+  <> Opts.help "A file containing a line-separated list of .purs globs."
+  where
+    optional p = (Just <$> p) <|> pure Nothing
 
 excludedFiles :: Opts.Parser FilePath
 excludedFiles = Opts.strOption $
@@ -162,6 +176,7 @@ options =
 
 pscMakeOptions :: Opts.Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile
+                                <*> globInputFile
                                 <*> many excludedFiles
                                 <*> outputDirectory
                                 <*> options
