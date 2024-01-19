@@ -22,6 +22,6 @@
   ```sh
   purs compile src/**/*.purs
   purs compile --source-globs .spago/source-globs
-  purs compile src/**/*.purs --source-globs .spago/source-globs
+  purs compile --source-globs .spago/source-globs src/**/*.purs 
   ```
   
