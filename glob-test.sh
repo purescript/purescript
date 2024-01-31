@@ -48,10 +48,10 @@ echo "---"
 cat z/src/Bar/Baz.purs
 echo "---"
 
-EXPECTED=$(purs compile --output z/out1 z/Foo.purs z/src/**/*.purs z/test/**/*.purs 2>&1)
+EXPECTED=$(purs compile --output z/out1 'z/Foo.purs' 'z/src/**/*.purs' 'z/test/**/*.purs' 2>&1)
 SOURCE_GLOBS=$(purs compile  --output z/out2 --source-globs z/globsAll 2>&1)
-MIXED_ALL=$(purs compile  --output z/out3 --source-globs z/globsAll z/Foo.purs 2>&1)
-MIXED_NO_FOO=$(purs compile  --output z/out4 --source-globs z/globsNoFoo z/Foo.purs 2>&1)
+MIXED_ALL=$(purs compile  --output z/out3 --source-globs z/globsAll 'z/Foo.purs' 2>&1)
+MIXED_NO_FOO=$(purs compile  --output z/out4 --source-globs z/globsNoFoo 'z/Foo.purs' 2>&1)
 
 echo "Result"
 tree z/out1
