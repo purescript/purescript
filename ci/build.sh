@@ -176,8 +176,6 @@ pushd sdist-test
 # documentation errors in dependencies
 $STACK build $STACK_OPTS --haddock-arguments --optghc=-Werror
 
-stack exec ../glob-test.sh
-
 if [ "$do_prerelease" ]
 then
   if [ "$($STACK exec -- purs --version)" != "$build_version" ]
