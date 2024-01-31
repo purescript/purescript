@@ -48,16 +48,23 @@ echo "---"
 cat z/src/Bar/Baz.purs
 echo "---"
 
-EXPECTED=$(purs compile --output z/out1 'z/Foo.purs' 'z/src/**/*.purs' 'z/test/**/*.purs' 2>&1)
-SOURCE_GLOBS=$(purs compile  --output z/out2 --source-globs z/globsAll 2>&1)
-MIXED_ALL=$(purs compile  --output z/out3 --source-globs z/globsAll 'z/Foo.purs' 2>&1)
-MIXED_NO_FOO=$(purs compile  --output z/out4 --source-globs z/globsNoFoo 'z/Foo.purs' 2>&1)
+purs compile --output z/out1 'z/Foo.purs' 'z/src/**/*.purs' 'z/test/**/*.purs' 2>&1
+EXPECTED=$(cd z/out1 && tree . 2>&1)
+
+purs compile  --output z/out2 --source-globs z/globsAll 2>&1
+SOURCE_GLOBS=$(cd z/out2 && tree . 2>&1)
+
+purs compile  --output z/out3 --source-globs z/globsAll 'z/Foo.purs' 2>&1
+MIXED_ALL=$(cd z/out3 && tree . 2>&1)
+
+purs compile  --output z/out4 --source-globs z/globsNoFoo 'z/Foo.purs' 2>&1
+MIXED_NO_FOO=$(cd z/out4 && tree . 2>&1)
 
 echo "Result"
-tree z/out1
-tree z/out2
-tree z/out3
-tree z/out4
+echo "${EXPECTED}"
+echo "${SOURCE_GLOBS}"
+echo "${MIXED_ALL}"
+echo "${MIXED_NO_FOO}"
 
 rm -rf z/
 
