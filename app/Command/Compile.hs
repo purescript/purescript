@@ -96,12 +96,10 @@ inputFile = Opts.strArgument $
   <> Opts.help "The input .purs file(s)."
 
 globInputFile :: Opts.Parser (Maybe FilePath)
-globInputFile = optional $ Opts.strOption $
+globInputFile = Opts.optional $ Opts.strOption $
      Opts.long "source-globs"
   <> Opts.metavar "FILE"
   <> Opts.help "A file containing a line-separated list of .purs globs."
-  where
-    optional p = (Just <$> p) <|> pure Nothing
 
 excludedFiles :: Opts.Parser FilePath
 excludedFiles = Opts.strOption $
