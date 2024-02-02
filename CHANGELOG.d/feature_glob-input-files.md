@@ -1,6 +1,9 @@
-* Add support for `purs compile --source-globs path/to/file`
+* Enable passing source input globs via `--source-globs path/to/file`
 
-  Due to a shell character limitation on Windows where a large list of 
+  `--source-globs` support has been added to the following commands:
+  `compile`, `docs`, `graph`, `ide`, and `publish`.
+
+  Due to a [shell character limitation on Windows](https://learn.microsoft.com/en-us/troubleshoot/windows-client/shell-experience/command-line-string-limitation) where a large list of 
   source globs cannot be passed (e.g. `purs compile ... glob1000/src/**/*.purs`),
   source globs can be stored in a file according to the format below
   and the file is passed in instead via `purs compile --source-globs path/to/file`.
@@ -24,4 +27,8 @@
   purs compile --source-globs .spago/source-globs
   purs compile --source-globs .spago/source-globs src/**/*.purs 
   ```
+
+  In the command, `purs compile glob1 glob2 --source-globs globsFoundInFile --exclude-file glob3`,
+  the files passed to the compiler are: all the files found by `glob1`, `glob2`, and `globsFoundinFile`
+  minus the files found by `glob3`.
   
