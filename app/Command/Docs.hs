@@ -18,9 +18,10 @@ import Text.PrettyPrint.ANSI.Leijen qualified as PP
 import System.Directory (getCurrentDirectory, createDirectoryIfMissing, removeFile)
 import System.Exit (exitFailure)
 import System.FilePath ((</>))
-import System.FilePath.Glob (compile, glob, globDir1)
+import System.FilePath.Glob (compile, globDir1)
 import System.IO (hPutStrLn, stderr)
 import System.IO.UTF8 (writeUTF8FileT)
+import System.FilePath.Glob.PureScript (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 
 -- | Available output formats
 data Format
@@ -35,12 +36,19 @@ data PSCDocsOptions = PSCDocsOptions
   , _pscdOutput :: Maybe FilePath
   , _pscdCompileOutputDir :: FilePath
   , _pscdInputFiles  :: [FilePath]
+  , _pscdInputFromFile :: Maybe FilePath
+  , _pscdExcludeFiles :: [FilePath]
   }
   deriving (Show)
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions fmt moutput compileOutput inputGlob) = do
-  input <- concat <$> mapM glob inputGlob
+docgen (PSCDocsOptions fmt moutput compileOutput inputGlob inputGlobFromFile excludeGlob) = do
+  input <- toInputGlobs $ PSCGlobs
+    { pscInputGlobs = inputGlob
+    , pscInputGlobsFromFile = inputGlobFromFile
+    , pscExcludeGlobs = excludeGlob
+    , pscWarnFileTypeNotFound = warnFileTypeNotFound "docs"
+    }
   when (null input) $ do
     hPutStrLn stderr "purs docs: no input files."
     exitFailure
@@ -104,7 +112,13 @@ defaultOutputForFormat fmt =
     Ctags -> "tags"
 
 pscDocsOptions :: Opts.Parser PSCDocsOptions
-pscDocsOptions = PSCDocsOptions <$> format <*> output <*> compileOutputDir <*> many inputFile
+pscDocsOptions = 
+  PSCDocsOptions <$> format 
+                 <*> output 
+                 <*> compileOutputDir 
+                 <*> many inputFile
+                 <*> globInputFile
+                 <*> many excludeFile
   where
   format :: Opts.Parser Format
   format = Opts.option Opts.auto $
@@ -132,6 +146,19 @@ pscDocsOptions = PSCDocsOptions <$> format <*> output <*> compileOutputDir <*> m
   inputFile = Opts.strArgument $
        Opts.metavar "FILE"
     <> Opts.help "The input .purs file(s)"
+  
+  globInputFile :: Opts.Parser (Maybe FilePath)
+  globInputFile = Opts.optional $ Opts.strOption $
+      Opts.long "source-globs"
+    <> Opts.metavar "FILE"
+    <> Opts.help "A file containing a line-separated list of .purs globs."
+
+  excludeFile :: Opts.Parser FilePath
+  excludeFile = Opts.strOption $
+      Opts.short 'x'
+    <> Opts.long "exclude-files"
+    <> Opts.help "Glob of .purs files to exclude from the supplied files."
+
 
 command :: Opts.Parser (IO ())
 command = docgen <$> (Opts.helper <*> pscDocsOptions)

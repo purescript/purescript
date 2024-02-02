@@ -14,17 +14,25 @@ import Options.Applicative qualified as Opts
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitFailure)
 import System.Directory (getCurrentDirectory)
-import System.FilePath.Glob (glob)
 import System.IO (hPutStr, hPutStrLn, stderr)
+import System.FilePath.Glob.PureScript (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 
 data GraphOptions = GraphOptions
-  { graphInput      :: [FilePath]
-  , graphJSONErrors :: Bool
+  { graphInput         :: [FilePath]
+  , graphInputFromFile :: Maybe FilePath
+  , graphExclude       :: [FilePath]
+  , graphJSONErrors    :: Bool
   }
 
 graph :: GraphOptions -> IO ()
 graph GraphOptions{..} = do
-  input <- globWarningOnMisses (unless graphJSONErrors . warnFileTypeNotFound) graphInput
+  input <- toInputGlobs $ PSCGlobs
+    { pscInputGlobs = graphInput
+    , pscInputGlobsFromFile = graphInputFromFile
+    , pscExcludeGlobs = graphExclude
+    , pscWarnFileTypeNotFound = unless graphJSONErrors . warnFileTypeNotFound "graph"
+    }
+
   when (null input && not graphJSONErrors) $ do
     hPutStr stderr $ unlines
       [ "purs graph: No input files."
@@ -37,18 +45,14 @@ graph GraphOptions{..} = do
   printWarningsAndErrors graphJSONErrors makeWarnings makeResult
     >>= (LB.putStr . Json.encode)
 
-  where
-  warnFileTypeNotFound :: String -> IO ()
-  warnFileTypeNotFound =
-    hPutStrLn stderr . ("purs graph: No files found using pattern: " <>)
-
-
 command :: Opts.Parser (IO ())
 command = graph <$> (Opts.helper <*> graphOptions)
   where
   graphOptions :: Opts.Parser GraphOptions
   graphOptions =
     GraphOptions <$> many inputFile
+                 <*> globInputFile
+                 <*> many excludeFile
                  <*> jsonErrors
 
   inputFile :: Opts.Parser FilePath
@@ -56,6 +60,18 @@ command = graph <$> (Opts.helper <*> graphOptions)
     Opts.strArgument $
       Opts.metavar "FILE" <>
       Opts.help "The input .purs file(s)."
+  
+  globInputFile :: Opts.Parser (Maybe FilePath)
+  globInputFile = Opts.optional $ Opts.strOption $
+      Opts.long "source-globs"
+    <> Opts.metavar "FILE"
+    <> Opts.help "A file containing a line-separated list of .purs globs."
+
+  excludeFile :: Opts.Parser FilePath
+  excludeFile = Opts.strOption $
+      Opts.short 'x'
+    <> Opts.long "exclude-files"
+    <> Opts.help "Glob of .purs files to exclude from the supplied files."
 
   jsonErrors :: Opts.Parser Bool
   jsonErrors =
@@ -84,16 +100,3 @@ printWarningsAndErrors True warnings errors = do
   case errors of
     Left _errs -> exitFailure
     Right res -> pure res
-
-
-globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
-globWarningOnMisses warn = concatMapM globWithWarning
-  where
-  globWithWarning :: String -> IO [FilePath]
-  globWithWarning pattern' = do
-    paths <- glob pattern'
-    when (null paths) $ warn pattern'
-    return paths
-
-  concatMapM :: (a -> IO [b]) -> [a] -> IO [b]
-  concatMapM f = fmap concat . mapM f

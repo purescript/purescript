@@ -7,7 +7,7 @@ import Control.Monad (when)
 import Data.Aeson qualified as A
 import Data.Bool (bool)
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
-import Data.List (intercalate, nub, (\\))
+import Data.List (intercalate)
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
@@ -20,9 +20,9 @@ import Options.Applicative qualified as Opts
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitSuccess, exitFailure)
 import System.Directory (getCurrentDirectory)
-import System.FilePath.Glob (glob)
-import System.IO (hPutStr, hPutStrLn, stderr, stdout)
-import System.IO.UTF8 (readUTF8FilesT, readUTF8FileT)
+import System.IO (hPutStr, stderr, stdout)
+import System.IO.UTF8 (readUTF8FilesT)
+import System.FilePath.Glob.PureScript (toInputGlobs, PSCGlobs(..), warnFileTypeNotFound)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput         :: [FilePath]
@@ -55,14 +55,12 @@ printWarningsAndErrors verbose True files warnings errors = do
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
-  mbInputsFromFile <- traverse readUTF8FileT pscmInputFromFile
-  let
-    excludeBlankLines = not . T.null . T.strip
-    excludeComments = (==) Nothing . T.stripPrefix "#"
-    toInputs = map (T.unpack . T.strip) . filter (\x -> excludeBlankLines x && excludeComments x) . T.lines
-  included <- globWarningOnMisses warnFileTypeNotFound $ nub $ pscmInput <> maybe [] toInputs mbInputsFromFile
-  excluded <- globWarningOnMisses warnFileTypeNotFound pscmExclude
-  let input = included \\ excluded
+  input <- toInputGlobs $ PSCGlobs
+    { pscInputGlobs = pscmInput
+    , pscInputGlobsFromFile = pscmInputFromFile
+    , pscExcludeGlobs = pscmExclude
+    , pscWarnFileTypeNotFound = warnFileTypeNotFound "compile"
+    }
   when (null input) $ do
     hPutStr stderr $ unlines [ "purs compile: No input files."
                              , "Usage: For basic information, try the `--help' option."
@@ -78,18 +76,6 @@ compile PSCMakeOptions{..} = do
   printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors moduleFiles makeWarnings makeErrors
   exitSuccess
 
-warnFileTypeNotFound :: String -> IO ()
-warnFileTypeNotFound = hPutStrLn stderr . ("purs compile: No files found using pattern: " ++)
-
-globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
-globWarningOnMisses warn = concatMapM globWithWarning
-  where
-  globWithWarning pattern' = do
-    paths <- glob pattern'
-    when (null paths) $ warn pattern'
-    return paths
-  concatMapM f = fmap concat . mapM f
-
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
      Opts.metavar "FILE"
@@ -101,8 +87,8 @@ globInputFile = Opts.optional $ Opts.strOption $
   <> Opts.metavar "FILE"
   <> Opts.help "A file containing a line-separated list of .purs globs."
 
-excludedFiles :: Opts.Parser FilePath
-excludedFiles = Opts.strOption $
+excludeFile :: Opts.Parser FilePath
+excludeFile = Opts.strOption $
      Opts.short 'x'
   <> Opts.long "exclude-files"
   <> Opts.help "Glob of .purs files to exclude from the supplied files."
@@ -175,7 +161,7 @@ options =
 pscMakeOptions :: Opts.Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> globInputFile
-                                <*> many excludedFiles
+                                <*> many excludeFile
                                 <*> outputDirectory
                                 <*> options
                                 <*> (not <$> noPrefix)

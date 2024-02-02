@@ -57,11 +57,13 @@ listenOnLocalhost port = do
       pure sock)
 
 data ServerOptions = ServerOptions
-  { _serverDirectory  :: Maybe FilePath
-  , _serverGlobs      :: [FilePath]
-  , _serverOutputPath :: FilePath
-  , _serverPort       :: Network.PortNumber
-  , _serverLoglevel   :: IdeLogLevel
+  { _serverDirectory     :: Maybe FilePath
+  , _serverGlobs         :: [FilePath]
+  , _serverGlobsFromFile :: Maybe FilePath
+  , _serverGlobsExcluded :: [FilePath]
+  , _serverOutputPath    :: FilePath
+  , _serverPort          :: Network.PortNumber
+  , _serverLoglevel      :: IdeLogLevel
   -- TODO(Christoph) Deprecated
   , _serverEditorMode :: Bool
   , _serverPolling    :: Bool
@@ -110,7 +112,7 @@ command = Opts.helper <*> subcommands where
     Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer))
 
   server :: ServerOptions -> IO ()
-  server opts'@(ServerOptions dir globs outputPath port logLevel editorMode polling noWatch) = do
+  server opts'@(ServerOptions dir globs globsFromFile globsExcluded outputPath port logLevel editorMode polling noWatch) = do
     when (logLevel == LogDebug || logLevel == LogAll)
       (putText "Parsed Options:" *> print opts')
     maybe (pure ()) setCurrentDirectory dir
@@ -136,6 +138,8 @@ command = Opts.helper <*> subcommands where
         { confLogLevel = logLevel
         , confOutputPath = outputPath
         , confGlobs = globs
+        , confGlobsFromFile = globsFromFile
+        , confGlobsExclude = globsExcluded
         }
     ts <- newIORef Nothing
     let
@@ -151,6 +155,8 @@ command = Opts.helper <*> subcommands where
     ServerOptions
       <$> optional (Opts.strOption (Opts.long "directory" `mappend` Opts.short 'd'))
       <*> many (Opts.argument Opts.str (Opts.metavar "Source GLOBS..."))
+      <*> globInputFile
+      <*> many excludeFile
       <*> Opts.strOption (Opts.long "output-directory" `mappend` Opts.value "output/")
       <*> (fromIntegral <$>
            Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer)))
@@ -162,6 +168,18 @@ command = Opts.helper <*> subcommands where
       <*> Opts.switch (Opts.long "editor-mode")
       <*> Opts.switch (Opts.long "no-watch")
       <*> Opts.switch (Opts.long "polling")
+    where
+      globInputFile :: Opts.Parser (Maybe FilePath)
+      globInputFile = Opts.optional $ Opts.strOption $
+          Opts.long "source-globs"
+        <> Opts.metavar "FILE"
+        <> Opts.help "A file containing a line-separated list of .purs globs."
+
+      excludeFile :: Opts.Parser FilePath
+      excludeFile = Opts.strOption $
+          Opts.short 'x'
+        <> Opts.long "exclude-files"
+        <> Opts.help "Glob of .purs files to exclude from the supplied files."
 
   parseLogLevel :: Text -> IdeLogLevel
   parseLogLevel s = case s of

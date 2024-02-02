@@ -389,6 +389,7 @@ library
     Language.PureScript.TypeClassDictionaries
     Language.PureScript.Types
     System.IO.UTF8
+    System.FilePath.Glob.PureScript
   other-modules:
     Data.Text.PureScript
     Language.PureScript.Constants.TH

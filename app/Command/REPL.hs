@@ -22,12 +22,14 @@ import System.IO.UTF8 (readUTF8File)
 import System.Exit (ExitCode(..), exitFailure)
 import System.Directory (doesFileExist, getCurrentDirectory)
 import System.FilePath ((</>))
-import System.FilePath.Glob qualified as Glob
 import System.IO (hPutStrLn, stderr)
+import System.FilePath.Glob.PureScript (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 
 -- | Command line options
 data PSCiOptions = PSCiOptions
   { psciInputGlob         :: [String]
+  , psciInputFromFile     :: Maybe String
+  , psciExclude           :: [String]
   , psciBackend           :: Backend
   }
 
@@ -35,6 +37,18 @@ inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
      Opts.metavar "FILES"
   <> Opts.help "Optional .purs files to load on start"
+
+globInputFile :: Opts.Parser (Maybe FilePath)
+globInputFile = Opts.optional $ Opts.strOption $
+     Opts.long "source-globs"
+  <> Opts.metavar "FILE"
+  <> Opts.help "An optional file containing a line-separated list of .purs globs representing files to load on start."
+
+excludedFiles :: Opts.Parser FilePath
+excludedFiles = Opts.strOption $
+     Opts.short 'x'
+  <> Opts.long "exclude-files"
+  <> Opts.help "An optional glob of .purs files to exclude from the supplied files."
 
 nodePathOption :: Opts.Parser (Maybe FilePath)
 nodePathOption = Opts.optional . Opts.strOption $
@@ -64,6 +78,8 @@ backend =
 
 psciOptions :: Opts.Parser PSCiOptions
 psciOptions = PSCiOptions <$> many inputFile
+                          <*> globInputFile
+                          <*> many excludedFiles
                           <*> backend
 
 -- | Parses the input and returns either a command, or an error as a 'String'.
@@ -132,7 +148,12 @@ command = loop <$> options
   where
     loop :: PSCiOptions -> IO ()
     loop PSCiOptions{..} = do
-        inputFiles <- concat <$> traverse Glob.glob psciInputGlob
+        inputFiles <- toInputGlobs $ PSCGlobs
+          { pscInputGlobs = psciInputGlob
+          , pscInputGlobsFromFile = psciInputFromFile
+          , pscExcludeGlobs = psciExclude
+          , pscWarnFileTypeNotFound = warnFileTypeNotFound "repl"
+            }
         e <- runExceptT $ do
           modules <- ExceptT (loadAllModules inputFiles)
           when (null modules) . liftIO $ do

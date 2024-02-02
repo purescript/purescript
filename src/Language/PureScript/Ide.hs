@@ -42,7 +42,7 @@ import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, n
 import Language.PureScript.Ide.Usage (findUsages)
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
 import System.FilePath ((</>), normalise)
-import System.FilePath.Glob (glob)
+import System.FilePath.Glob.PureScript (toInputGlobs, PSCGlobs(..))
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.
@@ -179,8 +179,14 @@ findAvailableExterns = do
 -- | Finds all matches for the globs specified at the commandline
 findAllSourceFiles :: Ide m => m [FilePath]
 findAllSourceFiles = do
-  globs <- confGlobs . ideConfiguration <$> ask
-  liftIO (concatMapM glob globs)
+  IdeConfiguration{..} <- ideConfiguration <$> ask
+  liftIO $ toInputGlobs $ PSCGlobs
+    { pscInputGlobs = confGlobs
+    , pscInputGlobsFromFile = confGlobsFromFile
+    , pscExcludeGlobs = confGlobsExclude
+    , pscWarnFileTypeNotFound = const $ pure ()
+    }
+
 
 -- | Looks up the ExternsFiles for the given Modulenames and loads them into the
 -- server state. Then proceeds to parse all the specified sourcefiles and

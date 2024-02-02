@@ -15,6 +15,7 @@ import System.FilePath ((</>))
 import System.Process (createProcess, getProcessExitCode, shell)
 
 import Language.PureScript qualified as P
+import Data.Maybe (Maybe(Nothing))
 
 defConfig :: IdeConfiguration
 defConfig =
@@ -22,6 +23,8 @@ defConfig =
     { confLogLevel = LogNone
     , confOutputPath = "output/"
     , confGlobs = ["src/**/*.purs"]
+    , confGlobsFromFile = Nothing
+    , confGlobsExclude = []
     }
 
 runIde' :: IdeConfiguration -> IdeState -> [Command] -> IO ([Either IdeError Success], IdeState)
