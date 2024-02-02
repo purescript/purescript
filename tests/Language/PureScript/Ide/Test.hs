@@ -15,7 +15,6 @@ import System.FilePath ((</>))
 import System.Process (createProcess, getProcessExitCode, shell)
 
 import Language.PureScript qualified as P
-import Data.Maybe (Maybe(Nothing))
 
 defConfig :: IdeConfiguration
 defConfig =
