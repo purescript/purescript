@@ -57,7 +57,9 @@ src/**/*.purs
 test/**/*.purs
 EOF
 
-tree . -L 3
+if [ ! "$(command -v tree)" = "" ]; then
+  tree . -L 3
+fi
 echo ::endgroup::
 
 echo ::group::Calling purs compile
