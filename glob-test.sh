@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-# This script assumes `ci/build.sh && cd sdist-test` has been run.
+# This script assumes `ci/build.sh && cd sdist-test` has been run
+# and that the program `tree` has been installed.
 
 # Creates the following structure
 #   Foo.purs
@@ -57,7 +58,7 @@ src/**/*.purs
 test/**/*.purs
 EOF
 
-(tree . -L 3 || echo "'tree' is not installed, so can't print directory structure")
+tree . -L 3
 echo ::endgroup::
 
 echo ::group::Calling purs compile

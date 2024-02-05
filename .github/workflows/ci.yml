@@ -136,6 +136,7 @@ jobs:
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual glob checks happen in a temporary directory.
         run: |
+          apt-get install tree
           ../ci/fix-home stack exec bash ../glob-test.sh
 
       - name: "(Linux only) Build the entire package set"
