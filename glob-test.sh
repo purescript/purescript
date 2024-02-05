@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This script assumes `stack build`/`stack build --fast` has been executed.
+# This script assumes `ci/build.sh && cd sdist-test` has been run.
 
 # Creates the following structure
 #   Foo.purs
