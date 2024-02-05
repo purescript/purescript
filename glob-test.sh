@@ -57,9 +57,7 @@ src/**/*.purs
 test/**/*.purs
 EOF
 
-if [ ! "$(command -v tree)" = "" ]; then
-  tree . -L 3
-fi
+(tree . -L 3 || echo "'tree' is not installed, so can't print directory structure")
 echo ::endgroup::
 
 echo ::group::Calling purs compile
