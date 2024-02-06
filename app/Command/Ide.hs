@@ -39,6 +39,7 @@ import System.Directory (doesDirectoryExist, getCurrentDirectory, setCurrentDire
 import System.FilePath ((</>))
 import System.IO (BufferMode(..), hClose, hFlush, hSetBuffering, hSetEncoding, utf8)
 import System.IO.Error (isEOFError)
+import SharedCLI qualified
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
 listenOnLocalhost port = do
@@ -154,9 +155,9 @@ command = Opts.helper <*> subcommands where
   serverOptions =
     ServerOptions
       <$> optional (Opts.strOption (Opts.long "directory" `mappend` Opts.short 'd'))
-      <*> many (Opts.argument Opts.str (Opts.metavar "Source GLOBS..."))
-      <*> globInputFile
-      <*> many excludeFile
+      <*> many SharedCLI.inputFile
+      <*> SharedCLI.globInputFile
+      <*> many SharedCLI.excludeFiles
       <*> Opts.strOption (Opts.long "output-directory" `mappend` Opts.value "output/")
       <*> (fromIntegral <$>
            Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer)))
@@ -168,18 +169,6 @@ command = Opts.helper <*> subcommands where
       <*> Opts.switch (Opts.long "editor-mode")
       <*> Opts.switch (Opts.long "no-watch")
       <*> Opts.switch (Opts.long "polling")
-    where
-      globInputFile :: Opts.Parser (Maybe FilePath)
-      globInputFile = Opts.optional $ Opts.strOption $
-          Opts.long "source-globs"
-        <> Opts.metavar "FILE"
-        <> Opts.help "A file containing a line-separated list of .purs globs."
-
-      excludeFile :: Opts.Parser FilePath
-      excludeFile = Opts.strOption $
-          Opts.short 'x'
-        <> Opts.long "exclude-files"
-        <> Opts.help "Glob of .purs files to exclude from the supplied files."
 
   parseLogLevel :: Text -> IdeLogLevel
   parseLogLevel s = case s of

@@ -15,6 +15,7 @@ import Language.PureScript.Docs qualified as D
 import Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import Options.Applicative qualified as Opts
 import Text.PrettyPrint.ANSI.Leijen qualified as PP
+import SharedCLI qualified
 import System.Directory (getCurrentDirectory, createDirectoryIfMissing, removeFile)
 import System.Exit (exitFailure)
 import System.FilePath ((</>))
@@ -116,9 +117,9 @@ pscDocsOptions =
   PSCDocsOptions <$> format 
                  <*> output 
                  <*> compileOutputDir 
-                 <*> many inputFile
-                 <*> globInputFile
-                 <*> many excludeFile
+                 <*> many SharedCLI.inputFile
+                 <*> SharedCLI.globInputFile
+                 <*> many SharedCLI.excludeFiles
   where
   format :: Opts.Parser Format
   format = Opts.option Opts.auto $
@@ -141,24 +142,6 @@ pscDocsOptions =
     <> Opts.long "compile-output"
     <> Opts.metavar "DIR"
     <> Opts.help "Compiler output directory"
-
-  inputFile :: Opts.Parser FilePath
-  inputFile = Opts.strArgument $
-       Opts.metavar "FILE"
-    <> Opts.help "The input .purs file(s)"
-  
-  globInputFile :: Opts.Parser (Maybe FilePath)
-  globInputFile = Opts.optional $ Opts.strOption $
-      Opts.long "source-globs"
-    <> Opts.metavar "FILE"
-    <> Opts.help "A file containing a line-separated list of .purs globs."
-
-  excludeFile :: Opts.Parser FilePath
-  excludeFile = Opts.strOption $
-      Opts.short 'x'
-    <> Opts.long "exclude-files"
-    <> Opts.help "Glob of .purs files to exclude from the supplied files."
-
 
 command :: Opts.Parser (IO ())
 command = docgen <$> (Opts.helper <*> pscDocsOptions)

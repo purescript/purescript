@@ -17,6 +17,7 @@ import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Interactive
 import Options.Applicative qualified as Opts
+import SharedCLI qualified
 import System.Console.Haskeline (InputT, Settings(..), defaultSettings, getInputLine, handleInterrupt, outputStrLn, runInputT, setComplete, withInterrupt)
 import System.IO.UTF8 (readUTF8File)
 import System.Exit (ExitCode(..), exitFailure)
@@ -32,23 +33,6 @@ data PSCiOptions = PSCiOptions
   , psciExclude           :: [String]
   , psciBackend           :: Backend
   }
-
-inputFile :: Opts.Parser FilePath
-inputFile = Opts.strArgument $
-     Opts.metavar "FILES"
-  <> Opts.help "Optional .purs files to load on start"
-
-globInputFile :: Opts.Parser (Maybe FilePath)
-globInputFile = Opts.optional $ Opts.strOption $
-     Opts.long "source-globs"
-  <> Opts.metavar "FILE"
-  <> Opts.help "An optional file containing a line-separated list of .purs globs representing files to load on start."
-
-excludedFiles :: Opts.Parser FilePath
-excludedFiles = Opts.strOption $
-     Opts.short 'x'
-  <> Opts.long "exclude-files"
-  <> Opts.help "An optional glob of .purs files to exclude from the supplied files."
 
 nodePathOption :: Opts.Parser (Maybe FilePath)
 nodePathOption = Opts.optional . Opts.strOption $
@@ -77,9 +61,9 @@ backend =
   <|> (nodeBackend <$> nodePathOption <*> nodeFlagsOption)
 
 psciOptions :: Opts.Parser PSCiOptions
-psciOptions = PSCiOptions <$> many inputFile
-                          <*> globInputFile
-                          <*> many excludedFiles
+psciOptions = PSCiOptions <$> many SharedCLI.inputFile
+                          <*> SharedCLI.globInputFile
+                          <*> many SharedCLI.excludeFiles
                           <*> backend
 
 -- | Parses the input and returns either a command, or an error as a 'String'.

@@ -424,6 +424,7 @@ executable purs
     Command.Ide
     Command.Publish
     Command.REPL
+    SharedCLI
     Version
     Paths_purescript
   autogen-modules:

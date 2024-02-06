@@ -16,6 +16,7 @@ import System.Exit (exitFailure)
 import System.Directory (getCurrentDirectory)
 import System.IO (hPutStr, hPutStrLn, stderr)
 import System.FilePath.Glob.PureScript (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
+import SharedCLI qualified
 
 data GraphOptions = GraphOptions
   { graphInput         :: [FilePath]
@@ -50,28 +51,10 @@ command = graph <$> (Opts.helper <*> graphOptions)
   where
   graphOptions :: Opts.Parser GraphOptions
   graphOptions =
-    GraphOptions <$> many inputFile
-                 <*> globInputFile
-                 <*> many excludeFile
+    GraphOptions <$> many SharedCLI.inputFile
+                 <*> SharedCLI.globInputFile
+                 <*> many SharedCLI.excludeFiles
                  <*> jsonErrors
-
-  inputFile :: Opts.Parser FilePath
-  inputFile =
-    Opts.strArgument $
-      Opts.metavar "FILE" <>
-      Opts.help "The input .purs file(s)."
-  
-  globInputFile :: Opts.Parser (Maybe FilePath)
-  globInputFile = Opts.optional $ Opts.strOption $
-      Opts.long "source-globs"
-    <> Opts.metavar "FILE"
-    <> Opts.help "A file containing a line-separated list of .purs globs."
-
-  excludeFile :: Opts.Parser FilePath
-  excludeFile = Opts.strOption $
-      Opts.short 'x'
-    <> Opts.long "exclude-files"
-    <> Opts.help "Glob of .purs files to exclude from the supplied files."
 
   jsonErrors :: Opts.Parser Bool
   jsonErrors =

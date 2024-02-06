@@ -17,6 +17,7 @@ import Language.PureScript.CST qualified as CST
 import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
 import Language.PureScript.Make (buildMakeActions, inferForeignModules, runMake)
 import Options.Applicative qualified as Opts
+import SharedCLI qualified
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitSuccess, exitFailure)
 import System.Directory (getCurrentDirectory)
@@ -75,23 +76,6 @@ compile PSCMakeOptions{..} = do
     P.make makeActions (map snd ms)
   printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors moduleFiles makeWarnings makeErrors
   exitSuccess
-
-inputFile :: Opts.Parser FilePath
-inputFile = Opts.strArgument $
-     Opts.metavar "FILE"
-  <> Opts.help "The input .purs file(s)."
-
-globInputFile :: Opts.Parser (Maybe FilePath)
-globInputFile = Opts.optional $ Opts.strOption $
-     Opts.long "source-globs"
-  <> Opts.metavar "FILE"
-  <> Opts.help "A file containing a line-separated list of .purs globs."
-
-excludeFile :: Opts.Parser FilePath
-excludeFile = Opts.strOption $
-     Opts.short 'x'
-  <> Opts.long "exclude-files"
-  <> Opts.help "Glob of .purs files to exclude from the supplied files."
 
 outputDirectory :: Opts.Parser FilePath
 outputDirectory = Opts.strOption $
@@ -159,9 +143,9 @@ options =
     handleTargets ts = S.fromList (if P.JSSourceMap `elem` ts then P.JS : ts else ts)
 
 pscMakeOptions :: Opts.Parser PSCMakeOptions
-pscMakeOptions = PSCMakeOptions <$> many inputFile
-                                <*> globInputFile
-                                <*> many excludeFile
+pscMakeOptions = PSCMakeOptions <$> many SharedCLI.inputFile
+                                <*> SharedCLI.globInputFile
+                                <*> many SharedCLI.excludeFiles
                                 <*> outputDirectory
                                 <*> options
                                 <*> (not <$> noPrefix)
