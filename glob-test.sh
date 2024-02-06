@@ -65,13 +65,13 @@ echo ::group::Calling purs compile
 "${PURS}" compile --output "out1" 'Foo.purs' 'src/**/*.purs' 'test/**/*.purs' 2>&1
 EXPECTED=$(cd out1 && tree . 2>&1)
 
-"${PURS}" compile  --output "out2" --source-globs globsAll 2>&1
+"${PURS}" compile  --output "out2" --source-globs-file globsAll 2>&1
 SOURCE_GLOBS=$(cd out2 && tree . 2>&1)
 
-"${PURS}" compile  --output "out3" --source-globs globsAll 'Foo.purs' 2>&1
+"${PURS}" compile  --output "out3" --source-globs-file globsAll 'Foo.purs' 2>&1
 MIXED_ALL=$(cd out3 && tree . 2>&1)
 
-"${PURS}" compile  --output "out4" --source-globs globsNoFoo 'Foo.purs' 2>&1
+"${PURS}" compile  --output "out4" --source-globs-file globsNoFoo 'Foo.purs' 2>&1
 MIXED_NO_FOO=$(cd out4 && tree . 2>&1)
 echo ::endgroup::
 
