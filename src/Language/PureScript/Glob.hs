@@ -28,7 +28,7 @@ inputGlobsFromFile globsFromFile = do
   mbInputsFromFile <- traverse readUTF8FileT globsFromFile
   let
     excludeBlankLines = not . T.null . T.strip
-    excludeComments = (==) Nothing . T.stripPrefix "#"
+    excludeComments = not . T.isPrefixOf "#"
     toInputs = map (T.unpack . T.strip) . filter (\x -> excludeBlankLines x && excludeComments x) . T.lines
   pure $ maybe [] toInputs mbInputsFromFile
 
