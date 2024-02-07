@@ -1,4 +1,4 @@
-module System.FilePath.Glob.PureScript where
+module Language.PureScript.Glob where
 
 import Prelude
 

@@ -15,7 +15,7 @@ import System.Console.ANSI qualified as ANSI
 import System.Exit (exitFailure)
 import System.Directory (getCurrentDirectory)
 import System.IO (hPutStr, hPutStrLn, stderr)
-import System.FilePath.Glob.PureScript (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
+import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 import SharedCLI qualified
 
 data GraphOptions = GraphOptions

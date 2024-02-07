@@ -42,7 +42,7 @@ import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, n
 import Language.PureScript.Ide.Usage (findUsages)
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
 import System.FilePath ((</>), normalise)
-import System.FilePath.Glob.PureScript (toInputGlobs, PSCGlobs(..))
+import Language.PureScript.Glob (toInputGlobs, PSCGlobs(..))
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.

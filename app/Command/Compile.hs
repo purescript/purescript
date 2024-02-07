@@ -23,7 +23,7 @@ import System.Exit (exitSuccess, exitFailure)
 import System.Directory (getCurrentDirectory)
 import System.IO (hPutStr, stderr, stdout)
 import System.IO.UTF8 (readUTF8FilesT)
-import System.FilePath.Glob.PureScript (toInputGlobs, PSCGlobs(..), warnFileTypeNotFound)
+import Language.PureScript.Glob (toInputGlobs, PSCGlobs(..), warnFileTypeNotFound)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput         :: [FilePath]

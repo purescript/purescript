@@ -22,7 +22,7 @@ import System.FilePath ((</>))
 import System.FilePath.Glob (compile, globDir1)
 import System.IO (hPutStrLn, stderr)
 import System.IO.UTF8 (writeUTF8FileT)
-import System.FilePath.Glob.PureScript (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
+import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 
 -- | Available output formats
 data Format

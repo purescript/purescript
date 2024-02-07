@@ -24,7 +24,7 @@ import System.Exit (ExitCode(..), exitFailure)
 import System.Directory (doesFileExist, getCurrentDirectory)
 import System.FilePath ((</>))
 import System.IO (hPutStrLn, stderr)
-import System.FilePath.Glob.PureScript (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
+import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 
 -- | Command line options
 data PSCiOptions = PSCiOptions
