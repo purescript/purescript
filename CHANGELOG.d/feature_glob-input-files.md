@@ -30,9 +30,9 @@
 
   In the command...
   ```
-  purs compile inputGlob1 inputGlob2 --source-globs-file inputGlobsFoundInFile --exclude-files excludeGlob1
-  ``````
+  purs compile inputGlob1 inputGlob2 --source-globs-file fileWithMoreGlobs --exclude-files excludeGlob1
+  ```
   the files passed to the compiler are: all the files found by 
-  `inputGlob1`, `inputGlob2`, and `inputGlobsFoundinFile`
+  `inputGlob1`, `inputGlob2`, and all the globs listed in `fileWithMoreGlobs`
   minus the files found by `excludeGlob1`.
   
