@@ -15,6 +15,7 @@ import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.Foldable (for_)
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
+import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 import Language.PureScript.Interactive
 import Options.Applicative qualified as Opts
 import SharedCLI qualified
@@ -24,7 +25,6 @@ import System.Exit (ExitCode(..), exitFailure)
 import System.Directory (doesFileExist, getCurrentDirectory)
 import System.FilePath ((</>))
 import System.IO (hPutStrLn, stderr)
-import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 
 -- | Command line options
 data PSCiOptions = PSCiOptions
@@ -137,7 +137,7 @@ command = loop <$> options
           , pscInputGlobsFromFile = psciInputFromFile
           , pscExcludeGlobs = psciExclude
           , pscWarnFileTypeNotFound = warnFileTypeNotFound "repl"
-            }
+          }
         e <- runExceptT $ do
           modules <- ExceptT (loadAllModules inputFiles)
           when (null modules) . liftIO $ do

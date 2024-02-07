@@ -6,8 +6,8 @@ import Control.Monad (when)
 import Data.List (nub, (\\))
 import Data.Text qualified as T
 import System.FilePath.Glob (glob)
-import System.IO.UTF8 (readUTF8FileT)
 import System.IO (hPutStrLn, stderr)
+import System.IO.UTF8 (readUTF8FileT)
 
 data PSCGlobs = PSCGlobs
   { pscInputGlobs :: [FilePath]

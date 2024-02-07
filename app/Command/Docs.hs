@@ -13,6 +13,7 @@ import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.Docs qualified as D
 import Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
+import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 import Options.Applicative qualified as Opts
 import Text.PrettyPrint.ANSI.Leijen qualified as PP
 import SharedCLI qualified
@@ -22,7 +23,6 @@ import System.FilePath ((</>))
 import System.FilePath.Glob (compile, globDir1)
 import System.IO (hPutStrLn, stderr)
 import System.IO.UTF8 (writeUTF8FileT)
-import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 
 -- | Available output formats
 data Format

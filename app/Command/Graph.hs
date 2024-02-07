@@ -10,13 +10,13 @@ import Data.ByteString.Lazy qualified as LB
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
 import Language.PureScript qualified as P
 import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
+import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 import Options.Applicative qualified as Opts
+import SharedCLI qualified
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitFailure)
 import System.Directory (getCurrentDirectory)
 import System.IO (hPutStr, hPutStrLn, stderr)
-import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
-import SharedCLI qualified
 
 data GraphOptions = GraphOptions
   { graphInput         :: [FilePath]

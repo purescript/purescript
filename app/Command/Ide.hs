@@ -35,11 +35,11 @@ import Language.PureScript.Ide.State (updateCacheTimestamp)
 import Language.PureScript.Ide.Types (Ide, IdeConfiguration(..), IdeEnvironment(..), IdeLogLevel(..), emptyIdeState)
 import Network.Socket qualified as Network
 import Options.Applicative qualified as Opts
+import SharedCLI qualified
 import System.Directory (doesDirectoryExist, getCurrentDirectory, setCurrentDirectory)
 import System.FilePath ((</>))
 import System.IO (BufferMode(..), hClose, hFlush, hSetBuffering, hSetEncoding, utf8)
 import System.IO.Error (isEOFError)
-import SharedCLI qualified
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
 listenOnLocalhost port = do

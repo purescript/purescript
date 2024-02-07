@@ -15,6 +15,7 @@ import Data.Traversable (for)
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
+import Language.PureScript.Glob (toInputGlobs, PSCGlobs(..), warnFileTypeNotFound)
 import Language.PureScript.Make (buildMakeActions, inferForeignModules, runMake)
 import Options.Applicative qualified as Opts
 import SharedCLI qualified
@@ -23,7 +24,6 @@ import System.Exit (exitSuccess, exitFailure)
 import System.Directory (getCurrentDirectory)
 import System.IO (hPutStr, stderr, stdout)
 import System.IO.UTF8 (readUTF8FilesT)
-import Language.PureScript.Glob (toInputGlobs, PSCGlobs(..), warnFileTypeNotFound)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput         :: [FilePath]
