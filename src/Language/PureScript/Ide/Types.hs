@@ -162,6 +162,8 @@ data IdeConfiguration =
   { confOutputPath :: FilePath
   , confLogLevel :: IdeLogLevel
   , confGlobs :: [FilePath]
+  , confGlobsFromFile :: Maybe FilePath
+  , confGlobsExclude :: [FilePath]
   }
 
 data IdeEnvironment =

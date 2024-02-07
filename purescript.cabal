@@ -294,6 +294,7 @@ library
     Language.PureScript.Errors
     Language.PureScript.Errors.JSON
     Language.PureScript.Externs
+    Language.PureScript.Glob
     Language.PureScript.Graph
     Language.PureScript.Hierarchy
     Language.PureScript.Ide
@@ -423,6 +424,7 @@ executable purs
     Command.Ide
     Command.Publish
     Command.REPL
+    SharedCLI
     Version
     Paths_purescript
   autogen-modules:

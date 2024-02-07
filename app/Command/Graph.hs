@@ -10,21 +10,30 @@ import Data.ByteString.Lazy qualified as LB
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
 import Language.PureScript qualified as P
 import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
+import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 import Options.Applicative qualified as Opts
+import SharedCLI qualified
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitFailure)
 import System.Directory (getCurrentDirectory)
-import System.FilePath.Glob (glob)
 import System.IO (hPutStr, hPutStrLn, stderr)
 
 data GraphOptions = GraphOptions
   { graphInput      :: [FilePath]
+  , graphInputFromFile :: Maybe FilePath
+  , graphExclude       :: [FilePath]
   , graphJSONErrors :: Bool
   }
 
 graph :: GraphOptions -> IO ()
 graph GraphOptions{..} = do
-  input <- globWarningOnMisses (unless graphJSONErrors . warnFileTypeNotFound) graphInput
+  input <- toInputGlobs $ PSCGlobs
+    { pscInputGlobs = graphInput
+    , pscInputGlobsFromFile = graphInputFromFile
+    , pscExcludeGlobs = graphExclude
+    , pscWarnFileTypeNotFound = unless graphJSONErrors . warnFileTypeNotFound "graph"
+    }
+
   when (null input && not graphJSONErrors) $ do
     hPutStr stderr $ unlines
       [ "purs graph: No input files."
@@ -37,25 +46,15 @@ graph GraphOptions{..} = do
   printWarningsAndErrors graphJSONErrors makeWarnings makeResult
     >>= (LB.putStr . Json.encode)
 
-  where
-  warnFileTypeNotFound :: String -> IO ()
-  warnFileTypeNotFound =
-    hPutStrLn stderr . ("purs graph: No files found using pattern: " <>)
-
-
 command :: Opts.Parser (IO ())
 command = graph <$> (Opts.helper <*> graphOptions)
   where
   graphOptions :: Opts.Parser GraphOptions
   graphOptions =
-    GraphOptions <$> many inputFile
+    GraphOptions <$> many SharedCLI.inputFile
+                 <*> SharedCLI.globInputFile
+                 <*> many SharedCLI.excludeFiles
                  <*> jsonErrors
-
-  inputFile :: Opts.Parser FilePath
-  inputFile =
-    Opts.strArgument $
-      Opts.metavar "FILE" <>
-      Opts.help "The input .purs file(s)."
 
   jsonErrors :: Opts.Parser Bool
   jsonErrors =
@@ -84,16 +83,3 @@ printWarningsAndErrors True warnings errors = do
   case errors of
     Left _errs -> exitFailure
     Right res -> pure res
-
-
-globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
-globWarningOnMisses warn = concatMapM globWithWarning
-  where
-  globWithWarning :: String -> IO [FilePath]
-  globWithWarning pattern' = do
-    paths <- glob pattern'
-    when (null paths) $ warn pattern'
-    return paths
-
-  concatMapM :: (a -> IO [b]) -> [a] -> IO [b]
-  concatMapM f = fmap concat . mapM f
