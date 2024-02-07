@@ -58,13 +58,13 @@ listenOnLocalhost port = do
       pure sock)
 
 data ServerOptions = ServerOptions
-  { _serverDirectory     :: Maybe FilePath
-  , _serverGlobs         :: [FilePath]
+  { _serverDirectory   :: Maybe FilePath
+  , _serverGlobs       :: [FilePath]
   , _serverGlobsFromFile :: Maybe FilePath
   , _serverGlobsExcluded :: [FilePath]
-  , _serverOutputPath    :: FilePath
-  , _serverPort          :: Network.PortNumber
-  , _serverLoglevel      :: IdeLogLevel
+  , _serverOutputPath  :: FilePath
+  , _serverPort        :: Network.PortNumber
+  , _serverLoglevel    :: IdeLogLevel
   -- TODO(Christoph) Deprecated
   , _serverEditorMode :: Bool
   , _serverPolling    :: Bool

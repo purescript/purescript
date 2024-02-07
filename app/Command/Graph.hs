@@ -19,10 +19,10 @@ import System.Directory (getCurrentDirectory)
 import System.IO (hPutStr, hPutStrLn, stderr)
 
 data GraphOptions = GraphOptions
-  { graphInput         :: [FilePath]
+  { graphInput       :: [FilePath]
   , graphInputFromFile :: Maybe FilePath
   , graphExclude       :: [FilePath]
-  , graphJSONErrors    :: Bool
+  , graphJSONErrors  :: Bool
   }
 
 graph :: GraphOptions -> IO ()

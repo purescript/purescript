@@ -26,13 +26,13 @@ import System.IO (hPutStr, stderr, stdout)
 import System.IO.UTF8 (readUTF8FilesT)
 
 data PSCMakeOptions = PSCMakeOptions
-  { pscmInput         :: [FilePath]
+  { pscmInput        :: [FilePath]
   , pscmInputFromFile :: Maybe FilePath
-  , pscmExclude       :: [FilePath]
-  , pscmOutputDir     :: FilePath
-  , pscmOpts          :: P.Options
-  , pscmUsePrefix     :: Bool
-  , pscmJSONErrors    :: Bool
+  , pscmExclude      :: [FilePath]
+  , pscmOutputDir    :: FilePath
+  , pscmOpts         :: P.Options
+  , pscmUsePrefix    :: Bool
+  , pscmJSONErrors   :: Bool
   }
 
 -- | Arguments: verbose, use JSON, warnings, errors
