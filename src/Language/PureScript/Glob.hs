@@ -17,7 +17,7 @@ data PSCGlobs = PSCGlobs
   }
 
 toInputGlobs :: PSCGlobs -> IO [FilePath]
-toInputGlobs (PSCGlobs { pscInputGlobs, pscInputGlobsFromFile, pscExcludeGlobs, pscWarnFileTypeNotFound}) = do
+toInputGlobs (PSCGlobs {..}) = do
   globsFromFile <- inputGlobsFromFile pscInputGlobsFromFile
   included <- globWarningOnMisses pscWarnFileTypeNotFound $ nub $ pscInputGlobs <> globsFromFile
   excluded <- globWarningOnMisses pscWarnFileTypeNotFound pscExcludeGlobs
@@ -30,16 +30,15 @@ inputGlobsFromFile globsFromFile = do
     excludeBlankLines = not . T.null . T.strip
     excludeComments = not . T.isPrefixOf "#"
     toInputs = map (T.unpack . T.strip) . filter (\x -> excludeBlankLines x && excludeComments x) . T.lines
-  pure $ maybe [] toInputs mbInputsFromFile
+  pure $ foldMap toInputs mbInputsFromFile
 
 globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
-globWarningOnMisses warn = concatMapM globWithWarning
+globWarningOnMisses warn = foldMap globWithWarning
   where
   globWithWarning pattern' = do
     paths <- glob pattern'
     when (null paths) $ warn pattern'
     return paths
-  concatMapM f = fmap concat . mapM f
 
 warnFileTypeNotFound :: String -> String -> IO ()
 warnFileTypeNotFound pursCmd = hPutStrLn stderr . ("purs " <> pursCmd <> ": No files found using pattern: " ++)
