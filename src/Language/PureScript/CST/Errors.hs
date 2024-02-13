@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module Language.PureScript.CST.Errors
   ( ParserErrorInfo(..)
   , ParserErrorType(..)
@@ -11,8 +12,10 @@ module Language.PureScript.CST.Errors
 
 import Prelude
 
+import Control.DeepSeq (NFData)
 import Data.Text qualified as Text
 import Data.Char (isSpace, toUpper)
+import GHC.Generics (Generic)
 import Language.PureScript.CST.Layout (LayoutStack)
 import Language.PureScript.CST.Print (printToken)
 import Language.PureScript.CST.Types (SourcePos(..), SourceRange(..), SourceToken(..), Token(..))
@@ -56,7 +59,7 @@ data ParserErrorType
   | ErrConstraintInForeignImportSyntax
   | ErrEof
   | ErrCustom String
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data ParserWarningType
   = WarnDeprecatedRowSyntax
@@ -64,14 +67,14 @@ data ParserWarningType
   | WarnDeprecatedKindImportSyntax
   | WarnDeprecatedKindExportSyntax
   | WarnDeprecatedCaseOfOffsideSyntax
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data ParserErrorInfo a = ParserErrorInfo
   { errRange :: SourceRange
   , errToks :: [SourceToken]
   , errStack :: LayoutStack
   , errType :: a
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Generic, NFData)
 
 type ParserError = ParserErrorInfo ParserErrorType
 type ParserWarning = ParserErrorInfo ParserWarningType

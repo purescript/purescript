@@ -35,6 +35,7 @@ import Language.PureScript.Ide.State (updateCacheTimestamp)
 import Language.PureScript.Ide.Types (Ide, IdeConfiguration(..), IdeEnvironment(..), IdeLogLevel(..), emptyIdeState)
 import Network.Socket qualified as Network
 import Options.Applicative qualified as Opts
+import SharedCLI qualified
 import System.Directory (doesDirectoryExist, getCurrentDirectory, setCurrentDirectory)
 import System.FilePath ((</>))
 import System.IO (BufferMode(..), hClose, hFlush, hSetBuffering, hSetEncoding, utf8)
@@ -59,6 +60,8 @@ listenOnLocalhost port = do
 data ServerOptions = ServerOptions
   { _serverDirectory  :: Maybe FilePath
   , _serverGlobs      :: [FilePath]
+  , _serverGlobsFromFile :: Maybe FilePath
+  , _serverGlobsExcluded :: [FilePath]
   , _serverOutputPath :: FilePath
   , _serverPort       :: Network.PortNumber
   , _serverLoglevel   :: IdeLogLevel
@@ -110,7 +113,7 @@ command = Opts.helper <*> subcommands where
     Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer))
 
   server :: ServerOptions -> IO ()
-  server opts'@(ServerOptions dir globs outputPath port logLevel editorMode polling noWatch) = do
+  server opts'@(ServerOptions dir globs globsFromFile globsExcluded outputPath port logLevel editorMode polling noWatch) = do
     when (logLevel == LogDebug || logLevel == LogAll)
       (putText "Parsed Options:" *> print opts')
     maybe (pure ()) setCurrentDirectory dir
@@ -136,6 +139,8 @@ command = Opts.helper <*> subcommands where
         { confLogLevel = logLevel
         , confOutputPath = outputPath
         , confGlobs = globs
+        , confGlobsFromFile = globsFromFile
+        , confGlobsExclude = globsExcluded
         }
     ts <- newIORef Nothing
     let
@@ -150,7 +155,9 @@ command = Opts.helper <*> subcommands where
   serverOptions =
     ServerOptions
       <$> optional (Opts.strOption (Opts.long "directory" `mappend` Opts.short 'd'))
-      <*> many (Opts.argument Opts.str (Opts.metavar "Source GLOBS..."))
+      <*> many SharedCLI.inputFile
+      <*> SharedCLI.globInputFile
+      <*> many SharedCLI.excludeFiles
       <*> Opts.strOption (Opts.long "output-directory" `mappend` Opts.value "output/")
       <*> (fromIntegral <$>
            Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer)))

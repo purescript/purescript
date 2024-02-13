@@ -75,6 +75,17 @@ jobs:
           . /etc/os-release
           echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
           apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
+
+      - # We need `gh` installed on the Linux version. Otherwise, release artifacts won't be uploaded.
+        name: "(Linux only) Install gh"
+        if: "contains(matrix.os, 'ubuntu-latest')"
+        run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          apt-get update
+          apt-get install gh
+
       - uses: "actions/checkout@v2"
       - uses: "actions/setup-node@v2"
         with:
@@ -103,7 +114,7 @@ jobs:
           path: |
             /root/.stack
             ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ runner.os }}-${{ job.container.id }}-MdyPsf-${{ hashFiles('stack.yaml') }}"
+          key: "${{ matrix.image || runner.os }}--MdyPsf-${{ hashFiles('stack.yaml') }}"
 
       - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
         # This ensures that the local GHC and MSYS binaries that Stack installs
@@ -116,6 +127,15 @@ jobs:
 
       - id: "build"
         run: "ci/fix-home ci/build.sh"
+
+      - name: "(Linux only) Glob tests"
+        if: "contains(matrix.os, 'ubuntu-latest')"
+        working-directory: "sdist-test"
+        # We build in this directory in build.sh, so this is where we need to
+        # launch `stack exec`. The actual glob checks happen in a temporary directory.
+        run: |
+          apt-get install tree
+          ../ci/fix-home stack exec bash ../glob-test.sh
 
       - name: "(Linux only) Build the entire package set"
         if: "contains(matrix.os, 'ubuntu-latest')"
@@ -232,7 +252,7 @@ jobs:
         with:
           path: |
             /root/.stack
-          key: "${{ runner.os }}-${{ job.container.id }}-UnWw0N-lint-${{ hashFiles('stack.yaml') }}"
+          key: "lint-${{ hashFiles('stack.yaml') }}"
 
       - run: "ci/fix-home ci/run-hlint.sh --git"
         env:
