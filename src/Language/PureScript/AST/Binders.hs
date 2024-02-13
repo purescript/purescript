@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 -- |
 -- Case binders
 --
@@ -5,6 +6,8 @@ module Language.PureScript.AST.Binders where
 
 import Prelude
 
+import Control.DeepSeq (NFData)
+import GHC.Generics (Generic)
 import Language.PureScript.AST.SourcePos (SourceSpan)
 import Language.PureScript.AST.Literals (Literal(..))
 import Language.PureScript.Names (Ident, OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified)
@@ -61,7 +64,7 @@ data Binder
   -- A binder with a type annotation
   --
   | TypedBinder SourceType Binder
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 -- Manual Eq and Ord instances for `Binder` were added on 2018-03-05. Comparing
 -- the `SourceSpan` values embedded in some of the data constructors of `Binder`

@@ -13,12 +13,14 @@ import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.Docs qualified as D
 import Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
+import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 import Options.Applicative qualified as Opts
 import Text.PrettyPrint.ANSI.Leijen qualified as PP
+import SharedCLI qualified
 import System.Directory (getCurrentDirectory, createDirectoryIfMissing, removeFile)
 import System.Exit (exitFailure)
 import System.FilePath ((</>))
-import System.FilePath.Glob (compile, glob, globDir1)
+import System.FilePath.Glob (compile, globDir1)
 import System.IO (hPutStrLn, stderr)
 import System.IO.UTF8 (writeUTF8FileT)
 
@@ -35,12 +37,19 @@ data PSCDocsOptions = PSCDocsOptions
   , _pscdOutput :: Maybe FilePath
   , _pscdCompileOutputDir :: FilePath
   , _pscdInputFiles  :: [FilePath]
+  , _pscdInputFromFile :: Maybe FilePath
+  , _pscdExcludeFiles :: [FilePath]
   }
   deriving (Show)
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions fmt moutput compileOutput inputGlob) = do
-  input <- concat <$> mapM glob inputGlob
+docgen (PSCDocsOptions fmt moutput compileOutput inputGlob inputGlobFromFile excludeGlob) = do
+  input <- toInputGlobs $ PSCGlobs
+    { pscInputGlobs = inputGlob
+    , pscInputGlobsFromFile = inputGlobFromFile
+    , pscExcludeGlobs = excludeGlob
+    , pscWarnFileTypeNotFound = warnFileTypeNotFound "docs"
+    }
   when (null input) $ do
     hPutStrLn stderr "purs docs: no input files."
     exitFailure
@@ -104,7 +113,13 @@ defaultOutputForFormat fmt =
     Ctags -> "tags"
 
 pscDocsOptions :: Opts.Parser PSCDocsOptions
-pscDocsOptions = PSCDocsOptions <$> format <*> output <*> compileOutputDir <*> many inputFile
+pscDocsOptions = 
+  PSCDocsOptions <$> format 
+                 <*> output 
+                 <*> compileOutputDir 
+                 <*> many SharedCLI.inputFile
+                 <*> SharedCLI.globInputFile
+                 <*> many SharedCLI.excludeFiles
   where
   format :: Opts.Parser Format
   format = Opts.option Opts.auto $
@@ -127,11 +142,6 @@ pscDocsOptions = PSCDocsOptions <$> format <*> output <*> compileOutputDir <*> m
     <> Opts.long "compile-output"
     <> Opts.metavar "DIR"
     <> Opts.help "Compiler output directory"
-
-  inputFile :: Opts.Parser FilePath
-  inputFile = Opts.strArgument $
-       Opts.metavar "FILE"
-    <> Opts.help "The input .purs file(s)"
 
 command :: Opts.Parser (IO ())
 command = docgen <$> (Opts.helper <*> pscDocsOptions)

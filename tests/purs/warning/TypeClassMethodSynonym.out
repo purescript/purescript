@@ -1,0 +1,11 @@
+Warning found:
+in module [33mMain[0m
+at tests/purs/warning/TypeClassMethodSynonym.purs:8:3 - 8:19 (line 8, column 3 - line 8, column 19)
+
+  Type variable [33ma[0m was shadowed.
+
+in type declaration for [33mc[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/ShadowedTypeVar.md for more information,
+or to contribute content related to this warning.
+

@@ -4,7 +4,7 @@
 module Language.PureScript.Types where
 
 import Prelude
-import Protolude (ordNub)
+import Protolude (ordNub, fromMaybe)
 
 import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
@@ -18,7 +18,7 @@ import Data.Aeson.Types qualified as A
 import Data.Foldable (fold, foldl')
 import Data.IntSet qualified as IS
 import Data.List (sortOn)
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
 import GHC.Generics (Generic)
@@ -530,7 +530,7 @@ replaceAllTypeVars = go [] where
   go bs m (ForAll ann vis v mbK t sco)
     | v `elem` keys = go bs (filter ((/= v) . fst) m) $ ForAll ann vis v mbK' t sco
     | v `elem` usedVars =
-      let v' = genName v (keys ++ bs ++ usedVars)
+      let v' = genPureName v (keys ++ bs ++ usedVars)
           t' = go bs [(v, TypeVar ann v')] t
       in ForAll ann vis v' mbK' (go (v' : bs) m t') sco
     | otherwise = ForAll ann vis v mbK' (go (v : bs) m t) sco
@@ -545,10 +545,12 @@ replaceAllTypeVars = go [] where
   go bs m (ParensInType ann t) = ParensInType ann (go bs m t)
   go _  _ ty = ty
 
-  genName orig inUse = try' 0 where
-    try' :: Integer -> Text
-    try' n | (orig <> T.pack (show n)) `elem` inUse = try' (n + 1)
-           | otherwise = orig <> T.pack (show n)
+genPureName :: Text -> [Text] -> Text
+genPureName orig inUse = try' 0
+  where
+  try' :: Integer -> Text
+  try' n | (orig <> T.pack (show n)) `elem` inUse = try' (n + 1)
+         | otherwise = orig <> T.pack (show n)
 
 -- | Add visible type abstractions to top-level foralls.
 addVisibility :: [(Text, TypeVarVisibility)] -> Type a -> Type a
@@ -597,11 +599,24 @@ quantify :: Type a -> Type a
 quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) TypeVarInvisible arg Nothing t Nothing) ty $ freeTypeVariables ty
 
 -- | Move all universal quantifiers to the front of a type
-moveQuantifiersToFront :: Type a -> Type a
-moveQuantifiersToFront = go [] [] where
-  go qs cs (ForAll ann vis q mbK ty sco) = go ((ann, q, sco, mbK, vis) : qs) cs ty
-  go qs cs (ConstrainedType ann c ty) = go qs ((ann, c) : cs) ty
-  go qs cs ty = foldl (\ty' (ann, q, sco, mbK, vis) -> ForAll ann vis q mbK ty' sco) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
+moveQuantifiersToFront :: a -> Type a -> Type a
+moveQuantifiersToFront syntheticAnn = go [] [] 
+  where
+  go qs cs = \case
+    ForAll ann vis q mbK ty sco -> do
+      let 
+        cArgs :: [Text] = cs >>= constraintArgs . snd >>= freeTypeVariables
+        (q'', ty')
+          | q `elem` cArgs = do
+              let q' = genPureName q $ cArgs <> freeTypeVariables ty
+              (q', replaceTypeVars q (TypeVar syntheticAnn q') ty)
+          | otherwise =
+              (q, ty)
+      go ((ann, q'', sco, mbK, vis) : qs) cs ty'
+    ConstrainedType ann c ty ->
+      go qs ((ann, c) : cs) ty
+    ty -> 
+      foldl (\ty' (ann, q, sco, mbK, vis) -> ForAll ann vis q mbK ty' sco) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
 
 -- | Check if a type contains `forall`
 containsForAll :: Type a -> Bool

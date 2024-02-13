@@ -102,6 +102,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@milesfrain](https://github.com/milesfrain) | Miles Frain | [MIT license] |
 | [@MiracleBlue](https://github.com/MiracleBlue) | Nicholas Kircher | [MIT license] |
 | [@mjgpy3](https://github.com/mjgpy3) | Michael Gilliland | [MIT license] |
+| [@mjrussell](https://github.com/mjrussell) | Matthew Russell | [MIT license] |
 | [@MonoidMusician](https://github.com/MonoidMusician) | Verity Scheel | [MIT license] |
 | [@mpietrzak](https://github.com/mpietrzak) | Maciej Pietrzak | [MIT license] |
 | [@mrhania](https://github.com/mrhania) | Łukasz Hanuszczak | [MIT license] |

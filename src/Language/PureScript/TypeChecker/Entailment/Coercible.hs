@@ -37,7 +37,7 @@ import Data.Set qualified as S
 
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (DataDeclType(..), Environment(..), TypeKind(..), unapplyKinds)
-import Language.PureScript.Errors (DeclarationRef(..), ErrorMessageHint(..), ExportSource, ImportDeclarationType(..), MultipleErrors, SimpleErrorMessage(..), SourceAnn, errorMessage)
+import Language.PureScript.Errors (DeclarationRef(..), ErrorMessageHint(..), ExportSource, ImportDeclarationType(..), MultipleErrors, SimpleErrorMessage(..), SourceAnn, errorMessage, UnknownsHint(..))
 import Language.PureScript.Names (ModuleName, ProperName, ProperNameType(..), Qualified(..), byMaybeModuleName, toMaybeModuleName)
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, freshKindWithKind, unifyKinds')
 import Language.PureScript.TypeChecker.Monad (CheckState(..))
@@ -531,7 +531,8 @@ insoluble k a b =
   -- "Consider adding a type annotation" hint, because annotating kinds to
   -- instantiate unknowns in Coercible constraints should never resolve
   -- NoInstanceFound errors.
-  errorMessage $ NoInstanceFound (srcConstraint Prim.Coercible [k] [a, b] Nothing) [] (any containsUnknowns [a, b])
+  errorMessage $ NoInstanceFound (srcConstraint Prim.Coercible [k] [a, b] Nothing) [] 
+    $ if any containsUnknowns [a, b] then Unknowns else NoUnknowns
 
 -- | Constraints of the form @Coercible a b@ can be solved if the two arguments
 -- are the same. Since we currently don't support higher-rank arguments in

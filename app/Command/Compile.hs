@@ -7,7 +7,7 @@ import Control.Monad (when)
 import Data.Aeson qualified as A
 import Data.Bool (bool)
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
-import Data.List (intercalate, (\\))
+import Data.List (intercalate)
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text qualified as T
@@ -15,17 +15,19 @@ import Data.Traversable (for)
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
+import Language.PureScript.Glob (toInputGlobs, PSCGlobs(..), warnFileTypeNotFound)
 import Language.PureScript.Make (buildMakeActions, inferForeignModules, runMake)
 import Options.Applicative qualified as Opts
+import SharedCLI qualified
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitSuccess, exitFailure)
 import System.Directory (getCurrentDirectory)
-import System.FilePath.Glob (glob)
-import System.IO (hPutStr, hPutStrLn, stderr, stdout)
+import System.IO (hPutStr, stderr, stdout)
 import System.IO.UTF8 (readUTF8FilesT)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
+  , pscmInputFromFile :: Maybe FilePath
   , pscmExclude      :: [FilePath]
   , pscmOutputDir    :: FilePath
   , pscmOpts         :: P.Options
@@ -54,9 +56,12 @@ printWarningsAndErrors verbose True files warnings errors = do
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
-  included <- globWarningOnMisses warnFileTypeNotFound pscmInput
-  excluded <- globWarningOnMisses warnFileTypeNotFound pscmExclude
-  let input = included \\ excluded
+  input <- toInputGlobs $ PSCGlobs
+    { pscInputGlobs = pscmInput
+    , pscInputGlobsFromFile = pscmInputFromFile
+    , pscExcludeGlobs = pscmExclude
+    , pscWarnFileTypeNotFound = warnFileTypeNotFound "compile"
+    }
   when (null input) $ do
     hPutStr stderr $ unlines [ "purs compile: No input files."
                              , "Usage: For basic information, try the `--help' option."
@@ -71,29 +76,6 @@ compile PSCMakeOptions{..} = do
     P.make makeActions (map snd ms)
   printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors moduleFiles makeWarnings makeErrors
   exitSuccess
-
-warnFileTypeNotFound :: String -> IO ()
-warnFileTypeNotFound = hPutStrLn stderr . ("purs compile: No files found using pattern: " ++)
-
-globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
-globWarningOnMisses warn = concatMapM globWithWarning
-  where
-  globWithWarning pattern' = do
-    paths <- glob pattern'
-    when (null paths) $ warn pattern'
-    return paths
-  concatMapM f = fmap concat . mapM f
-
-inputFile :: Opts.Parser FilePath
-inputFile = Opts.strArgument $
-     Opts.metavar "FILE"
-  <> Opts.help "The input .purs file(s)."
-
-excludedFiles :: Opts.Parser FilePath
-excludedFiles = Opts.strOption $
-     Opts.short 'x'
-  <> Opts.long "exclude-files"
-  <> Opts.help "Glob of .purs files to exclude from the supplied files."
 
 outputDirectory :: Opts.Parser FilePath
 outputDirectory = Opts.strOption $
@@ -161,8 +143,9 @@ options =
     handleTargets ts = S.fromList (if P.JSSourceMap `elem` ts then P.JS : ts else ts)
 
 pscMakeOptions :: Opts.Parser PSCMakeOptions
-pscMakeOptions = PSCMakeOptions <$> many inputFile
-                                <*> many excludedFiles
+pscMakeOptions = PSCMakeOptions <$> many SharedCLI.inputFile
+                                <*> SharedCLI.globInputFile
+                                <*> many SharedCLI.excludeFiles
                                 <*> outputDirectory
                                 <*> options
                                 <*> (not <$> noPrefix)
