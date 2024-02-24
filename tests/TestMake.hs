@@ -47,8 +47,8 @@ spec = do
   let foreignJsPath name = sourcesDir </> (T.unpack name <> ".js")
 
   -- Test helpers.
-  let testN fn name modules compile2 res =
-        fn name $ do
+  let testN itFn name modules compileFn res =
+        itFn name $ do
           let names = map (\(mn, _, _) -> mn) modules
           let paths = map modulePath names
           let timestamp = utcMidnightOnDate 2019 1
@@ -61,7 +61,7 @@ spec = do
           forM_ (zip [length modules..] modules) $ \(idx, (mn, _, mbContent)) -> do
             maybe (pure ()) (writeFile (modulePath mn) (timestamp idx)) mbContent
 
-          compile2 paths `shouldReturn` moduleNames res
+          compileFn paths `shouldReturn` moduleNames res
 
   let test2 fn name (mAContent1, mAContent2, mBContent) res =
         testN fn name
@@ -73,7 +73,7 @@ spec = do
         testN fn name
           [ ("A", mAContent1, Just mAContent2)
           , ("B", mBContent, Nothing)
-          ] compileAllowingFailures res
+          ] compileWithFailure res
 
   let test3 fn name  (mAContent1, mAContent2, mBContent, mCContent) res =
         testN fn name
@@ -87,16 +87,16 @@ spec = do
           [ ("A", mAContent1, Just mAContent2)
           , ("B", mBContent, Nothing)
           , ("C", mCContent, Nothing)
-          ] compileAllowingFailures res
+          ] compileWithFailure res
 
   let recompile2 fn name ms =
-        test2 fn ("recompiles when upstream changed effectively: " <> name) ms ["A", "B"]
+        test2 fn ("recompiles downstream when " <> name) ms ["A", "B"]
 
   let recompileWithFailure2 fn name ms =
-        testWithFailure2 fn ("recompiles when upstream changed effectively: " <> name) ms ["A", "B"]
+        testWithFailure2 fn ("recompiles downstream when " <> name) ms ["A", "B"]
 
   let noRecompile2 fn name ms =
-        test2 fn ("does not recompile when upstream not changed effectively: " <> name) ms ["A"]
+        test2 fn ("does not recompile downstream when " <> name) ms ["A"]
 
   before_ (rimraf modulesDir >> rimraf sourcesDir >> createDirectory sourcesDir) $ do
     it "does not recompile if there are no changes" $ do
@@ -157,318 +157,6 @@ spec = do
       removeFile mFFIPath
       compile [mPath] `shouldReturn` moduleNames ["Module"]
 
-    it "recompiles downstream modules when a module is rebuilt and externs changed" $ do
-      let mAPath = modulePath "A"
-          mBPath = modulePath "B"
-          mAContent1 = "module A where\nfoo = 0\n"
-          mAContent2 = "module A where\nfoo = '1'\n"
-          mBContent = "module B where\nimport A as A\nbar = A.foo\n"
-
-      writeFile mAPath timestampA mAContent1
-      writeFile mBPath timestampB mBContent
-      compile [mAPath, mBPath] `shouldReturn` moduleNames ["A", "B"]
-
-      writeFile mAPath timestampC mAContent2
-      compile [mAPath, mBPath] `shouldReturn` moduleNames ["A", "B"]
-
-    it "only recompiles downstream modules when a module is rebuilt end externs changed" $ do
-      let mAPath = modulePath "A"
-          mBPath = modulePath "B"
-          mCPath = modulePath "C"
-          modulePaths = [mAPath, mBPath, mCPath]
-
-          mAContent1 = "module A where\nfoo = 0\n"
-          mAContent2 = "module A where\nfoo = '1'\n" -- change externs here
-          mBContent = "module B where\nimport A (foo)\nbar = foo\n"
-          mCContent = "module C where\nbaz = 3\n"
-
-      writeFile mAPath timestampA mAContent1
-      writeFile mBPath timestampB mBContent
-      writeFile mCPath timestampC mCContent
-      compile modulePaths `shouldReturn` moduleNames ["A", "B", "C"]
-
-      writeFile mAPath timestampD mAContent2
-      compile modulePaths `shouldReturn` moduleNames ["A", "B"]
-
-    it "recompiles downstream after a module has been rebuilt separately" $ do
-      let mAPath = modulePath "A"
-          mBPath = modulePath "B"
-          mCPath = modulePath "C"
-          mPaths = [mAPath, mBPath, mCPath]
-
-          mAContent1 = "module A where\nfoo = 0\n"
-          mAContent2 = "module A where\nfoo = 1\n"
-          mBContent = "module B where\nimport A\nbar = 1\nbaz = foo\n"
-          mCContent = "module C where\nimport B\nqux = bar"
-
-      writeFile mAPath timestampA mAContent1
-      writeFile mBPath timestampB mBContent
-      writeFile mCPath timestampB mCContent
-
-      compile mPaths `shouldReturn` moduleNames ["A", "B", "C"]
-
-      threadDelay oneSecond
-
-      writeFile mAPath timestampC mAContent2
-      compile [mAPath] `shouldReturn` moduleNames ["A"]
-
-      compile mPaths `shouldReturn` moduleNames ["B", "C"]
-
-    -- Reexports.
-    test3 it "recompiles downstream modules when a reexported module changed"
-      ( "module A where\nfoo = 0\n"
-      , "module A where\nfoo = '1'\nbar = 1\n" -- change externs here
-      , "module B (module E) where\nimport A (foo) as E\n"
-      , "module C where\nimport B as B\nbaz = B.foo\n"
-      )
-      ["A", "B", "C"]
-
-    -- test3 fit "reexported module changed"
-    --   ( "module A where\ndata ABC = A Int | B\n"
-    --   , "module A where\ndata ABC = A String | B\n" -- change externs here
-    --   , "module B (module E) where\nimport A (ABC(..)) as E\n"
-    --   , "module C where\nimport B as B\nbaz = B.A\n"
-    --   )
-    --   ["A", "B", "C"]
-
-    -- Imports.
-    testWithFailure2 it "recompiles downstream when removed reference found in imports"
-      ( "module A where\nfoo = 0\n"
-      , "module A where\nfoo2 = 1\n"
-      , "module B where\nimport A (foo)\nbar = 1"
-      )
-      ["A", "B"]
-
-    test2 it "does not recompiles downstream when removed reference is not used"
-      ( "module A where\nfoo = 0\n"
-      , "module A where\nfoo2 = 1\n"
-      , "module B where\nimport A\nbar = 1"
-      )
-      ["A"]
-
-    -- Usage in the code
-    -- signature
-
-    -- inlined
-    testWithFailure2 it "recompiles downstream when found changed inlined type"
-      ( "module A where\ntype T = Int\n"
-      , "module A where\ntype T = String\n"
-      , "module B where\nimport A\nx = (1 :: T)"
-      )
-      ["A", "B"]
-
-    -- Transitive change.
-    test3 it "recompiles downstream due to transitive change"
-      ( "module A where\nfoo = 0\n"
-      , "module A where\nfoo = '1'\n"
-      , "module B where\nimport A (foo)\nbar = qux\nqux = foo"
-      , "module C where\nimport B (bar)\nbaz = bar\n"
-      )
-      ["A", "B", "C"]
-
-    test3 it "do not recompile downstream if no transitive change"
-      ( "module A where\nfoo = 0\n"
-      , "module A where\nfoo = '1'\n"
-      , "module B where\nimport A (foo)\nbar = 1\nqux = foo"
-      , "module C where\nimport B (bar)\nbaz = bar\n"
-      )
-      ["A", "B"]
-
-    noRecompile2 it "unused type changed"
-      ( "module A where\ntype SynA = Int\ntype SynA2 = Int"
-      , "module A where\ntype SynA = String\ntype SynA2 = Int"
-      , "module B where\nimport A as A\ntype SynB = A.SynA2"
-      )
-
-    -- Type synonyms.
-    recompile2 it "type synonym changed"
-      ( "module A where\ntype SynA = Int\n"
-      , "module A where\ntype SynA = String\n"
-      , "module B where\nimport A as A\ntype SynB = Array A.SynA\n"
-      )
-
-    recompile2 it "type synonym dependency changed"
-      ( "module A where\ntype SynA = Int\ntype SynA2 = SynA\n"
-      , "module A where\ntype SynA = String\ntype SynA2 = SynA\n"
-      , "module B where\nimport A as A\ntype SynB = Array A.SynA2\n"
-      )
-
-    -- Data types.
-    recompile2 it "data type changed (parameter added)"
-      ( "module A where\ndata T = A Int | B Int\n"
-      , "module A where\ndata T a = A Int | B a\n"
-      , "module B where\nimport A (T)\ntype B = T"
-      )
-
-    recompile2 it "data type changed (constructor added)"
-      ( "module A where\ndata T = A Int | B Int\n"
-      , "module A where\ndata T = A Int | B Int | C Int\n"
-      , "module B where\nimport A (T(B))\nb = B"
-      )
-
-    recompile2 it "data type constructor dependency changed"
-      ( "module A where\ntype SynA = Int\ndata AB = A SynA | B Int\n"
-      , "module A where\ntype SynA = String\ndata AB = A SynA | B Int\n"
-      , "module B where\nimport A (AB(..))\nb = A"
-      )
-
-    noRecompile2 it "data type constructor changed, but not used"
-      ( "module A where\ntype SynA = Int\ndata AB = A SynA | B Int\n"
-      , "module A where\ntype SynA = String\ndata AB = A SynA | B Int\n"
-      -- use type and other constructor
-      , "module B where\nimport A (AB(..))\ntype B = AB\nb = B"
-      )
-
-
-    -- Value operators.
-    recompile2 it "value op changed"
-      ( "module A where\ndata T a = T Int a\ninfixl 2 T as :+:\n"
-      , "module A where\ndata T a = T Int a\ninfixl 3 T as :+:\n"
-      , "module B where\nimport A\nt = 1 :+: \"1\" "
-      )
-
-    recompile2 it "value op dependency changed"
-      ( "module A where\ndata T a = T a String\ninfixl 2 T as :+:\n"
-      , "module A where\ndata T a = T Int a\ninfixl 2 T as :+:\n"
-      , "module B where\nimport A\nt = 1 :+: \"1\" "
-      )
-
-
-    -- Type operators.
-    recompile2 it "type op changed"
-      ( "module A where\ndata T a b = T a b\ninfixl 2 type T as :+:\n"
-      , "module A where\ndata T a b = T a b\ninfixl 3 type T as :+:\n"
-      , "module B where\nimport A\nfn :: Int :+: String -> Int\nfn _ = 1"
-      )
-
-    recompile2 it "type op dependency changed"
-      ( "module A where\ndata T a b = T a b\ninfixl 2 type T as :+:\n"
-      , "module A where\ndata T b a = T a b\ninfixl 2 type T as :+:\n"
-      , "module B where\nimport A\nfn :: Int :+: String -> Int\nfn _ = 1"
-      )
-
-    -- Type classes.
-    recompile2 it "type class changed"
-      ( "module A where\nclass Cls a where m1 :: a -> Int\n"
-      , "module A where\nclass Cls a where m1 :: a -> Char\n"
-      , T.unlines
-          [ "module B where"
-          , "import A as A"
-          , "fn :: forall a. A.Cls a => a -> Int"
-          , "fn _ = 1"
-          ]
-      )
-
-    recompile2 it "type class changed (member affected)"
-      ( "module A where\nclass Cls a where m1 :: a -> Int\n"
-      , "module A where\nclass Cls a where m1 :: a -> Char\n"
-      , T.unlines
-          [ "module B where"
-          , "import A as A"
-          , "fn x = A.m1 x"
-          ]
-      )
-
-    recompile2 it "type class instance added"
-      ( "module A where\nclass Cls a where m1 :: a -> Int\n"
-      , "module A where\nclass Cls a where m1 :: a -> Int\ninstance Cls Int where m1 _ = 1"
-      , T.unlines
-          [ "module B where"
-          , "import A as A"
-          , "fn :: forall a. A.Cls a => a -> Int"
-          , "fn _ = 1"
-          ]
-      )
-
-    recompileWithFailure2 it "type class instance removed"
-      ( "module A where\nclass Cls a where m1 :: a -> Int\ninstance Cls Int where m1 _ = 1"
-      , "module A where\nclass Cls a where m1 :: a -> Int\n"
-      , T.unlines
-          [ "module B where"
-          , "import A (m1)"
-          , "x = m1 1"
-          ]
-      )
-
-    test3 it "recompiles downstream if instance added for type"
-      ( "module A where\nimport B\nnewtype T = T Int\n"
-      , "module A where\nimport B\nnewtype T = T Int\ninstance Cls T where m1 _ = 1"
-      , "module B where\nclass Cls a where m1 :: a -> Int\n"
-      , T.unlines
-          [ "module C where"
-          , "import A"
-          , "t = T 1"
-          ]
-      )
-      ["A", "C"]
-
-    test3 it "recompiles downstream if instance added for type"
-      ( "module A where\nimport B\nnewtype T = T Int\n"
-      , "module A where\nimport B\nnewtype T = T Int\ninstance Cls T where m1 _ = 1"
-      , "module B where\nclass Cls a where m1 :: a -> Int\n"
-      , T.unlines
-          [ "module C where"
-          , "import A"
-          , "t = T 1"
-          ]
-      )
-      ["A", "C"]
-
-    testWithFailure3 it "recompiles downstream if instance removed for type"
-      ( "module A where\nimport B\nnewtype T = T Int\ninstance Cls T where m1 _ = 1"
-      , "module A where\nimport B\nnewtype T = T Int\n"
-      , "module B where\nclass Cls a where m1 :: a -> Int\n"
-      , T.unlines
-          [ "module C where"
-          , "import A"
-          , "import B"
-          , "i :: Int"
-          , "i = m1 (T 1)"
-          ]
-      )
-      ["A", "C"]
-
-    testN it "doesn't recompile downstream if an instance added for the type and type class changed"
-      [ ( "A"
-        , "module A where\nclass Cls a where m1 :: a -> Char\n"
-        , Just "module A where\nclass Cls a where m1 :: a -> Int\n"
-        )
-      , ( "B"
-        , "module B where\nimport A\nnewtype T = T Int\n"
-        , Just "module B where\nimport A\nnewtype T = T Int\ninstance Cls T where m1 _ = 1"
-        )
-      , ("C", "module C where\nimport B\ntype C = T", Nothing)
-      ] compile ["A", "B"]
-
-    it "does not recompile downstream modules when a module is rebuilt but externs have not changed" $ do
-      let mAPath = modulePath "A"
-          mBPath = modulePath "B"
-          mCPath = modulePath "C"
-          modulePaths = [mAPath, mBPath, mCPath]
-
-          mAContent1 = "module A where\nfoo = 0\n"
-          mAContent2 = "module A (foo) where\nbar = 1\nfoo = 1\n"
-          mBContent =
-            T.unlines
-              [ "module B where"
-              , "import A (foo)"
-              , "import C (baz)"
-              , "bar = foo"
-              , "qux = baz"
-              ]
-          mCContent = "module C where\nbaz = 3\n"
-
-      writeFile mAPath timestampA mAContent1
-      writeFile mBPath timestampB mBContent
-      writeFile mCPath timestampC mCContent
-      compile modulePaths `shouldReturn` moduleNames ["A", "B", "C"]
-      --
-      writeFile mAPath timestampD mAContent2
-      threadDelay oneSecond
-      compile modulePaths `shouldReturn` moduleNames ["A"]
-      -- compile again to check that it won't try recompile skipped module again
-      compile modulePaths `shouldReturn` moduleNames []
-
     it "does not necessarily recompile modules which were not part of the previous batch" $ do
       let mAPath = modulePath "A"
           mBPath = modulePath "B"
@@ -495,8 +183,8 @@ spec = do
           moduleContent = "module Module where\nfoo :: Int\nfoo = \"not an int\"\n"
 
       writeFile mPath timestampA moduleContent
-      compileAllowingFailures [mPath] `shouldReturn` moduleNames ["Module"]
-      compileAllowingFailures [mPath] `shouldReturn` moduleNames ["Module"]
+      compileWithFailure [mPath] `shouldReturn` moduleNames ["Module"]
+      compileWithFailure [mPath] `shouldReturn` moduleNames ["Module"]
 
     it "recompiles if docs are requested but not up to date" $ do
       let mPath = sourcesDir </> "Module.purs"
@@ -533,6 +221,406 @@ spec = do
       -- Since the existing CoreFn.json is now outdated, the module should be
       -- recompiled.
       go optsCoreFnOnly `shouldReturn` moduleNames ["Module"]
+
+    -- Cut off rebuild tests.
+
+    -- If a module is compiled with effective changes for downstream they should
+    -- be rebuilt too.
+    it "recompiles downstream modules when a module is rebuilt and externs changed" $ do
+      let mAPath = modulePath "A"
+          mBPath = modulePath "B"
+          mAContent1 = "module A where\nfoo = 0\n"
+          mAContent2 = "module A where\nfoo = '1'\n"
+          mBContent = "module B where\nimport A as A\nbar = A.foo\n"
+
+      writeFile mAPath timestampA mAContent1
+      writeFile mBPath timestampB mBContent
+      compile [mAPath, mBPath] `shouldReturn` moduleNames ["A", "B"]
+
+      writeFile mAPath timestampC mAContent2
+      compile [mAPath, mBPath] `shouldReturn` moduleNames ["A", "B"]
+
+    -- If a module is compiled with no effective changes for downstream they should
+    -- not be rebuilt.
+    it "recompiles downstream modules only when a module is rebuilt end externs changed" $ do
+      let mAPath = modulePath "A"
+          mBPath = modulePath "B"
+          mCPath = modulePath "C"
+          modulePaths = [mAPath, mBPath, mCPath]
+
+          mAContent1 = "module A where\nfoo = 0\n"
+          mAContent2 = "module A where\nfoo = '1'\n" -- change externs here
+          mBContent = "module B where\nimport A (foo)\nbar = foo\n"
+          mCContent = "module C where\nbaz = 3\n"
+
+      writeFile mAPath timestampA mAContent1
+      writeFile mBPath timestampB mBContent
+      writeFile mCPath timestampC mCContent
+      compile modulePaths `shouldReturn` moduleNames ["A", "B", "C"]
+
+      writeFile mAPath timestampD mAContent2
+      compile modulePaths `shouldReturn` moduleNames ["A", "B"]
+
+    -- If module is compiled separately (e.g., with ide). Then downstream should
+    -- be rebuilt during the next build.
+    it "recompiles downstream after a module has been rebuilt separately" $ do
+      let mAPath = modulePath "A"
+          mBPath = modulePath "B"
+          mCPath = modulePath "C"
+          mPaths = [mAPath, mBPath, mCPath]
+
+          mAContent1 = "module A where\nfoo = 0\n"
+          mAContent2 = "module A where\nfoo = 1\n"
+          mBContent = "module B where\nimport A\nbar = 1\nbaz = foo\n"
+          mCContent = "module C where\nimport B\nqux = bar"
+
+      writeFile mAPath timestampA mAContent1
+      writeFile mBPath timestampB mBContent
+      writeFile mCPath timestampB mCContent
+
+      compile mPaths `shouldReturn` moduleNames ["A", "B", "C"]
+
+      threadDelay oneSecond
+
+      writeFile mAPath timestampC mAContent2
+      compile [mAPath] `shouldReturn` moduleNames ["A"]
+
+      compile mPaths `shouldReturn` moduleNames ["B", "C"]
+
+    -- If a module failed to compile, then the error is fixed and there are no
+    -- effective changes for downstream modules, they should not be recompiled.
+    it "does not recompile downstream modules after the error fixed and externs not changed" $ do
+      let mAPath = modulePath "A"
+          mBPath = modulePath "B"
+          mAContent1 = "module A where\nfoo :: Int\nfoo = 0\n"
+          mAContent2 = "module A where\nfoo :: Char\nfoo = 0\n"
+          mBContent = "module B where\nimport A as A\nbar :: Int\nbar = A.foo\n"
+
+      writeFile mAPath timestampA mAContent1
+      writeFile mBPath timestampB mBContent
+      compile [mAPath, mBPath] `shouldReturn` moduleNames ["A", "B"]
+
+      writeFile mAPath timestampC mAContent2
+      compileWithFailure [mAPath, mBPath] `shouldReturn` moduleNames ["A"]
+
+      writeFile mAPath timestampD mAContent1
+      compile [mAPath, mBPath] `shouldReturn` moduleNames ["A"]
+
+    -- If a module failed to compile, then the error is fixed and there are
+    -- effective changes for downstream modules, they should be recompiled.
+    it "recompiles downstream modules after the error fixed and externs changed" $ do
+      let mAPath = modulePath "A"
+          mBPath = modulePath "B"
+          mAContent1 = "module A where\nfoo :: Int\nfoo = 0\n"
+          mAContent2 = "module A where\nfoo :: Char\nfoo = 0\n"
+          mAContent3 = "module A where\nfoo :: Char\nfoo = '0'\n"
+          mBContent = "module B where\nimport A as A\nbar :: Int\nbar = A.foo\n"
+
+      writeFile mAPath timestampA mAContent1
+      writeFile mBPath timestampB mBContent
+      compile [mAPath, mBPath] `shouldReturn` moduleNames ["A", "B"]
+
+      writeFile mAPath timestampC mAContent2
+      compileWithFailure [mAPath, mBPath] `shouldReturn` moduleNames ["A"]
+      writeFile mAPath timestampD mAContent3
+      compileWithFailure [mAPath, mBPath] `shouldReturn` moduleNames ["A", "B"]
+
+    -- Reexports: original ref is changed.
+    test3 it "recompiles downstream when a reexported ref changed"
+      ( "module A where\nfoo = 0\n"
+      , "module A where\nfoo = '1'\nbar = 1\n" -- change externs here
+      , "module B (module E) where\nimport A (foo) as E\n"
+      , "module C where\nimport B as B\nbaz = B.foo\n"
+      )
+      ["A", "B", "C"]
+
+    -- Reexports: original ref is changed. Ref is imported but not used.
+    test3 it "does not recompile downstream when a reexported ref changed and the ref is imported but not used"
+      ( "module A where\nfoo = 0\n"
+      , "module A where\nfoo = '1'\nbar = 1\n" -- change externs here
+      , "module B (module E) where\nimport A as E\n"
+      -- Import but not use.
+      , "module C where\nimport B (foo)\nx = 1\n"
+      )
+      ["A", "B"]
+
+    -- Reexports: original export is removed from module.
+    testWithFailure3 it "recompiles downstream when a reexported ref removed"
+      ( "module A where\nfoo = 0\n"
+      , "module A where\nbar = 1\n" -- change externs here
+      , "module B (module E) where\nimport A as E\n"
+      , "module C where\nimport B as B\nbaz = B.foo\n"
+      )
+      ["A", "B", "C"]
+
+    -- Reexports: ref is removed from reexporting module.
+    testWithFailure3 it "recompiles downstream when a reexported ref removed (from reexported)"
+      ( "module B (module E) where\nimport A (foo) as E\n"
+      , "module B where\nimport A (foo) as E\n"
+      , "module A where\nfoo = 0\n"
+      , "module C where\nimport B as B\nbaz = B.foo\n"
+      )
+      ["B", "C"]
+
+    -- Reexports: ref is imported but not used. Reexport ref is removed from
+    -- reexporting module.
+    testWithFailure3 it "recompiles downstream when a reexported ref removed (imported but not used)"
+      ( "module B (module E) where\nimport A (foo) as E\n"
+      , "module B where\nimport A (foo) as E\n"
+      , "module A where\nfoo = 0\n"
+      -- Import but not use.
+      , "module C where\nimport B (foo) as B\nx=1\n"
+      )
+      ["B", "C"]
+
+    -- Reexports: original ref Removed. Ref is imported but not used.
+    testWithFailure3 it "recompiles downstream when a reexported ref removed in original"
+      ( "module A where\nfoo = 0\n"
+      , "module A where\nbar = 1\n" -- change externs here
+      , "module B (module E) where\nimport A as E\n"
+      -- Import but not use.
+      , "module C where\nimport B (foo)\nx = 1\n"
+      )
+      ["A", "B", "C"]
+
+    -- Imports.
+    testWithFailure2 it "recompiles downstream when removed reference found in imports"
+      ( "module A where\nfoo = 0\n"
+      , "module A where\nfoo2 = 1\n"
+      , "module B where\nimport A (foo)\nbar = 1"
+      )
+      ["A", "B"]
+
+    test2 it "does not recompiles downstream when removed reference is not used"
+      ( "module A where\nfoo = 0\n"
+      , "module A where\nfoo2 = 1\n"
+      , "module B where\nimport A\nbar = 1"
+      )
+      ["A"]
+
+    -- We need to ensure that it finds refs everywhere inside a module.
+    -- Usage: Inlined type.
+    testWithFailure2 it "recompiles downstream when found changed inlined type"
+      ( "module A where\ntype T = Int\n"
+      , "module A where\ntype T = String\n"
+      , "module B where\nimport A\nx = (1 :: T)"
+      )
+      ["A", "B"]
+
+    -- Transitive change: module A changes, module B depends on A and module C
+    -- depends on B are both recompiled.
+    test3 it "recompiles downstream due to transitive change"
+      ( "module A where\nfoo = 0\n"
+      , "module A where\nfoo = '1'\n"
+      , "module B where\nimport A (foo)\nbar = qux\nqux = foo"
+      , "module C where\nimport B (bar)\nbaz = bar\n"
+      )
+      ["A", "B", "C"]
+
+    test3 it "does not recompile downstream if no transitive change"
+      ( "module A where\nfoo = 0\n"
+      , "module A where\nfoo = '1'\n"
+      , "module B where\nimport A (foo)\nbar = 1\nqux = foo"
+      , "module C where\nimport B (bar)\nbaz = bar\n"
+      )
+      ["A", "B"]
+
+    -- Non effective change does not cause downstream rebuild.
+    test2 it "does not recompile downstream if unused type changed"
+      ( "module A where\ntype SynA = Int\ntype SynA2 = Int"
+      , "module A where\ntype SynA = String\ntype SynA2 = Int"
+      , "module B where\nimport A as A\ntype SynB = A.SynA2"
+      )
+      ["A"]
+
+    -- Type synonym change.
+    recompile2 it "type synonym changed"
+      ( "module A where\ntype SynA = Int\n"
+      , "module A where\ntype SynA = String\n"
+      , "module B where\nimport A as A\ntype SynB = Array A.SynA\n"
+      )
+
+    -- Type synonym indirect change.
+    recompile2 it "type synonym dependency changed"
+      ( "module A where\ntype SynA = Int\ntype SynA2 = SynA\n"
+      , "module A where\ntype SynA = String\ntype SynA2 = SynA\n"
+      , "module B where\nimport A as A\ntype SynB = Array A.SynA2\n"
+      )
+
+    -- Data type: parameter added.
+    recompile2 it "data type changed (parameter added)"
+      ( "module A where\ndata T = A Int | B Int\n"
+      , "module A where\ndata T a = A Int | B a\n"
+      , "module B where\nimport A (T)\ntype B = T"
+      )
+
+    -- Data type: constructor added.
+    recompile2 it "data type changed (constructor added)"
+      ( "module A where\ndata T = A | B\n"
+      , "module A where\ndata T = A | B | C\n"
+      , "module B where\nimport A (T(B))\nb = B"
+      )
+
+    -- Data type: constructor indirectly changed.
+    recompile2 it "data type constructor dependency changed"
+      ( "module A where\ntype SynA = Int\ndata AB = A SynA | B Int\n"
+      , "module A where\ntype SynA = String\ndata AB = A SynA | B Int\n"
+      , "module B where\nimport A (AB(..))\nb = A"
+      )
+
+    -- Data type: constructor changed but not used.
+    noRecompile2 it "data type constructor changed, but not used"
+      ( "module A where\ntype SynA = Int\ndata AB = A SynA | B Int\n"
+      , "module A where\ntype SynA = String\ndata AB = A SynA | B Int\n"
+      -- use type and other constructor
+      , "module B where\nimport A (AB(..))\ntype B = AB\nb = B"
+      )
+
+    -- Data type: constructor added, but not imported.
+    noRecompile2 it "data type constructor added, but ctors not imported"
+      ( "module A where\ntype SynA = Int\ndata AB = A SynA | B Int\n"
+      , "module A where\ntype SynA = String\ndata AB = A SynA | B Int | C\n"
+      -- use just type
+      , "module B where\nimport A (AB)\ntype B = AB\n"
+      )
+
+    -- Data type: constructor added, but not used.
+    noRecompile2 it "data type constructor added, but ctors not imported"
+      ( "module A where\ntype SynA = Int\ndata AB = A SynA | B Int\n"
+      , "module A where\ntype SynA = String\ndata AB = A SynA | B Int | C\n"
+      -- use type
+      , "module B where\nimport A (AB(..))\ntype B = AB\n"
+      )
+
+    -- Data type: constructor added, and constructors are used in the downstream
+    -- module (this may be need when there is a case statement without wildcard,
+    -- but we don't analyze the usage that deep).
+    recompile2 it "data type constructor added and ctors are used"
+      ( "module A where\ntype SynA = Int\ndata AB = A SynA | B Int\n"
+      , "module A where\ntype SynA = String\ndata AB = A SynA | B Int | C\n"
+      -- use type and other constructor
+      , "module B where\nimport A (AB(..))\ntype B = AB\nb = B\n"
+      )
+
+    -- Value operator change.
+    recompile2 it "value op changed"
+      ( "module A where\ndata T a = T Int a\ninfixl 2 T as :+:\n"
+      , "module A where\ndata T a = T Int a\ninfixl 3 T as :+:\n"
+      , "module B where\nimport A\nt = 1 :+: \"1\" "
+      )
+
+    -- Value operator indirect change.
+    recompile2 it "value op dependency changed"
+      ( "module A where\ndata T a = T a String\ninfixl 2 T as :+:\n"
+      , "module A where\ndata T a = T Int a\ninfixl 2 T as :+:\n"
+      , "module B where\nimport A\nt = 1 :+: \"1\" "
+      )
+
+
+    -- Type operator change.
+    recompile2 it "type op changed"
+      ( "module A where\ndata T a b = T a b\ninfixl 2 type T as :+:\n"
+      , "module A where\ndata T a b = T a b\ninfixl 3 type T as :+:\n"
+      , "module B where\nimport A\nfn :: Int :+: String -> Int\nfn _ = 1"
+      )
+
+    -- Type operator indirect change.
+    recompile2 it "type op dependency changed"
+      ( "module A where\ndata T a b = T a b\ninfixl 2 type T as :+:\n"
+      , "module A where\ndata T b a = T a b\ninfixl 2 type T as :+:\n"
+      , "module B where\nimport A\nfn :: Int :+: String -> Int\nfn _ = 1"
+      )
+
+    -- Type classes changed. Downstream uses type class in signature.
+    recompile2 it "type class changed"
+      ( "module A where\nclass Cls a where m1 :: a -> Int\n"
+      , "module A where\nclass Cls a where m1 :: a -> Char\n"
+      , T.unlines
+          [ "module B where"
+          , "import A as A"
+          , "fn :: forall a. A.Cls a => a -> Int"
+          , "fn _ = 1"
+          ]
+      )
+
+    -- Type classes changed. Downstream uses only its member.
+    recompile2 it "type class changed (member affected)"
+      ( "module A where\nclass Cls a where m1 :: a -> Int\n"
+      , "module A where\nclass Cls a where m1 :: a -> Char\n"
+      , T.unlines
+          [ "module B where"
+          , "import A as A"
+          , "fn x = A.m1 x"
+          ]
+      )
+
+    -- Type class instance added.
+    recompile2 it "type class instance added"
+      ( "module A where\nclass Cls a where m1 :: a -> Int\n"
+      , "module A where\nclass Cls a where m1 :: a -> Int\ninstance Cls Int where m1 _ = 1"
+      , T.unlines
+          [ "module B where"
+          , "import A as A"
+          , "fn :: forall a. A.Cls a => a -> Int"
+          , "fn _ = 1"
+          ]
+      )
+
+    -- Type class instance removed.
+    recompileWithFailure2 it "type class instance removed"
+      ( "module A where\nclass Cls a where m1 :: a -> Int\ninstance Cls Int where m1 _ = 1"
+      , "module A where\nclass Cls a where m1 :: a -> Int\n"
+      , T.unlines
+          [ "module B where"
+          , "import A (m1)"
+          , "x = m1 1"
+          ]
+      )
+
+    -- Type class instance added for a type. We need to recompile downstream
+    -- modules that use this type, because it can be effected (even if it
+    -- doesn't use type class as we do not analyze this).
+    test3 it "recompiles downstream if instance added for a type"
+      ( "module B where\nimport A\nnewtype T = T Int\n"
+      , "module B where\nimport A\nnewtype T = T Int\ninstance Cls T where m1 _ = 1"
+      , "module A where\nclass Cls a where m1 :: a -> Int\n"
+      , T.unlines
+          [ "module C where"
+          , "import B"
+          , "t = T 1"
+          ]
+      )
+      ["B", "C"]
+
+    -- Type class instance removed for a type.
+    testWithFailure3 it "recompiles downstream if type class instance removed for a type"
+      ( "module B where\nimport A\nnewtype T = T Int\ninstance Cls T where m1 _ = 1"
+      , "module B where\nimport A\nnewtype T = T Int\n"
+      , "module A where\nclass Cls a where m1 :: a -> Int\n"
+      , T.unlines
+          [ "module C where"
+          , "import A"
+          , "import B"
+          , "i :: Int"
+          , "i = m1 (T 1)"
+          ]
+      )
+      ["B", "C"]
+
+    -- Type class instance added for the type and type class in another module
+    -- it self is modified. We don't need to recompile downstream modules that
+    -- depend only on type (if they use type class they will be recompiled).
+    testN it "does not recompile downstream if an instance added for the type and type class changed"
+      [ ( "A"
+        , "module A where\nclass Cls a where m1 :: a -> Char\n"
+        , Just "module A where\nclass Cls a where m1 :: a -> Int\n"
+        )
+      , ( "B"
+        , "module B where\nimport A\nnewtype T = T Int\n"
+        , Just "module B where\nimport A\nnewtype T = T Int\ninstance Cls T where m1 _ = 1"
+        )
+      , ("C", "module C where\nimport B\ntype C = T", Nothing)
+      ] compile ["A", "B"]
 
 -- Note [Sleeping to avoid flaky tests]
 --
@@ -595,14 +683,23 @@ assertSuccess (result, recompiled) =
     Right _ ->
       pure recompiled
 
+assertFailure :: (Either P.MultipleErrors a, Set P.ModuleName) -> IO (Set P.ModuleName)
+assertFailure (result, recompiled) =
+  case result of
+    Left _ ->
+      pure recompiled
+    Right _ ->
+      fail "should compile with errors"
+
 -- | Compile, returning the set of modules which were rebuilt, and failing if
 -- any errors occurred.
 compile :: [FilePath] -> IO (Set P.ModuleName)
 compile input =
   compileWithResult input >>= assertSuccess
 
-compileAllowingFailures :: [FilePath] -> IO (Set P.ModuleName)
-compileAllowingFailures input = fmap snd (compileWithResult input)
+compileWithFailure :: [FilePath] -> IO (Set P.ModuleName)
+compileWithFailure input =
+  compileWithResult input >>= assertFailure
 
 writeFile :: FilePath -> UTCTime -> T.Text -> IO ()
 writeFile path mtime contents = do
@@ -613,4 +710,3 @@ writeFile path mtime contents = do
 -- from other test results
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "make"
-
