@@ -11,6 +11,7 @@ import Data.Graph as G (graphFromEdges, reachable)
 import Data.List qualified as L
 import Data.Map qualified as M
 import Data.Set qualified as S
+
 import Language.PureScript.AST qualified as P
 import Language.PureScript.AST.Declarations.ChainId (ChainId (..))
 import Language.PureScript.Constants.Prim (primModules)
@@ -20,7 +21,6 @@ import Language.PureScript.Externs qualified as P
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.Names qualified as P
 import Language.PureScript.Types qualified as P
-import Language.PureScript.Environment (isDictTypeName)
 
 -- Refs structure appropriate for storing and checking externs diffs.
 data Ref
@@ -63,7 +63,6 @@ isRefRemoved _ = False
 -- present in new extern's exports) or changed in dependencies.
 getReExported :: P.ExternsFile -> P.ExternsFile -> ModuleRefsMap -> RefsWithStatus
 getReExported newExts oldExts depsDiffsMap =
-  -- S.fromList $ map snd $ filter checkRe oldExports
   M.fromList $ mapMaybe checkRe oldExports
   where
     goRe (P.ReExportRef _ es ref) = (P.exportSourceDefinedIn es,) <$> toRefs ref
@@ -136,9 +135,7 @@ getChanged newExts oldExts depsDiffsMap =
     -- combining Declarations, Fixities and Type Fixities - as they are
     -- separated in externs we handle them separately. We don't care about added things.
     (_, removed, changed, unchangedRefs) =
-      foldl
-        zipTuple4
-        (mempty, mempty, mempty, mempty)
+      fold
         [ declsSplit
         , splitRefs (getFixities newExts) (getFixities oldExts) (pure . externsFixityToRef fixityCtx)
         , splitRefs (getTypeFixities newExts) (getTypeFixities oldExts) (pure . externsTypeFixityToRef)
@@ -224,6 +221,8 @@ diffExterns newExts oldExts depsDiffs =
     affectedLocalRefs =
       M.fromSet (const Updated) $ getAffectedLocal modName diffsMapWithLocal unchangedRefs
 
+-- Checks if the externs diffs effect the module (the module uses any diff's
+-- entries). True if uses, False if not.
 checkDiffs :: P.Module -> [ExternsDiff] -> Bool
 checkDiffs (P.Module _ _ _ decls exports) diffs
   | all isEmpty diffs = False
@@ -233,12 +232,14 @@ checkDiffs (P.Module _ _ _ decls exports) diffs
   where
     mbSearch = makeSearches decls diffs
     searches = fromMaybe S.empty mbSearch
+
     -- Check if the module reexports any of searched refs.
     checkReExports = flip (maybe False) exports $ any $ \case
       P.ModuleRef _ mn -> not . null $ S.filter ((== Just mn) . fst) searches
       _ -> False
 
 -- Goes though the module and try to find any usage of the refs.
+-- Takes a set of refs to search in module's declarations, if found returns True.
 checkUsage :: Set (Maybe ModuleName, Ref) -> [P.Declaration] -> Bool
 checkUsage searches decls = foldMap findUsage decls /= mempty
   where
@@ -254,7 +255,7 @@ checkUsage searches decls = foldMap findUsage decls /= mempty
     stripCtorType x = x
 
     searches' = S.map (map stripCtorType) searches
-    check = (\x -> [x | x]) . flip S.member searches' . toSearched
+    check = Any . flip S.member searches' . toSearched
 
     checkType = check . map TypeRef
     checkTypeOp = check . map TypeOpRef
@@ -362,10 +363,6 @@ isEmpty (ExternsDiff _ refs)
 
 type Tuple4 m a = (m a, m a, m a, m a)
 
-zipTuple4 :: Monoid (m a) => Tuple4 m a -> Tuple4 m a -> Tuple4 m a
-zipTuple4 (f1, s1, t1, fo1) (f2, s2, t2, fo2) =
-  (f1 <> f2, s1 <> s2, t1 <> t2, fo1 <> fo2)
-
 -- | Returns refs as a tuple of four (added, removed, changed, unchanged).
 splitRefs :: Ord r => Eq a => [a] -> [a] -> (a -> Maybe r) -> Tuple4 [] r
 splitRefs new old toRef =
@@ -378,8 +375,8 @@ splitRefs new old toRef =
     go ref decl (a, r, c, u) = case M.lookup ref newMap of
       Nothing -> (a, r <> [ref], c, u)
       Just newDecl
-        | decl /= newDecl -> (a, r, c <> [ref], u)
-        | otherwise -> (a, r, c, u <> [ref])
+        | decl /= newDecl -> (a, r, ref : c, u)
+        | otherwise -> (a, r, c, ref : u)
 
 -- | Traverses the type and finds all the refs within.
 typeDeps :: P.Type a -> S.Set (ModuleName, Ref)
@@ -424,14 +421,14 @@ externsTypeFixityToRef (P.ExternsTypeFixity _ _ n alias) =
 externsDeclarationToRef :: ModuleName -> P.ExternsDeclaration -> Maybe RefWithDeps
 externsDeclarationToRef moduleName = \case
   P.EDType n t tk
-    | isDictTypeName n -> Nothing
+    | P.isDictTypeName n -> Nothing
     | otherwise -> Just (TypeRef n, typeDeps t <> typeKindDeps tk)
   --
   P.EDTypeSynonym n args t ->
     Just (TypeRef n, typeDeps t <> foldArgs args)
   --
   P.EDDataConstructor n _ tn t _
-    | isDictTypeName n -> Nothing
+    | P.isDictTypeName n -> Nothing
     | otherwise ->
         Just
           ( ConstructorRef tn n
