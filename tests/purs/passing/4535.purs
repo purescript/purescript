@@ -6,6 +6,7 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\), type (/\))
 import Effect (Effect)
 import Effect.Console (log)
+import Type.Proxy (Proxy(..))
 
 singleArgument :: forall @a. a -> Unit
 singleArgument _ = unit
@@ -33,6 +34,10 @@ type InSynonym = Int /\ Number
 -- sake of redundancy.
 inSynonym :: InSynonym -> Unit
 inSynonym = singleArgument @InSynonym
+
+-- This test accounts for type operators used as type arguments directly.
+operatorAsArgument :: Proxy (/\)
+operatorAsArgument = Proxy @(/\)
 
 main :: Effect Unit
 main = log "Done"
