@@ -8,11 +8,11 @@ while inferring the kind of [33mb[0m
 while checking that type [33mb[0m
   has kind [33mt0[0m
 while inferring the kind of [33mFoo$Dict b[0m
-while inferring the kind of [33mRecord () -> Foo$Dict b[0m
-while inferring the kind of [33m( "Foo0" :: Record () -> Foo$Dict b[0m
-                            [33m)                                  [0m
-while inferring the kind of [33m{ "Foo0" :: Record () -> Foo$Dict b[0m
-                            [33m}                                  [0m
+while inferring the kind of [33m{} -> Foo$Dict b[0m
+while inferring the kind of [33m( "Foo0" :: {} -> Foo$Dict b[0m
+                            [33m)                           [0m
+while inferring the kind of [33m{ "Foo0" :: {} -> Foo$Dict b[0m
+                            [33m}                           [0m
 in type constructor [33mBar$Dict[0m
 
 where [33mt0[0m is an unknown type
