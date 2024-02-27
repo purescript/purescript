@@ -55,7 +55,7 @@ jobs:
         include:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
             os: ["ubuntu-latest"]
-            image: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
+            image: haskell:9.2.8@sha256:b3b2f3909c7381bb96b8f18766f9407a3d6f61e0f07ea95e812583ac4f442cbb
           - os: ["macOS-11"]
           - os: ["windows-2019"]
           - os: ["self-hosted", "macos", "ARM64"]
@@ -231,7 +231,7 @@ jobs:
     # means our published binaries will work on the widest number of platforms.
     # But the HLint binary downloaded by this job requires a newer glibc
     # version.
-    container: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
+    container: haskell:9.2.8@sha256:b3b2f3909c7381bb96b8f18766f9407a3d6f61e0f07ea95e812583ac4f442cbb
 
     steps:
       - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
