@@ -99,7 +99,7 @@ jobs:
         # and their Haskell environment is instead provided by a nix-shell
         # See https://github.com/purescript/purescript/pulls/4455
         if: "!contains(matrix.os, 'ubuntu-latest') && !contains(matrix.os, 'self-hosted')"
-        uses: "haskell/actions/setup@v1"
+        uses: "haskell-actions/setup@v2"
         with:
           enable-stack: true
           stack-version: "${{ env.STACK_VERSION }}"
