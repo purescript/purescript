@@ -71,3 +71,19 @@ Error: EACCES: permission denied
 ```
 
 The best solution is to install [Node.js and npm via a node version manager](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm#using-a-node-version-manager-to-install-nodejs-and-npm). This error is due to permissions issues when installing packages globally. You can read more about this error in npm's guide to [resolving EACCES permissions errors when installing packages globally](https://docs.npmjs.com/getting-started/fixing-npm-permissions).
+
+## hGetContents invalid argument error
+
+If you encounter this error while trying to build purescript from sources:
+
+```
+language-javascript> happy: src/Language/JavaScript/Parser/Grammar7.y: hGetContents: invalid argument (invalid byte sequence)
+```
+
+You are most likely not using UTF-8 system-wide. This happens sometimes on Docker / Ubuntu. To fix this, generate the locales for the system:
+
+```bash
+apt-get install -y locales
+echo 'en_US.UTF-8' >> /etc/locale.gen
+locale-gen en_US.UTF-8
+```

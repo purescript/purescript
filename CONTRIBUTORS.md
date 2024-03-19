@@ -145,6 +145,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@senju](https://github.com/senju) | senju | [MIT license] |
 | [@seungha-kim](https://github.com/seungha-kim) | Seungha Kim | [MIT license] |
 | [@sharkdp](https://github.com/sharkdp) | David Peter | [MIT license] |
+| [@shybovycha](https://github.com/shybovycha) | Artem Shubovych | [MIT license] |
 | [@sigma-andex](https://github.com/sigma-andex) | Jan Schulte | [MIT license] |
 | [@simonyangme](https://github.com/simonyangme) | Simon Yang | [MIT license] |
 | [@sloosch](https://github.com/sloosch) | Simon Looschen | [MIT license] |

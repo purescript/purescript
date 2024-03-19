@@ -1,0 +1,1 @@
+* Generate [`Symbol()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol) objects for sum ADTs and use equality (`===`) instead of `instanceof` for comparisons on sum ADTs
