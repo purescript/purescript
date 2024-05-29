@@ -241,21 +241,22 @@ checkDiffs (P.Module _ _ _ decls exports) diffs
 -- Goes though the module and try to find any usage of the refs.
 -- Takes a set of refs to search in module's declarations, if found returns True.
 checkUsage :: Set (Maybe ModuleName, Ref) -> [P.Declaration] -> Bool
-checkUsage searches decls = foldMap findUsage decls /= mempty
+checkUsage searches decls = anyUsages
   where
-    findUsage decl =
-      let (extr, _, _, _, _) = P.everythingWithScope goDecl goExpr goBinder mempty mempty
-       in extr mempty decl
+    -- Two traversals: one to pick up usages of types, one for the rest.
+    Any anyUsages =
+      foldMap checkUsageInTypes decls
+        <> foldMap checkOtherUsages decls
 
-    toSearched = (,) <$> P.getQual <*> P.disqualify
+    -- To check data constructors we remove an origin type from it (see `checkCtor`).
+    searches' = S.map (map stripCtorType) searches
 
     -- To check data constructors we remove an origin type from it.
     emptyName = P.ProperName ""
     stripCtorType (ConstructorRef _ n) = ConstructorRef emptyName n
     stripCtorType x = x
 
-    searches' = S.map (map stripCtorType) searches
-    check = Any . flip S.member searches' . toSearched
+    check q = Any $ S.member (P.getQual q, P.disqualify q) searches'
 
     checkType = check . map TypeRef
     checkTypeOp = check . map TypeOpRef
@@ -264,31 +265,21 @@ checkUsage searches decls = foldMap findUsage decls /= mempty
     checkCtor = check . map (ConstructorRef emptyName)
     checkClass = check . map TypeClassRef
 
-    onTypes = P.everythingOnTypes (<>) $ \case
-      P.TypeConstructor _ n -> checkType n
-      P.TypeOp _ n -> checkTypeOp n
-      P.ConstrainedType _ c _ -> checkClass (P.constraintClass c)
-      _ -> mempty
+    -- A nested traversal: pick up types in the module then traverse the structure of the types
+    (checkUsageInTypes, _, _, _, _) =
+      P.accumTypes $ P.everythingOnTypes (<>) $ \case
+        P.TypeConstructor _ n -> checkType n
+        P.TypeOp _ n -> checkTypeOp n
+        P.ConstrainedType _ c _ -> checkClass (P.constraintClass c)
+        _ -> mempty
 
-    foldCtor f (P.DataConstructorDeclaration _ _ vars) =
-      foldMap (f . snd) vars
-
-    constraintTypes =
-      foldMap (\c -> P.constraintArgs c <> P.constraintKindArgs c)
+    checkOtherUsages =
+      let (extr, _, _, _, _) = P.everythingWithScope goDecl goExpr goBinder mempty mempty
+       in extr mempty
 
     goDecl _ = \case
-      P.TypeDeclaration t -> onTypes (P.tydeclType t)
-      P.DataDeclaration _ _ _ _ ctors -> foldMap (foldCtor onTypes) ctors
-      P.TypeSynonymDeclaration _ _ _ t -> onTypes t
-      P.KindDeclaration _ _ _ t -> onTypes t
-      P.FixityDeclaration _ (Right (P.TypeFixity _ tn _)) ->
-        checkType tn
-      P.FixityDeclaration _ (Left (P.ValueFixity _ (P.Qualified by val) _)) ->
-        either (checkValue . P.Qualified by) (checkCtor . P.Qualified by) val
-      P.TypeClassDeclaration _ _ _ cs _ _ ->
-        foldMap onTypes (constraintTypes cs)
-      P.TypeInstanceDeclaration _ _ _ _ _ cs tc sts _ ->
-        foldMap onTypes (constraintTypes cs <> sts) <> checkClass tc
+      P.TypeInstanceDeclaration _ _ _ _ _ _ tc _ _ ->
+        checkClass tc
       _ -> mempty
 
     isLocal scope ident = P.LocalIdent ident `S.member` scope
@@ -298,7 +289,6 @@ checkUsage searches decls = foldMap findUsage decls /= mempty
         | otherwise -> checkValue n
       P.Constructor _ n -> checkCtor n
       P.Op _ n -> checkValueOp n
-      P.TypedValue _ _ t -> onTypes t
       _ -> mempty
 
     goBinder _ binder = case binder of
