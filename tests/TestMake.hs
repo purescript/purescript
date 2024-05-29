@@ -9,7 +9,7 @@ import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 
 import Control.Concurrent (threadDelay)
-import Control.Monad (guard, void, forM_)
+import Control.Monad (guard, void, forM_, when)
 import Control.Exception (tryJust)
 import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent.MVar (readMVar, newMVar, modifyMVar_)
@@ -19,11 +19,13 @@ import Data.Text qualified as T
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Map qualified as M
+import Data.Version (showVersion)
 
+import Paths_purescript qualified as Paths
 import System.FilePath ((</>))
 import System.Directory (createDirectory, removeDirectoryRecursive, removeFile, setModificationTime)
 import System.IO.Error (isDoesNotExistError)
-import System.IO.UTF8 (readUTF8FilesT, writeUTF8FileT)
+import System.IO.UTF8 (readUTF8FilesT, readUTF8FileT, writeUTF8FileT)
 
 import Test.Hspec (Spec, before_, it, shouldReturn)
 
@@ -55,6 +57,9 @@ spec = do
 
           forM_ (zip [0..] modules) $ \(idx, (mn, content, _)) -> do
             writeFile (modulePath mn) (timestamp idx) content
+            -- Write a fake foreign module to bypass compiler's check.
+            when (T.isInfixOf "\nforeign import" content) $
+              writeFile (foreignJsPath mn) (timestamp idx) content
 
           compile paths `shouldReturn` moduleNames names
 
@@ -189,15 +194,15 @@ spec = do
     it "recompiles if docs are requested but not up to date" $ do
       let mPath = sourcesDir </> "Module.purs"
 
-          moduleContent1 = "module Module where\nx :: Int\nx = 1"
-          moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
+          mContent1 = "module Module where\nx :: Int\nx = 1"
+          mContent2 = mContent1 <> "\ny :: Int\ny = 1"
 
           optsWithDocs = P.defaultOptions { P.optionsCodegenTargets = Set.fromList [P.JS, P.Docs] }
           go opts = compileWithOptions opts [mPath] >>= assertSuccess
 
-      writeFile mPath timestampA moduleContent1
+      writeFile mPath timestampA mContent1
       go optsWithDocs `shouldReturn` moduleNames ["Module"]
-      writeFile mPath timestampB moduleContent2
+      writeFile mPath timestampB mContent2
       -- See Note [Sleeping to avoid flaky tests]
       threadDelay oneSecond
       go P.defaultOptions `shouldReturn` moduleNames ["Module"]
@@ -207,20 +212,41 @@ spec = do
 
     it "recompiles if CoreFn is requested but not up to date" $ do
       let mPath = sourcesDir </> "Module.purs"
-          moduleContent1 = "module Module where\nx :: Int\nx = 1"
-          moduleContent2 = moduleContent1 <> "\ny :: Int\ny = 1"
+          mContent1 = "module Module where\nx :: Int\nx = 1"
+          mContent2 = mContent1 <> "\ny :: Int\ny = 1"
           optsCoreFnOnly = P.defaultOptions { P.optionsCodegenTargets = Set.singleton P.CoreFn }
           go opts = compileWithOptions opts [mPath] >>= assertSuccess
 
-      writeFile mPath timestampA moduleContent1
+      writeFile mPath timestampA mContent1
       go optsCoreFnOnly `shouldReturn` moduleNames ["Module"]
-      writeFile mPath timestampB moduleContent2
+      writeFile mPath timestampB mContent2
       -- See Note [Sleeping to avoid flaky tests]
       threadDelay oneSecond
       go P.defaultOptions `shouldReturn` moduleNames ["Module"]
       -- Since the existing CoreFn.json is now outdated, the module should be
       -- recompiled.
       go optsCoreFnOnly `shouldReturn` moduleNames ["Module"]
+
+    it "recompiles if cache-db version differs from the current" $ do
+      let mPath = sourcesDir </> "Module.purs"
+          mContent = "module Module where\nfoo :: Int\nfoo = 1\n"
+
+      writeFile mPath timestampA mContent
+      compile [mPath] `shouldReturn` moduleNames ["Module"]
+
+      -- Replace version with illegal in cache-db file.
+      let cacheDbFilePath = P.cacheDbFile modulesDir
+          versionText ver = "\"version\":\"" <> ver <> "\""
+
+      cacheContent <- readUTF8FileT cacheDbFilePath
+
+      let currentVer = T.pack (showVersion Paths.version)
+      let newContent =
+            T.replace (versionText currentVer) (versionText "0.0.0") cacheContent
+
+      writeUTF8FileT cacheDbFilePath newContent
+
+      compile [mPath] `shouldReturn` moduleNames ["Module"]
 
     -- Cut off rebuild tests.
 
@@ -433,11 +459,32 @@ spec = do
       )
       ["A"]
 
+    -- Type synonym in foreign import.
+    recompile2 it "type synonym changed in foreign import"
+      ( "module A where\ntype SynA = Int\n"
+      , "module A where\ntype SynA = String\n"
+      , "module B where\nimport A as A\nforeign import a :: A.SynA\n"
+      )
+
     -- Type synonym change.
     recompile2 it "type synonym changed"
       ( "module A where\ntype SynA = Int\n"
       , "module A where\ntype SynA = String\n"
       , "module B where\nimport A as A\ntype SynB = Array A.SynA\n"
+      )
+
+    -- Type synonym change in value.
+    recompile2 it "type synonym changed in value"
+      ( "module A where\ntype SynA = Int\n"
+      , "module A where\ntype SynA = String\n"
+      , "module B where\nimport A as A\nvalue = ([] :: Array A.SynA)\n"
+      )
+
+    -- Type synonym change in pattern.
+    recompile2 it "type synonym changed in pattern"
+      ( "module A where\ntype SynA = Int\n"
+      , "module A where\ntype SynA = String\n"
+      , "module B where\nimport A as A\nfn = \\(_ :: Array A.SynA) -> 0\n"
       )
 
     -- Type synonym indirect change.
@@ -515,7 +562,6 @@ spec = do
       , "module A where\ndata T a = T Int a\ninfixl 2 T as :+:\n"
       , "module B where\nimport A\nt = 1 :+: \"1\" "
       )
-
 
     -- Type operator change.
     recompile2 it "type op changed"
