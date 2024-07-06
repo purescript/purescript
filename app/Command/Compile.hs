@@ -1,4 +1,5 @@
-module Command.Compile (command) where
+{-# LANGUAGE NumericUnderscores #-}
+module Command.Compile (command, parseCommand) where
 
 import Prelude
 
@@ -7,11 +8,13 @@ import Control.Monad (when)
 import Data.Aeson qualified as A
 import Data.Bool (bool)
 import Data.ByteString.Lazy.UTF8 qualified as LBU8
-import Data.List (intercalate)
+import Data.List qualified as List
 import Data.Map qualified as M
 import Data.Set qualified as S
+import Data.Ord (comparing)
 import Data.Text qualified as T
 import Data.Traversable (for)
+import Language.PureScript.CST.Parser qualified as CST.Parser
 import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
@@ -24,6 +27,11 @@ import System.Exit (exitSuccess, exitFailure)
 import System.Directory (getCurrentDirectory)
 import System.IO (hPutStr, stderr, stdout)
 import System.IO.UTF8 (readUTF8FilesT)
+import System.CPUTime (getCPUTime)
+import Text.Printf (printf)
+import Control.Exception (evaluate)
+import Control.Monad (void)
+import Control.DeepSeq (rnf)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
@@ -120,7 +128,7 @@ codegenTargets = Opts.option targetParser $
       )
 
 targetsMessage :: String
-targetsMessage = "Accepted codegen targets are '" <> intercalate "', '" (M.keys P.codegenTargets) <> "'."
+targetsMessage = "Accepted codegen targets are '" <> List.intercalate "', '" (M.keys P.codegenTargets) <> "'."
 
 targetParser :: Opts.ReadM [P.CodegenTarget]
 targetParser =
@@ -153,3 +161,83 @@ pscMakeOptions = PSCMakeOptions <$> many SharedCLI.inputFile
 
 command :: Opts.Parser (IO ())
 command = compile <$> (Opts.helper <*> pscMakeOptions)
+
+parseCommand :: Opts.Parser (IO ())
+parseCommand = parse <$> (Opts.helper <*> pscMakeOptions)
+
+parse :: PSCMakeOptions -> IO ()
+parse PSCMakeOptions{..} = do
+  input <- toInputGlobs $ PSCGlobs
+    { pscInputGlobs = pscmInput
+    , pscInputGlobsFromFile = pscmInputFromFile
+    , pscExcludeGlobs = pscmExclude
+    , pscWarnFileTypeNotFound = warnFileTypeNotFound "compile"
+    }
+  when (null input) $ do
+    hPutStr stderr $ unlines
+      [ "purs compile: No input files."
+      , "Usage: For basic information, try the `--help' option."
+      ]
+    exitFailure
+  modules <- readUTF8FilesT input
+  -- (makeErrors, makeWarnings) <- runMake pscmOpts $ do
+  durationStats <- for modules $ \(fp, content) -> do
+    start <- getCPUTime
+    void $ do
+      x <- evaluate $ CST.Parser.parse content
+      rnf x `seq` return ()
+    end <- getCPUTime
+    let ms = (fromIntegral (end - start)) / (1_000_000_000 :: Double)
+    pure $ DurationStat ms fp
+  let stats = getDurationStats durationStats
+  putStrLn $ displayDurationStats stats "Parse"
+
+  exitSuccess
+
+data DurationStat = DurationStat
+  { duration :: !Double
+  , file :: !FilePath
+  -- , result :: !(Either (NE.NonEmpty ParserError) (CST.Module ()))
+  }
+
+data DurationStats = DurationStats
+  { minDuration :: ![DurationStat]
+  , maxDuration :: ![DurationStat]
+  , mean :: !Double
+  }
+
+getDurationStats :: [DurationStat] -> DurationStats
+getDurationStats res = DurationStats
+  { minDuration = List.take 20 sorted
+  , maxDuration = List.reverse (takeEnd 20 sorted)
+  , mean = mean $ map duration sorted
+  }
+  where
+  sorted = List.sortBy (comparing duration) res
+
+  mean :: [Double] -> Double
+  mean xs = (sum xs) / fromIntegral (length xs)
+
+displayDurationStats :: DurationStats -> String -> String
+displayDurationStats (DurationStats { minDuration, maxDuration, mean }) title =
+  List.intercalate "\n"
+    [ ""
+    , "---- [ " <> title <> " Timing Information ] ----"
+    , "Fastest Parse Times:"
+    , List.intercalate "\n" $ displayLine <$> minDuration
+    , ""
+    , "Slowest Parse Times:"
+    , List.intercalate "\n" $ displayLine <$> maxDuration
+    , ""
+    , "Mean Parse: " <> formatMs mean
+    ]
+
+  where
+  displayLine (DurationStat{ file, duration }) =
+    takeEnd 12 ("        " <> formatMs duration) <> "  " <> file -- <> "  " <> (either (const "0") (const " ") result)
+
+  formatMs :: Double -> String
+  formatMs = printf "%.3f ms"
+
+takeEnd :: Int -> [a] -> [a]
+takeEnd n xs = List.foldl' (const . drop 1) xs (drop n xs)

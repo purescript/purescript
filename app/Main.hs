@@ -64,6 +64,9 @@ main = do
         , Opts.command "compile"
             (Opts.info Compile.command
               (Opts.progDesc "Compile PureScript source files"))
+        , Opts.command "parse"
+            (Opts.info Compile.parseCommand
+              (Opts.progDesc "Parse PureScript source files and output timing information"))
         , Opts.command "docs"
             (Opts.info Docs.command
               (Opts.progDesc "Generate documentation from PureScript source files in a variety of formats, including Markdown and HTML" <> Docs.infoModList))

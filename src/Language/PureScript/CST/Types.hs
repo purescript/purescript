@@ -92,10 +92,14 @@ data Ident = Ident
   { getIdent :: Text
   } deriving (Show, Eq, Ord, Generic)
 
+instance NFData Ident
+
 data Name a = Name
   { nameTok :: SourceToken
   , nameValue :: a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (Name a)
 
 data QualifiedName a = QualifiedName
   { qualTok :: SourceToken
@@ -103,10 +107,14 @@ data QualifiedName a = QualifiedName
   , qualName :: a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (QualifiedName a)
+
 data Label = Label
   { lblTok :: SourceToken
   , lblName :: PSString
   } deriving (Show, Eq, Ord, Generic)
+
+instance NFData Label
 
 data Wrapped a = Wrapped
   { wrpOpen :: SourceToken
@@ -114,16 +122,22 @@ data Wrapped a = Wrapped
   , wrpClose :: SourceToken
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (Wrapped a)
+
 data Separated a = Separated
   { sepHead :: a
   , sepTail :: [(SourceToken, a)]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (Separated a)
 
 data Labeled a b = Labeled
   { lblLabel :: a
   , lblSep :: SourceToken
   , lblValue  :: b
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance (NFData a, NFData b) => NFData (Labeled a b)
 
 type Delimited a = Wrapped (Maybe (Separated a))
 type DelimitedNonEmpty a = Wrapped (Separated a)
@@ -132,6 +146,8 @@ data OneOrDelimited a
   = One a
   | Many (DelimitedNonEmpty a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (OneOrDelimited a)
 
 data Type a
   = TypeVar a (Name Ident)
@@ -154,20 +170,28 @@ data Type a
   | TypeUnaryRow a SourceToken (Type a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (Type a)
+
 data TypeVarBinding a
   = TypeVarKinded (Wrapped (Labeled (Maybe SourceToken, Name Ident) (Type a)))
   | TypeVarName (Maybe SourceToken, Name Ident)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (TypeVarBinding a)
 
 data Constraint a
   = Constraint a (QualifiedName (N.ProperName 'N.ClassName)) [Type a]
   | ConstraintParens a (Wrapped (Constraint a))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (Constraint a)
+
 data Row a = Row
   { rowLabels :: Maybe (Separated (Labeled Label (Type a)))
   , rowTail :: Maybe (SourceToken, Type a)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (Row a)
 
 data Module a = Module
   { modAnn :: a
@@ -180,6 +204,8 @@ data Module a = Module
   , modTrailingComments :: [Comment LineFeed]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (Module a)
+
 data Export a
   = ExportValue a (Name Ident)
   | ExportOp a (Name (N.OpName 'N.ValueOpName))
@@ -189,10 +215,14 @@ data Export a
   | ExportModule a SourceToken (Name N.ModuleName)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (Export a)
+
 data DataMembers a
   = DataAll a SourceToken
   | DataEnumerated a (Delimited (Name (N.ProperName 'N.ConstructorName)))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (DataMembers a)
 
 data Declaration a
   = DeclData a (DataHead a) (Maybe (SourceToken, Separated (DataCtor a)))
@@ -209,15 +239,21 @@ data Declaration a
   | DeclRole a SourceToken SourceToken (Name (N.ProperName 'N.TypeName)) (NonEmpty Role)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (Declaration a)
+
 data Instance a = Instance
   { instHead :: InstanceHead a
   , instBody :: Maybe (SourceToken, NonEmpty (InstanceBinding a))
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (Instance a)
+
 data InstanceBinding a
   = InstanceBindingSignature a (Labeled (Name Ident) (Type a))
   | InstanceBindingName a (ValueBindingFields a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (InstanceBinding a)
 
 data ImportDecl a = ImportDecl
   { impAnn :: a
@@ -227,6 +263,8 @@ data ImportDecl a = ImportDecl
   , impQual :: Maybe (SourceToken, Name N.ModuleName)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (ImportDecl a)
+
 data Import a
   = ImportValue a (Name Ident)
   | ImportOp a (Name (N.OpName 'N.ValueOpName))
@@ -235,17 +273,23 @@ data Import a
   | ImportClass a SourceToken (Name (N.ProperName 'N.ClassName))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (Import a)
+
 data DataHead a = DataHead
   { dataHdKeyword :: SourceToken
   , dataHdName :: Name (N.ProperName 'N.TypeName)
   , dataHdVars :: [TypeVarBinding a]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (DataHead a)
+
 data DataCtor a = DataCtor
   { dataCtorAnn :: a
   , dataCtorName :: Name (N.ProperName 'N.ConstructorName)
   , dataCtorFields :: [Type a]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (DataCtor a)
 
 data ClassHead a = ClassHead
   { clsKeyword :: SourceToken
@@ -255,10 +299,14 @@ data ClassHead a = ClassHead
   , clsFundeps :: Maybe (SourceToken, Separated ClassFundep)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (ClassHead a)
+
 data ClassFundep
   = FundepDetermined SourceToken (NonEmpty (Name Ident))
   | FundepDetermines (NonEmpty (Name Ident)) SourceToken (NonEmpty (Name Ident))
   deriving (Show, Eq, Ord, Generic)
+
+instance NFData ClassFundep
 
 data InstanceHead a = InstanceHead
   { instKeyword :: SourceToken
@@ -268,16 +316,22 @@ data InstanceHead a = InstanceHead
   , instTypes :: [Type a]
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (InstanceHead a)
+
 data Fixity
   = Infix
   | Infixl
   | Infixr
   deriving (Show, Eq, Ord, Generic)
 
+instance NFData Fixity
+
 data FixityOp
   = FixityValue (QualifiedName (Either Ident (N.ProperName 'N.ConstructorName))) SourceToken (Name (N.OpName 'N.ValueOpName))
   | FixityType SourceToken (QualifiedName (N.ProperName 'N.TypeName)) SourceToken (Name (N.OpName 'N.TypeOpName))
   deriving (Show, Eq, Ord, Generic)
+
+instance NFData FixityOp
 
 data FixityFields = FixityFields
   { fxtKeyword :: (SourceToken, Fixity)
@@ -285,16 +339,22 @@ data FixityFields = FixityFields
   , fxtOp :: FixityOp
   } deriving (Show, Eq, Ord, Generic)
 
+instance NFData FixityFields
+
 data ValueBindingFields a = ValueBindingFields
   { valName :: Name Ident
   , valBinders :: [Binder a]
   , valGuarded :: Guarded a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (ValueBindingFields a)
+
 data Guarded a
   = Unconditional SourceToken (Where a)
   | Guarded (NonEmpty (GuardedExpr a))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (Guarded a)
 
 data GuardedExpr a = GuardedExpr
   { grdBar :: SourceToken
@@ -303,10 +363,14 @@ data GuardedExpr a = GuardedExpr
   , grdWhere :: Where a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (GuardedExpr a)
+
 data PatternGuard a = PatternGuard
   { patBinder :: Maybe (Binder a, SourceToken)
   , patExpr :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (PatternGuard a)
 
 data Foreign a
   = ForeignValue (Labeled (Name Ident) (Type a))
@@ -314,10 +378,14 @@ data Foreign a
   | ForeignKind SourceToken (Name (N.ProperName 'N.TypeName))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (Foreign a)
+
 data Role = Role
   { roleTok :: SourceToken
   , roleValue :: R.Role
   } deriving (Show, Eq, Ord, Generic)
+
+instance NFData Role
 
 data Expr a
   = ExprHole a (Name Ident)
@@ -348,15 +416,21 @@ data Expr a
   | ExprAdo a (AdoBlock a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (Expr a)
+
 data RecordLabeled a
   = RecordPun (Name Ident)
   | RecordField Label SourceToken a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (RecordLabeled a)
+
 data RecordUpdate a
   = RecordUpdateLeaf Label SourceToken (Expr a)
   | RecordUpdateBranch Label (DelimitedNonEmpty (RecordUpdate a))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (RecordUpdate a)
 
 data RecordAccessor a = RecordAccessor
   { recExpr :: Expr a
@@ -364,12 +438,16 @@ data RecordAccessor a = RecordAccessor
   , recPath :: Separated Label
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (RecordAccessor a)
+
 data Lambda a = Lambda
   { lmbSymbol :: SourceToken
   , lmbBinders :: NonEmpty (Binder a)
   , lmbArr :: SourceToken
   , lmbBody :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (Lambda a)
 
 data IfThenElse a = IfThenElse
   { iteIf :: SourceToken
@@ -380,12 +458,16 @@ data IfThenElse a = IfThenElse
   , iteFalse :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (IfThenElse a)
+
 data CaseOf a = CaseOf
   { caseKeyword :: SourceToken
   , caseHead :: Separated (Expr a)
   , caseOf :: SourceToken
   , caseBranches :: NonEmpty (Separated (Binder a), Guarded a)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (CaseOf a)
 
 data LetIn a = LetIn
   { letKeyword :: SourceToken
@@ -394,10 +476,14 @@ data LetIn a = LetIn
   , letBody :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (LetIn a)
+
 data Where a = Where
   { whereExpr :: Expr a
   , whereBindings :: Maybe (SourceToken, NonEmpty (LetBinding a))
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (Where a)
 
 data LetBinding a
   = LetBindingSignature a (Labeled (Name Ident) (Type a))
@@ -405,10 +491,14 @@ data LetBinding a
   | LetBindingPattern a (Binder a) SourceToken (Where a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (LetBinding a)
+
 data DoBlock a = DoBlock
   { doKeyword :: SourceToken
   , doStatements :: NonEmpty (DoStatement a)
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (DoBlock a)
 
 data DoStatement a
   = DoLet SourceToken (NonEmpty (LetBinding a))
@@ -416,12 +506,16 @@ data DoStatement a
   | DoBind (Binder a) SourceToken (Expr a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+instance NFData a => NFData (DoStatement a)
+
 data AdoBlock a = AdoBlock
   { adoKeyword :: SourceToken
   , adoStatements :: [DoStatement a]
   , adoIn :: SourceToken
   , adoResult :: Expr a
   } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (AdoBlock a)
 
 data Binder a
   = BinderWildcard a SourceToken
@@ -438,3 +532,5 @@ data Binder a
   | BinderTyped a (Binder a) SourceToken (Type a)
   | BinderOp a (Binder a) (QualifiedName (N.OpName 'N.ValueOpName)) (Binder a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+instance NFData a => NFData (Binder a)
