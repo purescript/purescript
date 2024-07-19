@@ -201,8 +201,7 @@ populateVolatileStateSync = do
   st <- ideStateVar <$> ask
   let message duration = "Finished populating volatile state in: " <> displayTimeSpec duration
   results <- logPerf message $ do
-    !r <- liftIO (atomically (populateVolatileStateSTM st))
-    pure r
+    liftIO (atomically (populateVolatileStateSTM st))
   void $ Map.traverseWithKey
     (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
     (Map.filter reexportHasFailures results)
@@ -235,7 +234,7 @@ populateVolatileStateSTM ref = do
         & resolveOperators
         & resolveReexports reexportRefs
   setVolatileStateSTM ref (IdeVolatileState (AstData asts) (map reResolved results) rebuildCache)
-  pure (force results)
+  pure results
 
 resolveLocations
   :: ModuleMap (DefinitionSites P.SourceSpan, TypeAnnotations)
