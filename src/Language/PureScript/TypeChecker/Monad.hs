@@ -9,7 +9,8 @@ import Prelude
 
 import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State (MonadState(..), StateT(..), forM_, gets, guard, join, modify, when, (<=<))
+import Control.Monad.State (MonadState(..), StateT(..), gets, modify)
+import Control.Monad (forM_, guard, join, when, (<=<))
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Maybe (fromMaybe)

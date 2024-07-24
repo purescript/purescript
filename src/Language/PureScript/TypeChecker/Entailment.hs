@@ -15,9 +15,11 @@ import Protolude (ordNub, headMay)
 
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State (MonadState(..), MonadTrans(..), StateT(..), evalStateT, execStateT, foldM, gets, guard, join, modify, zipWithM, zipWithM_, (<=<))
+import Control.Monad.State (MonadState(..), MonadTrans(..), StateT(..), evalStateT, execStateT, gets, modify)
+import Control.Monad (foldM, guard, join, zipWithM, zipWithM_, (<=<))
 import Control.Monad.Supply.Class (MonadSupply(..))
-import Control.Monad.Writer (Any(..), MonadWriter(..), WriterT(..))
+import Control.Monad.Writer (MonadWriter(..), WriterT(..))
+import Data.Monoid (Any(..))
 
 import Data.Either (lefts, partitionEithers)
 import Data.Foldable (for_, fold, toList)
