@@ -13,7 +13,7 @@ module Language.PureScript.Make.Actions
 
 import Prelude
 
-import Control.Monad (unless, when)
+import Control.Monad (guard, unless, when)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Reader (asks)
@@ -46,8 +46,8 @@ import Language.PureScript.Docs.Prim qualified as Docs.Prim
 import Language.PureScript.Docs.Types qualified as Docs
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage')
 import Language.PureScript.Externs (ExternsFile, externsFileName)
-import Language.PureScript.Make.Monad (Make, copyFile, getTimestamp, getTimestampMaybe, hashFile, makeIO, readExternsFile, readJSONFile, readTextFile, writeCborFile, writeJSONFile, writeTextFile)
-import Language.PureScript.Make.Cache (CacheDb, ContentHash, normaliseForCache)
+import Language.PureScript.Make.Monad (Make, copyFile, getCurrentTime, getTimestamp, getTimestampMaybe, hashFile, makeIO, readExternsFile, readJSONFile, readTextFile, setTimestamp, writeCborFile, writeJSONFile, writeTextFile)
+import Language.PureScript.Make.Cache (CacheDb, ContentHash, cacheDbIsCurrentVersion, fromCacheDbVersioned, normaliseForCache, toCacheDbVersioned)
 import Language.PureScript.Names (Ident(..), ModuleName, runModuleName)
 import Language.PureScript.Options (CodegenTarget(..), Options(..))
 import Language.PureScript.Pretty.Common (SMap(..))
@@ -71,16 +71,26 @@ data RebuildPolicy
 data ProgressMessage
   = CompilingModule ModuleName (Maybe (Int, Int))
   -- ^ Compilation started for the specified module
+  | SkippingModule ModuleName (Maybe (Int, Int))
   deriving (Show, Eq, Ord)
 
 -- | Render a progress message
 renderProgressMessage :: T.Text -> ProgressMessage -> T.Text
-renderProgressMessage infx (CompilingModule mn mi) =
-  T.concat
-    [ renderProgressIndex mi
-    , infx
-    , runModuleName mn
-    ]
+renderProgressMessage infx msg = case msg of
+  CompilingModule mn mi ->
+    T.concat
+      [ renderProgressIndex mi
+      , "Compiling "
+      , infx
+      , runModuleName mn
+      ]
+  SkippingModule mn mi ->
+    T.concat
+      [renderProgressIndex mi
+      , "Skipping "
+      , infx
+      , runModuleName mn
+      ]
   where
   renderProgressIndex :: Maybe (Int, Int) -> T.Text
   renderProgressIndex = maybe "" $ \(start, end) ->
@@ -109,6 +119,9 @@ data MakeActions m = MakeActions
   -- externs file, or if any of the requested codegen targets were not produced
   -- the last time this module was compiled, this function must return Nothing;
   -- this indicates that the module will have to be recompiled.
+  , updateOutputTimestamp :: ModuleName -> m Bool
+  -- ^ Updates the modification time of existing output files to mark them as
+  -- actual.
   , readExterns :: ModuleName -> m (FilePath, Maybe ExternsFile)
   -- ^ Read the externs file for a module as a string and also return the actual
   -- path for the file.
@@ -141,8 +154,12 @@ readCacheDb'
   => FilePath
   -- ^ The path to the output directory
   -> m CacheDb
-readCacheDb' outputDir =
-  fromMaybe mempty <$> readJSONFile (cacheDbFile outputDir)
+readCacheDb' outputDir = do
+  mdb <- readJSONFile (cacheDbFile outputDir)
+  pure $ fromMaybe mempty $ do
+    db <- mdb
+    guard $ cacheDbIsCurrentVersion db
+    pure $ fromCacheDbVersioned db
 
 writeCacheDb'
   :: (MonadIO m, MonadError MultipleErrors m)
@@ -151,7 +168,7 @@ writeCacheDb'
   -> CacheDb
   -- ^ The CacheDb to be written
   -> m ()
-writeCacheDb' = writeJSONFile . cacheDbFile
+writeCacheDb' = (. toCacheDbVersioned) . writeJSONFile . cacheDbFile
 
 writePackageJson'
   :: (MonadIO m, MonadError MultipleErrors m)
@@ -174,7 +191,18 @@ buildMakeActions
   -- ^ Generate a prefix comment?
   -> MakeActions Make
 buildMakeActions outputDir filePathMap foreigns usePrefix =
-    MakeActions getInputTimestampsAndHashes getOutputTimestamp readExterns codegen ffiCodegen progress readCacheDb writeCacheDb writePackageJson outputPrimDocs
+  MakeActions
+    getInputTimestampsAndHashes
+    getOutputTimestamp
+    updateOutputTimestamp
+    readExterns
+    codegen
+    ffiCodegen
+    progress
+    readCacheDb
+    writeCacheDb
+    writePackageJson
+    outputPrimDocs
   where
 
   getInputTimestampsAndHashes
@@ -233,6 +261,18 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
                 if externsTimestamp <= minimum modTimes
                   then Just externsTimestamp
                   else Nothing
+
+  updateOutputTimestamp :: ModuleName -> Make Bool
+  updateOutputTimestamp mn = do
+    curTime <- getCurrentTime
+    ok <- setTimestamp (outputFilename mn externsFileName) curTime
+    -- Then update timestamps of all actual codegen targets.
+    codegenTargets <- asks optionsCodegenTargets
+    let outputPaths = fmap (targetFilename mn) (S.toList codegenTargets)
+    results <- traverse (flip setTimestamp curTime) outputPaths
+    -- If something goes wrong (any of targets doesn't exit, a file system
+    -- error), return False.
+    pure $ and (ok : results)
 
   readExterns :: ModuleName -> Make (FilePath, Maybe ExternsFile)
   readExterns mn = do
@@ -314,7 +354,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   requiresForeign = not . null . CF.moduleForeign
 
   progress :: ProgressMessage -> Make ()
-  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage "Compiling "
+  progress = liftIO . TIO.hPutStr stderr . (<> "\n") . renderProgressMessage ""
 
   readCacheDb :: Make CacheDb
   readCacheDb = readCacheDb' outputDir
