@@ -15,6 +15,7 @@ import Data.Aeson qualified as Aeson
 import Data.IORef (IORef)
 import Data.Time.Clock (UTCTime)
 import Data.Map.Lazy qualified as M
+import Data.Set qualified as S
 import Language.PureScript qualified as P
 import Language.PureScript.Errors.JSON qualified as P
 import Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
@@ -178,11 +179,11 @@ type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
 data IdeState = IdeState
   { ideFileState :: IdeFileState
   , ideVolatileState :: IdeVolatileState
-  , ideModifierState :: IdeModifierState
+  , ideDurableState :: IdeDurableState
   } deriving (Show)
 
 emptyIdeState :: IdeState
-emptyIdeState = IdeState emptyFileState emptyVolatileState emptyModifierState
+emptyIdeState = IdeState emptyFileState emptyVolatileState emptyDurableState
 
 emptyFileState :: IdeFileState
 emptyFileState = IdeFileState M.empty M.empty
@@ -190,8 +191,8 @@ emptyFileState = IdeFileState M.empty M.empty
 emptyVolatileState :: IdeVolatileState
 emptyVolatileState = IdeVolatileState (AstData M.empty) M.empty Nothing
 
-emptyModifierState :: IdeModifierState
-emptyModifierState = IdeModifierState mempty
+emptyDurableState :: IdeDurableState
+emptyDurableState = IdeDurableState S.empty
 
 -- | @IdeFileState@ holds data that corresponds 1-to-1 to an entity on the
 -- filesystem. Externs correspond to the ExternsFiles the compiler emits into
@@ -216,8 +217,13 @@ data IdeVolatileState = IdeVolatileState
   , vsCachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
   } deriving (Show)
 
-data IdeModifierState = IdeModifierState
-  { mdFocusedModules :: Set P.ModuleName
+-- | @IdeDurableState@ holds data that persists across resets of the @IdeState@.
+-- This is particularly useful for configuration variables that can be modified
+-- during runtime. For instance, the module names for the "focus" feature are 
+-- stored in the drFocusedModules field, which the client populates using the
+-- @Focus@ command to specify only which modules to load.
+data IdeDurableState = IdeDurableState
+  { drFocusedModules :: Set P.ModuleName
   } deriving (Show)
 
 newtype Match a = Match (P.ModuleName, a)

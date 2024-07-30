@@ -65,7 +65,8 @@ import System.Directory (getModificationTime)
 resetIdeState :: Ide m => m ()
 resetIdeState = do
   ideVar <- ideStateVar <$> ask
-  liftIO (atomically (writeTVar ideVar emptyIdeState))
+  durableState <- getDurableState
+  liftIO (atomically (writeTVar ideVar (emptyIdeState { ideDurableState = durableState })))
 
 getOutputDirectory :: Ide m => m FilePath
 getOutputDirectory = do
@@ -145,21 +146,21 @@ setVolatileStateSTM ref vs = do
     x {ideVolatileState = vs}
   pure ()
 
--- | Retrieves the ModifierState from the State.
-getModifierState :: Ide m => m IdeModifierState
-getModifierState = do
+-- | Retrieves the DurableState from the State.
+getDurableState :: Ide m => m IdeDurableState
+getDurableState = do
   st <- ideStateVar <$> ask
-  liftIO (atomically (getModifierStateSTM st))
+  liftIO (atomically (getDurableStateSTM st))
 
--- | STM version of getModifierState
-getModifierStateSTM :: TVar IdeState -> STM IdeModifierState
-getModifierStateSTM ref = ideModifierState <$> readTVar ref
+-- | STM version of getDurableState
+getDurableStateSTM :: TVar IdeState -> STM IdeDurableState
+getDurableStateSTM ref = ideDurableState <$> readTVar ref
 
--- | Sets the ModifierState inside Ide's state
-setModifierStateSTM :: TVar IdeState -> IdeModifierState -> STM ()
-setModifierStateSTM ref md = do
+-- | Sets the DurableState inside Ide's state
+setDurableStateSTM :: TVar IdeState -> IdeDurableState -> STM ()
+setDurableStateSTM ref md = do
   modifyTVar ref $ \x ->
-    x {ideModifierState = md}
+    x {ideDurableState = md}
   pure ()
 
 -- | Checks if the given ModuleName matches the last rebuild cache and if it
@@ -474,7 +475,7 @@ resolveDataConstructorsForModule decls =
 
 getFocusedModules :: Ide m => m (Set P.ModuleName)
 getFocusedModules = do
-  IdeModifierState{mdFocusedModules = focusedModules} <- getModifierState
+  IdeDurableState{drFocusedModules = focusedModules} <- getDurableState
   pure focusedModules
 
 setFocusedModules :: Ide m => [P.ModuleName] -> m ()
@@ -484,5 +485,4 @@ setFocusedModules modulesToFocus = do
 
 setFocusedModulesSTM :: TVar IdeState -> [P.ModuleName] -> STM ()
 setFocusedModulesSTM ref modulesToFocus = do
-  IdeModifierState{} <- getModifierStateSTM ref
-  setModifierStateSTM ref (IdeModifierState (Set.fromList modulesToFocus))
+  setDurableStateSTM ref (IdeDurableState (Set.fromList modulesToFocus))
