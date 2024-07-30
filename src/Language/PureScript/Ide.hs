@@ -22,6 +22,7 @@ import Protolude hiding (moduleName)
 
 import "monad-logger" Control.Monad.Logger (MonadLogger, logWarnN)
 import Data.Map qualified as Map
+import Data.Set qualified as Set
 import Data.Text qualified as T
 import Language.PureScript qualified as P
 import Language.PureScript.Glob (toInputGlobs, PSCGlobs(..))
@@ -37,7 +38,7 @@ import Language.PureScript.Ide.Matcher (Matcher)
 import Language.PureScript.Ide.Prim (idePrimDeclarations)
 import Language.PureScript.Ide.Rebuild (rebuildFileAsync, rebuildFileSync)
 import Language.PureScript.Ide.SourceFile (parseModulesFromFiles)
-import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState)
+import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState, setFocusedModules, getFocusedModules)
 import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..))
 import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, namespaceForDeclaration, withEmptyAnn)
 import Language.PureScript.Ide.Usage (findUsages)
@@ -102,6 +103,8 @@ handleCommand c = case c of
     rebuildFileAsync file actualFile targets
   RebuildSync file actualFile targets ->
     rebuildFileSync file actualFile targets
+  Focus modulesToFocus ->
+    setFocusedModules modulesToFocus $> TextResult "Focused modules have been set."
   Cwd ->
     TextResult . T.pack <$> liftIO getCurrentDirectory
   Reset ->
@@ -215,10 +218,18 @@ loadModules
   => [P.ModuleName]
   -> m Success
 loadModules moduleNames = do
+  focusedModules <- getFocusedModules
   -- We resolve all the modulenames to externs files and load these into memory.
   oDir <- outputDirectory
-  let efPaths =
-        map (\mn -> oDir </> toS (P.runModuleName mn) </> P.externsFileName) moduleNames
+  let
+    -- But we only load the externs files that are in the focusedModules.
+    efModules = 
+        if Set.null focusedModules then 
+          moduleNames
+        else 
+          Set.toList $ Set.fromList moduleNames `Set.intersection` focusedModules
+    efPaths =
+        map (\mn -> oDir </> toS (P.runModuleName mn) </> P.externsFileName) efModules
   efiles <- traverse readExternFile efPaths
   traverse_ insertExterns efiles
 

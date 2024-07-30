@@ -31,6 +31,9 @@ module Language.PureScript.Ide.State
   , populateVolatileStateSTM
   , getOutputDirectory
   , updateCacheTimestamp
+  , getFocusedModules
+  , setFocusedModules
+  , setFocusedModulesSTM
   -- for tests
   , resolveOperatorsForModule
   , resolveInstances
@@ -44,6 +47,7 @@ import Control.Lens (Ixed(..), preview, view, (%~), (.~), (^.))
 import "monad-logger" Control.Monad.Logger (MonadLogger, logWarnN)
 import Data.IORef (readIORef, writeIORef)
 import Data.Map.Lazy qualified as Map
+import Data.Set qualified as Set
 import Data.Time.Clock (UTCTime)
 import Data.Zip (unzip)
 import Language.PureScript qualified as P
@@ -139,6 +143,23 @@ setVolatileStateSTM :: TVar IdeState -> IdeVolatileState -> STM ()
 setVolatileStateSTM ref vs = do
   modifyTVar ref $ \x ->
     x {ideVolatileState = vs}
+  pure ()
+
+-- | Retrieves the ModifierState from the State.
+getModifierState :: Ide m => m IdeModifierState
+getModifierState = do
+  st <- ideStateVar <$> ask
+  liftIO (atomically (getModifierStateSTM st))
+
+-- | STM version of getModifierState
+getModifierStateSTM :: TVar IdeState -> STM IdeModifierState
+getModifierStateSTM ref = ideModifierState <$> readTVar ref
+
+-- | Sets the ModifierState inside Ide's state
+setModifierStateSTM :: TVar IdeState -> IdeModifierState -> STM ()
+setModifierStateSTM ref md = do
+  modifyTVar ref $ \x ->
+    x {ideModifierState = md}
   pure ()
 
 -- | Checks if the given ModuleName matches the last rebuild cache and if it
@@ -450,3 +471,18 @@ resolveDataConstructorsForModule decls =
       & mapMaybe (preview (idaDeclaration . _IdeDeclDataConstructor))
       & foldr (\(IdeDataConstructor name typeName type') ->
                   Map.insertWith (<>) typeName [(name, type')]) Map.empty
+
+getFocusedModules :: Ide m => m (Set P.ModuleName)
+getFocusedModules = do
+  IdeModifierState{mdFocusedModules = focusedModules} <- getModifierState
+  pure focusedModules
+
+setFocusedModules :: Ide m => [P.ModuleName] -> m ()
+setFocusedModules modulesToFocus = do
+  st <- ideStateVar <$> ask
+  liftIO (atomically (setFocusedModulesSTM st modulesToFocus)) 
+
+setFocusedModulesSTM :: TVar IdeState -> [P.ModuleName] -> STM ()
+setFocusedModulesSTM ref modulesToFocus = do
+  IdeModifierState{} <- getModifierStateSTM ref
+  setModifierStateSTM ref (IdeModifierState (Set.fromList modulesToFocus))

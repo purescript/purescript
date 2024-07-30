@@ -62,6 +62,7 @@ data Command
     | List { listType :: ListType }
     | Rebuild FilePath (Maybe FilePath) (Set P.CodegenTarget)
     | RebuildSync FilePath (Maybe FilePath) (Set P.CodegenTarget)
+    | Focus [P.ModuleName]
     | Cwd
     | Reset
     | Quit
@@ -79,6 +80,7 @@ commandName c = case c of
   List{} -> "List"
   Rebuild{} -> "Rebuild"
   RebuildSync{} -> "RebuildSync"
+  Focus{} -> "Focus"
   Cwd{} -> "Cwd"
   Reset{} -> "Reset"
   Quit{} -> "Quit"
@@ -176,6 +178,13 @@ instance FromJSON Command where
           <$> params .: "file"
           <*> params .:? "actualFile"
           <*> (parseCodegenTargets =<< params .:? "codegen" .!= [ "js" ])
+      "focus" -> do
+        params' <- o .:? "params"
+        case params' of
+          Nothing -> 
+            pure (Focus [])
+          Just params ->
+            Focus <$> (map P.moduleNameFromString <$> params .:? "modules" .!= [])
       c -> fail ("Unknown command: " <> show c)
     where
       parseCodegenTargets ts =

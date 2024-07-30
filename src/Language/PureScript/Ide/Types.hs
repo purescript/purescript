@@ -178,10 +178,11 @@ type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
 data IdeState = IdeState
   { ideFileState :: IdeFileState
   , ideVolatileState :: IdeVolatileState
+  , ideModifierState :: IdeModifierState
   } deriving (Show)
 
 emptyIdeState :: IdeState
-emptyIdeState = IdeState emptyFileState emptyVolatileState
+emptyIdeState = IdeState emptyFileState emptyVolatileState emptyModifierState
 
 emptyFileState :: IdeFileState
 emptyFileState = IdeFileState M.empty M.empty
@@ -189,6 +190,8 @@ emptyFileState = IdeFileState M.empty M.empty
 emptyVolatileState :: IdeVolatileState
 emptyVolatileState = IdeVolatileState (AstData M.empty) M.empty Nothing
 
+emptyModifierState :: IdeModifierState
+emptyModifierState = IdeModifierState mempty
 
 -- | @IdeFileState@ holds data that corresponds 1-to-1 to an entity on the
 -- filesystem. Externs correspond to the ExternsFiles the compiler emits into
@@ -211,6 +214,10 @@ data IdeVolatileState = IdeVolatileState
   { vsAstData :: AstData P.SourceSpan
   , vsDeclarations :: ModuleMap [IdeDeclarationAnn]
   , vsCachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
+  } deriving (Show)
+
+data IdeModifierState = IdeModifierState
+  { mdFocusedModules :: Set P.ModuleName
   } deriving (Show)
 
 newtype Match a = Match (P.ModuleName, a)
