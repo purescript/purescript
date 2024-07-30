@@ -28,7 +28,7 @@ import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as BSL8
 import GHC.IO.Exception (IOErrorType(..), IOException(..))
 import Language.PureScript.Ide (handleCommand)
-import Language.PureScript.Ide.Command (Command(..), commandName)
+import Language.PureScript.Ide.Command (commandName, Command(..))
 import Language.PureScript.Ide.Util (decodeT, displayTimeSpec, encodeT, logPerf, runLogger)
 import Language.PureScript.Ide.Error (IdeError(..))
 import Language.PureScript.Ide.State (updateCacheTimestamp)
@@ -199,14 +199,22 @@ startServer port env = Network.withSocketsDo $ do
               logPerf message $ do
                 result <- runExceptT $ do
                   updateCacheTimestamp >>= \case
-                    Nothing -> pure ()
+                    Nothing -> 
+                      handleCommand cmd'
                     Just (before, after) -> do
                       -- If the cache db file was changed outside of the IDE
                       -- we trigger a reset before processing the command
                       $(logInfo) ("cachedb was changed from: " <> show before <> ", to: " <> show after)
-                      unless (isLoadAll cmd') $
-                        void (handleCommand Reset *> handleCommand (LoadSync []))
-                  handleCommand cmd'
+                      let doReload = handleCommand Reset *> handleCommand (LoadSync [])
+                      case cmd' of
+                        -- handleCommand on Load [] already resets the state.
+                        Load [] -> handleCommand cmd'
+                        -- Focus needs to fire before doReload, because we
+                        -- want to set the focused modules first before
+                        -- loading everything with LoadSync [].
+                        Focus _ -> handleCommand cmd' <* doReload
+                        -- Otherwise, just doReload and then handle.
+                        _ -> doReload *> handleCommand cmd'
                 liftIO $ catchGoneHandle $ BSL8.hPutStrLn h $ case result of
                   Right r  -> Aeson.encode r
                   Left err -> Aeson.encode err
@@ -218,11 +226,6 @@ startServer port env = Network.withSocketsDo $ do
                 catchGoneHandle (T.hPutStrLn h (encodeT (GeneralError errMsg)))
                 hFlush stdout
           liftIO $ catchGoneHandle (hClose h)
-
-isLoadAll :: Command -> Bool
-isLoadAll = \case
-  Load [] -> True
-  _ -> False
 
 catchGoneHandle :: IO () -> IO ()
 catchGoneHandle =
