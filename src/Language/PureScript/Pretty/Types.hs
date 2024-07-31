@@ -99,9 +99,14 @@ convertPrettyPrintType = go
   goTypeApp d (TypeApp _ f a) b
     | eqType f tyFunction = PPFunction (go (d-1) a) (go (d-1) b)
     | otherwise = PPTypeApp (goTypeApp d f a) (go (d-1) b)
-  goTypeApp d o ty@RCons{}
-    | eqType o tyRecord = uncurry PPRecord (goRow d ty)
+  goTypeApp d o ty
+    | eqType o tyRecord, isConsOrEmpty ty = uncurry PPRecord (goRow d ty)
   goTypeApp d a b = PPTypeApp (go (d-1) a) (go (d-1) b)
+
+  isConsOrEmpty = \case
+    RCons{} -> True
+    REmpty{} -> True
+    _ -> False
 
 -- TODO(Christoph): get rid of T.unpack s
 

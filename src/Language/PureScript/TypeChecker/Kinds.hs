@@ -54,6 +54,7 @@ import Language.PureScript.Names (pattern ByNullSourcePos, ModuleName, Name(..),
 import Language.PureScript.TypeChecker.Monad (CheckState(..), Substitution(..), UnkLevel(..), Unknown, bindLocalTypeVariables, debugType, getEnv, lookupTypeVariable, unsafeCheckCurrentModule, withErrorMessageHint, withFreshSubstitution)
 import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, newSkolemScope, skolemize)
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
+import Language.PureScript.TypeChecker.Unify.Rows (unifyishRows, isKindsDoNotUnify)
 import Language.PureScript.Types
 import Language.PureScript.Pretty.Types (prettyPrintType)
 
@@ -384,10 +385,7 @@ unifyKinds
   => SourceType
   -> SourceType
   -> m ()
-unifyKinds = unifyKindsWithFailure $ \w1 w2 ->
-  throwError
-    . errorMessage''' (fst . getAnnForType <$> [w1, w2])
-    $ KindsDoNotUnify w1 w2
+unifyKinds = unifyKindsWithFailure AttachSourceSpans
 
 -- | Does not attach positions to the error node, instead relies on the
 -- | local position context. This is useful when invoking kind unification
@@ -397,10 +395,7 @@ unifyKinds'
   => SourceType
   -> SourceType
   -> m ()
-unifyKinds' = unifyKindsWithFailure $ \w1 w2 ->
-  throwError
-    . errorMessage
-    $ KindsDoNotUnify w1 w2
+unifyKinds' = unifyKindsWithFailure UseLocalContext
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind
@@ -409,17 +404,30 @@ checkTypeKind
   -> SourceType
   -> m ()
 checkTypeKind ty kind =
-  unifyKindsWithFailure (\_ _ -> throwError . errorMessage $ ExpectedType ty kind) kind E.kindType
+  catchError (unifyKinds' kind E.kindType) $ \_ ->
+    throwError $ errorMessage $ ExpectedType ty kind
+
+data SourceSpanOptions
+  = UseLocalContext
+  | AttachSourceSpans
 
 unifyKindsWithFailure
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
-  => (SourceType -> SourceType -> m ())
+  => SourceSpanOptions
   -> SourceType
   -> SourceType
   -> m ()
-unifyKindsWithFailure onFailure = go
+unifyKindsWithFailure sourceSpanOptions = go
   where
-  goWithLabel l t1 t2 = withErrorMessageHint (ErrorInRowLabel l) $ go t1 t2
+  mkErrorMessage = case sourceSpanOptions of
+    UseLocalContext -> 
+      \w1 w2 -> errorMessage $ KindsDoNotUnify w1 w2
+    AttachSourceSpans ->
+      \w1 w2 -> errorMessage''' (fst . getAnnForType <$> [w1, w2]) $ KindsDoNotUnify w1 w2
+
+  unifyRows = 
+    unifyishRows unifyTails isKindsDoNotUnify (\w1 w2 -> pure $ mkErrorMessage w1 w2) go
+
   go = curry $ \case
     (TypeApp _ p1 p2, TypeApp _ p3 p4) -> do
       go p1 p3
@@ -442,26 +450,22 @@ unifyKindsWithFailure onFailure = go
     (p1, TUnknown _ a') ->
       solveUnknown a' p1
     (w1, w2) ->
-      onFailure w1 w2
-
-  unifyRows r1 r2 = do
-    let (matches, rest) = alignRowsWith goWithLabel r1 r2
-    sequence_ matches
-    unifyTails rest
+      throwError $ mkErrorMessage w1 w2
 
   unifyTails = \case
     (([], TUnknown _ a'), (rs, p1)) ->
-      solveUnknown a' $ rowFromList (rs, p1)
+      solveUnknown a' (rowFromList (rs, p1)) $> True
     ((rs, p1), ([], TUnknown _ a')) ->
-      solveUnknown a' $ rowFromList (rs, p1)
+      solveUnknown a' (rowFromList (rs, p1)) $> True
     (([], w1), ([], w2)) | eqType w1 w2 ->
-      pure ()
+      pure True
     ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) | u1 /= u2 -> do
       rest <- freshKind nullSourceSpan
       solveUnknown u1 $ rowFromList (rs2, rest)
       solveUnknown u2 $ rowFromList (rs1, rest)
-    (w1, w2) ->
-      onFailure (rowFromList w1) (rowFromList w2)
+      pure True
+    (_, _) ->
+      pure False
 
 solveUnknown
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
