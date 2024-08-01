@@ -43,6 +43,7 @@ import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, n
 import Language.PureScript.Ide.Usage (findUsages)
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
 import System.FilePath ((</>), normalise)
+import Control.Concurrent.Async.Lifted (mapConcurrently, mapConcurrently_)
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.
@@ -219,8 +220,8 @@ loadModules moduleNames = do
   oDir <- outputDirectory
   let efPaths =
         map (\mn -> oDir </> toS (P.runModuleName mn) </> P.externsFileName) moduleNames
-  efiles <- traverse readExternFile efPaths
-  traverse_ insertExterns efiles
+  efiles <- mapConcurrently readExternFile efPaths
+  mapConcurrently_ insertExterns efiles
 
   -- We parse all source files, log eventual parse failures and insert the
   -- successful parses into the state.
@@ -228,7 +229,7 @@ loadModules moduleNames = do
     partitionEithers <$> (parseModulesFromFiles =<< findAllSourceFiles)
   unless (null failures) $
     logWarnN ("Failed to parse: " <> show failures)
-  traverse_ insertModule allModules
+  mapConcurrently_ insertModule allModules
 
   pure (TextResult ("Loaded " <> show (length efiles) <> " modules and "
                     <> show (length allModules) <> " source files."))
