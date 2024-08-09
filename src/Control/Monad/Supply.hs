@@ -7,7 +7,8 @@ import Prelude
 
 import Control.Applicative (Alternative)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Reader (MonadPlus, MonadReader, MonadTrans)
+import Control.Monad.Reader (MonadReader, MonadTrans)
+import Control.Monad (MonadPlus)
 import Control.Monad.State (StateT(..))
 import Control.Monad.Writer (MonadWriter)
 

@@ -9,7 +9,7 @@ import Prelude
 
 import Control.Applicative (Alternative(..))
 import Control.Arrow ((&&&))
-import Control.Monad.Writer (guard)
+import Control.Monad (guard)
 import Data.List (sort)
 import Data.Text (Text)
 import Data.Text.Lazy (toStrict)

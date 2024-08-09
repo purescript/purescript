@@ -6,7 +6,7 @@ import Prelude
 import Command.Docs.Html (asHtml, writeHtmlModules)
 import Command.Docs.Markdown (asMarkdown, writeMarkdownModules)
 import Control.Applicative (Alternative(..), optional)
-import Control.Monad.Writer (when)
+import Control.Monad (when)
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
