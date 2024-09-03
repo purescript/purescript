@@ -2,7 +2,7 @@ module Language.PureScript.Sugar.Operators.Common where
 
 import Prelude
 
-import Control.Monad.State (guard, join)
+import Control.Monad (guard, join)
 import Control.Monad.Except (MonadError(..))
 
 import Data.Either (rights)

@@ -32,7 +32,7 @@ defaults:
 env:
   CI_PRERELEASE: "${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}"
   CI_RELEASE: "${{ github.event_name == 'release' }}"
-  STACK_VERSION: "2.9.3"
+  STACK_VERSION: "2.15.1"
 
 concurrency:
   # We never want two prereleases building at the same time, since they would
@@ -55,8 +55,8 @@ jobs:
         include:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
             os: ["ubuntu-latest"]
-            image: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
-          - os: ["macOS-11"]
+            image: haskell:9.2.8@sha256:b3b2f3909c7381bb96b8f18766f9407a3d6f61e0f07ea95e812583ac4f442cbb
+          - os: ["macOS-14"]
           - os: ["windows-2019"]
 
     runs-on: "${{ matrix.os }}"
@@ -67,15 +67,6 @@ jobs:
       version: "${{ steps.build.outputs.version }}"
 
     steps:
-      - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
-        # if the Git version is less than 2.18.
-        name: "(Linux only) Install a newer version of Git"
-        if: "contains(matrix.os, 'ubuntu-latest')"
-        run: |
-          . /etc/os-release
-          echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
-          apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
-
       - # We need `gh` installed on the Linux version. Otherwise, release artifacts won't be uploaded.
         name: "(Linux only) Install gh"
         if: "contains(matrix.os, 'ubuntu-latest')"
@@ -97,7 +88,7 @@ jobs:
         # and their Haskell environment is instead provided by a nix-shell
         # See https://github.com/purescript/purescript/pulls/4455
         if: "!contains(matrix.os, 'ubuntu-latest') && !contains(matrix.os, 'self-hosted')"
-        uses: "haskell/actions/setup@v1"
+        uses: "haskell-actions/setup@v2"
         with:
           enable-stack: true
           stack-version: "${{ env.STACK_VERSION }}"
@@ -233,16 +224,9 @@ jobs:
     # means our published binaries will work on the widest number of platforms.
     # But the HLint binary downloaded by this job requires a newer glibc
     # version.
-    container: haskell:9.2.5@sha256:2597b0e2458165a6635906204f7fac43c22e7d2a46aca1235a811194bb6cd419
+    container: haskell:9.2.8@sha256:b3b2f3909c7381bb96b8f18766f9407a3d6f61e0f07ea95e812583ac4f442cbb
 
     steps:
-      - # We need a proper Git repository, but the checkout step will unpack a tarball instead of doing a clone
-        # if the Git version is less than 2.18.
-        name: "Install a newer version of Git"
-        run: |
-          . /etc/os-release
-          echo deb http://deb.debian.org/debian "$VERSION_CODENAME"-backports main >> /etc/apt/sources.list
-          apt-get update && apt-get install -y git/"$VERSION_CODENAME"-backports
       - uses: "actions/checkout@v2"
       - name: "Fix working directory ownership"
         run: |
