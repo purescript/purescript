@@ -1,0 +1,1 @@
+* The forall keyword is optional in the instance header but gives a warning if it's missing
