@@ -54,7 +54,7 @@ import Language.PureScript.Ide.Externs (convertExterns)
 import Language.PureScript.Ide.Reexports (ReexportResult(..), prettyPrintReexportResult, reexportHasFailures, resolveReexports)
 import Language.PureScript.Ide.SourceFile (extractAstInformation)
 import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Util (discardAnn, displayTimeSpec, logPerf, opNameT, properNameT, runLogger)
+import Language.PureScript.Ide.Util (discardAnn, opNameT, properNameT, runLogger)
 import System.Directory (getModificationTime)
 
 -- | Resets all State inside psc-ide
@@ -199,9 +199,7 @@ cachedRebuild = vsCachedRebuild <$> getVolatileState
 populateVolatileStateSync :: (Ide m, MonadLogger m) => m ()
 populateVolatileStateSync = do
   st <- ideStateVar <$> ask
-  let message duration = "Finished populating volatile state in: " <> displayTimeSpec duration
-  results <- logPerf message $ do
-    liftIO (atomically (populateVolatileStateSTM st))
+  results <- liftIO (atomically (populateVolatileStateSTM st))
   void $ Map.traverseWithKey
     (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
     (Map.filter reexportHasFailures results)
