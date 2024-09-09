@@ -35,9 +35,8 @@ data ReexportResult a
   = ReexportResult
   { reResolved :: a
   , reFailed   :: [(P.ModuleName, P.DeclarationRef)]
-  } deriving (Show, Eq, Functor, Generic)
+  } deriving (Show, Eq, Functor)
 
-instance NFData a => NFData (ReexportResult a)
 
 -- | Uses the passed formatter to format the resolved module, and adds possible
 -- failures
