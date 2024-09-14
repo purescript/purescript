@@ -39,6 +39,7 @@ import Language.PureScript.TypeClassDictionaries (NamedDict, TypeClassDictionary
 import Language.PureScript.Types (SourceConstraint, SourceType, srcInstanceType)
 
 import Paths_purescript as Paths
+import Data.Aeson (ToJSON, FromJSON)
 
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile
@@ -61,9 +62,10 @@ data ExternsFile = ExternsFile
   -- ^ List of type and value declaration
   , efSourceSpan :: SourceSpan
   -- ^ Source span for error reporting
-  } deriving (Show, Generic, NFData)
+  } deriving (Show, Generic, NFData, ToJSON, FromJSON)
 
 instance Serialise ExternsFile
+
 
 -- | A module import in an externs file
 data ExternsImport = ExternsImport
@@ -77,6 +79,8 @@ data ExternsImport = ExternsImport
   } deriving (Show, Generic, NFData)
 
 instance Serialise ExternsImport
+instance ToJSON ExternsImport
+instance FromJSON ExternsImport
 
 -- | A fixity declaration in an externs file
 data ExternsFixity = ExternsFixity
@@ -92,6 +96,8 @@ data ExternsFixity = ExternsFixity
   } deriving (Show, Generic, NFData)
 
 instance Serialise ExternsFixity
+instance ToJSON ExternsFixity
+instance FromJSON ExternsFixity
 
 -- | A type fixity declaration in an externs file
 data ExternsTypeFixity = ExternsTypeFixity
@@ -104,7 +110,7 @@ data ExternsTypeFixity = ExternsTypeFixity
   , efTypeOperator :: OpName 'TypeOpName
   -- | The value the operator is an alias for
   , efTypeAlias :: Qualified (ProperName 'TypeName)
-  } deriving (Show, Generic, NFData)
+  } deriving (Show, Generic, NFData, ToJSON, FromJSON)
 
 instance Serialise ExternsTypeFixity
 
@@ -157,9 +163,10 @@ data ExternsDeclaration =
       , edInstanceNameSource      :: NameSource
       , edInstanceSourceSpan      :: SourceSpan
       }
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, ToJSON, FromJSON)
 
 instance Serialise ExternsDeclaration
+
 
 -- | Check whether the version in an externs file matches the currently running
 -- version.

@@ -30,6 +30,7 @@ module Language.PureScript.Ide.State
   , populateVolatileStateSync
   , populateVolatileStateSTM
   , getOutputDirectory
+  , getSqliteFilePath
   , updateCacheTimestamp
   -- for tests
   , resolveOperatorsForModule
@@ -66,6 +67,10 @@ resetIdeState = do
 getOutputDirectory :: Ide m => m FilePath
 getOutputDirectory = do
   confOutputPath . ideConfiguration <$> ask
+
+getSqliteFilePath :: Ide m => m FilePath
+getSqliteFilePath = do
+  sqliteFilePath . ideConfiguration <$> ask
 
 getCacheTimestamp :: Ide m => m (Maybe UTCTime)
 getCacheTimestamp = do

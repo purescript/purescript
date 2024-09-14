@@ -30,19 +30,32 @@ import Language.PureScript.Ide.Command (Command(..), ImportCommand(..), ListType
 import Language.PureScript.Ide.Completion (CompletionOptions, completionFromMatch, getCompletions, getExactCompletions, simpleExport)
 import Language.PureScript.Ide.Error (IdeError(..))
 import Language.PureScript.Ide.Externs (readExternFile)
-import Language.PureScript.Ide.Filter (Filter)
+import Language.PureScript.Ide.Filter qualified as F
 import Language.PureScript.Ide.Imports (parseImportsFromFile)
 import Language.PureScript.Ide.Imports.Actions (addImplicitImport, addImportForIdentifier, addQualifiedImport, answerRequest)
 import Language.PureScript.Ide.Matcher (Matcher)
 import Language.PureScript.Ide.Prim (idePrimDeclarations)
 import Language.PureScript.Ide.Rebuild (rebuildFileAsync, rebuildFileSync)
 import Language.PureScript.Ide.SourceFile (parseModulesFromFiles)
-import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState)
-import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..))
+import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState, getSqliteFilePath)
+import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..), Completion (..))
 import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, namespaceForDeclaration, withEmptyAnn)
 import Language.PureScript.Ide.Usage (findUsages)
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
 import System.FilePath ((</>), normalise)
+import Language.PureScript.Names (ModuleName(ModuleName))
+import Language.PureScript.AST.SourcePos (SourceSpan(SourceSpan))
+import Language.PureScript.Errors (SourcePos(..))
+import Database.SQLite.Simple qualified as SQLite
+import Language.PureScript (cacheDbFile, runModuleName)
+import Debug.Trace qualified as Debug
+import Data.Maybe (catMaybes)
+import Protolude (head)
+import Data.Foldable (find, Foldable (toList))
+import Data.Text qualified
+import Data.Either (isLeft)
+import Codec.Serialise (deserialise)
+import Data.ByteString.Lazy qualified
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.
@@ -53,17 +66,21 @@ handleCommand
 handleCommand c = case c of
   Load [] ->
     -- Clearing the State before populating it to avoid a space leak
-    resetIdeState *> findAvailableExterns >>= loadModulesAsync
+    pure $ TextResult "Done"
+    -- resetIdeState *> findAvailableExterns >>= loadModulesAsync
   Load modules ->
-    loadModulesAsync modules
+    pure $ TextResult "Done"
+    -- loadModulesAsync modules
   LoadSync [] ->
-    findAvailableExterns >>= loadModulesSync
+    pure $ TextResult "Done"
+    -- findAvailableExterns >>= loadModulesSync
   LoadSync modules ->
-    loadModulesSync modules
+    pure $ TextResult "Done"
+    -- loadModulesSync modules
   Type search filters currentModule ->
     findType search filters currentModule
   Complete filters matcher currentModule complOptions ->
-    findCompletions filters matcher currentModule complOptions
+    findCompletions' filters matcher currentModule complOptions
   List LoadedModules -> do
     logWarnN
       "Listing the loaded modules command is DEPRECATED, use the completion command and filter it to modules instead"
@@ -111,7 +128,7 @@ handleCommand c = case c of
 
 findCompletions
   :: Ide m
-  => [Filter]
+  => [F.Filter]
   -> Matcher IdeDeclarationAnn
   -> Maybe P.ModuleName
   -> CompletionOptions
@@ -121,19 +138,94 @@ findCompletions filters matcher currentModule complOptions = do
   let insertPrim = Map.union idePrimDeclarations
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
+findCompletions'
+  :: Ide m
+  => [F.Filter]
+  -> Matcher IdeDeclarationAnn
+  -> Maybe P.ModuleName
+  -> CompletionOptions
+  -> m Success
+findCompletions' filters matcher currentModule complOptions = do
+  sq <- sqliteFile
+  completions <- liftIO $ SQLite.withConnection sq $ \conn -> do
+    rows :: [(Text, Text, Maybe Text)] <- SQLite.query conn "select module_name, name, docs from declarations where name glob ?" (SQLite.Only (glob filters :: Text))
+    return rows
+
+  Debug.traceM $ show completions
+
+  pure $ CompletionResult $ completions <&> \(module_name, name, docs) ->
+        Completion
+          { complModule = module_name
+          , complIdentifier = name
+          , complType = "TYPE"
+          , complExpandedType = "EXPANDED"
+          , complLocation = Just (SourceSpan
+             { spanName = ".spago/BuildInfo.purs"
+             , spanStart = SourcePos
+               { sourcePosLine = 3
+               , sourcePosColumn = 1
+               }
+             , spanEnd = SourcePos
+               { sourcePosLine = 1
+               , sourcePosColumn = 1
+               }
+             })
+          , complDocumentation = docs
+          , complExportedFrom =  [ModuleName "BuildInfo"]
+          , complDeclarationType = Nothing
+          }
+  where
+  glob :: [F.Filter] -> Text
+  glob f = mapMaybe globSearch f & head & fromMaybe "*"
+  globSearch :: F.Filter -> Maybe Text
+  globSearch (F.Filter (Right (F.Prefix p))) = Just (p <> "*")
+  globSearch (F.Filter (Right (F.Exact p))) = Just p
+  globSearch _ = Nothing
+
+
+  -- modules <- getAllModules currentModule
+  -- let insertPrim = Map.union idePrimDeclarations
+  -- pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
+
 findType
   :: Ide m
   => Text
-  -> [Filter]
+  -> [F.Filter]
   -> Maybe P.ModuleName
   -> m Success
 findType search filters currentModule = do
-  modules <- getAllModules currentModule
-  let insertPrim = Map.union idePrimDeclarations
-  pure (CompletionResult (getExactCompletions search filters (insertPrim modules)))
+  sqlite <- getSqliteFilePath
+  rows <- liftIO $ SQLite.withConnection sqlite $ \conn -> do  
+    SQLite.query_ conn $ SQLite.Query $
+      "select module_name, name, type, span " <>
+      "from declarations where " <>
+      T.intercalate " and " (
+      ("name glob '" <> search <> "' ") : mapMaybe (\case
+        F.Filter (Left modules) ->
+          Just $ "module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> ")"
+        F.Filter (Right (F.Exact f)) -> Just $ "name glob '" <> f <> "'"
+        F.Filter (Right (F.Prefix f)) -> Just $ "name glob '" <> f <> "*'"
+        F.Filter _ -> Nothing)
+      filters)
+
+  pure $ CompletionResult (rows <&> \(module_name, name, type_, span) -> Completion 
+       { complModule = module_name
+       , complIdentifier = name
+       , complType = "TYPE"
+       , complExpandedType = "EXPANDED"
+       , complLocation = deserialise span
+       , complDocumentation = Just type_
+       , complExportedFrom =  [ModuleName "MODDD"]
+       , complDeclarationType = Nothing
+       }
+       ) 
 
 printModules :: Ide m => m Success
 printModules = ModuleList . map P.runModuleName <$> getLoadedModulenames
+
+sqliteFile :: Ide m => m FilePath
+sqliteFile = outputDirectory <&> ( </> "cache.db")
+
 
 outputDirectory :: Ide m => m FilePath
 outputDirectory = do

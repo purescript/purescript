@@ -15,9 +15,15 @@ import Data.Aeson qualified as Aeson
 import Data.IORef (IORef)
 import Data.Time.Clock (UTCTime)
 import Data.Map.Lazy qualified as M
-import Language.PureScript qualified as P
-import Language.PureScript.Errors.JSON qualified as P
 import Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Types qualified as P
+import Language.PureScript.AST.Operators qualified as P
+import Language.PureScript.AST.SourcePos qualified as P
+import Language.PureScript.Externs qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+import Language.PureScript.Errors qualified as P
+import Language.PureScript.Errors.JSON qualified as P
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a
@@ -160,6 +166,7 @@ data IdeLogLevel = LogDebug | LogPerf | LogAll | LogDefault | LogNone
 data IdeConfiguration =
   IdeConfiguration
   { confOutputPath :: FilePath
+  , sqliteFilePath :: FilePath
   , confLogLevel :: IdeLogLevel
   , confGlobs :: [FilePath]
   , confGlobsFromFile :: Maybe FilePath

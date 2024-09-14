@@ -7,6 +7,7 @@ import Prelude
 import Language.PureScript.AST.SourcePos qualified as Pos
 import Control.DeepSeq (NFData)
 import Codec.Serialise (Serialise)
+import Data.Aeson (ToJSON, FromJSON)
 
 -- |
 -- For a given instance chain, stores the chain's file name and
@@ -14,7 +15,7 @@ import Codec.Serialise (Serialise)
 -- This data is used to determine which instances are part of
 -- the same instance chain.
 newtype ChainId = ChainId (String, Pos.SourcePos)
-  deriving (Eq, Ord, Show, NFData, Serialise)
+  deriving (Eq, Ord, Show, NFData, Serialise, ToJSON, FromJSON)
 
 mkChainId :: String -> Pos.SourcePos -> ChainId
 mkChainId fileName startingSourcePos = ChainId (fileName, startingSourcePos)

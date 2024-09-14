@@ -11,7 +11,7 @@ import Protolude hiding (moduleName)
 import "monad-logger" Control.Monad.Logger (LoggingT, MonadLogger, logDebug)
 import Data.List qualified as List
 import Data.Map.Lazy qualified as M
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, catMaybes)
 import Data.Set qualified as S
 import Data.Time qualified as Time
 import Data.Text qualified as Text
@@ -26,6 +26,19 @@ import Language.PureScript.Ide.State (cacheRebuild, getExternFiles, insertExtern
 import Language.PureScript.Ide.Types (Ide, IdeConfiguration(..), IdeEnvironment(..), ModuleMap, Success(..))
 import Language.PureScript.Ide.Util (ideReadFile)
 import System.Directory (getCurrentDirectory)
+import Database.SQLite.Simple qualified as SQLite
+import System.FilePath ((</>))
+import Data.Aeson (decode)
+import Language.PureScript.Externs (ExternsFile(ExternsFile))
+import Data.ByteString qualified as T
+import Data.ByteString.Lazy qualified as TE
+import Language.PureScript.Names (runModuleName)
+import Data.Text (intercalate)
+import Unsafe.Coerce (unsafeCoerce)
+import Database.SQLite.Simple (Query(fromQuery), ToRow, SQLData (SQLText))
+import Data.String (String)
+import Codec.Serialise (deserialise)
+import Language.PureScript (ModuleName)
 
 -- | Given a filepath performs the following steps:
 --
@@ -64,10 +77,11 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
       throwError $ RebuildError [(fp', input)] $ CST.toMultipleErrors fp' parseError
     Right m -> pure m
   let moduleName = P.getModuleName m
+  outputDirectory <- confOutputPath . ideConfiguration <$> ask
   -- Externs files must be sorted ahead of time, so that they get applied
   -- in the right order (bottom up) to the 'Environment'.
-  externs <- logPerf (labelTimespec "Sorting externs") (sortExterns m =<< getExternFiles)
-  outputDirectory <- confOutputPath . ideConfiguration <$> ask
+  -- externs' <- logPerf (labelTimespec "Sorting externs") (sortExterns m =<< getExternFiles)
+  !externs <- logPerf (labelTimespec "Sorting externs") (sortExterns' outputDirectory m)
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton moduleName (Left P.RebuildAlways)
@@ -88,11 +102,11 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
     Left errors ->
       throwError (RebuildError [(fp', input)] errors)
     Right newExterns -> do
-      insertModule (fromMaybe file actualFile, m)
-      insertExterns newExterns
-      void populateVolatileState
+      -- insertModule (fromMaybe file actualFile, m)
+      -- insertExterns newExterns
+      -- void populateVolatileState
       _ <- updateCacheTimestamp
-      runOpenBuild (rebuildModuleOpen makeEnv externs m)
+      -- runOpenBuild (rebuildModuleOpen makeEnv externs m)
       pure (RebuildSuccess (CST.toMultipleWarnings fp pwarnings <> warnings))
 
 -- | When adjusting the cache db file after a rebuild we always pick a
@@ -227,6 +241,41 @@ sortExterns m ex = do
     -- Sort a list so its elements appear in the same order as in another list.
     inOrderOf :: (Ord a) => [a] -> [a] -> [a]
     inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
+
+sortExterns'
+  :: (Ide m)
+  => FilePath
+  -> P.Module
+  -> m [P.ExternsFile]
+sortExterns' outputDir m = liftIO do 
+  let P.Module _ _ _ declarations _ = m
+  let moduleDependencies = declarations >>= \case
+              P.ImportDeclaration _ importName _ _ -> [importName]
+              _ -> []
+  topo outputDir moduleDependencies
+
+topo :: FilePath -> [ModuleName] -> IO [ExternsFile]
+topo outputDir dependencies = do
+  !r <- SQLite.withConnection (outputDir </> "cache.db") \conn -> 
+    SQLite.query conn query (SQLite.Only $ "[" <> Data.Text.intercalate ", " (dependencies <&> \v -> "\"" <> runModuleName v <> "\"") <> "]")
+      <&> \r -> (r >>= identity) <&> deserialise 
+  pure r
+
+ where
+ query = "  with recursive \
+         \  graph(dependency, level) as ( \
+         \     select module_name , 1 as level \
+         \     from modules where module_name in (select value from json_each(?)) \
+         \     union \
+         \     select d.dependency as dep, graph.level + 1 as level \
+         \     from graph join dependencies d on graph.dependency = d.module_name \ 
+         \  ), \
+         \  topo as ( \
+         \  select dependency, max(level) as level \
+         \  from graph group by dependency \
+         \  ) \
+         \  select extern \
+         \  from topo join modules on topo.dependency = modules.module_name order by level desc;"
 
 -- | Removes a modules export list.
 openModuleExports :: P.Module -> P.Module

@@ -6,7 +6,7 @@ import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Control.Monad (unless)
 import Codec.Serialise (Serialise)
-import Data.Aeson ((.=), (.:))
+import Data.Aeson ((.=), (.:), ToJSON, FromJSON)
 import Data.Aeson qualified as A
 import Data.Foldable (find, fold)
 import Data.Functor ((<&>))
@@ -266,6 +266,9 @@ data TypeKind
   | ScopedTypeVar
   -- ^ A scoped type variable
   deriving (Show, Eq, Generic)
+
+instance ToJSON TypeKind
+instance FromJSON TypeKind
 
 instance NFData TypeKind
 instance Serialise TypeKind

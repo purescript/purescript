@@ -23,7 +23,7 @@ import Prelude
 
 import Codec.Serialise (Serialise)
 import Codec.Serialise qualified as Serialise
-import Control.Exception (fromException, tryJust, Exception (displayException))
+import Control.Exception (fromException, tryJust, Exception (displayException), try)
 import Control.Monad (join, guard)
 import Control.Monad.Base (MonadBase(..))
 import Control.Monad.Error.Class (MonadError(..))
@@ -39,7 +39,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time.Clock (UTCTime)
 import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), singleError)
-import Language.PureScript.Externs (ExternsFile, externsIsCurrentVersion)
+import Language.PureScript.Externs (ExternsFile (efModuleName, efImports, efExports), externsIsCurrentVersion, ExternsImport (eiModule))
 import Language.PureScript.Make.Cache (ContentHash, hash)
 import Language.PureScript.Options (Options)
 import System.Directory (createDirectoryIfMissing, getModificationTime)
@@ -47,6 +47,11 @@ import System.Directory qualified as Directory
 import System.FilePath (takeDirectory)
 import System.IO.Error (tryIOError, isDoesNotExistError)
 import System.IO.UTF8 (readUTF8FileT)
+import System.FilePath.Posix ((</>))
+import Language.PureScript.Names (runModuleName)
+import Control.Concurrent (threadDelay)
+import Data.Foldable (for_)
+import Data.Aeson (ToJSON(toJSON))
 
 -- | A monad for running make actions
 newtype Make a = Make
