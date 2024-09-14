@@ -81,6 +81,12 @@ common defaults
     -- Don’t warn if the monomorphism restriction is used
     -Wno-monomorphism-restriction
 
+    -Wno-unused-matches
+    -Wno-unused-local-binds
+    -Wno-unused-imports
+    -Wno-unused-top-binds
+    -Wno-redundant-constraints
+
     -- Remaining options don't come from the above blog post
     -Wno-missing-deriving-strategies
     -Wno-missing-export-lists
@@ -337,6 +343,7 @@ library
     Language.PureScript.Make.Actions
     Language.PureScript.Make.BuildPlan
     Language.PureScript.Make.Cache
+    Language.PureScript.Make.IdeCache
     Language.PureScript.Make.Monad
     Language.PureScript.ModuleDependencies
     Language.PureScript.Names

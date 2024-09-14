@@ -21,10 +21,13 @@ import Data.Aeson (KeyValue(..), ToJSON(..), Value, object)
 import Data.Aeson.Types qualified as Aeson
 import Data.Aeson.KeyMap qualified as KM
 import Data.Text qualified as T
-import Language.PureScript qualified as P
-import Language.PureScript.Errors.JSON (toJSONError)
-import Language.PureScript.Ide.Types (ModuleIdent, Completion(..))
 import Protolude
+import Language.PureScript.Ide.Types (ModuleIdent, Completion (..))
+import Language.PureScript.Errors qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Pretty qualified as P
+import Language.PureScript.Types qualified as P
+import Language.PureScript.Errors.JSON (toJSONError)
 
 data IdeError
     = GeneralError Text

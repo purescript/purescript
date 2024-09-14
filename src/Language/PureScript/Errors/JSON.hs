@@ -7,8 +7,10 @@ import Prelude
 import Data.Aeson.TH qualified as A
 import Data.List.NonEmpty qualified as NEL
 import Data.Text (Text)
+import Language.PureScript.AST.SourcePos qualified as P
+import Language.PureScript.Errors qualified as P
+import Language.PureScript.Names qualified as P
 
-import Language.PureScript qualified as P
 
 data ErrorPosition = ErrorPosition
   { startLine :: Int

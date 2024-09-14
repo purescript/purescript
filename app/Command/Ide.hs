@@ -138,6 +138,7 @@ command = Opts.helper <*> subcommands where
       conf = IdeConfiguration
         { confLogLevel = logLevel
         , confOutputPath = outputPath
+        , sqliteFilePath = outputPath </> "cache.db"
         , confGlobs = globs
         , confGlobsFromFile = globsFromFile
         , confGlobsExclude = globsExcluded

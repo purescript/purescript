@@ -12,11 +12,15 @@ import Control.Lens (preview, view, (&), (^.))
 import "monad-logger" Control.Monad.Logger (MonadLogger, logErrorN)
 import Data.Version (showVersion)
 import Data.Text qualified as Text
-import Language.PureScript qualified as P
 import Language.PureScript.Make.Monad qualified as Make
 import Language.PureScript.Ide.Error (IdeError (..))
 import Language.PureScript.Ide.Types (IdeDataConstructor(..), IdeDeclaration(..), IdeDeclarationAnn(..), IdeType(..), IdeTypeClass(..), IdeTypeOperator(..), IdeTypeSynonym(..), IdeValue(..), IdeValueOperator(..), _IdeDeclType, anyOf, emptyAnn, ideTypeKind, ideTypeName)
 import Language.PureScript.Ide.Util (properNameT)
+import Language.PureScript.Externs qualified as P
+import Paths_purescript qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+import Language.PureScript.Types qualified as P
 
 readExternFile
   :: (MonadIO m, MonadError IdeError m, MonadLogger m)

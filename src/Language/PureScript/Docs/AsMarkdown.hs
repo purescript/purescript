@@ -3,6 +3,7 @@ module Language.PureScript.Docs.AsMarkdown
   , runDocs
   , moduleAsMarkdown
   , codeToString
+  , declAsMarkdown
   ) where
 
 import Prelude
@@ -17,8 +18,8 @@ import Data.Text qualified as T
 
 import Language.PureScript.Docs.RenderedCode (RenderedCode, RenderedCodeElement(..), outputWith)
 import Language.PureScript.Docs.Types (ChildDeclaration(..), ChildDeclarationInfo(..), Declaration(..), Module(..), ignorePackage)
-import Language.PureScript qualified as P
 import Language.PureScript.Docs.Render qualified as Render
+import Language.PureScript.Names qualified as P
 
 moduleAsMarkdown :: Module -> Docs
 moduleAsMarkdown Module{..} = do
