@@ -198,6 +198,7 @@ common defaults
     semigroups ==0.20.*,
     semialign >=1.2.0.1 && <1.3,
     sourcemap >=0.1.7 && <0.2,
+    sqlite-simple ==0.4.18.2,
     stm >=2.5.0.2 && <2.6,
     stringsearch >=0.3.6.6 && <0.4,
     template-haskell >=2.18.0.0 && <2.19,
