@@ -57,6 +57,7 @@ import Language.PureScript.Ide.SourceFile (extractAstInformation)
 import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Util (discardAnn, displayTimeSpec, logPerf, opNameT, properNameT, runLogger)
 import System.Directory (getModificationTime)
+import Database.SQLite.Simple qualified as SQLite
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
@@ -71,6 +72,11 @@ getOutputDirectory = do
 getSqliteFilePath :: Ide m => m FilePath
 getSqliteFilePath = do
   sqliteFilePath . ideConfiguration <$> ask
+
+runQuery :: SQLite.FromRow r => Ide m => Text -> m [r]
+runQuery q = do
+  IdeEnvironment{..} <- ask
+  liftIO $ query q
 
 getCacheTimestamp :: Ide m => m (Maybe UTCTime)
 getCacheTimestamp = do
