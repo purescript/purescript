@@ -214,7 +214,7 @@ findType search filters currentModule = do
        , complType = "TYPE"
        , complExpandedType = "EXPANDED"
        , complLocation = deserialise span
-       , complDocumentation = Just type_
+       , complDocumentation = type_
        , complExportedFrom =  [ModuleName "MODDD"]
        , complDeclarationType = Nothing
        }
@@ -225,7 +225,6 @@ printModules = ModuleList . map P.runModuleName <$> getLoadedModulenames
 
 sqliteFile :: Ide m => m FilePath
 sqliteFile = outputDirectory <&> ( </> "cache.db")
-
 
 outputDirectory :: Ide m => m FilePath
 outputDirectory = do
