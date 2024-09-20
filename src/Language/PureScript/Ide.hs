@@ -56,6 +56,7 @@ import Data.Text qualified
 import Data.Either (isLeft)
 import Codec.Serialise (deserialise)
 import Data.ByteString.Lazy qualified
+import Database.SQLite.Simple (Only(Only))
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.
@@ -85,9 +86,9 @@ handleCommand c = case c of
   List LoadedModules -> do
     logWarnN
       "Listing the loaded modules command is DEPRECATED, use the completion command and filter it to modules instead"
-    printModules
+    ModuleList . join <$> runQuery "select module_name from modules"
   List AvailableModules ->
-    listAvailableModules
+    ModuleList . join <$> runQuery "select module_name from modules"
   List (Imports fp) ->
     ImportList <$> parseImportsFromFile fp
   CaseSplit l b e wca t ->
@@ -220,9 +221,6 @@ findDeclarations filters currentModule completionOptions = do
        }
        )
 
-printModules :: Ide m => m Success
-printModules = ModuleList . map P.runModuleName <$> getLoadedModulenames
-
 sqliteFile :: Ide m => m FilePath
 sqliteFile = outputDirectory <&> ( </> "cache.db")
 
@@ -231,14 +229,6 @@ outputDirectory = do
   outputPath <- confOutputPath . ideConfiguration <$> ask
   cwd <- liftIO getCurrentDirectory
   pure (cwd </> outputPath)
-
-listAvailableModules :: Ide m => m Success
-listAvailableModules = do
-  oDir <- outputDirectory
-  liftIO $ do
-    contents <- getDirectoryContents oDir
-    let cleaned = filter (`notElem` [".", ".."]) contents
-    return (ModuleList (map toS cleaned))
 
 caseSplit :: (Ide m, MonadError IdeError m) =>
   Text -> Int -> Int -> CS.WildcardAnnotations -> Text -> m Success
