@@ -22,7 +22,7 @@ import Language.PureScript.CST qualified as CST
 
 import Language.PureScript.Ide.Error (IdeError(..))
 import Language.PureScript.Ide.Logging (labelTimespec, logPerf, runLogger)
-import Language.PureScript.Ide.State (cacheRebuild, getExternFiles, insertExterns, insertModule, populateVolatileState, updateCacheTimestamp)
+import Language.PureScript.Ide.State (cacheRebuild, getExternFiles, insertExterns, insertModule, populateVolatileState, updateCacheTimestamp, runQuery)
 import Language.PureScript.Ide.Types (Ide, IdeConfiguration(..), IdeEnvironment(..), ModuleMap, Success(..))
 import Language.PureScript.Ide.Util (ideReadFile)
 import System.Directory (getCurrentDirectory)
@@ -40,6 +40,7 @@ import Data.String (String)
 import Codec.Serialise (deserialise)
 import Language.PureScript (ModuleName)
 import Language.PureScript.Constants.Prim (primModules)
+import Data.Foldable (concat)
 
 -- | Given a filepath performs the following steps:
 --
@@ -248,35 +249,35 @@ sortExterns'
   => FilePath
   -> P.Module
   -> m [P.ExternsFile]
-sortExterns' outputDir m = liftIO do 
+sortExterns' outputDir m = do 
   let P.Module _ _ _ declarations _ = m
   let moduleDependencies = declarations >>= \case
               P.ImportDeclaration _ importName _ _ -> [importName]
               _ -> []
-  topo outputDir (primModules <> moduleDependencies)
 
-topo :: FilePath -> [ModuleName] -> IO [ExternsFile]
-topo outputDir dependencies = do
-  !r <- SQLite.withConnection (outputDir </> "cache.db") \conn -> 
-    SQLite.query conn query (SQLite.Only $ "[" <> Data.Text.intercalate ", " (dependencies <&> \v -> "\"" <> runModuleName v <> "\"") <> "]")
-      <&> \r -> (r >>= identity) <&> deserialise 
-  pure r
+  externs <- runQuery $ unlines [
+           "with recursive",
+           "graph(dependency, level) as (", 
+           " select module_name , 1 as level",
+           " from modules where module_name in (" <> Data.Text.intercalate ", " (moduleDependencies <&> \v -> "'" <> runModuleName v <> "'") <> ")", 
+           " union ",
+           " select d.dependency as dep, graph.level + 1 as level", 
+           " from graph join dependencies d on graph.dependency = d.module_name",  
+           "),",
+           "topo as (", 
+           " select dependency, max(level) as level", 
+           " from graph group by dependency", 
+           ") ", 
+           "select extern",
+           "from topo join modules on topo.dependency = modules.module_name order by level desc;"
+          ]
 
- where
- query = "  with recursive \
-         \  graph(dependency, level) as ( \
-         \     select module_name , 1 as level \
-         \     from modules where module_name in (select value from json_each(?)) \
-         \     union \
-         \     select d.dependency as dep, graph.level + 1 as level \
-         \     from graph join dependencies d on graph.dependency = d.module_name \ 
-         \  ), \
-         \  topo as ( \
-         \  select dependency, max(level) as level \
-         \  from graph group by dependency \
-         \  ) \
-         \  select extern \
-         \  from topo join modules on topo.dependency = modules.module_name order by level desc;"
+  pure $ (externs >>= identity) <&> deserialise 
+
+  -- !r <- SQLite.withConnection (outputDir </> "cache.db") \conn -> 
+  --   SQLite.query conn query (SQLite.Only $ "[" <> Data.Text.intercalate ", " (dependencies <&> \v -> "\"" <> runModuleName v <> "\"") <> "]")
+  --     <&> \r -> (r >>= identity) <&> deserialise 
+  -- pure r
 
 -- | Removes a modules export list.
 openModuleExports :: P.Module -> P.Module
