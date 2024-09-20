@@ -1,32 +1,33 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+
 -- |
 -- Type definitions for psc-ide
-
-{-# language DeriveAnyClass, NoGeneralizedNewtypeDeriving, TemplateHaskell #-}
-
 module Language.PureScript.Ide.Types where
-
-import Protolude hiding (moduleName)
 
 import Control.Concurrent.STM (TVar)
 import Control.Lens (Getting, Traversal', makeLenses)
 import Control.Monad.Fail (fail)
-import Data.Aeson (ToJSON, FromJSON, (.=))
+import Data.Aeson (FromJSON, ToJSON, (.=))
 import Data.Aeson qualified as Aeson
 import Data.IORef (IORef)
-import Data.Time.Clock (UTCTime)
 import Data.Map.Lazy qualified as M
-import Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
-import Language.PureScript.Names qualified as P
-import Language.PureScript.Types qualified as P
+import Data.Time.Clock (UTCTime)
+import Database.SQLite.Simple qualified as SQLite
+import Language.PureScript.AST.Declarations qualified as P
 import Language.PureScript.AST.Operators qualified as P
 import Language.PureScript.AST.SourcePos qualified as P
-import Language.PureScript.Externs qualified as P
-import Language.PureScript.AST.Declarations qualified as P
 import Language.PureScript.Errors qualified as P
 import Language.PureScript.Errors.JSON qualified as P
-import Database.SQLite.Simple qualified as SQLite
+import Language.PureScript.Externs qualified as P
+import Language.PureScript.Ide.Filter.Declaration (DeclarationType (..))
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Types qualified as P
+import Protolude hiding (moduleName)
 
 type ModuleIdent = Text
+
 type ModuleMap a = Map P.ModuleName a
 
 data IdeDeclaration
@@ -41,56 +42,64 @@ data IdeDeclaration
   deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeValue = IdeValue
-  { _ideValueIdent :: P.Ident
-  , _ideValueType :: P.SourceType
-  } deriving (Show, Eq, Ord, Generic, NFData)
+  { _ideValueIdent :: P.Ident,
+    _ideValueType :: P.SourceType
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeType = IdeType
- { _ideTypeName :: P.ProperName 'P.TypeName
- , _ideTypeKind :: P.SourceType
- , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.SourceType)]
- } deriving (Show, Eq, Ord, Generic, NFData)
+  { _ideTypeName :: P.ProperName 'P.TypeName,
+    _ideTypeKind :: P.SourceType,
+    _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.SourceType)]
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeSynonym = IdeTypeSynonym
-  { _ideSynonymName :: P.ProperName 'P.TypeName
-  , _ideSynonymType :: P.SourceType
-  , _ideSynonymKind :: P.SourceType
-  } deriving (Show, Eq, Ord, Generic, NFData)
+  { _ideSynonymName :: P.ProperName 'P.TypeName,
+    _ideSynonymType :: P.SourceType,
+    _ideSynonymKind :: P.SourceType
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeDataConstructor = IdeDataConstructor
-  { _ideDtorName :: P.ProperName 'P.ConstructorName
-  , _ideDtorTypeName :: P.ProperName 'P.TypeName
-  , _ideDtorType :: P.SourceType
-  } deriving (Show, Eq, Ord, Generic, NFData)
+  { _ideDtorName :: P.ProperName 'P.ConstructorName,
+    _ideDtorTypeName :: P.ProperName 'P.TypeName,
+    _ideDtorType :: P.SourceType
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeClass = IdeTypeClass
-  { _ideTCName :: P.ProperName 'P.ClassName
-  , _ideTCKind :: P.SourceType
-  , _ideTCInstances :: [IdeInstance]
-  } deriving (Show, Eq, Ord, Generic, NFData)
+  { _ideTCName :: P.ProperName 'P.ClassName,
+    _ideTCKind :: P.SourceType,
+    _ideTCInstances :: [IdeInstance]
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeInstance = IdeInstance
-  { _ideInstanceModule :: P.ModuleName
-  , _ideInstanceName :: P.Ident
-  , _ideInstanceTypes :: [P.SourceType]
-  , _ideInstanceConstraints :: Maybe [P.SourceConstraint]
-  } deriving (Show, Eq, Ord, Generic, NFData)
+  { _ideInstanceModule :: P.ModuleName,
+    _ideInstanceName :: P.Ident,
+    _ideInstanceTypes :: [P.SourceType],
+    _ideInstanceConstraints :: Maybe [P.SourceConstraint]
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeValueOperator = IdeValueOperator
-  { _ideValueOpName :: P.OpName 'P.ValueOpName
-  , _ideValueOpAlias :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))
-  , _ideValueOpPrecedence :: P.Precedence
-  , _ideValueOpAssociativity :: P.Associativity
-  , _ideValueOpType :: Maybe P.SourceType
-  } deriving (Show, Eq, Ord, Generic, NFData)
+  { _ideValueOpName :: P.OpName 'P.ValueOpName,
+    _ideValueOpAlias :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName)),
+    _ideValueOpPrecedence :: P.Precedence,
+    _ideValueOpAssociativity :: P.Associativity,
+    _ideValueOpType :: Maybe P.SourceType
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeOperator = IdeTypeOperator
-  { _ideTypeOpName :: P.OpName 'P.TypeOpName
-  , _ideTypeOpAlias :: P.Qualified (P.ProperName 'P.TypeName)
-  , _ideTypeOpPrecedence :: P.Precedence
-  , _ideTypeOpAssociativity :: P.Associativity
-  , _ideTypeOpKind :: Maybe P.SourceType
-  } deriving (Show, Eq, Ord, Generic, NFData)
+  { _ideTypeOpName :: P.OpName 'P.TypeOpName,
+    _ideTypeOpAlias :: P.Qualified (P.ProperName 'P.TypeName),
+    _ideTypeOpPrecedence :: P.Precedence,
+    _ideTypeOpAssociativity :: P.Associativity,
+    _ideTypeOpKind :: Maybe P.SourceType
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 _IdeDeclValue :: Traversal' IdeDeclaration IdeValue
 _IdeDeclValue f (IdeDeclValue x) = map IdeDeclValue (f x)
@@ -136,17 +145,18 @@ makeLenses ''IdeValueOperator
 makeLenses ''IdeTypeOperator
 
 data IdeDeclarationAnn = IdeDeclarationAnn
-  { _idaAnnotation :: Annotation
-  , _idaDeclaration :: IdeDeclaration
-  } deriving (Show, Eq, Ord, Generic, NFData)
+  { _idaAnnotation :: Annotation,
+    _idaDeclaration :: IdeDeclaration
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
 
-data Annotation
-  = Annotation
-  { _annLocation :: Maybe P.SourceSpan
-  , _annExportedFrom :: Maybe P.ModuleName
-  , _annTypeAnnotation :: Maybe P.SourceType
-  , _annDocumentation :: Maybe Text
-  } deriving (Show, Eq, Ord, Generic, NFData)
+data Annotation = Annotation
+  { _annLocation :: Maybe P.SourceSpan,
+    _annExportedFrom :: Maybe P.ModuleName,
+    _annTypeAnnotation :: Maybe P.SourceType,
+    _annDocumentation :: Maybe Text
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 makeLenses ''Annotation
 makeLenses ''IdeDeclarationAnn
@@ -155,99 +165,65 @@ emptyAnn :: Annotation
 emptyAnn = Annotation Nothing Nothing Nothing Nothing
 
 type DefinitionSites a = Map IdeNamespaced a
+
 type TypeAnnotations = Map P.Ident P.SourceType
-newtype AstData a = AstData (ModuleMap (DefinitionSites a, TypeAnnotations))
-  -- ^ SourceSpans for the definition sites of values and types as well as type
-  -- annotations found in a module
+
+newtype AstData a
+  = -- | SourceSpans for the definition sites of values and types as well as type
+    -- annotations found in a module
+    AstData (ModuleMap (DefinitionSites a, TypeAnnotations))
   deriving (Show, Eq, Ord, Generic, NFData, Functor, Foldable)
 
 data IdeLogLevel = LogDebug | LogPerf | LogAll | LogDefault | LogNone
   deriving (Show, Eq)
 
-data IdeConfiguration =
-  IdeConfiguration
-  { confOutputPath :: FilePath
-  , sqliteFilePath :: FilePath
-  , confLogLevel :: IdeLogLevel
-  , confGlobs :: [FilePath]
-  , confGlobsFromFile :: Maybe FilePath
-  , confGlobsExclude :: [FilePath]
+data IdeConfiguration = IdeConfiguration
+  { confOutputPath :: FilePath,
+    sqliteFilePath :: FilePath,
+    confLogLevel :: IdeLogLevel,
+    confGlobs :: [FilePath],
+    confGlobsFromFile :: Maybe FilePath,
+    confGlobsExclude :: [FilePath]
   }
 
-data IdeEnvironment =
-  IdeEnvironment
-  { ideStateVar :: TVar IdeState
-  , ideConfiguration :: IdeConfiguration
-  , ideCacheDbTimestamp :: IORef (Maybe UTCTime)
-  , query :: forall a. SQLite.FromRow a => Text -> IO [a]
+data IdeEnvironment = IdeEnvironment
+  { sCachedRebuild :: Maybe (P.ModuleName, P.ExternsFile),
+    ideConfiguration :: IdeConfiguration,
+    ideCacheDbTimestamp :: IORef (Maybe UTCTime),
+    query :: forall a. (SQLite.FromRow a) => Text -> IO [a],
+    queryNamed :: forall a. (SQLite.FromRow a) => SQLite.Query -> [SQLite.NamedParam] -> IO [a], 
+    executeNamed :: SQLite.Query -> [SQLite.NamedParam] -> IO ()
   }
 
 type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
 
-data IdeState = IdeState
-  { ideFileState :: IdeFileState
-  , ideVolatileState :: IdeVolatileState
-  } deriving (Show)
-
-emptyIdeState :: IdeState
-emptyIdeState = IdeState emptyFileState emptyVolatileState
-
-emptyFileState :: IdeFileState
-emptyFileState = IdeFileState M.empty M.empty
-
-emptyVolatileState :: IdeVolatileState
-emptyVolatileState = IdeVolatileState (AstData M.empty) M.empty Nothing
-
-
--- | @IdeFileState@ holds data that corresponds 1-to-1 to an entity on the
--- filesystem. Externs correspond to the ExternsFiles the compiler emits into
--- the output folder, and modules are parsed ASTs from source files. This means,
--- that we can update single modules or ExternsFiles inside this state whenever
--- the corresponding entity changes on the file system.
-data IdeFileState = IdeFileState
-  { fsExterns :: ModuleMap P.ExternsFile
-  , fsModules :: ModuleMap (P.Module, FilePath)
-  } deriving (Show)
-
--- | @IdeVolatileState@ is derived from the @IdeFileState@ and needs to be
--- invalidated and refreshed carefully. It holds @AstData@, which is the data we
--- extract from the parsed ASTs, as well as the IdeDeclarations, which contain
--- lots of denormalized data, so they need to fully rebuilt whenever
--- @IdeFileState@ changes. The vsCachedRebuild field can hold a rebuild result
--- with open imports which is used to provide completions for module private
--- declarations
-data IdeVolatileState = IdeVolatileState
-  { vsAstData :: AstData P.SourceSpan
-  , vsDeclarations :: ModuleMap [IdeDeclarationAnn]
-  , vsCachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
-  } deriving (Show)
-
 newtype Match a = Match (P.ModuleName, a)
-           deriving (Show, Eq, Functor)
+  deriving (Show, Eq, Functor)
 
 -- | A completion as it gets sent to the editors
 data Completion = Completion
-  { complModule :: Text
-  , complIdentifier :: Text
-  , complType :: Text
-  , complExpandedType :: Text
-  , complLocation :: Maybe P.SourceSpan
-  , complDocumentation :: Maybe Text
-  , complExportedFrom :: [P.ModuleName]
-  , complDeclarationType :: Maybe DeclarationType
-  } deriving (Show, Eq, Ord)
+  { complModule :: Text,
+    complIdentifier :: Text,
+    complType :: Text,
+    complExpandedType :: Text,
+    complLocation :: Maybe P.SourceSpan,
+    complDocumentation :: Maybe Text,
+    complExportedFrom :: [P.ModuleName],
+    complDeclarationType :: Maybe DeclarationType
+  }
+  deriving (Show, Eq, Ord)
 
 instance ToJSON Completion where
   toJSON Completion {..} =
     Aeson.object
-      [ "module" .= complModule
-      , "identifier" .= complIdentifier
-      , "type" .= complType
-      , "expandedType" .= complExpandedType
-      , "definedAt" .= complLocation
-      , "documentation" .= complDocumentation
-      , "exportedFrom" .= map P.runModuleName complExportedFrom
-      , "declarationType" .= complDeclarationType
+      [ "module" .= complModule,
+        "identifier" .= complIdentifier,
+        "type" .= complType,
+        "expandedType" .= complExpandedType,
+        "definedAt" .= complLocation,
+        "documentation" .= complDocumentation,
+        "exportedFrom" .= map P.runModuleName complExportedFrom,
+        "declarationType" .= complDeclarationType
       ]
 
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
@@ -269,8 +245,9 @@ declarationType decl = case decl of
   IdeDeclValueOperator _ -> ValueOperator
   IdeDeclTypeOperator _ -> TypeOperator
   IdeDeclModule _ -> Module
-data Success =
-  CompletionResult [Completion]
+
+data Success
+  = CompletionResult [Completion]
   | TextResult Text
   | UsagesResult [P.SourceSpan]
   | MultilineTextResult [Text]
@@ -279,7 +256,7 @@ data Success =
   | RebuildSuccess P.MultipleErrors
   deriving (Show)
 
-encodeSuccess :: ToJSON a => a -> Aeson.Value
+encodeSuccess :: (ToJSON a) => a -> Aeson.Value
 encodeSuccess res =
   Aeson.object ["resultType" .= ("success" :: Text), "result" .= res]
 
@@ -291,11 +268,12 @@ instance ToJSON Success where
     MultilineTextResult ts -> encodeSuccess ts
     ImportList (moduleName, imports) ->
       Aeson.object
-        [ "resultType" .= ("success" :: Text)
-        , "result" .= Aeson.object
-            [ "imports" .= map encodeImport imports
-            , "moduleName" .= P.runModuleName moduleName
-            ]
+        [ "resultType" .= ("success" :: Text),
+          "result"
+            .= Aeson.object
+              [ "imports" .= map encodeImport imports,
+                "moduleName" .= P.runModuleName moduleName
+              ]
         ]
     ModuleList modules -> encodeSuccess modules
     RebuildSuccess warnings -> encodeSuccess (P.toJSONErrors False P.Warning [] warnings)
@@ -304,21 +282,24 @@ encodeImport :: (P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName) -> A
 encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifier) = case importType of
   P.Implicit ->
     Aeson.object $
-      [ "module" .= mn
-      , "importType" .= ("implicit" :: Text)
-      ] ++ map ("qualifier" .=) (maybeToList qualifier)
+      [ "module" .= mn,
+        "importType" .= ("implicit" :: Text)
+      ]
+        ++ map ("qualifier" .=) (maybeToList qualifier)
   P.Explicit refs ->
     Aeson.object $
-      [ "module" .= mn
-      , "importType" .= ("explicit" :: Text)
-      , "identifiers" .= (identifierFromDeclarationRef <$> refs)
-      ] ++ map ("qualifier" .=) (maybeToList qualifier)
+      [ "module" .= mn,
+        "importType" .= ("explicit" :: Text),
+        "identifiers" .= (identifierFromDeclarationRef <$> refs)
+      ]
+        ++ map ("qualifier" .=) (maybeToList qualifier)
   P.Hiding refs ->
     Aeson.object $
-      [ "module" .= mn
-      , "importType" .= ("hiding" :: Text)
-      , "identifiers" .= (identifierFromDeclarationRef <$> refs)
-      ] ++ map ("qualifier" .=) (maybeToList qualifier)
+      [ "module" .= mn,
+        "importType" .= ("hiding" :: Text),
+        "identifiers" .= (identifierFromDeclarationRef <$> refs)
+      ]
+        ++ map ("qualifier" .=) (maybeToList qualifier)
 
 -- | Denotes the different namespaces a name in PureScript can reside in.
 data IdeNamespace = IdeNSValue | IdeNSType | IdeNSModule

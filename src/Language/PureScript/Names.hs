@@ -21,6 +21,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 
 import Language.PureScript.AST.SourcePos (SourcePos, pattern SourcePos)
+import Database.SQLite.Simple.ToField
 
 -- | A sum of the possible name types, useful for error and lint messages.
 data Name
@@ -188,7 +189,7 @@ coerceProperName = ProperName . runProperName
 -- Module names
 --
 newtype ModuleName = ModuleName Text
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, ToField)
   deriving newtype Serialise
 
 instance NFData ModuleName

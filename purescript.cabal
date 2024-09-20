@@ -306,6 +306,7 @@ library
     Language.PureScript.Hierarchy
     Language.PureScript.Ide
     Language.PureScript.Ide.CaseSplit
+    Language.PureScript.Ide.Cache
     Language.PureScript.Ide.Command
     Language.PureScript.Ide.Completion
     Language.PureScript.Ide.Error

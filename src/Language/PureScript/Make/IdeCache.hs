@@ -45,6 +45,11 @@ sqliteExtern outputDir docs extern = liftIO $ do
         , ":dependency" := runModuleName (eiModule i)
         ])
 
+    withRetry $ SQLite.executeNamed conn "INSERT INTO dependencies (module_name, dependency) VALUES (:module_name, :dependency)"
+        [ ":module_name" := runModuleName (efModuleName extern )
+        , ":dependency" := ("Prim" :: Text)
+        ]
+
     for_ (Docs.modDeclarations docs) (\d -> do
        withRetry $ SQLite.executeNamed conn "INSERT INTO declarations (module_name, name, span, type, docs, declaration) VALUES (:module_name, :name, :span, :type, :docs, :declaration)"
         [ ":module_name" := runModuleName (efModuleName extern)
@@ -103,9 +108,22 @@ sqliteInit outputDir = liftIO $ do
     createParentDirectory db
     conn <- SQLite.open db
     withRetry $ SQLite.execute_ conn "pragma journal_mode=wal"
-    withRetry $ SQLite.execute_ conn "create table if not exists modules (module_name text primary key, comment text, extern blob, dec text, unique (module_name) on conflict replace)"
-    withRetry $ SQLite.execute_ conn "create table if not exists dependencies (id integer primary key, module_name text not null, dependency text not null, unique (module_name, dependency) on conflict ignore)"
-    withRetry $ SQLite.execute_ conn "create table if not exists declarations (module_name text, name text not null, span blob, type text, docs text, declaration text not null)"
+    withRetry $ SQLite.execute_ conn "create table if not exists doc_modules (module_name text primary key, comment text, extern blob, dec text, unique (module_name) on conflict replace)"
+    withRetry $ SQLite.execute_ conn "create table if not exists doc_dependencies (id integer primary key, module_name text not null, dependency text not null, unique (module_name, dependency) on conflict ignore)"
+    withRetry $ SQLite.execute_ conn "create table if not exists doc_declarations (module_name text, name text not null, span blob, type text, docs text, declaration text not null)"
+    withRetry $ SQLite.execute_ conn "create index dm on declarations(module_name); create index dn on declarations(name);"
+    SQLite.close conn
+  where
+  db = outputDir </> "cache.db"
+
+sqliteInitIde :: (MonadIO m) => FilePath -> m ()
+sqliteInitIde outputDir = liftIO $ do
+    createParentDirectory db
+    conn <- SQLite.open db
+    withRetry $ SQLite.execute_ conn "pragma journal_mode=wal"
+    withRetry $ SQLite.execute_ conn "create table if not exists ide_modules (module_name text primary key, comment text, extern blob, dec text, unique (module_name) on conflict replace)"
+    withRetry $ SQLite.execute_ conn "create table if not exists ide_dependencies (id integer primary key, module_name text not null, dependency text not null, unique (module_name, dependency) on conflict ignore)"
+    withRetry $ SQLite.execute_ conn "create table if not exists ide_declarations (module_name text, name text not null, span blob, type text, docs text, declaration text not null)"
     withRetry $ SQLite.execute_ conn "create index dm on declarations(module_name); create index dn on declarations(name);"
     SQLite.close conn
   where

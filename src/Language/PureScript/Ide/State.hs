@@ -117,14 +117,7 @@ insertModule module' = do
   liftIO . atomically $ insertModuleSTM stateVar module'
 
 -- | STM version of insertModule
-insertModuleSTM :: TVar IdeState -> (FilePath, P.Module) -> STM ()
-insertModuleSTM ref (fp, module') =
-  modifyTVar ref $ \x ->
-    x { ideFileState = (ideFileState x) {
-          fsModules = Map.insert
-            (P.getModuleName module')
-            (module', fp)
-            (fsModules (ideFileState x))}}
+
 
 -- | Retrieves the FileState from the State. This includes loaded Externfiles
 -- and parsed Modules
@@ -231,13 +224,14 @@ populateVolatileState = do
 
 -- | STM version of populateVolatileState
 populateVolatileStateSTM
-  :: TVar IdeState
+  :: FilePath
   -> STM (ModuleMap (ReexportResult [IdeDeclarationAnn]))
-populateVolatileStateSTM ref = do
-  IdeFileState{fsExterns = externs, fsModules = modules} <- getFileStateSTM ref
+populateVolatileStateSTM outputPath = do
+  -- IdeFileState{fsExterns = externs, fsModules = modules} <- getFileStateSTM outputPath
   -- We're not using the cached rebuild for anything other than preserving it
   -- through the repopulation
-  rebuildCache <- vsCachedRebuild <$> getVolatileStateSTM ref
+  rebuildCache <- vsCachedRebuild <$> getVolatileStateSTM outputPath
+
   let asts = map (extractAstInformation . fst) modules
   let (moduleDeclarations, reexportRefs) = unzip (Map.map convertExterns externs)
       results =
