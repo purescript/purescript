@@ -30,6 +30,7 @@ module Language.PureScript.Ide.State
   , populateVolatileStateSync
   , populateVolatileStateSTM
   , getOutputDirectory
+  , runQuery
   , getSqliteFilePath
   , updateCacheTimestamp
   -- for tests
@@ -58,6 +59,7 @@ import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Util (discardAnn, displayTimeSpec, logPerf, opNameT, properNameT, runLogger)
 import System.Directory (getModificationTime)
 import Database.SQLite.Simple qualified as SQLite
+import Debug.Trace qualified as Debug
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
@@ -75,6 +77,7 @@ getSqliteFilePath = do
 
 runQuery :: SQLite.FromRow r => Ide m => Text -> m [r]
 runQuery q = do
+  Debug.traceM $ show q
   IdeEnvironment{..} <- ask
   liftIO $ query q
 
