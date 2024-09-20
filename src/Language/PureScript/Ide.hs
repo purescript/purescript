@@ -207,8 +207,6 @@ findDeclarations filters currentModule completionOptions = do
       filters) <>
     foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)
 
-  Debug.traceM $ show rows
-
   pure $ CompletionResult (rows <&> \(module_name, name, type_, span) -> Completion
        { complModule = module_name
        , complIdentifier = name
