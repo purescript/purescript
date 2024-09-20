@@ -40,6 +40,7 @@ import System.Directory (doesDirectoryExist, getCurrentDirectory, setCurrentDire
 import System.FilePath ((</>))
 import System.IO (BufferMode(..), hClose, hFlush, hSetBuffering, hSetEncoding, utf8)
 import System.IO.Error (isEOFError)
+import Database.SQLite.Simple qualified as SQLite
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
 listenOnLocalhost port = do
@@ -149,6 +150,8 @@ command = Opts.helper <*> subcommands where
         { ideStateVar = ideState
         , ideConfiguration = conf
         , ideCacheDbTimestamp = ts
+        , query = \q -> SQLite.withConnection (outputPath </> "cache.db")
+             (\conn -> SQLite.query_ conn $ SQLite.Query q)
         }
     startServer port env
 

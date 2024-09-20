@@ -24,6 +24,7 @@ import Language.PureScript.Externs qualified as P
 import Language.PureScript.AST.Declarations qualified as P
 import Language.PureScript.Errors qualified as P
 import Language.PureScript.Errors.JSON qualified as P
+import Database.SQLite.Simple qualified as SQLite
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a
@@ -178,6 +179,7 @@ data IdeEnvironment =
   { ideStateVar :: TVar IdeState
   , ideConfiguration :: IdeConfiguration
   , ideCacheDbTimestamp :: IORef (Maybe UTCTime)
+  , query :: forall a. SQLite.FromRow a => Text -> IO [a]
   }
 
 type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
