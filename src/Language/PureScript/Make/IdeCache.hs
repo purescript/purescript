@@ -18,7 +18,7 @@ import Data.Maybe (isNothing, fromMaybe)
 import Language.PureScript.CST.Utils (ProperName(..))
 import Language.PureScript.Docs.Types qualified as Docs
 import Language.PureScript.Ide.Externs (convertExterns)
-import Language.PureScript.Ide.Util (identifierFromIdeDeclaration, discardAnn)
+import Language.PureScript.Ide.Util (identifierFromIdeDeclaration, discardAnn, namespaceForDeclaration)
 import Data.Function ((&))
 import Data.Bifunctor (first)
 import Data.Text (Text)
@@ -27,6 +27,7 @@ import Language.PureScript.Docs.Types (Declaration(declChildren))
 import Language.PureScript.Docs.Render (renderDeclaration)
 import Language.PureScript.Docs.AsMarkdown (codeToString, declAsMarkdown, runDocs)
 import Codec.Serialise (serialise)
+import Data.Aeson (encode)
 
 sqliteExtern :: (MonadIO m) => FilePath -> Docs.Module -> ExternsFile -> m ()
 sqliteExtern outputDir docs extern = liftIO $ do 
@@ -43,6 +44,14 @@ sqliteExtern outputDir docs extern = liftIO $ do
        withRetry $ SQLite.executeNamed conn "INSERT INTO dependencies (module_name, dependency) VALUES (:module_name, :dependency)"
         [ ":module_name" := runModuleName (efModuleName extern )
         , ":dependency" := runModuleName (eiModule i)
+        ])
+
+    for_ (fst $ convertExterns extern) (\ideDeclaration -> do
+       withRetry $ SQLite.executeNamed conn "INSERT INTO ide_declarations (module_name, name, namespace, declaration) VALUES (:module_name, :name, :namespace, :declaration)"
+        [ ":module_name" := runModuleName (efModuleName extern )
+        , ":name" := identifierFromIdeDeclaration (discardAnn ideDeclaration)
+        , ":namespace" := encode (namespaceForDeclaration (discardAnn ideDeclaration))
+        , ":declaration" := serialise ideDeclaration
         ])
 
     for_ (Docs.modDeclarations docs) (\d -> do
@@ -107,6 +116,7 @@ sqliteInit outputDir = liftIO $ do
     withRetry $ SQLite.execute_ conn "create table if not exists dependencies (id integer primary key, module_name text not null, dependency text not null, unique (module_name, dependency) on conflict ignore)"
     withRetry $ SQLite.execute_ conn "create table if not exists declarations (module_name text, name text not null, span blob, type text, docs text, declaration text not null)"
     withRetry $ SQLite.execute_ conn "create index dm on declarations(module_name); create index dn on declarations(name);"
+    withRetry $ SQLite.execute_ conn "create table if not exists ide_declarations (module_name text, name text, namespace text, declaration blob)"
     SQLite.close conn
   where
   db = outputDir </> "cache.db"
