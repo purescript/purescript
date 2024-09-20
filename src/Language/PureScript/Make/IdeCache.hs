@@ -38,16 +38,11 @@ sqliteExtern outputDir docs extern = liftIO $ do
       , ":extern" := Serialise.serialise extern
       , ":dec" := show ( efExports extern )
       ]
+
     for_ (efImports extern) (\i -> do
        withRetry $ SQLite.executeNamed conn "INSERT INTO dependencies (module_name, dependency) VALUES (:module_name, :dependency)"
         [ ":module_name" := runModuleName (efModuleName extern )
         , ":dependency" := runModuleName (eiModule i)
-        ])
-
-    for_ (fst $ convertExterns extern) (\i -> do
-       withRetry $ SQLite.executeNamed conn "INSERT INTO decla (module_name, id) VALUES (:module_name, :id)"
-        [ ":module_name" := runModuleName (efModuleName extern )
-        , ":id" := identifierFromIdeDeclaration (discardAnn i)
         ])
 
     for_ (Docs.modDeclarations docs) (\d -> do
@@ -59,7 +54,6 @@ sqliteExtern outputDir docs extern = liftIO $ do
         , ":type" := runDocs (declAsMarkdown d)
         , ":declaration" := show d
         ]
-       
 
        for_ (declChildren d) $ \ch -> do
          withRetry $ SQLite.executeNamed conn "INSERT INTO declarations (module_name, name, span, docs, declaration) VALUES (:module_name, :name, :span, :docs, :declaration)"
@@ -112,7 +106,7 @@ sqliteInit outputDir = liftIO $ do
     withRetry $ SQLite.execute_ conn "create table if not exists modules (module_name text primary key, comment text, extern blob, dec text, unique (module_name) on conflict replace)"
     withRetry $ SQLite.execute_ conn "create table if not exists dependencies (id integer primary key, module_name text not null, dependency text not null, unique (module_name, dependency) on conflict ignore)"
     withRetry $ SQLite.execute_ conn "create table if not exists declarations (module_name text, name text not null, span blob, type text, docs text, declaration text not null)"
-    withRetry $ SQLite.execute_ conn "create table if not exists decla(module_name text primary key, id text)"
+    withRetry $ SQLite.execute_ conn "create index dm on declarations(module_name); create index dn on declarations(name);"
     SQLite.close conn
   where
   db = outputDir </> "cache.db"
