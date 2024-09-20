@@ -37,7 +37,7 @@ import Language.PureScript.Ide.Matcher (Matcher)
 import Language.PureScript.Ide.Prim (idePrimDeclarations)
 import Language.PureScript.Ide.Rebuild (rebuildFileAsync, rebuildFileSync)
 import Language.PureScript.Ide.SourceFile (parseModulesFromFiles)
-import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState, getSqliteFilePath)
+import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState, getSqliteFilePath, runQuery)
 import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..), Completion (..))
 import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, namespaceForDeclaration, withEmptyAnn)
 import Language.PureScript.Ide.Usage (findUsages)
@@ -193,25 +193,19 @@ findDeclarations
   -> Maybe CompletionOptions
   -> m Success
 findDeclarations filters currentModule completionOptions = do
-  sqlite <- getSqliteFilePath
-  let q = SQLite.Query $
-            "select module_name, name, type, span " <>
-            "from declarations where " <>
-            T.intercalate " and " (
-              mapMaybe (\case
-                F.Filter (Left modules) ->
-                  Just $ "module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> ")"
-                F.Filter (Right (F.Exact f)) -> Just $ "name glob '" <> f <> "'"
-                F.Filter (Right (F.Prefix f)) -> Just $ "name glob '" <> f <> "*'"
-                F.Filter _ -> Nothing)
-              filters) <>
-            foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)
+  rows <- runQuery $
+    "select module_name, name, type, span " <>
+    "from declarations where " <>
+    T.intercalate " and " (
+      mapMaybe (\case
+        F.Filter (Left modules) ->
+          Just $ "module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> ")"
+        F.Filter (Right (F.Exact f)) -> Just $ "name glob '" <> f <> "'"
+        F.Filter (Right (F.Prefix f)) -> Just $ "name glob '" <> f <> "*'"
+        F.Filter _ -> Nothing)
+      filters) <>
+    foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)
 
-
-  rows <- liftIO $ SQLite.withConnection sqlite $ \conn -> do
-    SQLite.query_ conn q
-
-  Debug.traceM $ show q
   Debug.traceM $ show rows
 
   pure $ CompletionResult (rows <&> \(module_name, name, type_, span) -> Completion
