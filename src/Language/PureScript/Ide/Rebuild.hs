@@ -39,6 +39,7 @@ import Database.SQLite.Simple (Query(fromQuery), ToRow, SQLData (SQLText))
 import Data.String (String)
 import Codec.Serialise (deserialise)
 import Language.PureScript (ModuleName)
+import Language.PureScript.Constants.Prim (primModules)
 
 -- | Given a filepath performs the following steps:
 --
@@ -252,7 +253,7 @@ sortExterns' outputDir m = liftIO do
   let moduleDependencies = declarations >>= \case
               P.ImportDeclaration _ importName _ _ -> [importName]
               _ -> []
-  topo outputDir moduleDependencies
+  topo outputDir (primModules <> moduleDependencies)
 
 topo :: FilePath -> [ModuleName] -> IO [ExternsFile]
 topo outputDir dependencies = do
