@@ -27,7 +27,7 @@ import Language.PureScript qualified as P
 import Language.PureScript.Glob (toInputGlobs, PSCGlobs(..))
 import Language.PureScript.Ide.CaseSplit qualified as CS
 import Language.PureScript.Ide.Command (Command(..), ImportCommand(..), ListType(..))
-import Language.PureScript.Ide.Completion (CompletionOptions, completionFromMatch, getCompletions, getExactCompletions, simpleExport)
+import Language.PureScript.Ide.Completion (CompletionOptions (coMaxResults), completionFromMatch, getCompletions, getExactCompletions, simpleExport)
 import Language.PureScript.Ide.Error (IdeError(..))
 import Language.PureScript.Ide.Externs (readExternFile)
 import Language.PureScript.Ide.Filter qualified as F
@@ -51,7 +51,7 @@ import Language.PureScript (cacheDbFile, runModuleName)
 import Debug.Trace qualified as Debug
 import Data.Maybe (catMaybes)
 import Protolude (head)
-import Data.Foldable (find, Foldable (toList))
+import Data.Foldable (find, Foldable (toList, foldMap))
 import Data.Text qualified
 import Data.Either (isLeft)
 import Codec.Serialise (deserialise)
@@ -78,9 +78,10 @@ handleCommand c = case c of
     pure $ TextResult "Done"
     -- loadModulesSync modules
   Type search filters currentModule ->
-    findType search filters currentModule
+    findDeclarations (F.Filter (Right $ F.Exact search) : filters) currentModule Nothing
   Complete filters matcher currentModule complOptions ->
-    findCompletions' filters matcher currentModule complOptions
+    findDeclarations filters currentModule (Just complOptions)
+    -- findCompletions' filters matcher currentModule complOptions
   List LoadedModules -> do
     logWarnN
       "Listing the loaded modules command is DEPRECATED, use the completion command and filter it to modules instead"
@@ -151,8 +152,6 @@ findCompletions' filters matcher currentModule complOptions = do
     rows :: [(Text, Text, Maybe Text)] <- SQLite.query conn "select module_name, name, docs from declarations where name glob ?" (SQLite.Only (glob filters :: Text))
     return rows
 
-  Debug.traceM $ show completions
-
   pure $ CompletionResult $ completions <&> \(module_name, name, docs) ->
         Completion
           { complModule = module_name
@@ -187,28 +186,35 @@ findCompletions' filters matcher currentModule complOptions = do
   -- let insertPrim = Map.union idePrimDeclarations
   -- pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
-findType
+findDeclarations
   :: Ide m
-  => Text
-  -> [F.Filter]
+  => [F.Filter]
   -> Maybe P.ModuleName
+  -> Maybe CompletionOptions
   -> m Success
-findType search filters currentModule = do
+findDeclarations filters currentModule completionOptions = do
   sqlite <- getSqliteFilePath
-  rows <- liftIO $ SQLite.withConnection sqlite $ \conn -> do  
-    SQLite.query_ conn $ SQLite.Query $
-      "select module_name, name, type, span " <>
-      "from declarations where " <>
-      T.intercalate " and " (
-      ("name glob '" <> search <> "' ") : mapMaybe (\case
-        F.Filter (Left modules) ->
-          Just $ "module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> ")"
-        F.Filter (Right (F.Exact f)) -> Just $ "name glob '" <> f <> "'"
-        F.Filter (Right (F.Prefix f)) -> Just $ "name glob '" <> f <> "*'"
-        F.Filter _ -> Nothing)
-      filters)
+  let q = SQLite.Query $
+            "select module_name, name, type, span " <>
+            "from declarations where " <>
+            T.intercalate " and " (
+              mapMaybe (\case
+                F.Filter (Left modules) ->
+                  Just $ "module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> ")"
+                F.Filter (Right (F.Exact f)) -> Just $ "name glob '" <> f <> "'"
+                F.Filter (Right (F.Prefix f)) -> Just $ "name glob '" <> f <> "*'"
+                F.Filter _ -> Nothing)
+              filters) <>
+            foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)
 
-  pure $ CompletionResult (rows <&> \(module_name, name, type_, span) -> Completion 
+
+  rows <- liftIO $ SQLite.withConnection sqlite $ \conn -> do
+    SQLite.query_ conn q
+
+  Debug.traceM $ show q
+  Debug.traceM $ show rows
+
+  pure $ CompletionResult (rows <&> \(module_name, name, type_, span) -> Completion
        { complModule = module_name
        , complIdentifier = name
        , complType = "TYPE"
@@ -218,7 +224,7 @@ findType search filters currentModule = do
        , complExportedFrom =  [ModuleName "MODDD"]
        , complDeclarationType = Nothing
        }
-       ) 
+       )
 
 printModules :: Ide m => m Success
 printModules = ModuleList . map P.runModuleName <$> getLoadedModulenames
