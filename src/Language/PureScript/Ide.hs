@@ -142,53 +142,6 @@ findCompletions filters matcher currentModule complOptions = do
   let insertPrim = Map.union idePrimDeclarations
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
-findCompletions'
-  :: Ide m
-  => [F.Filter]
-  -> Matcher IdeDeclarationAnn
-  -> Maybe P.ModuleName
-  -> CompletionOptions
-  -> m Success
-findCompletions' filters matcher currentModule complOptions = do
-  sq <- sqliteFile
-  completions <- liftIO $ SQLite.withConnection sq $ \conn -> do
-    rows :: [(Text, Text, Maybe Text)] <- SQLite.query conn "select module_name, name, docs from declarations where name glob ?" (SQLite.Only (glob filters :: Text))
-    return rows
-
-  pure $ CompletionResult $ completions <&> \(module_name, name, docs) ->
-        Completion
-          { complModule = module_name
-          , complIdentifier = name
-          , complType = "TYPE"
-          , complExpandedType = "EXPANDED"
-          , complLocation = Just (SourceSpan
-             { spanName = ".spago/BuildInfo.purs"
-             , spanStart = SourcePos
-               { sourcePosLine = 3
-               , sourcePosColumn = 1
-               }
-             , spanEnd = SourcePos
-               { sourcePosLine = 1
-               , sourcePosColumn = 1
-               }
-             })
-          , complDocumentation = docs
-          , complExportedFrom =  [ModuleName "BuildInfo"]
-          , complDeclarationType = Nothing
-          }
-  where
-  glob :: [F.Filter] -> Text
-  glob f = mapMaybe globSearch f & head & fromMaybe "*"
-  globSearch :: F.Filter -> Maybe Text
-  globSearch (F.Filter (Right (F.Prefix p))) = Just (p <> "*")
-  globSearch (F.Filter (Right (F.Exact p))) = Just p
-  globSearch _ = Nothing
-
-
-  -- modules <- getAllModules currentModule
-  -- let insertPrim = Map.union idePrimDeclarations
-  -- pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
-
 findDeclarations
   :: Ide m
   => [F.Filter]
