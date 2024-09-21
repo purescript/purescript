@@ -38,7 +38,7 @@ import Language.PureScript.Ide.Prim (idePrimDeclarations)
 import Language.PureScript.Ide.Rebuild (rebuildFileAsync, rebuildFileSync)
 import Language.PureScript.Ide.SourceFile (parseModulesFromFiles)
 import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState, getSqliteFilePath, runQuery)
-import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..), Completion (..))
+import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..), Completion (..), toText)
 import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, namespaceForDeclaration, withEmptyAnn)
 import Language.PureScript.Ide.Usage (findUsages)
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
@@ -57,6 +57,8 @@ import Data.Either (isLeft)
 import Codec.Serialise (deserialise)
 import Data.ByteString.Lazy qualified
 import Database.SQLite.Simple (Only(Only))
+import Database.SQLite.Simple.ToField (ToField(..))
+import Language.PureScript.Ide.Filter.Declaration (declarationTypeToText)
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.
@@ -201,8 +203,12 @@ findDeclarations filters currentModule completionOptions = do
       mapMaybe (\case
         F.Filter (Left modules) ->
           Just $ "module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> ")"
-        F.Filter (Right (F.Exact f)) -> Just $ "name glob '" <> f <> "'"
         F.Filter (Right (F.Prefix f)) -> Just $ "name glob '" <> f <> "*'"
+        F.Filter (Right (F.Exact f)) -> Just $ "name glob '" <> f <> "'"
+        F.Filter (Right (F.Namespace namespaces)) ->
+          Just $ "namespace in (" <> T.intercalate "," (toList namespaces <&> \n -> "'" <> toText n <> "'") <> ")"
+        F.Filter (Right (F.DeclType dt)) ->
+          Just $ "namespace in (" <> T.intercalate "," (toList dt <&> \t -> "'" <> declarationTypeToText t <> "'") <> ")"
         F.Filter _ -> Nothing)
       filters) <>
     foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)

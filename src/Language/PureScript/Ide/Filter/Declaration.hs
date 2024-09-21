@@ -1,5 +1,6 @@
 module Language.PureScript.Ide.Filter.Declaration
        ( DeclarationType(..)
+       , declarationTypeToText
        ) where
 
 import Protolude                     hiding (isPrefixOf)
@@ -43,12 +44,16 @@ instance ToJSON DeclarationType where
     TypeOperator    -> "typeoperator"
     Module          -> "module"
 
+declarationTypeToText :: DeclarationType -> Text 
+declarationTypeToText Value = "value"
+declarationTypeToText Type = "type"
+declarationTypeToText Synonym = "synonym"
+declarationTypeToText DataConstructor = "dataconstructor"
+declarationTypeToText TypeClass = "typeclass"
+declarationTypeToText ValueOperator = "valueoperator"
+declarationTypeToText TypeOperator = "typeoperator"
+declarationTypeToText Module = "module"
+
+
 instance ToField DeclarationType where
-  toField Value = SQLText "value"
-  toField Type = SQLText "type"
-  toField Synonym = SQLText "synonym"
-  toField DataConstructor = SQLText "dataconstructor"
-  toField TypeClass = SQLText "typeclass"
-  toField ValueOperator = SQLText "valueoperator"
-  toField TypeOperator = SQLText "typeoperator"
-  toField Module = SQLText "module"
+  toField d = SQLText $ declarationTypeToText d

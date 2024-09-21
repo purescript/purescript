@@ -334,11 +334,13 @@ instance FromJSON IdeNamespace where
     "module" -> pure IdeNSModule
     s -> fail ("Unknown namespace: " <> show s)
 
-instance ToField IdeNamespace where
-  toField IdeNSValue = SQLText "value"
-  toField IdeNSType = SQLText "type"
-  toField IdeNSModule = SQLText "module"
+toText :: IdeNamespace -> Text
+toText IdeNSValue = "value"
+toText IdeNSType = "type"
+toText IdeNSModule = "module"
 
+instance ToField IdeNamespace where
+  toField n = SQLText $ toText n 
 
 -- | A name tagged with a namespace
 data IdeNamespaced = IdeNamespaced IdeNamespace Text
