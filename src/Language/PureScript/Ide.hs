@@ -197,8 +197,8 @@ findDeclarations
   -> m Success
 findDeclarations filters currentModule completionOptions = do
   rows <- runQuery $
-    "select module_name, name, type, span " <>
-    "from declarations where " <>
+    "select module_name, name, span " <>
+    "from ide_declarations where " <>
     T.intercalate " and " (
       mapMaybe (\case
         F.Filter (Left modules) ->
@@ -213,13 +213,13 @@ findDeclarations filters currentModule completionOptions = do
       filters) <>
     foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)
 
-  pure $ CompletionResult (rows <&> \(module_name, name, type_, span) -> Completion
+  pure $ CompletionResult (rows <&> \(module_name, name, span) -> Completion
        { complModule = module_name
        , complIdentifier = name
        , complType = "TYPE"
        , complExpandedType = "EXPANDED"
        , complLocation = deserialise span
-       , complDocumentation = type_
+       , complDocumentation = Just "adfadsf"
        , complExportedFrom =  [ModuleName "MODDD"]
        , complDeclarationType = Nothing
        }
