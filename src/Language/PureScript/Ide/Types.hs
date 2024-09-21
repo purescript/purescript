@@ -26,6 +26,8 @@ import Language.PureScript.Errors qualified as P
 import Language.PureScript.Errors.JSON qualified as P
 import Database.SQLite.Simple qualified as SQLite
 import Codec.Serialise (Serialise)
+import Database.SQLite.Simple.ToField (ToField(..))
+import Database.SQLite.Simple (SQLData(SQLText))
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a
@@ -332,10 +334,11 @@ instance FromJSON IdeNamespace where
     "module" -> pure IdeNSModule
     s -> fail ("Unknown namespace: " <> show s)
 
-instance ToJSON IdeNamespace where
-  toJSON IdeNSValue = "value"
-  toJSON IdeNSType = "type"
-  toJSON IdeNSModule = "module"
+instance ToField IdeNamespace where
+  toField IdeNSValue = SQLText "value"
+  toField IdeNSType = SQLText "type"
+  toField IdeNSModule = SQLText "module"
+
 
 -- | A name tagged with a namespace
 data IdeNamespaced = IdeNamespaced IdeNamespace Text

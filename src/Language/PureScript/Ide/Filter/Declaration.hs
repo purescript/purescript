@@ -6,6 +6,8 @@ import Protolude                     hiding (isPrefixOf)
 
 import Control.Monad.Fail (fail)
 import Data.Aeson (FromJSON(..), ToJSON(..), withText)
+import Database.SQLite.Simple.ToField (ToField(..))
+import Database.SQLite.Simple (SQLData(..))
 
 data DeclarationType
   = Value
@@ -40,3 +42,13 @@ instance ToJSON DeclarationType where
     ValueOperator   -> "valueoperator"
     TypeOperator    -> "typeoperator"
     Module          -> "module"
+
+instance ToField DeclarationType where
+  toField Value = SQLText "value"
+  toField Type = SQLText "type"
+  toField Synonym = SQLText "synonym"
+  toField DataConstructor = SQLText "dataconstructor"
+  toField TypeClass = SQLText "typeclass"
+  toField ValueOperator = SQLText "valueoperator"
+  toField TypeOperator = SQLText "typeoperator"
+  toField Module = SQLText "module"
