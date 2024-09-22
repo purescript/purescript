@@ -38,7 +38,7 @@ import Language.PureScript.Ide.Prim (idePrimDeclarations)
 import Language.PureScript.Ide.Rebuild (rebuildFileAsync, rebuildFileSync)
 import Language.PureScript.Ide.SourceFile (parseModulesFromFiles)
 import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState, getSqliteFilePath, runQuery)
-import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..), Completion (..), toText)
+import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..), Completion (..), toText, Match (..))
 import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, namespaceForDeclaration, withEmptyAnn)
 import Language.PureScript.Ide.Usage (findUsages)
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
@@ -59,6 +59,7 @@ import Data.ByteString.Lazy qualified
 import Database.SQLite.Simple (Only(Only))
 import Database.SQLite.Simple.ToField (ToField(..))
 import Language.PureScript.Ide.Filter.Declaration (declarationTypeToText)
+import Data.ByteString.Lazy qualified as Lazy
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.
@@ -149,8 +150,8 @@ findDeclarations
   -> Maybe CompletionOptions
   -> m Success
 findDeclarations filters currentModule completionOptions = do
-  rows <- runQuery $
-    "select module_name, name, span " <>
+  rows :: [(Text, Lazy.ByteString)] <- runQuery $
+    "select module_name, declaration " <>
     "from ide_declarations where " <>
     T.intercalate " and " (
       mapMaybe (\case
@@ -166,17 +167,9 @@ findDeclarations filters currentModule completionOptions = do
       filters) <>
     foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)
 
-  pure $ CompletionResult (rows <&> \(module_name, name, span) -> Completion
-       { complModule = module_name
-       , complIdentifier = name
-       , complType = "TYPE"
-       , complExpandedType = "EXPANDED"
-       , complLocation = deserialise span
-       , complDocumentation = Just "adfadsf"
-       , complExportedFrom =  [ModuleName "MODDD"]
-       , complDeclarationType = Nothing
-       }
-       )
+  let matches = rows <&> \(m, decl) -> (Match (ModuleName m, deserialise decl), [])
+  
+  pure $ CompletionResult $ completionFromMatch <$> matches 
 
 sqliteFile :: Ide m => m FilePath
 sqliteFile = outputDirectory <&> ( </> "cache.db")

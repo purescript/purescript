@@ -28,6 +28,7 @@ import Language.PureScript.Docs.Render (renderDeclaration)
 import Language.PureScript.Docs.AsMarkdown (codeToString, declAsMarkdown, runDocs)
 import Codec.Serialise (serialise)
 import Data.Aeson (encode)
+import Debug.Trace qualified as Debug
 
 sqliteExtern :: (MonadIO m) => FilePath -> Docs.Module -> ExternsFile -> m ()
 sqliteExtern outputDir docs extern = liftIO $ do 
@@ -46,8 +47,15 @@ sqliteExtern outputDir docs extern = liftIO $ do
         , ":dependency" := runModuleName (eiModule i)
         ])
 
+
+    Debug.traceM $ show $  convertExterns extern
+    Debug.traceM $ show $ Docs.modDeclarations docs
+
     for_ (fst $ convertExterns extern) (\ideDeclaration -> do
-       withRetry $ SQLite.executeNamed conn "INSERT INTO ide_declarations (module_name, name, namespace, declaration_type, span, declaration) VALUES (:module_name, :name, :namespace, :declaration_type, :span, :declaration)"
+       withRetry $ SQLite.executeNamed conn
+          ("INSERT INTO ide_declarations (module_name, name, namespace, declaration_type, span, declaration) " <>
+           "VALUES (:module_name, :name, :namespace, :declaration_type, :span, :declaration)"
+          )
         [ ":module_name" := runModuleName (efModuleName extern )
         , ":name" := identifierFromIdeDeclaration (discardAnn ideDeclaration)
         , ":namespace" := namespaceForDeclaration (discardAnn ideDeclaration)
