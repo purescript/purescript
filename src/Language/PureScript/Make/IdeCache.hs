@@ -1,6 +1,8 @@
 module Language.PureScript.Make.IdeCache where
 
 import Prelude
+
+import Language.PureScript.Ide.ToIde (toIdeDeclarationAnn)
 import Database.SQLite.Simple (NamedParam(..))
 import Database.SQLite.Simple qualified as SQLite
 import Codec.Serialise qualified as Serialise
@@ -29,9 +31,10 @@ import Language.PureScript.Docs.AsMarkdown (codeToString, declAsMarkdown, runDoc
 import Codec.Serialise (serialise)
 import Data.Aeson (encode)
 import Debug.Trace qualified as Debug
+import Language.PureScript.AST.Declarations (Module)
 
-sqliteExtern :: (MonadIO m) => FilePath -> Docs.Module -> ExternsFile -> m ()
-sqliteExtern outputDir docs extern = liftIO $ do 
+sqliteExtern :: (MonadIO m) => FilePath -> Module -> Docs.Module -> ExternsFile -> m ()
+sqliteExtern outputDir m docs extern = liftIO $ do 
     conn <- SQLite.open db
     withRetry $ SQLite.executeNamed conn
       "INSERT INTO modules (module_name, comment, extern, dec) VALUES (:module_name, :docs, :extern, :dec)" 
@@ -47,11 +50,7 @@ sqliteExtern outputDir docs extern = liftIO $ do
         , ":dependency" := runModuleName (eiModule i)
         ])
 
-
-    Debug.traceM $ show $  convertExterns extern
-    Debug.traceM $ show $ Docs.modDeclarations docs
-
-    for_ (fst $ convertExterns extern) (\ideDeclaration -> do
+    for_ (toIdeDeclarationAnn m extern) (\ideDeclaration -> do
        withRetry $ SQLite.executeNamed conn
           ("INSERT INTO ide_declarations (module_name, name, namespace, declaration_type, span, declaration) " <>
            "VALUES (:module_name, :name, :namespace, :declaration_type, :span, :declaration)"

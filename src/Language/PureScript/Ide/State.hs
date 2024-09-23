@@ -19,6 +19,7 @@ module Language.PureScript.Ide.State
   ( getLoadedModulenames
   , getExternFiles
   , getFileState
+  , toIdeDeclarationAnn
   , resetIdeState
   , cacheRebuild
   , cachedRebuild
@@ -247,6 +248,20 @@ populateVolatileStateSTM ref = do
         & resolveReexports reexportRefs
   setVolatileStateSTM ref (IdeVolatileState (AstData asts) (map reResolved results) rebuildCache)
   pure results
+
+toIdeDeclarationAnn :: P.Module -> ExternsFile -> [IdeDeclarationAnn]
+toIdeDeclarationAnn m e = results
+  where
+  asts = extractAstInformation m
+  (moduleDeclarations, reexportRefs) = convertExterns e
+  results =
+        moduleDeclarations
+        & resolveDataConstructorsForModule
+        & resolveLocationsForModule asts
+        & resolveDocumentationForModule m
+        -- & resolveInstances externs
+        -- & resolveOperators
+        -- & resolveReexports reexportRefs
 
 resolveLocations
   :: ModuleMap (DefinitionSites P.SourceSpan, TypeAnnotations)

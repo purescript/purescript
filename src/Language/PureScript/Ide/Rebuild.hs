@@ -199,7 +199,7 @@ shushProgress ma =
 -- | Stops any kind of codegen
 shushCodegen :: Monad m => P.MakeActions m -> P.MakeActions m
 shushCodegen ma =
-  ma { P.codegen = \_ _ _ -> pure ()
+  ma { P.codegen = \_ _ _ _ -> pure ()
      , P.ffiCodegen = \_ -> pure ()
      }
 
