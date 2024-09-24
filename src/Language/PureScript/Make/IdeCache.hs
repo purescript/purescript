@@ -2,6 +2,7 @@ module Language.PureScript.Make.IdeCache where
 
 import Prelude
 
+import Language.PureScript.Ide.ToI (toI)
 import Language.PureScript.Ide.ToIde (toIdeDeclarationAnn)
 import Database.SQLite.Simple (NamedParam(..))
 import Database.SQLite.Simple qualified as SQLite
@@ -49,6 +50,8 @@ sqliteExtern outputDir m docs extern = liftIO $ do
         [ ":module_name" := runModuleName (efModuleName extern )
         , ":dependency" := runModuleName (eiModule i)
         ])
+
+    toI
 
     for_ (toIdeDeclarationAnn m extern) (\ideDeclaration -> do
        withRetry $ SQLite.executeNamed conn
