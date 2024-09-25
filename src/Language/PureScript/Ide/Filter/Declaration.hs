@@ -54,6 +54,5 @@ declarationTypeToText ValueOperator = "valueoperator"
 declarationTypeToText TypeOperator = "typeoperator"
 declarationTypeToText Module = "module"
 
-
 instance ToField DeclarationType where
   toField d = SQLText $ declarationTypeToText d
