@@ -149,20 +149,28 @@ sqliteInit outputDir = liftIO $ do
     createParentDirectory db
     conn <- SQLite.open db
     withRetry $ SQLite.execute_ conn "pragma journal_mode=wal"
-    withRetry $ SQLite.execute_ conn "create table if not exists modules (module_name text primary key, comment text, extern blob, dec text, unique (module_name) on conflict replace)"
+    withRetry $ SQLite.execute_ conn $ SQLite.Query $ Text.pack $ unlines
+      [ "create table if not exists modules ("
+      , " module_name text primary key,"
+      , " comment text,"
+      , " extern blob,"
+      , " dec text,"
+      , " unique (module_name) on conflict replace"
+      , ")"
+      ]
     withRetry $ SQLite.execute_ conn "create table if not exists dependencies (id integer primary key, module_name text not null, dependency text not null, unique (module_name, dependency) on conflict ignore)"
 
     withRetry $ SQLite.execute_ conn $ SQLite.Query $ Text.pack $ unlines
-      [ "create table if not exists declarations"
-      , "( module_name text"
-      , ", name text not null"
-      , ", namespace text"
-      , ", rexported_from text"
-      , ", span text"
-      , ", declaration_type text"
-      , ", type text"
-      , ", docs text"
-      , ", declaration text not null"
+      [ "create table if not exists declarations ("
+      , " module_name text,"
+      , " name text not null,"
+      , " namespace text,"
+      , " rexported_from text,"
+      , " span text,"
+      , " declaration_type text,"
+      , " type text,"
+      , " docs text,"
+      , " declaration text not null"
       , ")"
       ]
 
