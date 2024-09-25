@@ -38,8 +38,16 @@ import Data.Aeson qualified as Aeson
 sqliteExtern :: (MonadIO m) => FilePath -> Module -> Docs.Module -> ExternsFile -> m ()
 sqliteExtern outputDir m docs extern = liftIO $ do
     conn <- SQLite.open db
+
+    withRetry $ SQLite.execute_ conn "pragma foreign_keys = ON;"
+
     withRetry $ SQLite.executeNamed conn
-      "INSERT INTO modules (module_name, comment, extern, dec) VALUES (:module_name, :docs, :extern, :dec)"
+      "delete from modules where module_name = :module_name"
+      [ ":module_name" :=  runModuleName ( efModuleName extern )
+      ]
+
+    withRetry $ SQLite.executeNamed conn
+      "insert into modules (module_name, comment, extern, dec) values (:module_name, :docs, :extern, :dec)"
       [ ":module_name" :=  runModuleName ( efModuleName extern )
       , ":docs" := Docs.modComments docs
       , ":extern" := Serialise.serialise extern
@@ -47,15 +55,15 @@ sqliteExtern outputDir m docs extern = liftIO $ do
       ]
 
     for_ (efImports extern) (\i -> do
-       withRetry $ SQLite.executeNamed conn "INSERT INTO dependencies (module_name, dependency) VALUES (:module_name, :dependency)"
+       withRetry $ SQLite.executeNamed conn "insert into dependencies (module_name, dependency) values (:module_name, :dependency)"
         [ ":module_name" := runModuleName (efModuleName extern )
         , ":dependency" := runModuleName (eiModule i)
         ])
 
     for_ (toIdeDeclarationAnn m extern) (\ideDeclaration -> do
        withRetry $ SQLite.executeNamed conn
-          ("INSERT INTO ide_declarations (module_name, name, namespace, declaration_type, span, declaration) " <>
-           "VALUES (:module_name, :name, :namespace, :declaration_type, :span, :declaration)"
+          ("insert into ide_declarations (module_name, name, namespace, declaration_type, span, declaration) " <>
+           "values (:module_name, :name, :namespace, :declaration_type, :span, :declaration)"
           )
         [ ":module_name" := runModuleName (efModuleName extern )
         , ":name" := identifierFromIdeDeclaration (discardAnn ideDeclaration)
@@ -67,8 +75,8 @@ sqliteExtern outputDir m docs extern = liftIO $ do
 
     for_ (Docs.modDeclarations docs) (\d -> do
        withRetry $ SQLite.executeNamed conn
-         ("INSERT INTO declarations (module_name, name, namespace, declaration_type, span, type, docs, declaration) " <>
-          "VALUES (:module_name, :name, :namespace, :declaration_type, :span, :type, :docs, :declaration)"
+         ("insert into declarations (module_name, name, namespace, declaration_type, span, type, docs, declaration) " <>
+          "values (:module_name, :name, :namespace, :declaration_type, :span, :type, :docs, :declaration)"
          )
         [ ":module_name" := runModuleName (efModuleName extern)
         , ":name" := Docs.declTitle d
@@ -83,8 +91,8 @@ sqliteExtern outputDir m docs extern = liftIO $ do
 
        for_ (declChildren d) $ \ch -> do
          withRetry $ SQLite.executeNamed conn
-            ("INSERT INTO declarations (module_name, name, span, docs, declaration) " <>
-             "VALUES (:module_name, :name, :span, :docs, :declaration)")
+            ("insert into declarations (module_name, name, span, docs, declaration) " <>
+             "values (:module_name, :name, :span, :docs, :declaration)")
           [ ":module_name" := runModuleName (efModuleName extern)
           , ":name" := Docs.cdeclTitle ch
           , ":span" := Aeson.encode (Docs.declSourceSpan d)
@@ -97,8 +105,8 @@ sqliteExtern outputDir m docs extern = liftIO $ do
     for_ (Docs.modReExports docs) $ \rexport -> do
        for_ (snd rexport) $ \d  -> do
          withRetry $ SQLite.executeNamed conn
-           ("INSERT INTO declarations (module_name, name, rexported_from, declaration_type, span, type, docs, declaration)" <>
-            "VALUES (:module_name, :name, :rexported_from, :declaration_type, :span, :type, :docs, :declaration)"
+           ("insert into declarations (module_name, name, rexported_from, declaration_type, span, type, docs, declaration)" <>
+            "values (:module_name, :name, :rexported_from, :declaration_type, :span, :type, :docs, :declaration)"
            )
           [ ":module_name" := runModuleName (efModuleName extern)
           , ":name" := Docs.declTitle d
@@ -148,7 +156,8 @@ sqliteInit :: (MonadIO m) => FilePath -> m ()
 sqliteInit outputDir = liftIO $ do
     createParentDirectory db
     conn <- SQLite.open db
-    withRetry $ SQLite.execute_ conn "pragma journal_mode=wal"
+    withRetry $ SQLite.execute_ conn "pragma journal_mode=wal;"
+    withRetry $ SQLite.execute_ conn "pragma foreign_keys = ON;"
     withRetry $ SQLite.execute_ conn $ SQLite.Query $ Text.pack $ unlines
       [ "create table if not exists modules ("
       , " module_name text primary key,"
@@ -158,11 +167,18 @@ sqliteInit outputDir = liftIO $ do
       , " unique (module_name) on conflict replace"
       , ")"
       ]
-    withRetry $ SQLite.execute_ conn "create table if not exists dependencies (id integer primary key, module_name text not null, dependency text not null, unique (module_name, dependency) on conflict ignore)"
+
+    withRetry $ SQLite.execute_ conn $ SQLite.Query $ Text.pack $ unlines
+      [ "create table if not exists dependencies ("
+      , " module_name text not null references modules(module_name) on delete cascade,"
+      , " dependency text not null,"
+      , " unique (module_name, dependency) on conflict ignore"
+      , ")"
+      ]
 
     withRetry $ SQLite.execute_ conn $ SQLite.Query $ Text.pack $ unlines
       [ "create table if not exists declarations ("
-      , " module_name text,"
+      , " module_name text references modules(module_name) on delete cascade,"
       , " name text not null,"
       , " namespace text,"
       , " rexported_from text,"
@@ -174,7 +190,8 @@ sqliteInit outputDir = liftIO $ do
       , ")"
       ]
 
-    withRetry $ SQLite.execute_ conn "create index if not exists dm on declarations(module_name); create index dn on declarations(name);"
+    withRetry $ SQLite.execute_ conn "create index if not exists dm on declarations(module_name)"
+    withRetry $ SQLite.execute_ conn "create index if not exists dn on declarations(name);"
 
     withRetry $ SQLite.execute_ conn "create table if not exists ide_declarations (module_name text, name text, namespace text, declaration_type text, span blob, declaration blob)"
     SQLite.close conn
