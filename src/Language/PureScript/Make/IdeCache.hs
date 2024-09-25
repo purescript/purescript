@@ -91,10 +91,11 @@ sqliteExtern outputDir m docs extern = liftIO $ do
 
        for_ (declChildren d) $ \ch -> do
          withRetry $ SQLite.executeNamed conn
-            ("insert into declarations (module_name, name, span, docs, declaration) " <>
-             "values (:module_name, :name, :span, :docs, :declaration)")
+            ("insert into declarations (module_name, name, namespace, span, docs, declaration) " <>
+             "values (:module_name, :name, :namespace, :span, :docs, :declaration)")
           [ ":module_name" := runModuleName (efModuleName extern)
           , ":name" := Docs.cdeclTitle ch
+          , ":namespace" := childDeclInfoNamespaceIde (Docs.cdeclInfo ch)
           , ":span" := Aeson.encode (Docs.declSourceSpan d)
           , ":docs" := Docs.cdeclComments ch
           , ":declaration" := show d
@@ -181,11 +182,11 @@ sqliteInit outputDir = liftIO $ do
       , " module_name text references modules(module_name) on delete cascade,"
       , " name text not null,"
       , " namespace text,"
-      , " rexported_from text,"
-      , " span text,"
       , " declaration_type text,"
+      , " rexported_from text,"
       , " type text,"
       , " docs text,"
+      , " span text,"
       , " declaration text not null"
       , ")"
       ]
@@ -203,8 +204,14 @@ toDeclarationType (Docs.Declaration _ _ _ _ (Docs.ValueDeclaration _) _) = Value
 toDeclarationType (Docs.Declaration _ _ _ _ (Docs.DataDeclaration _ _ _) _) = Type
 toDeclarationType (Docs.Declaration _ _ _ _ _ _ )  = Value
 
+toIdeN :: Docs.Namespace -> IdeNamespace
+toIdeN Docs.ValueLevel = IdeNSValue
+toIdeN Docs.TypeLevel = IdeNSType
 
 toIdeNamespace :: Declaration -> IdeNamespace
 toIdeNamespace (Docs.Declaration _ _ _ _ declInfo _) = case Docs.declInfoNamespace declInfo of
   Docs.ValueLevel -> IdeNSValue
   Docs.TypeLevel -> IdeNSType
+
+childDeclInfoNamespaceIde :: Docs.ChildDeclarationInfo -> IdeNamespace
+childDeclInfoNamespaceIde = toIdeN . Docs.childDeclInfoNamespace
