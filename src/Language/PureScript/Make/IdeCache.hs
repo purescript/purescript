@@ -9,7 +9,7 @@ import Codec.Serialise qualified as Serialise
 import Control.Concurrent (threadDelay)
 import Control.Exception (try)
 import System.FilePath ((</>), takeDirectory)
-import Language.PureScript.Names (runModuleName, ProperName (runProperName), runIdent)
+import Language.PureScript.Names (runModuleName, ProperName (runProperName), runIdent, disqualify, Ident (..))
 import Language.PureScript.Externs (ExternsFile(..), ExternsImport(..))
 import Data.Foldable (for_)
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -31,13 +31,33 @@ import Language.PureScript.Docs.AsMarkdown (codeToString, declAsMarkdown, runDoc
 import Codec.Serialise (serialise)
 import Data.Aeson (encode)
 import Debug.Trace qualified as Debug
-import Language.PureScript.AST.Declarations (Module)
+import Language.PureScript.AST.Declarations (Module, Expr (Var), getModuleDeclarations)
 import Language.PureScript.Ide.Filter.Declaration (DeclarationType (..))
 import Data.Aeson qualified as Aeson
+import Language.PureScript.AST.Traversals (everywhereOnValuesM)
+import Protolude (identity)
 
 sqliteExtern :: (MonadIO m) => FilePath -> Module -> Docs.Module -> ExternsFile -> m ()
 sqliteExtern outputDir m docs extern = liftIO $ do
     conn <- SQLite.open db
+
+    -- Debug.traceM $ show m 
+
+    let (doDecl, _, _) = everywhereOnValuesM (pure . identity) (\expr -> case expr of
+         Var ss i -> do 
+            let iv = disqualify i
+            case iv of
+              Ident t -> do
+                withRetry $ SQLite.executeNamed conn
+                  "insert into asts (module_name, name, span) values (:module_name, :name, :span)"
+                  [ ":module_name" := runModuleName ( efModuleName extern )
+                  , ":name" := t
+                  , ":span" := Aeson.encode ss
+                  ]
+              _ -> pure ()
+            pure expr
+         _ -> pure expr
+         ) (pure . identity)
 
     withRetry $ SQLite.execute_ conn "pragma foreign_keys = ON;"
 
@@ -46,6 +66,7 @@ sqliteExtern outputDir m docs extern = liftIO $ do
       [ ":module_name" :=  runModuleName ( efModuleName extern )
       ]
 
+
     withRetry $ SQLite.executeNamed conn
       "insert into modules (module_name, comment, extern, dec) values (:module_name, :docs, :extern, :dec)"
       [ ":module_name" :=  runModuleName ( efModuleName extern )
@@ -53,6 +74,8 @@ sqliteExtern outputDir m docs extern = liftIO $ do
       , ":extern" := Serialise.serialise extern
       , ":dec" := show ( efExports extern )
       ]
+
+    for_ (getModuleDeclarations m) (\d -> doDecl d)
 
     for_ (efImports extern) (\i -> do
        withRetry $ SQLite.executeNamed conn "insert into dependencies (module_name, dependency) values (:module_name, :dependency)"
@@ -191,10 +214,21 @@ sqliteInit outputDir = liftIO $ do
       , ")"
       ]
 
+    withRetry $ SQLite.execute_ conn $ SQLite.Query $ Text.pack $ unlines
+      [ "create table if not exists asts ("
+      , " module_name text references modules(module_name) on delete cascade,"
+      , " name text not null,"
+      , " span text"
+      , ")"
+      ]
+
     withRetry $ SQLite.execute_ conn "create index if not exists dm on declarations(module_name)"
     withRetry $ SQLite.execute_ conn "create index if not exists dn on declarations(name);"
+    
+    withRetry $ SQLite.execute_ conn "create index if not exists asts_module_name_idx on asts(module_name);"
+    withRetry $ SQLite.execute_ conn "create index if not exists asts_name_idx on asts(name);"
 
-    withRetry $ SQLite.execute_ conn "create table if not exists ide_declarations (module_name text, name text, namespace text, declaration_type text, span blob, declaration blob)"
+    withRetry $ SQLite.execute_ conn "create table if not exists ide_declarations (module_name text references modules(module_name) on delete cascade, name text, namespace text, declaration_type text, span blob, declaration blob)"
     SQLite.close conn
   where
   db = outputDir </> "cache.db"

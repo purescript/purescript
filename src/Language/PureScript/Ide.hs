@@ -60,6 +60,7 @@ import Database.SQLite.Simple (Only(Only))
 import Database.SQLite.Simple.ToField (ToField(..))
 import Language.PureScript.Ide.Filter.Declaration (declarationTypeToText)
 import Data.ByteString.Lazy qualified as Lazy
+import Data.Aeson qualified as Aeson
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.
@@ -99,15 +100,24 @@ handleCommand c = case c of
   AddClause l wca ->
     MultilineTextResult <$> CS.addClause l wca
   FindUsages moduleName ident namespace -> do
-    Map.lookup moduleName <$> getAllModules Nothing >>= \case
-      Nothing -> throwError (GeneralError "Module not found")
-      Just decls -> do
-        case find (\d -> namespaceForDeclaration (discardAnn d) == namespace
-                    && identifierFromIdeDeclaration (discardAnn d) == ident) decls of
-          Nothing -> throwError (GeneralError "Declaration not found")
-          Just declaration -> do
-            let sourceModule = fromMaybe moduleName (declaration & _idaAnnotation & _annExportedFrom)
-            UsagesResult . foldMap toList <$> findUsages (discardAnn declaration) sourceModule
+    r :: [Only Lazy.ByteString] <- runQuery $ unlines
+      [ "select a.span"
+      , "from dependencies d join asts a on d.module_name = a.module_name"
+      , "where d.dependency = '" <> runModuleName moduleName <> "' and a.name = '" <> ident <> "'"
+      ]
+
+    pure $ UsagesResult (mapMaybe (\(Only span) -> Aeson.decode span) r)
+
+
+    -- Map.lookup moduleName <$> getAllModules Nothing >>= \case
+    --   Nothing -> throwError (GeneralError "Module not found")
+    --   Just decls -> do
+    --     case find (\d -> namespaceForDeclaration (discardAnn d) == namespace
+    --                 && identifierFromIdeDeclaration (discardAnn d) == ident) decls of
+    --       Nothing -> throwError (GeneralError "Declaration not found")
+    --       Just declaration -> do
+    --         let sourceModule = fromMaybe moduleName (declaration & _idaAnnotation & _annExportedFrom)
+    --         UsagesResult . foldMap toList <$> findUsages (discardAnn declaration) sourceModule
   Import fp outfp _ (AddImplicitImport mn) -> do
     rs <- addImplicitImport fp mn
     answerRequest outfp rs
@@ -168,8 +178,8 @@ findDeclarations filters currentModule completionOptions = do
     foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)
 
   let matches = rows <&> \(m, decl) -> (Match (ModuleName m, deserialise decl), [])
-  
-  pure $ CompletionResult $ completionFromMatch <$> matches 
+
+  pure $ CompletionResult $ completionFromMatch <$> matches
 
 sqliteFile :: Ide m => m FilePath
 sqliteFile = outputDirectory <&> ( </> "cache.db")
