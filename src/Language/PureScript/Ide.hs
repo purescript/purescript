@@ -101,9 +101,9 @@ handleCommand c = case c of
     MultilineTextResult <$> CS.addClause l wca
   FindUsages moduleName ident namespace -> do
     r :: [Only Lazy.ByteString] <- runQuery $ unlines
-      [ "select a.span"
+      [ "select distinct a.span"
       , "from dependencies d join asts a on d.module_name = a.module_name"
-      , "where d.dependency = '" <> runModuleName moduleName <> "' and a.name = '" <> ident <> "'"
+      , "where (d.dependency = '" <> runModuleName moduleName <> "' or d.module_name = '" <> runModuleName moduleName <> "') and a.name = '" <> ident <> "'"
       ]
 
     pure $ UsagesResult (mapMaybe (\(Only span) -> Aeson.decode span) r)
