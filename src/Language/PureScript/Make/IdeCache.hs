@@ -9,7 +9,7 @@ import Codec.Serialise qualified as Serialise
 import Control.Concurrent (threadDelay)
 import Control.Exception (try)
 import System.FilePath ((</>), takeDirectory)
-import Language.PureScript.Names (runModuleName, ProperName (runProperName), runIdent, disqualify, Ident (..))
+import Language.PureScript.Names (runModuleName, ProperName (runProperName), runIdent, disqualify, Ident (..), OpName (OpName))
 import Language.PureScript.Externs (ExternsFile(..), ExternsImport(..))
 import Data.Foldable (for_)
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -36,6 +36,7 @@ import Language.PureScript.Ide.Filter.Declaration (DeclarationType (..))
 import Data.Aeson qualified as Aeson
 import Language.PureScript.AST.Traversals (everywhereOnValuesM)
 import Protolude (identity)
+import Language.PureScript.Names qualified as T
 
 sqliteExtern :: (MonadIO m) => FilePath -> Module -> Docs.Module -> ExternsFile -> m ()
 sqliteExtern outputDir m docs extern = liftIO $ do
@@ -82,6 +83,18 @@ sqliteExtern outputDir m docs extern = liftIO $ do
          withRetry $ SQLite.executeNamed conn "insert into exports (module_name, name, defined_in, declaration_type) values (:module_name, :name, :defined_in, 'value')"
           [ ":module_name" := runModuleName (efModuleName extern )
           , ":name" := i
+          , ":defined_in" := runModuleName definedIn
+          ]
+       ReExportRef _ (ExportSource _ definedIn) (ValueOpRef _ (OpName n)) -> do
+         withRetry $ SQLite.executeNamed conn "insert into exports (module_name, name, defined_in, declaration_type) values (:module_name, :name, :defined_in, 'valueoperator')"
+          [ ":module_name" := runModuleName (efModuleName extern )
+          , ":name" := n
+          , ":defined_in" := runModuleName definedIn
+          ]
+       ReExportRef _ (ExportSource _ definedIn) (TypeClassRef _ (T.ProperName n)) -> do
+         withRetry $ SQLite.executeNamed conn "insert into exports (module_name, name, defined_in, declaration_type) values (:module_name, :name, :defined_in, 'typeclass')"
+          [ ":module_name" := runModuleName (efModuleName extern )
+          , ":name" := n
           , ":defined_in" := runModuleName definedIn
           ]
        _ -> pure ()
