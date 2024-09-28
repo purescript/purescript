@@ -162,17 +162,20 @@ findDeclarations
 findDeclarations filters currentModule completionOptions = do
   rows :: [(Text, Lazy.ByteString)] <- runQuery $
     "select module_name, declaration " <>
-    "from ide_declarations where " <>
+    "from ide_declarations id where " <>
     T.intercalate " and " (
       mapMaybe (\case
         F.Filter (Left modules) ->
-          Just $ "module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> ")"
-        F.Filter (Right (F.Prefix f)) -> Just $ "name glob '" <> f <> "*'"
-        F.Filter (Right (F.Exact f)) -> Just $ "name glob '" <> f <> "'"
+          Just $ "(exists (select 1 from exports e where id.module_name = e.defined_in and id.name = e.name and id.declaration_type = e.declaration_type and e.module_name in (" <>
+            T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> 
+          "))" <>
+          " or " <> "id.module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> "))"
+        F.Filter (Right (F.Prefix f)) -> Just $ "id.name glob '" <> f <> "*'"
+        F.Filter (Right (F.Exact f)) -> Just $ "id.name glob '" <> f <> "'"
         F.Filter (Right (F.Namespace namespaces)) ->
-          Just $ "namespace in (" <> T.intercalate "," (toList namespaces <&> \n -> "'" <> toText n <> "'") <> ")"
+          Just $ "id.namespace in (" <> T.intercalate "," (toList namespaces <&> \n -> "'" <> toText n <> "'") <> ")"
         F.Filter (Right (F.DeclType dt)) ->
-          Just $ "namespace in (" <> T.intercalate "," (toList dt <&> \t -> "'" <> declarationTypeToText t <> "'") <> ")"
+          Just $ "id.namespace in (" <> T.intercalate "," (toList dt <&> \t -> "'" <> declarationTypeToText t <> "'") <> ")"
         F.Filter _ -> Nothing)
       filters) <>
     foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)

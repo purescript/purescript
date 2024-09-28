@@ -31,7 +31,7 @@ import Language.PureScript.Docs.AsMarkdown (codeToString, declAsMarkdown, runDoc
 import Codec.Serialise (serialise)
 import Data.Aeson (encode)
 import Debug.Trace qualified as Debug
-import Language.PureScript.AST.Declarations (Module, Expr (Var), getModuleDeclarations)
+import Language.PureScript.AST.Declarations (Module, Expr (Var), getModuleDeclarations, DeclarationRef (..), ExportSource (..))
 import Language.PureScript.Ide.Filter.Declaration (DeclarationType (..))
 import Data.Aeson qualified as Aeson
 import Language.PureScript.AST.Traversals (everywhereOnValuesM)
@@ -41,7 +41,7 @@ sqliteExtern :: (MonadIO m) => FilePath -> Module -> Docs.Module -> ExternsFile 
 sqliteExtern outputDir m docs extern = liftIO $ do
     conn <- SQLite.open db
 
-    -- Debug.traceM $ show m 
+    Debug.traceM $ show extern 
 
     let (doDecl, _, _) = everywhereOnValuesM (pure . identity) (\expr -> case expr of
          Var ss i -> do 
@@ -76,6 +76,16 @@ sqliteExtern outputDir m docs extern = liftIO $ do
       ]
 
     for_ (getModuleDeclarations m) (\d -> doDecl d)
+
+    for_ (efExports extern) (\case 
+       ReExportRef _ (ExportSource _ definedIn) (ValueRef _ (Ident i)) -> do
+         withRetry $ SQLite.executeNamed conn "insert into exports (module_name, name, defined_in, declaration_type) values (:module_name, :name, :defined_in, 'value')"
+          [ ":module_name" := runModuleName (efModuleName extern )
+          , ":name" := i
+          , ":defined_in" := runModuleName definedIn
+          ]
+       _ -> pure ()
+          )
 
     for_ (efImports extern) (\i -> do
        withRetry $ SQLite.executeNamed conn "insert into dependencies (module_name, dependency) values (:module_name, :dependency)"
@@ -219,6 +229,15 @@ sqliteInit outputDir = liftIO $ do
       , " module_name text references modules(module_name) on delete cascade,"
       , " name text not null,"
       , " span text"
+      , ")"
+      ]
+
+    withRetry $ SQLite.execute_ conn $ SQLite.Query $ Text.pack $ unlines
+      [ "create table if not exists exports ("
+      , "module_name text references modules(module_name) on delete cascade,"
+      , "name text not null,"
+      , "defined_in text,"
+      , "declaration_type text"
       , ")"
       ]
 
