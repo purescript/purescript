@@ -42,7 +42,7 @@ sqliteExtern :: (MonadIO m) => FilePath -> Module -> Docs.Module -> ExternsFile 
 sqliteExtern outputDir m docs extern = liftIO $ do
     conn <- SQLite.open db
 
-    Debug.traceM $ show extern 
+    -- Debug.traceM $ show extern 
 
     let (doDecl, _, _) = everywhereOnValuesM (pure . identity) (\expr -> case expr of
          Var ss i -> do 
@@ -260,10 +260,17 @@ sqliteInit outputDir = liftIO $ do
     withRetry $ SQLite.execute_ conn "create index if not exists asts_module_name_idx on asts(module_name);"
     withRetry $ SQLite.execute_ conn "create index if not exists asts_name_idx on asts(name);"
 
-    withRetry $ SQLite.execute_ conn "create index if not exists ide_declarations_name_idx on ide_declarations(name);"
-    withRetry $ SQLite.execute_ conn "create index if not exists ide_declarations_module_name_idx on ide_declarations(module_name);"
+
+    withRetry $ SQLite.execute_ conn "create index if not exists exports_name_idx on exports(name);"
+    withRetry $ SQLite.execute_ conn "create index if not exists exports_module_name_idx on exports(module_name);"
+
+    withRetry $ SQLite.execute_ conn "create index if not exists exports_defined_in_id on exports(defined_in);"
+    withRetry $ SQLite.execute_ conn "create index if not exists exports_declaration_type_idx on exports(declaration_type);"
 
     withRetry $ SQLite.execute_ conn "create table if not exists ide_declarations (module_name text references modules(module_name) on delete cascade, name text, namespace text, declaration_type text, span blob, declaration blob)"
+
+    withRetry $ SQLite.execute_ conn "create index if not exists ide_declarations_name_idx on ide_declarations(name);"
+    withRetry $ SQLite.execute_ conn "create index if not exists ide_declarations_module_name_idx on ide_declarations(module_name);"
     SQLite.close conn
   where
   db = outputDir </> "cache.db"
