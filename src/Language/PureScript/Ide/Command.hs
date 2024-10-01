@@ -24,7 +24,7 @@ import Language.PureScript qualified as P
 import Language.PureScript.Ide.CaseSplit (WildcardAnnotations, explicitAnnotations, noAnnotations)
 import Language.PureScript.Ide.Completion (CompletionOptions, defaultCompletionOptions)
 import Language.PureScript.Ide.Filter (Filter)
-import Language.PureScript.Ide.Matcher (Matcher)
+import Language.PureScript.Ide.Matcher (Matcher, Matcher')
 import Language.PureScript.Ide.Types (IdeDeclarationAnn, IdeNamespace)
 
 data Command
@@ -37,7 +37,7 @@ data Command
       }
     | Complete
       { completeFilters       :: [Filter]
-      , completeMatcher       :: Matcher IdeDeclarationAnn
+      , completeMatcher       :: Maybe Matcher'
       , completeCurrentModule :: Maybe P.ModuleName
       , completeOptions       :: CompletionOptions
       }
@@ -141,7 +141,7 @@ instance FromJSON Command where
         params <- o .: "params"
         Complete
           <$> params .:? "filters" .!= []
-          <*> params .:? "matcher" .!= mempty
+          <*> params .:? "matcher" .!= Nothing
           <*> (fmap P.moduleNameFromString <$> params .:? "currentModule")
           <*> params .:? "options" .!= defaultCompletionOptions
       "caseSplit" -> do

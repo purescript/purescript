@@ -14,6 +14,7 @@
 
 module Language.PureScript.Ide.Matcher
        ( Matcher
+       , Matcher'(..)
        , runMatcher
        -- for tests
        , flexMatcher
@@ -34,6 +35,26 @@ import Text.Regex.TDFA ((=~))
 type ScoredMatch a = (Match a, Double)
 
 newtype Matcher a = Matcher (Endo [Match a]) deriving (Semigroup, Monoid)
+
+data Matcher'
+ = Distance { search:: Text, maximumDistance :: Int }
+ | Flex { search:: Text }
+ deriving (Show)
+
+instance FromJSON Matcher' where
+  parseJSON = withObject "matcher" $ \o -> do
+    (matcher :: Maybe Text) <- o .:? "matcher"
+    case matcher of
+      Just "flex" -> do
+        params <- o .: "params"
+        Flex <$> params .: "search"
+      Just "distance" -> do
+        params <- o .: "params"
+        Distance
+          <$> params .: "search"
+          <*> params .: "maximumDistance"
+      Just s -> fail ("Unknown matcher: " <> show s)
+      Nothing -> fail "Unknown matcher"
 
 instance FromJSON (Matcher IdeDeclarationAnn) where
   parseJSON = withObject "matcher" $ \o -> do

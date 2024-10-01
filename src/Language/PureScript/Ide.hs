@@ -33,7 +33,7 @@ import Language.PureScript.Ide.Externs (readExternFile)
 import Language.PureScript.Ide.Filter qualified as F
 import Language.PureScript.Ide.Imports (parseImportsFromFile)
 import Language.PureScript.Ide.Imports.Actions (addImplicitImport, addImportForIdentifier, addQualifiedImport, answerRequest)
-import Language.PureScript.Ide.Matcher (Matcher)
+import Language.PureScript.Ide.Matcher (Matcher, Matcher' (..))
 import Language.PureScript.Ide.Prim (idePrimDeclarations)
 import Language.PureScript.Ide.Rebuild (rebuildFileAsync, rebuildFileSync)
 import Language.PureScript.Ide.SourceFile (parseModulesFromFiles)
@@ -84,8 +84,12 @@ handleCommand c = case c of
     -- loadModulesSync modules
   Type search filters currentModule ->
     findDeclarations (F.Filter (Right $ F.Exact search) : filters) currentModule Nothing
-  Complete filters matcher currentModule complOptions ->
-    findDeclarations filters currentModule (Just complOptions)
+  Complete filters matcher currentModule complOptions -> do
+    Debug.traceM $ show matcher
+
+    findDeclarations (filters <> foldMap (\case 
+        Flex q -> [F.Filter (Right $ F.Prefix q)]
+        Distance q _ -> [F.Filter (Right $ F.Prefix q)]) matcher) currentModule (Just complOptions)
     -- findCompletions' filters matcher currentModule complOptions
   List LoadedModules -> do
     logWarnN
@@ -162,12 +166,12 @@ findDeclarations
 findDeclarations filters currentModule completionOptions = do
   rows :: [(Text, Lazy.ByteString)] <- runQuery $
     "select module_name, declaration " <>
-    "from ide_declarations id where " <>
-    T.intercalate " and " (
+    "from ide_declarations id " <>
+    (
       mapMaybe (\case
         F.Filter (Left modules) ->
           Just $ "(exists (select 1 from exports e where id.module_name = e.defined_in and id.name = e.name and id.declaration_type = e.declaration_type and e.module_name in (" <>
-            T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> 
+            T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <>
           "))" <>
           " or " <> "id.module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> "))"
         F.Filter (Right (F.Prefix f)) -> Just $ "id.name glob '" <> f <> "*'"
@@ -177,7 +181,9 @@ findDeclarations filters currentModule completionOptions = do
         F.Filter (Right (F.DeclType dt)) ->
           Just $ "id.namespace in (" <> T.intercalate "," (toList dt <&> \t -> "'" <> declarationTypeToText t <> "'") <> ")"
         F.Filter _ -> Nothing)
-      filters) <>
+      filters
+      & \f -> if null f then " " else " where " <> T.intercalate " and " f
+      ) <>
     foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)
 
   let matches = rows <&> \(m, decl) -> (Match (ModuleName m, deserialise decl), [])
