@@ -85,7 +85,6 @@ handleCommand c = case c of
   Type search filters currentModule ->
     findDeclarations (F.Filter (Right $ F.Exact search) : filters) currentModule Nothing
   Complete filters matcher currentModule complOptions -> do
-    Debug.traceM $ show matcher
 
     findDeclarations (filters <> foldMap (\case 
         Flex q -> [F.Filter (Right $ F.Prefix q)]
