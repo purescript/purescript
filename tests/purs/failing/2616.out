@@ -16,6 +16,7 @@ while applying a function [33mcompare[0m
   of type [33mOrd t0 => t0 -> t0 -> Ordering[0m
   to argument [33m$l2[0m
 while inferring the type of [33mcompare $l2[0m
+while matching label [33mcompare[0m
 in value declaration [33mordFoo[0m
 
 where [33mr1[0m is a rigid type variable

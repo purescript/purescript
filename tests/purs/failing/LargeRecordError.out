@@ -1,0 +1,41 @@
+Error found:
+in module [33mA[0m
+at tests/purs/failing/LargeRecordError.purs:6:3 - 6:26 (line 6, column 3 - line 6, column 26)
+
+  Could not match type
+  [33m            [0m
+  [33m  ( h :: Int[0m
+  [33m  , j :: Int[0m
+  [33m  ...       [0m
+  [33m  )         [0m
+  [33m            [0m
+  with type
+  [33m           [0m
+  [33m  ( g :: t1[0m
+  [33m  ...      [0m
+  [33m  | t2     [0m
+  [33m  )        [0m
+  [33m           [0m
+
+while trying to match type [33m{ a :: Int[0m
+                           [33m, b :: Int[0m
+                           [33m, c :: Int[0m
+                           [33m, d :: Int[0m
+                           [33m, e :: Int[0m
+                           [33m, f :: Int[0m
+                           [33m, h :: Int[0m
+                           [33m, j :: Int[0m
+                           [33m}         [0m
+  with type [33mRecord t0[0m
+while checking that expression [33mcase $0 of                                         [0m
+                               [33m  { a: a, b: b, c: c, d: d, e: e, f: f, g: g } -> 1[0m
+  has type [33mInt[0m
+in value declaration [33mf[0m
+
+where [33mt0[0m is an unknown type
+      [33mt2[0m is an unknown type
+      [33mt1[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+or to contribute content related to this error.
+
