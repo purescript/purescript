@@ -12,7 +12,7 @@ module Language.PureScript.Sugar.Names
 import Prelude
 import Protolude (sortOn, swap, foldl')
 
-import Control.Arrow (first, second, (&&&))
+import Control.Arrow (first, second)
 import Control.Monad (foldM, when, (>=>))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy (MonadState, StateT(..), gets, modify)
@@ -184,49 +184,49 @@ renameInModule imports (Module modSS coms mn decls exps) =
       updateGuard
 
   updateDecl
-    :: M.Map Ident SourcePos
+    :: M.Map Name SourcePos
     -> Declaration
-    -> m (M.Map Ident SourcePos, Declaration)
+    -> m (M.Map Name SourcePos, Declaration)
   updateDecl bound (DataDeclaration sa dtype name args dctors) =
     fmap (bound,) $
       DataDeclaration sa dtype name
-        <$> updateTypeArguments args
-        <*> traverse (traverseDataCtorFields (traverse (sndM updateTypesEverywhere))) dctors
-  updateDecl bound (TypeSynonymDeclaration sa name ps ty) =
-    fmap (bound,) $
+        <$> updateTypeArguments bound args
+        <*> traverse (traverseDataCtorFields (traverse (sndM (updateTypesEverywhere bound)))) dctors
+  updateDecl bound (TypeSynonymDeclaration sa@(ss, _) name ps ty) =
+    fmap (M.insert (TyName name) (spanStart ss) bound,) $
       TypeSynonymDeclaration sa name
-        <$> updateTypeArguments ps
-        <*> updateTypesEverywhere ty
+        <$> updateTypeArguments bound ps
+        <*> updateTypesEverywhere bound ty
   updateDecl bound (TypeClassDeclaration sa className args implies deps ds) =
     fmap (bound,) $
       TypeClassDeclaration sa className
-        <$> updateTypeArguments args
-        <*> updateConstraints implies
+        <$> updateTypeArguments bound args
+        <*> updateConstraints bound implies
         <*> pure deps
         <*> pure ds
   updateDecl bound (TypeInstanceDeclaration sa na@(ss, _) ch idx name cs cn ts ds) =
     fmap (bound,) $
       TypeInstanceDeclaration sa na ch idx name
-        <$> updateConstraints cs
+        <$> updateConstraints bound cs
         <*> updateClassName cn ss
-        <*> traverse updateTypesEverywhere ts
+        <*> traverse (updateTypesEverywhere bound) ts
         <*> pure ds
   updateDecl bound (KindDeclaration sa kindFor name ty) =
     fmap (bound,) $
       KindDeclaration sa kindFor name
-        <$> updateTypesEverywhere ty
+        <$> updateTypesEverywhere bound ty
   updateDecl bound (TypeDeclaration (TypeDeclarationData sa name ty)) =
     fmap (bound,) $
       TypeDeclaration . TypeDeclarationData sa name
-        <$> updateTypesEverywhere ty
+        <$> updateTypesEverywhere bound ty
   updateDecl bound (ExternDeclaration sa name ty) =
-    fmap (M.insert name (spanStart $ fst sa) bound,) $
+    fmap (M.insert (IdentName name) (spanStart $ fst sa) bound,) $
       ExternDeclaration sa name
-        <$> updateTypesEverywhere ty
+        <$> updateTypesEverywhere bound ty
   updateDecl bound (ExternDataDeclaration sa name ki) =
     fmap (bound,) $
       ExternDataDeclaration sa name
-        <$> updateTypesEverywhere ki
+        <$> updateTypesEverywhere bound ki
   updateDecl bound (TypeFixityDeclaration sa@(ss, _) fixity alias op) =
     fmap (bound,) $
       TypeFixityDeclaration sa fixity
@@ -246,86 +246,69 @@ renameInModule imports (Module modSS coms mn decls exps) =
     return (b, d)
 
   updateValue
-    :: (SourceSpan, M.Map Ident SourcePos)
+    :: (SourceSpan, M.Map Name SourcePos)
     -> Expr
-    -> m ((SourceSpan, M.Map Ident SourcePos), Expr)
+    -> m ((SourceSpan, M.Map Name SourcePos), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _ _) =
     return ((pos', bound), v)
   updateValue (pos, bound) (Abs (VarBinder ss arg) val') =
-    return ((pos, M.insert arg (spanStart ss) bound), Abs (VarBinder ss arg) val')
+    return ((pos, M.insert (IdentName arg) (spanStart ss) bound), Abs (VarBinder ss arg) val')
   updateValue (pos, bound) (Let w ds val') = do
     let
-      args = mapMaybe letBoundVariable ds
+      names = mapMaybe letBoundName ds
       groupByFst = map (\ts -> (fst (NEL.head ts), snd <$> ts)) . NEL.groupAllWith fst
-      duplicateArgsErrs = foldMap mkArgError $ groupByFst args
-      mkArgError (ident, poses)
+      duplicateNameErrs = foldMap mkNameError $ groupByFst names
+      mkNameError (name, poses)
         | NEL.length poses < 2 = mempty
-        | otherwise = errorMessage'' (NEL.reverse poses) (OverlappingNamesInLet ident)
-    when (nonEmpty duplicateArgsErrs) $
-      throwError duplicateArgsErrs
+        | otherwise = errorMessage'' (NEL.reverse poses) (OverlappingNamesInLet name)
+    when (nonEmpty duplicateNameErrs) $
+      throwError duplicateNameErrs
     return ((pos, declarationsToMap ds `M.union` bound), Let w ds val')
-  updateValue (_, bound) (Var ss name'@(Qualified qualifiedBy ident)) =
-    ((ss, bound), ) <$> case (M.lookup ident bound, qualifiedBy) of
-      -- bound idents that have yet to be locally qualified.
-      (Just sourcePos, ByNullSourcePos) ->
-        pure $ Var ss (Qualified (BySourcePos sourcePos) ident)
-      -- unbound idents are likely import unqualified imports, so we
-      -- handle them through updateValueName if they don't exist as a
-      -- local binding.
-      (Nothing, ByNullSourcePos) ->
-        Var ss <$> updateValueName name' ss
-      -- bound/unbound idents with explicit qualification is still
-      -- handled through updateValueName, as it fully resolves the
-      -- ModuleName.
-      (_, ByModuleName _) ->
-        Var ss <$> updateValueName name' ss
-      -- encountering non-null source spans may be a bug in previous
-      -- desugaring steps or with the AST traversals.
-      (_, BySourcePos _) ->
-        internalError "updateValue: ident is locally-qualified by a non-null source position"
+  updateValue (_, bound) (Var ss qname) =
+    ((ss, bound), ) <$> (Var ss <$> updateBoundName bound IdentName updateValueName qname ss)
   updateValue (_, bound) (Op ss op) =
     ((ss, bound), ) <$> (Op ss <$> updateValueOpName op ss)
   updateValue (_, bound) (Constructor ss name) =
     ((ss, bound), ) <$> (Constructor ss <$> updateDataConstructorName name ss)
-  updateValue s (TypedValue check val ty) =
-    (s, ) <$> (TypedValue check val <$> updateTypesEverywhere ty)
-  updateValue s (VisibleTypeApp val ty) =
-    (s, ) <$> VisibleTypeApp val <$> updateTypesEverywhere ty
+  updateValue s@(_, bound) (TypedValue check val ty) =
+    (s, ) <$> (TypedValue check val <$> updateTypesEverywhere bound ty)
+  updateValue s@(_, bound) (VisibleTypeApp val ty) =
+    (s, ) <$> VisibleTypeApp val <$> updateTypesEverywhere bound ty
   updateValue s v = return (s, v)
 
   updateBinder
-    :: (SourceSpan, M.Map Ident SourcePos)
+    :: (SourceSpan, M.Map Name SourcePos)
     -> Binder
-    -> m ((SourceSpan, M.Map Ident SourcePos), Binder)
+    -> m ((SourceSpan, M.Map Name SourcePos), Binder)
   updateBinder (_, bound) v@(PositionedBinder pos _ _) =
     return ((pos, bound), v)
   updateBinder (_, bound) (ConstructorBinder ss name b) =
     ((ss, bound), ) <$> (ConstructorBinder ss <$> updateDataConstructorName name ss <*> pure b)
   updateBinder (_, bound) (OpBinder ss op) =
     ((ss, bound), ) <$> (OpBinder ss <$> updateValueOpName op ss)
-  updateBinder s (TypedBinder t b) = do
-    t' <- updateTypesEverywhere t
+  updateBinder s@(_, bound) (TypedBinder t b) = do
+    t' <- updateTypesEverywhere bound t
     return (s, TypedBinder t' b)
   updateBinder s v =
     return (s, v)
 
   updateCase
-    :: (SourceSpan, M.Map Ident SourcePos)
+    :: (SourceSpan, M.Map Name SourcePos)
     -> CaseAlternative
-    -> m ((SourceSpan, M.Map Ident SourcePos), CaseAlternative)
+    -> m ((SourceSpan, M.Map Name SourcePos), CaseAlternative)
   updateCase (pos, bound) c@(CaseAlternative bs _) =
-    return ((pos, rUnionMap binderNamesWithSpans' bs `M.union` bound), c)
+    return ((pos, M.mapKeysMonotonic IdentName (rUnionMap binderNamesWithSpans' bs) `M.union` bound), c)
     where
     rUnionMap f = foldl' (flip (M.union . f)) M.empty
 
   updateGuard
-    :: (SourceSpan, M.Map Ident SourcePos)
+    :: (SourceSpan, M.Map Name SourcePos)
     -> Guard
-    -> m ((SourceSpan, M.Map Ident SourcePos), Guard)
+    -> m ((SourceSpan, M.Map Name SourcePos), Guard)
   updateGuard (pos, bound) g@(ConditionGuard _) =
     return ((pos, bound), g)
   updateGuard (pos, bound) g@(PatternGuard b _) =
-    return ((pos, binderNamesWithSpans' b `M.union` bound), g)
+    return ((pos, M.mapKeysMonotonic IdentName (binderNamesWithSpans' b) `M.union` bound), g)
 
   binderNamesWithSpans' :: Binder -> M.Map Ident SourcePos
   binderNamesWithSpans'
@@ -333,40 +316,42 @@ renameInModule imports (Module modSS coms mn decls exps) =
     . fmap (second spanStart . swap)
     . binderNamesWithSpans
 
-  letBoundVariable :: Declaration -> Maybe (Ident, SourceSpan)
-  letBoundVariable = fmap (valdeclIdent &&& (fst . valdeclSourceAnn)) . getValueDeclaration
+  letBoundName :: Declaration -> Maybe (Name, SourceSpan)
+  letBoundName d = (, declSourceSpan d) <$> declName d
 
-  declarationsToMap :: [Declaration] -> M.Map Ident SourcePos
+  declarationsToMap :: [Declaration] -> M.Map Name SourcePos
   declarationsToMap = foldl goDTM M.empty
     where
       goDTM a (ValueDeclaration ValueDeclarationData {..}) =
-        M.insert valdeclIdent (spanStart $ fst valdeclSourceAnn) a
+        M.insert (IdentName valdeclIdent) (spanStart $ fst valdeclSourceAnn) a
+      goDTM a (TypeSynonymDeclaration (ss, _) name _ _) =
+        M.insert (TyName name) (spanStart ss) a
       goDTM a _ =
         a
 
   updateTypeArguments
     :: (Traversable f, Traversable g)
-    => f (a, g SourceType) -> m (f (a, g SourceType))
-  updateTypeArguments = traverse (sndM (traverse updateTypesEverywhere))
+    => M.Map Name SourcePos -> f (a, g SourceType) -> m (f (a, g SourceType))
+  updateTypeArguments bound = traverse (sndM (traverse (updateTypesEverywhere bound)))
 
-  updateTypesEverywhere :: SourceType -> m SourceType
-  updateTypesEverywhere = everywhereOnTypesM updateType
+  updateTypesEverywhere :: M.Map Name SourcePos -> SourceType -> m SourceType
+  updateTypesEverywhere bound = everywhereOnTypesM updateType
     where
     updateType :: SourceType -> m SourceType
     updateType (TypeOp ann@(ss, _) name) = TypeOp ann <$> updateTypeOpName name ss
-    updateType (TypeConstructor ann@(ss, _) name) = TypeConstructor ann <$> updateTypeName name ss
+    updateType (TypeConstructor ann@(ss, _) name) = TypeConstructor ann <$> updateBoundName bound TyName updateTypeName name ss
     updateType (ConstrainedType ann c t) = ConstrainedType ann <$> updateInConstraint c <*> pure t
     updateType t = return t
     updateInConstraint :: SourceConstraint -> m SourceConstraint
     updateInConstraint (Constraint ann@(ss, _) name ks ts info) =
       Constraint ann <$> updateClassName name ss <*> pure ks <*> pure ts <*> pure info
 
-  updateConstraints :: [SourceConstraint] -> m [SourceConstraint]
-  updateConstraints = traverse $ \(Constraint ann@(pos, _) name ks ts info) ->
+  updateConstraints :: M.Map Name SourcePos -> [SourceConstraint] -> m [SourceConstraint]
+  updateConstraints bound = traverse $ \(Constraint ann@(pos, _) name ks ts info) ->
     Constraint ann
       <$> updateClassName name pos
-      <*> traverse updateTypesEverywhere ks
-      <*> traverse updateTypesEverywhere ts
+      <*> traverse (updateTypesEverywhere bound) ks
+      <*> traverse (updateTypesEverywhere bound) ts
       <*> pure info
 
   updateTypeName
@@ -401,6 +386,31 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> SourceSpan
     -> m (Qualified (OpName 'ValueOpName))
   updateValueOpName = update (importedValueOps imports) ValOpName
+
+  updateBoundName
+    :: M.Map Name SourcePos
+    -> (a -> Name)
+    -> (Qualified a -> SourceSpan -> m (Qualified a))
+    -> Qualified a -> SourceSpan -> m (Qualified a)
+  updateBoundName bound toName updateUnboundName qname@(Qualified qualifiedBy name) ss =
+    case (M.lookup (toName name) bound, qualifiedBy) of
+      -- bound names that have yet to be locally qualified.
+      (Just sourcePos, ByNullSourcePos) ->
+        pure $ Qualified (BySourcePos sourcePos) name
+      -- unbound names are likely import unqualified imports, so we
+      -- handle them through updateUnboundName if they don't exist as a
+      -- local binding.
+      (Nothing, ByNullSourcePos) ->
+        updateUnboundName qname ss
+      -- bound/unbound names with explicit qualification are still
+      -- handled through updateUnboundName, as it fully resolves the
+      -- ModuleName.
+      (_, ByModuleName _) ->
+        updateUnboundName qname ss
+      -- encountering non-null source spans may be a bug in previous
+      -- desugaring steps or with the AST traversals.
+      (_, BySourcePos _) ->
+        internalError "updateBoundName: name is locally-qualified by a non-null source position"
 
   -- Update names so unqualified references become qualified, and locally
   -- qualified references are replaced with their canonical qualified names
