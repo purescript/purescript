@@ -48,6 +48,7 @@ data Environment = Environment
   } deriving (Show, Generic)
 
 instance NFData Environment
+instance Serialise Environment
 
 -- | Information about a type class
 data TypeClassData = TypeClassData
@@ -74,6 +75,7 @@ data TypeClassData = TypeClassData
   } deriving (Show, Generic)
 
 instance NFData TypeClassData
+instance Serialise TypeClassData
 
 -- | A functional dependency indicates a relationship between two sets of
 -- type arguments in a class declaration.
@@ -137,7 +139,7 @@ makeTypeClassData args m s deps = TypeClassData args m' s deps determinedArgs co
     coveringSets' = S.toList coveringSets
 
     m' = map (\(a, b) -> (a, b, addVtaInfo b)) m
-    
+
     addVtaInfo :: SourceType -> Maybe (S.Set (NEL.NonEmpty Int))
     addVtaInfo memberTy = do
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex $ freeTypeVariables memberTy)

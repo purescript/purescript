@@ -10,6 +10,7 @@ module Language.PureScript.CST.Types where
 
 import Prelude
 
+import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
@@ -29,14 +30,22 @@ data SourceRange = SourceRange
   , srcEnd :: !SourcePos
   } deriving (Show, Eq, Ord, Generic, NFData)
 
+instance Serialise SourcePos
+instance Serialise SourceRange
+
+instance Serialise TokenAnn
+instance Serialise SourceStyle
+instance Serialise Token
+instance Serialise SourceToken
+
 data Comment l
   = Comment !Text
   | Space {-# UNPACK #-} !Int
   | Line !l
-  deriving (Show, Eq, Ord, Generic, Functor, NFData)
+  deriving (Show, Eq, Ord, Generic, Functor, NFData, Serialise)
 
 data LineFeed = LF | CRLF
-  deriving (Show, Eq, Ord, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 data TokenAnn = TokenAnn
   { tokRange :: !SourceRange
