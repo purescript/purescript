@@ -190,9 +190,9 @@ sqliteInit :: (MonadIO m) => FilePath -> m ()
 sqliteInit outputDir = liftIO $ do
     createParentDirectory db
     conn <- SQLite.open db
+    SQLite.execute_ conn "pragma busy_timeout = 300000;"
     SQLite.execute_ conn "pragma journal_mode=wal;"
     SQLite.execute_ conn "pragma foreign_keys = ON;"
-    SQLite.execute_ conn "pragma busy_timeout = 300000;"
     SQLite.execute_ conn $ SQLite.Query $ Text.pack $ unlines
       [ "create table if not exists modules ("
       , " module_name text primary key,"
