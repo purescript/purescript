@@ -432,6 +432,7 @@ executable purs
     Command.Graph
     Command.Hierarchy
     Command.Ide
+    Command.QuickBuild
     Command.Publish
     Command.REPL
     SharedCLI

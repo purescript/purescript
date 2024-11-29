@@ -78,7 +78,7 @@ getSqliteFilePath = do
 
 runQuery :: SQLite.FromRow r => Ide m => Text -> m [r]
 runQuery q = do
-  Debug.traceM $ show q
+  -- Debug.traceM $ show q
   IdeEnvironment{..} <- ask
   liftIO $ query q
 
