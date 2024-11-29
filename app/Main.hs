@@ -8,6 +8,7 @@ import Command.Docs qualified as Docs
 import Command.Graph qualified as Graph
 import Command.Hierarchy qualified as Hierarchy
 import Command.Ide qualified as Ide
+import Command.QuickBuild qualified as QB
 import Command.Publish qualified as Publish
 import Command.REPL qualified as REPL
 import Control.Monad (join)
@@ -76,6 +77,9 @@ main = do
         , Opts.command "ide"
             (Opts.info Ide.command
               (Opts.progDesc "Start or query an IDE server process"))
+        , Opts.command "qb"
+            (Opts.info QB.command
+              (Opts.progDesc "Quick build module"))
         , Opts.command "publish"
             (Opts.info Publish.command
               (Opts.progDesc "Generates documentation packages for upload to Pursuit"))
