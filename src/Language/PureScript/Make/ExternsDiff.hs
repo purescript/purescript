@@ -21,6 +21,7 @@ import Language.PureScript.Externs qualified as P
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.Names qualified as P
 import Language.PureScript.Types qualified as P
+import Language.PureScript.Roles qualified as P
 
 -- Refs structure appropriate for storing and checking externs diffs.
 data Ref
@@ -474,15 +475,57 @@ stripDeclaration :: P.ExternsDeclaration -> P.ExternsDeclaration
 stripDeclaration = \case
   P.EDType n t (P.DataType dt args _) ->
     -- Remove the notion of data constructors, we only compare type's left side.
-    P.EDType n t (P.DataType dt args [])
+    P.EDType n (normalizeType t) (P.DataType dt (normalizeDataTypeArgs args) [])
+  --
+  P.EDTypeSynonym n args t ->
+    P.EDTypeSynonym n (normalizeTypeArgs args) (normalizeType t)
   --
   P.EDInstance cn n fa ks ts cs ch chi ns ss ->
-    P.EDInstance cn n fa ks ts cs (map stripChain ch) chi ns ss
+    -- Normalize instance parameters and strip chain source positions
+    P.EDInstance cn n fa 
+      (map normalizeType ks)
+      (map normalizeType ts)
+      cs 
+      (map stripChain ch) 
+      chi ns ss
   --
+  P.EDDataConstructor n o tc t f -> P.EDDataConstructor n o tc (normalizeType t) f
+  --
+  P.EDValue n t -> P.EDValue n (normalizeType t)
+  -- 
   decl -> decl
   where
     emptySP = P.SourcePos 0 0
     stripChain (ChainId (n, _)) = ChainId (n, emptySP)
+    -- Normalize type parameters to t0, t1, etc and strip source positions
+    normalizeType :: P.SourceType -> P.SourceType
+    normalizeType = P.everywhereOnTypes go
+      where
+        -- Strip source positions from annotations
+        stripAnn (ss, _) = (ss { P.spanStart = emptySP, P.spanEnd = emptySP }, [])
+        go (P.TypeVar ann name) = P.TypeVar (stripAnn ann) $ "t" <> show name
+        go (P.TypeConstructor ann n) = P.TypeConstructor (stripAnn ann) n
+        go (P.TypeOp ann n) = P.TypeOp (stripAnn ann) n
+        go (P.TypeApp ann t1 t2) = P.TypeApp (stripAnn ann) (normalizeType t1) (normalizeType t2)
+        go (P.KindApp ann t1 t2) = P.KindApp (stripAnn ann) (normalizeType t1) (normalizeType t2)
+        go (P.ForAll ann tv n t1 t2 s) = P.ForAll (stripAnn ann) tv n (fmap normalizeType t1) (normalizeType t2) s
+        go (P.ConstrainedType ann c t) = P.ConstrainedType (stripAnn ann) c (normalizeType t)
+        go (P.REmpty ann) = P.REmpty (stripAnn ann)
+        go (P.RCons ann n t r) = P.RCons (stripAnn ann) n (normalizeType t) r
+        go (P.KindedType ann t k) = P.KindedType (stripAnn ann) (normalizeType t) k
+        go (P.BinaryNoParensType ann op t1 t2) = P.BinaryNoParensType (stripAnn ann) op (normalizeType t1) (normalizeType t2)
+        go (P.ParensInType ann t) = P.ParensInType (stripAnn ann) (normalizeType t)
+        go other = other
+
+    -- Normalize data type arguments 
+    normalizeDataTypeArgs :: [(Text, Maybe P.SourceType, P.Role)] -> [(Text, Maybe P.SourceType, P.Role)]
+    normalizeDataTypeArgs = zipWith (\i (_, mt, r) -> ("t" <> show (i :: Int) , fmap normalizeType mt, r)) [0..]
+
+    -- Normalize type arguments
+    normalizeTypeArgs :: [(Text, Maybe P.SourceType)] -> [(Text, Maybe P.SourceType)]
+    normalizeTypeArgs = zipWith (\i (_, mt) -> ("t" <> show (i :: Int), fmap normalizeType mt)) [0..]
+
+
 
 isPrimModule :: ModuleName -> Bool
 isPrimModule = flip S.member (S.fromList primModules)
