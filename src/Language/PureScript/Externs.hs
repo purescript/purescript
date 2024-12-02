@@ -22,7 +22,7 @@ import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Control.Monad (join)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
-import Data.List (foldl', find, isPrefixOf)
+import Data.List (foldl', find)
 import Data.Foldable (fold)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -31,7 +31,7 @@ import Data.Map qualified as M
 import Data.List.NonEmpty qualified as NEL
 import GHC.Generics (Generic)
 
-import Language.PureScript.AST (Associativity, Declaration(..), DeclarationRef(..), Fixity(..), ImportDeclarationType, Module(..), NameSource(..), Precedence, SourceSpan (spanName), pattern TypeFixityDeclaration, pattern ValueFixityDeclaration, getTypeOpRef, getValueOpRef)
+import Language.PureScript.AST (Associativity, Declaration(..), DeclarationRef(..), Fixity(..), ImportDeclarationType, Module(..), NameSource(..), Precedence, SourceSpan, pattern TypeFixityDeclaration, pattern ValueFixityDeclaration, getTypeOpRef, getValueOpRef)
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (DataDeclType, Environment(..), FunctionalDependency, NameKind(..), NameVisibility(..), TypeClassData(..), TypeKind(..), dictTypeName, makeTypeClassData)
@@ -208,9 +208,9 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
 -- happens in the CoreFn, not the original module AST, so it needs to be
 -- applied to the exported names here also. (The appropriate map is returned by
 -- `L.P.Renamer.renameInModule`.)
-moduleToExternsFile :: FilePath -> Module -> Environment -> M.Map Ident Ident -> ExternsFile
-moduleToExternsFile _ (Module _ _ _ _ Nothing) _ _ = internalError "moduleToExternsFile: module exports were not elaborated"
-moduleToExternsFile currentDir (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsFile{..}
+moduleToExternsFile :: Module -> Environment -> M.Map Ident Ident -> ExternsFile
+moduleToExternsFile (Module _ _ _ _ Nothing) _ _ = internalError "moduleToExternsFile: module exports were not elaborated"
+moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsFile{..}
   where
   efVersion       = T.pack currentVersion
   efModuleName    = mn
@@ -219,15 +219,7 @@ moduleToExternsFile currentDir (Module ss _ mn ds (Just exps)) env renamedIdents
   efFixities      = mapMaybe fixityDecl ds
   efTypeFixities  = mapMaybe typeFixityDecl ds
   efDeclarations  = concatMap toExternsDeclaration exps
-  efSourceSpan    = ensureFullPath ss
-
-  ensureFullPath :: SourceSpan -> SourceSpan 
-  ensureFullPath s = s { spanName = makeAbsolute (spanName s) }
-
-  makeAbsolute :: String -> String
-  makeAbsolute path
-    | "/" `isPrefixOf` path = path 
-    | otherwise = currentDir <> "/" <> path
+  efSourceSpan    = ss
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
   fixityDecl (ValueFixityDeclaration _ (Fixity assoc prec) name op) =
