@@ -70,14 +70,14 @@ import Language.PureScript.Make.Monad as Monad
       getCurrentTime,
       copyFile )
 import Language.PureScript.CoreFn qualified as CF
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, getCurrentDirectory)
 import System.FilePath (replaceExtension)
 
 -- | Rebuild a single module.
 --
 rebuildModule
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadBase IO m)
   => MakeActions m
   -> [ExternsFile]
   -> Module
@@ -88,7 +88,7 @@ rebuildModule actions externs m = do
 
 rebuildModule'
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadBase IO m)
   => MakeActions m
   -> Env
   -> [ExternsFile]
@@ -98,7 +98,7 @@ rebuildModule' act env ext mdl = rebuildModuleWithIndex act env ext mdl Nothing
 
 rebuildModuleWithIndex
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadBase IO m)
   => MakeActions m
   -> Env
   -> [ExternsFile]
@@ -111,6 +111,7 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
       withPrim = importPrim m
   lint withPrim
 
+  pwd <- liftBase getCurrentDirectory
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     (desugared, (exEnv', usedImports)) <- runStateT (desugar externs withPrim) (exEnv, mempty)
     let modulesExports = (\(_, _, exports) -> exports) <$> exEnv'
@@ -134,7 +135,7 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
       corefn = CF.moduleToCoreFn env' mod'
       (optimized, nextVar'') = runSupply nextVar' $ CF.optimizeCoreFn corefn
       (renamedIdents, renamed) = renameInModule optimized
-      exts = moduleToExternsFile mod' env' renamedIdents
+      exts = moduleToExternsFile pwd mod' env' renamedIdents
   ffiCodegen renamed
 
   -- It may seem more obvious to write `docs <- Docs.convertModule m env' here,
