@@ -26,6 +26,7 @@ import Language.PureScript.Ide.State (cacheRebuild, getExternFiles, insertExtern
 import Language.PureScript.Ide.Types (Ide, IdeConfiguration(..), IdeEnvironment(..), ModuleMap, Success(..))
 import Language.PureScript.Ide.Util (ideReadFile)
 import System.Directory (getCurrentDirectory)
+import System.FilePath (makeRelative)
 
 -- | Given a filepath performs the following steps:
 --
@@ -54,6 +55,7 @@ rebuildFile
   -- ^ A runner for the second build with open exports
   -> m Success
 rebuildFile file actualFile codegenTargets runOpenBuild = do
+  currentDir <- liftIO getCurrentDirectory
   (fp, input) <-
     case List.stripPrefix "data:" file of
       Just source -> pure ("", Text.pack source)
@@ -88,7 +90,8 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
     Left errors ->
       throwError (RebuildError [(fp', input)] errors)
     Right newExterns -> do
-      insertModule (fromMaybe file actualFile, m)
+      let actualFile' = maybe file (makeRelative currentDir) actualFile
+      insertModule (actualFile', m)
       insertExterns newExterns
       void populateVolatileState
       _ <- updateCacheTimestamp
