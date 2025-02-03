@@ -151,7 +151,10 @@ command = Opts.helper <*> subcommands where
         , ideConfiguration = conf
         , ideCacheDbTimestamp = ts
         , query = \q -> SQLite.withConnection (outputPath </> "cache.db")
-             (\conn -> SQLite.query_ conn $ SQLite.Query q)
+             (\conn -> do
+              SQLite.execute_ conn "pragma busy_timeout = 30000;"
+              SQLite.query_ conn $ SQLite.Query q
+              )
         }
     startServer port env
 
