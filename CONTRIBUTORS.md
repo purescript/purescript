@@ -168,6 +168,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@xgrommx](https://github.com/xgrommx) | Denis Stoyanov | [MIT license] |
 | [@zudov](https://github.com/zudov) | Konstantin Zudov | [MIT license] |
 | [@roryc89](https://github.com/roryc89) | Rory Campbell | [MIT license] |
+| [@drathier](https://github.com/drathier) | Drathier | [MIT license] |
 
 
 ### Contributors using Modified Terms
