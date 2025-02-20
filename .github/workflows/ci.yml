@@ -55,11 +55,11 @@ jobs:
         include:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
             os: ["ubuntu-latest"]
-            image: haskell:9.2.8@sha256:203bc96f3f7bf18af230408683d048a8849e9101ee2ddba55588600f2b27ac69
+            image: haskell:9.2.8@sha256:b3b2f3909c7381bb96b8f18766f9407a3d6f61e0f07ea95e812583ac4f442cbb
           - os: ["macOS-14"]
           - os: ["windows-2019"]
-          - os: ["self-hosted", "macOS", "ARM64"]
-          - os: ["self-hosted", "Linux", "ARM64"]
+          - os: [self-hosted, macOS, ARM64]
+          - os: [self-hosted, Linux, ARM64]
 
     runs-on: "${{ matrix.os }}"
     container: "${{ matrix.image }}"
@@ -222,7 +222,7 @@ jobs:
     # means our published binaries will work on the widest number of platforms.
     # But the HLint binary downloaded by this job requires a newer glibc
     # version.
-    container: haskell:9.2.8@sha256:203bc96f3f7bf18af230408683d048a8849e9101ee2ddba55588600f2b27ac69
+    container: haskell:9.2.8@sha256:b3b2f3909c7381bb96b8f18766f9407a3d6f61e0f07ea95e812583ac4f442cbb
 
     steps:
       - uses: "actions/checkout@v2"
