@@ -79,8 +79,8 @@ jobs:
           apt-get update
           apt-get install gh
 
-      - uses: "actions/checkout@v2"
-      - uses: "actions/setup-node@v2"
+      - uses: "actions/checkout@v4"
+      - uses: "actions/setup-node@v4"
         with:
           node-version: "22"
 
@@ -102,7 +102,7 @@ jobs:
           [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
           chown root:root .
 
-      - uses: "actions/cache@v2"
+      - uses: "actions/cache@v4"
         with:
           path: |
             /root/.stack
@@ -224,13 +224,13 @@ jobs:
     container: haskell:9.6.6
 
     steps:
-      - uses: "actions/checkout@v2"
+      - uses: "actions/checkout@v4"
 
       - name: "Fix working directory ownership"
         run: |
           chown root:root .
 
-      - uses: "actions/cache@v2"
+      - uses: "actions/cache@v4"
         with:
           path: |
             /root/.stack
@@ -278,15 +278,15 @@ jobs:
       - "lint"
     if: "${{ github.event_name == 'push' && needs.build.outputs.do-not-prerelease != 'true' }}"
     steps:
-      - uses: "actions/download-artifact@v3"
+      - uses: "actions/download-artifact@v4"
       - uses: "ncipollo/release-action@v1.10.0"
         with:
           tag: "v${{ needs.build.outputs.version }}"
           artifacts: "*-bundle/*"
           prerelease: true
           body: "This is an automated preview release. Get the latest stable release [here](https://github.com/purescript/purescript/releases/latest)."
-      - uses: "actions/checkout@v3"
-      - uses: "actions/setup-node@v3"
+      - uses: "actions/checkout@v4"
+      - uses: "actions/setup-node@v4"
         with:
           node-version: "16.x"
           registry-url: "https://registry.npmjs.org"
