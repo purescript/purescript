@@ -11,7 +11,6 @@ module Language.PureScript.Linter.Exhaustive
 import Prelude
 import Protolude (ordNub)
 
-import Control.Applicative (Applicative(..))
 import Control.Arrow (first, second)
 import Control.Monad (unless)
 import Control.Monad.Writer.Class (MonadWriter(..))

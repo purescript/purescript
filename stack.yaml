@@ -1,6 +1,6 @@
 # Please update Haskell image versions under .github/workflows/ci.yml together to use the same GHC version
 # (or the CI build will fail)
-resolver: lts-20.26
+resolver: lts-22.43
 pvp-bounds: both
 packages:
 - '.'
@@ -27,6 +27,19 @@ extra-deps:
 - hspec-2.10.9
 - hspec-core-2.10.9
 - hspec-discover-2.10.9
+- bower-json-1.1.0.0
+- haskeline-0.8.2
+- these-1.2.1
+
+- github: Vekhir/aeson-better-errors
+  commit: 1ec49ab7d1472046b680b5a64ae2930515b47714
+
+- github: MercuryTechnologies/cheapskate
+  commit: 30ca0ccbac2f59bedf89a855627373931a7e3758
+
+- github: GuillaumedeVolpiano/pattern-arrows
+  commit: 785512b896b0c20c576cbbd099f705798117801c
+
 nix:
   packages:
   - zlib
@@ -37,8 +50,6 @@ nix:
 flags:
   aeson-pretty:
     lib-only: true
-  these:
-    assoc: false
   haskeline:
     # Avoids a libtinfo dynamic library dependency
     terminfo: false
