@@ -58,8 +58,8 @@ jobs:
             image: haskell:9.6.6
           - os: ["macOS-14"]
           - os: ["windows-2019"]
-          - os: ["self-hosted", "macos", "ARM64"]
-          - os: ["self-hosted", "Linux", "ARM64"]
+          - os: [self-hosted, macOS, ARM64]
+          - os: [self-hosted, Linux, ARM64]
 
     runs-on: "${{ matrix.os }}"
     container: "${{ matrix.image }}"
@@ -82,7 +82,7 @@ jobs:
       - uses: "actions/checkout@v2"
       - uses: "actions/setup-node@v2"
         with:
-          node-version: "16"
+          node-version: "22"
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
@@ -144,7 +144,6 @@ jobs:
         # Moreover, npm has a hook issue that will cause spago to fail to install
         # We upgrade npm to fix this
         run: |
-          npm i -g npm@8.8.0
           ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
 
       - name: Verify that 'libtinfo' isn't in binary
@@ -199,7 +198,7 @@ jobs:
 
       - name: "(Prerelease only) Upload bundle"
         if: "${{ env.CI_PRERELEASE == 'true' && steps.build.outputs.do-not-prerelease != 'true' }}"
-        uses: "actions/upload-artifact@v3"
+        uses: "actions/upload-artifact@v4.6.0"
         with:
           name: "${{ runner.os }}-${{ runner.arch }}-bundle"
           path: |
