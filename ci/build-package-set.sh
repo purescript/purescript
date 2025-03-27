@@ -5,7 +5,7 @@ shopt -s nullglob
 
 psroot=$(dirname "$(dirname "$(realpath "$0")")")
 
-if [[ "${CI:-}" && "$(echo $psroot/CHANGELOG.d/breaking_*)" ]]; then
+if [[ "${CI:-}" && "$(echo "$psroot"/CHANGELOG.d/breaking_*)" ]]; then
   echo "Skipping package-set build due to unreleased breaking changes"
   exit 0
 fi
@@ -20,7 +20,7 @@ which spago || npm install spago@0.93.43
 echo ::endgroup::
 
 echo ::group::Create dummy project
-spago init
+spago init --name purescript-dummy
 echo ::endgroup::
 
 echo ::group::Compile package set
