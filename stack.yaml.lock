@@ -12,41 +12,6 @@ packages:
   original:
     hackage: language-javascript-0.7.0.0
 - completed:
-    hackage: process-1.6.13.1@sha256:c8bb8b7c993ff72d771381b3b56852dd154bce51880a24789c11f57b0688d353,2963
-    pantry-tree:
-      sha256: 58117b15fa330c79b3bca6b29c65f815e45840f79cc0915d3434f25e54ac8fa5
-      size: 1543
-  original:
-    hackage: process-1.6.13.1
-- completed:
-    hackage: Cabal-3.6.3.0@sha256:ff97c442b0c679c1c9876acd15f73ac4f602b973c45bde42b43ec28265ee48f4,12459
-    pantry-tree:
-      sha256: b250a53bdb56844f047a2927833bb565b936a289abfa85dfc2a63148d776368a
-      size: 19757
-  original:
-    hackage: Cabal-3.6.3.0
-- completed:
-    hackage: hspec-2.10.9@sha256:6000b21e29175be7cf6625399603772650abd3d9c47e722faa930dd5e9836bba,1714
-    pantry-tree:
-      sha256: 9771ad23bc54e3339706842b3e00890d722dcd66559eed4dcd253f526141c55b
-      size: 583
-  original:
-    hackage: hspec-2.10.9
-- completed:
-    hackage: hspec-core-2.10.9@sha256:9ea6963951a17087c5be676d0730d130cef0bd2f12b9bc445e322f6e1778ce12,6730
-    pantry-tree:
-      sha256: 633792b19fb0890bdc246a28ca04d55b6888b065b14e2417fc6745ec9df711ff
-      size: 6070
-  original:
-    hackage: hspec-core-2.10.9
-- completed:
-    hackage: hspec-discover-2.10.9@sha256:e54f978b1bcb3d0fd3a78eccf360b0731184290a1387d431531217db68f55fc4,2169
-    pantry-tree:
-      sha256: 2650803ddd66d6032ab03a4871a8879feb5787c7e49db43463743f7c06df3a58
-      size: 828
-  original:
-    hackage: hspec-discover-2.10.9
-- completed:
     hackage: bower-json-1.1.0.0@sha256:a136aaca67bf0d15c336f5864f7e9d40ebe046ca2cb4b25bc4895617ea35f9f6,1864
     pantry-tree:
       sha256: 3acd48e7012f246ad44c7c17cd6340362b1dc448c1d93156280814e76d9e0589
