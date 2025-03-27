@@ -248,7 +248,7 @@ jobs:
 
       - run: |
           ci/fix-home stack --no-terminal --jobs=2 \
-            build --fast --ghc-options -fwrite-ide-info"
+            build --fast --ghc-options -fwrite-ide-info
 
       - run: "ci/fix-home stack exec weeder"
 
@@ -258,7 +258,7 @@ jobs:
       # don't want to leave weeds lying around in our test suite either.
       - run: |
           ci/fix-home stack --no-terminal --jobs=2 \
-            build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
+            build --fast --test --no-run-tests --ghc-options -fwrite-ide-info
 
       - run: "ci/fix-home stack exec weeder"
 
