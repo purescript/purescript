@@ -109,7 +109,7 @@ jobs:
           path: |
             /root/.stack
             ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ matrix.image || runner.os }}--MdyPsf-${{ hashFiles('stack.yaml.lock') }}"
+          key: "${{ matrix.image || runner.os }}--MdyPsf-${{ hashFiles('stack.yaml.lock', 'purescript.cabal') }}"
 
       - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
         # This ensures that the local GHC and MSYS binaries that Stack installs
@@ -236,7 +236,7 @@ jobs:
         with:
           path: |
             /root/.stack
-          key: "lint-${{ hashFiles('stack.yaml.lock') }}"
+          key: "lint-${{ hashFiles('stack.yaml.lock', 'purescript.cabal') }}"
 
       - run: "ci/fix-home ci/run-hlint.sh --git"
         env:
