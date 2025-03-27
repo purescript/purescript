@@ -54,10 +54,10 @@ jobs:
       matrix:
         include:
           - # If upgrading the Haskell image, also upgrade it in the lint job below
-            os: ["ubuntu-latest"]
+            os: [ubuntu-24.04]
             image: haskell:9.6.6
-          - os: ["macOS-14"]
-          - os: ["windows-2019"]
+          - os: [macos-15]
+          - os: [windows-2019]
           - os: [self-hosted, macOS, ARM64]
           - os: [self-hosted, Linux, ARM64]
 
@@ -71,7 +71,7 @@ jobs:
     steps:
       - # We need `gh` installed on the Linux version. Otherwise, release artifacts won't be uploaded.
         name: "(Linux only) Install gh"
-        if: "contains(matrix.os, 'ubuntu-latest')"
+        if: contains(matrix.os, 'ubuntu-24.04')
         run: |
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
           chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
@@ -89,7 +89,7 @@ jobs:
         # Note: here we exclude the self-hosted runners because this action does not work on ARM
         # and their Haskell environment is instead provided by a nix-shell
         # See https://github.com/purescript/purescript/pulls/4455
-        if: "!contains(matrix.os, 'ubuntu-latest') && !contains(matrix.os, 'self-hosted')"
+        if: "!contains(matrix.os, 'ubuntu-24.04') && !contains(matrix.os, 'self-hosted')"
         uses: "haskell-actions/setup@v2"
         with:
           enable-stack: true
@@ -97,7 +97,7 @@ jobs:
           stack-no-global: true
 
       - name: "(Linux only) Check Stack version and fix working directory ownership"
-        if: "contains(matrix.os, 'ubuntu-latest')"
+        if: contains(matrix.os, 'ubuntu-24.04')
         run: |
           [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
           chown root:root .
@@ -122,7 +122,7 @@ jobs:
         run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Glob tests"
-        if: "contains(matrix.os, 'ubuntu-latest')"
+        if: contains(matrix.os, 'ubuntu-24.04')
         working-directory: "sdist-test"
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual glob checks happen in a temporary directory.
@@ -131,7 +131,7 @@ jobs:
           ../ci/fix-home stack exec bash ../glob-test.sh
 
       - name: "(Linux only) Build the entire package set"
-        if: "contains(matrix.os, 'ubuntu-latest')"
+        if: contains(matrix.os, 'ubuntu-24.04')
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual package-set building happens in a
         # temporary directory.
@@ -147,7 +147,7 @@ jobs:
           ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
 
       - name: Verify that 'libtinfo' isn't in binary
-        if: "runner.os == 'Linux'"
+        if: runner.os == 'Linux'
         working-directory: "sdist-test"
         run: |
           if [ $(ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
@@ -157,7 +157,7 @@ jobs:
           fi
 
       - name: "(Self-hosted Linux ARM64 only) Patch the binary to work on non-Nix systems"
-        if: "runner.os == 'Linux' && runner.arch == 'ARM64'"
+        if: runner.os == 'Linux' && runner.arch == 'ARM64'
         working-directory: "sdist-test"
         # The self-hosted build happens inside a nix-shell that provides a working stack binary
         # on ARM systems, and while the macOS binary is fine - because macOS binaries are almost
@@ -214,7 +214,7 @@ jobs:
         run: "gh release upload --clobber ${{ github.ref_name }} sdist-test/bundle/*.{tar.gz,sha}"
 
   lint:
-    runs-on: "ubuntu-latest"
+    runs-on: "ubuntu-24.04"
     # At the moment, this is a different image from the image used for
     # compilation, though the GHC versions match. This is because the
     # compilation image uses an old version of glibc, which we want because it
@@ -272,7 +272,7 @@ jobs:
       - run: "ci/fix-home stack exec weeder"
 
   make-prerelease:
-    runs-on: "ubuntu-latest"
+    runs-on: "ubuntu-24.04"
     needs:
       - "build"
       - "lint"
