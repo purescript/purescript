@@ -63,11 +63,7 @@ jobs:
           - os: [self-hosted, Linux, ARM64]
 
     runs-on: "${{ matrix.os }}"
-    container:
-      image: "${{ matrix.image }}"
-      # Fix ownership problems
-      # https://github.com/actions/runner/issues/2033#issuecomment-1598547465
-      options: --user 1001
+    container:  "${{ matrix.image }}"
 
     outputs:
       do-not-prerelease: "${{ steps.build.outputs.do-not-prerelease }}"
@@ -101,6 +97,11 @@ jobs:
           enable-stack: true
           stack-version: "${{ env.STACK_VERSION }}"
           stack-no-global: true
+
+      - name: "(Linux only) Fix working directory ownership"
+        if: contains(matrix.os, 'ubuntu-24.04')
+        run: |
+          chown root:root .
 
       - uses: "actions/cache@v4"
         with:
