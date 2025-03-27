@@ -20,6 +20,7 @@ on:
       - purescript.cabal
       - Setup.hs
       - stack.yaml
+      - stack.yaml.lock
       - update-changelog.hs
       - weeder.dhall
   release:
@@ -92,6 +93,7 @@ jobs:
         if: "!contains(matrix.os, 'ubuntu-24.04') && !contains(matrix.os, 'self-hosted')"
         uses: "haskell-actions/setup@v2"
         with:
+          ghc-version: "9.6.6"
           enable-stack: true
           stack-version: "${{ env.STACK_VERSION }}"
           stack-no-global: true
@@ -107,7 +109,7 @@ jobs:
           path: |
             /root/.stack
             ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ matrix.image || runner.os }}--MdyPsf-${{ hashFiles('stack.yaml') }}"
+          key: "${{ matrix.image || runner.os }}--MdyPsf-${{ hashFiles('stack.yaml.lock') }}"
 
       - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
         # This ensures that the local GHC and MSYS binaries that Stack installs
@@ -234,7 +236,7 @@ jobs:
         with:
           path: |
             /root/.stack
-          key: "lint-${{ hashFiles('stack.yaml') }}"
+          key: "lint-${{ hashFiles('stack.yaml.lock') }}"
 
       - run: "ci/fix-home ci/run-hlint.sh --git"
         env:
