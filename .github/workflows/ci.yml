@@ -242,12 +242,12 @@ jobs:
           VERSION: "3.5"
 
       - name: Install weeder
-        run: >-
-          ci/fix-home stack --no-terminal --jobs=2
+        run: |
+          ci/fix-home stack --no-terminal --jobs=2 \
             build --copy-compiler-tool weeder-2.8.0
 
-      - run: >-
-          ci/fix-home stack --no-terminal --jobs=2
+      - run: |
+          ci/fix-home stack --no-terminal --jobs=2 \
             build --fast --ghc-options -fwrite-ide-info"
 
       - run: "ci/fix-home stack exec weeder"
@@ -256,8 +256,8 @@ jobs:
       # reference from our test suite to count in the above check; the fact
       # that a function is tested is not evidence that it's needed. But we also
       # don't want to leave weeds lying around in our test suite either.
-      - run: >-
-          ci/fix-home stack --no-terminal --jobs=2
+      - run: |
+          ci/fix-home stack --no-terminal --jobs=2 \
             build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
 
       - run: "ci/fix-home stack exec weeder"
