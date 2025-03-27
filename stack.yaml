@@ -53,3 +53,9 @@ flags:
   haskeline:
     # Avoids a libtinfo dynamic library dependency
     terminfo: false
+
+allow-newer-deps:
+  - aeson-better-errors
+  - cheapskate
+  - haskeline
+  - process
