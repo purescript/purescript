@@ -233,7 +233,7 @@ renderTypeWithRole = \case
 renderType' :: PrettyPrintType -> RenderedCode
 renderType'
   = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern matchType ()
+  . PA.pattern_ matchType ()
 
 renderTypeVars :: [(TypeVarVisibility, Text, Maybe PrettyPrintType)] -> RenderedCode
 renderTypeVars tyVars = mintersperse sp (map renderTypeVar tyVars)
@@ -252,4 +252,4 @@ renderTypeAtom = renderTypeAtom' . convertPrettyPrintType maxBound
 renderTypeAtom' :: PrettyPrintType -> RenderedCode
 renderTypeAtom'
   = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern matchTypeAtom ()
+  . PA.pattern_ matchTypeAtom ()

@@ -54,17 +54,6 @@ packages:
     version: 0.1.1.2
   original:
     url: https://github.com/MercuryTechnologies/cheapskate/archive/30ca0ccbac2f59bedf89a855627373931a7e3758.tar.gz
-- completed:
-    name: pattern-arrows
-    pantry-tree:
-      sha256: 7d51af4146abac54e420de9d078ab411538a23f6e3a9ece33ce269bfb05febfc
-      size: 324
-    sha256: 1f1b7c38622f65bddd7e49079abcf176ab68e3aca626e02b22078b125d54e70a
-    size: 2711
-    url: https://github.com/GuillaumedeVolpiano/pattern-arrows/archive/785512b896b0c20c576cbbd099f705798117801c.tar.gz
-    version: 0.0.1
-  original:
-    url: https://github.com/GuillaumedeVolpiano/pattern-arrows/archive/785512b896b0c20c576cbbd099f705798117801c.tar.gz
 snapshots:
 - completed:
     sha256: 08bd13ce621b41a8f5e51456b38d5b46d7783ce114a50ab604d6bbab0d002146

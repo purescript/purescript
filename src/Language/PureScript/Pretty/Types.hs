@@ -238,7 +238,7 @@ forall_ = mkPattern match
 typeAtomAsBox' :: PrettyPrintType -> Box
 typeAtomAsBox'
   = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern (matchTypeAtom defaultOptions) ()
+  . PA.pattern_ (matchTypeAtom defaultOptions) ()
 
 typeAtomAsBox :: Int -> Type a -> Box
 typeAtomAsBox maxDepth = typeAtomAsBox' . convertPrettyPrintType maxDepth
@@ -280,7 +280,7 @@ unicodeOptions = TypeRenderOptions False True False
 typeAsBoxImpl :: TypeRenderOptions -> PrettyPrintType -> Box
 typeAsBoxImpl tro
   = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern (matchType tro) ()
+  . PA.pattern_ (matchType tro) ()
 
 -- | Generate a pretty-printed string representing a 'Type'
 prettyPrintType :: Int -> Type a -> String

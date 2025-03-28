@@ -23,9 +23,6 @@ extra-deps:
 - github: MercuryTechnologies/cheapskate
   commit: 30ca0ccbac2f59bedf89a855627373931a7e3758
 
-- github: GuillaumedeVolpiano/pattern-arrows
-  commit: 785512b896b0c20c576cbbd099f705798117801c
-
 nix:
   packages:
   - zlib
