@@ -34,7 +34,7 @@ import Control.Monad.Fix (fix)
 newtype Pattern u a b = Pattern { runPattern :: A.Kleisli (StateT u Maybe) a b } deriving (A.Arrow, A.ArrowZero, A.ArrowPlus)
 
 instance C.Category (Pattern u) where
-    id = Pattern (C.id)
+    id = Pattern C.id
     Pattern p1 . Pattern p2 = Pattern (p1 C.. p2)
 
 instance Functor (Pattern u a) where
@@ -110,8 +110,7 @@ data Operator u a r where
 -- Build a pretty printer from an operator table and an indecomposable pattern
 --
 buildPrettyPrinter :: OperatorTable u a r -> Pattern u a r -> Pattern u a r
-buildPrettyPrinter table p = foldl (\p' ops -> foldl1 (<+>) (flip map ops $ \op ->
-  case op of
+buildPrettyPrinter table p = foldl (\p' ops -> foldl1 (<+>) (flip map ops $ \case
     AssocL pat g -> chainl pat g p'
     AssocR pat g -> chainr pat g p'
     Wrap pat g -> wrap pat g p'
