@@ -55,10 +55,14 @@ jobs:
       matrix:
         include:
           - image: haskell:9.6.6  # Also upgrade version in the lint job below
-            os: ubuntu-latest  # Exact version is not important, as it's only the container host
-          - os: macos-13
-          - os: macos-14
-          - os: windows-2019
+            os: ubuntu-latest  # Exact version is not important, as it's only the container host)
+
+          - image: haskell:9.6.6
+            os: ubuntu-24.04-arm  # Exact version is not important, as it's only the container host
+
+          - os: macos-13  # x64
+          - os: macos-14  # arm64
+          - os: windows-2019  # x64
           - os: [self-hosted, macOS, ARM64]
           - os: [self-hosted, Linux, ARM64]
 
