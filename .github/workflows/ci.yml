@@ -63,8 +63,6 @@ jobs:
           - os: macos-13  # x64
           - os: macos-14  # arm64
           - os: windows-2019  # x64
-          - os: [self-hosted, macOS, ARM64]
-          - os: [self-hosted, Linux, ARM64]
 
     runs-on: "${{ matrix.os }}"
     container:  "${{ matrix.image }}"
@@ -91,9 +89,6 @@ jobs:
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
-        # Note: here we exclude the self-hosted runners because this action does not work on ARM
-        # and their Haskell environment is instead provided by a nix-shell
-        # See https://github.com/purescript/purescript/pulls/4455
         if: startsWith(matrix.os, 'macos') || startsWith(matrix.os, 'windows')
         uses: "haskell-actions/setup@v2"
         with:
@@ -162,20 +157,6 @@ jobs:
             exit 1
           fi
 
-      - name: "(Self-hosted Linux ARM64 only) Patch the binary to work on non-Nix systems"
-        if: contains(matrix.os, 'self-hosted') && runner.os == 'Linux' && runner.arch == 'ARM64'
-        working-directory: "sdist-test"
-        # The self-hosted build happens inside a nix-shell that provides a working stack binary
-        # on ARM systems, and while the macOS binary is fine - because macOS binaries are almost
-        # statically linked), the linux ones are all pointing at the nix store.
-        # So here we first point the binary to the right linker that should work on a generic linux,
-        # and then fix the RUNPATH with the right location to load the shared libraries from
-        run: |
-          patchelf \
-            --set-interpreter /usr/lib/ld-linux-aarch64.so.1 \
-            --set-rpath /usr/lib/aarch64-linux-gnu \
-            $(stack path --local-doc-root)/../bin/purs
-
       - name: "(Release/prerelease only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' || env.CI_PRERELEASE == 'true' && steps.build.outputs.do-not-prerelease != 'true' }}"
         run: |
@@ -216,8 +197,6 @@ jobs:
 
       - name: "(Release only) Publish bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
-        # This requires the gh command line tool to be installed on our
-        # self-hosted runners
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: "gh release upload --clobber ${{ github.ref_name }} sdist-test/bundle/*.{tar.gz,sha}"
