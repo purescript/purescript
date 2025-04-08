@@ -154,7 +154,7 @@ common defaults
     -- will reject them. It should therefore always be pinned to a single
     -- specific version.
     aeson >=2.0.3.0 && <2.2,
-    aeson-better-errors >=0.9.1.1 && <0.10,
+    aeson-better-errors >=0.9.1.2 && <0.10,
     ansi-terminal >=0.11.3 && <1.1,
     array >=0.5.4.0 && <0.6,
     base >=4.16.2.0 && <4.19,

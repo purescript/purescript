@@ -33,16 +33,12 @@ packages:
   original:
     hackage: these-1.2.1
 - completed:
-    name: aeson-better-errors
+    hackage: aeson-better-errors-0.9.1.2@sha256:900dec7555ca1098e51609af13502a4afc5d8c987beb83f752c03f6ff0276c05,2015
     pantry-tree:
-      sha256: 0e3b85926e5bb2c6e06c52f79908c24224325aff6734ff49186f5613f2bbb765
-      size: 590
-    sha256: bd19b66a27d6de0a2ec63ddad79049906e6a089b836c1591df9f0e6da2fe0bf8
-    size: 8822
-    url: https://github.com/Vekhir/aeson-better-errors/archive/1ec49ab7d1472046b680b5a64ae2930515b47714.tar.gz
-    version: 0.9.1.1
+      sha256: eef21e27f816d2a02f35986f2ee07eb7fcf03c0f041590fef96609f78a5dee3e
+      size: 492
   original:
-    url: https://github.com/Vekhir/aeson-better-errors/archive/1ec49ab7d1472046b680b5a64ae2930515b47714.tar.gz
+    hackage: aeson-better-errors-0.9.1.2
 - completed:
     name: cheapskate
     pantry-tree:

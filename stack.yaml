@@ -16,9 +16,7 @@ extra-deps:
 - bower-json-1.1.0.0
 - haskeline-0.8.2
 - these-1.2.1
-
-- github: Vekhir/aeson-better-errors
-  commit: 1ec49ab7d1472046b680b5a64ae2930515b47714
+- aeson-better-errors-0.9.1.2
 
 - github: MercuryTechnologies/cheapskate
   commit: 30ca0ccbac2f59bedf89a855627373931a7e3758
