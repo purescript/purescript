@@ -60,12 +60,18 @@ jobs:
           - image: haskell:9.8.4
             os: ubuntu-24.04-arm  # Exact version is not important, as it's only the container host
 
+          - image: quay.io/benz0li/ghc-musl:9.8.4
+            os: ubuntu-latest
+            static: true
+
           - os: macos-13  # x64
           - os: macos-14  # arm64
           - os: windows-2019  # x64
 
     runs-on: "${{ matrix.os }}"
     container:  "${{ matrix.image }}"
+    env:
+      CI_STATIC: "${{ matrix.static }}"
 
     outputs:
       do-not-prerelease: "${{ steps.build.outputs.do-not-prerelease }}"
@@ -82,10 +88,21 @@ jobs:
           apt-get update
           apt-get install -y gh
 
+      - name: "(Alpine only) Install gh"
+        if: ${{ matrix.static }}
+        run: |
+          apk add github-cli
+
       - uses: "actions/checkout@v4"
       - uses: "actions/setup-node@v4"
+        if: ${{ ! matrix.static }}
         with:
           node-version: "22"
+
+      - name: "(Alpine only) Install Node"
+        if: ${{ matrix.static }}
+        run: |
+          apk add nodejs npm
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
@@ -98,7 +115,7 @@ jobs:
           stack-no-global: true
 
       - name: "(Linux only) Fix working directory ownership"
-        if: startsWith(matrix.image, 'haskell')
+        if: ${{ startsWith(matrix.image, 'haskell') || matrix.static }}
         run: |
           chown root:root .
 
@@ -107,7 +124,7 @@ jobs:
           path: |
             /root/.stack
             ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ matrix.image || runner.os }}--MdyPsf-${{ hashFiles('stack.yaml.lock', 'purescript.cabal') }}"
+          key: "${{ matrix.image || runner.os }}-v2-${{ hashFiles('stack.yaml.lock', 'purescript.cabal') }}"
 
       - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
         # This ensures that the local GHC and MSYS binaries that Stack installs
@@ -118,11 +135,17 @@ jobs:
           mkdir -p "$STACK_ROOT"
           echo "local-programs-path: $STACK_ROOT/programs" > $STACK_ROOT/config.yaml
 
+      - name: "(Alpine only) Configure Stack"
+        if: ${{ matrix.static }}
+        run: |
+          ci/fix-home stack config set system-ghc --global true
+          ci/fix-home stack config set install-ghc --global false
+
       - id: "build"
         run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Glob tests"
-        if: startsWith(matrix.image, 'haskell')
+        if: ${{ startsWith(matrix.image, 'haskell') }}
         working-directory: "sdist-test"
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual glob checks happen in a temporary directory.
@@ -130,8 +153,15 @@ jobs:
           apt-get install -y tree
           ../ci/fix-home stack exec bash ../glob-test.sh
 
+      - name: "(Alpine only) Glob tests"
+        if: ${{ matrix.static }}
+        working-directory: "sdist-test"
+        run: |
+          apk add tree
+          ../ci/fix-home stack exec bash ../glob-test.sh
+
       - name: "(Linux only) Build the entire package set"
-        if: startsWith(matrix.image, 'haskell')
+        if: ${{ startsWith(matrix.image, 'haskell') }}
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual package-set building happens in a
         # temporary directory.
@@ -147,8 +177,15 @@ jobs:
           apt-get install -y jq
           ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
 
+      - name: "(Alpine only) Build the entire package set"
+        if: ${{ matrix.static }}
+        working-directory: "sdist-test"
+        run: |
+          apk add jq
+          ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
+
       - name: Verify that 'libtinfo' isn't in binary
-        if: runner.os == 'Linux'
+        if: ${{ runner.os == 'Linux' && matrix.static }}
         working-directory: "sdist-test"
         run: |
           if [ $(ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
@@ -157,11 +194,17 @@ jobs:
             exit 1
           fi
 
+      - name: "(Alpine only) Install perl-utils"
+        if: ${{ matrix.static }}
+        run: |
+          apk add perl-utils
+        
       - name: "(Release/prerelease only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' || env.CI_PRERELEASE == 'true' && steps.build.outputs.do-not-prerelease != 'true' }}"
         run: |
           os_name="${{ runner.os }}"
           os_arch="${{ runner.arch }}"
+          os_static="${{ matrix.static }}"
           case "$os_name" in
             Linux)
               case "$os_arch" in
@@ -169,6 +212,12 @@ jobs:
                   bundle_os=linux-arm64;;
                 *)
                   bundle_os=linux64;;
+              esac
+              case "$os_static" in
+                true)
+                  bundle_os="${bundle_os}-static";;
+                *)
+                  bundle_os="${bundle_os}-dynamic";; 
               esac;;
             macOS)
               case "$os_arch" in
