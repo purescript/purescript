@@ -34,10 +34,3 @@ flags:
   haskeline:
     # Avoids a libtinfo dynamic library dependency
     terminfo: false
-
-allow-newer: true
-allow-newer-deps:
-  - aeson-better-errors
-  - cheapskate
-  - haskeline
-  - process
