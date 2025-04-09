@@ -7,7 +7,7 @@ module Language.PureScript.CodeGen.JS
   ) where
 
 import Prelude
-import Protolude (ordNub)
+import Protolude (liftA2, ordNub)
 
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)

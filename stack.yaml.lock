@@ -33,23 +33,23 @@ packages:
   original:
     hackage: these-1.2.1
 - completed:
-    hackage: aeson-better-errors-0.9.1.2@sha256:900dec7555ca1098e51609af13502a4afc5d8c987beb83f752c03f6ff0276c05,2015
+    hackage: aeson-better-errors-0.9.1.3@sha256:1bfdda3982368cafc7317b9f0c1f7267a6b0bbac9515ae1fad37f2b19178f567,2071
     pantry-tree:
-      sha256: eef21e27f816d2a02f35986f2ee07eb7fcf03c0f041590fef96609f78a5dee3e
+      sha256: 1c14247866dfb8052506c179e4725b8a7ce1472a4fb227d61576d862d9494551
       size: 492
   original:
-    hackage: aeson-better-errors-0.9.1.2
+    hackage: aeson-better-errors-0.9.1.3
 - completed:
     name: cheapskate
     pantry-tree:
-      sha256: 8e446e334a25a9e1200abb5015d61c3f31bd589fa77ae6443bd64eb5f067bfe2
-      size: 12002
-    sha256: 378a4822bdf0697cbf004af9a337da36ee655bd1e0af72633f28741d8727aae3
-    size: 60730
-    url: https://github.com/MercuryTechnologies/cheapskate/archive/30ca0ccbac2f59bedf89a855627373931a7e3758.tar.gz
+      sha256: a2253619f50d26f0137a802e51e5e7103ee52b1f71bc060d93a0979dcbefa2c8
+      size: 12069
+    sha256: 959fc7a6ca7e0a743b06b0c287aa4a1c3ec7fc740e5830a4a841d43e925a6d73
+    size: 62502
+    url: https://github.com/purescript/cheapskate/archive/8bfaf4beeb108e97a274ed51303f278905979e87.tar.gz
     version: 0.1.1.2
   original:
-    url: https://github.com/MercuryTechnologies/cheapskate/archive/30ca0ccbac2f59bedf89a855627373931a7e3758.tar.gz
+    url: https://github.com/purescript/cheapskate/archive/8bfaf4beeb108e97a274ed51303f278905979e87.tar.gz
 snapshots:
 - completed:
     sha256: 08bd13ce621b41a8f5e51456b38d5b46d7783ce114a50ab604d6bbab0d002146

@@ -16,10 +16,10 @@ extra-deps:
 - bower-json-1.1.0.0
 - haskeline-0.8.2
 - these-1.2.1
-- aeson-better-errors-0.9.1.2
+- aeson-better-errors-0.9.1.3
 
-- github: MercuryTechnologies/cheapskate
-  commit: 30ca0ccbac2f59bedf89a855627373931a7e3758
+- github: purescript/cheapskate
+  commit: 8bfaf4beeb108e97a274ed51303f278905979e87
 
 nix:
   packages:
@@ -37,6 +37,4 @@ flags:
 
 allow-newer: true
 allow-newer-deps:
-- aeson-better-errors
-- cheapskate
 - haskeline
