@@ -19,12 +19,12 @@ packages:
   original:
     hackage: bower-json-1.1.0.0
 - completed:
-    hackage: haskeline-0.8.2@sha256:3b4b594095d64f5fa199b07bdca7d6b790313ed7f380a1b061845507e6563880,6005
+    hackage: haskeline-0.8.2.1@sha256:31d9b8234041ea3379d01d269df0d651fd96db4e5d2c74c642bd847a17f07f96,6287
     pantry-tree:
-      sha256: 17ee6b093c5135399b8e6bc3a63d9c6a4b0bc2100b495d2d974bc1464769de39
+      sha256: 67a28823c657fb6920dc11986b2f26a4fe947e612a896cfee01070c42d39f3dd
       size: 2955
   original:
-    hackage: haskeline-0.8.2
+    hackage: haskeline-0.8.2.1
 - completed:
     hackage: these-1.2.1@sha256:35c57aede96c15ea1fed559ac287b1168eb2b2869d79e62ed8c845780b7ea136,2294
     pantry-tree:
