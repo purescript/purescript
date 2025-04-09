@@ -176,7 +176,7 @@ common defaults
     file-embed >=0.0.15.0 && <0.1,
     filepath >=1.4.2.2 && <1.5,
     Glob >=0.10.2 && <0.11,
-    haskeline >=0.8.2.1 && <0.9,
+    haskeline ==0.8.2,
     language-javascript ==0.7.0.0,
     lens >=5.1.1 && <5.3,
     lifted-async >=0.10.2.2 && <0.11,

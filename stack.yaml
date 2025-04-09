@@ -14,7 +14,7 @@ extra-deps:
 # https://github.com/erikd/language-javascript/issues/131
 - language-javascript-0.7.0.0
 - bower-json-1.1.0.0
-- haskeline-0.8.2.1
+- haskeline-0.8.2
 - these-1.2.1
 - aeson-better-errors-0.9.1.2
 
@@ -39,3 +39,4 @@ allow-newer: true
 allow-newer-deps:
 - aeson-better-errors
 - cheapskate
+- haskeline
