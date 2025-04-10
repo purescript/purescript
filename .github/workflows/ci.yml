@@ -64,10 +64,6 @@ jobs:
             os: ubuntu-latest
             static: true
 
-          - image: benz0li/ghc-musl:9.6.6-linux-arm64v8
-            os: ubuntu-latest
-            static: true
-
           - os: macos-13  # x64
           - os: macos-14  # arm64
           - os: windows-2019  # x64
