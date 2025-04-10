@@ -231,7 +231,7 @@ compile' options expectedModule SupportModules{..} inputFiles = do
       _ -> do
         unless hasExpectedModuleName $
           error $ "While testing multiple PureScript files, the expected main module was not found: '" <> expectedModuleName <> "'."
-        compiledModulePath <$ P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
+        compiledModulePath <$ P.make_ actions (CST.pureResult <$> supportModules ++ map snd ms)
 
 getPsModuleName :: (a, AST.Module) -> T.Text
 getPsModuleName psModule = case snd psModule of
