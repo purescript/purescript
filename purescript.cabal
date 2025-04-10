@@ -430,6 +430,8 @@ executable purs
     Paths_purescript
   autogen-modules:
     Paths_purescript
+  if flag(static)
+    ld-options: -static -pthread
 
 test-suite tests
   import: defaults
@@ -483,3 +485,8 @@ test-suite tests
     TestSourceMaps
     TestUtils
     Paths_purescript
+
+flag static
+  description: Builds a statically-linked version of the PureScript compiler.
+  manual: True
+  default: False

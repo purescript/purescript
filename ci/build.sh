@@ -25,7 +25,7 @@ set -ex
 
 # We test with --haddock because haddock generation can fail if there is invalid doc-comment syntax,
 # and these failures are very easy to miss otherwise.
-STACK="stack --no-terminal --haddock --jobs=2"
+STACK="stack --no-terminal --haddock --jobs=4"
 
 STACK_OPTS="--test"
 if [ "$CI_RELEASE" = "true" -o "$CI_PRERELEASE" = "true" ]
@@ -33,6 +33,10 @@ then
   STACK_OPTS="$STACK_OPTS --flag=purescript:RELEASE"
 else
   STACK_OPTS="$STACK_OPTS --fast"
+fi
+if [ "$CI_STATIC" = "true" ]
+then
+  STACK_OPTS="$STACK_OPTS --flag=purescript:static"
 fi
 
 (echo "::endgroup::"; echo "::group::Set version number for build") 2>/dev/null
