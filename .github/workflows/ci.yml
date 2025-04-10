@@ -60,11 +60,11 @@ jobs:
           - image: haskell:9.6.6
             os: ubuntu-24.04-arm  # Exact version is not important, as it's only the container host
 
-          - image: benz0li/ghc-musl:9.6.6
-            os: ubuntu-24.04-arm
+          - image: benz0li/ghc-musl:9.6.6-linux-amd64
+            os: ubuntu-latest
             static: true
 
-          - image: benz0li/ghc-musl:9.6.6
+          - image: benz0li/ghc-musl:9.6.6-linux-arm64v8
             os: ubuntu-latest
             static: true
 
