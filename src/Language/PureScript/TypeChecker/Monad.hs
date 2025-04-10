@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- |
 -- Monads for type checking and type inference and associated data types

@@ -114,8 +114,8 @@ createBindingGroups moduleName = mapM f <=< handleDecls
 
       valueDeclarationInfo = M.fromList $ swap <$> valueDeclarationKeys
       findDeclarationInfo i = (M.findWithDefault False i valueDeclarationInfo, i)
-      computeValueDependencies = (`intersect` valueDeclarationKeys) . fmap findDeclarationInfo . usedIdents moduleName 
-  
+      computeValueDependencies = (`intersect` valueDeclarationKeys) . fmap findDeclarationInfo . usedIdents moduleName
+
       makeValueDeclarationVert = (,,) <$> id <*> makeValueDeclarationKey <*> computeValueDependencies
       valueDeclarationVerts = makeValueDeclarationVert <$> values
 
@@ -267,7 +267,7 @@ toDataBindingGroup
   -> m Declaration
 toDataBindingGroup (AcyclicSCC (d, _, _)) = return d
 toDataBindingGroup (CyclicSCC ds')
-  | Just kds@((ss, _):|_) <- nonEmpty $ concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
+  | Just kds@((ss, _) :| _) <- nonEmpty $ concatMap (kindDecl . getDecl) ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
   | not (null typeSynonymCycles) =
       throwError
         . MultipleErrors

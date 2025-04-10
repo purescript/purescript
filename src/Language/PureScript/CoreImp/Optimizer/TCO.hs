@@ -3,7 +3,7 @@ module Language.PureScript.CoreImp.Optimizer.TCO (tco) where
 
 import Prelude
 
-import Control.Applicative (empty, liftA2)
+import Control.Applicative (empty)
 import Control.Monad (guard)
 import Control.Monad.State (State, evalState, get, modify)
 import Data.Functor (($>), (<&>))
