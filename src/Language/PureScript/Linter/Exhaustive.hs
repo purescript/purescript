@@ -9,7 +9,7 @@ module Language.PureScript.Linter.Exhaustive
   ) where
 
 import Prelude
-import Protolude (liftA2, ordNub)
+import Protolude (ordNub)
 
 import Control.Arrow (first, second)
 import Control.Monad (unless)
