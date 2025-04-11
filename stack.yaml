@@ -6,7 +6,7 @@ packages:
 - '.'
 ghc-options:
   # Build with advanced optimizations enabled by default
-  "$locals": -O2 -Werror
+  "$locals": -O2 -Werror -fspecialize-aggressively -fexpose-all-unfoldings
 extra-deps:
 # As of 2021-11-08, the latest release of `language-javascript` is 0.7.1.0,
 # but it has a problem with parsing the `async` keyword.  It doesn't allow
