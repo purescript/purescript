@@ -1,6 +1,7 @@
 {- HLINT ignore "Unused LANGUAGE pragma" -} -- HLint doesn't recognize that TypeApplications is used in a pattern
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeAbstractions #-}
 module Language.PureScript.TypeChecker.Deriving (deriveInstance) where
 
 import Protolude hiding (Type)
