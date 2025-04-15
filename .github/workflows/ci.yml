@@ -54,10 +54,10 @@ jobs:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
         include:
-          - image: haskell:9.6.6  # Also upgrade version in the lint job below
+          - image: haskell:9.8.4  # Also upgrade version in the lint job below
             os: ubuntu-latest  # Exact version is not important, as it's only the container host)
 
-          - image: haskell:9.6.6
+          - image: haskell:9.8.4
             os: ubuntu-24.04-arm  # Exact version is not important, as it's only the container host
 
           - os: macos-13  # x64
@@ -92,7 +92,7 @@ jobs:
         if: startsWith(matrix.os, 'macos') || startsWith(matrix.os, 'windows')
         uses: "haskell-actions/setup@v2"
         with:
-          ghc-version: "9.6.6"
+          ghc-version: "9.8.4"
           enable-stack: true
           stack-version: "${{ env.STACK_VERSION }}"
           stack-no-global: true
@@ -202,7 +202,7 @@ jobs:
         run: "gh release upload --clobber ${{ github.ref_name }} sdist-test/bundle/*.{tar.gz,sha}"
 
   lint:
-    container: haskell:9.6.6
+    container: haskell:9.8.4
     runs-on: ubuntu-latest  # Exact version is not important, as it's only the container host
 
     steps:

@@ -67,7 +67,7 @@ nullRenderContext = HtmlRenderContext
 
 packageAsHtml
     :: (InPackage P.ModuleName -> Maybe HtmlRenderContext)
-    -> Package a
+    -> Package x
     -> HtmlOutput Html
 packageAsHtml getHtmlCtx Package{..} =
   HtmlOutput indexFile modules
@@ -242,7 +242,7 @@ codeAsHtml r = outputWith elemAsHtml
 
   isOp = isRight . runParser CST.parseOperator
 
-  runParser :: CST.Parser a -> Text -> Either String a
+  runParser :: CST.Parser x -> Text -> Either String x
   runParser p' =
     bimap (CST.prettyPrintError . NE.head) snd
       . CST.runTokenParser p'

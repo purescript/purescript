@@ -4,6 +4,7 @@ module Language.PureScript.Sugar.Names.Exports
   ) where
 
 import Prelude
+import Protolude (headDef)
 
 import Control.Monad (filterM, foldM, liftM2, unless, void, when)
 import Control.Monad.Writer.Class (MonadWriter(..))
@@ -127,7 +128,8 @@ resolveExports env ss mn imps exps refs =
     -> (a -> Name)
     -> M.Map (Qualified a) [ImportRecord a]
     -> m [Qualified a]
-  extract ss' useQual name toName = fmap (map (importName . head . snd)) . go . M.toList
+  extract ss' useQual name toName =
+    fmap (map (importName . headDef (internalError "Missing value in extract") . snd)) . go . M.toList
     where
     go = filterM $ \(name', options) -> do
       let isMatch = if useQual then isQualifiedWith name name' else any (checkUnqual name') options

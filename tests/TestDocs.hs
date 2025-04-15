@@ -1,6 +1,7 @@
 module TestDocs where
 
 import Prelude
+import Protolude (tailDef)
 
 import Data.Bifunctor (first)
 import Data.List (findIndex)
@@ -952,7 +953,7 @@ testCases =
     codeToString (Docs.renderType ty) == expected
 
   shouldBeOrdered mn declNames =
-    zipWith (ShouldComeBefore mn) declNames (tail declNames)
+    zipWith (ShouldComeBefore mn) declNames (tailDef mempty declNames)
 
 testTagsCases :: [(Text, [TagsAssertion])]
 testTagsCases =

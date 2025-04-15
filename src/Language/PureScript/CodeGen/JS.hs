@@ -7,7 +7,7 @@ module Language.PureScript.CodeGen.JS
   ) where
 
 import Prelude
-import Protolude (ordNub)
+import Protolude (ordNub, headDef)
 
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
@@ -310,7 +310,8 @@ moduleBindToJs mn = bindToJs
     let (f, args) = unApp e []
     args' <- mapM valueToJs args
     case f of
-      Var (_, _, Just IsNewtype) _ -> return (head args')
+      Var (_, _, Just IsNewtype) _ ->
+        return (headDef (internalError "Newtype constructor without constructor name") args')
       Var (_, _, Just (IsConstructor _ fields)) name | length args == length fields ->
         return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
       _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args' <$> valueToJs f
