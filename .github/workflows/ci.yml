@@ -220,7 +220,7 @@ jobs:
 
       - run: "ci/fix-home ci/run-hlint.sh --git"
         env:
-          VERSION: "3.5"
+          VERSION: "3.10"
 
       - name: Install weeder
         run: |
