@@ -2,7 +2,7 @@ Warning found:
 in module [33mMain[0m
 at tests/purs/warning/ShadowedNameParens.purs:7:5 - 7:6 (line 7, column 5 - line 7, column 6)
 
-  Name [33mn[0m was shadowed.
+  The value [33mn[0m was shadowed.
 
 in value declaration [33mf[0m
 

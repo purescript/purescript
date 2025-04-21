@@ -11,6 +11,7 @@ import Prelude hiding ((<>))
 
 import Control.Arrow (second)
 
+import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import Data.List.NonEmpty qualified as NEL
 import Data.Monoid qualified as Monoid ((<>))
@@ -75,10 +76,10 @@ prettyPrintValue d (Case values binders) =
 prettyPrintValue d (Let FromWhere ds val) =
   prettyPrintValue (d - 1) val //
     moveRight 2 (text "where" //
-                 vcat left (map (prettyPrintDeclaration (d - 1)) ds))
+                 vcat left (mapMaybe (prettyPrintDeclaration' (d - 1)) ds))
 prettyPrintValue d (Let FromLet ds val) =
   text "let" //
-    moveRight 2 (vcat left (map (prettyPrintDeclaration (d - 1)) ds)) //
+    moveRight 2 (vcat left (mapMaybe (prettyPrintDeclaration' (d - 1)) ds)) //
     (text "in " <> prettyPrintValue (d - 1) val)
 prettyPrintValue d (Do m els) =
   textT (maybe "" ((Monoid.<> ".") . runModuleName) m) <> text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
@@ -139,6 +140,12 @@ prettyPrintDeclaration d (BindingGroupDeclaration ds) =
   toDecl ((sa, nm), t, e) = ValueDecl sa nm t [] [GuardedExpr [] e]
 prettyPrintDeclaration _ _ = internalError "Invalid argument to prettyPrintDeclaration"
 
+prettyPrintDeclaration' :: Int -> Declaration -> Maybe Box
+prettyPrintDeclaration' d = \case
+  KindDeclaration{} -> Nothing
+  TypeSynonymDeclaration{} -> Nothing
+  decl -> Just $ prettyPrintDeclaration d decl
+
 prettyPrintCaseAlternative :: Int -> CaseAlternative -> Box
 prettyPrintCaseAlternative d _ | d < 0 = ellipsis
 prettyPrintCaseAlternative d (CaseAlternative binders result) =
@@ -184,7 +191,7 @@ prettyPrintDoNotationElement d (DoNotationBind binder val) =
   textT (prettyPrintBinder binder Monoid.<> " <- ") <> prettyPrintValue d val
 prettyPrintDoNotationElement d (DoNotationLet ds) =
   text "let" //
-    moveRight 2 (vcat left (map (prettyPrintDeclaration (d - 1)) ds))
+    moveRight 2 (vcat left (mapMaybe (prettyPrintDeclaration' (d - 1)) ds))
 prettyPrintDoNotationElement d (PositionedDoNotationElement _ _ el) = prettyPrintDoNotationElement d el
 
 prettyPrintBinderAtom :: Binder -> Text

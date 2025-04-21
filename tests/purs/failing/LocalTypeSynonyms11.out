@@ -1,0 +1,13 @@
+Error found:
+at tests/purs/failing/LocalTypeSynonyms11.purs:7:3 - 7:16 (line 7, column 3 - line 7, column 16)
+
+  A cycle appears in a set of kind declarations:
+
+    {[33mT1[0m, [33mT2[0m}
+
+  Kind declarations may not refer to themselves in their own signatures.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CycleInKindDeclaration.md for more information,
+or to contribute content related to this error.
+
