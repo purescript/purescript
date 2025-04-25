@@ -403,6 +403,7 @@ library
     System.IO.UTF8
   other-modules:
     Data.Text.PureScript
+    Data.InternedName
     Language.PureScript.Constants.TH
     Paths_purescript
   autogen-modules:
