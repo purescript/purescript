@@ -2,23 +2,25 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/Rank2Types.purs:8:25 - 8:26 (line 8, column 25 - line 8, column 26)
 
-  Could not match type
+  Expected type
+  [33m    [0m
+  [33m  a1[0m
+  [33m    [0m
+  but found type
   [33m     [0m
   [33m  Int[0m
   [33m     [0m
-  with type
-  [33m    [0m
-  [33m  a0[0m
-  [33m    [0m
 
-while checking that type [33mInt[0m
-  is at least as general as type [33ma0[0m
 while checking that expression [33m1[0m
-  has type [33ma0[0m
+  has type [33ma1[0m
+while applying a function [33m(add (#dict Semiring t2)) n[0m
+  of type [33mt0 -> t0[0m
+  to argument [33m1[0m
 in value declaration [33mtest1[0m
 
-where [33ma0[0m is a rigid type variable
+where [33ma1[0m is a rigid type variable
         bound at (line 8, column 14 - line 8, column 27)
+      [33mt0[0m is an unknown type
 
 See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
 or to contribute content related to this error.

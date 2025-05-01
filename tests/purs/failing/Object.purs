@@ -1,4 +1,4 @@
--- @shouldFailWith PropertyIsMissing
+-- @shouldFailWith TypesDoNotUnify
 module Main where
 
 import Prelude

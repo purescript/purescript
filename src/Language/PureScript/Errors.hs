@@ -11,7 +11,7 @@ import Control.Arrow ((&&&))
 import Control.DeepSeq (NFData)
 import Control.Lens (both, head1, over)
 import Control.Monad (forM, unless)
-import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Error.Class (MonadError(..), liftEither)
 import Control.Monad.Trans.State.Lazy (State, evalState, get, put)
 import Control.Monad.Writer (MonadWriter(..), censor)
 import Data.Monoid (Last(..))
@@ -50,7 +50,7 @@ import Language.PureScript.Pretty.Common (endWith)
 import Language.PureScript.PSString (decodeStringWithReplacement)
 import Language.PureScript.Roles (Role, displayRole)
 import Language.PureScript.Traversals (sndM)
-import Language.PureScript.Types (Constraint(..), ConstraintData(..), RowListItem(..), SourceConstraint, SourceType, Type(..), eraseForAllKindAnnotations, eraseKindApps, everywhereOnTypesTopDownM, getAnnForType, isMonoType, overConstraintArgs, rowFromList, rowToList, srcTUnknown)
+import Language.PureScript.Types (Constraint(..), ConstraintData(..), RowListItem(..), SourceConstraint, SourceType, Type(..), eqType, eraseForAllKindAnnotations, eraseKindApps, everywhereOnTypesTopDownM, getAnnForType, isMonoType, overConstraintArgs, rowFromList, rowToList, srcTUnknown)
 import Language.PureScript.Publish.BoxesHelpers qualified as BoxHelpers
 import System.Console.ANSI qualified as ANSI
 import System.FilePath (makeRelative)
@@ -107,7 +107,10 @@ data SimpleErrorMessage
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
   | EscapedSkolem Text (Maybe SourceSpan) SourceType
-  | TypesDoNotUnify SourceType SourceType
+  | TypesDoNotUnify
+      Bool -- ^ if this error is known to be a case where the first type is used but the second type is expected
+      SourceType
+      SourceType
   | KindsDoNotUnify SourceType SourceType
   | ConstrainedTypeUnified SourceType SourceType
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified (Either SourceType Ident)]
@@ -135,9 +138,6 @@ data SimpleErrorMessage
   | ExpectedType SourceType SourceType
   -- | constructor name, expected argument count, actual argument count
   | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName)) Int Int
-  | ExprDoesNotHaveType Expr SourceType
-  | PropertyIsMissing Label
-  | AdditionalProperty Label
   | OrphanInstance Ident (Qualified (ProperName 'ClassName)) (S.Set ModuleName) [SourceType]
   | InvalidNewtype (ProperName 'TypeName)
   | InvalidInstanceHead SourceType
@@ -310,9 +310,6 @@ errorCode em = case unwrapErrorMessage em of
   ExtraneousClassMember{} -> "ExtraneousClassMember"
   ExpectedType{} -> "ExpectedType"
   IncorrectConstructorArity{} -> "IncorrectConstructorArity"
-  ExprDoesNotHaveType{} -> "ExprDoesNotHaveType"
-  PropertyIsMissing{} -> "PropertyIsMissing"
-  AdditionalProperty{} -> "AdditionalProperty"
   OrphanInstance{} -> "OrphanInstance"
   InvalidNewtype{} -> "InvalidNewtype"
   InvalidInstanceHead{} -> "InvalidInstanceHead"
@@ -468,9 +465,8 @@ onTypesInErrorMessageM :: Applicative m => (SourceType -> m SourceType) -> Error
 onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse gHint hints <*> gSimple simple
   where
   gSimple (InfiniteType t) = InfiniteType <$> f t
-  gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
+  gSimple (TypesDoNotUnify isOrdered t1 t2) = TypesDoNotUnify isOrdered <$> f t1 <*> f t2
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
-  gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con ambig unks) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure ambig <*> pure unks
   gSimple (AmbiguousTypeVariables t uis) = AmbiguousTypeVariables <$> f t <*> pure uis
@@ -860,14 +856,21 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
             , line "has escaped its scope, appearing in the type"
             , markCodeBox $ indent $ prettyType ty
             ]
-    renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
+    renderSimpleErrorMessage (TypesDoNotUnify isOrdered u1 u2)
       = let (row1Box, row2Box) = printRows u1 u2
 
-        in paras [ line "Could not match type"
-                 , row1Box
-                 , line "with type"
-                 , row2Box
-                 ]
+        in if isOrdered then
+          paras [ line "Expected type"
+                , row2Box
+                , line "but found type"
+                , row1Box
+                ]
+        else
+          paras [ line "Could not match type"
+                , row1Box
+                , line "with type"
+                , row2Box
+                ]
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
       paras [ line "Could not match kind"
@@ -1073,16 +1076,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       paras [ line $ "Data constructor " <> markCode (showQualified runProperName nm) <> " was given " <> T.pack (show actual) <> " arguments in a case expression, but expected " <> T.pack (show expected) <> " arguments."
             , line $ "This problem can be fixed by giving " <> markCode (showQualified runProperName nm) <> " " <> T.pack (show expected) <> " arguments."
             ]
-    renderSimpleErrorMessage (ExprDoesNotHaveType expr ty) =
-      paras [ line "Expression"
-            , markCodeBox $ indent $ prettyPrintValue prettyDepth expr
-            , line "does not have type"
-            , markCodeBox $ indent $ prettyType ty
-            ]
-    renderSimpleErrorMessage (PropertyIsMissing prop) =
-      line $ "Type of expression lacks required label " <> markCode (prettyPrintLabel prop) <> "."
-    renderSimpleErrorMessage (AdditionalProperty prop) =
-      line $ "Type of expression contains additional label " <> markCode (prettyPrintLabel prop) <> "."
     renderSimpleErrorMessage (OrphanInstance nm cnm nonOrphanModules ts) =
       paras [ line $ "Orphan instance" <> prettyPrintPlainIdent nm <> " found for "
             , markCodeBox $ indent $ Box.hsep 1 Box.left
@@ -1623,6 +1616,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
         let (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
         in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
 
+      (_, TypeApp s1 f1@(TypeConstructor _ C.Record) r1'@RCons{}, TypeApp s2 f2@(TypeConstructor _ C.Record) r2'@RCons{}) ->
+        let (sorted1, sorted2) = filterRows (rowToList r1') (rowToList r2')
+        in (printRow typeDiffAsBox $ TypeApp s1 f1 sorted1, printRow typeDiffAsBox $ TypeApp s2 f2 sorted2)
+
       (_, _, _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
 
 
@@ -1733,14 +1730,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
 
     -- See https://github.com/purescript/purescript/issues/1802
     stripRedundantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
-    stripRedundantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
-      where
-      isCheckHint ErrorCheckingType{} = True
-      isCheckHint _ = False
-    stripRedundantHints TypesDoNotUnify{} = stripFirst isUnifyHint
+    stripRedundantHints (TypesDoNotUnify _ t1 t2) = stripFirst isMatchingSubsumptionHint . stripFirst isUnifyHint
       where
       isUnifyHint ErrorUnifyingTypes{} = True
       isUnifyHint _ = False
+      isMatchingSubsumptionHint (ErrorInSubsumption t1' t2') = t1 `eqType` t1' && t2 `eqType` t2'
+      isMatchingSubsumptionHint _ = False
     stripRedundantHints (NoInstanceFound (Constraint _ C.Coercible _ args _) _ _) = filter (not . isSolverHint)
       where
       isSolverHint (ErrorSolvingConstraint (Constraint _ C.Coercible _ args' _)) = args == args'
@@ -2058,15 +2053,35 @@ parU
   -> (a -> m b)
   -> m [b]
 parU xs f =
-    forM xs (withError . f) >>= collectErrors
+    forM xs (tryError . f) >>= collectErrors
   where
-    withError :: m b -> m (Either MultipleErrors b)
-    withError u = catchError (Right <$> u) (return . Left)
+    -- exported from Control.Monad.Error.Class in mtl >= 2.3
+    tryError :: m b -> m (Either MultipleErrors b)
+    tryError u = catchError (Right <$> u) (return . Left)
 
     collectErrors :: [Either MultipleErrors b] -> m [b]
     collectErrors es = case partitionEithers es of
       ([], rs) -> return rs
       (errs, _) -> throwError $ fold errs
+
+-- | Collect errors in parallel, using a function to combine results
+liftParU2
+  :: forall m a b c
+   . MonadError MultipleErrors m
+  => (a -> b -> c)
+  -> m a
+  -> m b
+  -> m c
+liftParU2 f ma mb = f' <$> tryError ma <*> tryError mb >>= liftEither
+  where
+  -- exported from Control.Monad.Error.Class in mtl >= 2.3
+  tryError :: forall d. m d -> m (Either MultipleErrors d)
+  tryError u = catchError (Right <$> u) (return . Left)
+
+  f' (Left e) (Left e') = Left $ e <> e'
+  f' (Left e) (Right _) = Left e
+  f' (Right _) (Left e) = Left e
+  f' (Right a) (Right b) = Right $ f a b
 
 internalCompilerError
   :: (MonadError MultipleErrors m, GHC.Stack.HasCallStack)

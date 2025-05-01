@@ -599,7 +599,7 @@ canonRow a b
         (deriveds, (([], tail1), ([], tail2))) -> do
           pure . Canonicalized . S.fromList $ (tail1, tail2) : deriveds
         (_, (rl1, rl2)) ->
-          throwError . errorMessage $ TypesDoNotUnify (rowFromList rl1) (rowFromList rl2)
+          throwError . errorMessage $ TypesDoNotUnify False (rowFromList rl1) (rowFromList rl2)
   | otherwise = empty
 
 -- | Unwrapping a newtype can fails in two ways:
@@ -769,7 +769,7 @@ decompose env tyName axs bxs = do
           | ax == bx ->
               pure mempty
           | otherwise ->
-              throwError . errorMessage $ TypesDoNotUnify ax bx
+              throwError . errorMessage $ TypesDoNotUnify False ax bx
         Representational ->
           pure $ S.singleton (ax, bx)
         Phantom ->

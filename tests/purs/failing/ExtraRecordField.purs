@@ -1,4 +1,4 @@
--- @shouldFailWith AdditionalProperty
+-- @shouldFailWith TypesDoNotUnify
 module ExtraRecordField where
 
 import Prelude ((<>))
