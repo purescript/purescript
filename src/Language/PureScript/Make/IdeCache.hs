@@ -258,7 +258,10 @@ sqliteInit outputDir = liftIO $ do
     SQLite.execute_ conn "create table if not exists ide_declarations (module_name text references modules(module_name) on delete cascade, name text, namespace text, declaration_type text, span blob, declaration blob)"
 
     SQLite.execute_ conn "create index if not exists ide_declarations_name_idx on ide_declarations(name);"
+
     SQLite.execute_ conn "create index if not exists ide_declarations_module_name_idx on ide_declarations(module_name);"
+
+    SQLite.execute_ conn "create index if not exists exports_idx on exports(defined_in,name,declaration_type,module_name);"
 
     SQLite.close conn
   where

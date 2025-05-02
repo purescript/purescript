@@ -173,6 +173,7 @@ findDeclarations filters currentModule completionOptions = do
             T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <>
           "))" <>
           " or " <> "id.module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> "))"
+        F.Filter (Right (F.Prefix "")) -> Nothing
         F.Filter (Right (F.Prefix f)) -> Just $ "id.name glob '" <> f <> "*'"
         F.Filter (Right (F.Exact f)) -> Just $ "id.name glob '" <> f <> "'"
         F.Filter (Right (F.Namespace namespaces)) ->
