@@ -37,7 +37,7 @@ import Language.PureScript.Ide.Matcher (Matcher, Matcher' (..))
 import Language.PureScript.Ide.Prim (idePrimDeclarations)
 import Language.PureScript.Ide.Rebuild (rebuildFileAsync, rebuildFileSync)
 import Language.PureScript.Ide.SourceFile (parseModulesFromFiles)
-import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState, getSqliteFilePath, runQuery)
+import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState, getSqliteFilePath, runQuery, escapeSQL)
 import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..), Completion (..), toText, Match (..))
 import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, namespaceForDeclaration, withEmptyAnn)
 import Language.PureScript.Ide.Usage (findUsages)
@@ -174,8 +174,8 @@ findDeclarations filters currentModule completionOptions = do
           "))" <>
           " or " <> "id.module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> "))"
         F.Filter (Right (F.Prefix "")) -> Nothing
-        F.Filter (Right (F.Prefix f)) -> Just $ "id.name glob '" <> f <> "*'"
-        F.Filter (Right (F.Exact f)) -> Just $ "id.name glob '" <> f <> "'"
+        F.Filter (Right (F.Prefix f)) -> Just $ "id.name glob '" <> escapeSQL f <> "*'"
+        F.Filter (Right (F.Exact f)) -> Just $ "id.name glob '" <> escapeSQL f <> "'"
         F.Filter (Right (F.Namespace namespaces)) ->
           Just $ "id.namespace in (" <> T.intercalate "," (toList namespaces <&> \n -> "'" <> toText n <> "'") <> ")"
         F.Filter (Right (F.DeclType dt)) ->

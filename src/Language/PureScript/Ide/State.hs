@@ -38,6 +38,7 @@ module Language.PureScript.Ide.State
   , resolveOperatorsForModule
   , resolveInstances
   , resolveDataConstructorsForModule
+  , escapeSQL
   ) where
 
 import Protolude hiding (moduleName, unzip)
@@ -61,6 +62,7 @@ import Language.PureScript.Ide.Util (discardAnn, opNameT, properNameT, runLogger
 import System.Directory (getModificationTime)
 import Database.SQLite.Simple qualified as SQLite
 import Debug.Trace qualified as Debug
+import Data.Text qualified as T
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
@@ -81,6 +83,9 @@ runQuery q = do
   -- Debug.traceM $ show q
   IdeEnvironment{..} <- ask
   liftIO $ query q
+
+escapeSQL :: Text -> Text
+escapeSQL = T.replace "'" "''"
 
 getCacheTimestamp :: Ide m => m (Maybe UTCTime)
 getCacheTimestamp = do
