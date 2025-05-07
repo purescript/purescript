@@ -20,6 +20,7 @@ module Language.PureScript.Ide
 
 import Protolude hiding (moduleName)
 
+import qualified Language.PureScript.Ide.Imports as IDEImports
 import "monad-logger" Control.Monad.Logger (MonadLogger, logWarnN)
 import Data.Map qualified as Map
 import Data.Text qualified as T
@@ -180,7 +181,13 @@ findDeclarations filters currentModule completionOptions = do
           Just $ "id.namespace in (" <> T.intercalate "," (toList namespaces <&> \n -> "'" <> toText n <> "'") <> ")"
         F.Filter (Right (F.DeclType dt)) ->
           Just $ "id.namespace in (" <> T.intercalate "," (toList dt <&> \t -> "'" <> declarationTypeToText t <> "'") <> ")"
-        F.Filter _ -> Nothing)
+        F.Filter (Right (F.Dependencies qualifier _ imports@(_:_))) -> Just $ "id.module_name in (" <>
+          T.intercalate "," (filter (\(IDEImports.Import _ _ qualified) -> case qualifier of
+             Nothing -> True
+             Just qual -> Just qual == qualified
+              ) imports <&> \(IDEImports.Import m _ _)-> "'" <> escapeSQL (runModuleName m) <> "'") <> ")"
+        F.Filter _ -> Nothing
+        )
       filters
       & \f -> if null f then " " else " where " <> T.intercalate " and " f
       ) <>
