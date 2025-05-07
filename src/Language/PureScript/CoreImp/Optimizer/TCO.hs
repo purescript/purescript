@@ -5,8 +5,8 @@ import Prelude
 
 import Control.Applicative (empty)
 import Control.Monad (guard)
-import Control.Monad.State (State, evalState, get, modify)
-import Data.Functor (($>), (<&>))
+import Control.Monad.State (State, evalState, gets, modify)
+import Data.Functor (($>))
 import Data.Set qualified as S
 import Data.Text (Text, pack)
 import Language.PureScript.CoreImp.AST (AST(..), InitializerEffects(..), UnaryOperator(..), everything, everywhereTopDownM)
@@ -23,8 +23,8 @@ tco = flip evalState 0 . everywhereTopDownM convert where
   copyVar arg = "$copy_" <> arg
 
   tcoDoneM :: State Int Text
-  tcoDoneM = get <&> \count -> "$tco_done" <>
-    if count == 0 then "" else pack . show $ count
+  tcoDoneM = gets (\count -> "$tco_done" <>
+    if count == 0 then "" else pack . show $ count)
 
   tcoLoop :: Text
   tcoLoop = "$tco_loop"

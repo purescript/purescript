@@ -237,7 +237,8 @@ desugarDecl mn exps = go
 
   expRef :: Ident -> Qualified (ProperName 'ClassName) -> [SourceType] -> Maybe DeclarationRef
   expRef name className tys
-    | isExportedClass className && all isExportedType (getConstructors `concatMap` tys) = Just $ TypeInstanceRef genSpan name UserNamed
+    | isExportedClass className && all (all isExportedType . getConstructors) tys =
+        Just $ TypeInstanceRef genSpan name UserNamed
     | otherwise = Nothing
 
   isExportedClass :: Qualified (ProperName 'ClassName) -> Bool

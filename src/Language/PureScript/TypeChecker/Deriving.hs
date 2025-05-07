@@ -530,7 +530,7 @@ validateParamsInTypeConstructors derivingClass utc isBi CovariantClasses{..} con
 
   hasInstance :: InstanceContext -> Qualified (Either Text (ProperName 'TypeName)) -> Qualified (ProperName 'ClassName) -> Bool
   hasInstance tcds ht@(Qualified qb _) cn@(Qualified cqb _) =
-    any tcdAppliesToType $ concatMap (findDicts tcds cn) (ordNub [ByNullSourcePos, cqb, qb])
+    any (any tcdAppliesToType . findDicts tcds cn) (ordNub [ByNullSourcePos, cqb, qb])
     where
     tcdAppliesToType tcd = case tcdInstanceTypes tcd of
       [headOfType -> ht'] -> ht == ht'
