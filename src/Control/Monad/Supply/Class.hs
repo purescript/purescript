@@ -11,13 +11,14 @@ import Control.Monad.State (StateT)
 import Control.Monad.Supply (SupplyT(..))
 import Control.Monad.Writer (WriterT)
 import Data.Text (Text, pack)
+import Data.Int (Int64)
 
 class Monad m => MonadSupply m where
-  fresh :: m Integer
-  peek :: m Integer
-  default fresh :: (MonadTrans t, MonadSupply n, m ~ t n) => m Integer
+  fresh :: m Int64
+  peek :: m Int64
+  default fresh :: (MonadTrans t, MonadSupply n, m ~ t n) => m Int64
   fresh = lift fresh
-  default peek :: (MonadTrans t, MonadSupply n, m ~ t n) => m Integer
+  default peek :: (MonadTrans t, MonadSupply n, m ~ t n) => m Int64
   peek = lift peek
 
 instance Monad m => MonadSupply (SupplyT m) where
