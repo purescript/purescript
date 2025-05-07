@@ -5,8 +5,6 @@ module Language.PureScript.Sugar.Accessor
 
 import           Prelude
 
-import Data.Monoid (Any(..))
-
 import           Control.Monad.Writer
 
 import           Language.PureScript.AST
