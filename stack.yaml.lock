@@ -42,14 +42,14 @@ packages:
 - completed:
     name: cheapskate
     pantry-tree:
-      sha256: a2253619f50d26f0137a802e51e5e7103ee52b1f71bc060d93a0979dcbefa2c8
+      sha256: b130a35ad29a61ac64c2d29bb09309ddf07b139342c67ef01ccc59ad4167d529
       size: 12069
-    sha256: 959fc7a6ca7e0a743b06b0c287aa4a1c3ec7fc740e5830a4a841d43e925a6d73
-    size: 62502
-    url: https://github.com/purescript/cheapskate/archive/8bfaf4beeb108e97a274ed51303f278905979e87.tar.gz
+    sha256: 2b495e2b6d571c33b91ebb76c1b7fe9c9b56ff90ca0804106a3260f2bbdc9a9a
+    size: 62489
+    url: https://github.com/purescript/cheapskate/archive/633c69024e061ad956f1aecfc137fb99a7a7a20b.tar.gz
     version: 0.1.1.2
   original:
-    url: https://github.com/purescript/cheapskate/archive/8bfaf4beeb108e97a274ed51303f278905979e87.tar.gz
+    url: https://github.com/purescript/cheapskate/archive/633c69024e061ad956f1aecfc137fb99a7a7a20b.tar.gz
 snapshots:
 - completed:
     sha256: d133abe75e408a407cce3f032c96ac1bbadf474a93b5156ebf4135b53382d56b

@@ -19,7 +19,7 @@ extra-deps:
 - aeson-better-errors-0.9.1.3
 
 - github: purescript/cheapskate
-  commit: 8bfaf4beeb108e97a274ed51303f278905979e87
+  commit: 633c69024e061ad956f1aecfc137fb99a7a7a20b
 
 nix:
   packages:
