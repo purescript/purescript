@@ -38,3 +38,4 @@ flags:
 allow-newer: true
 allow-newer-deps:
 - haskeline
+- weeder
