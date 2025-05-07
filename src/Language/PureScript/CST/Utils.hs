@@ -1,6 +1,7 @@
 module Language.PureScript.CST.Utils where
 
 import Prelude
+import Protolude (headDef)
 
 import Control.Monad (unless)
 import Data.Coerce (coerce)
@@ -86,16 +87,20 @@ unexpectedLabel :: SourceToken -> Label
 unexpectedLabel tok = Label tok "<unexpected>"
 
 unexpectedExpr :: Monoid a => [SourceToken] -> Expr a
-unexpectedExpr toks = ExprIdent mempty (unexpectedQual (head toks))
+unexpectedExpr toks =
+  ExprIdent mempty (unexpectedQual (headDef placeholder toks ))
 
 unexpectedBinder :: Monoid a => [SourceToken] -> Binder a
-unexpectedBinder toks = BinderVar mempty (unexpectedName (head toks))
+unexpectedBinder toks =
+  BinderVar mempty (unexpectedName (headDef placeholder toks))
 
 unexpectedRecordUpdate :: Monoid a => [SourceToken] -> RecordUpdate a
-unexpectedRecordUpdate toks = RecordUpdateLeaf (unexpectedLabel (head toks)) (head toks) (unexpectedExpr toks)
+unexpectedRecordUpdate toks =
+  RecordUpdateLeaf (unexpectedLabel (headDef placeholder toks)) (headDef placeholder toks) (unexpectedExpr toks)
 
 unexpectedRecordLabeled :: [SourceToken] -> RecordLabeled a
-unexpectedRecordLabeled toks = RecordPun (unexpectedName (head toks))
+unexpectedRecordLabeled toks =
+  RecordPun (unexpectedName (headDef placeholder toks))
 
 rangeToks :: TokenRange -> [SourceToken]
 rangeToks (a, b) = [a, b]

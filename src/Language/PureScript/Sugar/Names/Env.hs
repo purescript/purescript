@@ -20,7 +20,7 @@ module Language.PureScript.Sugar.Names.Env
 
 import Prelude
 
-import Control.Monad (forM_, when)
+import Control.Monad (forM_, when, (>=>))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
 
@@ -28,7 +28,7 @@ import Data.Function (on)
 import Data.Foldable (find)
 import Data.List (groupBy, sortOn, delete)
 import Data.Maybe (mapMaybe)
-import Safe (headMay)
+import Safe (headMay, headDef)
 import Data.Map qualified as M
 import Data.Set qualified as S
 
@@ -482,8 +482,9 @@ checkImportConflicts ss currentModule toName xs =
     byOrig = sortOn importSourceModule xs
     groups = groupBy ((==) `on` importSourceModule) byOrig
     nonImplicit = filter ((/= FromImplicit) . importProvenance) xs
-    name = toName . disqualify . importName $ head xs
-    conflictModules = mapMaybe (getQual . importName . head) groups
+    name = toName . disqualify . importName $
+      headDef (internalError "checkImportConflicts: No imports found") xs
+    conflictModules = mapMaybe (headMay >=> (getQual . importName)) groups
   in
     if length groups > 1
     then case nonImplicit of
@@ -494,8 +495,8 @@ checkImportConflicts ss currentModule toName xs =
         return (mnNew, mnOrig)
       _ -> throwError . errorMessage' ss $ ScopeConflict name conflictModules
     else
-      case head byOrig of
-        ImportRecord (Qualified (ByModuleName mnNew) _) mnOrig _ _ ->
+      case headMay byOrig of
+        Just (ImportRecord (Qualified (ByModuleName mnNew) _) mnOrig _ _) ->
           return (mnNew, mnOrig)
         _ ->
           internalError "checkImportConflicts: ImportRecord should be qualified"

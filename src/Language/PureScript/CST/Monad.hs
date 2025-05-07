@@ -1,6 +1,7 @@
 module Language.PureScript.CST.Monad where
 
 import Prelude
+import Protolude (headMay, lastMay)
 
 import Data.List (sortOn)
 import Data.List.NonEmpty qualified as NE
@@ -102,9 +103,14 @@ mkParserError stack toks ty =
     , errType = ty
     }
   where
+  emptySourceRange = SourceRange (SourcePos 0 0) (SourcePos 0 0)
   range = case toks of
-    [] -> SourceRange (SourcePos 0 0) (SourcePos 0 0)
-    _  -> widen (tokRange . tokAnn $ head toks) (tokRange . tokAnn $ last toks)
+    [] -> emptySourceRange
+    [tok] -> widen (tokRange . tokAnn $ tok) (tokRange . tokAnn $ tok)
+    _ -> case (headMay toks, lastMay toks) of
+      (Just tokFirst, Just tokLast) ->
+        widen (tokRange . tokAnn $ tokFirst) (tokRange . tokAnn $ tokLast)
+      _ -> emptySourceRange
 
 addFailure :: [SourceToken] -> ParserErrorType -> Parser ()
 addFailure toks ty = Parser $ \st _ ksucc ->

@@ -4,6 +4,7 @@
 module Language.PureScript.Interactive.Directive where
 
 import Prelude
+import Protolude (headDef)
 
 import Data.Maybe (fromJust)
 import Data.List (isPrefixOf)
@@ -48,7 +49,7 @@ stringsFor d = fromJust (lookup d directiveStrings)
 -- Returns the default string representation of a directive.
 --
 stringFor :: Directive -> String
-stringFor = head . stringsFor
+stringFor = headDef "stringFor: no string found" . stringsFor
 
 -- |
 -- Returns the list of directives which could be expanded from the string
