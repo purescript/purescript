@@ -24,6 +24,7 @@ import System.Exit (exitSuccess, exitFailure)
 import System.Directory (getCurrentDirectory)
 import System.IO (hPutStr, stderr, stdout)
 import System.IO.UTF8 (readUTF8FilesT)
+import Language.PureScript.Make.IdeCache (sqliteInit)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
@@ -56,6 +57,7 @@ printWarningsAndErrors verbose True files warnings errors = do
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
+  sqliteInit "output"
   input <- toInputGlobs $ PSCGlobs
     { pscInputGlobs = pscmInput
     , pscInputGlobsFromFile = pscmInputFromFile
