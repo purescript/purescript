@@ -41,6 +41,7 @@ import System.FilePath ((</>))
 import System.IO (BufferMode(..), hClose, hFlush, hSetBuffering, hSetEncoding, utf8)
 import System.IO.Error (isEOFError)
 import Database.SQLite.Simple qualified as SQLite
+import Protolude qualified as D
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
 listenOnLocalhost port = do
@@ -196,6 +197,7 @@ startServer port env = Network.withSocketsDo $ do
       case accepted of
         Left err -> $(logError) err
         Right (cmd, h) -> do
+          -- traceM cmd
           case decodeT cmd of
             Right cmd' -> do
               let message duration =

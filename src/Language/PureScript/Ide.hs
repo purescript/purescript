@@ -181,11 +181,15 @@ findDeclarations filters currentModule completionOptions = do
           Just $ "id.namespace in (" <> T.intercalate "," (toList namespaces <&> \n -> "'" <> toText n <> "'") <> ")"
         F.Filter (Right (F.DeclType dt)) ->
           Just $ "id.namespace in (" <> T.intercalate "," (toList dt <&> \t -> "'" <> declarationTypeToText t <> "'") <> ")"
-        F.Filter (Right (F.Dependencies qualifier _ imports@(_:_))) -> Just $ "id.module_name in (" <>
-          T.intercalate "," (filter (\(IDEImports.Import _ _ qualified) -> case qualifier of
-             Nothing -> True
-             Just qual -> Just qual == qualified
-              ) imports <&> \(IDEImports.Import m _ _)-> "'" <> escapeSQL (runModuleName m) <> "'") <> ")"
+        F.Filter (Right (F.Dependencies qualifier _ imports@(_:_))) -> 
+          Just $ "(exists (select 1 from exports e where id.module_name = e.defined_in and id.name = e.name and id.declaration_type = e.declaration_type and e.module_name in "
+             <> moduleNames <> ") or id.module_name in" <> moduleNames <> ")"
+          where
+          moduleNames = " (" <>
+              T.intercalate "," (filter (\(IDEImports.Import _ _ qualified) -> case qualifier of
+                 Nothing -> True
+                 Just qual -> Just qual == qualified
+                  ) imports <&> \(IDEImports.Import m _ _)-> "'" <> escapeSQL (runModuleName m) <> "'") <> ") "
         F.Filter _ -> Nothing
         )
       filters
