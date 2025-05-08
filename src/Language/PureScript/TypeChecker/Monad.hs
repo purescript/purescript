@@ -14,6 +14,7 @@ import Control.Monad (forM_, guard, join, when, (<=<))
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Maybe (fromMaybe)
+import Data.IntMap.Lazy qualified as IM
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Data.Text (Text, isPrefixOf, unpack)
@@ -46,11 +47,11 @@ instance Ord UnkLevel where
 
 -- | A substitution of unification variables for types.
 data Substitution = Substitution
-  { substType :: M.Map Int SourceType
+  { substType :: IM.IntMap SourceType
   -- ^ Type substitution
-  , substUnsolved :: M.Map Int (UnkLevel, SourceType)
+  , substUnsolved :: IM.IntMap (UnkLevel, SourceType)
   -- ^ Unsolved unification variables with their level (scope ordering) and kind
-  , substNames :: M.Map Int Text
+  , substNames :: IM.IntMap Text
   -- ^ The original names of unknowns
   }
 
@@ -59,17 +60,17 @@ insertUnkName u t = do
   modify (\s ->
             s { checkSubstitution =
                   (checkSubstitution s) { substNames =
-                                            M.insert u t $ substNames $ checkSubstitution s
+                                            IM.insert u t $ substNames $ checkSubstitution s
                                         }
               }
          )
 
 lookupUnkName :: (MonadState CheckState m) => Unknown -> m (Maybe Text)
-lookupUnkName u = gets $ M.lookup u . substNames . checkSubstitution
+lookupUnkName u = gets $ IM.lookup u . substNames . checkSubstitution
 
 -- | An empty substitution
 emptySubstitution :: Substitution
-emptySubstitution = Substitution M.empty M.empty M.empty
+emptySubstitution = Substitution IM.empty IM.empty IM.empty
 
 -- | State required for type checking
 data CheckState = CheckState
@@ -467,13 +468,13 @@ debugValue = init . render . prettyPrintValue 100
 debugSubstitution :: Substitution -> [String]
 debugSubstitution (Substitution solved unsolved names) =
   concat
-    [ fmap go1 (M.toList solved)
-    , fmap go2 (M.toList unsolved')
-    , fmap go3 (M.toList names)
+    [ fmap go1 (IM.toList solved)
+    , fmap go2 (IM.toList unsolved')
+    , fmap go3 (IM.toList names)
     ]
   where
   unsolved' =
-    M.filterWithKey (\k _ -> M.notMember k solved) unsolved
+    IM.filterWithKey (\k _ -> IM.notMember k solved) unsolved
 
   go1 (u, ty) =
     "?" <> show u <> " = " <> debugType ty

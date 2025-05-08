@@ -24,6 +24,7 @@ import Data.Either (partitionEithers)
 import Data.Text (Text)
 import Data.List.NonEmpty qualified as NEL
 import Data.Map qualified as M
+import Data.IntMap.Lazy qualified as IM
 import Data.Set qualified as S
 import Data.Text qualified as T
 
@@ -458,11 +459,11 @@ typeCheckAll moduleName = traverse go
     typeModule (KindedType _ t1 _) = typeModule t1
     typeModule _ = internalError "Invalid type in instance in findNonOrphanModules"
 
-    modulesByTypeIndex :: M.Map Int (Maybe ModuleName)
-    modulesByTypeIndex = M.fromList (zip [0 ..] (typeModule <$> tys'))
+    modulesByTypeIndex :: IM.IntMap (Maybe ModuleName)
+    modulesByTypeIndex = IM.fromList (zip [0 ..] (typeModule <$> tys'))
 
     lookupModule :: Int -> S.Set ModuleName
-    lookupModule idx = case M.lookup idx modulesByTypeIndex of
+    lookupModule idx = case IM.lookup idx modulesByTypeIndex of
       Just ms -> S.fromList (toList ms)
       Nothing -> internalError "Unknown type index in findNonOrphanModules"
 

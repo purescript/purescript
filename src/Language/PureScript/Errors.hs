@@ -28,7 +28,7 @@ import Data.List (transpose, nubBy, partition, dropWhileEnd, sortOn, uncons)
 import Data.List.NonEmpty qualified as NEL
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Maybe (maybeToList, fromMaybe, isJust, mapMaybe)
-import Data.Map qualified as M
+import Data.IntMap.Strict qualified as M
 import Data.Ord (Down(..))
 import Data.Set qualified as S
 import Data.Text qualified as T
@@ -418,9 +418,9 @@ addHints hints = onErrorMessages $ \(ErrorMessage hints' se) -> ErrorMessage (hi
 
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
 data TypeMap = TypeMap
-  { umSkolemMap   :: M.Map Int (String, Int, Maybe SourceSpan)
+  { umSkolemMap   :: M.IntMap (String, Int, Maybe SourceSpan)
   -- ^ a map from skolems to their new names, including source and naming info
-  , umUnknownMap  :: M.Map Int Int
+  , umUnknownMap  :: M.IntMap Int
   -- ^ a map from unification variables to their new names
   , umNextIndex   :: Int
   -- ^ unknowns and skolems share a source of names during renaming, to
