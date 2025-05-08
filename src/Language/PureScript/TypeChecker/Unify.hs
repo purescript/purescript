@@ -23,7 +23,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Foldable (traverse_)
 import Data.Maybe (fromMaybe)
-import Data.Map qualified as M
+import Data.IntMap.Lazy qualified as IM
 import Data.Text qualified as T
 
 import Language.PureScript.Crash (internalError)
@@ -41,8 +41,8 @@ freshType = state $ \st -> do
     t = checkNextType st
     st' = st { checkNextType = t + 2
              , checkSubstitution =
-                 (checkSubstitution st) { substUnsolved = M.insert t (UnkLevel (pure t), E.kindType)
-                                                        . M.insert (t + 1) (UnkLevel (pure (t + 1)), srcTUnknown t)
+                 (checkSubstitution st) { substUnsolved = IM.insert t (UnkLevel (pure t), E.kindType)
+                                                        . IM.insert (t + 1) (UnkLevel (pure (t + 1)), srcTUnknown t)
                                                         . substUnsolved
                                                         $ checkSubstitution st
                                         }
@@ -56,7 +56,7 @@ freshTypeWithKind kind = state $ \st -> do
     t = checkNextType st
     st' = st { checkNextType = t + 1
              , checkSubstitution =
-                 (checkSubstitution st) { substUnsolved = M.insert t (UnkLevel (pure t), kind) (substUnsolved (checkSubstitution st)) }
+                 (checkSubstitution st) { substUnsolved = IM.insert t (UnkLevel (pure t), kind) (substUnsolved (checkSubstitution st)) }
              }
   (srcTUnknown t, st')
 
@@ -70,11 +70,11 @@ solveType u t = rethrow (onErrorMessages withoutPosition) $ do
   occursCheck u t
   k1 <- elaborateKind t
   subst <- gets checkSubstitution
-  k2 <- maybe (internalCompilerError ("No kind for unification variable ?" <> T.pack (show u))) (pure . substituteType subst . snd) . M.lookup u . substUnsolved $ subst
+  k2 <- maybe (internalCompilerError ("No kind for unification variable ?" <> T.pack (show u))) (pure . substituteType subst . snd) . IM.lookup u . substUnsolved $ subst
   t' <- instantiateKind (t, k1) k2
   modify $ \cs -> cs { checkSubstitution =
                          (checkSubstitution cs) { substType =
-                                                    M.insert u t' $ substType $ checkSubstitution cs
+                                                    IM.insert u t' $ substType $ checkSubstitution cs
                                                 }
                      }
 
@@ -83,7 +83,7 @@ substituteType :: Substitution -> SourceType -> SourceType
 substituteType sub = everywhereOnTypes go
   where
   go (TUnknown ann u) =
-    case M.lookup u (substType sub) of
+    case IM.lookup u (substType sub) of
       Nothing -> TUnknown ann u
       Just (TUnknown ann' u1) | u1 == u -> TUnknown ann' u1
       Just t -> substituteType sub t

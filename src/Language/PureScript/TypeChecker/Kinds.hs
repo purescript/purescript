@@ -42,6 +42,7 @@ import Data.Functor (($>))
 import Data.IntSet qualified as IS
 import Data.List (nubBy, sortOn, (\\))
 import Data.Map qualified as M
+import Data.IntMap.Lazy qualified as IM
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -93,7 +94,7 @@ apply ty = flip substituteType ty <$> gets checkSubstitution
 substituteType :: Substitution -> SourceType -> SourceType
 substituteType sub = everywhereOnTypes $ \case
   TUnknown ann u ->
-    case M.lookup u (substType sub) of
+    case IM.lookup u (substType sub) of
       Nothing -> TUnknown ann u
       Just (TUnknown ann' u1) | u1 == u -> TUnknown ann' u1
       Just t -> substituteType sub t
@@ -122,14 +123,14 @@ addUnsolved lvl unk kind = modify $ \st -> do
       Nothing -> pure unk
       Just (UnkLevel lvl') -> lvl' <> pure unk
     subs = checkSubstitution st
-    uns = M.insert unk (newLvl, kind) $ substUnsolved subs
+    uns = IM.insert unk (newLvl, kind) $ substUnsolved subs
   st { checkSubstitution = subs { substUnsolved = uns } }
 
 solve :: Unknown -> SourceType -> TypeCheckM ()
 solve unk solution = modify $ \st -> do
   let
     subs = checkSubstitution st
-    tys = M.insert unk solution $ substType subs
+    tys = IM.insert unk solution $ substType subs
   st { checkSubstitution = subs { substType = tys } }
 
 lookupUnsolved
@@ -138,7 +139,7 @@ lookupUnsolved
   -> TypeCheckM (UnkLevel, SourceType)
 lookupUnsolved u = do
   uns <- gets (substUnsolved . checkSubstitution)
-  case M.lookup u uns of
+  case IM.lookup u uns of
     Nothing -> internalCompilerError $ "Unsolved unification variable ?" <> T.pack (show u) <> " is not bound"
     Just res -> return res
 
