@@ -171,9 +171,9 @@ findDeclarations filters currentModule completionOptions = do
       mapMaybe (\case
         F.Filter (Left modules) ->
           Just $ "(exists (select 1 from exports e where id.module_name = e.defined_in and id.name = e.name and id.declaration_type = e.declaration_type and e.module_name in (" <>
-            T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <>
+            T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> escapeSQL m <> "'") <>
           "))" <>
-          " or " <> "id.module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> "))"
+          " or " <> "id.module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> escapeSQL m <> "'") <> "))"
         F.Filter (Right (F.Prefix "")) -> Nothing
         F.Filter (Right (F.Prefix f)) -> Just $ "id.name glob '" <> escapeSQL f <> "*'"
         F.Filter (Right (F.Exact f)) -> Just $ "id.name glob '" <> escapeSQL f <> "'"
