@@ -1,2 +1,3 @@
 packages:
   purescript.cabal
+with-compiler: ghc-9.2.8
