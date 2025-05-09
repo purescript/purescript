@@ -114,7 +114,8 @@ unifyTypes t1 t2 = do
   where
   unifyTypes'' t1' t2'= do
     cache <- gets unificationCache
-    when (S.notMember (t1', t2') cache) $
+    when (S.notMember (t1', t2') cache) $ do
+      modify $ \st -> st { unificationCache = S.insert (t1', t2') cache }
       unifyTypes' t1' t2'
   unifyTypes' (TUnknown _ u1) (TUnknown _ u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown _ u) t = solveType u t
