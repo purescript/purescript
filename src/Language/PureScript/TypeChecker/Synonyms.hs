@@ -12,14 +12,13 @@ module Language.PureScript.TypeChecker.Synonyms
 import Prelude
 
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State (MonadState)
 import Data.Maybe (fromMaybe)
 import Data.Map qualified as M
 import Data.Text (Text)
 import Language.PureScript.Environment (Environment(..), TypeKind)
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), SourceSpan, errorMessage')
 import Language.PureScript.Names (ProperName, ProperNameType(..), Qualified)
-import Language.PureScript.TypeChecker.Monad (CheckState, getEnv)
+import Language.PureScript.TypeChecker.Monad (getEnv, TypeCheckM)
 import Language.PureScript.Types (SourceType, Type(..), completeBinderList, everywhereOnTypesTopDownM, getAnnForType, replaceAllTypeVars)
 
 -- | Type synonym information (arguments with kinds, aliased type), indexed by name
@@ -56,7 +55,7 @@ replaceAllTypeSynonyms' syns kinds = everywhereOnTypesTopDownM try
   lookupKindArgs ctor = fromMaybe [] $ fmap (fmap (fst . snd) . fst) . completeBinderList . fst =<< M.lookup ctor kinds
 
 -- | Replace fully applied type synonyms
-replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => SourceType -> m SourceType
+replaceAllTypeSynonyms :: SourceType -> TypeCheckM SourceType
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either throwError return $ replaceAllTypeSynonyms' (typeSynonyms env) (types env) d

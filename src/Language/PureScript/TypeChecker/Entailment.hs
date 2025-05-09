@@ -17,7 +17,6 @@ import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State (MonadState(..), MonadTrans(..), StateT(..), evalStateT, execStateT, gets, modify)
 import Control.Monad (foldM, guard, join, zipWithM, zipWithM_, (<=<))
-import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer (MonadWriter(..), WriterT(..))
 import Data.Monoid (Any(..))
 
@@ -39,12 +38,12 @@ import Language.PureScript.AST (Binder(..), ErrorMessageHint(..), Expr(..), Lite
 import Language.PureScript.AST.Declarations (UnknownsHint(..))
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (Environment(..), FunctionalDependency(..), TypeClassData(..), dictTypeName, kindRow, tyBoolean, tyInt, tyString)
-import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), addHint, addHints, errorMessage, rethrow)
+import Language.PureScript.Errors (SimpleErrorMessage(..), addHint, addHints, errorMessage, rethrow)
 import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), byMaybeModuleName, coerceProperName, disqualify, freshIdent, getQual)
 import Language.PureScript.TypeChecker.Entailment.Coercible (GivenSolverState(..), WantedSolverState(..), initialGivenSolverState, initialWantedSolverState, insoluble, solveGivens, solveWanteds)
 import Language.PureScript.TypeChecker.Entailment.IntCompare (mkFacts, mkRelation, solveRelation)
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, unifyKinds')
-import Language.PureScript.TypeChecker.Monad (CheckState(..), withErrorMessageHint)
+import Language.PureScript.TypeChecker.Monad (CheckState(..), withErrorMessageHint, TypeCheckM)
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
 import Language.PureScript.TypeChecker.Unify (freshTypeWithKind, substituteType, unifyTypes)
 import Language.PureScript.TypeClassDictionaries (NamedDict, TypeClassDictionaryInScope(..), superclassName)
@@ -112,11 +111,10 @@ combineContexts = M.unionWith (M.unionWith (M.unionWith (<>)))
 
 -- | Replace type class dictionary placeholders with inferred type class dictionaries
 replaceTypeClassDictionaries
-  :: forall m
-   . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
-  => Bool
+  :: 
+   Bool
   -> Expr
-  -> m (Expr, [(Ident, InstanceContext, SourceConstraint)])
+  -> TypeCheckM (Expr, [(Ident, InstanceContext, SourceConstraint)])
 replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ do
     -- Loop, deferring any unsolved constraints, until there are no more
     -- constraints which can be solved, then make a generalization pass.
@@ -128,18 +126,18 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
     loop expr >>= generalizePass
   where
     -- This pass solves constraints where possible, deferring constraints if not.
-    deferPass :: Expr -> StateT InstanceContext m (Expr, Any)
+    deferPass :: Expr -> StateT InstanceContext TypeCheckM (Expr, Any)
     deferPass = fmap (second fst) . runWriterT . f where
-      f :: Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
+      f :: Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext TypeCheckM) Expr
       (_, f, _) = everywhereOnValuesTopDownM return (go True) return
 
     -- This pass generalizes any remaining constraints
-    generalizePass :: Expr -> StateT InstanceContext m (Expr, [(Ident, InstanceContext, SourceConstraint)])
+    generalizePass :: Expr -> StateT InstanceContext TypeCheckM (Expr, [(Ident, InstanceContext, SourceConstraint)])
     generalizePass = fmap (second snd) . runWriterT . f where
-      f :: Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
+      f :: Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext TypeCheckM) Expr
       (_, f, _) = everywhereOnValuesTopDownM return (go False) return
 
-    go :: Bool -> Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
+    go :: Bool -> Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext TypeCheckM) Expr
     go deferErrors (TypeClassDictionary constraint context hints) =
       rethrow (addHints hints) $ entails (SolverOptions shouldGeneralize deferErrors) constraint context hints
     go _ other = return other
@@ -180,9 +178,8 @@ instance Monoid t => Monoid (Matched t) where
 -- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 entails
-  :: forall m
-   . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
-  => SolverOptions
+  :: 
+   SolverOptions
   -- ^ Solver options
   -> SourceConstraint
   -- ^ The constraint to solve
@@ -190,11 +187,11 @@ entails
   -- ^ The contexts in which to solve the constraint
   -> [ErrorMessageHint]
   -- ^ Error message hints to apply to any instance errors
-  -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
+  -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext TypeCheckM) Expr
 entails SolverOptions{..} constraint context hints =
   overConstraintArgsAll (lift . lift . traverse replaceAllTypeSynonyms) constraint >>= solve
   where
-    forClassNameM :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> m [TypeClassDict]
+    forClassNameM :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> TypeCheckM [TypeClassDict]
     forClassNameM env ctx cn@C.Coercible kinds args =
       fromMaybe (forClassName env ctx cn kinds args) <$>
         solveCoercible env ctx kinds args
@@ -234,10 +231,10 @@ entails SolverOptions{..} constraint context hints =
     valUndefined :: Expr
     valUndefined = Var nullSourceSpan C.I_undefined
 
-    solve :: SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
+    solve :: SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext TypeCheckM) Expr
     solve = go 0 hints
       where
-        go :: Int -> [ErrorMessageHint] -> SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
+        go :: Int -> [ErrorMessageHint] -> SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext TypeCheckM) Expr
         go work _ (Constraint _ className' _ tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
         go work hints' con@(Constraint _ className' kinds' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con) .) . runStateT . runWriterT $ do
             -- We might have unified types by solving other constraints, so we need to
@@ -343,7 +340,7 @@ entails SolverOptions{..} constraint context hints =
             withFreshTypes
               :: TypeClassDict
               -> Matching SourceType
-              -> m (Matching SourceType)
+              -> TypeCheckM (Matching SourceType)
             withFreshTypes TypeClassDictionaryInScope{..} initSubst = do
                 subst <- foldM withFreshType initSubst $ filter (flip M.notMember initSubst . fst) tcdForAll
                 for_ (M.toList initSubst) $ unifySubstKind subst
@@ -361,7 +358,7 @@ entails SolverOptions{..} constraint context hints =
                       (substituteType currentSubst . replaceAllTypeVars (M.toList subst) $ instKind)
                       (substituteType currentSubst tyKind)
 
-            unique :: [SourceType] -> [SourceType] -> [Qualified (Either SourceType Ident)] -> [(a, TypeClassDict)] -> UnknownsHint -> m (EntailsResult a)
+            unique :: [SourceType] -> [SourceType] -> [Qualified (Either SourceType Ident)] -> [(a, TypeClassDict)] -> UnknownsHint -> TypeCheckM (EntailsResult a)
             unique kindArgs tyArgs ambiguous [] unks
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
@@ -401,7 +398,7 @@ entails SolverOptions{..} constraint context hints =
             -- Create dictionaries for subgoals which still need to be solved by calling go recursively
             -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
             -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-            solveSubgoals :: Matching SourceType -> ErrorMessageHint -> Maybe [SourceConstraint] -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) (Maybe [Expr])
+            solveSubgoals :: Matching SourceType -> ErrorMessageHint -> Maybe [SourceConstraint] -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext TypeCheckM) (Maybe [Expr])
             solveSubgoals _ _ Nothing = return Nothing
             solveSubgoals subst hint (Just subgoals) =
               Just <$> traverse (rethrow (addHint hint) . go (work + 1) (hints' <> [hint]) . mapConstraintArgsAll (map (replaceAllTypeVars (M.toList subst)))) subgoals
@@ -412,7 +409,7 @@ entails SolverOptions{..} constraint context hints =
             useEmptyDict args = Unused (foldl (App . Abs (VarBinder nullSourceSpan UnusedIdent)) valUndefined (fold args))
 
             -- Make a dictionary from subgoal dictionaries by applying the correct function
-            mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
+            mkDictionary :: Evidence -> Maybe [Expr] -> TypeCheckM Expr
             mkDictionary (NamedInstance n) args = return $ foldl App (Var nullSourceSpan n) (fold args)
             mkDictionary EmptyClassInstance args = return (useEmptyDict args)
             mkDictionary (WarnInstance msg) args = do
@@ -470,7 +467,7 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
 
-    solveCoercible :: Environment -> InstanceContext -> [SourceType] -> [SourceType] -> m (Maybe [TypeClassDict])
+    solveCoercible :: Environment -> InstanceContext -> [SourceType] -> [SourceType] -> TypeCheckM (Maybe [TypeClassDict])
     solveCoercible env ctx kinds [a, b] = do
       let coercibleDictsInScope = findDicts ctx C.Coercible ByNullSourcePos
           givens = flip mapMaybe coercibleDictsInScope $ \case

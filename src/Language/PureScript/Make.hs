@@ -72,12 +72,13 @@ import Language.PureScript.Make.Monad as Monad
 import Language.PureScript.CoreFn qualified as CF
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
+import Language.PureScript.TypeChecker.Monad (liftTypeCheckM)
 
 -- | Rebuild a single module.
 --
 rebuildModule
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadIO m)
   => MakeActions m
   -> [ExternsFile]
   -> Module
@@ -88,7 +89,7 @@ rebuildModule actions externs m = do
 
 rebuildModule'
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadIO m)
   => MakeActions m
   -> Env
   -> [ExternsFile]
@@ -98,7 +99,7 @@ rebuildModule' act env ext mdl = rebuildModuleWithIndex act env ext mdl Nothing
 
 rebuildModuleWithIndex
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadIO m)
   => MakeActions m
   -> Env
   -> [ExternsFile]
@@ -114,7 +115,7 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     (desugared, (exEnv', usedImports)) <- runStateT (desugar externs withPrim) (exEnv, mempty)
     let modulesExports = (\(_, _, exports) -> exports) <$> exEnv'
-    (checked, CheckState{..}) <- runStateT (typeCheckModule modulesExports desugared) $ emptyCheckState env
+    (checked, CheckState{..}) <- runStateT (liftTypeCheckM $ typeCheckModule modulesExports desugared) $ emptyCheckState env
     let usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
           M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkConstructorImportsForCoercible
     -- Imports cannot be linted before type checking because we need to
@@ -165,7 +166,7 @@ data MakeOptions = MakeOptions
 -- again.
 --
 -- It collects and returns externs for all modules passed.
-make :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m. (MonadIO m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [CST.PartialResult Module]
      -> m [ExternsFile]
@@ -175,13 +176,13 @@ make  = make' (MakeOptions {moCollectAllExterns = True})
 -- and an @externs.cbor@ file.
 --
 -- This version of make returns nothing.
-make_ :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make_ :: forall m. (MonadIO m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [CST.PartialResult Module]
      -> m ()
 make_ ma ms = void $ make' (MakeOptions {moCollectAllExterns = False}) ma ms
 
-make' :: forall m. (MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make' :: forall m. (MonadIO m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeOptions
      -> MakeActions m
      -> [CST.PartialResult Module]

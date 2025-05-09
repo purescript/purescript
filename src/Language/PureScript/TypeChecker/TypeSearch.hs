@@ -12,10 +12,8 @@ import Language.PureScript.TypeChecker.Monad qualified as TC
 import Language.PureScript.TypeChecker.Subsumption (subsumes)
 import Language.PureScript.TypeChecker.Unify       as P
 
-import Control.Monad.Supply                        as P
 import Language.PureScript.AST                     as P
 import Language.PureScript.Environment             as P
-import Language.PureScript.Errors                  as P
 import Language.PureScript.Label (Label)
 import Language.PureScript.Names                   as P
 import Language.PureScript.Pretty.Types            as P
@@ -26,14 +24,23 @@ import Language.PureScript.Types                   as P
 checkInEnvironment
   :: Environment
   -> TC.CheckState
-  -> StateT TC.CheckState (SupplyT (WriterT b (Except P.MultipleErrors))) a
+  -> TC.TypeCheckM a
   -> Maybe (a, Environment)
-checkInEnvironment env st =
-  either (const Nothing) Just
-  . runExcept
-  . evalWriterT
-  . P.evalSupplyT 0
-  . TC.runCheck (st { TC.checkEnv = env })
+checkInEnvironment _ _ _ = Nothing
+-- TODO: bring this back
+-- Currently not possible since TypeCheckM contains IO
+--
+-- checkInEnvironment
+--   :: Environment
+--   -> TC.CheckState
+--   -> StateT TC.CheckState (SupplyT (WriterT b (Except P.MultipleErrors))) a
+--   -> Maybe (a, Environment)
+-- checkInEnvironment env st =
+--   either (const Nothing) Just
+--   . runExcept
+--   . evalWriterT
+--   . P.evalSupplyT 0
+--   . TC.runCheck (st { TC.checkEnv = env })
 
 evalWriterT :: Monad m => WriterT b m r -> m r
 evalWriterT m = fmap fst (runWriterT m)

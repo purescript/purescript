@@ -9,7 +9,6 @@ import Prelude
 
 import Control.Monad (when)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..))
 
 import Data.Foldable (for_)
 import Data.List (uncons)
@@ -19,8 +18,8 @@ import Data.Ord (comparing)
 import Language.PureScript.AST (ErrorMessageHint(..), Expr(..), pattern NullSourceAnn)
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (tyFunction, tyRecord)
-import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage, internalCompilerError)
-import Language.PureScript.TypeChecker.Monad (CheckState, getHints, getTypeClassDictionaries, withErrorMessageHint)
+import Language.PureScript.Errors (SimpleErrorMessage(..), errorMessage, internalCompilerError)
+import Language.PureScript.TypeChecker.Monad (getHints, getTypeClassDictionaries, withErrorMessageHint, TypeCheckM)
 import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, skolemize)
 import Language.PureScript.TypeChecker.Unify (alignRowsWith, freshTypeWithKind, unifyTypes)
 import Language.PureScript.Types (RowListItem(..), SourceType, Type(..), eqType, isREmpty, replaceTypeVars, rowFromList)
@@ -59,21 +58,21 @@ defaultCoercion SNoElaborate = ()
 
 -- | Check that one type subsumes another, rethrowing errors to provide a better error message
 subsumes
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  :: ()
   => SourceType
   -> SourceType
-  -> m (Expr -> Expr)
+  -> TypeCheckM (Expr -> Expr)
 subsumes ty1 ty2 =
   withErrorMessageHint (ErrorInSubsumption ty1 ty2) $
     subsumes' SElaborate ty1 ty2
 
 -- | Check that one type subsumes another
 subsumes'
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  :: ()
   => ModeSing mode
   -> SourceType
   -> SourceType
-  -> m (Coercion mode)
+  -> TypeCheckM (Coercion mode)
 subsumes' mode (ForAll _ _ ident mbK ty1 _) ty2 = do
   u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   let replaced = replaceTypeVars ident u ty1
