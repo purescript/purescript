@@ -10,6 +10,7 @@ import Prelude
 import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State (MonadState(..), StateT(..), gets, modify, MonadIO (liftIO))
+import Control.Monad.State.Strict qualified as StrictState
 import Control.Monad (forM_, guard, join, when, (<=<))
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
@@ -35,7 +36,7 @@ import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.Logger (Logger, runLogger')
 import Control.Monad.Supply.Class qualified as Supply
 
-newtype TypeCheckM a = TypeCheckM { unTypeCheckM :: StateT CheckState (SupplyT (ExceptT MultipleErrors (Logger MultipleErrors))) a }
+newtype TypeCheckM a = TypeCheckM { unTypeCheckM :: StateT CheckState (SupplyT (ExceptT MultipleErrors Logger)) a }
   deriving newtype (Functor, Applicative, Monad, MonadSupply, MonadState CheckState, MonadWriter MultipleErrors, MonadError MultipleErrors)
 
 -- | Lift a TypeCheckM computation into another monad that satisfies all its constraints
@@ -45,7 +46,7 @@ liftTypeCheckM ::
 liftTypeCheckM (TypeCheckM m) = do
   st <- get
   freshId <- Supply.peek
-  (result, errors) <- liftIO $ runLogger' $ runExceptT $ flip runStateT freshId $ unSupplyT $ runStateT m st
+  (result, errors) <- liftIO $ runLogger' $ runExceptT $ flip StrictState.runStateT freshId $ unSupplyT $ runStateT m st
   tell errors
   case result of
     Left err ->

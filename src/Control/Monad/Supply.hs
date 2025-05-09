@@ -20,7 +20,7 @@ import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Trans (lift)
 
 newtype SupplyT m a = SupplyT { unSupplyT :: StateT Int64 m a }
-  deriving (Functor, Applicative, Monad, MonadTrans, MonadError e, MonadWriter w, MonadReader r, Alternative, MonadPlus)
+  deriving (Functor, Applicative, Monad, MonadTrans, MonadError e, MonadWriter w, MonadReader r, Alternative, MonadPlus, MonadIO)
 
 runSupplyT :: Int64 -> SupplyT m a -> m (a, Int64)
 runSupplyT n = flip runStateT n . unSupplyT
