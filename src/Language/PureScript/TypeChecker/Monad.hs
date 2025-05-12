@@ -9,10 +9,8 @@ import Prelude
 
 import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State (MonadState(..), StateT(..), gets, modify, MonadIO (liftIO))
+import Control.Monad.State (MonadState(..), StateT(..), gets, modify)
 import Control.Monad.State.Strict qualified as StrictState
-import Control.Monad (forM_, guard, join, when, (<=<))
-import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Maybe (fromMaybe)
 import Data.IntMap.Lazy qualified as IM
@@ -33,20 +31,21 @@ import Text.PrettyPrint.Boxes (render)
 import Control.Monad.Supply (SupplyT (unSupplyT))
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Except (ExceptT, runExceptT)
-import Control.Monad.Logger (Logger, runLogger')
+import Control.Monad.Writer.Strict as SW
 import Control.Monad.Supply.Class qualified as Supply
+import Control.Monad.Identity (Identity(runIdentity))
 
-newtype TypeCheckM a = TypeCheckM { unTypeCheckM :: StateT CheckState (SupplyT (ExceptT MultipleErrors Logger)) a }
+newtype TypeCheckM a = TypeCheckM { unTypeCheckM :: StateT CheckState (SupplyT (ExceptT MultipleErrors (SW.Writer MultipleErrors))) a }
   deriving newtype (Functor, Applicative, Monad, MonadSupply, MonadState CheckState, MonadWriter MultipleErrors, MonadError MultipleErrors)
 
 -- | Lift a TypeCheckM computation into another monad that satisfies all its constraints
 liftTypeCheckM ::
-  (MonadSupply m, MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m, MonadIO m) =>
+  (MonadSupply m, MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m) =>
   TypeCheckM a -> m a
 liftTypeCheckM (TypeCheckM m) = do
   st <- get
   freshId <- Supply.peek
-  (result, errors) <- liftIO $ runLogger' $ runExceptT $ flip StrictState.runStateT freshId $ unSupplyT $ runStateT m st
+  let (result, errors) = runIdentity $ SW.runWriterT $ runExceptT $ flip StrictState.runStateT freshId $ unSupplyT $ runStateT m st
   tell errors
   case result of
     Left err ->
@@ -344,7 +343,7 @@ modifyEnv :: (Environment -> Environment) -> TypeCheckM ()
 modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 
 -- | Run a computation in the typechecking monad, failing with an error, or succeeding with a return value and the final @Environment@.
-runCheck :: CheckState -> StateT CheckState TypeCheckM a -> TypeCheckM (a, Environment)
+runCheck :: Functor m => CheckState -> StateT CheckState m a -> m (a, Environment)
 runCheck st check = second checkEnv <$> runStateT check st
 
 -- | Make an assertion, failing with an error message

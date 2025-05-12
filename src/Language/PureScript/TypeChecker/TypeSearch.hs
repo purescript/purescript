@@ -20,27 +20,21 @@ import Language.PureScript.Pretty.Types            as P
 import Language.PureScript.TypeChecker.Skolems     as Skolem
 import Language.PureScript.TypeChecker.Synonyms    as P
 import Language.PureScript.Types                   as P
+import Control.Monad.Supply qualified as P
+import Language.PureScript.TypeChecker.Monad qualified as P
 
 checkInEnvironment
   :: Environment
   -> TC.CheckState
   -> TC.TypeCheckM a
   -> Maybe (a, Environment)
-checkInEnvironment _ _ _ = Nothing
--- TODO: bring this back
--- Currently not possible since TypeCheckM contains IO
---
--- checkInEnvironment
---   :: Environment
---   -> TC.CheckState
---   -> StateT TC.CheckState (SupplyT (WriterT b (Except P.MultipleErrors))) a
---   -> Maybe (a, Environment)
--- checkInEnvironment env st =
---   either (const Nothing) Just
---   . runExcept
---   . evalWriterT
---   . P.evalSupplyT 0
---   . TC.runCheck (st { TC.checkEnv = env })
+checkInEnvironment env st =
+  either (const Nothing) Just
+  . runExcept
+  . evalWriterT
+  . P.evalSupplyT 0
+  . TC.runCheck (st { TC.checkEnv = env })
+  . P.liftTypeCheckM
 
 evalWriterT :: Monad m => WriterT b m r -> m r
 evalWriterT m = fmap fst (runWriterT m)

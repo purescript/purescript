@@ -44,6 +44,7 @@ import Language.PureScript.Interactive.Types        as Interactive
 import System.Directory (getCurrentDirectory)
 import System.FilePath ((</>))
 import System.FilePath.Glob (glob)
+import Language.PureScript.TypeChecker.Monad (liftTypeCheckM)
 
 -- | Pretty-print errors
 printErrors :: MonadIO m => P.MultipleErrors -> m ()
@@ -296,10 +297,10 @@ handleKindOf print' typ = do
       case M.lookup (P.Qualified (P.ByModuleName mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
-              k   = undefined -- TODO: check (snd <$> P.kindOf typ') chk
+              k   = check (snd <$> liftTypeCheckM (P.kindOf typ')) chk
 
-              check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
-              check sew = fst . runWriter . runExceptT . runStateT sew
+              check :: P.SupplyT (StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors))) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
+              check sew = fst . runWriter . runExceptT . runStateT (P.evalSupplyT 0 sew)
           case k of
             Left err        -> printErrors err
             Right (kind, _) -> print' . P.prettyPrintType 1024 $ kind
