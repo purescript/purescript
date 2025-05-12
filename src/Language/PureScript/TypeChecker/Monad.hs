@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE TypeOperators #-}
 
 -- |
@@ -38,11 +37,6 @@ import Control.Monad.Writer (MonadWriter(..), censor)
 import Control.Monad.Supply.Class qualified as Supply
 import Control.Monad.Identity (Identity(runIdentity))
 import Control.Monad (forM_, when, join, (<=<), guard)
-
-instance (Monad m, Monoid w) => MonadWriter w (SW.WriterT w m) where
-  tell = SW.tell
-  listen = SW.listen
-  pass = SW.pass
 
 newtype TypeCheckM a = TypeCheckM { unTypeCheckM :: StateT CheckState (SupplyT (ExceptT MultipleErrors (SW.Writer MultipleErrors))) a }
   deriving newtype (Functor, Applicative, Monad, MonadSupply, MonadState CheckState, MonadWriter MultipleErrors, MonadError MultipleErrors)
