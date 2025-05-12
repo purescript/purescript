@@ -716,6 +716,7 @@ everywhereOnTypesM f = go where
   go (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go t1 <*> go t2 <*> go t3) >>= f
   go (ParensInType ann t) = (ParensInType ann <$> go t) >>= f
   go other = f other
+{-# INLINE everywhereOnTypesM #-}
 
 everywhereOnTypesTopDownM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesTopDownM f = go <=< f where
@@ -729,6 +730,7 @@ everywhereOnTypesTopDownM f = go <=< f where
   go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann <$> (f t1 >>= go) <*> (f t2 >>= go) <*> (f t3 >>= go)
   go (ParensInType ann t) = ParensInType ann <$> (f t >>= go)
   go other = pure other
+{-# INLINE everywhereOnTypesTopDownM #-}
 
 everythingOnTypes :: (r -> r -> r) -> (Type a -> r) -> Type a -> r
 everythingOnTypes (<+>) f = go where
@@ -743,6 +745,7 @@ everythingOnTypes (<+>) f = go where
   go t@(BinaryNoParensType _ t1 t2 t3) = f t <+> go t1 <+> go t2 <+> go t3
   go t@(ParensInType _ t1) = f t <+> go t1
   go other = f other
+{-# INLINE everythingOnTypes #-}
 
 everythingWithContextOnTypes :: s -> r -> (r -> r -> r) -> (s -> Type a -> (s, r)) -> Type a -> r
 everythingWithContextOnTypes s0 r0 (<+>) f = go' s0 where
@@ -758,6 +761,7 @@ everythingWithContextOnTypes s0 r0 (<+>) f = go' s0 where
   go s (BinaryNoParensType _ t1 t2 t3) = go' s t1 <+> go' s t2 <+> go' s t3
   go s (ParensInType _ t1) = go' s t1
   go _ _ = r0
+{-# INLINE everythingWithContextOnTypes #-}
 
 annForType :: Lens' (Type a) a
 annForType k (TUnknown a b) = (\z -> TUnknown z b) <$> k a
