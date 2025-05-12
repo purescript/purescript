@@ -13,9 +13,10 @@ import Command.REPL qualified as REPL
 import Control.Monad (join)
 import Data.Foldable (fold)
 import Options.Applicative qualified as Opts
+import Prettyprinter qualified as Doc
+import Prettyprinter.Render.Terminal (AnsiStyle)
 import System.Environment (getArgs)
 import System.IO qualified as IO
-import Text.PrettyPrint.ANSI.Leijen qualified as Doc
 import Version (versionString)
 
 
@@ -39,11 +40,11 @@ main = do
             "For example, `purs compile --help` displays options specific to the `compile` command."
         , Doc.hardline
         , Doc.hardline
-        , Doc.text $ "purs " ++ versionString
+        , Doc.pretty $ "purs " ++ versionString
         ]
 
-    para :: String -> Doc.Doc
-    para = foldr (Doc.</>) Doc.empty . map Doc.text . words
+    para :: String -> Doc.Doc AnsiStyle
+    para = foldr (\x y -> x <> Doc.softline <> y) mempty . map Doc.pretty . words
 
     -- | Displays full command help when invoked with no arguments.
     execParserPure :: Opts.ParserInfo a -> [String] -> Opts.ParserResult a

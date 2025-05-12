@@ -20,6 +20,7 @@ on:
       - purescript.cabal
       - Setup.hs
       - stack.yaml
+      - stack.yaml.lock
       - update-changelog.hs
       - weeder.dhall
   release:
@@ -32,7 +33,7 @@ defaults:
 env:
   CI_PRERELEASE: "${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}"
   CI_RELEASE: "${{ github.event_name == 'release' }}"
-  STACK_VERSION: "2.15.1"
+  STACK_VERSION: "3.3.1"
 
 concurrency:
   # We never want two prereleases building at the same time, since they would
@@ -53,14 +54,18 @@ jobs:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
         include:
-          - # If upgrading the Haskell image, also upgrade it in the lint job below
-            os: ["ubuntu-latest"]
-            image: haskell:9.2.8@sha256:b3b2f3909c7381bb96b8f18766f9407a3d6f61e0f07ea95e812583ac4f442cbb
-          - os: ["macOS-14"]
-          - os: ["windows-2019"]
+          - image: haskell:9.6.6  # Also upgrade version in the lint job below
+            os: ubuntu-latest  # Exact version is not important, as it's only the container host)
+
+          - image: haskell:9.6.6
+            os: ubuntu-24.04-arm  # Exact version is not important, as it's only the container host
+
+          - os: macos-13  # x64
+          - os: macos-14  # arm64
+          - os: windows-2019  # x64
 
     runs-on: "${{ matrix.os }}"
-    container: "${{ matrix.image }}"
+    container:  "${{ matrix.image }}"
 
     outputs:
       do-not-prerelease: "${{ steps.build.outputs.do-not-prerelease }}"
@@ -69,43 +74,40 @@ jobs:
     steps:
       - # We need `gh` installed on the Linux version. Otherwise, release artifacts won't be uploaded.
         name: "(Linux only) Install gh"
-        if: "contains(matrix.os, 'ubuntu-latest')"
+        if: startsWith(matrix.image, 'haskell')
         run: |
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
           chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
           apt-get update
-          apt-get install gh
+          apt-get install -y gh
 
-      - uses: "actions/checkout@v2"
-      - uses: "actions/setup-node@v2"
+      - uses: "actions/checkout@v4"
+      - uses: "actions/setup-node@v4"
         with:
-          node-version: "16"
+          node-version: "22"
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
-        # Note: here we exclude the self-hosted runners because this action does not work on ARM
-        # and their Haskell environment is instead provided by a nix-shell
-        # See https://github.com/purescript/purescript/pulls/4455
-        if: "!contains(matrix.os, 'ubuntu-latest') && !contains(matrix.os, 'self-hosted')"
+        if: startsWith(matrix.os, 'macos') || startsWith(matrix.os, 'windows')
         uses: "haskell-actions/setup@v2"
         with:
+          ghc-version: "9.6.6"
           enable-stack: true
           stack-version: "${{ env.STACK_VERSION }}"
           stack-no-global: true
 
-      - name: "(Linux only) Check Stack version and fix working directory ownership"
-        if: "contains(matrix.os, 'ubuntu-latest')"
+      - name: "(Linux only) Fix working directory ownership"
+        if: startsWith(matrix.image, 'haskell')
         run: |
-          [ "$(stack --numeric-version)" = "$STACK_VERSION" ]
           chown root:root .
 
-      - uses: "actions/cache@v2"
+      - uses: "actions/cache@v4"
         with:
           path: |
             /root/.stack
             ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ matrix.image || runner.os }}--MdyPsf-${{ hashFiles('stack.yaml') }}"
+          key: "${{ matrix.image || runner.os }}--MdyPsf-${{ hashFiles('stack.yaml.lock', 'purescript.cabal') }}"
 
       - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
         # This ensures that the local GHC and MSYS binaries that Stack installs
@@ -120,16 +122,16 @@ jobs:
         run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Glob tests"
-        if: "contains(matrix.os, 'ubuntu-latest')"
+        if: startsWith(matrix.image, 'haskell')
         working-directory: "sdist-test"
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual glob checks happen in a temporary directory.
         run: |
-          apt-get install tree
+          apt-get install -y tree
           ../ci/fix-home stack exec bash ../glob-test.sh
 
       - name: "(Linux only) Build the entire package set"
-        if: "contains(matrix.os, 'ubuntu-latest')"
+        if: startsWith(matrix.image, 'haskell')
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual package-set building happens in a
         # temporary directory.
@@ -142,11 +144,11 @@ jobs:
         # Moreover, npm has a hook issue that will cause spago to fail to install
         # We upgrade npm to fix this
         run: |
-          npm i -g npm@8.8.0
+          apt-get install -y jq
           ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
 
       - name: Verify that 'libtinfo' isn't in binary
-        if: "runner.os == 'Linux'"
+        if: runner.os == 'Linux'
         working-directory: "sdist-test"
         run: |
           if [ $(ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
@@ -154,17 +156,6 @@ jobs:
             ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo'
             exit 1
           fi
-
-      - name: "(Self-hosted Linux ARM64 only) Patch the binary to work on non-Nix systems"
-        if: "runner.os == 'Linux' && runner.arch == 'ARM64'"
-        working-directory: "sdist-test"
-        # The self-hosted build happens inside a nix-shell that provides a working stack binary
-        # on ARM systems, and while the macOS binary is fine - because macOS binaries are almost
-        # statically linked), the linux ones are all pointing at the nix store.
-        # So here we first point the binary to the right linker that should work on a generic linux,
-        # and then fix the RUNPATH with the right location to load the shared libraries from
-        run: |
-          patchelf --set-interpreter /usr/lib/ld-linux-aarch64.so.1 --set-rpath /usr/lib/aarch64-linux-gnu $(stack path --local-doc-root)/../bin/purs
 
       - name: "(Release/prerelease only) Create bundle"
         if: "${{ env.CI_RELEASE == 'true' || env.CI_PRERELEASE == 'true' && steps.build.outputs.do-not-prerelease != 'true' }}"
@@ -197,7 +188,7 @@ jobs:
 
       - name: "(Prerelease only) Upload bundle"
         if: "${{ env.CI_PRERELEASE == 'true' && steps.build.outputs.do-not-prerelease != 'true' }}"
-        uses: "actions/upload-artifact@v3"
+        uses: "actions/upload-artifact@v4.6.0"
         with:
           name: "${{ runner.os }}-${{ runner.arch }}-bundle"
           path: |
@@ -206,62 +197,39 @@ jobs:
 
       - name: "(Release only) Publish bundle"
         if: "${{ env.CI_RELEASE == 'true' }}"
-        # Astonishingly, GitHub doesn't currently maintain a first-party action
-        # for uploading assets to GitHub releases! This is the best third-party
-        # one I could find, but as this step handles a token, it seems
-        # particularly important that we lock it down to a specific audited
-        # version, instead of a tag like the other steps.
-        uses: "AButler/upload-release-assets@ec6d3263266dc57eb6645b5f75e827987f7c217d"
-        with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
-          files: "sdist-test/bundle/*.{tar.gz,sha}"
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        run: "gh release upload --clobber ${{ github.ref_name }} sdist-test/bundle/*.{tar.gz,sha}"
 
   lint:
-    runs-on: "ubuntu-latest"
-    # At the moment, this is a different image from the image used for
-    # compilation, though the GHC versions match. This is because the
-    # compilation image uses an old version of glibc, which we want because it
-    # means our published binaries will work on the widest number of platforms.
-    # But the HLint binary downloaded by this job requires a newer glibc
-    # version.
-    container: haskell:9.2.8@sha256:b3b2f3909c7381bb96b8f18766f9407a3d6f61e0f07ea95e812583ac4f442cbb
+    container: haskell:9.6.6
+    runs-on: ubuntu-latest  # Exact version is not important, as it's only the container host
 
     steps:
-      - uses: "actions/checkout@v2"
+      - uses: "actions/checkout@v4"
+
       - name: "Fix working directory ownership"
         run: |
           chown root:root .
 
-      - uses: "actions/cache@v2"
+      - uses: "actions/cache@v4"
         with:
           path: |
             /root/.stack
-          key: "lint-${{ hashFiles('stack.yaml') }}"
+          key: "lint-${{ hashFiles('stack.yaml.lock', 'purescript.cabal') }}"
 
       - run: "ci/fix-home ci/run-hlint.sh --git"
         env:
           VERSION: "3.5"
 
-      # Note: the weeder version will need to be updated when we next update our version
-      # of GHC.
-      #
-      # weeder-2.2.0 has somewhat strange version deps. It doesn't appear to
-      # support the exact versions of dhall and generic-lens in LTS-18.
-      # However, forcing it to use the versions of dhall and generic-lens in
-      # LTS-18 doesn't cause any problems when building, so the following
-      # commands build weeder while ignoring version constraints.
       - name: Install weeder
         run: |
-          # The `stack.yaml` file is copied to a separate file so that
-          # adding `allow-newer: true` doesn't affect any subsequant
-          # calls to `stack`.
-          cp stack.yaml stack-weeder.yaml
-          # `allow-newer: true` is needed so that weeder-2.2.0 can be
-          # installed with the dependencies present in LTS-18.
-          echo 'allow-newer: true' >> stack-weeder.yaml
-          ci/fix-home stack --no-terminal --jobs=2 build --copy-compiler-tool --stack-yaml ./stack-weeder.yaml weeder-2.4.0
+          ci/fix-home stack --no-terminal --jobs=2 \
+            build --copy-compiler-tool weeder-2.8.0
 
-      - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --ghc-options -fwrite-ide-info"
+      - run: |
+          ci/fix-home stack --no-terminal --jobs=2 \
+            build --fast --ghc-options -fwrite-ide-info
 
       - run: "ci/fix-home stack exec weeder"
 
@@ -269,36 +237,38 @@ jobs:
       # reference from our test suite to count in the above check; the fact
       # that a function is tested is not evidence that it's needed. But we also
       # don't want to leave weeds lying around in our test suite either.
-      - run: "ci/fix-home stack --no-terminal --jobs=2 build --fast --test --no-run-tests --ghc-options -fwrite-ide-info"
+      - run: |
+          ci/fix-home stack --no-terminal --jobs=2 \
+            build --fast --test --no-run-tests --ghc-options -fwrite-ide-info
 
       - run: "ci/fix-home stack exec weeder"
 
-  # make-prerelease:
-  #   runs-on: "ubuntu-latest"
-  #   needs:
-  #     - "build"
-  #     - "lint"
-  #   if: "${{ github.event_name == 'push' && needs.build.outputs.do-not-prerelease != 'true' }}"
-  #   steps:
-  #     - uses: "actions/download-artifact@v3"
-  #     - uses: "ncipollo/release-action@v1.10.0"
-  #       with:
-  #         tag: "v${{ needs.build.outputs.version }}"
-  #         artifacts: "*-bundle/*"
-  #         prerelease: true
-  #         body: "This is an automated preview release. Get the latest stable release [here](https://github.com/purescript/purescript/releases/latest)."
-  #     - uses: "actions/checkout@v3"
-  #     - uses: "actions/setup-node@v3"
-  #       with:
-  #         node-version: "16.x"
-  #         registry-url: "https://registry.npmjs.org"
-  #     - name: "Publish npm package"
-  #       working-directory: "npm-package"
-  #       env:
-  #         BUILD_VERSION: "${{ needs.build.outputs.version }}"
-  #         NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}"
-  #       run: |
-  #         src_version=$(node -pe 'require("./package.json").version')
-  #         npm version --allow-same-version "$BUILD_VERSION"
-  #         sed -i -e "s/--purs-ver=${src_version//./\\.}/--purs-ver=$BUILD_VERSION/" package.json
-  #         npm publish --tag next
+  make-prerelease:
+    runs-on: ubuntu-latest
+    needs:
+      - "build"
+      - "lint"
+    if: "${{ github.event_name == 'push' && needs.build.outputs.do-not-prerelease != 'true' }}"
+    steps:
+      - uses: "actions/download-artifact@v4"
+      - uses: "ncipollo/release-action@v1.10.0"
+        with:
+          tag: "v${{ needs.build.outputs.version }}"
+          artifacts: "*-bundle/*"
+          prerelease: true
+          body: "This is an automated preview release. Get the latest stable release [here](https://github.com/purescript/purescript/releases/latest)."
+      - uses: "actions/checkout@v4"
+      - uses: "actions/setup-node@v4"
+        with:
+          node-version: "16.x"
+          registry-url: "https://registry.npmjs.org"
+      - name: "Publish npm package"
+        working-directory: "npm-package"
+        env:
+          BUILD_VERSION: "${{ needs.build.outputs.version }}"
+          NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}"
+        run: |
+          src_version=$(node -pe 'require("./package.json").version')
+          npm version --allow-same-version "$BUILD_VERSION"
+          sed -i -e "s/--purs-ver=${src_version//./\\.}/--purs-ver=$BUILD_VERSION/" package.json
+          npm publish --tag next

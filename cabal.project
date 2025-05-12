@@ -1,3 +1,7 @@
 packages:
   purescript.cabal
-with-compiler: ghc-9.2.8
+
+source-repository-package
+   type: git
+   location: https://github.com/purescript/cheapskate.git
+   tag: 8bfaf4beeb108e97a274ed51303f278905979e87

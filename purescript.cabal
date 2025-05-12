@@ -153,18 +153,17 @@ common defaults
     -- modules must be parseable by this library otherwise the compiler
     -- will reject them. It should therefore always be pinned to a single
     -- specific version.
-    aeson >=2.0.3.0 && <2.1,
-    aeson-better-errors >=0.9.1.1 && <0.10,
-    ansi-terminal >=0.11.3 && <0.12,
+    aeson >=2.0.3.0 && <2.2,
+    aeson-better-errors >=0.9.1.3 && <0.10,
+    ansi-terminal >=0.11.3 && <1.1,
     array >=0.5.4.0 && <0.6,
-    base >=4.16.2.0 && <4.17,
+    base >=4.16.2.0 && <4.19,
     blaze-html >=0.9.1.2 && <0.10,
     bower-json >=1.1.0.0 && <1.2,
     boxes >=0.1.5 && <0.2,
     bytestring >=0.11.3.1 && <0.12,
-    Cabal >=3.6.3.0 && <3.7,
+    Cabal >=3.10.3.0 && <3.11,
     cborg >=0.2.7.0 && <0.3,
-    serialise >=0.2.5.0 && <0.3,
     cheapskate >=0.1.1.2 && <0.2,
     clock >=0.8.3 && <0.9,
     containers >=0.6.5.1 && <0.7,
@@ -179,38 +178,38 @@ common defaults
     file-embed >=0.0.15.0 && <0.1,
     filepath >=1.4.2.2 && <1.5,
     Glob >=0.10.2 && <0.11,
-    haskeline >=0.8.2 && <0.9,
+    haskeline ==0.8.2,
     language-javascript ==0.7.0.0,
-    lens >=5.1.1 && <5.2,
+    lens >=5.1.1 && <5.3,
     lifted-async >=0.10.2.2 && <0.11,
     lifted-base >=0.2.3.12 && <0.3,
-    memory >=0.17.0 && <0.18,
+    memory >=0.17.0 && <0.19,
     monad-control >=1.0.3.1 && <1.1,
     monad-logger >=0.3.36 && <0.4,
     monoidal-containers >=0.6.2.0 && <0.7,
-    mtl >=2.2.2 && <2.3,
+    mtl >=2.2.2 && <2.4,
     parallel >=3.2.2.0 && <3.3,
     parsec >=3.1.15.0 && <3.2,
-    pattern-arrows >=0.0.2 && <0.1,
-    process ==1.6.13.1,
+    process >=1.6.19.0 && <1.7,
     protolude >=0.3.1 && <0.4,
     regex-tdfa >=1.3.1.2 && <1.4,
     safe >=0.3.19 && <0.4,
     scientific >=0.3.7.0 && <0.4,
+    semialign >=1.2.0.1 && <1.4,
     semigroups ==0.20.*,
-    semialign >=1.2.0.1 && <1.3,
+    serialise >=0.2.5.0 && <0.3,
     sourcemap >=0.1.7 && <0.2,
     stm >=2.5.0.2 && <2.6,
     stringsearch >=0.3.6.6 && <0.4,
-    template-haskell >=2.18.0.0 && <2.19,
-    text >=1.2.5.0 && <1.3,
-    these >=1.1.1.1 && <1.2,
-    time >=1.11.1.1 && <1.12,
-    transformers >=0.5.6.2 && <0.6,
+    template-haskell >=2.18.0.0 && <2.21,
+    text >=1.2.5.0 && <2.1,
+    these >=1.1.1.1 && <1.3,
+    time >=1.11.1.1 && <1.13,
+    transformers >=0.5.6.2 && <0.7,
     transformers-base >=0.4.6 && <0.5,
     utf8-string >=1.0.2 && <1.1,
-    vector >=0.12.3.1 && <0.13,
-    witherable >=0.4.2 && <0.5
+    vector >=0.12.3.1 && <0.14,
+    witherable >=0.4.2 && <0.5,
 
 library
   import: defaults
@@ -219,6 +218,7 @@ library
     Control.Monad.Logger
     Control.Monad.Supply
     Control.Monad.Supply.Class
+    Control.PatternArrows
     Language.PureScript
     Language.PureScript.AST
     Language.PureScript.AST.Binders
@@ -407,10 +407,11 @@ executable purs
   main-is: Main.hs
   ghc-options: -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N -Wno-unused-packages
   build-depends:
-    ansi-wl-pprint >=0.6.9 && <0.7,
+    prettyprinter >=1.6 && <1.8,
+    prettyprinter-ansi-terminal >=1.1.1 && <1.2,
     exceptions >=0.10.4 && <0.11,
     network >=3.1.2.7 && <3.2,
-    optparse-applicative >=0.17.0.0 && <0.18,
+    optparse-applicative >=0.17.0.0 && <0.19,
     purescript
   if flag(release)
     cpp-options: -DRELEASE
@@ -444,7 +445,7 @@ test-suite tests
   build-depends:
     purescript,
     generic-random >=1.5.0.1 && <1.6,
-    hspec >= 2.10.7 && < 3,
+    hspec >= 2.11.10 && < 3,
     HUnit >=1.6.2.0 && <1.7,
     newtype >=0.2.2.0 && <0.3,
     QuickCheck >=2.14.2 && <2.15,
