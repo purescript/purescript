@@ -78,7 +78,7 @@ import Language.PureScript.TypeChecker.Monad (liftTypeCheckM)
 --
 rebuildModule
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadIO m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> [ExternsFile]
   -> Module
@@ -89,7 +89,7 @@ rebuildModule actions externs m = do
 
 rebuildModule'
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadIO m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> Env
   -> [ExternsFile]
@@ -99,7 +99,7 @@ rebuildModule' act env ext mdl = rebuildModuleWithIndex act env ext mdl Nothing
 
 rebuildModuleWithIndex
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadIO m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> Env
   -> [ExternsFile]
