@@ -88,7 +88,7 @@ unexpectedLabel tok = Label tok "<unexpected>"
 
 unexpectedExpr :: Monoid a => [SourceToken] -> Expr a
 unexpectedExpr toks =
-  ExprIdent mempty (unexpectedQual (headDef placeholder toks ))
+  ExprIdent mempty (unexpectedQual (headDef placeholder toks))
 
 unexpectedBinder :: Monoid a => [SourceToken] -> Binder a
 unexpectedBinder toks =

@@ -23,8 +23,8 @@ tco = flip evalState 0 . everywhereTopDownM convert where
   copyVar arg = "$copy_" <> arg
 
   tcoDoneM :: State Int Text
-  tcoDoneM = gets (\count -> "$tco_done" <>
-    if count == 0 then "" else pack . show $ count)
+  tcoDoneM = gets $ \count -> "$tco_done" <>
+    if count == 0 then "" else pack . show $ count
 
   tcoLoop :: Text
   tcoLoop = "$tco_loop"
