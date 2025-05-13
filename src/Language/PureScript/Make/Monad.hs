@@ -54,7 +54,7 @@ import System.IO.UTF8 (readUTF8FileT)
 
 -- | A monad for running make actions
 newtype Make a = Make
-  { unMake :: ReaderT Options (ExceptT MultipleErrors Logger) a
+  { unMake :: ReaderT Options (ExceptT MultipleErrors (Logger MultipleErrors)) a
   } deriving (Functor, Applicative, Monad, MonadIO, MonadError MultipleErrors, MonadWriter MultipleErrors, MonadReader Options)
 
 instance MonadBase IO Make where
