@@ -35,8 +35,11 @@ directiveStrings =
 -- |
 -- Like `directiveStrings`, but the other way around.
 --
-directiveStrings' :: [(NonEmpty String, Directive)]
-directiveStrings' = map (\(d, s) -> (s, d)) directiveStrings
+directiveStrings' :: [(String, Directive)]
+directiveStrings' =
+  concatMap
+    (\(dir, strs) -> map (, dir) $ NEL.toList strs)
+    directiveStrings
 
 -- |
 -- Returns all possible string representations of a directive.
@@ -54,17 +57,16 @@ stringFor = NEL.head . stringsFor
 -- Returns the list of directives which could be expanded from the string
 -- argument, together with the string alias that matched.
 --
-directivesFor' :: String -> [(Directive, NonEmpty String)]
+directivesFor' :: String -> [(Directive, String)]
 directivesFor' str = go directiveStrings'
   where
-  go = map swap . filter ((str `isPrefixOf`) . NEL.head . fst)
+  go = map swap . filter ((str `isPrefixOf`) . fst)
 
 directivesFor :: String -> [Directive]
 directivesFor = map fst . directivesFor'
 
 directiveStringsFor :: String -> [String]
-directiveStringsFor str =
-  concatMap (NEL.toList . snd) (directivesFor' str)
+directiveStringsFor str = map snd (directivesFor' str)
 
 -- |
 -- The help menu.

@@ -471,6 +471,7 @@ test-suite tests
     TestGraph
     TestHierarchy
     TestIde
+    TestInteractive
     TestMake
     TestPrimDocs
     TestPsci

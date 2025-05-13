@@ -92,7 +92,7 @@ parseDirective cmd =
     [(d, _)] -> commandFor d
     []       -> Left "Unrecognized directive. Type :? for help."
     ds       -> Left ("Ambiguous directive. Possible matches: " ++
-                  intercalate ", " (map (NE.head . snd) ds) ++ ". Type :? for help.")
+                  intercalate ", " (map snd ds) ++ ". Type :? for help.")
   where
   (dstr, arg) = trim <$> break isSpace cmd
 
