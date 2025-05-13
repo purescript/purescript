@@ -134,7 +134,7 @@ solve unk solution = modify $ \st -> do
   st { checkSubstitution = subs { substType = tys } }
 
 lookupUnsolved
-  :: (HasCallStack)
+  :: HasCallStack
   => Unknown
   -> TypeCheckM (UnkLevel, SourceType)
 lookupUnsolved u = do
@@ -144,7 +144,7 @@ lookupUnsolved u = do
     Just res -> return res
 
 unknownsWithKinds
-  :: (HasCallStack)
+  :: HasCallStack
   => [Unknown]
   -> TypeCheckM [(Unknown, SourceType)]
 unknownsWithKinds = fmap (fmap snd . nubBy ((==) `on` fst) . sortOn fst . join) . traverse go
@@ -155,7 +155,7 @@ unknownsWithKinds = fmap (fmap snd . nubBy ((==) `on` fst) . sortOn fst . join) 
     pure $ (lvl, (u, ty)) : rest
 
 inferKind
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> TypeCheckM (SourceType, SourceType)
 inferKind = \tyToInfer ->
@@ -243,7 +243,7 @@ inferKind = \tyToInfer ->
       internalError $ "inferKind: Unimplemented case \n" <> prettyPrintType 100 ty
 
 inferAppKind
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceAnn
   -> (SourceType, SourceType)
   -> SourceType
@@ -276,7 +276,7 @@ inferAppKind ann (fn, fnKind) arg = case fnKind of
     _ -> pure True
 
 cannotApplyTypeToType
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> SourceType
   -> TypeCheckM a
@@ -286,7 +286,7 @@ cannotApplyTypeToType fn arg = do
   internalCompilerError . T.pack $ "Cannot apply type to type: " <> debugType (srcTypeApp fn arg)
 
 cannotApplyKindToType
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> SourceType
   -> TypeCheckM a
@@ -297,7 +297,7 @@ cannotApplyKindToType poly arg = do
   internalCompilerError . T.pack $ "Cannot apply kind to type: " <> debugType (srcKindApp poly arg)
 
 checkKind
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> SourceType
   -> TypeCheckM SourceType
@@ -311,13 +311,13 @@ checkKind = checkKind' False
 -- error.
 --
 checkIsSaturatedType
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> TypeCheckM SourceType
 checkIsSaturatedType ty = checkKind' True ty E.kindType
 
 checkKind'
-  :: (HasCallStack)
+  :: HasCallStack
   => Bool
   -> SourceType
   -> SourceType
@@ -332,7 +332,7 @@ checkKind' requireSynonymsToExpand ty kind2 = do
         instantiateKind (ty', kind1') kind2'
 
 instantiateKind
-  :: (HasCallStack)
+  :: HasCallStack
   => (SourceType, SourceType)
   -> SourceType
   -> TypeCheckM SourceType
@@ -350,7 +350,7 @@ instantiateKind (ty, kind1) kind2 = case kind1 of
     _ -> False
 
 subsumesKind
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> SourceType
   -> TypeCheckM ()
@@ -393,7 +393,7 @@ unifyKinds = unifyKindsWithFailure $ \w1 w2 ->
 -- | local position context. This is useful when invoking kind unification
 -- | outside of kind checker internals.
 unifyKinds'
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> SourceType
   -> TypeCheckM ()
@@ -404,7 +404,7 @@ unifyKinds' = unifyKindsWithFailure $ \w1 w2 ->
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> SourceType
   -> TypeCheckM ()
@@ -412,7 +412,7 @@ checkTypeKind ty kind =
   unifyKindsWithFailure (\_ _ -> throwError . errorMessage $ ExpectedType ty kind) kind E.kindType
 
 unifyKindsWithFailure
-  :: (HasCallStack)
+  :: HasCallStack
   => (SourceType -> SourceType -> TypeCheckM ())
   -> SourceType
   -> SourceType
@@ -464,7 +464,7 @@ unifyKindsWithFailure onFailure = go
       onFailure (rowFromList w1) (rowFromList w2)
 
 solveUnknown
-  :: (HasCallStack)
+  :: HasCallStack
   => Unknown
   -> SourceType
   -> TypeCheckM ()
@@ -475,7 +475,7 @@ solveUnknown a' p1 = do
   solve a' p2
 
 solveUnknownAsFunction
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceAnn
   -> Unknown
   -> TypeCheckM SourceType
@@ -490,7 +490,7 @@ solveUnknownAsFunction ann u = do
   pure uarr
 
 promoteKind
-  :: (HasCallStack)
+  :: HasCallStack
   => Unknown
   -> SourceType
   -> TypeCheckM SourceType
@@ -512,7 +512,7 @@ promoteKind u2 ty = do
       pure ty'
 
 elaborateKind
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> TypeCheckM SourceType
 elaborateKind = \case
@@ -588,7 +588,7 @@ checkEscapedSkolems ty =
     errorMessage' (fst $ getAnnForType ty') $ EscapedSkolem name (Just ss) ty'
 
 kindOfWithUnknowns
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> TypeCheckM (([(Unknown, SourceType)], SourceType), SourceType)
 kindOfWithUnknowns ty = do
@@ -598,14 +598,14 @@ kindOfWithUnknowns ty = do
 
 -- | Infer the kind of a single type
 kindOf
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> TypeCheckM (SourceType, SourceType)
 kindOf = fmap (first snd) . kindOfWithScopedVars
 
 -- | Infer the kind of a single type, returning the kinds of any scoped type variables
 kindOfWithScopedVars
-  :: (HasCallStack)
+  :: HasCallStack
   => SourceType
   -> TypeCheckM (([(Text, SourceType)], SourceType), SourceType)
 kindOfWithScopedVars ty = do

@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeOperators #-}
 
 -- |
 -- Functions for replacing fully applied type synonyms
