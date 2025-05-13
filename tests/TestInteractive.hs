@@ -31,7 +31,7 @@ spec = do
 directiveStringsTests :: Spec
 directiveStringsTests = describe "directiveStrings" $ do
   it "should have non-empty string lists for each directive" $ do
-    let allHaveElements = all (not . null . NEL.toList . snd) directiveStrings
+    let allHaveElements = not (any (null . NEL.toList . snd) directiveStrings)
     allHaveElements `shouldBe` True
 
 directiveStrings'Tests :: Spec
@@ -90,7 +90,7 @@ helpTests = describe "help" $ do
 
   it "should contain descriptive help text" $ do
     let helpTexts = map (\(_, _, text) -> text) help
-    all (not . null) helpTexts `shouldBe` True
+    not (any null helpTexts) `shouldBe` True
 
   it "should include parameters where needed" $ do
     lookup Browse (map (\(d, a, _) -> (d, a)) help) `shouldBe` Just "<module>"
