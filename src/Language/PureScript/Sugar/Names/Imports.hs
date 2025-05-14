@@ -7,7 +7,7 @@ module Language.PureScript.Sugar.Names.Imports
 
 import Prelude
 
-import Control.Monad (foldM, when)
+import Control.Monad (foldM, when, unless)
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Foldable (for_, traverse_)
@@ -147,7 +147,7 @@ resolveImport importModule exps imps impQual = resolveByType
     -> ProperName 'ConstructorName
     -> m ()
   checkDctorExists ss tcon exports dctor
-    = when (dctor `notElem` exports)
+    = unless (dctor `elem` exports)
     . throwError . errorMessage' ss
     $ UnknownImportDataConstructor importModule tcon dctor
 

@@ -8,7 +8,7 @@ module Language.PureScript.TypeChecker
   ) where
 
 import Prelude
-import Protolude (headMay, maybeToLeft, ordNub)
+import Protolude (headMay, maybeToLeft, ordNub, headDef)
 
 import Control.Lens ((^..), _2)
 import Control.Monad (when, unless, void, forM, zipWithM_)
@@ -422,7 +422,9 @@ typeCheckAll moduleName = traverse go
 
   checkInstanceMembers :: [Declaration] -> m [Declaration]
   checkInstanceMembers instDecls = do
-    let idents = sort . map head . group . map memberName $ instDecls
+    let idents = sort
+          . map (headDef $ internalError "checkInstanceMembers: Empty instance declaration list")
+          . group . map memberName $ instDecls
     for_ (firstDuplicate idents) $ \ident ->
       throwError . errorMessage $ DuplicateValueDeclaration ident
     return instDecls
@@ -747,7 +749,9 @@ typeCheckModule modulesExports (Module ss coms mn decls (Just exps)) =
 
   checkClassMembersAreExported :: DeclarationRef -> m ()
   checkClassMembersAreExported dr@(TypeClassRef ss' name) = do
-    let members = ValueRef ss' `map` head (mapMaybe findClassMembers decls)
+    let members = ValueRef ss' `map`
+          (headDef $ internalError "checkClassMembersAreExported: Empty class member list")
+          (mapMaybe findClassMembers decls)
     let missingMembers = members \\ exps
     unless (null missingMembers) . throwError . errorMessage' ss' $ TransitiveExportError dr missingMembers
     where

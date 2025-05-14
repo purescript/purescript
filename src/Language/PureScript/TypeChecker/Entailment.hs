@@ -11,7 +11,7 @@ module Language.PureScript.TypeChecker.Entailment
   ) where
 
 import Prelude
-import Protolude (ordNub, headMay)
+import Protolude (ordNub, headMay, headDef)
 
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
@@ -257,7 +257,7 @@ entails SolverOptions{..} constraint context hints =
               , typeClassDependencies
               , typeClassIsEmpty
               , typeClassCoveringSets
-              , typeClassMembers 
+              , typeClassMembers
               } <- case M.lookup className' classesInScope of
                 Nothing -> throwError . errorMessage $ UnknownClass className'
                 Just tcd -> pure tcd
@@ -281,8 +281,8 @@ entails SolverOptions{..} constraint context hints =
                                     else Left (Left (tcdToInstanceDescription tcd)) -- can't continue with this chain yet, need proof of apartness
 
                   lefts [found]
-            solution <- lift . lift 
-              $ unique kinds'' tys'' ambiguous instances 
+            solution <- lift . lift
+              $ unique kinds'' tys'' ambiguous instances
               $ unknownsInAllCoveringSets (fst . (typeClassArguments !!)) typeClassMembers tys'' typeClassCoveringSets
             case solution of
               Solved substs tcd -> do
@@ -293,7 +293,7 @@ entails SolverOptions{..} constraint context hints =
                 -- Now enforce any functional dependencies, using unification
                 -- Note: we need to generate fresh types for any unconstrained
                 -- type variables before unifying.
-                let subst = fmap head substs
+                let subst = fmap (headDef $ internalError "entails: empty substitution") substs
                 currentSubst <- lift . lift $ gets checkSubstitution
                 subst' <- lift . lift $ withFreshTypes tcd (fmap (substituteType currentSubst) subst)
                 lift . lift $ zipWithM_ (\t1 t2 -> do
@@ -431,9 +431,9 @@ entails SolverOptions{..} constraint context hints =
             unknownsInAllCoveringSets :: (Int -> Text) -> [(Ident, SourceType, Maybe (S.Set (NEL.NonEmpty Int)))] -> [SourceType] -> S.Set (S.Set Int) -> UnknownsHint
             unknownsInAllCoveringSets indexToArgText tyClassMembers tyArgs coveringSets = do
               let unkIndices = findIndices containsUnknowns tyArgs
-              if all (\s -> any (`S.member` s) unkIndices) coveringSets then 
+              if all (\s -> any (`S.member` s) unkIndices) coveringSets then
                 fromMaybe Unknowns unknownsRequiringVtas
-              else 
+              else
                 NoUnknowns
               where
                 unknownsRequiringVtas = do
@@ -452,15 +452,15 @@ entails SolverOptions{..} constraint context hints =
                         (_, getVars, _, _, _) = everythingOnValues (++) ignore getVarIdents ignore ignore ignore
                         ignore = const []
                         getVarIdents = \case
-                          Var _ ident | Just vtas <- M.lookup ident tyClassMemberVta -> 
+                          Var _ ident | Just vtas <- M.lookup ident tyClassMemberVta ->
                             [(ident, vtas)]
-                          _ -> 
+                          _ ->
                             []
 
                     getECTExpr = \case
                       ErrorCheckingType expr _ -> Just expr
                       _ -> Nothing
-                      
+
                   tyClassMembers' <- headMay $ mapMaybe (fmap tyClassMembersInExpr . getECTExpr) hints
                   membersWithVtas <- NEL.nonEmpty tyClassMembers'
                   pure $ UnknownsWithVtaRequiringArgs membersWithVtas
@@ -668,7 +668,7 @@ entails SolverOptions{..} constraint context hints =
                  , l, r
                  , rowFromList (fixed, rowVar)
                  , Just [ srcConstraint C.RowUnion kinds [rest, r, rowVar] Nothing ]
-                 , [("r", kindRow (head kinds))]
+                 , [("r", kindRow (headDef (internalError "unionRows: empty kinds") kinds))]
                  )
 
     solveRowCons :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]

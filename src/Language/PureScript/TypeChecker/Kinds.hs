@@ -26,6 +26,7 @@ module Language.PureScript.TypeChecker.Kinds
   ) where
 
 import Prelude
+import Protolude (headDef)
 
 import Control.Arrow ((***))
 import Control.Lens ((^.), _1, _2, _3)
@@ -633,7 +634,7 @@ kindOfData
   -> DataDeclarationArgs
   -> m DataDeclarationResult
 kindOfData moduleName dataDecl =
-  head . (^. _2) <$> kindsOfAll moduleName [] [dataDecl] []
+  headDef (internalError "kindOfData: empty list") . (^. _2) <$> kindsOfAll moduleName [] [dataDecl] []
 
 inferDataDeclaration
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
@@ -685,7 +686,7 @@ kindOfTypeSynonym
   -> TypeDeclarationArgs
   -> m TypeDeclarationResult
 kindOfTypeSynonym moduleName typeDecl =
-  head . (^. _1) <$> kindsOfAll moduleName [typeDecl] [] []
+  headDef (internalError "kindOfTypeSynonym: empty list") . (^. _1) <$> kindsOfAll moduleName [typeDecl] [] []
 
 inferTypeSynonym
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
@@ -802,7 +803,7 @@ kindOfClass
   -> ClassDeclarationArgs
   -> m ClassDeclarationResult
 kindOfClass moduleName clsDecl =
-  head . (^. _3) <$> kindsOfAll moduleName [] [] [clsDecl]
+  headDef (internalError "kindOfClass: empty list") . (^. _3) <$> kindsOfAll moduleName [] [] [clsDecl]
 
 inferClassDeclaration
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)

@@ -875,7 +875,7 @@ instance A.ToJSON a => A.ToJSON (InPackage a) where
       Local y      -> withPackage (Nothing :: Maybe ()) y
       FromDep pn y -> withPackage (Just pn) y
     where
-    withPackage :: (A.ToJSON p, A.ToJSON x) => p -> x -> A.Value
+    withPackage :: (A.ToJSON p, A.ToJSON y) => p -> y -> A.Value
     withPackage p y =
       A.object [ "package" .= p
                , "item"    .= y
