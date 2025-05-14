@@ -36,10 +36,9 @@ directiveStrings =
 -- Like `directiveStrings`, but the other way around.
 --
 directiveStrings' :: [(String, Directive)]
-directiveStrings' =
-  concatMap
-    (\(dir, strs) -> map (, dir) $ NEL.toList strs)
-    directiveStrings
+directiveStrings' = concatMap go directiveStrings
+  where
+  go (dir, strs) = map (, dir) $ NEL.toList strs
 
 -- |
 -- Returns all possible string representations of a directive.
@@ -66,7 +65,7 @@ directivesFor :: String -> [Directive]
 directivesFor = map fst . directivesFor'
 
 directiveStringsFor :: String -> [String]
-directiveStringsFor str = map snd (directivesFor' str)
+directiveStringsFor = map snd . directivesFor'
 
 -- |
 -- The help menu.
