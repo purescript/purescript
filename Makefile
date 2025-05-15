@@ -76,4 +76,20 @@ lint: lint-hlint ## Check project adheres to standards
 lint-hlint: $(bin_dir)/hlint ## Check project adheres to hlint standards
 	$< --git
 
+.PHONY: profile
+profile:
+	@stack build
+	@cd ../application/purs-projects && \
+		(git diff --quiet && git diff --cached --quiet && git checkout 567cde598728d6a02fd22972c888e5194af383c4 || { echo "❌ dirty working directory on purs-projects, aborting checkout."; exit 1; }) && \
+		spago install && \
+	    spago sources > .spago/sources.txt && \
+		rm -rf output
+
+	@stack exec zsh -- -c 'cd ../application/purs-projects && purs compile --source-globs-file .spago/sources.txt +RTS -sprofile.txt -RTS'
+	@mv ../application/purs-projects/profile.txt profile.txt
+
+	@rm ../application/purs-projects/output/Schema.AdminDashboard/externs.cbor
+	@stack exec zsh -- -c 'cd ../application/purs-projects && purs compile --source-globs-file .spago/sources.txt +RTS -sprofile.txt -RTS'
+	@mv ../application/purs-projects/profile.txt profile-admin.txt
+
 .PHONY : build build-dirty run install ghci test test-ghci test-profiling ghcid dev-deps license-generator clean lint lint-hlint
