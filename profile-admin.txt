@@ -1,27 +1,27 @@
-'purs' 'compile' '--source-globs-file' '.spago/sources.txt' +RTS '-N' '-sprofile.txt' 
- 765,357,373,648 bytes allocated in the heap
- 360,583,388,216 bytes copied during GC
-   6,131,704,224 bytes maximum residency (40 sample(s))
-      59,567,712 bytes maximum slop
-           17666 MiB total memory in use (0 MB lost due to fragmentation)
+'purs' 'compile' '--source-globs-file' '.spago/sources.txt' +RTS '-N' '-A256m' '-n16m' '-sprofile.txt' 
+ 764,715,301,176 bytes allocated in the heap
+  71,684,539,216 bytes copied during GC
+   5,771,888,480 bytes maximum residency (8 sample(s))
+      57,078,368 bytes maximum slop
+           19290 MiB total memory in use (0 MB lost due to fragmentation)
 
                                      Tot time (elapsed)  Avg pause  Max pause
-  Gen  0     63238 colls, 63238 par   214.826s  86.156s     0.0014s    0.0344s
-  Gen  1        40 colls,    39 par   126.759s  24.613s     0.6153s    2.3480s
+  Gen  0       347 colls,   347 par   109.302s  25.584s     0.0737s    0.8975s
+  Gen  1         8 colls,     7 par   33.883s   6.849s     0.8561s    2.4644s
 
-  Parallel GC work balance: 62.83% (serial 0%, perfect 100%)
+  Parallel GC work balance: 87.94% (serial 0%, perfect 100%)
 
-  TASKS: 58 (1 bound, 57 peak workers (57 total), using -N10)
+  TASKS: 63 (1 bound, 62 peak workers (62 total), using -N10)
 
   SPARKS: 7516 (7516 converted, 0 overflowed, 0 dud, 0 GC'd, 0 fizzled)
 
-  INIT    time    0.000s  (  0.003s elapsed)
-  MUT     time  307.420s  ( 79.011s elapsed)
-  GC      time  341.586s  (110.770s elapsed)
-  EXIT    time    0.110s  (  0.004s elapsed)
-  Total   time  649.117s  (189.789s elapsed)
+  INIT    time    0.003s  (  0.156s elapsed)
+  MUT     time  340.588s  ( 94.439s elapsed)
+  GC      time  143.185s  ( 32.433s elapsed)
+  EXIT    time    0.108s  (  0.004s elapsed)
+  Total   time  483.883s  (127.032s elapsed)
 
-  Alloc rate    2,489,613,396 bytes per MUT second
+  Alloc rate    2,245,281,654 bytes per MUT second
 
-  Productivity  47.4% of total user, 41.6% of total elapsed
+  Productivity  70.4% of total user, 74.3% of total elapsed
 
