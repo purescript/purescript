@@ -85,11 +85,11 @@ profile:
 	    spago sources > .spago/sources.txt && \
 		rm -rf output
 
-	@stack exec zsh -- -c 'cd ../application/purs-projects && purs compile --source-globs-file .spago/sources.txt +RTS -sprofile.txt -RTS'
+	@stack exec zsh -- -c 'cd ../application/purs-projects && purs compile --source-globs-file .spago/sources.txt +RTS -A256m -n16m -sprofile.txt -RTS'
 	@mv ../application/purs-projects/profile.txt profile.txt
 
 	@rm ../application/purs-projects/output/Schema.AdminDashboard/externs.cbor
-	@stack exec zsh -- -c 'cd ../application/purs-projects && purs compile --source-globs-file .spago/sources.txt +RTS -sprofile.txt -RTS'
+	@stack exec zsh -- -c 'cd ../application/purs-projects && purs compile --source-globs-file .spago/sources.txt +RTS -A256m -n16m -sprofile.txt -RTS'
 	@mv ../application/purs-projects/profile.txt profile-admin.txt
 
 .PHONY : build build-dirty run install ghci test test-ghci test-profiling ghcid dev-deps license-generator clean lint lint-hlint
