@@ -13,7 +13,8 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Ide.Filter
-       ( Filter
+       ( Filter(..)
+       , DeclarationFilter(..)
        , moduleFilter
        , namespaceFilter
        , exactFilter

@@ -1,11 +1,14 @@
 module Language.PureScript.Ide.Filter.Declaration
        ( DeclarationType(..)
+       , declarationTypeToText
        ) where
 
 import Protolude                     hiding (isPrefixOf)
 
 import Control.Monad.Fail (fail)
 import Data.Aeson (FromJSON(..), ToJSON(..), withText)
+import Database.SQLite.Simple.ToField (ToField(..))
+import Database.SQLite.Simple (SQLData(..))
 
 data DeclarationType
   = Value
@@ -40,3 +43,16 @@ instance ToJSON DeclarationType where
     ValueOperator   -> "valueoperator"
     TypeOperator    -> "typeoperator"
     Module          -> "module"
+
+declarationTypeToText :: DeclarationType -> Text 
+declarationTypeToText Value = "value"
+declarationTypeToText Type = "type"
+declarationTypeToText Synonym = "synonym"
+declarationTypeToText DataConstructor = "dataconstructor"
+declarationTypeToText TypeClass = "typeclass"
+declarationTypeToText ValueOperator = "valueoperator"
+declarationTypeToText TypeOperator = "typeoperator"
+declarationTypeToText Module = "module"
+
+instance ToField DeclarationType where
+  toField d = SQLText $ declarationTypeToText d

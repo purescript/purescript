@@ -53,6 +53,7 @@ import Language.PureScript.Make.Monad as Monad
 import Language.PureScript.CoreFn qualified as CF
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
+import Debug.Trace qualified as Debug
 
 -- | Rebuild a single module.
 --
@@ -97,6 +98,7 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
     (desugared, (exEnv', usedImports)) <- runStateT (desugar externs withPrim) (exEnv, mempty)
     let modulesExports = (\(_, _, exports) -> exports) <$> exEnv'
     (checked, CheckState{..}) <- runStateT (typeCheckModule modulesExports desugared) $ emptyCheckState env
+    -- Debug.traceM $ show checkEnv
     let usedImports' = foldl' (flip $ \(fromModuleName, newtypeCtorName) ->
           M.alter (Just . (fmap DctorName newtypeCtorName :) . fold) fromModuleName) usedImports checkConstructorImportsForCoercible
     -- Imports cannot be linted before type checking because we need to
@@ -126,13 +128,13 @@ rebuildModuleWithIndex MakeActions{..} exEnv externs m@(Module _ _ moduleName _ 
   -- a bug in the compiler, which should be reported as such.
   -- 2. We do not want to perform any extra work generating docs unless the
   -- user has asked for docs to be generated.
-  let docs = case Docs.convertModule externs exEnv env' m of
+  let docs = case Docs.convertModule externs exEnv env' withPrim of
                Left errs -> internalError $
                  "Failed to produce docs for " ++ T.unpack (runModuleName moduleName)
                  ++ "; details:\n" ++ prettyPrintMultipleErrors defaultPPEOptions errs
                Right d -> d
 
-  evalSupplyT nextVar'' $ codegen renamed docs exts
+  evalSupplyT nextVar'' $ codegen withPrim renamed docs exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.cbor@ file.

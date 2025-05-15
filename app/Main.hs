@@ -8,6 +8,7 @@ import Command.Docs qualified as Docs
 import Command.Graph qualified as Graph
 import Command.Hierarchy qualified as Hierarchy
 import Command.Ide qualified as Ide
+import Command.QuickBuild qualified as QB
 import Command.Publish qualified as Publish
 import Command.REPL qualified as REPL
 import Control.Monad (join)
@@ -61,6 +62,9 @@ main = do
         [ Opts.command "bundle"
             (Opts.info Bundle.command
               (Opts.progDesc "This command was removed in v0.15.0. Run this command for migration information."))
+        , Opts.command "sqlite"
+            (Opts.info Bundle.initSqlite
+              (Opts.progDesc "Init sqlite"))
         , Opts.command "compile"
             (Opts.info Compile.command
               (Opts.progDesc "Compile PureScript source files"))
@@ -76,6 +80,9 @@ main = do
         , Opts.command "ide"
             (Opts.info Ide.command
               (Opts.progDesc "Start or query an IDE server process"))
+        , Opts.command "qb"
+            (Opts.info QB.command
+              (Opts.progDesc "Quick build module"))
         , Opts.command "publish"
             (Opts.info Publish.command
               (Opts.progDesc "Generates documentation packages for upload to Pursuit"))

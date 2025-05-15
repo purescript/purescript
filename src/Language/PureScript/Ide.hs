@@ -20,6 +20,7 @@ module Language.PureScript.Ide
 
 import Protolude hiding (moduleName)
 
+import qualified Language.PureScript.Ide.Imports as IDEImports
 import "monad-logger" Control.Monad.Logger (MonadLogger, logWarnN)
 import Data.Map qualified as Map
 import Data.Text qualified as T
@@ -27,22 +28,40 @@ import Language.PureScript qualified as P
 import Language.PureScript.Glob (toInputGlobs, PSCGlobs(..))
 import Language.PureScript.Ide.CaseSplit qualified as CS
 import Language.PureScript.Ide.Command (Command(..), ImportCommand(..), ListType(..))
-import Language.PureScript.Ide.Completion (CompletionOptions, completionFromMatch, getCompletions, getExactCompletions, simpleExport)
+import Language.PureScript.Ide.Completion (CompletionOptions (coMaxResults), completionFromMatch, getCompletions, getExactCompletions, simpleExport)
 import Language.PureScript.Ide.Error (IdeError(..))
 import Language.PureScript.Ide.Externs (readExternFile)
-import Language.PureScript.Ide.Filter (Filter)
+import Language.PureScript.Ide.Filter qualified as F
 import Language.PureScript.Ide.Imports (parseImportsFromFile)
 import Language.PureScript.Ide.Imports.Actions (addImplicitImport, addImportForIdentifier, addQualifiedImport, answerRequest)
-import Language.PureScript.Ide.Matcher (Matcher)
+import Language.PureScript.Ide.Matcher (Matcher, Matcher' (..))
 import Language.PureScript.Ide.Prim (idePrimDeclarations)
 import Language.PureScript.Ide.Rebuild (rebuildFileAsync, rebuildFileSync)
 import Language.PureScript.Ide.SourceFile (parseModulesFromFiles)
-import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState)
-import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..))
+import Language.PureScript.Ide.State (getAllModules, getLoadedModulenames, insertExterns, insertModule, populateVolatileState, populateVolatileStateSync, resetIdeState, getSqliteFilePath, runQuery, escapeSQL)
+import Language.PureScript.Ide.Types (Annotation(..), Ide, IdeConfiguration(..), IdeDeclarationAnn(..), IdeEnvironment(..), Success(..), Completion (..), toText, Match (..))
 import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration, namespaceForDeclaration, withEmptyAnn)
 import Language.PureScript.Ide.Usage (findUsages)
 import System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
 import System.FilePath ((</>), normalise)
+import Language.PureScript.Names (ModuleName(ModuleName))
+import Language.PureScript.AST.SourcePos (SourceSpan(SourceSpan))
+import Language.PureScript.Errors (SourcePos(..))
+import Database.SQLite.Simple qualified as SQLite
+import Language.PureScript (cacheDbFile, runModuleName)
+import Debug.Trace qualified as Debug
+import Data.Maybe (catMaybes)
+import Protolude (head)
+import Data.Foldable (find, Foldable (toList, foldMap))
+import Data.Text qualified
+import Data.Either (isLeft)
+import Codec.Serialise (deserialise)
+import Data.ByteString.Lazy qualified
+import Database.SQLite.Simple (Only(Only))
+import Database.SQLite.Simple.ToField (ToField(..))
+import Language.PureScript.Ide.Filter.Declaration (declarationTypeToText)
+import Data.ByteString.Lazy qualified as Lazy
+import Data.Aeson qualified as Aeson
 
 -- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.
@@ -53,23 +72,31 @@ handleCommand
 handleCommand c = case c of
   Load [] ->
     -- Clearing the State before populating it to avoid a space leak
-    resetIdeState *> findAvailableExterns >>= loadModulesAsync
+    pure $ TextResult "Done"
+    -- resetIdeState *> findAvailableExterns >>= loadModulesAsync
   Load modules ->
-    loadModulesAsync modules
+    pure $ TextResult "Done"
+    -- loadModulesAsync modules
   LoadSync [] ->
-    findAvailableExterns >>= loadModulesSync
+    pure $ TextResult "Done"
+    -- findAvailableExterns >>= loadModulesSync
   LoadSync modules ->
-    loadModulesSync modules
+    pure $ TextResult "Done"
+    -- loadModulesSync modules
   Type search filters currentModule ->
-    findType search filters currentModule
-  Complete filters matcher currentModule complOptions ->
-    findCompletions filters matcher currentModule complOptions
+    findDeclarations (F.Filter (Right $ F.Exact search) : filters) currentModule Nothing
+  Complete filters matcher currentModule complOptions -> do
+
+    findDeclarations (filters <> foldMap (\case 
+        Flex q -> [F.Filter (Right $ F.Prefix q)]
+        Distance q _ -> [F.Filter (Right $ F.Prefix q)]) matcher) currentModule (Just complOptions)
+    -- findCompletions' filters matcher currentModule complOptions
   List LoadedModules -> do
     logWarnN
       "Listing the loaded modules command is DEPRECATED, use the completion command and filter it to modules instead"
-    printModules
+    ModuleList . join <$> runQuery "select module_name from modules"
   List AvailableModules ->
-    listAvailableModules
+    ModuleList . join <$> runQuery "select module_name from modules"
   List (Imports fp) ->
     ImportList <$> parseImportsFromFile fp
   CaseSplit l b e wca t ->
@@ -77,15 +104,24 @@ handleCommand c = case c of
   AddClause l wca ->
     MultilineTextResult <$> CS.addClause l wca
   FindUsages moduleName ident namespace -> do
-    Map.lookup moduleName <$> getAllModules Nothing >>= \case
-      Nothing -> throwError (GeneralError "Module not found")
-      Just decls -> do
-        case find (\d -> namespaceForDeclaration (discardAnn d) == namespace
-                    && identifierFromIdeDeclaration (discardAnn d) == ident) decls of
-          Nothing -> throwError (GeneralError "Declaration not found")
-          Just declaration -> do
-            let sourceModule = fromMaybe moduleName (declaration & _idaAnnotation & _annExportedFrom)
-            UsagesResult . foldMap toList <$> findUsages (discardAnn declaration) sourceModule
+    r :: [Only Lazy.ByteString] <- runQuery $ unlines
+      [ "select distinct a.span"
+      , "from dependencies d join asts a on d.module_name = a.module_name"
+      , "where (d.dependency = '" <> runModuleName moduleName <> "' or d.module_name = '" <> runModuleName moduleName <> "') and a.name = '" <> ident <> "'"
+      ]
+
+    pure $ UsagesResult (mapMaybe (\(Only span) -> Aeson.decode span) r)
+
+
+    -- Map.lookup moduleName <$> getAllModules Nothing >>= \case
+    --   Nothing -> throwError (GeneralError "Module not found")
+    --   Just decls -> do
+    --     case find (\d -> namespaceForDeclaration (discardAnn d) == namespace
+    --                 && identifierFromIdeDeclaration (discardAnn d) == ident) decls of
+    --       Nothing -> throwError (GeneralError "Declaration not found")
+    --       Just declaration -> do
+    --         let sourceModule = fromMaybe moduleName (declaration & _idaAnnotation & _annExportedFrom)
+    --         UsagesResult . foldMap toList <$> findUsages (discardAnn declaration) sourceModule
   Import fp outfp _ (AddImplicitImport mn) -> do
     rs <- addImplicitImport fp mn
     answerRequest outfp rs
@@ -111,7 +147,7 @@ handleCommand c = case c of
 
 findCompletions
   :: Ide m
-  => [Filter]
+  => [F.Filter]
   -> Matcher IdeDeclarationAnn
   -> Maybe P.ModuleName
   -> CompletionOptions
@@ -121,33 +157,58 @@ findCompletions filters matcher currentModule complOptions = do
   let insertPrim = Map.union idePrimDeclarations
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
-findType
+findDeclarations
   :: Ide m
-  => Text
-  -> [Filter]
+  => [F.Filter]
   -> Maybe P.ModuleName
+  -> Maybe CompletionOptions
   -> m Success
-findType search filters currentModule = do
-  modules <- getAllModules currentModule
-  let insertPrim = Map.union idePrimDeclarations
-  pure (CompletionResult (getExactCompletions search filters (insertPrim modules)))
+findDeclarations filters currentModule completionOptions = do
+  rows :: [(Text, Lazy.ByteString)] <- runQuery $
+    "select module_name, declaration " <>
+    "from ide_declarations id " <>
+    (
+      mapMaybe (\case
+        F.Filter (Left modules) ->
+          Just $ "(exists (select 1 from exports e where id.module_name = e.defined_in and id.name = e.name and id.declaration_type = e.declaration_type and e.module_name in (" <>
+            T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> escapeSQL m <> "'") <>
+          "))" <>
+          " or " <> "id.module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> escapeSQL m <> "'") <> "))"
+        F.Filter (Right (F.Prefix "")) -> Nothing
+        F.Filter (Right (F.Prefix f)) -> Just $ "id.name glob '" <> escapeSQL f <> "*'"
+        F.Filter (Right (F.Exact f)) -> Just $ "id.name glob '" <> escapeSQL f <> "'"
+        F.Filter (Right (F.Namespace namespaces)) ->
+          Just $ "id.namespace in (" <> T.intercalate "," (toList namespaces <&> \n -> "'" <> toText n <> "'") <> ")"
+        F.Filter (Right (F.DeclType dt)) ->
+          Just $ "id.namespace in (" <> T.intercalate "," (toList dt <&> \t -> "'" <> declarationTypeToText t <> "'") <> ")"
+        F.Filter (Right (F.Dependencies qualifier _ imports@(_:_))) -> 
+          Just $ "(exists (select 1 from exports e where id.module_name = e.defined_in and id.name = e.name and id.declaration_type = e.declaration_type and e.module_name in "
+             <> moduleNames <> ") or id.module_name in" <> moduleNames <> ")"
+          where
+          moduleNames = " (" <>
+              T.intercalate "," (filter (\(IDEImports.Import _ _ qualified) -> case qualifier of
+                 Nothing -> True
+                 Just qual -> Just qual == qualified
+                  ) imports <&> \(IDEImports.Import m _ _)-> "'" <> escapeSQL (runModuleName m) <> "'") <> ") "
+        F.Filter _ -> Nothing
+        )
+      filters
+      & \f -> if null f then " " else " where " <> T.intercalate " and " f
+      ) <>
+    foldMap (\maxResults -> " limit " <> show maxResults ) (coMaxResults =<< completionOptions)
 
-printModules :: Ide m => m Success
-printModules = ModuleList . map P.runModuleName <$> getLoadedModulenames
+  let matches = rows <&> \(m, decl) -> (Match (ModuleName m, deserialise decl), [])
+
+  pure $ CompletionResult $ completionFromMatch <$> matches
+
+sqliteFile :: Ide m => m FilePath
+sqliteFile = outputDirectory <&> ( </> "cache.db")
 
 outputDirectory :: Ide m => m FilePath
 outputDirectory = do
   outputPath <- confOutputPath . ideConfiguration <$> ask
   cwd <- liftIO getCurrentDirectory
   pure (cwd </> outputPath)
-
-listAvailableModules :: Ide m => m Success
-listAvailableModules = do
-  oDir <- outputDirectory
-  liftIO $ do
-    contents <- getDirectoryContents oDir
-    let cleaned = filter (`notElem` [".", ".."]) contents
-    return (ModuleList (map toS cleaned))
 
 caseSplit :: (Ide m, MonadError IdeError m) =>
   Text -> Int -> Int -> CS.WildcardAnnotations -> Text -> m Success

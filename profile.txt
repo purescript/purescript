@@ -1,27 +1,27 @@
 'purs' 'compile' '--source-globs-file' '.spago/sources.txt' +RTS '-N' '-sprofile.txt' 
-3,482,404,119,952 bytes allocated in the heap
- 907,304,406,504 bytes copied during GC
-   4,217,119,128 bytes maximum residency (133 sample(s))
-      75,523,008 bytes maximum slop
-           11887 MiB total memory in use (0 MB lost due to fragmentation)
+1,516,071,924,704 bytes allocated in the heap
+ 574,866,053,056 bytes copied during GC
+   3,401,220,216 bytes maximum residency (98 sample(s))
+      49,707,176 bytes maximum slop
+            9222 MiB total memory in use (0 MB lost due to fragmentation)
 
                                      Tot time (elapsed)  Avg pause  Max pause
-  Gen  0     173582 colls, 173582 par   885.786s  237.209s     0.0014s    0.0167s
-  Gen  1       133 colls,   132 par   347.505s  47.618s     0.3580s    0.5545s
+  Gen  0     105895 colls, 105895 par   366.037s  140.943s     0.0013s    0.0198s
+  Gen  1        98 colls,    97 par   222.211s  29.697s     0.3030s    0.4475s
 
-  Parallel GC work balance: 71.47% (serial 0%, perfect 100%)
+  Parallel GC work balance: 63.05% (serial 0%, perfect 100%)
 
-  TASKS: 42 (1 bound, 41 peak workers (41 total), using -N10)
+  TASKS: 70 (1 bound, 66 peak workers (69 total), using -N10)
 
   SPARKS: 7516 (7516 converted, 0 overflowed, 0 dud, 0 GC'd, 0 fizzled)
 
-  INIT    time    0.000s  (  0.008s elapsed)
-  MUT     time  1332.818s  (174.863s elapsed)
-  GC      time  1233.290s  (284.827s elapsed)
-  EXIT    time    0.050s  (  0.001s elapsed)
-  Total   time  2566.158s  (459.698s elapsed)
+  INIT    time    0.000s  (  0.004s elapsed)
+  MUT     time  631.223s  (120.429s elapsed)
+  GC      time  588.249s  (170.640s elapsed)
+  EXIT    time    0.050s  (  0.010s elapsed)
+  Total   time  1219.522s  (291.083s elapsed)
 
-  Alloc rate    2,612,813,741 bytes per MUT second
+  Alloc rate    2,401,800,958 bytes per MUT second
 
-  Productivity  51.9% of total user, 38.0% of total elapsed
+  Productivity  51.8% of total user, 41.4% of total elapsed
 

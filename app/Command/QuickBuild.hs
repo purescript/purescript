@@ -15,11 +15,12 @@
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Command.Ide (command) where
+module Command.QuickBuild (command) where
 
 import Protolude
 
 import Data.Aeson qualified as Aeson
+import Data.Set qualified as Set
 import Control.Concurrent.STM (newTVarIO)
 import "monad-logger" Control.Monad.Logger (MonadLogger, logDebug, logError, logInfo)
 import Data.IORef (newIORef)
@@ -41,7 +42,7 @@ import System.FilePath ((</>))
 import System.IO (BufferMode(..), hClose, hFlush, hSetBuffering, hSetEncoding, utf8)
 import System.IO.Error (isEOFError)
 import Database.SQLite.Simple qualified as SQLite
-import Protolude qualified as D
+import  Language.PureScript.Options as PO
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
 listenOnLocalhost port = do
@@ -65,12 +66,14 @@ data ServerOptions = ServerOptions
   , _serverGlobsFromFile :: Maybe FilePath
   , _serverGlobsExcluded :: [FilePath]
   , _serverOutputPath :: FilePath
+  , _srcFile :: FilePath
   , _serverPort       :: Network.PortNumber
   , _serverLoglevel   :: IdeLogLevel
   -- TODO(Christoph) Deprecated
   , _serverEditorMode :: Bool
   , _serverPolling    :: Bool
   , _serverNoWatch    :: Bool
+
   } deriving (Show)
 
 data ClientOptions = ClientOptions
@@ -84,38 +87,10 @@ command = Opts.helper <*> subcommands where
     [ Opts.command "server"
         (Opts.info (fmap server serverOptions <**> Opts.helper)
           (Opts.progDesc "Start a server process"))
-    , Opts.command "client"
-        (Opts.info (fmap client clientOptions <**> Opts.helper)
-          (Opts.progDesc "Connect to a running server"))
     ]
 
-  client :: ClientOptions -> IO ()
-  client ClientOptions{..} = do
-    hSetEncoding stdin utf8
-    hSetEncoding stdout utf8
-    let handler (SomeException e) = do
-          T.putStrLn ("Couldn't connect to purs ide server on port " <> show clientPort <> ":")
-          print e
-          exitFailure
-    let hints = Network.defaultHints
-          { Network.addrFamily = Network.AF_INET
-          , Network.addrSocketType = Network.Stream
-          }
-    addr:_ <- Network.getAddrInfo (Just hints) (Just "127.0.0.1") (Just (show clientPort))
-    sock <- Network.socket (Network.addrFamily addr) (Network.addrSocketType addr) (Network.addrProtocol addr)
-    Network.connect sock (Network.addrAddress addr) `catch` handler
-    h <- Network.socketToHandle sock ReadWriteMode
-    T.hPutStrLn h =<< T.getLine
-    BS8.putStrLn =<< BS8.hGetLine h
-    hFlush stdout
-    hClose h
-
-  clientOptions :: Opts.Parser ClientOptions
-  clientOptions = ClientOptions . fromIntegral <$>
-    Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer))
-
   server :: ServerOptions -> IO ()
-  server opts'@(ServerOptions dir globs globsFromFile globsExcluded outputPath port logLevel editorMode polling noWatch) = do
+  server opts'@(ServerOptions dir globs globsFromFile globsExcluded outputPath srcFile port logLevel editorMode polling noWatch) = do
     when (logLevel == LogDebug || logLevel == LogAll)
       (putText "Parsed Options:" *> print opts')
     maybe (pure ()) setCurrentDirectory dir
@@ -123,11 +98,6 @@ command = Opts.helper <*> subcommands where
     cwd <- getCurrentDirectory
     let fullOutputPath = cwd </> outputPath
 
-    when editorMode
-      (putText "The --editor-mode flag is deprecated and ignored. It's now the default behaviour and the flag will be removed in a future version")
-
-    when polling
-      (putText "The --polling flag is deprecated and ignored. purs ide no longer uses a file system watcher, instead it relies on its clients to notify it about updates and checks timestamps to invalidate itself")
 
     when noWatch
       (putText "The --no-watch flag is deprecated and ignored. purs ide no longer uses a file system watcher, instead it relies on its clients to notify it about updates and checks timestamps to invalidate itself")
@@ -152,12 +122,9 @@ command = Opts.helper <*> subcommands where
         , ideConfiguration = conf
         , ideCacheDbTimestamp = ts
         , query = \q -> SQLite.withConnection (outputPath </> "cache.db")
-             (\conn -> do
-              SQLite.execute_ conn "pragma busy_timeout = 30000;"
-              SQLite.query_ conn $ SQLite.Query q
-              )
+             (\conn -> SQLite.query_ conn $ SQLite.Query q)
         }
-    startServer port env
+    startServer srcFile env
 
   serverOptions :: Opts.Parser ServerOptions
   serverOptions =
@@ -167,6 +134,7 @@ command = Opts.helper <*> subcommands where
       <*> SharedCLI.globInputFile
       <*> many SharedCLI.excludeFiles
       <*> Opts.strOption (Opts.long "output-directory" `mappend` Opts.value "output/")
+      <*> Opts.strOption (Opts.long "file" `mappend` Opts.value "output/")
       <*> (fromIntegral <$>
            Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer)))
       <*> (parseLogLevel <$> Opts.strOption
@@ -186,18 +154,30 @@ command = Opts.helper <*> subcommands where
     "none" -> LogNone
     _ -> LogDefault
 
-startServer :: Network.PortNumber -> IdeEnvironment -> IO ()
-startServer port env = Network.withSocketsDo $ do
-  sock <- listenOnLocalhost port
-  runLogger (confLogLevel (ideConfiguration env)) (runReaderT (forever (loop sock)) env)
+startServer :: FilePath -> IdeEnvironment -> IO ()
+startServer fp'' env = do
+  -- BSL8.putStrLn $ Aeson.encode fp''
+  runLogger (confLogLevel (ideConfiguration env)) (runReaderT (rebuildC fp'') env)
+  -- runLogger (confLogLevel (ideConfiguration env)) (runReaderT (forever (loop sock)) env)
   where
+    rebuildC :: (Ide m, MonadLogger m) => FilePath -> m ()
+    rebuildC fp = do
+     runExceptT $ do
+      result <- handleCommand (RebuildSync fp Nothing (Set.fromList [PO.JS]))
+
+      -- liftIO $ BSL8.putStrLn $ Aeson.encode result 
+       
+      return ()
+
+
+     return ()
+    
     loop :: (Ide m, MonadLogger m) => Network.Socket -> m ()
     loop sock = do
       accepted <- runExceptT (acceptCommand sock)
       case accepted of
         Left err -> $(logError) err
         Right (cmd, h) -> do
-          -- traceM cmd
           case decodeT cmd of
             Right cmd' -> do
               let message duration =

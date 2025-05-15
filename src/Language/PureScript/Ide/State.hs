@@ -19,6 +19,7 @@ module Language.PureScript.Ide.State
   ( getLoadedModulenames
   , getExternFiles
   , getFileState
+  , toIdeDeclarationAnn
   , resetIdeState
   , cacheRebuild
   , cachedRebuild
@@ -30,11 +31,14 @@ module Language.PureScript.Ide.State
   , populateVolatileStateSync
   , populateVolatileStateSTM
   , getOutputDirectory
+  , runQuery
+  , getSqliteFilePath
   , updateCacheTimestamp
   -- for tests
   , resolveOperatorsForModule
   , resolveInstances
   , resolveDataConstructorsForModule
+  , escapeSQL
   ) where
 
 import Protolude hiding (moduleName, unzip)
@@ -56,6 +60,9 @@ import Language.PureScript.Ide.SourceFile (extractAstInformation)
 import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Util (discardAnn, opNameT, properNameT, runLogger)
 import System.Directory (getModificationTime)
+import Database.SQLite.Simple qualified as SQLite
+import Debug.Trace qualified as Debug
+import Data.Text qualified as T
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
@@ -66,6 +73,19 @@ resetIdeState = do
 getOutputDirectory :: Ide m => m FilePath
 getOutputDirectory = do
   confOutputPath . ideConfiguration <$> ask
+
+getSqliteFilePath :: Ide m => m FilePath
+getSqliteFilePath = do
+  sqliteFilePath . ideConfiguration <$> ask
+
+runQuery :: SQLite.FromRow r => Ide m => Text -> m [r]
+runQuery q = do
+  -- Debug.traceM $ show q
+  IdeEnvironment{..} <- ask
+  liftIO $ query q
+
+escapeSQL :: Text -> Text
+escapeSQL = T.replace "'" "''"
 
 getCacheTimestamp :: Ide m => m (Maybe UTCTime)
 getCacheTimestamp = do
@@ -233,6 +253,20 @@ populateVolatileStateSTM ref = do
         & resolveReexports reexportRefs
   setVolatileStateSTM ref (IdeVolatileState (AstData asts) (map reResolved results) rebuildCache)
   pure results
+
+toIdeDeclarationAnn :: P.Module -> ExternsFile -> [IdeDeclarationAnn]
+toIdeDeclarationAnn m e = results
+  where
+  asts = extractAstInformation m
+  (moduleDeclarations, reexportRefs) = convertExterns e
+  results =
+        moduleDeclarations
+        & resolveDataConstructorsForModule
+        & resolveLocationsForModule asts
+        & resolveDocumentationForModule m
+        -- & resolveInstances externs
+        -- & resolveOperators
+        -- & resolveReexports reexportRefs
 
 resolveLocations
   :: ModuleMap (DefinitionSites P.SourceSpan, TypeAnnotations)

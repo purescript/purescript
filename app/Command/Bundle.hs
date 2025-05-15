@@ -1,11 +1,12 @@
 -- | Bundles compiled PureScript modules for the browser.
-module Command.Bundle (command) where
+module Command.Bundle (command, initSqlite) where
 
 import Prelude
 
 import System.Exit (exitFailure)
 import System.IO (stderr, hPutStrLn)
 import Options.Applicative qualified as Opts
+import Language.PureScript.Make.IdeCache (sqliteInit)
 
 app :: IO ()
 app = do
@@ -21,3 +22,9 @@ command :: Opts.Parser (IO ())
 command = run <$> (Opts.helper <*> pure ()) where
   run :: () -> IO ()
   run _ = app
+
+initSqlite :: Opts.Parser (IO ())
+initSqlite = run <$> (Opts.helper <*> pure ()) where
+  run :: () -> IO ()
+  run _ = do
+    sqliteInit "output"

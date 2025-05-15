@@ -15,9 +15,19 @@ import Data.Aeson qualified as Aeson
 import Data.IORef (IORef)
 import Data.Time.Clock (UTCTime)
 import Data.Map.Lazy qualified as M
-import Language.PureScript qualified as P
-import Language.PureScript.Errors.JSON qualified as P
 import Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Types qualified as P
+import Language.PureScript.AST.Operators qualified as P
+import Language.PureScript.AST.SourcePos qualified as P
+import Language.PureScript.Externs qualified as P
+import Language.PureScript.AST.Declarations qualified as P
+import Language.PureScript.Errors qualified as P
+import Language.PureScript.Errors.JSON qualified as P
+import Database.SQLite.Simple qualified as SQLite
+import Codec.Serialise (Serialise)
+import Database.SQLite.Simple.ToField (ToField(..))
+import Database.SQLite.Simple (SQLData(SQLText))
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a
@@ -31,43 +41,43 @@ data IdeDeclaration
   | IdeDeclValueOperator IdeValueOperator
   | IdeDeclTypeOperator IdeTypeOperator
   | IdeDeclModule P.ModuleName
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 data IdeValue = IdeValue
   { _ideValueIdent :: P.Ident
   , _ideValueType :: P.SourceType
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 data IdeType = IdeType
  { _ideTypeName :: P.ProperName 'P.TypeName
  , _ideTypeKind :: P.SourceType
  , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.SourceType)]
- } deriving (Show, Eq, Ord)
+ } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 data IdeTypeSynonym = IdeTypeSynonym
   { _ideSynonymName :: P.ProperName 'P.TypeName
   , _ideSynonymType :: P.SourceType
   , _ideSynonymKind :: P.SourceType
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 data IdeDataConstructor = IdeDataConstructor
   { _ideDtorName :: P.ProperName 'P.ConstructorName
   , _ideDtorTypeName :: P.ProperName 'P.TypeName
   , _ideDtorType :: P.SourceType
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 data IdeTypeClass = IdeTypeClass
   { _ideTCName :: P.ProperName 'P.ClassName
   , _ideTCKind :: P.SourceType
   , _ideTCInstances :: [IdeInstance]
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 data IdeInstance = IdeInstance
   { _ideInstanceModule :: P.ModuleName
   , _ideInstanceName :: P.Ident
   , _ideInstanceTypes :: [P.SourceType]
   , _ideInstanceConstraints :: Maybe [P.SourceConstraint]
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 data IdeValueOperator = IdeValueOperator
   { _ideValueOpName :: P.OpName 'P.ValueOpName
@@ -75,7 +85,7 @@ data IdeValueOperator = IdeValueOperator
   , _ideValueOpPrecedence :: P.Precedence
   , _ideValueOpAssociativity :: P.Associativity
   , _ideValueOpType :: Maybe P.SourceType
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 data IdeTypeOperator = IdeTypeOperator
   { _ideTypeOpName :: P.OpName 'P.TypeOpName
@@ -83,7 +93,7 @@ data IdeTypeOperator = IdeTypeOperator
   , _ideTypeOpPrecedence :: P.Precedence
   , _ideTypeOpAssociativity :: P.Associativity
   , _ideTypeOpKind :: Maybe P.SourceType
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 _IdeDeclValue :: Traversal' IdeDeclaration IdeValue
 _IdeDeclValue f (IdeDeclValue x) = map IdeDeclValue (f x)
@@ -131,7 +141,7 @@ makeLenses ''IdeTypeOperator
 data IdeDeclarationAnn = IdeDeclarationAnn
   { _idaAnnotation :: Annotation
   , _idaDeclaration :: IdeDeclaration
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 data Annotation
   = Annotation
@@ -139,7 +149,7 @@ data Annotation
   , _annExportedFrom :: Maybe P.ModuleName
   , _annTypeAnnotation :: Maybe P.SourceType
   , _annDocumentation :: Maybe Text
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 makeLenses ''Annotation
 makeLenses ''IdeDeclarationAnn
@@ -160,6 +170,7 @@ data IdeLogLevel = LogDebug | LogPerf | LogAll | LogDefault | LogNone
 data IdeConfiguration =
   IdeConfiguration
   { confOutputPath :: FilePath
+  , sqliteFilePath :: FilePath
   , confLogLevel :: IdeLogLevel
   , confGlobs :: [FilePath]
   , confGlobsFromFile :: Maybe FilePath
@@ -171,6 +182,7 @@ data IdeEnvironment =
   { ideStateVar :: TVar IdeState
   , ideConfiguration :: IdeConfiguration
   , ideCacheDbTimestamp :: IORef (Maybe UTCTime)
+  , query :: forall a. SQLite.FromRow a => Text -> IO [a]
   }
 
 type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
@@ -321,6 +333,14 @@ instance FromJSON IdeNamespace where
     "type" -> pure IdeNSType
     "module" -> pure IdeNSModule
     s -> fail ("Unknown namespace: " <> show s)
+
+toText :: IdeNamespace -> Text
+toText IdeNSValue = "value"
+toText IdeNSType = "type"
+toText IdeNSModule = "module"
+
+instance ToField IdeNamespace where
+  toField n = SQLText $ toText n 
 
 -- | A name tagged with a namespace
 data IdeNamespaced = IdeNamespaced IdeNamespace Text

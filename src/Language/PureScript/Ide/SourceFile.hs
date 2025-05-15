@@ -24,11 +24,14 @@ import Protolude
 
 import Control.Parallel.Strategies (withStrategy, parList, rseq)
 import Data.Map qualified as Map
-import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Ide.Error (IdeError)
 import Language.PureScript.Ide.Types (DefinitionSites, IdeNamespace(..), IdeNamespaced(..), TypeAnnotations)
 import Language.PureScript.Ide.Util (ideReadFile)
+import Language.PureScript.AST.Declarations qualified as P
+import Language.PureScript.AST.SourcePos qualified as P
+import Language.PureScript.Names qualified as P
+import Language.PureScript.Types qualified as P
 
 parseModule :: FilePath -> Text -> Either FilePath (FilePath, P.Module)
 parseModule path file =

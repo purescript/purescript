@@ -23,11 +23,18 @@ import Language.PureScript.Ide.Completion (getExactMatches)
 import Language.PureScript.Ide.Error (IdeError(..))
 import Language.PureScript.Ide.Filter (Filter)
 import Language.PureScript.Ide.Imports (Import(..), parseImportsFromFile', prettyPrintImportSection)
-import Language.PureScript.Ide.State (getAllModules)
+import Language.PureScript.Ide.State (getAllModules, runQuery)
 import Language.PureScript.Ide.Prim (idePrimDeclarations)
-import Language.PureScript.Ide.Types (Ide, IdeDeclaration(..), IdeType(..), Match(..), Success(..), _IdeDeclModule, ideDtorName, ideDtorTypeName, ideTCName, ideTypeName, ideTypeOpName, ideValueOpName)
+import Language.PureScript.Ide.Types (Ide, IdeDeclaration(..), IdeType(..), Match(..), Success(..), _IdeDeclModule, ideDtorName, ideDtorTypeName, ideTCName, ideTypeName, ideTypeOpName, ideValueOpName, toText)
 import Language.PureScript.Ide.Util (discardAnn, identifierFromIdeDeclaration)
 import System.IO.UTF8 (writeUTF8FileT)
+import Language.PureScript.Ide.Filter qualified as F
+import Language.PureScript.Names (runModuleName)
+import Language.PureScript.Ide.Filter.Declaration (declarationTypeToText)
+import Codec.Serialise (deserialise)
+import Data.List qualified as List
+import Data.ByteString.Lazy qualified as Lazy
+import Language.PureScript (ModuleName(..))
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
 addImplicitImport
@@ -162,13 +169,38 @@ addImportForIdentifier
   -> Maybe P.ModuleName  -- ^ The optional qualifier under which to import
   -> [Filter] -- ^ Filters to apply before searching for the identifier
   -> m (Either [Match IdeDeclaration] [Text])
-addImportForIdentifier fp ident qual filters = do
-  let addPrim = Map.union idePrimDeclarations
+addImportForIdentifier fp ident qual filters' = do
+  let filters = F.exactFilter ident : filters'
+
+
+  rows :: [(Text, Lazy.ByteString)] <- runQuery $
+    "select module_name, declaration " <>
+    "from ide_declarations where " <>
+    T.intercalate " and " (
+      mapMaybe (\case
+        F.Filter (Left modules) ->
+          Just $ "module_name in (" <> T.intercalate "," (toList modules <&> runModuleName <&> \m -> "'" <> m <> "'") <> ")"
+        F.Filter (Right (F.Prefix f)) -> Just $ "name glob '" <> f <> "*'"
+        F.Filter (Right (F.Exact f)) -> Just $ "name glob '" <> f <> "'"
+        F.Filter (Right (F.Namespace namespaces)) ->
+          Just $ "namespace in (" <> T.intercalate "," (toList namespaces <&> \n -> "'" <> toText n <> "'") <> ")"
+        F.Filter (Right (F.DeclType dt)) ->
+          Just $ "namespace in (" <> T.intercalate "," (toList dt <&> \t -> "'" <> declarationTypeToText t <> "'") <> ")"
+        F.Filter _ -> Nothing)
+      filters)
+  
+  let declarations :: [Match IdeDeclaration] = rows <&> \(m, bs) -> Match (ModuleName m, discardAnn $ deserialise bs)
+
+
+
+      -- getExactMatches ident filters (addPrim modules)
+
+
+  -- let addPrim = Map.union idePrimDeclarations
+
   modules <- getAllModules Nothing
   let
-    matches =
-      getExactMatches ident filters (addPrim modules)
-        & map (fmap discardAnn)
+    matches = declarations 
         & filter (\(Match (_, d)) -> not (has _IdeDeclModule d))
 
   case matches of
