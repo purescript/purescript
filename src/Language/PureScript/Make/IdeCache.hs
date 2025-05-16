@@ -6,8 +6,6 @@ import Language.PureScript.Ide.ToIde (toIdeDeclarationAnn)
 import Database.SQLite.Simple (NamedParam(..))
 import Database.SQLite.Simple qualified as SQLite
 import Codec.Serialise qualified as Serialise
-import Control.Concurrent (threadDelay)
-import Control.Exception (try)
 import System.FilePath ((</>), takeDirectory)
 import Language.PureScript.Names (runModuleName, ProperName (runProperName), runIdent, disqualify, Ident (..), OpName (OpName))
 import Language.PureScript.Externs (ExternsFile(..), ExternsImport(..))
@@ -16,21 +14,13 @@ import Control.Monad.IO.Class (MonadIO (liftIO))
 import System.Directory (createDirectoryIfMissing)
 import Language.PureScript.Externs qualified as P
 import Data.Text qualified as Text
-import Data.Maybe (isNothing, fromMaybe)
-import Language.PureScript.CST.Utils (ProperName(..))
 import Language.PureScript.Docs.Types qualified as Docs
-import Language.PureScript.Ide.Externs (convertExterns)
 import Language.PureScript.Ide.Util (identifierFromIdeDeclaration, discardAnn, namespaceForDeclaration)
-import Data.Function ((&))
-import Data.Bifunctor (first)
 import Data.Text (Text)
-import Language.PureScript.Ide.Types (Annotation(..), idaDeclaration, declarationType, IdeDeclarationAnn (_idaAnnotation), IdeNamespace (IdeNSValue, IdeNSType))
+import Language.PureScript.Ide.Types (Annotation(..), declarationType, IdeDeclarationAnn (_idaAnnotation), IdeNamespace (IdeNSValue, IdeNSType))
 import Language.PureScript.Docs.Types (Declaration(declChildren))
-import Language.PureScript.Docs.Render (renderDeclaration)
-import Language.PureScript.Docs.AsMarkdown (codeToString, declAsMarkdown, runDocs)
+import Language.PureScript.Docs.AsMarkdown (declAsMarkdown, runDocs)
 import Codec.Serialise (serialise)
-import Data.Aeson (encode)
-import Debug.Trace qualified as Debug
 import Language.PureScript.AST.Declarations (Module, Expr (Var), getModuleDeclarations, DeclarationRef (..), ExportSource (..))
 import Language.PureScript.Ide.Filter.Declaration (DeclarationType (..))
 import Data.Aeson qualified as Aeson

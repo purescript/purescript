@@ -53,7 +53,6 @@ import Language.PureScript.Make.Monad as Monad
 import Language.PureScript.CoreFn qualified as CF
 import System.Directory (doesFileExist)
 import System.FilePath (replaceExtension)
-import Debug.Trace qualified as Debug
 
 -- | Rebuild a single module.
 --

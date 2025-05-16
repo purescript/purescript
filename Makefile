@@ -81,7 +81,8 @@ profile:
 	@stack build
 	@cd ../application/purs-projects && \
 		(git diff --quiet && git diff --cached --quiet && git checkout 567cde598728d6a02fd22972c888e5194af383c4 || { echo "❌ dirty working directory on purs-projects, aborting checkout."; exit 1; }) && \
-		spago install && \
+		rm -rf .spago && \
+		spago fetch && \
 	    spago sources > .spago/sources.txt && \
 		rm -rf output
 

@@ -20,7 +20,7 @@ module Language.PureScript.Ide
 
 import Protolude hiding (moduleName)
 
-import qualified Language.PureScript.Ide.Imports as IDEImports
+import Language.PureScript.Ide.Imports qualified as IDEImports
 import "monad-logger" Control.Monad.Logger (MonadLogger, logWarnN)
 import Data.Map qualified as Map
 import Data.Text qualified as T

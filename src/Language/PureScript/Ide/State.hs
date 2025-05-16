@@ -61,7 +61,6 @@ import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Util (discardAnn, opNameT, properNameT, runLogger)
 import System.Directory (getModificationTime)
 import Database.SQLite.Simple qualified as SQLite
-import Debug.Trace qualified as Debug
 import Data.Text qualified as T
 
 -- | Resets all State inside psc-ide
@@ -258,7 +257,7 @@ toIdeDeclarationAnn :: P.Module -> ExternsFile -> [IdeDeclarationAnn]
 toIdeDeclarationAnn m e = results
   where
   asts = extractAstInformation m
-  (moduleDeclarations, reexportRefs) = convertExterns e
+  (moduleDeclarations, _) = convertExterns e
   results =
         moduleDeclarations
         & resolveDataConstructorsForModule
