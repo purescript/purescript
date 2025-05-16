@@ -30,4 +30,4 @@ instance Serialise InternedName where
   decode = fmap internName decode
 
 instance NFData InternedName where
-  rnf (InternedName name) = ()
+  rnf (InternedName _) = ()

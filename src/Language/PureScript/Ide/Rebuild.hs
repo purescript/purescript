@@ -38,9 +38,6 @@ import Unsafe.Coerce (unsafeCoerce)
 import Database.SQLite.Simple (Query(fromQuery), ToRow, SQLData (SQLText))
 import Data.String (String)
 import Codec.Serialise (deserialise)
-import Language.PureScript (ModuleName)
-import Language.PureScript.Constants.Prim (primModules)
-import Data.Foldable (concat)
 
 -- | Given a filepath performs the following steps:
 --
@@ -68,7 +65,7 @@ rebuildFile
   -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
   -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile file actualFile codegenTargets runOpenBuild = do
+rebuildFile file actualFile codegenTargets _ = do
   (fp, input) <-
     case List.stripPrefix "data:" file of
       Just source -> pure ("", Text.pack source)
@@ -249,7 +246,7 @@ sortExterns'
   => FilePath
   -> P.Module
   -> m [P.ExternsFile]
-sortExterns' outputDir m = do 
+sortExterns' _ m = do 
   let P.Module _ _ _ declarations _ = m
   let moduleDependencies = declarations >>= \case
               P.ImportDeclaration _ importName _ _ -> [importName]

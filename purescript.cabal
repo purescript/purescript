@@ -276,7 +276,6 @@ library
     Language.PureScript.CST.Positions
     Language.PureScript.CST.Print
     Language.PureScript.Ide.ToIde
-    Language.PureScript.Ide.ToI
     Language.PureScript.CST.Traversals
     Language.PureScript.CST.Traversals.Type
     Language.PureScript.CST.Types

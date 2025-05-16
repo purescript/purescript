@@ -2,34 +2,25 @@ module Language.PureScript.Ide.ToIde where
 
 import Protolude hiding (moduleName, unzip)
 
-import Control.Concurrent.STM (TVar, modifyTVar, readTVar, readTVarIO, writeTVar)
-import Control.Lens (Ixed(..), preview, view, (%~), (.~), (^.))
-import Data.IORef (readIORef, writeIORef)
+import Control.Lens ((^.))
 import Data.Map.Lazy qualified as Map
-import Data.Time.Clock (UTCTime)
-import Data.Zip (unzip)
 import Language.PureScript.Docs.Convert.Single (convertComments)
-import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
+import Language.PureScript.Externs (ExternsFile(..))
 import Language.PureScript.Ide.Externs (convertExterns)
 import Language.PureScript.Ide.SourceFile (extractAstInformation)
 import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.Util (discardAnn, displayTimeSpec, logPerf, opNameT, properNameT, runLogger)
-import System.Directory (getModificationTime)
-import Database.SQLite.Simple qualified as SQLite
-import Debug.Trace qualified as Debug
+import Language.PureScript.Ide.Util (opNameT, properNameT)
 import Language.PureScript.AST.Declarations (Module (..))
 import Language.PureScript.AST.SourcePos qualified as P
 import Language.PureScript.Names qualified as P
-import Data.Text (Text)
 import Language.PureScript.AST.Declarations qualified as P
 import Language.PureScript.Comments qualified as P
-import Data.Maybe (Maybe)
 
 toIdeDeclarationAnn :: Module -> ExternsFile -> [IdeDeclarationAnn]
 toIdeDeclarationAnn m e = results
   where
   asts = extractAstInformation m
-  (moduleDeclarations, reexportRefs) = convertExterns e
+  (moduleDeclarations, _) = convertExterns e
   results =
         moduleDeclarations
         -- & resolveDataConstructorsForModule
