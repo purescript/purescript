@@ -354,19 +354,21 @@ isEmpty (ExternsDiff _ refs)
 type Tuple4 m a = (m a, m a, m a, m a)
 
 -- | Returns refs as a tuple of four (added, removed, changed, unchanged).
-splitRefs :: Ord r => Eq a => [a] -> [a] -> (a -> Maybe r) -> Tuple4 [] r
+splitRefs :: forall ref a deps. Monoid deps => Ord ref => Eq a => [a] -> [a] -> (a -> Maybe (ref, deps)) -> Tuple4 [] (ref, deps)
 splitRefs new old toRef =
   M.foldrWithKey go (added, [], [], []) oldMap
   where
-    toMap = M.fromList . mapMaybe (((<$>) . flip (,)) <*> toRef)
+    toMap :: [a] -> Map ref (deps, [a])
+    toMap = M.fromListWith (<>) . mapMaybe (\decl -> do (ref, deps) <- toRef decl; pure (ref, (deps, [decl])))
     newMap = toMap new
     oldMap = toMap old
-    added = M.keys $ M.difference newMap oldMap
-    go ref decl (a, r, c, u) = case M.lookup ref newMap of
-      Nothing -> (a, r <> [ref], c, u)
-      Just newDecl
-        | decl /= newDecl -> (a, r, ref : c, u)
-        | otherwise -> (a, r, c, ref : u)
+    added = fmap (\(ref, (deps, _)) -> (ref, deps)) $ M.toList $ M.difference newMap oldMap
+    go :: ref -> (deps, [a]) -> Tuple4 [] (ref, deps) -> Tuple4 [] (ref, deps)
+    go ref (deps, decls) (a, r, c, u) = case M.lookup ref newMap of
+      Nothing -> (a, r <> [(ref, deps)], c, u)
+      Just (_, newDecls)
+        | decls /= newDecls -> (a, r, (ref, deps) : c, u)
+        | otherwise -> (a, r, c, (ref, deps) : u)
 
 -- | Traverses the type and finds all the refs within.
 typeDeps :: P.Type a -> S.Set (ModuleName, Ref)
