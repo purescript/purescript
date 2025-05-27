@@ -163,7 +163,7 @@ common defaults
     aeson-better-errors >=0.9.1.3 && <0.10,
     ansi-terminal >=0.11.3 && <1.1,
     array >=0.5.4.0 && <0.6,
-    intern ==0.9.4,
+    intern,
     base >=4.16.2.0 && <4.19,
     blaze-html >=0.9.1.2 && <0.10,
     bower-json >=1.1.0.0 && <1.2,
@@ -206,7 +206,7 @@ common defaults
     semigroups ==0.20.*,
     serialise >=0.2.5.0 && <0.3,
     sourcemap >=0.1.7 && <0.2,
-    sqlite-simple ==0.4.18.2,
+    sqlite-simple,
     stm >=2.5.0.2 && <2.6,
     stringsearch >=0.3.6.6 && <0.4,
     template-haskell >=2.18.0.0 && <2.21,
@@ -416,7 +416,7 @@ executable purs
   import: defaults
   hs-source-dirs: app
   main-is: Main.hs
-  ghc-options: -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N -Wno-unused-packages -eventlog
+  ghc-options: -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N -Wno-unused-packages
   build-depends:
     prettyprinter >=1.6 && <1.8,
     prettyprinter-ansi-terminal >=1.1.1 && <1.2,
