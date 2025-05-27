@@ -928,10 +928,15 @@ checkKindDeclaration _ ty = do
           pure $ ForAll a' vis v'' k' ty'' sc'
         other -> pure other
 
-  checkValidKind = everywhereOnTypesM $ \case
-    ty'@(ConstrainedType ann _ _) ->
-      throwError . errorMessage' (fst ann) $ UnsupportedTypeInKind ty'
-    other -> pure other
+  checkValidKind =
+    (\case
+        Left err -> throwError err
+        Right v -> pure v
+    ) . everywhereOnTypesM (\case
+         ty'@(ConstrainedType ann _ _) ->
+            throwError . errorMessage' (fst ann) $ UnsupportedTypeInKind ty'
+         other -> pure other
+    )
 
 existingSignatureOrFreshKind
   :: 
