@@ -13,6 +13,7 @@ module Language.PureScript.Externs
   , moduleToExternsFile
   , applyExternsFileToEnvironment
   , externsFileName
+  , currentVersion
   ) where
 
 import Prelude
@@ -93,7 +94,7 @@ data ExternsFixity = ExternsFixity
   , efOperator :: OpName 'ValueOpName
   -- | The value the operator is an alias for
   , efAlias :: Qualified (Either Ident (ProperName 'ConstructorName))
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData)
 
 instance Serialise ExternsFixity
 instance ToJSON ExternsFixity
@@ -110,7 +111,7 @@ data ExternsTypeFixity = ExternsTypeFixity
   , efTypeOperator :: OpName 'TypeOpName
   -- | The value the operator is an alias for
   , efTypeAlias :: Qualified (ProperName 'TypeName)
-  } deriving (Show, Generic, NFData, ToJSON, FromJSON)
+  } deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
 instance Serialise ExternsTypeFixity
 
@@ -163,16 +164,18 @@ data ExternsDeclaration =
       , edInstanceNameSource      :: NameSource
       , edInstanceSourceSpan      :: SourceSpan
       }
-  deriving (Show, Generic, NFData, ToJSON, FromJSON)
+  deriving (Eq, Show, Generic, NFData, ToJSON, FromJSON)
 
 instance Serialise ExternsDeclaration
 
+currentVersion :: String
+currentVersion = showVersion Paths.version
 
 -- | Check whether the version in an externs file matches the currently running
 -- version.
 externsIsCurrentVersion :: ExternsFile -> Bool
 externsIsCurrentVersion ef =
-  T.unpack (efVersion ef) == showVersion Paths.version
+  T.unpack (efVersion ef) == currentVersion
 
 -- | Convert an externs file back into a module
 applyExternsFileToEnvironment :: ExternsFile -> Environment -> Environment
@@ -215,7 +218,7 @@ moduleToExternsFile :: Module -> Environment -> M.Map Ident Ident -> ExternsFile
 moduleToExternsFile (Module _ _ _ _ Nothing) _ _ = internalError "moduleToExternsFile: module exports were not elaborated"
 moduleToExternsFile (Module ss _ mn ds (Just exps)) env renamedIdents = ExternsFile{..}
   where
-  efVersion       = T.pack (showVersion Paths.version)
+  efVersion       = T.pack currentVersion
   efModuleName    = mn
   efExports       = map renameRef exps
   efImports       = mapMaybe importDecl ds

@@ -1,13 +1,15 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 -- | Various constants which refer to things in the Prelude and other core libraries
 module Language.PureScript.Constants.Libs where
 
 import Protolude qualified as P
 
 import Data.String (IsString)
-import Language.PureScript.PSString (PSString)
 import Language.PureScript.Constants.TH qualified as TH
+import Language.PureScript.PSString (PSString)
+import Language.PureScript.Names (Ident (..), Qualified (..), QualifiedBy (..))
 
 -- Core lib values
 
@@ -166,6 +168,7 @@ $(TH.declare do
 
   TH.mod "Data.Symbol" do
     TH.cls "IsSymbol"
+    TH.asIdent do TH.var "IsSymbol"
 
   -- purescript-arrays
 
@@ -261,4 +264,16 @@ $(TH.declare do
   TH.mod "Unsafe.Coerce" do
     TH.asPair do TH.var "unsafeCoerce"
 
+  TH.mod "Type.Proxy" do
+    TH.dty "Proxy" ["Proxy"]
+    TH.asIdent do
+      TH.var "Proxy"
+  TH.mod "Data.Record" do
+    TH.asIdent do
+      TH.var "getField"
+      TH.var "hasFieldRecord"
+      
   )
+
+pattern IsSymbolDict :: Qualified Ident
+pattern IsSymbolDict = Qualified (ByModuleName M_Data_Symbol) (Ident "IsSymbol$Dict")

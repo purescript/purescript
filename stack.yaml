@@ -1,6 +1,6 @@
 # Please update Haskell image versions under .github/workflows/ci.yml together to use the same GHC version
 # (or the CI build will fail)
-resolver: lts-20.26
+resolver: lts-22.43
 pvp-bounds: both
 packages:
 - '.'
@@ -13,20 +13,14 @@ extra-deps:
 # `async` to be used as an object key:
 # https://github.com/erikd/language-javascript/issues/131
 - language-javascript-0.7.0.0
-# Fix issue with libtinfo.
-# See https://github.com/purescript/purescript/issues/4253
-- process-1.6.13.1
-# The Cabal library is not in Stackage
-- Cabal-3.6.3.0
-# hspec versions 2.9.3 to 2.10.6 depend on ghc
-# ghc depends on terminfo by default, but that can be ignored
-# if one uses the '-terminfo' flag.
-# Unfortunately, hspec doesn't expose a similar flag.
-#
-# Using hspec >= 2.10.7 addresses this.
-- hspec-2.10.9
-- hspec-core-2.10.9
-- hspec-discover-2.10.9
+- bower-json-1.1.0.0
+- haskeline-0.8.2
+- these-1.2.1
+- aeson-better-errors-0.9.1.3
+
+- github: purescript/cheapskate
+  commit: 8bfaf4beeb108e97a274ed51303f278905979e87
+
 nix:
   packages:
   - zlib
@@ -37,8 +31,10 @@ nix:
 flags:
   aeson-pretty:
     lib-only: true
-  these:
-    assoc: false
   haskeline:
     # Avoids a libtinfo dynamic library dependency
     terminfo: false
+
+allow-newer: true
+allow-newer-deps:
+- haskeline

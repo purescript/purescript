@@ -9,7 +9,6 @@ module Language.PureScript.CodeGen.JS
 import Prelude
 import Protolude (ordNub)
 
-import Control.Applicative (liftA2)
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)

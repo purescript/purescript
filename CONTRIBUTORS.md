@@ -16,6 +16,7 @@ If you would prefer to use different terms, please use the section below instead
 | :------- | :--- | :------ |
 | [@5outh](https://github.com/5outh) | Benjamin Kovach | [MIT license] |
 | [@actionshrimp](https://github.com/actionshrimp) | David Aitken | [MIT license] |
+| [@ad-si](https://github.com/ad-si) | Adrian Sieber | [MIT license] |
 | [@adnelson](https://github.com/adnelson) | Allen Nelson | [MIT license] |
 | [@alexbiehl](https://github.com/alexbiehl) | Alexander Biehl | [MIT license] |
 | [@andreypopp](https://github.com/andreypopp) | Andrey Popp | [MIT license] |

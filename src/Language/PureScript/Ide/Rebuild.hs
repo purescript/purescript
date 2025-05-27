@@ -38,6 +38,7 @@ import Unsafe.Coerce (unsafeCoerce)
 import Database.SQLite.Simple (Query(fromQuery), ToRow, SQLData (SQLText))
 import Data.String (String)
 import Codec.Serialise (deserialise)
+import System.FilePath (makeRelative)
 
 -- | Given a filepath performs the following steps:
 --
@@ -65,7 +66,8 @@ rebuildFile
   -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
   -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile file actualFile codegenTargets _ = do
+rebuildFile file actualFile codegenTargets runOpenBuild = do
+  currentDir <- liftIO getCurrentDirectory
   (fp, input) <-
     case List.stripPrefix "data:" file of
       Just source -> pure ("", Text.pack source)
