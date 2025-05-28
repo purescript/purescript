@@ -17,6 +17,9 @@ import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName
 import Language.PureScript.PSString (mkString)
 import Language.PureScript.Types (SourceType, Type(..), WildcardData(..), replaceAllTypeVars, srcTypeApp, srcTypeConstructor, srcTypeLevelString)
 import Language.PureScript.TypeChecker (checkNewtype)
+import Data.HashMap.Strict qualified as HM
+import Data.Map qualified as M
+import Data.Map (Map)
 
 -- | Elaborates deriving instance declarations by code generation.
 deriveInstances
@@ -25,7 +28,14 @@ deriveInstances
   => Module
   -> m Module
 deriveInstances (Module ss coms mn ds exts) =
-    Module ss coms mn <$> mapM (deriveInstance mn ds) ds <*> pure exts
+    Module ss coms mn <$> mapM (deriveInstance mn dsMap) ds <*> pure exts
+  where
+  dsMap :: DeclarationMap
+  dsMap = foldl' (\m d -> case d of
+    (DataDeclaration _ _ nm _ _) -> HM.insert nm d m
+    _ -> m) HM.empty ds
+
+type DeclarationMap = HM.HashMap (ProperName 'TypeName) Declaration
 
 -- | Takes a declaration, and if the declaration is a deriving TypeInstanceDeclaration,
 -- elaborates that into an instance declaration via code generation.
@@ -40,7 +50,7 @@ deriveInstance
   :: forall m
    . (MonadError MultipleErrors m, MonadSupply m)
   => ModuleName
-  -> [Declaration]
+  -> DeclarationMap
   -> Declaration
   -> m Declaration
 deriveInstance mn ds decl =
@@ -198,10 +208,6 @@ findTypeDecl
   :: (MonadError MultipleErrors m)
   => SourceSpan
   -> ProperName 'TypeName
-  -> [Declaration]
+  -> DeclarationMap
   -> m Declaration
-findTypeDecl ss tyConNm = note (errorMessage' ss $ CannotFindDerivingType tyConNm) . find isTypeDecl
-  where
-  isTypeDecl :: Declaration -> Bool
-  isTypeDecl (DataDeclaration _ _ nm _ _) = nm == tyConNm
-  isTypeDecl _ = False
+findTypeDecl ss tyConNm = note (errorMessage' ss $ CannotFindDerivingType tyConNm) . HM.lookup tyConNm

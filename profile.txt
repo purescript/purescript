@@ -1,27 +1,27 @@
 'purs' 'compile' '--source-globs-file' '.spago/sources.txt' +RTS '-N' '-A256m' '-n16m' '-sprofile.txt' 
-1,239,641,572,944 bytes allocated in the heap
-  92,117,540,648 bytes copied during GC
-   2,525,848,440 bytes maximum residency (16 sample(s))
-      41,515,920 bytes maximum slop
-            9680 MiB total memory in use (0 MiB lost due to fragmentation)
+1,239,412,052,704 bytes allocated in the heap
+  92,015,777,936 bytes copied during GC
+   2,538,965,264 bytes maximum residency (16 sample(s))
+      41,492,672 bytes maximum slop
+            9607 MiB total memory in use (0 MiB lost due to fragmentation)
 
                                      Tot time (elapsed)  Avg pause  Max pause
-  Gen  0       462 colls,   462 par   98.367s  12.592s     0.0273s    0.1880s
-  Gen  1        16 colls,    15 par   26.135s   3.701s     0.2313s    0.3772s
+  Gen  0       464 colls,   464 par   98.639s  12.205s     0.0263s    0.1521s
+  Gen  1        16 colls,    15 par   27.189s   3.696s     0.2310s    0.4026s
 
-  Parallel GC work balance: 90.30% (serial 0%, perfect 100%)
+  Parallel GC work balance: 91.06% (serial 0%, perfect 100%)
 
-  TASKS: 70 (1 bound, 69 peak workers (69 total), using -N10)
+  TASKS: 68 (1 bound, 66 peak workers (67 total), using -N10)
 
   SPARKS: 7516 (7516 converted, 0 overflowed, 0 dud, 0 GC'd, 0 fizzled)
 
-  INIT    time    0.174s  (  0.173s elapsed)
-  MUT     time  612.239s  (126.344s elapsed)
-  GC      time  124.502s  ( 16.293s elapsed)
-  EXIT    time    0.107s  (  0.009s elapsed)
-  Total   time  737.021s  (142.819s elapsed)
+  INIT    time    0.169s  (  0.168s elapsed)
+  MUT     time  606.333s  (127.778s elapsed)
+  GC      time  125.828s  ( 15.902s elapsed)
+  EXIT    time    0.093s  (  0.001s elapsed)
+  Total   time  732.422s  (143.849s elapsed)
 
-  Alloc rate    2,024,767,533 bytes per MUT second
+  Alloc rate    2,044,112,631 bytes per MUT second
 
-  Productivity  83.1% of total user, 88.5% of total elapsed
+  Productivity  82.8% of total user, 88.8% of total elapsed
 

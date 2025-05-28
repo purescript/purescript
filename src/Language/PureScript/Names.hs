@@ -1,4 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# language DeriveAnyClass #-}
+{-# LANGUAGE DerivingStrategies #-}
 
 -- |
 -- Data types for names
@@ -20,6 +22,7 @@ import Data.Aeson.TH (deriveJSON)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Int (Int64)
+import Data.Hashable (Hashable)
 
 import Language.PureScript.AST.SourcePos (SourcePos, pattern SourcePos)
 
@@ -158,6 +161,7 @@ coerceOpName = OpName . runOpName
 --
 newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: Text }
   deriving (Show, Eq, Ord, Generic)
+  deriving anyclass Hashable
 
 instance NFData (ProperName a)
 instance Serialise (ProperName a)
@@ -176,6 +180,7 @@ data ProperNameType
   | ConstructorName
   | ClassName
   | Namespace
+  deriving (Show, Eq, Ord, Generic, Hashable)
 
 -- |
 -- Coerces a ProperName from one ProperNameType to another. This should be used
