@@ -3,7 +3,6 @@ bin
 dist
 cabal-dev
 .cabal-sandbox
-stack.yaml.lock
 cabal.sandbox.config
 dist-newstyle/
 cabal.project.local*

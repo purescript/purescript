@@ -15,7 +15,8 @@ import Language.PureScript.Docs qualified as D
 import Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import Language.PureScript.Glob (PSCGlobs(..), toInputGlobs, warnFileTypeNotFound)
 import Options.Applicative qualified as Opts
-import Text.PrettyPrint.ANSI.Leijen qualified as PP
+import Prettyprinter qualified as PP
+import Prettyprinter.Render.Terminal (AnsiStyle)
 import SharedCLI qualified
 import System.Directory (getCurrentDirectory, createDirectoryIfMissing, removeFile)
 import System.Exit (exitFailure)
@@ -113,10 +114,10 @@ defaultOutputForFormat fmt =
     Ctags -> "tags"
 
 pscDocsOptions :: Opts.Parser PSCDocsOptions
-pscDocsOptions = 
-  PSCDocsOptions <$> format 
-                 <*> output 
-                 <*> compileOutputDir 
+pscDocsOptions =
+  PSCDocsOptions <$> format
+                 <*> output
+                 <*> compileOutputDir
                  <*> many SharedCLI.inputFile
                  <*> SharedCLI.globInputFile
                  <*> many SharedCLI.excludeFiles
@@ -150,9 +151,9 @@ infoModList :: Opts.InfoMod a
 infoModList = Opts.fullDesc <> footerInfo where
   footerInfo = Opts.footerDoc $ Just examples
 
-examples :: PP.Doc
+examples :: PP.Doc AnsiStyle
 examples =
-  PP.vcat $ map PP.text
+  PP.vcat
     [ "Examples:"
     , "  write documentation for all modules to ./generated-docs:"
     , "    purs docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""

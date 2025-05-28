@@ -18,12 +18,12 @@ import Prelude hiding (interact)
 import Control.Applicative ((<|>), empty)
 import Control.Arrow ((&&&))
 import Control.Monad ((<=<), guard, unless, when)
-import Control.Monad.Error.Class (MonadError, catchError, throwError)
-import Control.Monad.State (MonadState, StateT, get, gets, modify, put)
+import Control.Monad.Error.Class (catchError, throwError)
+import Control.Monad.State (StateT, get, gets, modify, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import Control.Monad.Writer.Strict (MonadWriter, Writer, execWriter, runWriter, runWriterT, tell)
+import Control.Monad.Writer (Writer, execWriter, runWriter, runWriterT, tell, WriterT)
 import Data.Either (partitionEithers)
 import Data.Foldable (fold, foldl', for_, toList)
 import Data.Functor (($>))
@@ -40,7 +40,7 @@ import Language.PureScript.Environment (DataDeclType(..), Environment(..), TypeK
 import Language.PureScript.Errors (DeclarationRef(..), ErrorMessageHint(..), ExportSource, ImportDeclarationType(..), MultipleErrors, SimpleErrorMessage(..), SourceAnn, errorMessage, UnknownsHint(..))
 import Language.PureScript.Names (ModuleName, ProperName, ProperNameType(..), Qualified(..), byMaybeModuleName, toMaybeModuleName)
 import Language.PureScript.TypeChecker.Kinds (elaborateKind, freshKindWithKind, unifyKinds')
-import Language.PureScript.TypeChecker.Monad (CheckState(..))
+import Language.PureScript.TypeChecker.Monad (CheckState(..), TypeCheckM)
 import Language.PureScript.TypeChecker.Roles (lookupRoles)
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
 import Language.PureScript.TypeChecker.Unify (alignRowsWith, freshTypeWithKind, substituteType)
@@ -118,10 +118,8 @@ initialGivenSolverState =
 -- 3c. Otherwise canonicalization can succeed with derived constraints which we
 -- add to the unsolved queue and then go back to 1.
 solveGivens
-  :: MonadError MultipleErrors m
-  => MonadState CheckState m
-  => Environment
-  -> StateT GivenSolverState m ()
+  :: Environment
+  -> StateT GivenSolverState TypeCheckM ()
 solveGivens env = go (0 :: Int) where
   go n = do
     when (n > 1000) . throwError . errorMessage $ PossiblyInfiniteCoercibleInstance
@@ -206,18 +204,15 @@ initialWantedSolverState givens a b =
 -- interact the latter with the former, we would report an insoluble
 -- @Coercible Boolean Char@.
 solveWanteds
-  :: MonadError MultipleErrors m
-  => MonadWriter [ErrorMessageHint] m
-  => MonadState CheckState m
-  => Environment
-  -> StateT WantedSolverState m ()
+  :: Environment
+  -> StateT WantedSolverState CanonM ()
 solveWanteds env = go (0 :: Int) where
   go n = do
     when (n > 1000) . throwError . errorMessage $ PossiblyInfiniteCoercibleInstance
     gets unsolvedWanteds >>= \case
       [] -> pure ()
       wanted : unsolved -> do
-        (k, a, b) <- lift $ unify wanted
+        (k, a, b) <- lift $ lift $ unify wanted
         WantedSolverState{..} <- get
         lift (canon env (Just inertGivens) k a b `catchError` recover (a, b) inertGivens) >>= \case
           Irreducible -> case interact env (a, b) inertGivens of
@@ -271,10 +266,8 @@ solveWanteds env = go (0 :: Int) where
 -- @Coercible (D \@k) (D \@k)@ constraint which could be trivially solved by
 -- reflexivity instead of having to saturate the type constructors.
 unify
-  :: MonadError MultipleErrors m
-  => MonadState CheckState m
-  => (SourceType, SourceType)
-  -> m (SourceType, SourceType, SourceType)
+  :: (SourceType, SourceType)
+  -> TypeCheckM (SourceType, SourceType, SourceType)
 unify (a, b) = do
   let kindOf = sequence . (id &&& elaborateKind) <=< replaceAllTypeSynonyms
   (a', kind) <- kindOf a
@@ -475,18 +468,17 @@ data Canonicalized
   -- necessarily an error, we may make further progress by interacting with
   -- inerts.
 
+type CanonM = WriterT [ErrorMessageHint] TypeCheckM
+
 -- | Canonicalization takes a wanted constraint and try to reduce it to a set of
 -- simpler constraints whose satisfaction will imply the goal.
 canon
-  :: MonadError MultipleErrors m
-  => MonadWriter [ErrorMessageHint] m
-  => MonadState CheckState m
-  => Environment
+  :: Environment
   -> Maybe [(SourceType, SourceType, SourceType)]
   -> SourceType
   -> SourceType
   -> SourceType
-  -> m Canonicalized
+  -> CanonM Canonicalized
 canon env givens k a b =
   maybe (throwError $ insoluble k a b) pure <=< runMaybeT $
         canonRefl a b
@@ -538,10 +530,9 @@ insoluble k a b =
 -- are the same. Since we currently don't support higher-rank arguments in
 -- instance heads, term equality is a sufficient notion of "the same".
 canonRefl
-  :: Monad m
-  => SourceType
+  :: SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonRefl a b =
   guard (a == b) $> Canonicalized mempty
 
@@ -550,12 +541,10 @@ canonRefl a b =
 -- @Coercible (T1 a_0 .. a_n c_0 .. c_m) (T2 b_0 .. b_n c_0 .. c_m)@, where both
 -- arguments are fully saturated with the same unknowns and have kind @Type@.
 canonUnsaturatedHigherKindedType
-  :: MonadError MultipleErrors m
-  => MonadState CheckState m
-  => Environment
+  :: Environment
   -> SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonUnsaturatedHigherKindedType env a b
   | (TypeConstructor _ aTyName, akapps, axs) <- unapplyTypes a
   , (ak, _) <- fromMaybe (internalError "canonUnsaturatedHigherKindedType: type lookup failed") $ M.lookup aTyName (types env)
@@ -564,10 +553,10 @@ canonUnsaturatedHigherKindedType env a b
       ak' <- lift $ do
         let (kvs, ak') = fromMaybe (internalError "canonUnsaturatedHigherKindedType: unkinded forall binder") $ completeBinderList ak
             instantiatedKinds = zipWith (\(_, (kv, _)) k -> (kv, k)) kvs akapps
-        unknownKinds <- traverse (\((ss, _), (kv, k)) -> (kv,) <$> freshKindWithKind ss k) $ drop (length akapps) kvs
+        unknownKinds <- traverse (\((ss, _), (kv, k)) -> (kv,) <$> lift (freshKindWithKind ss k)) $ drop (length akapps) kvs
         pure $ replaceAllTypeVars (instantiatedKinds <> unknownKinds) ak'
       let (aks', _) = unapplyKinds ak'
-      tys <- traverse freshTypeWithKind $ drop (length axs) aks'
+      tys <- traverse (lift . lift . freshTypeWithKind) $ drop (length axs) aks'
       let a' = foldl' srcTypeApp a tys
           b' = foldl' srcTypeApp b tys
       pure . Canonicalized $ S.singleton (a', b')
@@ -578,11 +567,9 @@ canonUnsaturatedHigherKindedType env a b
 -- yield a constraint @Coercible r s@ and constraints on the types for each
 -- label in both rows. Labels exclusive to one row yield a failure.
 canonRow
-  :: MonadError MultipleErrors m
-  => MonadState CheckState m
-  => SourceType
+  :: SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonRow a b
   | RCons{} <- a =
       case alignRowsWith (const (,)) a b of
@@ -591,10 +578,10 @@ canonRow a b
         -- and the unification error thrown when the rows are misaligned should
         -- not mention unknowns.
         (_, (([], u@TUnknown{}), rl2)) -> do
-          k <- elaborateKind u
+          k <- lift $ lift $ elaborateKind u
           throwError $ insoluble k u (rowFromList rl2)
         (_, (rl1, ([], u@TUnknown{}))) -> do
-          k <- elaborateKind u
+          k <- lift $ lift $ elaborateKind u
           throwError $ insoluble k (rowFromList rl1) u
         (deriveds, (([], tail1), ([], tail2))) -> do
           pure . Canonicalized . S.fromList $ (tail1, tail2) : deriveds
@@ -628,11 +615,9 @@ data UnwrapNewtypeError
 -- | Unwraps a newtype and yields its underlying type with the newtype arguments
 -- substituted in (e.g. @N[D/a] = D@ given @newtype N a = N a@ and @data D = D@).
 unwrapNewtype
-  :: MonadState CheckState m
-  => MonadWriter [ErrorMessageHint] m
-  => Environment
+  :: Environment
   -> SourceType
-  -> m (Either UnwrapNewtypeError SourceType)
+  -> CanonM (Either UnwrapNewtypeError SourceType)
 unwrapNewtype env = go (0 :: Int) where
   go n ty = runExceptT $ do
     when (n > 1000) $ throwError CannotUnwrapInfiniteNewtypeChain
@@ -712,14 +697,12 @@ lookupNewtypeConstructorInScope env currentModuleName currentModuleImports quali
 -- | Constraints of the form @Coercible (N a_0 .. a_n) b@ yield a constraint
 -- @Coercible a b@ if unwrapping the newtype yields @a@.
 canonNewtypeLeft
-  :: MonadState CheckState m
-  => MonadWriter [ErrorMessageHint] m
-  => Environment
+  :: Environment
   -> SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonNewtypeLeft env a b =
-  unwrapNewtype env a >>= \case
+  lift (unwrapNewtype env a) >>= \case
     Left CannotUnwrapInfiniteNewtypeChain -> empty
     Left CannotUnwrapConstructor -> empty
     Right a' -> pure . Canonicalized $ S.singleton (a', b)
@@ -727,12 +710,10 @@ canonNewtypeLeft env a b =
 -- | Constraints of the form @Coercible a (N b_0 .. b_n)@ yield a constraint
 -- @Coercible a b@ if unwrapping the newtype yields @b@.
 canonNewtypeRight
-  :: MonadState CheckState m
-  => MonadWriter [ErrorMessageHint] m
-  => Environment
+  :: Environment
   -> SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonNewtypeRight env =
   flip $ canonNewtypeLeft env
 
@@ -750,12 +731,11 @@ canonNewtypeRight env =
 -- We can decompose @Coercible (D a b d) (D a c e)@ into @Coercible b c@, but
 -- decomposing @Coercible (D a c d) (D b c d)@ would fail.
 decompose
-  :: MonadError MultipleErrors m
-  => Environment
+  :: Environment
   -> Qualified (ProperName 'TypeName)
   -> [SourceType]
   -> [SourceType]
-  -> m Canonicalized
+  -> TypeCheckM Canonicalized
 decompose env tyName axs bxs = do
   let roles = lookupRoles env tyName
       f role ax bx = case role of
@@ -779,29 +759,27 @@ decompose env tyName axs bxs = do
 -- | Constraints of the form @Coercible (D a_0 .. a_n) (D b_0 .. b_n)@, where
 -- @D@ is not a newtype, yield constraints on their arguments.
 canonDecomposition
-  :: MonadError MultipleErrors m
-  => Environment
+  :: Environment
   -> SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonDecomposition env a b
   | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
   , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
   , aTyName == bTyName
   , Nothing <- lookupNewtypeConstructor env aTyName [] =
-      decompose env aTyName axs bxs
+      lift $ lift $ decompose env aTyName axs bxs
   | otherwise = empty
 
 -- | Constraints of the form @Coercible (D1 a_0 .. a_n) (D2 b_0 .. b_n)@, where
 -- @D1@ and @D2@ are different type constructors and neither of them are
 -- newtypes, are insoluble.
 canonDecompositionFailure
-  :: MonadError MultipleErrors m
-  => Environment
+  :: Environment
   -> SourceType
   -> SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonDecompositionFailure env k a b
   | (TypeConstructor _ aTyName, _, _) <- unapplyTypes a
   , (TypeConstructor _ bTyName, _, _) <- unapplyTypes b
@@ -845,12 +823,11 @@ canonDecompositionFailure env k a b
 -- @Coercible (Const a a) (Const a b)@ to @Coercible a b@ we would not be able
 -- to discharge it with the given.
 canonNewtypeDecomposition
-  :: MonadError MultipleErrors m
-  => Environment
+  :: Environment
   -> Maybe [(SourceType, SourceType, SourceType)]
   -> SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonNewtypeDecomposition env (Just givens) a b
   | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
   , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
@@ -858,17 +835,16 @@ canonNewtypeDecomposition env (Just givens) a b
   , Just _ <- lookupNewtypeConstructor env aTyName [] = do
       let givensCanDischarge = any (\given -> canDischarge given (a, b)) givens
       guard $ not givensCanDischarge
-      decompose env aTyName axs bxs
+      lift $ lift $ decompose env aTyName axs bxs
 canonNewtypeDecomposition _ _ _ _ = empty
 
 -- | Constraints of the form @Coercible (N1 a_0 .. a_n) (N2 b_0 .. b_n)@, where
 -- @N1@ and @N2@ are different type constructors and either of them is a
 -- newtype whose constructor is out of scope, are irreducible.
 canonNewtypeDecompositionFailure
-  :: Monad m
-  => SourceType
+  :: SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonNewtypeDecompositionFailure a b
   | (TypeConstructor{}, _, _) <- unapplyTypes a
   , (TypeConstructor{}, _, _) <- unapplyTypes b
@@ -890,10 +866,9 @@ canonNewtypeDecompositionFailure a b
 -- repeatedly kick each other out the inert set whereas reordering the latter to
 -- @Coercible a b@ makes it redundant and let us discharge it.
 canonTypeVars
-  :: Monad m
-  => SourceType
+  :: SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonTypeVars a b
   | Skolem _ tv1 _ _ _ <- a
   , Skolem _ tv2 _ _ _ <- b
@@ -905,10 +880,9 @@ canonTypeVars a b
 
 -- | Constraints of the form @Coercible tv ty@ are irreducibles.
 canonTypeVarLeft
-  :: Monad m
-  => SourceType
+  :: SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonTypeVarLeft a _
   | Skolem{} <- a = pure Irreducible
   | otherwise = empty
@@ -917,30 +891,27 @@ canonTypeVarLeft a _
 -- @Coercible tv ty@ to satisfy the canonicality requirement of having the type
 -- variable on the left.
 canonTypeVarRight
-  :: Monad m
-  => SourceType
+  :: SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonTypeVarRight a b
   | Skolem{} <- b = pure . Canonicalized $ S.singleton (b, a)
   | otherwise = empty
 
 -- | Constraints of the form @Coercible (f a_0 .. a_n) b@ are irreducibles.
 canonApplicationLeft
-  :: Monad m
-  => SourceType
+  :: SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonApplicationLeft a _
   | TypeApp{} <- a = pure Irreducible
   | otherwise = empty
 
 -- | Constraints of the form @Coercible a (f b_0 .. b_n) b@ are irreducibles.
 canonApplicationRight
-  :: Monad m
-  => SourceType
+  :: SourceType
   -> SourceType
-  -> MaybeT m Canonicalized
+  -> MaybeT CanonM Canonicalized
 canonApplicationRight _ b
   | TypeApp{} <- b = pure Irreducible
   | otherwise = empty
