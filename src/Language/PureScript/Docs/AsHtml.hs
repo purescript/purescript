@@ -133,8 +133,7 @@ declAsHtml r d@Declaration{..} = do
     h3 ! A.class_ "decl__title clearfix" $ do
       a ! A.class_ "decl__anchor" ! A.href (v declFragment) $ "#"
       H.span $ text declTitle
-      text " " -- prevent browser from treating
-               -- declTitle + linkToSource as one word
+      text "\x200b" -- Zero-width space to allow double-click selection of title
       for_ declSourceSpan (linkToSource r)
 
     H.div ! A.class_ "decl__body" $ do
