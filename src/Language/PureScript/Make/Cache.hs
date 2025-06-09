@@ -4,7 +4,6 @@ module Language.PureScript.Make.Cache
   , CacheDb
   , CacheInfo(..)
   , checkChanged
-  , removeModules
   , normaliseForCache
   , cacheDbIsCurrentVersion
   , toCacheDbVersioned
@@ -25,7 +24,6 @@ import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe)
 import Data.Monoid (All(..))
-import Data.Set (Set)
 import Data.Text (Text, pack, unpack)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.These (These(..))
@@ -77,7 +75,7 @@ data CacheDbVersioned = CacheDbVersioned { cdbVersion :: Text, cdbModules :: Cac
 instance Aeson.FromJSON CacheDbVersioned where
   parseJSON = Aeson.withObject "CacheDb" $ \v ->
     CacheDbVersioned
-      <$> v .: "version"
+      <$> v .:  "version"
       <*> v .: "modules"
 
 instance Aeson.ToJSON CacheDbVersioned where
@@ -105,6 +103,19 @@ newtype CacheInfo = CacheInfo
   { unCacheInfo :: Map FilePath (UTCTime, ContentHash) }
   deriving stock (Show)
   deriving newtype (Eq, Ord, Semigroup, Monoid, Aeson.FromJSON, Aeson.ToJSON)
+
+-- Maps old paths to current by extension.
+-- "Old/Module.purs" => "New/Module.urs"
+mapFilePaths :: Map FilePath b -> Map FilePath a -> Map FilePath a
+mapFilePaths cur =
+  Map.mapKeys $
+    \fp -> if Map.member fp cur then fp else curFp fp
+  where
+    ext = FilePath.takeExtension
+    filterExt fp fp' = ext fp == ext fp'
+    curFp fp = case filter (filterExt fp) (Map.keys cur) of
+        (fp' : _) -> fp'
+        _ -> fp
 
 -- | Given a module name, and a map containing the associated input files
 -- together with current metadata i.e. timestamps and hashes, check whether the
@@ -134,7 +145,11 @@ checkChanged
   -> m (CacheInfo, Bool)
 checkChanged cacheDb mn basePath currentInfo = do
 
-  let dbInfo = unCacheInfo $ fromMaybe mempty (Map.lookup mn cacheDb)
+  -- Replace paths in cachedDb entry with paths from new info to handle module
+  -- file rename/move without recompilation.
+  let dbInfo = mapFilePaths currentInfo
+        $ unCacheInfo $ fromMaybe mempty (Map.lookup mn cacheDb)
+
   (newInfo, isUpToDate) <-
     fmap mconcat $
       for (Map.toList (align dbInfo currentInfo)) $ \(normaliseForCache basePath -> fp, aligned) -> do
@@ -161,11 +176,6 @@ checkChanged cacheDb mn basePath currentInfo = do
             pure (Map.singleton fp (newTimestamp, newHash), All (dbHash == newHash))
 
   pure (CacheInfo newInfo, getAll isUpToDate)
-
--- | Remove any modules from the given set from the cache database; used when
--- they failed to build.
-removeModules :: Set ModuleName -> CacheDb -> CacheDb
-removeModules = flip Map.withoutKeys
 
 -- | 1. Any path that is beneath our current working directory will be
 -- stored as a normalised relative path
