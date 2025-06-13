@@ -11,9 +11,15 @@ import Data.Foldable (foldl')
 import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import Data.Void (Void)
+import Data.Void (Void, absurd)
 import Data.Text qualified as Text
 import Language.PureScript.CST.Types
+
+data PosDelta = PosDelta
+  { posDeltaLines :: {-# UNPACK #-} !Int
+  , posDeltaTabs :: {-# UNPACK #-} !Int
+  , posDeltaColumns :: {-# UNPACK #-} !Int
+  }
 
 advanceToken :: SourcePos -> Token -> SourcePos
 advanceToken pos = applyDelta pos . tokenDelta
@@ -22,77 +28,81 @@ advanceLeading :: SourcePos -> [Comment LineFeed] -> SourcePos
 advanceLeading = foldl' $ \a -> applyDelta a . commentDelta lineDelta
 
 advanceTrailing :: SourcePos -> [Comment Void] -> SourcePos
-advanceTrailing = foldl' $ \a -> applyDelta a . commentDelta (const (0, 0))
+advanceTrailing = foldl' $ \a -> applyDelta a . commentDelta absurd
 
-tokenDelta :: Token -> (Int, Int)
+tokenDelta :: Token -> PosDelta
 tokenDelta = \case
-  TokLeftParen             -> (0, 1)
-  TokRightParen            -> (0, 1)
-  TokLeftBrace             -> (0, 1)
-  TokRightBrace            -> (0, 1)
-  TokLeftSquare            -> (0, 1)
-  TokRightSquare           -> (0, 1)
-  TokLeftArrow ASCII       -> (0, 2)
-  TokLeftArrow Unicode     -> (0, 1)
-  TokRightArrow ASCII      -> (0, 2)
-  TokRightArrow Unicode    -> (0, 1)
-  TokRightFatArrow ASCII   -> (0, 2)
-  TokRightFatArrow Unicode -> (0, 1)
-  TokDoubleColon ASCII     -> (0, 2)
-  TokDoubleColon Unicode   -> (0, 1)
-  TokForall ASCII          -> (0, 6)
-  TokForall Unicode        -> (0, 1)
-  TokEquals                -> (0, 1)
-  TokPipe                  -> (0, 1)
-  TokTick                  -> (0, 1)
-  TokDot                   -> (0, 1)
-  TokComma                 -> (0, 1)
-  TokUnderscore            -> (0, 1)
-  TokBackslash             -> (0, 1)
-  TokLowerName qual name   -> (0, qualDelta qual + Text.length name)
-  TokUpperName qual name   -> (0, qualDelta qual + Text.length name)
-  TokOperator qual sym     -> (0, qualDelta qual + Text.length sym)
-  TokSymbolName qual sym   -> (0, qualDelta qual + Text.length sym + 2)
-  TokSymbolArr Unicode     -> (0, 3)
-  TokSymbolArr ASCII       -> (0, 4)
-  TokHole hole             -> (0, Text.length hole + 1)
-  TokChar raw _            -> (0, Text.length raw + 2)
-  TokInt raw _             -> (0, Text.length raw)
-  TokNumber raw _          -> (0, Text.length raw)
+  TokLeftParen             -> PosDelta 0 0 1
+  TokRightParen            -> PosDelta 0 0 1
+  TokLeftBrace             -> PosDelta 0 0 1
+  TokRightBrace            -> PosDelta 0 0 1
+  TokLeftSquare            -> PosDelta 0 0 1
+  TokRightSquare           -> PosDelta 0 0 1
+  TokLeftArrow ASCII       -> PosDelta 0 0 2
+  TokLeftArrow Unicode     -> PosDelta 0 0 1
+  TokRightArrow ASCII      -> PosDelta 0 0 2
+  TokRightArrow Unicode    -> PosDelta 0 0 1
+  TokRightFatArrow ASCII   -> PosDelta 0 0 2
+  TokRightFatArrow Unicode -> PosDelta 0 0 1
+  TokDoubleColon ASCII     -> PosDelta 0 0 2
+  TokDoubleColon Unicode   -> PosDelta 0 0 1
+  TokForall ASCII          -> PosDelta 0 0 6
+  TokForall Unicode        -> PosDelta 0 0 1
+  TokEquals                -> PosDelta 0 0 1
+  TokPipe                  -> PosDelta 0 0 1
+  TokTick                  -> PosDelta 0 0 1
+  TokDot                   -> PosDelta 0 0 1
+  TokComma                 -> PosDelta 0 0 1
+  TokUnderscore            -> PosDelta 0 0 1
+  TokBackslash             -> PosDelta 0 0 1
+  TokLowerName qual name   -> PosDelta 0 0 (qualDelta qual + Text.length name)
+  TokUpperName qual name   -> PosDelta 0 0 (qualDelta qual + Text.length name)
+  TokOperator qual sym     -> PosDelta 0 0 (qualDelta qual + Text.length sym)
+  TokSymbolName qual sym   -> PosDelta 0 0 (qualDelta qual + Text.length sym + 2)
+  TokSymbolArr Unicode     -> PosDelta 0 0 3
+  TokSymbolArr ASCII       -> PosDelta 0 0 4
+  TokHole hole             -> PosDelta 0 0 (Text.length hole + 1)
+  TokChar raw _            -> PosDelta 0 0 (Text.length raw + 2)
+  TokInt raw _             -> PosDelta 0 0 (Text.length raw)
+  TokNumber raw _          -> PosDelta 0 0 (Text.length raw)
   TokString raw _          -> multiLine 1 $ textDelta raw
   TokRawString raw         -> multiLine 3 $ textDelta raw
-  TokLayoutStart           -> (0, 0)
-  TokLayoutSep             -> (0, 0)
-  TokLayoutEnd             -> (0, 0)
-  TokEof                   -> (0, 0)
+  TokLayoutStart           -> PosDelta 0 0 0
+  TokLayoutSep             -> PosDelta 0 0 0
+  TokLayoutEnd             -> PosDelta 0 0 0
+  TokEof                   -> PosDelta 0 0 0
 
 qualDelta :: [Text] -> Int
 qualDelta = foldr ((+) . (+ 1) . Text.length) 0
 
-multiLine :: Int -> (Int, Int) -> (Int, Int)
-multiLine n (0, c) = (0, c + n + n)
-multiLine n (l, c) = (l, c + n)
+multiLine :: Int -> PosDelta -> PosDelta
+multiLine n (PosDelta 0 0 c) = PosDelta 0 0 (c + n + n)
+multiLine n (PosDelta l i c) = PosDelta l i (c + n)
 
-commentDelta :: (a -> (Int, Int)) -> Comment a -> (Int, Int)
+commentDelta :: (a -> Int -> PosDelta) -> Comment a -> PosDelta
 commentDelta k = \case
   Comment raw -> textDelta raw
-  Space n -> (0, n)
-  Line a -> k a
+  Space n -> PosDelta 0 0 n
+  Line n i -> k n i
 
-lineDelta :: LineFeed -> (Int, Int)
-lineDelta _ = (1, 1)
+lineDelta :: LineFeed -> Int -> PosDelta
+lineDelta _ tabs = PosDelta 1 tabs 1
 
-textDelta :: Text -> (Int, Int)
-textDelta = Text.foldl' go (0, 0)
+textDelta :: Text -> PosDelta
+textDelta = Text.foldl' go (PosDelta 0 0 0)
   where
-  go (!l, !c) = \case
-    '\n' -> (l + 1, 1)
-    _    -> (l, c + 1)
+  go (PosDelta l i c) = \case
+    '\n' -> PosDelta (l + 1) 0 1
+    '\t' -> PosDelta l (i + 1) c
+    _    -> PosDelta l i (c + 1)
 
-applyDelta :: SourcePos -> (Int, Int) -> SourcePos
-applyDelta (SourcePos l c) = \case
-  (0, n) -> SourcePos l (c + n)
-  (k, d) -> SourcePos (l + k) d
+applyDelta :: SourcePos -> PosDelta -> SourcePos
+applyDelta pos delta = case (pos, delta) of
+  (SourcePos l (i, c), PosDelta 0 0 n) -> SourcePos l (i, c + n)
+  (SourcePos l (i, 1), PosDelta 0 t n) -> SourcePos l (i + t, n)
+  -- If we encounter tabs mid-line, treat them as 1 character
+  (SourcePos l (i, c), PosDelta 0 t n) -> SourcePos l (i, c + t + n - 1)
+  (SourcePos l _, PosDelta k t n) -> SourcePos (l + k) (t, n)
 
 sepLast :: Separated a -> a
 sepLast (Separated hd []) = hd
