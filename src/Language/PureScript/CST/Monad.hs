@@ -103,7 +103,7 @@ mkParserError stack toks ty =
     }
   where
   range = case NE.nonEmpty toks of
-    Nothing -> SourceRange (SourcePos 0 0) (SourcePos 0 0)
+    Nothing -> SourceRange (SourcePos 0 (0, 0)) (SourcePos 0 (0, 0))
     Just neToks -> widen
      (tokRange . tokAnn $ NE.head neToks)
      (tokRange . tokAnn $ NE.last neToks)
