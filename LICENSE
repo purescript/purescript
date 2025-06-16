@@ -14,17 +14,16 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 PureScript executables for Linux distributed under the Releases tab of its GitHub
 repository (https://github.com/purescript/purescript) may be statically-linked to
-a version of GMP, licensed under the GPU Lesser General Public License Version 3,
+a version of GMP, licensed under the GNU Lesser General Public License Version 3,
 29 June 2007. 
 
 The full source code of PureScript is available in the aforementioned repository,
 https://github.com/purescript/purescript, allowing you to modify and relink the
 GMP portion if desired.
 
-GMP source code is available at:
-https://gmplib.org/
+GMP source code is available at: https://gmplib.org/
 
-A copy of the LGPL is available below.
+A copy of the LGPL is reproduced below.
 
 PureScript uses the following Haskell library packages. Their license files follow.
 
