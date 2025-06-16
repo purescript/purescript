@@ -274,7 +274,7 @@ jobs:
       - name: Install weeder
         run: |
           ci/fix-home stack --no-terminal --jobs=2 \
-            build --copy-compiler-tool weeder-2.8.0
+            build --copy-compiler-tool weeder-2.9.0
 
       - run: |
           ci/fix-home stack --no-terminal --jobs=2 \
