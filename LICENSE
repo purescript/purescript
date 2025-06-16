@@ -17,8 +17,9 @@ repository (https://github.com/purescript/purescript) may be statically-linked t
 a version of GMP, licensed under the GPU Lesser General Public License Version 3,
 29 June 2007. 
 
-The full source code of PureScript is available in the aforementioned repository:
-https://github.com/purescript/purescript/
+The full source code of PureScript is available in the aforementioned repository,
+https://github.com/purescript/purescript, allowing you to modify and relink the
+GMP portion if desired.
 
 GMP source code is available at:
 https://gmplib.org/
