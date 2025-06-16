@@ -175,7 +175,7 @@ common defaults
     file-embed >=0.0.16.0 && <0.1,
     filepath >=1.4.301.0 && <1.5,
     Glob >=0.10.2 && <0.11,
-    haskeline ==0.8.2,
+    haskeline >=0.8.2.1 && <0.9,
     language-javascript ==0.7.0.0,
     lens >=5.3.4 && <5.4,
     lifted-async >=0.10.2.7 && <0.11,
@@ -395,6 +395,8 @@ library
     Paths_purescript
   autogen-modules:
     Paths_purescript
+  build-tool-depends:
+    happy:happy ==2.0.2
 
 executable purs
   import: defaults
