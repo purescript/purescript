@@ -357,6 +357,9 @@ tyVar = TypeVar nullSourceAnn
 tyForall :: Text -> SourceType -> SourceType -> SourceType
 tyForall var k ty = ForAll nullSourceAnn TypeVarInvisible var (Just k) ty Nothing
 
+tyForall' :: Text -> SourceType -> SourceType
+tyForall' var ty = ForAll nullSourceAnn TypeVarInvisible var Nothing ty Nothing
+
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
 function = TypeApp nullSourceAnn . TypeApp nullSourceAnn tyFunction
@@ -443,7 +446,7 @@ primRowTypes =
 primRowListTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primRowListTypes =
   M.fromList $
-    [ (C.RowList, (kindType -:> kindType, ExternData [Phantom]))
+    [ (C.RowList, (tyForall' "k" $ tyVar "k" -:> kindType, ExternData [Phantom]))
     , (C.RowListCons, (tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRowList (tyVar "k") -:> kindRowList (tyVar "k"), ExternData [Phantom, Phantom, Phantom]))
     , (C.RowListNil, (tyForall "k" kindType $ kindRowList (tyVar "k"), ExternData []))
     ] <> mconcat

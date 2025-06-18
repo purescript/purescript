@@ -90,6 +90,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@LiamGoodacre](https://github.com/LiamGoodacre) | Liam Goodacre | [MIT license] |
 | [@lukerandall](https://github.com/lukerandall) | Luke Randall | [MIT license] |
 | [@lunaris](https://github.com/lunaris) | Will Jones | [MIT license] |
+| [@m-rinaldi](https://github.com/m-rinaldi) | Jorge Rinaldi | [MIT license] |
 | [@marcosh](https://github.com/marcosh) | Marco Perone | [MIT license] |
 | [@matthew-hilty](https://github.com/matthew-hilty) | Matthew Hilty | [MIT license] |
 | [@matthewleon](https://github.com/matthewleon) | Matthew Leon | [MIT license] |
