@@ -232,7 +232,7 @@ jobs:
               esac
               case "$os_static" in
                 true)
-                  bundle_os="${bundle_os}-static";;
+                  bundle_os="${bundle_os}";;
                 *)
                   bundle_os="${bundle_os}-dynamic";; 
               esac;;
