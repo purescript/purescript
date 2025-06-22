@@ -101,7 +101,6 @@ jobs:
         run: |
           apk add github-cli
 
-      - uses: "actions/checkout@v4"
       - uses: "actions/setup-node@v4"
         if: ${{ ! matrix.static }}
         with:
@@ -119,6 +118,8 @@ jobs:
           apk add nodejs npm --update-cache
           mkdir /opt/bin
           ln -s /usr/bin/node /opt/bin/node
+
+      - uses: "actions/checkout@v4"
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
