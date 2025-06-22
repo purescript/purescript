@@ -141,7 +141,7 @@ jobs:
           path: |
             /root/.stack
             ${{ steps.haskell.outputs.stack-root }}
-          key: "${{ matrix.image || runner.os }}-v2-${{ hashFiles('stack.yaml.lock', 'purescript.cabal') }}"
+          key: "${{ matrix.image || runner.os }}-v3-${{ hashFiles('stack.yaml.lock', 'purescript.cabal') }}"
 
       - name: "(Windows only) Configure Stack to store its programs in STACK_ROOT"
         # This ensures that the local GHC and MSYS binaries that Stack installs
