@@ -76,8 +76,8 @@ jobs:
     container:
       image: "${{ matrix.image }}"
       volumes:
-        - "${{ contains(matrix.os, 'arm') && '/opt:/opt:rw,rshared' || ' ' }}"
-        - "${{ contains(matrix.os, 'arm') && '/opt:/__e/node20:ro,rshared' || ' ' }}"
+        - "${{ contains(matrix.os, 'arm') && matrix.static && '/opt:/opt:rw,rshared' || ' ' }}"
+        - "${{ contains(matrix.os, 'arm') && matrix.static && '/opt:/__e/node20:ro,rshared' || ' ' }}"
     env:
       CI_STATIC: "${{ matrix.static }}"
 
