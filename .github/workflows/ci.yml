@@ -34,7 +34,6 @@ env:
   CI_PRERELEASE: "${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}"
   CI_RELEASE: "${{ github.event_name == 'release' }}"
   STACK_VERSION: "3.3.1"
-  CI_STATIC: "true"
 
 concurrency:
   # We never want two prereleases building at the same time, since they would
@@ -73,6 +72,8 @@ jobs:
       volumes:
         - "${{ contains(matrix.os, 'arm') && '/opt:/opt:rw,rshared' || ' ' }}"
         - "${{ contains(matrix.os, 'arm') && '/opt:/__e/node20:ro,rshared' || ' ' }}"
+    env:
+      CI_STATIC: "${{ startsWith(matrix.os, 'ubuntu') }}"
 
     outputs:
       do-not-prerelease: "${{ steps.build.outputs.do-not-prerelease }}"
