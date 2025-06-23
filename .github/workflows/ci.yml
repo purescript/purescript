@@ -80,16 +80,17 @@ jobs:
     steps:
       # We need `gh` installed on the Linux version. Otherwise, release artifacts won't be uploaded.
       - name: "(Linux only) Install gh"
+        if: "${{ startsWith(matrix.os, 'ubuntu') }}"
         run: |
           apk add github-cli
 
       - name: "(Linux only / x64) Install Node"
-        if: "${{ ! contains(matrix.os, 'arm') }}"
+        if: "${{ startsWith(matrix.os, 'ubuntu') && ! contains(matrix.os, 'arm') }}"
         run: |
           apk add nodejs npm
 
       - name: "(Linux only / arm64) Install Node"
-        if: "${{ contains(matrix.os, 'arm') }}"
+        if: "${{ startsWith(matrix.os, 'ubuntu') && contains(matrix.os, 'arm') }}"
         run: |
           sed -i "/^ID=/s/alpine/NotpineForGHA/" /etc/os-release
           apk add nodejs npm --update-cache
@@ -109,7 +110,7 @@ jobs:
           stack-no-global: true
 
       - name: "(Linux only) Fix working directory ownership"
-        if: ${{ startsWith(matrix.os, 'ubuntu') }}
+        if: "${{ startsWith(matrix.os, 'ubuntu') }}"
         run: |
           chown root:root .
 
@@ -130,6 +131,7 @@ jobs:
           echo "local-programs-path: $STACK_ROOT/programs" > $STACK_ROOT/config.yaml
 
       - name: "(Linux only) Configure Stack"
+        if: "${{ startsWith(matrix.os, 'ubuntu') }}"
         run: |
           ci/fix-home stack config set system-ghc --global true
           ci/fix-home stack config set install-ghc --global false
