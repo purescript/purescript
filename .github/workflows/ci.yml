@@ -54,19 +54,11 @@ jobs:
       fail-fast: false # do not cancel builds for other OSes if one fails
       matrix:
         include:
-          - image: haskell:9.8.4  # Also upgrade version in the lint job below
-            os: ubuntu-latest  # Exact version is not important, as it's only the container host)
-
-          - image: haskell:9.8.4
-            os: ubuntu-24.04-arm  # Exact version is not important, as it's only the container host
-
           - image: quay.io/benz0li/ghc-musl:9.8.4
             os: ubuntu-latest
-            static: true
 
           - image: quay.io/benz0li/ghc-musl:9.8.4
             os: ubuntu-24.04-arm 
-            static: true
 
           - os: macos-13  # x64
           - os: macos-14  # arm64
@@ -75,44 +67,29 @@ jobs:
     runs-on: "${{ matrix.os }}"
     container:
       image: "${{ matrix.image }}"
+      # https://github.com/actions/runner/issues/801#issuecomment-2976165281
+      # This workaround also requires a special installation step for Node.js on arm64
       volumes:
-        - "${{ contains(matrix.os, 'arm') && matrix.static && '/opt:/opt:rw,rshared' || ' ' }}"
-        - "${{ contains(matrix.os, 'arm') && matrix.static && '/opt:/__e/node20:ro,rshared' || ' ' }}"
-    env:
-      CI_STATIC: "${{ matrix.static }}"
+        - "${{ contains(matrix.os, 'arm') && '/opt:/opt:rw,rshared' || ' ' }}"
+        - "${{ contains(matrix.os, 'arm') && '/opt:/__e/node20:ro,rshared' || ' ' }}"
 
     outputs:
       do-not-prerelease: "${{ steps.build.outputs.do-not-prerelease }}"
       version: "${{ steps.build.outputs.version }}"
 
     steps:
-      - # We need `gh` installed on the Linux version. Otherwise, release artifacts won't be uploaded.
-        name: "(Linux only) Install gh"
-        if: startsWith(matrix.image, 'haskell')
-        run: |
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          apt-get update
-          apt-get install -y gh
-
-      - name: "(Alpine only) Install gh"
-        if: ${{ matrix.static }}
+      # We need `gh` installed on the Linux version. Otherwise, release artifacts won't be uploaded.
+      - name: "(Linux only) Install gh"
         run: |
           apk add github-cli
 
-      - uses: "actions/setup-node@v4"
-        if: ${{ ! matrix.static }}
-        with:
-          node-version: "22"
-
-      - name: "(Alpine x64) Install Node"
-        if: "${{ ! contains(matrix.os, 'arm') && matrix.static }}"
+      - name: "(Linux only / x64) Install Node"
+        if: "${{ ! contains(matrix.os, 'arm') }}"
         run: |
           apk add nodejs npm
 
-      - name: "(Alpine ARM) Install Node"
-        if: "${{ contains(matrix.os, 'arm') && matrix.static }}"
+      - name: "(Linux only / arm64) Install Node"
+        if: "${{ contains(matrix.os, 'arm') }}"
         run: |
           sed -i "/^ID=/s/alpine/NotpineForGHA/" /etc/os-release
           apk add nodejs npm --update-cache
@@ -132,7 +109,7 @@ jobs:
           stack-no-global: true
 
       - name: "(Linux only) Fix working directory ownership"
-        if: ${{ startsWith(matrix.image, 'haskell') || matrix.static }}
+        if: ${{ startsWith(matrix.os, 'ubuntu') }}
         run: |
           chown root:root .
 
@@ -152,8 +129,7 @@ jobs:
           mkdir -p "$STACK_ROOT"
           echo "local-programs-path: $STACK_ROOT/programs" > $STACK_ROOT/config.yaml
 
-      - name: "(Alpine only) Configure Stack"
-        if: ${{ matrix.static }}
+      - name: "(Linux only) Configure Stack"
         run: |
           ci/fix-home stack config set system-ghc --global true
           ci/fix-home stack config set install-ghc --global false
@@ -162,23 +138,14 @@ jobs:
         run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Glob tests"
-        if: ${{ startsWith(matrix.image, 'haskell') }}
         working-directory: "sdist-test"
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual glob checks happen in a temporary directory.
-        run: |
-          apt-get install -y tree
-          ../ci/fix-home stack exec bash ../glob-test.sh
-
-      - name: "(Alpine only) Glob tests"
-        if: ${{ matrix.static }}
-        working-directory: "sdist-test"
         run: |
           apk add tree
           ../ci/fix-home stack exec bash ../glob-test.sh
 
       - name: "(Linux only) Build the entire package set"
-        if: ${{ startsWith(matrix.image, 'haskell') }}
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual package-set building happens in a
         # temporary directory.
@@ -191,18 +158,11 @@ jobs:
         # Moreover, npm has a hook issue that will cause spago to fail to install
         # We upgrade npm to fix this
         run: |
-          apt-get install -y jq
-          ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
-
-      - name: "(Alpine only) Build the entire package set"
-        if: ${{ matrix.static }}
-        working-directory: "sdist-test"
-        run: |
           apk add jq
           ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
 
       - name: Verify that 'libtinfo' isn't in binary
-        if: ${{ runner.os == 'Linux' && matrix.static }}
+        if: ${{ runner.os == 'Linux' }}
         working-directory: "sdist-test"
         run: |
           if [ $(ldd $(../ci/fix-home stack path --local-doc-root)/../bin/purs | grep 'libtinfo' | wc -l) -ge 1 ]; then
@@ -211,8 +171,7 @@ jobs:
             exit 1
           fi
 
-      - name: "(Alpine only) Install perl-utils"
-        if: ${{ matrix.static }}
+      - name: "(Linux only) Install perl-utils"
         run: |
           apk add perl-utils
         
@@ -221,7 +180,6 @@ jobs:
         run: |
           os_name="${{ runner.os }}"
           os_arch="${{ runner.arch }}"
-          os_static="${{ matrix.static }}"
           case "$os_name" in
             Linux)
               case "$os_arch" in
@@ -229,12 +187,6 @@ jobs:
                   bundle_os=linux-arm64;;
                 *)
                   bundle_os=linux64;;
-              esac
-              case "$os_static" in
-                true)
-                  bundle_os="${bundle_os}";;
-                *)
-                  bundle_os="${bundle_os}-dynamic";; 
               esac;;
             macOS)
               case "$os_arch" in
