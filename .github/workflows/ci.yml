@@ -142,6 +142,7 @@ jobs:
         run: "ci/fix-home ci/build.sh"
 
       - name: "(Linux only) Glob tests"
+        if: "${{ startsWith(matrix.os, 'ubuntu') }}"
         working-directory: "sdist-test"
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual glob checks happen in a temporary directory.
@@ -150,6 +151,7 @@ jobs:
           ../ci/fix-home stack exec bash ../glob-test.sh
 
       - name: "(Linux only) Build the entire package set"
+        if: "${{ startsWith(matrix.os, 'ubuntu') }}"
         # We build in this directory in build.sh, so this is where we need to
         # launch `stack exec`. The actual package-set building happens in a
         # temporary directory.
@@ -176,6 +178,7 @@ jobs:
           fi
 
       - name: "(Linux only) Install perl-utils"
+        if: "${{ startsWith(matrix.os, 'ubuntu') }}"
         run: |
           apk add perl-utils
         
