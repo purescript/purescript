@@ -171,6 +171,7 @@ module Language.PureScript.CST.Layout where
 
 import Prelude
 
+import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Data.DList (snoc)
 import Data.DList qualified as DList
@@ -204,7 +205,7 @@ data LayoutDelim
   | LytOf
   | LytDo
   | LytAdo
-  deriving (Show, Eq, Ord, Generic, NFData)
+  deriving (Show, Eq, Ord, Generic, NFData, Serialise)
 
 isIndented :: LayoutDelim -> Bool
 isIndented = \case

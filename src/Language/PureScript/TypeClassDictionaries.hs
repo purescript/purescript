@@ -3,6 +3,7 @@ module Language.PureScript.TypeClassDictionaries where
 import Prelude
 
 import GHC.Generics (Generic)
+import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Data.Text (Text, pack)
 
@@ -40,6 +41,7 @@ data TypeClassDictionaryInScope v
     deriving (Show, Functor, Foldable, Traversable, Generic)
 
 instance NFData v => NFData (TypeClassDictionaryInScope v)
+instance Serialise v => Serialise (TypeClassDictionaryInScope v)
 
 type NamedDict = TypeClassDictionaryInScope (Qualified Ident)
 

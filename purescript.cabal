@@ -335,6 +335,7 @@ library
     Language.PureScript.Make.Actions
     Language.PureScript.Make.BuildPlan
     Language.PureScript.Make.Cache
+    Language.PureScript.Make.ExternsDiff
     Language.PureScript.Make.Monad
     Language.PureScript.ModuleDependencies
     Language.PureScript.Names

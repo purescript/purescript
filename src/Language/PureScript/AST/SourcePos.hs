@@ -116,3 +116,6 @@ widenSourceSpan (SourceSpan n1 s1 e1) (SourceSpan n2 s2 e2) =
 
 widenSourceAnn :: SourceAnn -> SourceAnn -> SourceAnn
 widenSourceAnn (s1, _) (s2, _) = (widenSourceSpan s1 s2, [])
+
+replaceSpanName :: String -> SourceSpan -> SourceSpan
+replaceSpanName name (SourceSpan _ sps spe) = SourceSpan name sps spe

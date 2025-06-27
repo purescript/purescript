@@ -16,12 +16,13 @@ import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
 import Language.PureScript.Glob (toInputGlobs, PSCGlobs(..), warnFileTypeNotFound)
-import Language.PureScript.Make (buildMakeActions, inferForeignModules, runMake)
+import Language.PureScript.Make (buildMakeActions, inferForeignModules, progressWithFile, printProgress, runMake)
 import Options.Applicative qualified as Opts
 import SharedCLI qualified
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitSuccess, exitFailure)
-import System.Directory (getCurrentDirectory)
+import System.FilePath ((</>))
+import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
 import System.IO (hPutStr, stderr, stdout)
 import System.IO.UTF8 (readUTF8FilesT)
 
@@ -68,12 +69,19 @@ compile PSCMakeOptions{..} = do
                              ]
     exitFailure
   moduleFiles <- readUTF8FilesT input
+
+  _ <- createDirectoryIfMissing True pscmOutputDir
+  let logFile = pscmOutputDir </> "compile.log"
+  let cleanFile = True
+
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
     ms <- CST.parseModulesFromFiles id moduleFiles
     let filePathMap = M.fromList $ map (\(fp, pm) -> (P.getModuleName $ CST.resPartial pm, Right fp)) ms
     foreigns <- inferForeignModules filePathMap
-    let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
-    P.make makeActions (map snd ms)
+    logProgress <- progressWithFile logFile cleanFile
+    let makeActions = (buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix)
+            { P.progress = (*>) <$> printProgress <*> logProgress }
+    P.make_ makeActions (map snd ms)
   printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors moduleFiles makeWarnings makeErrors
   exitSuccess
 
