@@ -18,6 +18,7 @@ import Data.Map.Lazy qualified as M
 import Language.PureScript qualified as P
 import Language.PureScript.Errors.JSON qualified as P
 import Language.PureScript.Ide.Filter.Declaration (DeclarationType(..))
+import Control.Monad.Trans.Control (MonadBaseControl)
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a
@@ -173,7 +174,7 @@ data IdeEnvironment =
   , ideCacheDbTimestamp :: IORef (Maybe UTCTime)
   }
 
-type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
+type Ide m = (MonadIO m, MonadBaseControl IO m, MonadReader IdeEnvironment m)
 
 data IdeState = IdeState
   { ideFileState :: IdeFileState
