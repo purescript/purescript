@@ -2,6 +2,9 @@ packages:
   purescript.cabal
 
 source-repository-package
-   type: git
-   location: https://github.com/purescript/cheapskate.git
-   tag: 633c69024e061ad956f1aecfc137fb99a7a7a20b
+  type: git
+  location: https://github.com/purescript/cheapskate.git
+  tag: 633c69024e061ad956f1aecfc137fb99a7a7a20b
+
+package purescript
+  ghc-options: -fspecialize-aggressively -fexpose-all-unfoldings
