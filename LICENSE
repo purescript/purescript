@@ -94,7 +94,6 @@ PureScript uses the following Haskell library packages. Their license files foll
   ghc-prim
   half
   happy
-  happy-lib
   hashable
   haskeline
   indexed-traversable
