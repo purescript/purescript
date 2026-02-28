@@ -16,7 +16,7 @@ export PATH="$tmpdir/node_modules/.bin:$PATH"
 cd "$tmpdir"
 
 echo ::group::Ensure Spago is available
-which spago || npm install spago@0.93.43
+which spago || npm install spago
 echo ::endgroup::
 
 echo ::group::Create dummy project
