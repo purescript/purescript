@@ -487,6 +487,8 @@ test-suite tests
     TestSourceMaps
     TestUtils
     Paths_purescript
+  autogen-modules:
+    Paths_purescript
 
 flag static
   description: Builds a statically-linked version of the PureScript compiler.
