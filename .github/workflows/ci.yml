@@ -60,7 +60,7 @@ jobs:
           - image: quay.io/benz0li/ghc-musl:9.8.4
             os: ubuntu-24.04-arm 
 
-          - os: macos-13  # x64
+          - os: macos-15  # arm64
           - os: macos-14  # arm64
           - os: windows-2022  # x64
 
