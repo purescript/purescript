@@ -164,7 +164,7 @@ jobs:
         # Moreover, npm has a hook issue that will cause spago to fail to install
         # We upgrade npm to fix this
         run: |
-          apk add jq
+          apk add jq coreutils
           ../ci/fix-home stack --haddock exec ../ci/build-package-set.sh
 
       - name: Verify that 'libtinfo' isn't in binary
