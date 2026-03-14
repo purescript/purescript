@@ -79,6 +79,7 @@ depsNamesAndVersions = do
     name == "purescript"
     || name == "rts"
     || name == "ghc-boot-th"
+    || name == "happy-lib"
 
   parse line =
     case splitOn " " line of
