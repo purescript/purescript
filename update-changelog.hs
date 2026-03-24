@@ -25,7 +25,8 @@
   , RecordWildCards
   , TupleSections
   , ViewPatterns
-#-}
+ #-} -- Hlint requires this leading space
+
 -- |
 -- This script updates CHANGELOG.md with the contents of CHANGELOG.d, and
 -- empties CHANGELOG.d. It takes care of:

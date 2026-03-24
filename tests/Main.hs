@@ -12,6 +12,7 @@ import TestCoreFn qualified
 import TestCst qualified
 import TestDocs qualified
 import TestHierarchy qualified
+import TestInteractive qualified
 import TestPrimDocs qualified
 import TestPsci qualified
 import TestIde qualified
@@ -40,6 +41,7 @@ main = do
       describe "sourcemaps" TestSourceMaps.spec
     describe "make" TestMake.spec
     describe "psci" TestPsci.spec
+    describe "interactive" TestInteractive.spec
     describe "corefn" TestCoreFn.spec
     describe "docs" TestDocs.spec
     describe "prim-docs" TestPrimDocs.spec

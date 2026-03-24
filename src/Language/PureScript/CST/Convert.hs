@@ -16,6 +16,7 @@ module Language.PureScript.CST.Convert
   ) where
 
 import Prelude hiding (take)
+import Protolude (headDef)
 
 import Data.Bifunctor (bimap, first)
 import Data.Char (toLower)
@@ -446,7 +447,7 @@ convertDeclaration :: String -> Declaration a -> [AST.Declaration]
 convertDeclaration fileName decl = case decl of
   DeclData _ (DataHead _ a vars) bd -> do
     let
-      ctrs :: SourceToken -> DataCtor a -> [(SourceToken, DataCtor a)] -> [AST.DataConstructorDeclaration]
+      ctrs :: SourceToken -> DataCtor b -> [(SourceToken, DataCtor b)] -> [AST.DataConstructorDeclaration]
       ctrs st (DataCtor _ name fields) tl
         = AST.DataConstructorDeclaration (sourceAnnCommented fileName st (nameTok name)) (nameValue name) (zip ctrFields $ convertType fileName <$> fields)
         : (case tl of
@@ -460,7 +461,7 @@ convertDeclaration fileName decl = case decl of
       (goTypeVar <$> vars)
       (convertType fileName bd)
   DeclNewtype _ (DataHead _ a vars) st x ys -> do
-    let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(head ctrFields, convertType fileName ys)]]
+    let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(headDef (internalError "No constructor name") ctrFields, convertType fileName ys)]]
     pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let

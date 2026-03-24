@@ -5,7 +5,7 @@ module Language.PureScript.Linter.Imports
   ) where
 
 import Prelude
-import Protolude (ordNub)
+import Protolude (ordNub, tailDef, headDef)
 
 import Control.Monad (join, unless, foldM, (<=<))
 import Control.Monad.Writer.Class (MonadWriter(..))
@@ -91,7 +91,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
     let unwarned = imps \\ warned
         duplicates
           = join
-          . map tail
+          . map (tailDef $ internalError "lintImports: duplicates")
           . filter ((> 1) . length)
           . groupBy ((==) `on` defQual)
           . sortOn defQual
@@ -195,7 +195,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
             Just (Qualified _ name) -> Just (k, Qualified mnq (toName name))
             _ -> Nothing
       | isQualifiedWith k q =
-          case importName (head is) of
+          case importName (headDef (internalError "extractByQual: empty import list") is) of
             Qualified (ByModuleName mn') name -> Just (mn', Qualified mnq (toName name))
             _ -> internalError "unqualified name in extractByQual"
     go _ = Nothing

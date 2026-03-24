@@ -4,6 +4,7 @@ package = purescript
 exe_target = purs
 stack_yaml = STACK_YAML="stack.yaml"
 stack = $(stack_yaml) stack
+stack_dir = .stack-work
 
 .DEFAULT_GOAL := help
 
@@ -14,6 +15,10 @@ $(bin_dir)/hlint: ci/install-hlint.sh
 clean: ## Remove build artifacts
 	rm -fr $(bin_dir)
 	rm -fr $(build_dir)
+	rm -fr $(stack_dir)
+	rm -fr dist-newstyle
+	rm -fr .psci_modules
+	rm -fr .test_modules
 
 help: ## Print documentation
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

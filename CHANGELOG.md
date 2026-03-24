@@ -2,6 +2,40 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.16
+
+Bugfixes:
+
+* Fix compiler crash when a type operator is used in a type argument (#4536 by @purefunctor)
+
+* Speed up IDE performance on large projects (#4546 by @roryc89)
+
+* Fix double click select of titles in generated documentation (#4579 by @ad-si)
+
+Other improvements:
+
+* Update Stackage snapshot to lts-20.26 and GHC to 9.2.8 (#4537 by @purefunctor)
+
+* Enable statically-linked binaries using [ghc-musl](https://github.com/benz0li/ghc-musl) (#4573 by @purefunctor)
+* Update haskeline version bounds to >=0.8.2.1 && <0.9
+
+  Consequently, this fixes Cabal-based builds on GHC 9.8.4
+
+Internal:
+
+* Remove the step that upgraded Git from the CI workflow (#4541 by @rhendric)
+
+* Upgrade GHC to [`9.6.6`](https://downloads.haskell.org/~ghc/9.6.6/docs/users_guide/9.6.6-notes.html), Stackage LTS `22.43` (#4568 by @ad-si)
+* Minimum required glibc version is bumped from [`2.28` to `2.31`](https://sourceware.org/glibc/wiki/Glibc%20Timeline)
+
+* Upgrade GHC to [`9.8.4`](https://downloads.haskell.org/~ghc/9.8.4/docs/users_guide/9.8.4-notes.html), Stackage LTS `23.18` (#4574 by @ad-si)
+* Use [HLint 3.10](https://github.com/ndmitchell/hlint/blob/master/CHANGES.txt) in CI
+
+* Update weeder version in CI to 2.9.0 (#4573 by @purefunctor)
+* Add happy ==2.0.2 as build-tool-depends
+
+* Use `-fspecialize-aggressively` GHC option to improve compiler performance by ~30% on large builds (#4584 by @seastian)
+
 ## 0.15.15
 
 New features:

@@ -47,6 +47,7 @@ main = do
   putStrLn ""
   manager <- newManager tlsManagerSettings
   results <- traverse (\d -> (d,) <$> depsLicense manager d) deps
+  echoLgpl
   let failures = filter (not . snd) results
   if not (null failures)
     then do
@@ -63,6 +64,10 @@ echoHeader :: IO ()
 echoHeader =
   readFile "license-generator/header.txt" >>= putStr
 
+echoLgpl :: IO ()
+echoLgpl = 
+  readFile "license-generator/lgpl.txt" >>= putStr
+
 depsNamesAndVersions :: IO [(String, String)]
 depsNamesAndVersions = do
   contents <- lines <$> getContents
@@ -74,6 +79,7 @@ depsNamesAndVersions = do
     name == "purescript"
     || name == "rts"
     || name == "ghc-boot-th"
+    || name == "happy-lib"
 
   parse line =
     case splitOn " " line of

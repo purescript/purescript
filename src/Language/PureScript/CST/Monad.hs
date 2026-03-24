@@ -102,9 +102,11 @@ mkParserError stack toks ty =
     , errType = ty
     }
   where
-  range = case toks of
-    [] -> SourceRange (SourcePos 0 0) (SourcePos 0 0)
-    _  -> widen (tokRange . tokAnn $ head toks) (tokRange . tokAnn $ last toks)
+  range = case NE.nonEmpty toks of
+    Nothing -> SourceRange (SourcePos 0 0) (SourcePos 0 0)
+    Just neToks -> widen
+     (tokRange . tokAnn $ NE.head neToks)
+     (tokRange . tokAnn $ NE.last neToks)
 
 addFailure :: [SourceToken] -> ParserErrorType -> Parser ()
 addFailure toks ty = Parser $ \st _ ksucc ->

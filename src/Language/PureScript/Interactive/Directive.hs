@@ -8,6 +8,8 @@ import Prelude
 import Data.Maybe (fromJust)
 import Data.List (isPrefixOf)
 import Data.Tuple (swap)
+import Data.List.NonEmpty (NonEmpty(..))
+import Data.List.NonEmpty qualified as NEL
 
 import Language.PureScript.Interactive.Types (Directive(..))
 
@@ -15,40 +17,40 @@ import Language.PureScript.Interactive.Types (Directive(..))
 -- A mapping of directives to the different strings that can be used to invoke
 -- them.
 --
-directiveStrings :: [(Directive, [String])]
+directiveStrings :: [(Directive, NonEmpty String)]
 directiveStrings =
-    [ (Help      , ["?", "help"])
-    , (Quit      , ["quit"])
-    , (Reload    , ["reload"])
-    , (Clear     , ["clear"])
-    , (Browse    , ["browse"])
-    , (Type      , ["type"])
-    , (Kind      , ["kind"])
-    , (Show      , ["show"])
-    , (Paste     , ["paste"])
-    , (Complete  , ["complete"])
-    , (Print     , ["print"])
+    [ (Help      , NEL.fromList ["?", "help"])
+    , (Quit      , NEL.singleton "quit")
+    , (Reload    , NEL.singleton "reload")
+    , (Clear     , NEL.singleton "clear")
+    , (Browse    , NEL.singleton "browse")
+    , (Type      , NEL.singleton "type")
+    , (Kind      , NEL.singleton "kind")
+    , (Show      , NEL.singleton "show")
+    , (Paste     , NEL.singleton "paste")
+    , (Complete  , NEL.singleton "complete")
+    , (Print     , NEL.singleton "print")
     ]
 
 -- |
--- Like directiveStrings, but the other way around.
+-- Like `directiveStrings`, but the other way around.
 --
 directiveStrings' :: [(String, Directive)]
 directiveStrings' = concatMap go directiveStrings
   where
-  go (dir, strs) = map (, dir) strs
+  go (dir, strs) = map (, dir) $ NEL.toList strs
 
 -- |
 -- Returns all possible string representations of a directive.
 --
-stringsFor :: Directive -> [String]
+stringsFor :: Directive -> NonEmpty String
 stringsFor d = fromJust (lookup d directiveStrings)
 
 -- |
 -- Returns the default string representation of a directive.
 --
 stringFor :: Directive -> String
-stringFor = head . stringsFor
+stringFor = NEL.head . stringsFor
 
 -- |
 -- Returns the list of directives which could be expanded from the string
@@ -84,4 +86,3 @@ help =
   , (Complete, "<prefix>",  "Show completions for <prefix> as if pressing tab")
   , (Print,    "<fn>",      "Set the repl's printing function to <fn> (which must be fully qualified)")
   ]
-
