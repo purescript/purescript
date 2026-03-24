@@ -70,7 +70,7 @@ traverseCoreFn f g h i = (f', g', h', i')
   g' (Abs ann name e) = Abs ann name <$> g e
   g' (App ann v1 v2) = App ann <$> g v1 <*> g v2
   g' (Case ann vs alts) = Case ann <$> traverse g vs <*> traverse i alts
-  g' (Let ann ds e) = Let ann <$> traverse f ds <*> g' e
+  g' (Let ann ds e) = Let ann <$> traverse f ds <*> g e
   g' e = pure e
 
   h' (LiteralBinder a b) = LiteralBinder a <$> handleLiteral h b
