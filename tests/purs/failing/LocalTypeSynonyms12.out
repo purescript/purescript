@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/LocalTypeSynonyms12.purs:8:3 - 8:18 (line 8, column 3 - line 8, column 18)
+
+  The type [33mT[0m was defined multiple times in a binding group
+
+
+See https://github.com/purescript/documentation/blob/master/errors/OverlappingNamesInLet.md for more information,
+or to contribute content related to this error.
+

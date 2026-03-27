@@ -2,7 +2,7 @@ Error found:
 in module [33mMain[0m
 at tests/purs/failing/DuplicateDeclarationsInLet.purs:9:3 - 9:14 (line 9, column 3 - line 9, column 14)
 
-  The name [33ma[0m was defined multiple times in a binding group
+  The value [33ma[0m was defined multiple times in a binding group
 
 
 See https://github.com/purescript/documentation/blob/master/errors/OverlappingNamesInLet.md for more information,

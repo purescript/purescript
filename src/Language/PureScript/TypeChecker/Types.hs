@@ -5,6 +5,7 @@ module Language.PureScript.TypeChecker.Types
   ( BindingGroupType(..)
   , typesOf
   , checkTypeKind
+  , checkDuplicateTypeArguments
   ) where
 
 {-
@@ -35,11 +36,13 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Bifunctor (bimap)
 import Data.Either (partitionEithers)
+import Data.Foldable (for_)
 import Data.Functor (($>))
 import Data.List (transpose, (\\), partition, delete)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Text (Text)
 import Data.Traversable (for)
+import Data.Tuple (swap)
 import Data.List.NonEmpty qualified as NEL
 import Data.Map qualified as M
 import Data.Set qualified as S
@@ -48,11 +51,11 @@ import Data.IntSet qualified as IS
 import Language.PureScript.AST
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
-import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), errorMessage, errorMessage', escalateWarningWhen, internalCompilerError, onErrorMessages, onTypesInErrorMessage, parU)
+import Language.PureScript.Errors (ErrorMessage(..), MultipleErrors, SimpleErrorMessage(..), addHint, errorMessage, errorMessage', escalateWarningWhen, internalCompilerError, onErrorMessages, onTypesInErrorMessage, parU, positionedError, warnAndRethrow)
 import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), byMaybeModuleName, coerceProperName, freshIdent)
 import Language.PureScript.TypeChecker.Deriving (deriveInstance)
 import Language.PureScript.TypeChecker.Entailment (InstanceContext, newDictionaries, replaceTypeClassDictionaries)
-import Language.PureScript.TypeChecker.Kinds (checkConstraint, checkKind, checkTypeKind, kindOf, kindOfWithScopedVars, unifyKinds', unknownsWithKinds)
+import Language.PureScript.TypeChecker.Kinds (checkConstraint, checkKind, checkTypeKind, kindOf, kindOfLocalTypeSynonym, kindOfWithScopedVars, unifyKinds', unknownsWithKinds)
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems (introduceSkolemScope, newSkolemConstant, newSkolemScope, skolemEscapeCheck, skolemize, skolemizeTypesInValue)
 import Language.PureScript.TypeChecker.Subsumption (subsumes)
@@ -610,7 +613,35 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   bindNames dict $ do
     makeBindingGroupVisible
     inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
+inferLetBinding seen (TypeSynonymDeclaration sa@(ss, _) name args ty : rest) ret j = do
+  moduleName <- unsafeCheckCurrentModule
+  typesInScope <- types <$> getEnv
+  let isTypeVarInScope var = Qualified (ByModuleName moduleName) (ProperName var) `M.member` typesInScope
+  (kind', ty') <- warnAndRethrow (addHint (ErrorInTypeSynonym name) . addHint (positionedError ss)) $ do
+    checkDuplicateTypeArguments $ map fst args
+    let checkForAlls = tell . foldMap (errorMessage . ShadowedTypeVar) . filter isTypeVarInScope . collectTypeArgs
+    forM_ args $ \(arg, mbK) -> do
+      when (isTypeVarInScope arg) . tell . errorMessage . ShadowedTypeVar $ arg
+      forM_ mbK checkForAlls
+    checkForAlls ty
+    traverse replaceAllTypeSynonyms . swap =<< kindOfLocalTypeSynonym moduleName (sa, name, args, ty)
+  bindLocalTypeSynonym ss name args ty' kind' $
+    inferLetBinding (seen ++ [TypeSynonymDeclaration sa name args ty']) rest ret j
+inferLetBinding seen (KindDeclaration sa@(ss, _) kindFor name ty : rest) ret j = do
+  moduleName <- unsafeCheckCurrentModule
+  typesInScope <- types <$> getEnv
+  let isTypeVarInScope var = Qualified (ByModuleName moduleName) (ProperName var) `M.member` typesInScope
+  ty' <- warnAndRethrow (addHint (ErrorInKindDeclaration name) . addHint (positionedError ss)) $ do
+    tell . foldMap (errorMessage . ShadowedTypeVar) . filter isTypeVarInScope . collectTypeArgs $ ty
+    fst <$> kindOf ty
+  bindTypes (M.singleton (Qualified ByNullSourcePos name) (ty', LocalTypeVariable)) $
+    inferLetBinding (seen ++ [KindDeclaration sa kindFor name ty']) rest ret j
 inferLetBinding _ _ _ _ = internalError "Invalid argument to inferLetBinding"
+
+collectTypeArgs :: SourceType -> [Text]
+collectTypeArgs = S.toAscList . everythingOnTypes (<>) (\case
+  ForAll _ _ arg _ _ _ -> S.singleton arg
+  _ -> mempty)
 
 -- | Infer the types of variables brought into scope by a binder
 inferBinder
@@ -1038,3 +1069,13 @@ withErrorMessageHint'
   -> m a
   -> m a
 withErrorMessageHint' expr = if isInternal expr then const id else withErrorMessageHint
+
+checkDuplicateTypeArguments
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => [Text]
+  -> m ()
+checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
+  throwError . errorMessage $ DuplicateTypeArgument dup
+  where
+  firstDup :: Maybe Text
+  firstDup = listToMaybe $ args \\ ordNub args

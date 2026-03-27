@@ -1,0 +1,18 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/LocalTypeSynonyms3.purs:10:14 - 10:17 (line 10, column 14 - line 10, column 17)
+
+  Type synonym [33mF[0m is partially applied.
+  Type synonyms must be applied to all of their type arguments.
+
+in type synonym [33mG[0m
+while checking that expression [33mf identity      [0m
+                               [33m  where         [0m
+                               [33m  f = \k ->     [0m
+                               [33m        k "Done"[0m
+  has type [33mString[0m
+in value declaration [33mfoo[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/PartiallyAppliedSynonym.md for more information,
+or to contribute content related to this error.
+
