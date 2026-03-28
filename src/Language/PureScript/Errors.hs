@@ -7,6 +7,7 @@ module Language.PureScript.Errors
 import Prelude
 import Protolude (unsnoc)
 
+import Codec.Serialise (Serialise)
 import Control.Arrow ((&&&))
 import Control.DeepSeq (NFData)
 import Control.Lens (both, head1, over)
@@ -199,12 +200,12 @@ data SimpleErrorMessage
   | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName)) [Qualified (ProperName 'ClassName)] Bool
   | CannotSkipTypeApplication SourceType
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 data ErrorMessage = ErrorMessage
   [ErrorMessageHint]
   SimpleErrorMessage
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 newtype ErrorSuggestion = ErrorSuggestion Text
 
@@ -374,7 +375,8 @@ newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage]
   }
   deriving stock (Show)
-  deriving newtype (Semigroup, Monoid, NFData)
+  deriving newtype (Semigroup, Monoid, NFData, Serialise)
+
 
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool

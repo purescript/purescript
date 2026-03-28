@@ -50,7 +50,7 @@ data TypeSearch
     -- ^ Record fields that are available on the first argument to the typed
     -- hole
     }
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 onTypeSearchTypes :: (SourceType -> SourceType) -> TypeSearch -> TypeSearch
 onTypeSearchTypes f = runIdentity . onTypeSearchTypesM (Identity . f)
@@ -90,7 +90,7 @@ data ErrorMessageHint
   | MissingConstructorImportForCoercible (Qualified (ProperName 'ConstructorName))
   | PositionedError (NEL.NonEmpty SourceSpan)
   | RelatedPositions (NEL.NonEmpty SourceSpan)
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 -- | Categories of hints
 data HintCategory
@@ -112,7 +112,7 @@ data UnknownsHint
   = NoUnknowns
   | Unknowns
   | UnknownsWithVtaRequiringArgs (NEL.NonEmpty (Qualified Ident, [[Text]]))
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 -- |
 -- A module declaration, consisting of comments about the module, a module name,
@@ -165,7 +165,7 @@ importPrim =
       . addDefaultImport (Qualified ByNullSourcePos primModName)
 
 data NameSource = UserNamed | CompilerNamed
-  deriving (Show, Generic, NFData, Serialise)
+  deriving (Eq, Show, Generic, NFData, Serialise)
 
 -- |
 -- An item in a list of explicit imports or exports
@@ -323,7 +323,7 @@ data RoleDeclarationData = RoleDeclarationData
   { rdeclSourceAnn :: !SourceAnn
   , rdeclIdent :: !(ProperName 'TypeName)
   , rdeclRoles :: ![Role]
-  } deriving (Show, Eq, Generic, NFData)
+  } deriving (Show, Eq, Generic, NFData, Serialise)
 
 -- | A type declaration assigns a type to an identifier, eg:
 --
@@ -334,7 +334,7 @@ data TypeDeclarationData = TypeDeclarationData
   { tydeclSourceAnn :: !SourceAnn
   , tydeclIdent :: !Ident
   , tydeclType :: !SourceType
-  } deriving (Show, Eq, Generic, NFData)
+  } deriving (Show, Eq, Generic, NFData, Serialise)
 
 getTypeDeclaration :: Declaration -> Maybe TypeDeclarationData
 getTypeDeclaration (TypeDeclaration d) = Just d
@@ -356,7 +356,7 @@ data ValueDeclarationData a = ValueDeclarationData
   -- ^ Whether or not this value is exported/visible
   , valdeclBinders :: ![Binder]
   , valdeclExpression :: !a
-  } deriving (Show, Functor, Generic, NFData, Foldable, Traversable)
+  } deriving (Show, Functor, Generic, NFData, Foldable, Traversable, Serialise)
 
 getValueDeclaration :: Declaration -> Maybe (ValueDeclarationData [GuardedExpr])
 getValueDeclaration (ValueDeclaration d) = Just d
@@ -370,7 +370,7 @@ data DataConstructorDeclaration = DataConstructorDeclaration
   { dataCtorAnn :: !SourceAnn
   , dataCtorName :: !(ProperName 'ConstructorName)
   , dataCtorFields :: ![(Ident, SourceType)]
-  } deriving (Show, Eq, Generic, NFData)
+  } deriving (Show, Eq, Generic, NFData, Serialise)
 
 mapDataCtorFields :: ([(Ident, SourceType)] -> [(Ident, SourceType)]) -> DataConstructorDeclaration -> DataConstructorDeclaration
 mapDataCtorFields f DataConstructorDeclaration{..} = DataConstructorDeclaration { dataCtorFields = f dataCtorFields, .. }
@@ -445,13 +445,13 @@ data Declaration
   -- declaration, while the second @SourceAnn@ serves as the
   -- annotation for the type class and its arguments.
   | TypeInstanceDeclaration SourceAnn SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
-  deriving (Eq, Ord, Show, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic, NFData, Serialise)
 
 data TypeFixity = TypeFixity Fixity (Qualified (ProperName 'TypeName)) (OpName 'TypeOpName)
-  deriving (Eq, Ord, Show, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic, NFData, Serialise)
 
 pattern ValueFixityDeclaration :: SourceAnn -> Fixity -> Qualified (Either Ident (ProperName 'ConstructorName)) -> OpName 'ValueOpName -> Declaration
 pattern ValueFixityDeclaration sa fixity name op = FixityDeclaration sa (Left (ValueFixity fixity name op))
@@ -462,7 +462,7 @@ pattern TypeFixityDeclaration sa fixity name op = FixityDeclaration sa (Right (T
 data InstanceDerivationStrategy
   = KnownClassStrategy
   | NewtypeStrategy
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 -- | The members of a type class instance declaration
 data TypeInstanceBody
@@ -472,7 +472,7 @@ data TypeInstanceBody
   -- ^ This is an instance derived from a newtype
   | ExplicitInstance [Declaration]
   -- ^ This is a regular (explicit) instance
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 mapTypeInstanceBody :: ([Declaration] -> [Declaration]) -> TypeInstanceBody -> TypeInstanceBody
 mapTypeInstanceBody f = runIdentity . traverseTypeInstanceBody (Identity . f)
@@ -488,7 +488,7 @@ data KindSignatureFor
   | NewtypeSig
   | TypeSynonymSig
   | ClassSig
-  deriving (Eq, Ord, Show, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic, NFData, Serialise)
 
 declSourceAnn :: Declaration -> SourceAnn
 declSourceAnn (DataDeclaration sa _ _ _ _) = sa
@@ -625,13 +625,13 @@ flattenDecls = concatMap flattenOne
 --
 data Guard = ConditionGuard Expr
            | PatternGuard Binder Expr
-           deriving (Show, Generic, NFData)
+           deriving (Show, Generic, NFData, Serialise)
 
 -- |
 -- The right hand side of a binder in value declarations
 -- and case expressions.
 data GuardedExpr = GuardedExpr [Guard] Expr
-                 deriving (Show, Generic, NFData)
+                 deriving (Show, Generic, NFData, Serialise)
 
 pattern MkUnguarded :: Expr -> GuardedExpr
 pattern MkUnguarded e = GuardedExpr [] e
@@ -762,7 +762,7 @@ data Expr
   -- A value with source position information
   --
   | PositionedValue SourceSpan [Comment] Expr
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 -- |
 -- Metadata that tells where a let binding originated
@@ -776,7 +776,7 @@ data WhereProvenance
   -- The let binding was always a let binding
   --
   | FromLet
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 -- |
 -- An alternative in a case statement
@@ -790,7 +790,7 @@ data CaseAlternative = CaseAlternative
     -- The result expression or a collect of guarded expressions
     --
   , caseAlternativeResult :: [GuardedExpr]
-  } deriving (Show, Generic, NFData)
+  } deriving (Show, Generic, NFData, Serialise)
 
 -- |
 -- A statement in a do-notation block
@@ -812,7 +812,7 @@ data DoNotationElement
   -- A do notation element with source position information
   --
   | PositionedDoNotationElement SourceSpan [Comment] DoNotationElement
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 
 -- For a record update such as:
@@ -839,15 +839,16 @@ data DoNotationElement
 --
 
 newtype PathTree t = PathTree (AssocList PSString (PathNode t))
-  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
-  deriving newtype NFData
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+  deriving newtype (NFData, Serialise)
+
 
 data PathNode t = Leaf t | Branch (PathTree t)
-  deriving (Show, Eq, Ord, Generic, NFData, Functor, Foldable, Traversable)
+  deriving (Show, Eq, Ord, Generic, NFData, Functor, Foldable, Traversable, Serialise)
 
 newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
-  deriving (Show, Eq, Ord, Foldable, Functor, Traversable)
-  deriving newtype NFData
+  deriving (Show, Eq, Ord, Foldable, Functor, Traversable, Generic)
+  deriving newtype (NFData, Serialise)
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''NameSource)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)

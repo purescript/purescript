@@ -227,11 +227,11 @@ compile' options expectedModule SupportModules{..} inputFiles = do
         unless hasExpectedModuleName $
           error ("While testing a single PureScript file, the expected module name was '" <> expectedModuleName <>
             "' but got '" <> T.unpack (getPsModuleName singleModule) <> "'.")
-        compiledModulePath <$ P.rebuildModule actions supportExterns (snd singleModule)
+        compiledModulePath <$ P.rebuildModule actions supportExterns (mempty, snd singleModule)
       _ -> do
         unless hasExpectedModuleName $
           error $ "While testing multiple PureScript files, the expected main module was not found: '" <> expectedModuleName <> "'."
-        compiledModulePath <$ P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
+        compiledModulePath <$ P.make_ actions (CST.pureResult <$> supportModules ++ map snd ms)
 
 getPsModuleName :: (a, AST.Module) -> T.Text
 getPsModuleName psModule = case snd psModule of
