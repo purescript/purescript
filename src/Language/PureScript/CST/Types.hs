@@ -21,7 +21,7 @@ import Language.PureScript.PSString (PSString)
 
 data SourcePos = SourcePos
   { srcLine :: {-# UNPACK #-} !Int
-  , srcColumn :: {-# UNPACK #-} !Int
+  , srcColumn :: {-# UNPACK #-} !(Int, Int)
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data SourceRange = SourceRange
@@ -32,7 +32,7 @@ data SourceRange = SourceRange
 data Comment l
   = Comment !Text
   | Space {-# UNPACK #-} !Int
-  | Line !l
+  | Line !l !Int
   deriving (Show, Eq, Ord, Generic, Functor, NFData)
 
 data LineFeed = LF | CRLF
