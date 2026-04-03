@@ -7,15 +7,17 @@ import Protolude (note)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class (MonadSupply)
 import Data.List (foldl', find, unzip5)
-import Language.PureScript.AST (Binder(..), CaseAlternative(..), DataConstructorDeclaration(..), Declaration(..), Expr(..), pattern MkUnguarded, Module(..), SourceSpan(..), TypeInstanceBody(..), pattern ValueDecl)
+import Data.Text (Text)
+import Language.PureScript.AST (Binder(..), CaseAlternative(..), DataConstructorDeclaration(..), Declaration(..), Expr(..), pattern MkUnguarded, Module(..), SourceAnn, SourceSpan(..), TypeInstanceBody(..), pattern ValueDecl)
 import Language.PureScript.AST.Utils (UnwrappedTypeConstructor(..), lamCase, unguarded, unwrapTypeConstructor)
 import Language.PureScript.Constants.Libs qualified as Libs
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (DataDeclType(..), NameKind(..))
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage')
-import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), freshIdent)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), disqualify, freshIdent, mkDeriveInstanceName, runProperName)
 import Language.PureScript.PSString (mkString)
-import Language.PureScript.Types (SourceType, Type(..), WildcardData(..), replaceAllTypeVars, srcTypeApp, srcTypeConstructor, srcTypeLevelString)
+import Language.PureScript.AST.Declarations.ChainId (mkChainId)
+import Language.PureScript.Types (SourceType, Type(..), WildcardData(..), replaceAllTypeVars, srcTypeApp, srcTypeConstructor, srcTypeLevelString, srcTypeVar, srcTypeWildcard)
 import Language.PureScript.TypeChecker (checkNewtype)
 
 -- | Elaborates deriving instance declarations by code generation.
@@ -61,7 +63,35 @@ deriveInstance mn ds decl =
         Libs.Generic -> binaryWildcardClass (deriveGenericRep ss mn)
         Libs.Newtype -> binaryWildcardClass deriveNewtype
         _ -> pure decl
+    DeriveClause sa _ddt tyName tyVars className extraArgs DerivedInstance
+      | className == Libs.Generic || className == Libs.Newtype ->
+          deriveInstance mn ds (expandDeriveClause mn sa tyName tyVars className extraArgs DerivedInstance)
     _ -> pure decl
+
+-- | Expand a DeriveClause into a TypeInstanceDeclaration for early
+-- processing by deriveInstance (needed for Generic/Newtype which must
+-- resolve the wildcard type argument before general desugaring).
+expandDeriveClause
+  :: ModuleName
+  -> SourceAnn
+  -> ProperName 'TypeName
+  -> [(Text, Maybe SourceType)]
+  -> Qualified (ProperName 'ClassName)
+  -> [SourceType]
+  -> TypeInstanceBody
+  -> Declaration
+expandDeriveClause mn sa tyName tyVars className extraArgs body =
+  TypeInstanceDeclaration sa sa chainId 0 (Left instName) [] className instArgs body
+  where
+    instName = mkDeriveInstanceName (disqualify className) (runProperName tyName)
+    ss = fst sa
+    chainId = mkChainId (spanName ss) (spanStart ss)
+    instArgs
+      | not (null extraArgs) = extraArgs
+      | otherwise =
+          let tyCon = srcTypeConstructor (Qualified (ByModuleName mn) tyName)
+              applied = foldl' srcTypeApp tyCon (map (srcTypeVar . fst) tyVars)
+          in [applied, srcTypeWildcard]
 
 deriveGenericRep
   :: forall m

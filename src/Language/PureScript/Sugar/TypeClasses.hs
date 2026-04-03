@@ -16,21 +16,22 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State (MonadState(..), StateT, evalStateT, modify)
 import Control.Monad.Supply.Class (MonadSupply)
 import Data.Graph (SCC(..), stronglyConnComp)
-import Data.List (find, partition)
+import Data.List (find, foldl', partition)
 import Data.List.NonEmpty (nonEmpty)
 import Data.Map qualified as M
-import Data.Maybe (catMaybes, mapMaybe, isJust)
+import Data.Maybe (catMaybes, isJust, listToMaybe, mapMaybe)
 import Data.List.NonEmpty qualified as NEL
 import Data.Set qualified as S
 import Data.Text (Text)
 import Data.Traversable (for)
+import Language.PureScript.AST.Declarations.ChainId (mkChainId)
 import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.Crash (internalError)
-import Language.PureScript.Environment (DataDeclType(..), NameKind(..), TypeClassData(..), dictTypeName, function, makeTypeClassData, primClasses, primCoerceClasses, primIntClasses, primRowClasses, primRowListClasses, primSymbolClasses, primTypeErrorClasses, tyRecord)
+import Language.PureScript.Environment (DataDeclType(..), FunctionalDependency(..), NameKind(..), TypeClassData(..), dictTypeName, function, kindArity, makeTypeClassData, primClasses, primCoerceClasses, primIntClasses, primRowClasses, primRowListClasses, primSymbolClasses, primTypeErrorClasses, tyRecord)
 import Language.PureScript.Errors hiding (isExported, nonEmpty)
 import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
 import Language.PureScript.Label (Label(..))
-import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, freshIdent, qualify, runIdent)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, disqualify, freshIdent, mkDeriveInstanceName, qualify, runIdent, runProperName)
 import Language.PureScript.PSString (mkString)
 import Language.PureScript.Sugar.CaseDeclarations (desugarCases)
 import Language.PureScript.TypeClassDictionaries (superclassName)
@@ -213,6 +214,7 @@ desugarDecl mn exps = go
     let explicitOrNot = case body of
           DerivedInstance -> Left $ DerivedInstancePlaceholder className KnownClassStrategy
           NewtypeInstance -> Left $ DerivedInstancePlaceholder className NewtypeStrategy
+          ViaInstance viaTy -> Left $ DerivedInstancePlaceholder className (ViaStrategy viaTy)
           ExplicitInstance members -> Right members
     dictDecl <- case explicitOrNot of
       Right members
@@ -228,7 +230,64 @@ desugarDecl mn exps = go
         in
           return $ ValueDecl sa name' Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
     return (expRef name' className tys, [d, dictDecl])
+  go (DeriveClause sa _ddt tyName tyVars className extraArgs body) = do
+    memberMap <- get
+    let classMod = case className of
+          Qualified (ByModuleName m) _ -> m
+          _ -> mn
+        classData = M.lookup (classMod, disqualify className) memberMap
+        classArgs = maybe [] typeClassArguments classData
+        classDeps = maybe [] typeClassDependencies classData
+        ss = fst sa
+    instArgs <- case computeInstArgs classArgs classDeps tyName tyVars extraArgs of
+      Just args -> pure args
+      Nothing -> throwError . errorMessage' ss $ DeriveClauseArityError className (length classArgs)
+    let chainId = mkChainId (spanName ss) (spanStart ss)
+        name' = Left $ mkDeriveInstanceName (disqualify className) (runProperName tyName)
+    go (TypeInstanceDeclaration sa sa chainId 0 name' [] className instArgs body)
+
   go other = return (Nothing, [other])
+
+  -- Compute the type arguments to pass to the class in the generated
+  -- instance declaration. Uses the class param's kind to determine how
+  -- many of the data type's variables to apply. For multi-param classes,
+  -- params that are fully determined by fundeps get wildcards.
+  --
+  -- Examples for `data T a b`:
+  --   derive (Eq)      → Eq (T a b)       (kind Type, drop 0 vars)
+  --   derive (Functor) → Functor (T a)    (kind Type → Type, drop 1 var)
+  --   derive (Generic) → Generic (T a b) _ (fundep a → rep, wildcard)
+  computeInstArgs
+    :: [(Text, Maybe SourceType)]
+    -> [FunctionalDependency]
+    -> ProperName 'TypeName
+    -> [(Text, Maybe SourceType)]
+    -> [SourceType]
+    -> Maybe [SourceType]
+  computeInstArgs _ _ _ _ extraArgs
+    | not (null extraArgs) = Just extraArgs
+  computeInstArgs classArgs classDeps tyName tyVars _
+    | length classArgs == 1 =
+        let kind = snd =<< listToMaybe classArgs
+            dropCount = maybe 0 kindArity kind
+            applyCount = max 0 (length tyVars - dropCount)
+            tyCon = srcTypeConstructor (Qualified (ByModuleName mn) tyName)
+            applied = foldl' srcTypeApp tyCon (map (srcTypeVar . fst) (take applyCount tyVars))
+        in Just [applied]
+    | determinedByFirst classArgs classDeps =
+        let tyCon = srcTypeConstructor (Qualified (ByModuleName mn) tyName)
+            applied = foldl' srcTypeApp tyCon (map (srcTypeVar . fst) tyVars)
+        in Just [applied, srcTypeWildcard]
+    | otherwise = Nothing
+
+  -- Check if all class params after the first are determined by the first
+  -- via functional dependencies (e.g. Generic a rep | a -> rep).
+  determinedByFirst :: [(Text, Maybe SourceType)] -> [FunctionalDependency] -> Bool
+  determinedByFirst args deps =
+    length args > 1 && all (`elem` determined) [1 .. length args - 1]
+    where
+      determined = concatMap fdDetermined $ filter ((== [0]) . fdDeterminers) deps
+
 
   -- Completes the name generation for type class instances that do not have
   -- a unique name defined in source code.

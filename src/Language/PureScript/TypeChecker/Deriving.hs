@@ -32,7 +32,7 @@ import Language.PureScript.TypeChecker.Entailment (InstanceContext, findDicts)
 import Language.PureScript.TypeChecker.Monad (CheckState, getEnv, getTypeClassDictionaries, unsafeCheckCurrentModule)
 import Language.PureScript.TypeChecker.Synonyms (replaceAllTypeSynonyms)
 import Language.PureScript.TypeClassDictionaries (TypeClassDictionaryInScope(..))
-import Language.PureScript.Types (Constraint(..), pattern REmptyKinded, SourceType, Type(..), completeBinderList, eqType, everythingOnTypes, replaceAllTypeVars, srcTypeVar, usedTypeVariables)
+import Language.PureScript.Types (Constraint(..), SourceConstraint, pattern REmptyKinded, SourceType, Type(..), completeBinderList, eqType, everythingOnTypes, replaceAllTypeVars, srcTypeVar, usedTypeVariables)
 
 -- | Extract the name of the newtype appearing in the last type argument of
 -- a derived newtype instance.
@@ -107,6 +107,8 @@ deriveInstance instType className strategy = do
               | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys (last tys)
         _ -> throwError . errorMessage $ InvalidNewtypeInstance className tys
 
+    ViaStrategy viaTy -> deriveViaInstance mn className tys viaTy typeClassArguments typeClassSuperclasses typeClassDependencies
+
 deriveNewtypeInstance
   :: forall m
    . MonadError MultipleErrors m
@@ -179,6 +181,90 @@ deriveNewtypeInstance className tys (UnwrappedTypeConstructor mn tyConNm dkargs 
     -- Note that this check doesn't actually verify that the superclass is
     -- newtype-derived; see #3168. The whole verifySuperclasses feature
     -- is pretty sketchy, and could use a thorough review and probably rewrite.
+    hasNewtypeSuperclassInstance (suModule, suClass) nt@(newtypeModule, _) dicts =
+      let su = Qualified (ByModuleName suModule) suClass
+          lookIn mn'
+            = elem nt
+            . (toList . extractNewtypeName mn' . tcdInstanceTypes
+                <=< foldMap toList . M.elems
+                <=< toList . (M.lookup su <=< M.lookup (ByModuleName mn')))
+            $ dicts
+      in lookIn suModule || lookIn newtypeModule
+
+-- | Derive an instance by reusing an existing instance for the via type.
+-- Checks that the via type is coercible with the instance type and that
+-- required superclass instances exist.
+deriveViaInstance
+  :: forall m
+   . MonadError MultipleErrors m
+  => MonadState CheckState m
+  => MonadWriter MultipleErrors m
+  => ModuleName
+  -> Qualified (ProperName 'ClassName)
+  -> [SourceType]
+  -> SourceType
+  -> [(Text, Maybe SourceType)]
+  -> [SourceConstraint]
+  -> [FunctionalDependency]
+  -> m Expr
+deriveViaInstance mn className tys viaTy _typeClassArguments _typeClassSuperclasses _typeClassDependencies = do
+    viaTy' <- replaceAllTypeSynonyms viaTy
+    let floating = filter (`notElem` instVars) (ordNub $ usedTypeVariables viaTy')
+    unless (null floating) $
+      throwError . errorMessage $ FloatingViaTypeVariables className tys viaTy' floating
+    verifyCoercible viaTy'
+    verifySuperclasses
+    tys' <- mapM replaceAllTypeSynonyms tys
+    pure (DeferredDictionary className (init tys' ++ [viaTy']))
+  where
+    instVars = concatMap usedTypeVariables tys
+
+    -- Unwrap newtypes transitively to get the underlying runtime representation type.
+    getRepType :: SourceType -> m SourceType
+    getRepType ty = case unwrapTypeConstructor ty of
+      Just (UnwrappedTypeConstructor utcMn utcTyCon _ utcArgs) -> do
+        env <- getEnv
+        case Qualified (ByModuleName utcMn) utcTyCon `M.lookup` types env of
+          Just (_, DataType Newtype tyArgs [(_, [wrapped])]) -> do
+            let subst = zipWith (\(v, _, _) t -> (v, t)) tyArgs utcArgs
+            inner <- replaceAllTypeSynonyms $ replaceAllTypeVars subst wrapped
+            if eqType inner ty then pure ty
+            else getRepType inner
+          _ -> pure ty
+      Nothing -> pure ty
+
+    -- Check that the via type and the instance's last type arg have the
+    -- same runtime representation (i.e. they unwrap to the same type).
+    verifyCoercible :: SourceType -> m ()
+    verifyCoercible viaTy' = case tys of
+      _ : _ -> do
+        let actualTy = last tys
+        actualTy' <- replaceAllTypeSynonyms actualTy
+        actualRep <- getRepType actualTy'
+        viaRep <- getRepType viaTy'
+        unless (eqType actualRep viaRep) $
+          throwError . errorMessage $ NotCoercibleViaType className tys viaTy' actualTy
+      _ -> pure ()
+
+    -- Check that superclass instances exist for the via type. For each
+    -- superclass whose constraint mentions the class's last type param,
+    -- verify that a matching instance is in scope.
+    verifySuperclasses :: m ()
+    verifySuperclasses = do
+      env <- getEnv
+      for_ (M.lookup className (typeClasses env)) $ \TypeClassData{ typeClassArguments = args, typeClassSuperclasses = superclasses } ->
+        for_ superclasses $ \Constraint{..} -> do
+          let constraintClass' = qualify (internalError "verifySuperclasses: unknown class module") constraintClass
+          for_ (M.lookup constraintClass (typeClasses env)) $ \TypeClassData{ typeClassDependencies = deps } ->
+            when (not (null args) && any ((fst (last args) `elem`) . usedTypeVariables) constraintArgs) $ do
+              let determined = map (srcTypeVar . fst . (args !!)) . ordNub . concatMap fdDetermined . filter ((== [length args - 1]) . fdDeterminers) $ deps
+              if eqType (last constraintArgs) (srcTypeVar . fst $ last args) && all (`elem` determined) (init constraintArgs)
+                then do
+                  for_ (extractNewtypeName mn tys) $ \nm -> do
+                    unless (hasNewtypeSuperclassInstance constraintClass' nm (typeClassDictionaries env)) $
+                      tell . errorMessage $ MissingViaSuperclassInstance constraintClass className tys
+                else tell . errorMessage $ UnverifiableViaSuperclassInstance constraintClass className tys
+
     hasNewtypeSuperclassInstance (suModule, suClass) nt@(newtypeModule, _) dicts =
       let su = Qualified (ByModuleName suModule) suClass
           lookIn mn'

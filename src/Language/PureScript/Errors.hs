@@ -125,6 +125,10 @@ data SimpleErrorMessage
   | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | MissingNewtypeSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
   | UnverifiableSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
+  | NotCoercibleViaType (Qualified (ProperName 'ClassName)) [SourceType] SourceType SourceType
+  | FloatingViaTypeVariables (Qualified (ProperName 'ClassName)) [SourceType] SourceType [Text]
+  | MissingViaSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
+  | UnverifiableViaSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
   | CannotFindDerivingType (ProperName 'TypeName)
   | DuplicateLabel Label (Maybe Expr)
   | DuplicateValueDeclaration Ident
@@ -199,6 +203,7 @@ data SimpleErrorMessage
   | CannotDeriveInvalidConstructorArg (Qualified (ProperName 'ClassName)) [Qualified (ProperName 'ClassName)] Bool
   | CannotSkipTypeApplication SourceType
   | CannotApplyExpressionOfTypeOnType SourceType SourceType
+  | DeriveClauseArityError (Qualified (ProperName 'ClassName)) Int
   deriving (Show, Generic, NFData)
 
 data ErrorMessage = ErrorMessage
@@ -299,6 +304,10 @@ errorCode em = case unwrapErrorMessage em of
   InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
   MissingNewtypeSuperclassInstance{} -> "MissingNewtypeSuperclassInstance"
   UnverifiableSuperclassInstance{} -> "UnverifiableSuperclassInstance"
+  NotCoercibleViaType{} -> "NotCoercibleViaType"
+  FloatingViaTypeVariables{} -> "FloatingViaTypeVariables"
+  MissingViaSuperclassInstance{} -> "MissingViaSuperclassInstance"
+  UnverifiableViaSuperclassInstance{} -> "UnverifiableViaSuperclassInstance"
   InvalidDerivedInstance{} -> "InvalidDerivedInstance"
   ExpectedTypeConstructor{} -> "ExpectedTypeConstructor"
   CannotFindDerivingType{} -> "CannotFindDerivingType"
@@ -368,6 +377,7 @@ errorCode em = case unwrapErrorMessage em of
   CannotDeriveInvalidConstructorArg{} -> "CannotDeriveInvalidConstructorArg"
   CannotSkipTypeApplication{} -> "CannotSkipTypeApplication"
   CannotApplyExpressionOfTypeOnType{} -> "CannotApplyExpressionOfTypeOnType"
+  DeriveClauseArityError{} -> "DeriveClauseArityError"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -480,6 +490,10 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
   gSimple (MissingNewtypeSuperclassInstance cl1 cl2 ts) = MissingNewtypeSuperclassInstance cl1 cl2 <$> traverse f ts
   gSimple (UnverifiableSuperclassInstance cl1 cl2 ts) = UnverifiableSuperclassInstance cl1 cl2 <$> traverse f ts
+  gSimple (NotCoercibleViaType cl ts viaTy actualTy) = NotCoercibleViaType cl <$> traverse f ts <*> f viaTy <*> f actualTy
+  gSimple (FloatingViaTypeVariables cl ts viaTy vs) = FloatingViaTypeVariables cl <$> traverse f ts <*> f viaTy <*> pure vs
+  gSimple (MissingViaSuperclassInstance cl1 cl2 ts) = MissingViaSuperclassInstance cl1 cl2 <$> traverse f ts
+  gSimple (UnverifiableViaSuperclassInstance cl1 cl2 ts) = UnverifiableViaSuperclassInstance cl1 cl2 <$> traverse f ts
   gSimple (InvalidDerivedInstance cl ts n) = InvalidDerivedInstance cl <$> traverse f ts <*> pure n
   gSimple (ExpectedTypeConstructor cl ts ty) = ExpectedTypeConstructor cl <$> traverse f ts <*> f ty
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
@@ -1012,6 +1026,44 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
                 ]
             , line $ "implies an superclass instance for " <> markCode (showQualified runProperName su) <> " which could not be verified."
             ]
+    renderSimpleErrorMessage (NotCoercibleViaType nm ts viaTy actualTy) =
+      paras [ line "Cannot derive via instance for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
+                ]
+            , line "The via type"
+            , markCodeBox $ indent $ prettyType viaTy
+            , line "is not coercible with the instance type"
+            , markCodeBox $ indent $ prettyType actualTy
+            , line "Both types must have the same runtime representation."
+            ]
+    renderSimpleErrorMessage (FloatingViaTypeVariables nm ts viaTy vs) =
+      paras [ line "Cannot derive via instance for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
+                ]
+            , line "The via type"
+            , markCodeBox $ indent $ prettyType viaTy
+            , line $ "contains type variable(s) " <> T.intercalate ", " (map markCode vs) <> " not mentioned in the instance head."
+            ]
+    renderSimpleErrorMessage (MissingViaSuperclassInstance su cl ts) =
+      paras [ line "The derived via instance for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName cl)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
+                ]
+            , line $ "does not include a derived superclass instance for " <> markCode (showQualified runProperName su) <> "."
+            ]
+    renderSimpleErrorMessage (UnverifiableViaSuperclassInstance su cl ts) =
+      paras [ line "The derived via instance for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName cl)
+                , Box.vcat Box.left (map prettyTypeAtom ts)
+                ]
+            , line $ "implies a superclass instance for " <> markCode (showQualified runProperName su) <> " which could not be verified."
+            ]
     renderSimpleErrorMessage (InvalidDerivedInstance nm ts argCount) =
       paras [ line "Cannot derive the type class instance"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
@@ -1432,6 +1484,15 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath fileCon
       typeVariable = case tyFn of
         ForAll _ _ v _ _ _ -> v
         _ -> internalError "renderSimpleErrorMessage: Impossible!"
+
+    renderSimpleErrorMessage (DeriveClauseArityError className arity) =
+      paras
+        [ line $ "The type class " <> markCode (showQualified runProperName className)
+            <> " has " <> T.pack (show arity) <> " type parameters"
+            <> " and cannot be derived in a derive clause without explicit type arguments."
+        , line "Provide explicit type arguments in the derive clause, e.g.:"
+        , indent . line $ markCode ("derive (" <> showQualified runProperName className <> " TypeArg1 TypeArg2)")
+        ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =

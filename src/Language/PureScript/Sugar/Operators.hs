@@ -383,7 +383,17 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goDecl (TypeInstanceDeclaration sa@(ss, _) na ch idx name cs className tys impls) = do
     cs' <- traverse (overConstraintArgs (traverse (goType' ss))) cs
     tys' <- traverse (goType' ss) tys
-    return $ TypeInstanceDeclaration sa na ch idx name cs' className tys' impls
+    impls' <- case impls of
+      ViaInstance viaTy -> ViaInstance <$> goType' ss viaTy
+      _ -> pure impls
+    return $ TypeInstanceDeclaration sa na ch idx name cs' className tys' impls'
+  goDecl (DeriveClause sa@(ss, _) ddt tn tvs cn extraArgs body) = do
+    tvs' <- traverse (traverse (traverse (goType' ss))) tvs
+    extraArgs' <- traverse (goType' ss) extraArgs
+    body' <- case body of
+      ViaInstance viaTy -> ViaInstance <$> goType' ss viaTy
+      _ -> pure body
+    return $ DeriveClause sa ddt tn tvs' cn extraArgs' body'
   goDecl (TypeSynonymDeclaration sa@(ss, _) name args ty) =
     TypeSynonymDeclaration sa name
       <$> traverse (traverse (traverse (goType' ss))) args

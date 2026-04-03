@@ -1,0 +1,18 @@
+Error found:
+in module [33mDerivingViaFloatingTypeVariables[0m
+at tests/purs/failing/DerivingViaFloatingTypeVariables.purs:11:1 - 11:43 (line 11, column 1 - line 11, column 43)
+
+  Cannot derive via instance for
+  [33m                      [0m
+  [33m  Data.Show.Show MyInt[0m
+  [33m                      [0m
+  The via type
+  [33m           [0m
+  [33m  Wrapped a[0m
+  [33m           [0m
+  contains type variable(s) [33ma[0m not mentioned in the instance head.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/FloatingViaTypeVariables.md for more information,
+or to contribute content related to this error.
+

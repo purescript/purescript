@@ -19,7 +19,6 @@ import Prelude hiding (take)
 import Protolude (headDef)
 
 import Data.Bifunctor (bimap, first)
-import Data.Char (toLower)
 import Data.Foldable (foldl', toList)
 import Data.Functor (($>))
 import Data.List.NonEmpty qualified as NE
@@ -445,7 +444,7 @@ convertBinder fileName = go
 
 convertDeclaration :: String -> Declaration a -> [AST.Declaration]
 convertDeclaration fileName decl = case decl of
-  DeclData _ (DataHead _ a vars) bd -> do
+  DeclData _ hd@(DataHead _ a vars) bd derivClauses -> do
     let
       ctrs :: SourceToken -> DataCtor b -> [(SourceToken, DataCtor b)] -> [AST.DataConstructorDeclaration]
       ctrs st (DataCtor _ name fields) tl
@@ -454,15 +453,17 @@ convertDeclaration fileName decl = case decl of
             [] -> []
             (st', ctor) : tl' -> ctrs st' ctor tl'
           )
-    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
+    AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd' tl) -> ctrs st hd' tl) bd)
+      : convertDeriveClauses fileName ann Env.Data hd derivClauses
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
       (goTypeVar <$> vars)
       (convertType fileName bd)
-  DeclNewtype _ (DataHead _ a vars) st x ys -> do
+  DeclNewtype _ hd@(DataHead _ a vars) st x ys derivClauses -> do
     let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(headDef (internalError "No constructor name") ctrFields, convertType fileName ys)]]
-    pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
+    AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
+      : convertDeriveClauses fileName ann Env.Newtype hd derivClauses
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
       goTyVar (TypeVarKinded (Wrapped _ (Labeled (_, a) _ _) _)) = nameValue a
@@ -495,13 +496,14 @@ convertDeclaration fileName decl = case decl of
           (convertType fileName <$> args)
           (AST.ExplicitInstance $ goInstanceBinding <$> maybe [] (NE.toList . snd) bd)
     uncurry goInst <$> zip [0..] (toList insts)
-  DeclDerive _ _ new (InstanceHead kw nameSep ctrs cls args) -> do
+  DeclDerive _ _ strategy (InstanceHead kw nameSep ctrs cls args) -> do
     let
       chainId = mkChainId fileName $ startSourcePos kw
       name' = mkPartialInstanceName nameSep cls args
-      instTy
-        | isJust new = AST.NewtypeInstance
-        | otherwise = AST.DerivedInstance
+      instTy = case strategy of
+        Just (DeriveNewtype _ _) -> AST.NewtypeInstance
+        Just (DeriveVia _ _ viaTy) -> AST.ViaInstance (convertType fileName viaTy)
+        Nothing -> AST.DerivedInstance
       clsAnn = findInstanceAnn cls args
     pure $ AST.TypeInstanceDeclaration ann clsAnn chainId 0 name'
       (convertConstraint False fileName <$> maybe [] (toList . fst) ctrs)
@@ -555,22 +557,8 @@ convertDeclaration fileName decl = case decl of
   mkPartialInstanceName nameSep cls args =
     maybe (Left genName) (Right . ident . nameValue . fst) nameSep
     where
-      -- truncate to 25 chars to reduce verbosity
-      -- of name and still keep it readable
-      -- name will be used to create a GenIdent
-      -- in desugaring process
       genName :: Text.Text
-      genName = Text.take 25 (className <> typeArgs)
-
-      className :: Text.Text
-      className
-        = foldMap (uncurry Text.cons . first toLower)
-        . Text.uncons
-        . N.runProperName
-        $ qualName cls
-
-      typeArgs :: Text.Text
-      typeArgs = foldMap argName args
+      genName = N.mkDeriveInstanceName (qualName cls) (foldMap argName args)
 
       argName :: Type a -> Text.Text
       argName = \case
@@ -618,6 +606,35 @@ convertDeclaration fileName decl = case decl of
       qualRange cls
     else
       (fst $ qualRange cls, snd $ typeRange $ last args)
+
+-- | Converts derive clauses attached to a data/newtype declaration into
+-- DeriveClause AST nodes, one per class head. These are later expanded
+-- into TypeInstanceDeclarations during type class desugaring.
+convertDeriveClauses :: String -> Pos.SourceAnn -> Env.DataDeclType -> DataHead a -> [DeriveClause a] -> [AST.Declaration]
+convertDeriveClauses fileName ann dataDeclType hd = concatMap goClause
+  where
+  goClause = \case
+    DeriveClauseStandard _ _ classes ->
+      goClassHeads AST.DerivedInstance classes
+    DeriveClauseNewtype _ _ _ classes ->
+      goClassHeads AST.NewtypeInstance classes
+    DeriveClauseVia _ _ classes _ viaTy ->
+      goClassHeads (AST.ViaInstance (convertType fileName viaTy)) classes
+
+  goClassHeads instTy classes =
+    concatMap (goClassHead instTy) (wrpValue classes)
+
+  goClassHead instTy (DeriveClassHead _ cls extraArgs) =
+    pure $ AST.DeriveClause ann dataDeclType
+      (nameValue $ dataHdName hd)
+      (goTypeVar <$> dataHdVars hd)
+      (qualified cls)
+      (convertType fileName <$> extraArgs)
+      instTy
+
+  goTypeVar = \case
+    TypeVarKinded (Wrapped _ (Labeled (_, x) _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
+    TypeVarName (_, x) -> (getIdent $ nameValue x, Nothing)
 
 convertSignature :: String -> Labeled (Name Ident) (Type a) -> AST.Declaration
 convertSignature fileName (Labeled a _ b) = do
