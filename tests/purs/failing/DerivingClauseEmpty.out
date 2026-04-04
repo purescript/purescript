@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/DerivingClauseEmpty.purs:5:11 - 5:12 (line 5, column 11 - line 5, column 12)
+
+  Unable to parse module:
+  Unexpected token ')'
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

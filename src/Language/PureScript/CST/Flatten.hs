@@ -205,22 +205,41 @@ flattenRole = pure . roleTok
 
 flattenDeclaration :: Declaration a -> DList SourceToken
 flattenDeclaration = \case
-  DeclData _ a b ->
+  DeclData _ a b ds ->
     flattenDataHead a <>
-    foldMap (\(t, cs) -> pure t <> flattenSeparated flattenDataCtor cs) b
+    foldMap (\(t, cs) -> pure t <> flattenSeparated flattenDataCtor cs) b <>
+    foldMap flattenDeriveClause ds
   DeclType _ a b c ->flattenDataHead a <> pure b <> flattenType c
-  DeclNewtype _ a b c d -> flattenDataHead a <> pure b <> flattenName c <> flattenType d
+  DeclNewtype _ a b c d ds -> flattenDataHead a <> pure b <> flattenName c <> flattenType d <> foldMap flattenDeriveClause ds
   DeclClass _ a b ->
     flattenClassHead a <>
     foldMap (\(c, d) -> pure c <> foldMap (flattenLabeled flattenName flattenType) d) b
   DeclInstanceChain _ a -> flattenSeparated flattenInstance a
-  DeclDerive _ a b c -> pure a <> foldMap pure b <> flattenInstanceHead c
+  DeclDerive _ a b c -> pure a <> foldMap flattenDeriveStrategy b <> flattenInstanceHead c
   DeclKindSignature _ a b -> pure a <> flattenLabeled flattenName flattenType b
   DeclSignature _ a -> flattenLabeled flattenName flattenType a
   DeclFixity _ a -> flattenFixityFields a
   DeclForeign _ a b c -> pure a <> pure b <> flattenForeign c
   DeclRole _ a b c d -> pure a <> pure b <> flattenName c <> foldMap flattenRole d
   DeclValue _ a -> flattenValueBindingFields a
+
+flattenDeriveStrategy :: DeriveStrategy a -> DList SourceToken
+flattenDeriveStrategy = \case
+  DeriveNewtype _ t -> pure t
+  DeriveVia _ t ty -> pure t <> flattenType ty
+
+flattenDeriveClause :: DeriveClause a -> DList SourceToken
+flattenDeriveClause = \case
+  DeriveClauseStandard _ kw classes ->
+    pure kw <> flattenWrapped (flattenSeparated flattenDeriveClassHead) classes
+  DeriveClauseNewtype _ kw nt classes ->
+    pure kw <> pure nt <> flattenWrapped (flattenSeparated flattenDeriveClassHead) classes
+  DeriveClauseVia _ kw classes viaTok viaTy ->
+    pure kw <> flattenWrapped (flattenSeparated flattenDeriveClassHead) classes <> pure viaTok <> flattenType viaTy
+
+flattenDeriveClassHead :: DeriveClassHead a -> DList SourceToken
+flattenDeriveClassHead (DeriveClassHead _ cls args) =
+  flattenQualifiedName cls <> foldMap flattenType args
 
 flattenQualifiedName :: QualifiedName a -> DList SourceToken
 flattenQualifiedName = pure . qualTok

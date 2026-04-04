@@ -340,6 +340,7 @@ typeCheckAll moduleName = traverse go
         _ -> internalError "typesOf did not return a singleton"
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
+  go DeriveClause{} = internalError "DeriveClause should be desugared"
   go (BindingGroupDeclaration vals) = do
     env <- getEnv
     let sss = fmap (\(((ss, _), _), _, _) -> ss) vals

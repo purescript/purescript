@@ -445,6 +445,23 @@ data Declaration
   -- declaration, while the second @SourceAnn@ serves as the
   -- annotation for the type class and its arguments.
   | TypeInstanceDeclaration SourceAnn SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
+  -- |
+  -- A derive clause, expanded into a TypeInstanceDeclaration during
+  -- type class desugaring.
+  --
+  -- @
+  -- data Color = Red | Green | Blue
+  --   derive (Eq, Ord)
+  -- @
+  --
+  | DeriveClause
+      SourceAnn
+      DataDeclType                               -- Data or Newtype
+      (ProperName 'TypeName)                     -- declared type name
+      [(Text, Maybe SourceType)]                 -- type vars from data head
+      (Qualified (ProperName 'ClassName))         -- class to derive
+      [SourceType]                               -- user-supplied extra type args (may be empty)
+      TypeInstanceBody                           -- DerivedInstance | NewtypeInstance | ViaInstance
   deriving (Show, Generic, NFData)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -462,6 +479,7 @@ pattern TypeFixityDeclaration sa fixity name op = FixityDeclaration sa (Right (T
 data InstanceDerivationStrategy
   = KnownClassStrategy
   | NewtypeStrategy
+  | ViaStrategy SourceType
   deriving (Show, Generic, NFData)
 
 -- | The members of a type class instance declaration
@@ -470,6 +488,8 @@ data TypeInstanceBody
   -- ^ This is a derived instance
   | NewtypeInstance
   -- ^ This is an instance derived from a newtype
+  | ViaInstance SourceType
+  -- ^ This is an instance derived via a type
   | ExplicitInstance [Declaration]
   -- ^ This is a regular (explicit) instance
   deriving (Show, Generic, NFData)
@@ -506,6 +526,7 @@ declSourceAnn (FixityDeclaration sa _) = sa
 declSourceAnn (ImportDeclaration sa _ _ _) = sa
 declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
 declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _ _) = sa
+declSourceAnn (DeriveClause sa _ _ _ _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
@@ -530,6 +551,7 @@ declName DataBindingGroupDeclaration{} = Nothing
 declName BoundValueDeclaration{} = Nothing
 declName KindDeclaration{} = Nothing
 declName TypeDeclaration{} = Nothing
+declName DeriveClause{} = Nothing
 
 -- |
 -- Test if a declaration is a value declaration

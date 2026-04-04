@@ -159,12 +159,15 @@ dataMembersRange = \case
 
 declRange :: Declaration a -> TokenRange
 declRange = \case
-  DeclData _ hd ctors
+  DeclData _ hd ctors derivs
+    | _ : _ <- derivs -> (fst start, snd . deriveClauseRange $ last derivs)
     | Just (_, cs) <- ctors -> (fst start, snd . dataCtorRange $ sepLast cs)
     | otherwise -> start
     where start = dataHeadRange hd
   DeclType _ a _ b -> (fst $ dataHeadRange a,  snd $ typeRange b)
-  DeclNewtype _ a _ _ b -> (fst $ dataHeadRange a, snd $ typeRange b)
+  DeclNewtype _ a _ _ b derivs
+    | _ : _ <- derivs -> (fst $ dataHeadRange a, snd . deriveClauseRange $ last derivs)
+    | otherwise -> (fst $ dataHeadRange a, snd $ typeRange b)
   DeclClass _ hd body
     | Just (_, ts) <- body -> (fst start, snd . typeRange . lblValue $ NE.last ts)
     | otherwise -> start
@@ -188,6 +191,12 @@ dataCtorRange :: DataCtor a -> TokenRange
 dataCtorRange (DataCtor _ name fields)
   | [] <- fields = nameRange name
   | otherwise = (nameTok name, snd . typeRange $ last fields)
+
+deriveClauseRange :: DeriveClause a -> TokenRange
+deriveClauseRange = \case
+  DeriveClauseStandard _ kw (Wrapped _ _ close) -> (kw, close)
+  DeriveClauseNewtype _ kw _ (Wrapped _ _ close) -> (kw, close)
+  DeriveClauseVia _ kw _ _ viaTy -> (kw, snd $ typeRange viaTy)
 
 classHeadRange :: ClassHead a -> TokenRange
 classHeadRange (ClassHead kw _ name vars fdeps)

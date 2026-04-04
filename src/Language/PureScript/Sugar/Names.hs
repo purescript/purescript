@@ -210,7 +210,18 @@ renameInModule imports (Module modSS coms mn decls exps) =
         <$> updateConstraints cs
         <*> updateClassName cn ss
         <*> traverse updateTypesEverywhere ts
-        <*> pure ds
+        <*> case ds of
+              ViaInstance viaTy -> ViaInstance <$> updateTypesEverywhere viaTy
+              _ -> pure ds
+  updateDecl bound (DeriveClause sa ddt tn tvs cn extraArgs body) =
+    fmap (bound,) $
+      DeriveClause sa ddt tn
+        <$> updateTypeArguments tvs
+        <*> updateClassName cn (fst sa)
+        <*> traverse updateTypesEverywhere extraArgs
+        <*> case body of
+              ViaInstance viaTy -> ViaInstance <$> updateTypesEverywhere viaTy
+              _ -> pure body
   updateDecl bound (KindDeclaration sa kindFor name ty) =
     fmap (bound,) $
       KindDeclaration sa kindFor name

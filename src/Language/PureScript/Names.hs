@@ -17,6 +17,8 @@ import Data.Vector qualified as V
 import GHC.Generics (Generic)
 import Data.Aeson (FromJSON(..), FromJSONKey(..), Options(..), SumEncoding(..), ToJSON(..), ToJSONKey(..), defaultOptions, parseJSON2, toJSON2, withArray)
 import Data.Aeson.TH (deriveJSON)
+import Data.Bifunctor (first)
+import Data.Char (toLower)
 import Data.Text (Text)
 import Data.Text qualified as T
 
@@ -317,6 +319,13 @@ instance ToJSONKey ModuleName where
 
 instance FromJSONKey ModuleName where
   fromJSONKey = fmap moduleNameFromString fromJSONKey
+
+-- | Generate a partial instance name from a class name and a type name suffix.
+-- Lowercases the first letter of the class name and truncates to 25 characters.
+mkDeriveInstanceName :: ProperName 'ClassName -> T.Text -> T.Text
+mkDeriveInstanceName cls suffix = T.take 25 (clsText <> suffix)
+  where
+    clsText = foldMap (uncurry T.cons . first toLower) . T.uncons . runProperName $ cls
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''InternalIdentData)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)

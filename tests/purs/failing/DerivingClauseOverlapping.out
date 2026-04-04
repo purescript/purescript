@@ -1,0 +1,22 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/DerivingClauseOverlapping.purs:9:1 - 9:27 (line 9, column 1 - line 9, column 27)
+
+  Overlapping type class instances found for
+  [33m                      [0m
+  [33m  Data.Show.Show Color[0m
+  [33m                      [0m
+  The following instances were found:
+
+    instance in module [33mMain[0m with type [33mShow Color[0m (line 6, column 1 - line 7, column 16)
+    instance in module [33mMain[0m with type [33mShow Color[0m (line 9, column 1 - line 9, column 27)
+
+
+in type class instance
+[33m                      [0m
+[33m  Data.Show.Show Color[0m
+[33m                      [0m
+
+See https://github.com/purescript/documentation/blob/master/errors/OverlappingInstances.md for more information,
+or to contribute content related to this error.
+

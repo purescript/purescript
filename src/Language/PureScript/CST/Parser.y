@@ -119,6 +119,7 @@ import Language.PureScript.PSString (PSString)
   'of'               { SourceToken _ (TokLowerName [] "of") }
   'representational' { SourceToken _ (TokLowerName [] "representational") }
   'role'             { SourceToken _ (TokLowerName [] "role") }
+  'via'              { SourceToken _ (TokLowerName [] "via") }
   'then'             { SourceToken _ (TokLowerName [] "then") }
   'true'             { SourceToken _ (TokLowerName [] "true") }
   'type'             { SourceToken _ (TokLowerName [] "type") }
@@ -195,6 +196,7 @@ qualIdent :: { QualifiedName Ident }
   | 'nominal' {% toQualifiedName Ident $1 }
   | 'representational' {% toQualifiedName Ident $1 }
   | 'phantom' {% toQualifiedName Ident $1 }
+  | 'via' {% toQualifiedName Ident $1 }
 
 ident :: { Name Ident }
   : LOWER {% toName Ident $1 }
@@ -204,6 +206,7 @@ ident :: { Name Ident }
   | 'nominal' {% toName Ident $1 }
   | 'representational' {% toName Ident $1 }
   | 'phantom' {% toName Ident $1 }
+  | 'via' {% toName Ident $1 }
 
 qualOp :: { QualifiedOpName }
   : OPERATOR {% qualifiedOpName <\$> toQualifiedName N.OpName $1 }
@@ -258,6 +261,7 @@ label :: { Label }
   | 'phantom' { toLabel $1 }
   | 'representational' { toLabel $1 }
   | 'role' { toLabel $1 }
+  | 'via' { toLabel $1 }
   | 'then' { toLabel $1 }
   | 'true' { toLabel $1 }
   | 'type' { toLabel $1 }
@@ -661,10 +665,10 @@ import :: { Import () }
   | 'class' properName { ImportClass () $1 (getProperName $2) }
 
 decl :: { Declaration () }
-  : dataHead { DeclData () $1 Nothing }
-  | dataHead '=' sep(dataCtor, '|') { DeclData () $1 (Just ($2, $3)) }
+  : dataHead manyOrEmpty(deriveClause) { DeclData () $1 Nothing $2 }
+  | dataHead '=' sep(dataCtor, '|') manyOrEmpty(deriveClause) { DeclData () $1 (Just ($2, $3)) $4 }
   | typeHead '=' type {% checkNoWildcards $3 *> pure (DeclType () $1 $2 $3) }
-  | newtypeHead '=' properName typeAtom {% checkNoWildcards $4 *> pure (DeclNewtype () $1 $2 (getProperName $3) $4) }
+  | newtypeHead '=' properName typeAtom manyOrEmpty(deriveClause) {% checkNoWildcards $4 *> pure (DeclNewtype () $1 $2 (getProperName $3) $4 $5) }
   | classHead { either id (\h -> DeclClass () h Nothing) $1 }
   | classHead 'where' '\{' manySep(classMember, '\;') '\}' {% either (const (parseError $2)) (\h -> pure $ DeclClass () h (Just ($2, $4))) $1 }
   | instHead { DeclInstanceChain () (Separated (Instance $1 Nothing) []) }
@@ -673,7 +677,8 @@ decl :: { Declaration () }
   | 'newtype' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled (getProperName $2) $3 $4)) }
   | 'type' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled (getProperName $2) $3 $4)) }
   | 'derive' instHead { DeclDerive () $1 Nothing $2 }
-  | 'derive' 'newtype' instHead { DeclDerive () $1 (Just $2) $3 }
+  | 'derive' 'newtype' instHead { DeclDerive () $1 (Just (DeriveNewtype () $2)) $3 }
+  | 'derive' 'via' typeAtom instHead { DeclDerive () $1 (Just (DeriveVia () $2 $3)) $4 }
   | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
   | ident manyOrEmpty(binderAtom) guardedDecl { DeclValue () (ValueBindingFields $1 $2 $3) }
   | fixity { DeclFixity () $1 }
@@ -693,6 +698,18 @@ newtypeHead :: { DataHead () }
 dataCtor :: { DataCtor () }
   : properName manyOrEmpty(typeAtom)
       {% for_ $2 checkNoWildcards *> pure (DataCtor () (getProperName $1) $2) }
+
+deriveClause :: { DeriveClause () }
+  : 'derive' '(' sep(deriveClassHead, ',') ')'
+      { DeriveClauseStandard () $1 (Wrapped $2 $3 $4) }
+  | 'derive' 'newtype' '(' sep(deriveClassHead, ',') ')'
+      { DeriveClauseNewtype () $1 $2 (Wrapped $3 $4 $5) }
+  | 'derive' '(' sep(deriveClassHead, ',') ')' 'via' typeAtom
+      { DeriveClauseVia () $1 (Wrapped $2 $3 $4) $5 $6 }
+
+deriveClassHead :: { DeriveClassHead () }
+  : qualProperName manyOrEmpty(typeAtom)
+      { DeriveClassHead () (getQualifiedProperName $1) $2 }
 
 -- Class head syntax requires unbounded lookahead due to a conflict between
 -- row syntax and `typeVarBinding`. `(a :: B)` is either a row in `constraint`
