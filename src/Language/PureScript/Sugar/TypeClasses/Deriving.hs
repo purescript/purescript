@@ -8,14 +8,15 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class (MonadSupply)
 import Data.List (foldl', find, unzip5)
 import Language.PureScript.AST (Binder(..), CaseAlternative(..), DataConstructorDeclaration(..), Declaration(..), Expr(..), pattern MkUnguarded, Module(..), SourceSpan(..), TypeInstanceBody(..), pattern ValueDecl)
+import Language.PureScript.AST.Declarations.ChainId (mkChainId)
 import Language.PureScript.AST.Utils (UnwrappedTypeConstructor(..), lamCase, unguarded, unwrapTypeConstructor)
 import Language.PureScript.Constants.Libs qualified as Libs
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (DataDeclType(..), NameKind(..))
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage')
-import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), freshIdent)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), freshIdent, runIdent)
 import Language.PureScript.PSString (mkString)
-import Language.PureScript.Types (SourceType, Type(..), WildcardData(..), replaceAllTypeVars, srcTypeApp, srcTypeConstructor, srcTypeLevelString)
+import Language.PureScript.Types (SourceType, Type(..), WildcardData(..), replaceAllTypeVars, srcTypeApp, srcTypeConstructor, srcTypeLevelString, srcTypeVar)
 import Language.PureScript.TypeChecker (checkNewtype)
 
 -- | Elaborates deriving instance declarations by code generation.
@@ -61,6 +62,15 @@ deriveInstance mn ds decl =
         Libs.Generic -> binaryWildcardClass (deriveGenericRep ss mn)
         Libs.Newtype -> binaryWildcardClass deriveNewtype
         _ -> pure decl
+    DeriveClauseDeclaration sa@(ss, _) tyName tyVars className
+      | className == Libs.Generic || className == Libs.Newtype -> do
+        let tyCon = srcTypeConstructor (Qualified (ByModuleName mn) tyName)
+            tyVarTypes = map (\(v, _) -> srcTypeVar v) tyVars
+            fullyApplied = foldl srcTypeApp tyCon tyVarTypes
+            tys = [fullyApplied, TypeWildcard sa UnnamedWildcard]
+            chainId = mkChainId (spanName ss) (spanStart ss)
+        nm <- Left . runIdent <$> freshIdent "deriveClause"
+        deriveInstance mn ds $ TypeInstanceDeclaration sa sa chainId 0 nm [] className tys DerivedInstance
     _ -> pure decl
 
 deriveGenericRep

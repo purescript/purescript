@@ -194,10 +194,21 @@ data DataMembers a
   | DataEnumerated a (Delimited (Name (N.ProperName 'N.ConstructorName)))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
+data DeriveClass a = DeriveClass
+  { dcAnn :: a
+  , dcClass :: QualifiedName (N.ProperName 'N.ClassName)
+  } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+data DeriveClause a = DeriveClause
+  { dclAnn :: a
+  , dclKeyword :: SourceToken
+  , dclClasses :: Wrapped (Separated (DeriveClass a))
+  } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
 data Declaration a
-  = DeclData a (DataHead a) (Maybe (SourceToken, Separated (DataCtor a)))
+  = DeclData a (DataHead a) (Maybe (SourceToken, Separated (DataCtor a))) [DeriveClause a]
   | DeclType a (DataHead a) SourceToken (Type a)
-  | DeclNewtype a (DataHead a) SourceToken (Name (N.ProperName 'N.ConstructorName)) (Type a)
+  | DeclNewtype a (DataHead a) SourceToken (Name (N.ProperName 'N.ConstructorName)) (Type a) [DeriveClause a]
   | DeclClass a (ClassHead a) (Maybe (SourceToken, NonEmpty (Labeled (Name Ident) (Type a))))
   | DeclInstanceChain a (Separated (Instance a))
   | DeclDerive a SourceToken (Maybe SourceToken) (InstanceHead a)

@@ -203,13 +203,23 @@ flattenForeign = \case
 flattenRole :: Role -> DList SourceToken
 flattenRole = pure . roleTok
 
+flattenDeriveClass :: DeriveClass a -> DList SourceToken
+flattenDeriveClass (DeriveClass _ cls) =
+  flattenQualifiedName cls
+
+flattenDeriveClause :: DeriveClause a -> DList SourceToken
+flattenDeriveClause (DeriveClause _ kw classes) =
+  pure kw <>
+  flattenWrapped (flattenSeparated flattenDeriveClass) classes
+
 flattenDeclaration :: Declaration a -> DList SourceToken
 flattenDeclaration = \case
-  DeclData _ a b ->
+  DeclData _ a b drvs ->
     flattenDataHead a <>
-    foldMap (\(t, cs) -> pure t <> flattenSeparated flattenDataCtor cs) b
-  DeclType _ a b c ->flattenDataHead a <> pure b <> flattenType c
-  DeclNewtype _ a b c d -> flattenDataHead a <> pure b <> flattenName c <> flattenType d
+    foldMap (\(t, ctrs) -> pure t <> flattenSeparated flattenDataCtor ctrs) b <>
+    foldMap flattenDeriveClause drvs
+  DeclType _ a b c -> flattenDataHead a <> pure b <> flattenType c
+  DeclNewtype _ a b c d drvs -> flattenDataHead a <> pure b <> flattenName c <> flattenType d <> foldMap flattenDeriveClause drvs
   DeclClass _ a b ->
     flattenClassHead a <>
     foldMap (\(c, d) -> pure c <> foldMap (flattenLabeled flattenName flattenType) d) b

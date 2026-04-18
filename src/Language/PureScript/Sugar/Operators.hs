@@ -394,6 +394,9 @@ updateTypes goType = (goDecl, goExpr, goBinder)
     KindDeclaration sa sigFor name <$> goType' ss ty
   goDecl (ExternDataDeclaration sa@(ss, _) name ty) =
     ExternDataDeclaration sa name <$> goType' ss ty
+  goDecl (DeriveClauseDeclaration sa@(ss, _) tyName tyVars className) = do
+    tyVars' <- traverse (traverse (traverse (goType' ss))) tyVars
+    return $ DeriveClauseDeclaration sa tyName tyVars' className
   goDecl other =
     return other
 

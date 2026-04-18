@@ -445,7 +445,7 @@ convertBinder fileName = go
 
 convertDeclaration :: String -> Declaration a -> [AST.Declaration]
 convertDeclaration fileName decl = case decl of
-  DeclData _ (DataHead _ a vars) bd -> do
+  DeclData _ (DataHead _ a vars) bd drvs -> do
     let
       ctrs :: SourceToken -> DataCtor b -> [(SourceToken, DataCtor b)] -> [AST.DataConstructorDeclaration]
       ctrs st (DataCtor _ name fields) tl
@@ -454,15 +454,17 @@ convertDeclaration fileName decl = case decl of
             [] -> []
             (st', ctor) : tl' -> ctrs st' ctor tl'
           )
-    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
+    AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
+      : convertDeriveClauses fileName (nameValue a) (goTypeVar <$> vars) drvs
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
       (goTypeVar <$> vars)
       (convertType fileName bd)
-  DeclNewtype _ (DataHead _ a vars) st x ys -> do
+  DeclNewtype _ (DataHead _ a vars) st x ys drvs -> do
     let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(headDef (internalError "No constructor name") ctrFields, convertType fileName ys)]]
-    pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
+    AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
+      : convertDeriveClauses fileName (nameValue a) (goTypeVar <$> vars) drvs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
       goTyVar (TypeVarKinded (Wrapped _ (Labeled (_, a) _ _) _)) = nameValue a
@@ -618,6 +620,20 @@ convertDeclaration fileName decl = case decl of
       qualRange cls
     else
       (fst $ qualRange cls, snd $ typeRange $ last args)
+
+convertDeriveClauses
+  :: String
+  -> N.ProperName 'N.TypeName
+  -> [(Text.Text, Maybe T.SourceType)]
+  -> [DeriveClause a]
+  -> [AST.Declaration]
+convertDeriveClauses fileName tyName tyVars = concatMap go
+  where
+  go (DeriveClause _ _ (Wrapped _ classes _)) = map convertClass (toList classes)
+  convertClass (DeriveClass _ cls) =
+    AST.DeriveClauseDeclaration clsAnn tyName tyVars (qualified cls)
+    where
+    clsAnn = uncurry (sourceAnnCommented fileName) (qualRange cls)
 
 convertSignature :: String -> Labeled (Name Ident) (Type a) -> AST.Declaration
 convertSignature fileName (Labeled a _ b) = do

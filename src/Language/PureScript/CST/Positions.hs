@@ -157,14 +157,21 @@ dataMembersRange = \case
   DataAll _ a -> (a, a)
   DataEnumerated _ (Wrapped a _ b) -> (a, b)
 
+deriveClauseRange :: DeriveClause a -> TokenRange
+deriveClauseRange (DeriveClause _ kw classes) = (kw, wrpClose classes)
+
 declRange :: Declaration a -> TokenRange
 declRange = \case
-  DeclData _ hd ctors
+  DeclData _ hd ctors drvs
+    | _:_ <- drvs -> (fst start, snd . deriveClauseRange $ last drvs)
     | Just (_, cs) <- ctors -> (fst start, snd . dataCtorRange $ sepLast cs)
     | otherwise -> start
     where start = dataHeadRange hd
   DeclType _ a _ b -> (fst $ dataHeadRange a,  snd $ typeRange b)
-  DeclNewtype _ a _ _ b -> (fst $ dataHeadRange a, snd $ typeRange b)
+  DeclNewtype _ a _ _ b drvs
+    | _:_ <- drvs -> (fst start, snd . deriveClauseRange $ last drvs)
+    | otherwise -> start
+    where start = (fst $ dataHeadRange a, snd $ typeRange b)
   DeclClass _ hd body
     | Just (_, ts) <- body -> (fst start, snd . typeRange . lblValue $ NE.last ts)
     | otherwise -> start
