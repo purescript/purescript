@@ -157,8 +157,8 @@ dataMembersRange = \case
   DataAll _ a -> (a, a)
   DataEnumerated _ (Wrapped a _ b) -> (a, b)
 
-deriveClauseRange :: DeriveClause a -> TokenRange
-deriveClauseRange (DeriveClause _ kw classes) = (kw, wrpClose classes)
+deriveClauseRange :: DeriveClause -> TokenRange
+deriveClauseRange (DeriveClause kw classes) = (kw, wrpClose classes)
 
 declRange :: Declaration a -> TokenRange
 declRange = \case

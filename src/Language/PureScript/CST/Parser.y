@@ -681,11 +681,11 @@ decl :: { Declaration () }
   | 'foreign' 'import' 'data' properName '::' type { DeclForeign () $1 $2 (ForeignData $3 (Labeled (getProperName $4) $5 $6)) }
   | 'type' 'role' properName many(role) { DeclRole () $1 $2 (getProperName $3) $4 }
 
-deriveClause :: { DeriveClause () }
-  : 'derive' '(' sep(deriveClass, ',') ')' { DeriveClause () $1 (Wrapped $2 $3 $4) }
+deriveClause :: { DeriveClause }
+  : 'derive' '(' sep(deriveClass, ',') ')' { DeriveClause $1 (Wrapped $2 $3 $4) }
 
-deriveClass :: { DeriveClass () }
-  : qualProperName { DeriveClass () (getQualifiedProperName $1) }
+deriveClass :: { DeriveClass }
+  : qualProperName { DeriveClass (getQualifiedProperName $1) }
 
 dataHead :: { DataHead () }
   : 'data' properName manyOrEmpty(typeVarBindingPlain) { DataHead $1 (getProperName $2) $3 }

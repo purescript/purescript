@@ -624,12 +624,12 @@ convertDeclaration fileName decl = case decl of
 convertDeriveClauses
   :: String
   -> N.ProperName 'N.TypeName
-  -> [DeriveClause a]
+  -> [DeriveClause]
   -> [AST.Declaration]
 convertDeriveClauses fileName tyName = concatMap go
   where
-  go (DeriveClause _ _ (Wrapped _ classes _)) = map convertClass (toList classes)
-  convertClass (DeriveClass _ cls) =
+  go (DeriveClause _ (Wrapped _ classes _)) = map convertClass (toList classes)
+  convertClass (DeriveClass cls) =
     AST.TypeInstanceDeclaration clsAnn clsAnn chainId 0 (Left genName)
       []
       (qualified cls)

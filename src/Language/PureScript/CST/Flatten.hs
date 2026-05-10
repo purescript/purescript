@@ -203,12 +203,12 @@ flattenForeign = \case
 flattenRole :: Role -> DList SourceToken
 flattenRole = pure . roleTok
 
-flattenDeriveClass :: DeriveClass a -> DList SourceToken
-flattenDeriveClass (DeriveClass _ cls) =
+flattenDeriveClass :: DeriveClass -> DList SourceToken
+flattenDeriveClass (DeriveClass cls) =
   flattenQualifiedName cls
 
-flattenDeriveClause :: DeriveClause a -> DList SourceToken
-flattenDeriveClause (DeriveClause _ kw classes) =
+flattenDeriveClause :: DeriveClause -> DList SourceToken
+flattenDeriveClause (DeriveClause kw classes) =
   pure kw <>
   flattenWrapped (flattenSeparated flattenDeriveClass) classes
 
