@@ -455,7 +455,7 @@ convertDeclaration fileName decl = case decl of
             (st', ctor) : tl' -> ctrs st' ctor tl'
           )
     AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
-      : convertDeriveClauses fileName (nameValue a) (goTypeVar <$> vars) drvs
+      : convertDeriveClauses fileName (nameValue a) drvs
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
@@ -464,7 +464,7 @@ convertDeclaration fileName decl = case decl of
   DeclNewtype _ (DataHead _ a vars) st x ys drvs -> do
     let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(headDef (internalError "No constructor name") ctrFields, convertType fileName ys)]]
     AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
-      : convertDeriveClauses fileName (nameValue a) (goTypeVar <$> vars) drvs
+      : convertDeriveClauses fileName (nameValue a) drvs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
       goTyVar (TypeVarKinded (Wrapped _ (Labeled (_, a) _ _) _)) = nameValue a
@@ -624,16 +624,25 @@ convertDeclaration fileName decl = case decl of
 convertDeriveClauses
   :: String
   -> N.ProperName 'N.TypeName
-  -> [(Text.Text, Maybe T.SourceType)]
   -> [DeriveClause a]
   -> [AST.Declaration]
-convertDeriveClauses fileName tyName tyVars = concatMap go
+convertDeriveClauses fileName tyName = concatMap go
   where
   go (DeriveClause _ _ (Wrapped _ classes _)) = map convertClass (toList classes)
   convertClass (DeriveClass _ cls) =
-    AST.DeriveClauseDeclaration clsAnn tyName tyVars (qualified cls)
+    AST.TypeInstanceDeclaration clsAnn clsAnn chainId 0 (Left genName)
+      []
+      (qualified cls)
+      [tyCon]
+      AST.DerivedInstance
     where
     clsAnn = uncurry (sourceAnnCommented fileName) (qualRange cls)
+    chainId = mkChainId fileName (Pos.spanStart (fst clsAnn))
+    tyCon = T.TypeConstructor clsAnn (N.Qualified N.ByNullSourcePos tyName)
+    genName = Text.take 25 (lowerHead (N.runProperName (qualName cls)) <> N.runProperName tyName)
+    lowerHead t = case Text.uncons t of
+      Just (c, cs) -> Text.cons (toLower c) cs
+      Nothing -> t
 
 convertSignature :: String -> Labeled (Name Ident) (Type a) -> AST.Declaration
 convertSignature fileName (Labeled a _ b) = do

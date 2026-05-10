@@ -22,18 +22,15 @@ import Data.Map qualified as M
 import Data.Maybe (catMaybes, mapMaybe, isJust)
 import Data.List.NonEmpty qualified as NEL
 import Data.Set qualified as S
-import Data.Char qualified
 import Data.Text (Text)
-import Data.Text qualified
 import Data.Traversable (for)
 import Language.PureScript.Constants.Prim qualified as C
-import Language.PureScript.AST.Declarations.ChainId (mkChainId)
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment (DataDeclType(..), NameKind(..), TypeClassData(..), dictTypeName, function, makeTypeClassData, primClasses, primCoerceClasses, primIntClasses, primRowClasses, primRowListClasses, primSymbolClasses, primTypeErrorClasses, tyRecord)
 import Language.PureScript.Errors hiding (isExported, nonEmpty)
 import Language.PureScript.Externs (ExternsDeclaration(..), ExternsFile(..))
 import Language.PureScript.Label (Label(..))
-import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, freshIdent, qualify, runIdent, runProperName)
+import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, Name(..), ProperName, ProperNameType(..), Qualified(..), QualifiedBy(..), coerceProperName, freshIdent, qualify, runIdent)
 import Language.PureScript.PSString (mkString)
 import Language.PureScript.Sugar.CaseDeclarations (desugarCases)
 import Language.PureScript.TypeClassDictionaries (superclassName)
@@ -231,22 +228,6 @@ desugarDecl mn exps = go
         in
           return $ ValueDecl sa name' Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
     return (expRef name' className tys, [d, dictDecl])
-  go (DeriveClauseDeclaration sa tyName tyVars className) = do
-    memberMap <- get
-    let
-      classKey = case className of
-        Qualified (ByModuleName clsMn) cn -> (clsMn, cn)
-        _ -> (mn, let Qualified _ cn = className in cn)
-      mClassData = M.lookup classKey memberMap
-      ss = fst sa
-      chainId = mkChainId (spanName ss) (spanStart ss)
-      genName = Data.Char.toLower c `Data.Text.cons` cs
-        where Qualified _ clsName = className
-              (c, cs) = case Data.Text.uncons (runProperName clsName) of
-                Just pair -> pair
-                Nothing -> internalError "Empty class name"
-    tyConArgs <- computeInstArgs ss mn tyName tyVars mClassData className
-    go $ TypeInstanceDeclaration sa sa chainId 0 (Left genName) [] className tyConArgs DerivedInstance
   go other = return (Nothing, [other])
 
   -- Completes the name generation for type class instances that do not have
@@ -285,30 +266,6 @@ desugarDecl mn exps = go
 
   genSpan :: SourceSpan
   genSpan = internalModuleSourceSpan "<generated>"
-
-computeInstArgs
-  :: MonadError MultipleErrors m
-  => SourceSpan -> ModuleName -> ProperName 'TypeName -> [(Text, Maybe SourceType)]
-  -> Maybe TypeClassData -> Qualified (ProperName 'ClassName)
-  -> m [SourceType]
-computeInstArgs ss mn tyName tyVars mClassData className = do
-  let firstParamKind = do
-        tcd <- mClassData
-        (_, k) : _ <- pure (typeClassArguments tcd)
-        k
-  arity <- case firstParamKind of
-    Just k -> pure $ kindArity k
-    Nothing -> throwError . errorMessage' ss $ CannotDerive className []
-  let numVarsToApply = max 0 (length tyVars - arity)
-  pure [foldl srcTypeApp tyCon (take numVarsToApply tyVarTypes)]
-  where
-  tyCon = srcTypeConstructor (Qualified (ByModuleName mn) tyName)
-  tyVarTypes = map (\(v, _) -> srcTypeVar v) tyVars
-
-kindArity :: SourceType -> Int
-kindArity (TypeApp _ (TypeApp _ (TypeConstructor _ f) _) rest)
-  | f == C.Function = 1 + kindArity rest
-kindArity _ = 0
 
 memberToNameAndType :: Declaration -> (Ident, SourceType)
 memberToNameAndType (TypeDeclaration td) = unwrapTypeDeclaration td

@@ -242,10 +242,6 @@ renameInModule imports (Module modSS coms mn decls exps) =
       ValueFixityDeclaration sa fixity . fmap Right
         <$> updateDataConstructorName (Qualified mn' alias) ss
         <*> pure op
-  updateDecl bound (DeriveClauseDeclaration sa@(ss, _) tyName tyVars className) =
-    fmap (bound,) $
-      DeriveClauseDeclaration sa tyName tyVars
-        <$> updateClassName className ss
   updateDecl b d =
     return (b, d)
 

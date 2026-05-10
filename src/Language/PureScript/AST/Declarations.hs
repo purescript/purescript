@@ -445,11 +445,6 @@ data Declaration
   -- declaration, while the second @SourceAnn@ serves as the
   -- annotation for the type class and its arguments.
   | TypeInstanceDeclaration SourceAnn SourceAnn ChainId Integer (Either Text Ident) [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
-  -- |
-  -- A derive clause attached to a data or newtype declaration
-  -- (annotation, type name, type vars, class name)
-  --
-  | DeriveClauseDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe SourceType)] (Qualified (ProperName 'ClassName))
   deriving (Show, Generic, NFData)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -511,7 +506,6 @@ declSourceAnn (FixityDeclaration sa _) = sa
 declSourceAnn (ImportDeclaration sa _ _ _) = sa
 declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
 declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _ _) = sa
-declSourceAnn (DeriveClauseDeclaration sa _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
@@ -536,7 +530,6 @@ declName DataBindingGroupDeclaration{} = Nothing
 declName BoundValueDeclaration{} = Nothing
 declName KindDeclaration{} = Nothing
 declName TypeDeclaration{} = Nothing
-declName DeriveClauseDeclaration{} = Nothing
 
 -- |
 -- Test if a declaration is a value declaration
