@@ -445,7 +445,7 @@ convertBinder fileName = go
 
 convertDeclaration :: String -> Declaration a -> [AST.Declaration]
 convertDeclaration fileName decl = case decl of
-  DeclData _ (DataHead _ a vars) bd drvs -> do
+  DeclData _ (DataHead _ a vars) bd deriveClauses -> do
     let
       ctrs :: SourceToken -> DataCtor b -> [(SourceToken, DataCtor b)] -> [AST.DataConstructorDeclaration]
       ctrs st (DataCtor _ name fields) tl
@@ -455,16 +455,16 @@ convertDeclaration fileName decl = case decl of
             (st', ctor) : tl' -> ctrs st' ctor tl'
           )
     AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
-      : convertDeriveClauses fileName (nameValue a) drvs
+      : convertDeriveClauses fileName (nameValue a) deriveClauses
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
       (goTypeVar <$> vars)
       (convertType fileName bd)
-  DeclNewtype _ (DataHead _ a vars) st x ys drvs -> do
+  DeclNewtype _ (DataHead _ a vars) st x ys deriveClauses -> do
     let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(headDef (internalError "No constructor name") ctrFields, convertType fileName ys)]]
     AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
-      : convertDeriveClauses fileName (nameValue a) drvs
+      : convertDeriveClauses fileName (nameValue a) deriveClauses
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
       goTyVar (TypeVarKinded (Wrapped _ (Labeled (_, a) _ _) _)) = nameValue a
