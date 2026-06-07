@@ -205,11 +205,12 @@ flattenRole = pure . roleTok
 
 flattenDeclaration :: Declaration a -> DList SourceToken
 flattenDeclaration = \case
-  DeclData _ a b ->
+  DeclData _ a b drvs ->
     flattenDataHead a <>
-    foldMap (\(t, cs) -> pure t <> flattenSeparated flattenDataCtor cs) b
-  DeclType _ a b c ->flattenDataHead a <> pure b <> flattenType c
-  DeclNewtype _ a b c d -> flattenDataHead a <> pure b <> flattenName c <> flattenType d
+    foldMap (\(t, ctrs) -> pure t <> flattenSeparated flattenDataCtor ctrs) b <>
+    foldMap flattenDeriveClause drvs
+  DeclType _ a b c -> flattenDataHead a <> pure b <> flattenType c
+  DeclNewtype _ a b c d drvs -> flattenDataHead a <> pure b <> flattenName c <> flattenType d <> foldMap flattenDeriveClause drvs
   DeclClass _ a b ->
     flattenClassHead a <>
     foldMap (\(c, d) -> pure c <> foldMap (flattenLabeled flattenName flattenType) d) b
@@ -221,6 +222,16 @@ flattenDeclaration = \case
   DeclForeign _ a b c -> pure a <> pure b <> flattenForeign c
   DeclRole _ a b c d -> pure a <> pure b <> flattenName c <> foldMap flattenRole d
   DeclValue _ a -> flattenValueBindingFields a
+
+  where
+  flattenDeriveClass :: DeriveClass -> DList SourceToken
+  flattenDeriveClass (DeriveClass cls) =
+    flattenQualifiedName cls
+
+  flattenDeriveClause :: DeriveClause -> DList SourceToken
+  flattenDeriveClause (DeriveClause kw classes) =
+    pure kw <>
+    flattenWrapped (flattenSeparated flattenDeriveClass) classes
 
 flattenQualifiedName :: QualifiedName a -> DList SourceToken
 flattenQualifiedName = pure . qualTok

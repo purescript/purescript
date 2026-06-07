@@ -445,7 +445,7 @@ convertBinder fileName = go
 
 convertDeclaration :: String -> Declaration a -> [AST.Declaration]
 convertDeclaration fileName decl = case decl of
-  DeclData _ (DataHead _ a vars) bd -> do
+  DeclData _ (DataHead _ a vars) bd deriveClauses -> do
     let
       ctrs :: SourceToken -> DataCtor b -> [(SourceToken, DataCtor b)] -> [AST.DataConstructorDeclaration]
       ctrs st (DataCtor _ name fields) tl
@@ -454,15 +454,17 @@ convertDeclaration fileName decl = case decl of
             [] -> []
             (st', ctor) : tl' -> ctrs st' ctor tl'
           )
-    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
+    AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
+      : convertDeriveClauses fileName (nameValue a) deriveClauses
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
       (goTypeVar <$> vars)
       (convertType fileName bd)
-  DeclNewtype _ (DataHead _ a vars) st x ys -> do
+  DeclNewtype _ (DataHead _ a vars) st x ys deriveClauses -> do
     let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(headDef (internalError "No constructor name") ctrFields, convertType fileName ys)]]
-    pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
+    AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
+      : convertDeriveClauses fileName (nameValue a) deriveClauses
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
       goTyVar (TypeVarKinded (Wrapped _ (Labeled (_, a) _ _) _)) = nameValue a
@@ -553,25 +555,8 @@ convertDeclaration fileName decl = case decl of
 
   mkPartialInstanceName :: Maybe (Name Ident, SourceToken) -> QualifiedName (N.ProperName 'N.ClassName) -> [Type a] -> Either Text.Text N.Ident
   mkPartialInstanceName nameSep cls args =
-    maybe (Left genName) (Right . ident . nameValue . fst) nameSep
+    maybe (Left (genInstanceName cls (foldMap argName args))) (Right . ident . nameValue . fst) nameSep
     where
-      -- truncate to 25 chars to reduce verbosity
-      -- of name and still keep it readable
-      -- name will be used to create a GenIdent
-      -- in desugaring process
-      genName :: Text.Text
-      genName = Text.take 25 (className <> typeArgs)
-
-      className :: Text.Text
-      className
-        = foldMap (uncurry Text.cons . first toLower)
-        . Text.uncons
-        . N.runProperName
-        $ qualName cls
-
-      typeArgs :: Text.Text
-      typeArgs = foldMap argName args
-
       argName :: Type a -> Text.Text
       argName = \case
         -- These are only useful to disambiguate between overlapping instances
@@ -618,6 +603,36 @@ convertDeclaration fileName decl = case decl of
       qualRange cls
     else
       (fst $ qualRange cls, snd $ typeRange $ last args)
+
+convertDeriveClauses
+  :: String
+  -> N.ProperName 'N.TypeName
+  -> [DeriveClause]
+  -> [AST.Declaration]
+convertDeriveClauses fileName tyName = concatMap go
+  where
+  go (DeriveClause _ (Wrapped _ classes _)) = map convertClass (toList classes)
+  convertClass (DeriveClass cls) =
+    AST.TypeInstanceDeclaration clsAnn clsAnn chainId 0 (Left genName)
+      []
+      (qualified cls)
+      [tyCon]
+      AST.DerivedInstance
+    where
+    clsAnn = uncurry (sourceAnnCommented fileName) (qualRange cls)
+    chainId = mkChainId fileName (Pos.spanStart (fst clsAnn))
+    tyCon = T.TypeConstructor clsAnn (N.Qualified N.ByNullSourcePos tyName)
+    genName = genInstanceName cls (N.runProperName tyName)
+
+genInstanceName :: QualifiedName (N.ProperName 'N.ClassName) -> Text.Text -> Text.Text
+genInstanceName cls typeArgs = Text.take 25 (className <> typeArgs)
+  where
+  className :: Text.Text
+  className
+    = foldMap (uncurry Text.cons . first toLower)
+    . Text.uncons
+    . N.runProperName
+    $ qualName cls
 
 convertSignature :: String -> Labeled (Name Ident) (Type a) -> AST.Declaration
 convertSignature fileName (Labeled a _ b) = do

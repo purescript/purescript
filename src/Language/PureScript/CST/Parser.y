@@ -661,10 +661,10 @@ import :: { Import () }
   | 'class' properName { ImportClass () $1 (getProperName $2) }
 
 decl :: { Declaration () }
-  : dataHead { DeclData () $1 Nothing }
-  | dataHead '=' sep(dataCtor, '|') { DeclData () $1 (Just ($2, $3)) }
+  : dataHead manyOrEmpty(deriveClause) { DeclData () $1 Nothing $2 }
+  | dataHead '=' sep(dataCtor, '|') manyOrEmpty(deriveClause) { DeclData () $1 (Just ($2, $3)) $4 }
   | typeHead '=' type {% checkNoWildcards $3 *> pure (DeclType () $1 $2 $3) }
-  | newtypeHead '=' properName typeAtom {% checkNoWildcards $4 *> pure (DeclNewtype () $1 $2 (getProperName $3) $4) }
+  | newtypeHead '=' properName typeAtom manyOrEmpty(deriveClause) {% checkNoWildcards $4 *> pure (DeclNewtype () $1 $2 (getProperName $3) $4 $5) }
   | classHead { either id (\h -> DeclClass () h Nothing) $1 }
   | classHead 'where' '\{' manySep(classMember, '\;') '\}' {% either (const (parseError $2)) (\h -> pure $ DeclClass () h (Just ($2, $4))) $1 }
   | instHead { DeclInstanceChain () (Separated (Instance $1 Nothing) []) }
@@ -680,6 +680,12 @@ decl :: { Declaration () }
   | 'foreign' 'import' ident '::' type {% when (isConstrained $5) (addFailure ([$1, $2, nameTok $3, $4] <> toList (flattenType $5)) ErrConstraintInForeignImportSyntax) *> pure (DeclForeign () $1 $2 (ForeignValue (Labeled $3 $4 $5))) }
   | 'foreign' 'import' 'data' properName '::' type { DeclForeign () $1 $2 (ForeignData $3 (Labeled (getProperName $4) $5 $6)) }
   | 'type' 'role' properName many(role) { DeclRole () $1 $2 (getProperName $3) $4 }
+
+deriveClause :: { DeriveClause }
+  : 'derive' '(' sep(deriveClass, ',') ')' { DeriveClause $1 (Wrapped $2 $3 $4) }
+
+deriveClass :: { DeriveClass }
+  : qualProperName { DeriveClass (getQualifiedProperName $1) }
 
 dataHead :: { DataHead () }
   : 'data' properName manyOrEmpty(typeVarBindingPlain) { DataHead $1 (getProperName $2) $3 }

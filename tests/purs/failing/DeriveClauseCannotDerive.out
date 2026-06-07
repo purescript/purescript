@@ -1,0 +1,14 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/DeriveClauseCannotDerive.purs:7:11 - 7:18 (line 7, column 11 - line 7, column 18)
+
+  Cannot derive a type class instance for
+  [33m                  [0m
+  [33m  Main.MyClass Foo[0m
+  [33m                  [0m
+  since instances of this type class are not derivable.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CannotDerive.md for more information,
+or to contribute content related to this error.
+

@@ -15,7 +15,7 @@ import Language.PureScript.Environment (DataDeclType(..), NameKind(..))
 import Language.PureScript.Errors (MultipleErrors, SimpleErrorMessage(..), errorMessage')
 import Language.PureScript.Names (pattern ByNullSourcePos, Ident(..), ModuleName, ProperName(..), ProperNameType(..), Qualified(..), QualifiedBy(..), freshIdent)
 import Language.PureScript.PSString (mkString)
-import Language.PureScript.Types (SourceType, Type(..), WildcardData(..), replaceAllTypeVars, srcTypeApp, srcTypeConstructor, srcTypeLevelString)
+import Language.PureScript.Types (SourceType, Type(..), WildcardData(..), replaceAllTypeVars, srcTypeApp, srcTypeConstructor, srcTypeLevelString, srcTypeVar)
 import Language.PureScript.TypeChecker (checkNewtype)
 
 -- | Elaborates deriving instance declarations by code generation.
@@ -46,16 +46,32 @@ deriveInstance
 deriveInstance mn ds decl =
   case decl of
     TypeInstanceDeclaration sa@(ss, _) na ch idx nm deps className tys DerivedInstance -> let
+      -- Attached `derive (Generic)` / `derive (Newtype)` produces `[T]`.
+      -- These two classes need the fully-applied type plus a trailing
+      -- wildcard, so pad the args before falling into the standard handler.
+      paddedTys = case tys of
+        [bareTy]
+          | className == Libs.Generic || className == Libs.Newtype
+          , Just utc <- unwrapTypeConstructor bareTy
+          , mn == utcModuleName utc
+          , null (utcArgs utc)
+          , Just (DataDeclaration _ _ _ tyVars _) <- find (matchesTyName (utcTyCon utc)) ds ->
+              let applied = foldl srcTypeApp bareTy (map (srcTypeVar . fst) tyVars)
+              in [applied, TypeWildcard sa UnnamedWildcard]
+        _ -> tys
+      matchesTyName n (DataDeclaration _ _ n' _ _) = n == n'
+      matchesTyName _ _ = False
+
       binaryWildcardClass :: (Declaration -> [SourceType] -> m ([Declaration], SourceType)) -> m Declaration
-      binaryWildcardClass f = case tys of
+      binaryWildcardClass f = case paddedTys of
         [ty1, ty2] -> case unwrapTypeConstructor ty1 of
           Just UnwrappedTypeConstructor{..} | mn == utcModuleName -> do
             checkIsWildcard ss utcTyCon ty2
             tyConDecl <- findTypeDecl ss utcTyCon ds
             (members, ty2') <- f tyConDecl utcArgs
             pure $ TypeInstanceDeclaration sa na ch idx nm deps className [ty1, ty2'] (ExplicitInstance members)
-          _ -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty1
-        _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 2
+          _ -> throwError . errorMessage' ss $ ExpectedTypeConstructor className paddedTys ty1
+        _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className paddedTys 2
 
       in case className of
         Libs.Generic -> binaryWildcardClass (deriveGenericRep ss mn)
