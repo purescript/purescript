@@ -624,10 +624,6 @@ convertDeriveClauses fileName tyName = concatMap go
     tyCon = T.TypeConstructor clsAnn (N.Qualified N.ByNullSourcePos tyName)
     genName = genInstanceName cls (N.runProperName tyName)
 
--- | The auto-generated name for an instance, built from the class name (with a
--- lowercased head) followed by the rendered type arguments. Truncated to 25
--- chars to reduce verbosity while keeping it readable; the name is used to
--- create a GenIdent in the desugaring process.
 genInstanceName :: QualifiedName (N.ProperName 'N.ClassName) -> Text.Text -> Text.Text
 genInstanceName cls typeArgs = Text.take 25 (className <> typeArgs)
   where
