@@ -203,15 +203,6 @@ flattenForeign = \case
 flattenRole :: Role -> DList SourceToken
 flattenRole = pure . roleTok
 
-flattenDeriveClass :: DeriveClass -> DList SourceToken
-flattenDeriveClass (DeriveClass cls) =
-  flattenQualifiedName cls
-
-flattenDeriveClause :: DeriveClause -> DList SourceToken
-flattenDeriveClause (DeriveClause kw classes) =
-  pure kw <>
-  flattenWrapped (flattenSeparated flattenDeriveClass) classes
-
 flattenDeclaration :: Declaration a -> DList SourceToken
 flattenDeclaration = \case
   DeclData _ a b drvs ->
@@ -231,6 +222,16 @@ flattenDeclaration = \case
   DeclForeign _ a b c -> pure a <> pure b <> flattenForeign c
   DeclRole _ a b c d -> pure a <> pure b <> flattenName c <> foldMap flattenRole d
   DeclValue _ a -> flattenValueBindingFields a
+
+  where
+  flattenDeriveClass :: DeriveClass -> DList SourceToken
+  flattenDeriveClass (DeriveClass cls) =
+    flattenQualifiedName cls
+
+  flattenDeriveClause :: DeriveClause -> DList SourceToken
+  flattenDeriveClause (DeriveClause kw classes) =
+    pure kw <>
+    flattenWrapped (flattenSeparated flattenDeriveClass) classes
 
 flattenQualifiedName :: QualifiedName a -> DList SourceToken
 flattenQualifiedName = pure . qualTok
