@@ -555,25 +555,8 @@ convertDeclaration fileName decl = case decl of
 
   mkPartialInstanceName :: Maybe (Name Ident, SourceToken) -> QualifiedName (N.ProperName 'N.ClassName) -> [Type a] -> Either Text.Text N.Ident
   mkPartialInstanceName nameSep cls args =
-    maybe (Left genName) (Right . ident . nameValue . fst) nameSep
+    maybe (Left (genInstanceName cls (foldMap argName args))) (Right . ident . nameValue . fst) nameSep
     where
-      -- truncate to 25 chars to reduce verbosity
-      -- of name and still keep it readable
-      -- name will be used to create a GenIdent
-      -- in desugaring process
-      genName :: Text.Text
-      genName = Text.take 25 (className <> typeArgs)
-
-      className :: Text.Text
-      className
-        = foldMap (uncurry Text.cons . first toLower)
-        . Text.uncons
-        . N.runProperName
-        $ qualName cls
-
-      typeArgs :: Text.Text
-      typeArgs = foldMap argName args
-
       argName :: Type a -> Text.Text
       argName = \case
         -- These are only useful to disambiguate between overlapping instances
@@ -639,10 +622,21 @@ convertDeriveClauses fileName tyName = concatMap go
     clsAnn = uncurry (sourceAnnCommented fileName) (qualRange cls)
     chainId = mkChainId fileName (Pos.spanStart (fst clsAnn))
     tyCon = T.TypeConstructor clsAnn (N.Qualified N.ByNullSourcePos tyName)
-    genName = Text.take 25 (lowerHead (N.runProperName (qualName cls)) <> N.runProperName tyName)
-    lowerHead t = case Text.uncons t of
-      Just (c, cs) -> Text.cons (toLower c) cs
-      Nothing -> t
+    genName = genInstanceName cls (N.runProperName tyName)
+
+-- | The auto-generated name for an instance, built from the class name (with a
+-- lowercased head) followed by the rendered type arguments. Truncated to 25
+-- chars to reduce verbosity while keeping it readable; the name is used to
+-- create a GenIdent in the desugaring process.
+genInstanceName :: QualifiedName (N.ProperName 'N.ClassName) -> Text.Text -> Text.Text
+genInstanceName cls typeArgs = Text.take 25 (className <> typeArgs)
+  where
+  className :: Text.Text
+  className
+    = foldMap (uncurry Text.cons . first toLower)
+    . Text.uncons
+    . N.runProperName
+    $ qualName cls
 
 convertSignature :: String -> Labeled (Name Ident) (Type a) -> AST.Declaration
 convertSignature fileName (Labeled a _ b) = do
