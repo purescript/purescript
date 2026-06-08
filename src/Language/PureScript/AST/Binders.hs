@@ -7,6 +7,7 @@ module Language.PureScript.AST.Binders where
 import Prelude
 
 import Control.DeepSeq (NFData)
+import Codec.Serialise (Serialise)
 import GHC.Generics (Generic)
 import Language.PureScript.AST.SourcePos (SourceSpan)
 import Language.PureScript.AST.Literals (Literal(..))
@@ -64,7 +65,7 @@ data Binder
   -- A binder with a type annotation
   --
   | TypedBinder SourceType Binder
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Serialise)
 
 -- Manual Eq and Ord instances for `Binder` were added on 2018-03-05. Comparing
 -- the `SourceSpan` values embedded in some of the data constructors of `Binder`

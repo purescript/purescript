@@ -1,5 +1,5 @@
 module Language.PureScript.AST.Declarations.ChainId
-  ( ChainId
+  ( ChainId(..)
   , mkChainId
   ) where
 

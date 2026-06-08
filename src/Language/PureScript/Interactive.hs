@@ -60,7 +60,7 @@ rebuild
   -> P.Module
   -> P.Make (P.ExternsFile, P.Environment)
 rebuild loadedExterns m = do
-    externs <- P.rebuildModule buildActions loadedExterns m
+    externs <- P.rebuildModule buildActions loadedExterns (mempty, m)
     return (externs, foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment (loadedExterns ++ [externs]))
   where
     buildActions :: P.MakeActions P.Make
