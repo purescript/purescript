@@ -1,0 +1,26 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/LocalStandaloneKindSignatures.purs:9:20 - 9:25 (line 9, column 20 - line 9, column 25)
+
+  Could not match kind
+  [33m        [0m
+  [33m  Symbol[0m
+  [33m        [0m
+  with kind
+  [33m      [0m
+  [33m  Type[0m
+  [33m      [0m
+
+while checking that type [33m"foo"[0m
+  has kind [33mType[0m
+while inferring the kind of [33mFst Int "foo"[0m
+in type synonym [33mF[0m
+while checking that expression [33mresult      [0m
+                               [33m  where     [0m
+                               [33m  result = 0[0m
+  has type [33mInt[0m
+in value declaration [33mfoo[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

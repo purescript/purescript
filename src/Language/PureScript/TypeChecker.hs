@@ -19,7 +19,7 @@ import Control.Monad.Writer.Class (MonadWriter, tell)
 
 import Data.Foldable (for_, traverse_, toList)
 import Data.List (nubBy, (\\), sort, group)
-import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Either (partitionEithers)
 import Data.Text (Text)
 import Data.List.NonEmpty qualified as NEL
@@ -189,16 +189,6 @@ addTypeClassDictionaries
 addTypeClassDictionaries mn entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
   where insertState st = M.insertWith (M.unionWith (M.unionWith (<>))) mn entries (typeClassDictionaries . checkEnv $ st)
-
-checkDuplicateTypeArguments
-  :: (MonadState CheckState m, MonadError MultipleErrors m)
-  => [Text]
-  -> m ()
-checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
-  throwError . errorMessage $ DuplicateTypeArgument dup
-  where
-  firstDup :: Maybe Text
-  firstDup = listToMaybe $ args \\ ordNub args
 
 checkTypeClassInstance
   :: (MonadState CheckState m, MonadError MultipleErrors m)
