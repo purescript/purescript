@@ -45,6 +45,7 @@ import Data.String (String)
 
 import Language.PureScript.AST qualified as P
 import Language.PureScript.AST.Declarations.ChainId (ChainId (..))
+import Language.PureScript.Constants.Libs qualified as C
 import Language.PureScript.Constants.Prim (primModules)
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment qualified as P
@@ -52,7 +53,6 @@ import Language.PureScript.Externs qualified as P
 import Language.PureScript.Names (ModuleName)
 import Language.PureScript.Names qualified as P
 import Language.PureScript.Types qualified as P
-import Language.PureScript.AST.SourcePos (modifySpanName)
 
 -- Refs structure appropriate for storing and checking externs diffs.
 data Ref
@@ -96,10 +96,12 @@ isRefRemoved Removed = True
 isRefRemoved _ = False
 
 -- To get changed reexported refs, we take those which were removed (not
--- present in new extern's exports) or changed in dependencies.
+-- present in new extern's exports) or changed in dependencies. Refs that are
+-- newly reexported are also included (as Added): they may conflict with
+-- names already in scope in downstream modules.
 getReExported :: P.ExternsFile -> P.ExternsFile -> ModuleRefsMap -> RefsWithStatus
 getReExported newExts oldExts depsDiffsMap =
-  M.fromList $ mapMaybe checkRe $ S.toList oldExports
+  M.union (M.fromList $ mapMaybe checkRe $ S.toList oldExports) addedRefs
   where
     goRe (P.ReExportRef _ es ref) = S.mapMonotonic (P.exportSourceDefinedIn es,) (toRefs ref)
     goRe _ = S.empty
@@ -110,6 +112,8 @@ getReExported newExts oldExts depsDiffsMap =
       | (mn, ref) `notElem` newReExports = Just (ref, Removed)
       | Just True <- elem ref <$> M.lookup mn depsDiffsMap = Just (ref, Updated)
       | otherwise = Nothing
+    addedRefs =
+      M.fromSet (const Added) $ S.map snd (S.difference newReExports oldExports)
 
 -- Extracts declarations from old and new externs and compares them. Returns a
 -- tuple of changed refs (a form of which have changed) and unchanged refs with
@@ -273,7 +277,9 @@ data DiffRef
 
 data DiffAction
   = NoChange
-  | Patch (P.SourceSpan -> P.SourceSpan)
+  | -- | Maps old source file names to new ones; the previous build result
+    -- can be reused with the file names patched.
+    Patch (String -> String)
   | DiffRef DiffRef
 
 -- Checks if the module effectively uses any of diff's refs.
@@ -281,7 +287,7 @@ checkDiffs :: P.Module -> Maybe (String, String) -> [ExternsDiff] -> DiffAction
 checkDiffs (P.Module _ _ _ decls exports) moduleNameDiff diffs
   | Just renames <- M.fromList . catMaybes  . (moduleNameDiff :) <$> traverse isTrivial diffs
     = if M.null renames then NoChange else Patch $
-        modifySpanName $ \name -> fromMaybe name (M.lookup name renames)
+        \name -> fromMaybe name (M.lookup name renames)
   | otherwise = case makeSearches decls diffs of
       Left r -> DiffRef (ImportedRef r)
       Right searches
@@ -292,14 +298,18 @@ checkDiffs (P.Module _ _ _ decls exports) moduleNameDiff diffs
   where
     noRealChange = case moduleNameDiff of
       Nothing -> NoChange
-      Just (prev, next) -> Patch $ modifySpanName $ \name -> if name == prev then next else name
-    -- Check if the module reexports any of searched refs.
+      Just (prev, next) -> Patch $ \name -> if name == prev then next else name
+    -- Check if the module reexports any of searched refs. A `module M`
+    -- export reexports refs imported under the qualifier M, as well as refs
+    -- imported from the module M itself without qualification (the common
+    -- `module B (module A) where import A` prelude pattern).
     checkReExports searches =
       map (\(mn, _, ref) -> (mn, ref)) $
         exports >>=
          listToMaybe . foldMap
           ( \case
-              P.ModuleRef _ mn -> maybeToList $ find (\(_, mn' ,_) -> mn' == Just mn ) searches
+              P.ModuleRef _ mn -> maybeToList $
+                find (\(mnDef, mn', _) -> mn' == Just mn || (isNothing mn' && mnDef == mn)) searches
               _ -> []
           )
 
@@ -356,7 +366,18 @@ checkUsage searches decls = listToMaybe anyUsages
         | otherwise -> checkValue n
       P.Constructor _ n -> checkCtor n
       P.Op _ n -> checkValueOp n
+      -- Do/ado notation and unary minus are desugared later into references
+      -- to `bind`/`discard`, `map`/`apply`/`pure` and `negate` respectively
+      -- (qualified for qualified do/ado), so those hidden usages have to be
+      -- searched here explicitly.
+      P.Do mbQual _ ->
+        foldMap (checkValue . mkQualified mbQual) [C.S_bind, C.S_discard]
+      P.Ado mbQual _ _ ->
+        foldMap (checkValue . mkQualified mbQual) [C.S_map, C.S_apply, C.S_pure]
+      P.UnaryMinus _ _ -> checkValue (mkQualified Nothing C.S_negate)
       _ -> mempty
+
+    mkQualified mbQual = P.Qualified (P.byMaybeModuleName mbQual) . P.Ident
 
     goBinder _ binder = case binder of
       P.ConstructorBinder _ n _ -> checkCtor n

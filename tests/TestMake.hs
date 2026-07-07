@@ -143,8 +143,18 @@ spec = do
       writeModule "Module2" content
       compileAll >>= completelyRenamed ["Module1"] []
 
+      compileAll >>= expectCompiled []
+
     it "replaces file paths downstream" $ do
-      let content = "module Module where\ntype Foo = Int\n"
+      -- The instance chain makes sure chain ids (which contain the source
+      -- file name) are patched in the externs as well.
+      let content = T.unlines
+            [ "module Module where"
+            , "type Foo = Int"
+            , "class Cls a where m :: a -> Int"
+            , "instance Cls Int where m _ = 0"
+            , "else instance Cls a where m _ = 1"
+            ]
       let downstream = "module Downstream where\nimport Module (Foo)\nbar :: Foo\nbar = 0\n"
 
       writeModule "Module1" content
@@ -154,6 +164,8 @@ spec = do
 
       writeModule "Module2" content
       compileAll >>= completelyRenamed ["Module1"] []
+
+      compileAll >>= expectCompiled []
 
     it "does not necessarily recompile modules which were not part of the previous batch" $ do
       writeModule "A" "module A where\nfoo = 0\n"
@@ -469,6 +481,517 @@ spec = do
 
       compileAll >>= expectCompiled ["A"]
 
+    it "recompiles downstream when a reexported ref changed" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B (module E) where\nimport A (foo) as E\n"
+      writeModule "C" "module C where\nimport B as B\nbaz = B.foo\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "A" "module A where\nfoo = '1'\nbar = 1\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+    it "does not recompile downstream when a reexported ref changed but not used" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B (module E) where\nimport A as E\n"
+      -- Import but not use.
+      writeModule "C" "module C where\nimport B (foo)\nx = 1\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "A" "module A where\nfoo = '1'\nbar = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when a reexported ref removed" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B (module E) where\nimport A as E\n"
+      writeModule "C" "module C where\nimport B as B\nbaz = B.foo\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "A" "module A where\nbar = 1\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B", "C"]
+
+    it "recompiles downstream when a ref removed from the reexporting module" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B (module E) where\nimport A (foo) as E\n"
+      writeModule "C" "module C where\nimport B as B\nbaz = B.foo\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      -- Stop reexporting.
+      writeModule "B" "module B where\nimport A (foo) as E\nx = 1\n"
+      compileAll >>= expectCompiledWithFailure ["B", "C"]
+
+    it "recompiles downstream when a reexported ref removed (imported but not used)" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B (module E) where\nimport A (foo) as E\n"
+      -- Import but not use.
+      writeModule "C" "module C where\nimport B (foo) as B\nx = 1\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "B" "module B where\nimport A (foo) as E\nx = 1\n"
+      compileAll >>= expectCompiledWithFailure ["B", "C"]
+
+    it "recompiles downstream when a reexported ref removed in original (imported but not used)" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B (module E) where\nimport A as E\n"
+      -- Import but not use.
+      writeModule "C" "module C where\nimport B (foo)\nx = 1\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "A" "module A where\nbar = 1\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B", "C"]
+
+    -- The `module B (module A) where import A` pattern (unqualified import
+    -- reexported by the imported module's own name) is how Prelude-style
+    -- modules are commonly written, so the cut-off must handle it.
+
+    it "recompiles downstream when a ref reexported via unqualified import changed" $ do
+      writeModule "A" "module A where\nfoo :: Int\nfoo = 0\n"
+      writeModule "B" "module B (module A) where\nimport A\n"
+      writeModule "C" "module C where\nimport B (foo)\nbar :: Int\nbar = foo\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "A" "module A where\nfoo :: Boolean\nfoo = true\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B", "C"]
+
+    it "recompiles downstream when a ref reexported via unqualified import removed" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B (module A) where\nimport A\n"
+      writeModule "C" "module C where\nimport B (foo)\nbar = foo\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "A" "module A where\nqux = 1\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B", "C"]
+
+    it "recompiles downstream when an added reexport causes a conflict" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B (module A) where\nimport A\n"
+      writeModule "D" "module D where\nbar :: Int\nbar = 2\n"
+      writeModule "C" "module C where\nimport B\nimport D\nqux :: Int\nqux = bar\n"
+      compileAll >>= expectCompiled ["A", "B", "C", "D"]
+
+      -- A new `bar` flows through B's module reexport into C's open imports,
+      -- making C's use of `bar` ambiguous.
+      writeModule "A" "module A where\nfoo = 0\nbar = 1\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B", "C"]
+
+    it "recompiles downstream when a removed ref is found in explicit imports" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B where\nimport A (foo)\nbar = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\nfoo2 = 1\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B"]
+
+    it "does not recompile downstream when a removed ref is not used" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B where\nimport A\nbar = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\nfoo2 = 1\n"
+      compileAll >>= expectCompiled ["A"]
+
+    it "recompiles downstream when a changed ref is used through a hiding import" $ do
+      writeModule "A" "module A where\nfoo :: Int\nfoo = 0\nbar = 0\n"
+      writeModule "B" "module B where\nimport A hiding (bar)\nz :: Int\nz = foo\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\nfoo :: Char\nfoo = 'x'\nbar = 0\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B"]
+
+    it "recompiles downstream due to transitive change" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B where\nimport A (foo)\nbar = qux\nqux = foo\n"
+      writeModule "C" "module C where\nimport B (bar)\nbaz = bar\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "A" "module A where\nfoo = '1'\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+    it "does not recompile downstream if no transitive change" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B where\nimport A (foo)\nbar = 1\nqux = foo\n"
+      writeModule "C" "module C where\nimport B (bar)\nbaz = bar\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "A" "module A where\nfoo = '1'\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when found changed inlined type" $ do
+      writeModule "A" "module A where\ntype T = Int\n"
+      writeModule "B" "module B where\nimport A\nx = (1 :: T)\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ntype T = String\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B"]
+
+    it "does not recompile downstream if unused type changed" $ do
+      writeModule "A" "module A where\ntype SynA = Int\ntype SynA2 = Int\n"
+      writeModule "B" "module B where\nimport A as A\ntype SynB = A.SynA2\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ntype SynA = String\ntype SynA2 = Int\n"
+      compileAll >>= expectCompiled ["A"]
+
+    it "recompiles downstream when type synonym changed in foreign import" $ do
+      writeModule "A" "module A where\ntype SynA = Int\n"
+      writeModule "B" "module B where\nimport A as A\nforeign import a :: A.SynA\n"
+      writeForeign "B" "export var a = 1;\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ntype SynA = String\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when type synonym changed in type alias" $ do
+      writeModule "A" "module A where\ntype SynA = Int\n"
+      writeModule "B" "module B where\nimport A as A\ntype SynB = Array A.SynA\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ntype SynA = String\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when type synonym changed in value annotation" $ do
+      writeModule "A" "module A where\ntype SynA = Int\n"
+      writeModule "B" "module B where\nimport A as A\nvalue = ([] :: Array A.SynA)\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ntype SynA = String\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when type synonym changed in pattern annotation" $ do
+      writeModule "A" "module A where\ntype SynA = Int\n"
+      writeModule "B" "module B where\nimport A as A\nfn = \\(_ :: Array A.SynA) -> 0\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ntype SynA = String\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when type synonym dependency changed" $ do
+      writeModule "A" "module A where\ntype SynA = Int\ntype SynA2 = SynA\n"
+      writeModule "B" "module B where\nimport A as A\ntype SynB = Array A.SynA2\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ntype SynA = String\ntype SynA2 = SynA\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "transitively tracks type synonyms (via local synonym)" $ do
+      writeModule "A" "module A where\ntype TA = Int\n"
+      writeModule "B" "module B where\nimport A\ntype TB = TA\n"
+      writeModule "C" "module C where\nimport B\ntype TC = TB\nthingy :: TC\nthingy = 42\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+      compileAll >>= expectCompiled []
+
+      writeModule "A" "module A where\ntype TA = String\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B", "C"]
+
+    it "transitively tracks type synonyms (used directly)" $ do
+      writeModule "A" "module A where\ntype TA = Int\n"
+      writeModule "B" "module B where\nimport A\ntype TB = TA\n"
+      writeModule "C" "module C where\nimport B\nthingy :: TB\nthingy = 42\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+      compileAll >>= expectCompiled []
+
+      writeModule "A" "module A where\ntype TA = String\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B", "C"]
+
+    it "does not consider private type synonyms part of the public api" $ do
+      writeModule "A" "module A (pub) where\ntype Priv = Int\npub :: Int\npub = 42\npriv :: Priv\npriv = 1\n"
+      writeModule "B" "module B where\nimport A\nthingy :: Int\nthingy = pub\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A (pub) where\ntype Priv = String\npub :: Int\npub = 42\npriv :: Priv\npriv = \"1\"\n"
+      compileAll >>= expectCompiled ["A"]
+
+    it "recompiles downstream when class member type changed (class used in signature)" $ do
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Int\n"
+      writeModule "B" "module B where\nimport A as A\nfn :: forall a. A.Cls a => a -> Int\nfn _ = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Char\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when class member type changed (member used)" $ do
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Int\n"
+      writeModule "B" "module B where\nimport A as A\nfn x = A.m1 x\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Char\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when type class instance added" $ do
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Int\n"
+      writeModule "B" "module B where\nimport A as A\nfn :: forall a. A.Cls a => a -> Int\nfn _ = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Int\ninstance Cls Int where m1 _ = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when type class instance removed" $ do
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Int\ninstance Cls Int where m1 _ = 1\n"
+      writeModule "B" "module B where\nimport A (m1)\nx = m1 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Int\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B"]
+
+    it "recompiles downstream if instance added for a type" $ do
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Int\n"
+      writeModule "B" "module B where\nimport A\nnewtype T = T Int\n"
+      writeModule "C" "module C where\nimport B\nt = T 1\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "B" "module B where\nimport A\nnewtype T = T Int\ninstance Cls T where m1 _ = 1\n"
+      compileAll >>= expectCompiled ["B", "C"]
+
+    it "recompiles downstream if instance removed for a type" $ do
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Int\n"
+      writeModule "B" "module B where\nimport A\nnewtype T = T Int\ninstance Cls T where m1 _ = 1\n"
+      writeModule "C" "module C where\nimport A\nimport B\ni :: Int\ni = m1 (T 1)\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "B" "module B where\nimport A\nnewtype T = T Int\n"
+      compileAll >>= expectCompiledWithFailure ["B", "C"]
+
+    it "does not recompile downstream if instance added for a type and class changed" $ do
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Char\n"
+      writeModule "B" "module B where\nimport A\nnewtype T = T Int\n"
+      writeModule "C" "module C where\nimport B\ntype C2 = T\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+
+      writeModule "A" "module A where\nclass Cls a where m1 :: a -> Int\n"
+      writeModule "B" "module B where\nimport A\nnewtype T = T Int\ninstance Cls T where m1 _ = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    -- Instance *implementations* are not part of externs, so changing only
+    -- the body must not rebuild downstream.
+
+    it "does not recompile downstream when instance implementation changed (class module)" $ do
+      writeModule "A" "module A where\nclass TC a where\n  tc :: a\ninstance TC Int where\n  tc = 42\n"
+      writeModule "B" "module B where\nimport A\nthingy = tc\n"
+      writeModule "C" "module C where\nimport B\nasdf = thingy :: Int\n"
+      compileAll >>= expectCompiled ["A", "B", "C"]
+      compileAll >>= expectCompiled []
+
+      writeModule "A" "module A where\nclass TC a where\n  tc :: a\ninstance TC Int where\n  tc = 55\n"
+      compileAll >>= expectCompiled ["A"]
+      compileAll >>= expectCompiled []
+
+    it "does not recompile downstream when instance implementation changed (type module)" $ do
+      writeModule "A" "module A where\nclass TC a where\n  tc :: a\n"
+      writeModule "B" "module B where\nimport A\ndata BT = BT Int\ninstance TC BT where\n  tc = BT 42\n"
+      writeModule "C" "module C where\nimport A\nthingy = tc\n"
+      writeModule "D" "module D where\nimport B\nimport C\nasdf = thingy :: BT\n"
+      compileAll >>= expectCompiled ["A", "B", "C", "D"]
+      compileAll >>= expectCompiled []
+
+      writeModule "B" "module B where\nimport A\ndata BT = BT Int\ninstance TC BT where\n  tc = BT 55\n"
+      compileAll >>= expectCompiled ["B"]
+      compileAll >>= expectCompiled []
+
+    -- Superclass changes alter dictionary structure and must rebuild
+    -- everything that uses the class, its members, or instances of it.
+
+    it "tracks type class superclass changes across module boundaries" $ do
+      let mA sup = "module A where\nclass " <> sup <> " <= TC a where\n  tc :: a\nclass TCA a\nclass TCB a\nclass TCC a\n"
+      writeModule "A" (mA "TCA a")
+      writeModule "B" "module B where\nimport A\ndata BT = BT Int\ninstance TC BT where\n  tc = BT 55\ninstance TCA BT\ninstance TCB BT\n"
+      writeModule "C" "module C where\nimport A\nthingy = tc\n"
+      writeModule "D" "module D where\nimport B\nimport C\nasdf = thingy :: BT\n"
+      compileAll >>= expectCompiled ["A", "B", "C", "D"]
+      compileAll >>= expectCompiled []
+
+      -- Swap the superclass.
+      writeModule "A" (mA "TCB a")
+      compileAll >>= expectCompiled ["A", "B", "C", "D"]
+      compileAll >>= expectCompiled []
+
+      -- Add a second superclass.
+      writeModule "A" (mA "(TCA a, TCB a)")
+      compileAll >>= expectCompiled ["A", "B", "C", "D"]
+      compileAll >>= expectCompiled []
+
+      -- Change the superclass to one without an instance for BT: B's
+      -- instance declaration fails, D is skipped because B failed.
+      writeModule "A" (mA "TCC a")
+      compileAll >>= expectCompiledWithFailure ["A", "B", "C"]
+
+      -- Change back to a working superclass; B failed before so it is
+      -- rebuilt, and D comes back once B succeeds again.
+      writeModule "A" (mA "TCA a")
+      compileAll >>= expectCompiled ["A", "B", "C", "D"]
+      compileAll >>= expectCompiled []
+
+    it "recompiles downstream when instances in a chain are reordered" $ do
+      writeModule "A" "module A where\nclass Cls a where m :: a -> Int\ninstance Cls Int where m _ = 1\nelse instance Cls a where m _ = 2\n"
+      writeModule "B" "module B where\nimport A (m)\nb = m 'x'\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\nclass Cls a where m :: a -> Int\ninstance Cls a where m _ = 2\nelse instance Cls Int where m _ = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when value op fixity changed" $ do
+      writeModule "A" "module A where\ndata T a = T Int a\ninfixl 2 T as :+:\n"
+      writeModule "B" "module B where\nimport A\nt = 1 :+: \"1\"\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata T a = T Int a\ninfixl 3 T as :+:\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when value op target changed" $ do
+      writeModule "A" "module A where\ndata T a = T a String\ninfixl 2 T as :+:\n"
+      writeModule "B" "module B where\nimport A\nt = 1 :+: \"1\"\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata T a = T Int a\ninfixl 2 T as :+:\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when type op fixity changed" $ do
+      writeModule "A" "module A where\ndata T a b = T a b\ninfixl 2 type T as :+:\n"
+      writeModule "B" "module B where\nimport A\nfn :: Int :+: String -> Int\nfn _ = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata T a b = T a b\ninfixl 3 type T as :+:\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    it "recompiles downstream when type op target changed" $ do
+      writeModule "A" "module A where\ndata T a b = T a b\ndata U a b = U a b\ninfixl 2 type T as :+:\n"
+      writeModule "B" "module B where\nimport A\nfn :: Int :+: String -> Int\nfn _ = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata T a b = T a b\ndata U a b = U a b\ninfixl 2 type U as :+:\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+    -- Renaming/swapping declaration-side type arguments (with unchanged
+    -- kinds and roles) does not change the meaning of the type constructor
+    -- for type-only users; only its data constructors change (constructor
+    -- users are covered by "changing order of data type arguments causes
+    -- downstream rebuild").
+    it "does not recompile type-only users when data type args are swapped in place" $ do
+      writeModule "A" "module A where\ndata T a b = T a b\ninfixl 2 type T as :+:\n"
+      writeModule "B" "module B where\nimport A\nfn :: Int :+: String -> Int\nfn _ = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata T b a = T a b\ninfixl 2 type T as :+:\n"
+      compileAll >>= expectCompiled ["A"]
+
+    -- HIDDEN DESUGARING DEPENDENCIES: do/ado notation and unary minus
+    -- resolve to `bind`/`discard`/`map`/`apply`/`pure`/`negate` only during
+    -- desugaring, so the usage check must account for them explicitly.
+
+    it "recompiles downstream when qualified-do bind removed" $ do
+      writeModule "A" "module A where\ndata Box a = Box a\nbox :: forall a. a -> Box a\nbox = Box\nbind :: forall a b. Box a -> (a -> Box b) -> Box b\nbind (Box a) f = f a\n"
+      writeModule "B" "module B where\nimport A as A\nf :: A.Box Int\nf = A.do\n  x <- A.box 1\n  A.box x\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata Box a = Box a\nbox :: forall a. a -> Box a\nbox = Box\nbind2 :: forall a b. Box a -> (a -> Box b) -> Box b\nbind2 (Box a) f = f a\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B"]
+
+    it "recompiles downstream when qualified-do bind type changed" $ do
+      writeModule "A" "module A where\ndata Box a = Box a\nbox :: forall a. a -> Box a\nbox = Box\nbind :: forall a b. Box a -> (a -> Box b) -> Box b\nbind (Box a) f = f a\n"
+      writeModule "B" "module B where\nimport A as A\nf :: A.Box Int\nf = A.do\n  x <- A.box 1\n  A.box x\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata Box a = Box a\nbox :: forall a. a -> Box a\nbox = Box\nbind :: Box String -> (String -> Box String) -> Box String\nbind (Box a) f = f a\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B"]
+
+    it "recompiles downstream when qualified-ado map removed" $ do
+      writeModule "A" "module A where\ndata Box a = Box a\nbox :: forall a. a -> Box a\nbox = Box\nmap :: forall a b. (a -> b) -> Box a -> Box b\nmap f (Box a) = Box (f a)\n"
+      writeModule "B" "module B where\nimport A as A\ng :: A.Box Int\ng = A.ado\n  x <- A.box 1\n  in x\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata Box a = Box a\nbox :: forall a. a -> Box a\nbox = Box\nmap2 :: forall a b. (a -> b) -> Box a -> Box b\nmap2 f (Box a) = Box (f a)\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B"]
+
+    it "recompiles downstream when negate used via unary minus removed" $ do
+      writeModule "A" "module A where\ndata N = N\nnegate :: N -> N\nnegate n0 = n0\nn :: N\nn = N\n"
+      writeModule "B" "module B where\nimport A\nm = -n\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata N = N\nnegate2 :: N -> N\nnegate2 n0 = n0\nn :: N\nn = N\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B"]
+
+    it "recompiles downstream when a kind used in a kind signature changed" $ do
+      writeModule "A" "module A where\ndata K\n"
+      writeModule "B" "module B where\nimport A\ndata Q :: K -> Type\ndata Q a = Q\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata K x\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B"]
+
+    it "recompiles downstream when a role annotation changed" $ do
+      writeModule "A" "module A where\ndata T a = T\ntype role T phantom\n"
+      writeModule "B" $ T.unlines
+        [ "module B where"
+        , "import Prim.Coerce (class Coercible)"
+        , "import A as A"
+        , "f :: Coercible (A.T Int) (A.T Boolean) => Int"
+        , "f = 1"
+        , "g :: Int"
+        , "g = f"
+        ]
+      compileAll >>= expectCompiled ["A", "B"]
+
+      writeModule "A" "module A where\ndata T a = T\ntype role T nominal\n"
+      compileAll >>= expectCompiledWithFailure ["A", "B"]
+
+    -- Patching externs in place after a file rename is not enough when other
+    -- codegen targets embed the module's source path; corefn (like docs and
+    -- source maps) must be regenerated, while downstream modules can still be
+    -- patched.
+    it "recompiles a renamed module when corefn is requested" $ do
+      let content = "module Module where\ntype Foo = Int\n"
+          downstream = "module Downstream where\nimport Module (Foo)\nbar :: Foo\nbar = 0\n"
+          optsCoreFn = P.defaultOptions {P.optionsCodegenTargets = Set.fromList [P.JS, P.CoreFn]}
+          compileAllWith opts = listModulePaths >>= compileWithOptions opts mempty
+
+      writeModule "Module1" content
+      writeModule "Downstream" downstream
+      compileAllWith optsCoreFn >>= expectCompiled ["Module", "Downstream"]
+      deleteModule "Module1"
+
+      writeModule "Module2" content
+      compileAllWith optsCoreFn >>= expectCompiled ["Module"]
+
+      corefn <- readUTF8FileT (outputDir </> "Module" </> "corefn.json")
+      corefn `shouldSatisfy` T.isInfixOf "Module2.purs"
+      corefn `shouldSatisfy` (not . T.isInfixOf "Module1.purs")
+
+    -- With cut-off disabled, a downstream module is rebuilt even when the
+    -- change to its dependency has no effect on it (the same scenario as
+    -- "skips downstream rebuild when externs has not changed", but forced).
+    it "rebuilds unaffected downstream when cut-off is disabled" $ do
+      let noCutoff = P.defaultOptions {P.optionsNoCutoff = True}
+          compileAllNoCutoff = listModulePaths >>= compileWithOptions noCutoff mempty
+
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B where\nimport A as A\nbar = A.foo\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      -- A's externs are unchanged (only whitespace); normally B is skipped.
+      writeModule "A" "module A where\n\nfoo = 0\n"
+      compileAllNoCutoff >>= expectCompiled ["A", "B"]
+
+    -- --no-cutoff does not force truly up-to-date modules (no changed
+    -- dependency) to rebuild.
+    it "does not rebuild untouched modules when cut-off is disabled" $ do
+      let noCutoff = P.defaultOptions {P.optionsNoCutoff = True}
+          compileAllNoCutoff = listModulePaths >>= compileWithOptions noCutoff mempty
+
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B where\nimport A as A\nbar = A.foo\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      compileAllNoCutoff >>= expectCompiled []
+
+    it "forces a rebuild when previous externs are unreadable" $ do
+      writeModule "A" "module A where\nfoo = 0\n"
+      writeModule "B" "module B where\nimport A\nbar = foo\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
+      -- B is up to date but its previous externs cannot be loaded, and its
+      -- dependency A is rebuilt: B must be rebuilt, not crash or go stale.
+      writeUTF8FileT (outputDir </> "B" </> "externs.cbor") "corrupt"
+      writeModule "A" "module A where\nfoo = 0\nextra = 1\n"
+      compileAll >>= expectCompiled ["A", "B"]
+
   where
 
     sourcesDir = "tests/purs/make"
@@ -531,7 +1054,6 @@ spec = do
           -- And verify that none of the old names still show up
           filter (`T.isInfixOf` externsContents) oldNames `shouldBe` []
 
-
 utcMidnightOnDate :: Integer -> Int -> Int -> UTCTime
 utcMidnightOnDate year month day = UTCTime (fromGregorian year month day) (secondsToDiffTime 0)
 
@@ -545,7 +1067,6 @@ oneSecond :: Int
 oneSecond = 10 ^ (5 :: Int) -- microseconds.
 
 -- Note [Sleeping to avoid flaky tests]
---
 -- One of the things we want to test here is that all requested output files
 -- (via the --codegen CLI option) must be up to date if we are to skip
 -- recompiling a particular module. Since we check for outdatedness by
@@ -553,11 +1074,9 @@ oneSecond = 10 ^ (5 :: Int) -- microseconds.
 -- the timestamp of the externs file, this check is susceptible to flakiness
 -- if the timestamp resolution is sufficiently coarse. To get around this, we
 -- delay for one second.
---
 -- Note that most of the compiler behaviour here doesn't depend on file
 -- timestamps (instead, content hashes are usually more important) and so
 -- sleeping should not be necessary in most of these tests.
---
 -- See also discussion on https://github.com/purescript/purescript/pull/4053
 
 rimraf :: FilePath -> IO ()

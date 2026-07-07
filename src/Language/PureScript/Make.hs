@@ -51,6 +51,7 @@ import Language.PureScript.Make.ExternsDiff qualified as ED
 import Language.PureScript.Make.Monad as Monad
 import Language.PureScript.ModuleDependencies (DependencyDepth (..), moduleSignature, sortModules')
 import Language.PureScript.Names (ModuleName (..), isBuiltinModuleName, runModuleName)
+import Language.PureScript.Options (CodegenTarget (..))
 import Language.PureScript.Renamer (renameInModule)
 import Language.PureScript.Sugar (Env, collapseBindingGroups, createBindingGroups, desugar, desugarCaseGuards, externsEnv, primEnv)
 import Language.PureScript.TypeChecker (CheckState (..), emptyCheckState, typeCheckModule)
@@ -320,7 +321,21 @@ make' MakeOptions{..} ma@MakeActions{..} ms = do
 
           catchFailure moduleIndex $ do
             -- Get the reason for building or skipping the compilation.
-            case BuildPlan.getBuildReason buildPlan m depsDiffs of
+            noCutoff <- askNoCutoff
+            buildAction <- case BuildPlan.getBuildReason noCutoff buildPlan m depsDiffs of
+              -- Patching externs in place is only sufficient for a moved
+              -- module when JS is the only codegen target: corefn, docs and
+              -- source maps embed the module's own source path and would go
+              -- stale, so in that case rebuild instead. Downstream modules
+              -- carry a moved dependency's path only in their externs, which
+              -- are patched, so they can be patched either way.
+              action@(PatchExterns _ _ (Just _)) -> do
+                targets <- askCodegenTargets
+                pure $ if S.isSubsetOf targets (S.singleton JS)
+                  then action
+                  else RebuildBecause SourceFileMoved
+              action -> pure action
+            case buildAction of
               -- No rebuild reason skipping the module.
               SkipBuild exts warnings -> do
                 _ <- updateOutputTimestamp moduleName Nothing
@@ -330,6 +345,11 @@ make' MakeOptions{..} ma@MakeActions{..} ms = do
 
               PatchExterns patchedExterns patchedWarnings fileNameDiff -> do
                 replaceExterns patchedExterns
+                -- Writing the patched externs bumps its modification time, so
+                -- the other output files have to be re-stamped along with it:
+                -- otherwise the next build considers the codegen outputs
+                -- outdated and needlessly recompiles the module.
+                _ <- updateOutputTimestamp moduleName Nothing
                 progress $ SkippingModule moduleName moduleIndex
                 pure $ BuildJobSucceeded Nothing patchedWarnings patchedExterns (Just (ED.moduleMovedDiff moduleName fileNameDiff))
 

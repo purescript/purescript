@@ -27,7 +27,8 @@ import Data.Maybe (catMaybes, fromMaybe, isNothing)
 import Data.Set qualified as S
 import Data.Text qualified as T
 import Data.Time.Clock (UTCTime)
-import Language.PureScript.AST (Module, getModuleName, getModuleSourceSpan, SourceSpan, spanName)
+import Language.PureScript.AST (Module, getModuleName, getModuleSourceSpan, modifySpanName, spanName)
+import Language.PureScript.AST.Declarations.ChainId (ChainId (..))
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Errors (MultipleErrors (..))
@@ -173,11 +174,14 @@ data BuildAction
   | RebuildBecause RebuildReason
 
 -- Get the build reason.
-getBuildReason :: BuildPlan -> Module -> Maybe [ExternsDiff] -> BuildAction
-getBuildReason _ _ Nothing = RebuildBecause NoCachedDependency
-getBuildReason (BuildPlan {..}) m (Just depsDiffs) =
+getBuildReason :: Bool -> BuildPlan -> Module -> Maybe [ExternsDiff] -> BuildAction
+getBuildReason _ _ _ Nothing = RebuildBecause NoCachedDependency
+getBuildReason noCutoff (BuildPlan {..}) m (Just depsDiffs) =
   case M.lookup mn bpPrevious of
     Just (Just reason, _) -> RebuildBecause reason
+    -- With cut-off disabled, any module that is a candidate for skipping (up to
+    -- date but downstream of a rebuilt module) is rebuilt unconditionally.
+    Just (Nothing, _) | noCutoff -> RebuildBecause CutOffDisabled
     Just (Nothing, exts) ->
       let
         externs = pbExterns exts
@@ -195,8 +199,13 @@ getBuildReason (BuildPlan {..}) m (Just depsDiffs) =
   fileNameFromExterns = spanName . efSourceSpan
   fileNameFromModule = spanName . getModuleSourceSpan
 
-  patchExterns = over template :: (SourceSpan -> SourceSpan) -> ExternsFile -> ExternsFile
-  patchWarnings = over template :: (SourceSpan -> SourceSpan) -> MultipleErrors -> MultipleErrors
+  -- Source file names appear in externs both in source spans and inside
+  -- instance chain ids, so both have to be patched.
+  patchSpans = over template . modifySpanName :: (String -> String) -> ExternsFile -> ExternsFile
+  patchChainIds = over template . patchChainId :: (String -> String) -> ExternsFile -> ExternsFile
+  patchChainId f (ChainId (fp, pos)) = ChainId (f fp, pos)
+  patchExterns f = patchChainIds f . patchSpans f
+  patchWarnings f = over template (modifySpanName f) :: MultipleErrors -> MultipleErrors
 
 data Options = Options
   { optPreloadAllExterns :: Bool

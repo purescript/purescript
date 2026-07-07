@@ -92,6 +92,13 @@ data RebuildReason
   | LaterDependency ModuleName
   -- | Compiled because of (the first found) changed reference in a dependency.
   | UpstreamRef ED.DiffRef
+  -- | Compiled because the module's source file moved and requested codegen
+  -- targets (corefn, docs, source maps) embed the source path, so patching
+  -- the externs alone would leave them stale.
+  | SourceFileMoved
+  -- | Compiled because incremental cut-off was disabled (--no-cutoff) and this
+  -- module is downstream of a rebuilt module.
+  | CutOffDisabled
   deriving (Show, Eq, Ord)
 
 -- | Progress messages from the make process
@@ -222,6 +229,10 @@ data MakeActions m = MakeActions
   -- load .js files as ES modules.
   , outputPrimDocs :: m ()
   -- ^ If generating docs, output the documentation for the Prim modules
+  , askCodegenTargets :: m (S.Set CodegenTarget)
+  -- ^ Get the currently requested codegen targets.
+  , askNoCutoff :: m Bool
+  -- ^ Whether incremental build cut-off is disabled.
   }
 
 -- | Given the output directory, determines the location for the
@@ -333,6 +344,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     writeCacheDb
     writePackageJson
     outputPrimDocs
+    (asks optionsCodegenTargets)
+    (asks optionsNoCutoff)
   where
 
   getInputTimestampsAndHashes

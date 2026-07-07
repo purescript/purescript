@@ -116,6 +116,17 @@ jsonErrors = Opts.switch $
      Opts.long "json-errors"
   <> Opts.help "Print errors to stderr as JSON"
 
+noCutoff :: Opts.Parser Bool
+noCutoff = Opts.switch $
+     Opts.long "no-cutoff"
+  <> Opts.help
+      ( "Disable incremental build cut-off. By default, a module is not "
+      <> "recompiled if the modules it depends on changed in ways that do not "
+      <> "affect it. With this flag, every module downstream of a change is "
+      <> "recompiled, matching the behaviour of older compilers. Useful for "
+      <> "diagnosing an unexpected build result."
+      )
+
 codegenTargets :: Opts.Parser [P.CodegenTarget]
 codegenTargets = Opts.option targetParser $
      Opts.short 'g'
@@ -145,6 +156,7 @@ options =
     <$> verboseErrors
     <*> (not <$> comments)
     <*> (handleTargets <$> codegenTargets)
+    <*> noCutoff
   where
     -- Ensure that the JS target is included if sourcemaps are
     handleTargets :: [P.CodegenTarget] -> S.Set P.CodegenTarget
