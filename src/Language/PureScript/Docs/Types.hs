@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Language.PureScript.Docs.Types
   ( module Language.PureScript.Docs.Types
   , module ReExports
@@ -16,6 +17,7 @@ import Data.Aeson.BetterErrors
    keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser',
    fromAesonParser, perhaps, withText, asIntegral, nth, eachInObjectWithKey,
    asString)
+import Data.Data (Data)
 import Data.Map qualified as Map
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format qualified as TimeFormat
@@ -147,7 +149,7 @@ data Declaration = Declaration
   , declInfo       :: DeclarationInfo
   , declKind       :: Maybe KindInfo
   }
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData Declaration
 
@@ -194,7 +196,7 @@ data DeclarationInfo
   -- operator's fixity.
   --
   | AliasDeclaration P.Fixity FixityAlias
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData DeclarationInfo
 
@@ -205,7 +207,7 @@ data KindInfo = KindInfo
   { kiKeyword :: P.KindSignatureFor
   , kiKind :: Type'
   }
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData KindInfo
 
@@ -293,7 +295,7 @@ data ChildDeclaration = ChildDeclaration
   , cdeclSourceSpan :: Maybe P.SourceSpan
   , cdeclInfo       :: ChildDeclarationInfo
   }
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData ChildDeclaration
 
@@ -314,7 +316,7 @@ data ChildDeclarationInfo
   -- example, `pure` from `Applicative` would be `forall a. a -> f a`.
   --
   | ChildTypeClassMember Type'
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData ChildDeclarationInfo
 
@@ -385,6 +387,8 @@ data InPackage a
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData a => NFData (InPackage a)
+--instance Data a => Data (InPackage a)
+
 
 instance Functor InPackage where
   fmap f (Local x) = Local (f x)
@@ -567,6 +571,9 @@ asModule =
          <*> key "comments" (perhaps asText)
          <*> key "declarations" (eachInArray asDeclaration)
          <*> key "reExports" (eachInArray asReExport)
+
+instance A.FromJSON Module where
+  parseJSON = toAesonParser displayPackageError asModule
 
 asDeclaration :: Parse PackageError Declaration
 asDeclaration =

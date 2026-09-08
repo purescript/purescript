@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, DeriveDataTypeable #-}
 
 -- |
 -- Data types for roles.
@@ -16,6 +16,7 @@ import Data.Aeson qualified as A
 import Data.Aeson.TH qualified as A
 import Data.Text (Text)
 import GHC.Generics (Generic)
+import Data.Data (Data)
 
 -- |
 -- The role of a type constructor's parameter.
@@ -29,7 +30,7 @@ data Role
   | Phantom
   -- ^ This parameter has no effect on the representation of the type it is
   -- parameterising.
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData Role
 instance Serialise Role

@@ -1,4 +1,4 @@
-{-# Language DeriveAnyClass #-}
+{-# Language DeriveAnyClass, DeriveDataTypeable #-}
 -- |
 -- This module generates code for \"externs\" files, i.e. files containing only
 -- foreign import declarations.
@@ -22,6 +22,7 @@ import Control.DeepSeq (NFData)
 import Control.Monad (join)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
+import Data.Data (Data)
 import Data.Foldable (fold)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -61,7 +62,7 @@ data ExternsFile = ExternsFile
   -- ^ List of type and value declaration
   , efSourceSpan :: SourceSpan
   -- ^ Source span for error reporting
-  } deriving (Show, Generic, NFData)
+  } deriving (Show, Generic, NFData, Data)
 
 instance Serialise ExternsFile
 
@@ -74,7 +75,7 @@ data ExternsImport = ExternsImport
   , eiImportType :: ImportDeclarationType
   -- | The imported-as name, for qualified imports
   , eiImportedAs :: Maybe ModuleName
-  } deriving (Show, Generic, NFData)
+  } deriving (Show, Generic, NFData, Data)
 
 instance Serialise ExternsImport
 
@@ -89,7 +90,7 @@ data ExternsFixity = ExternsFixity
   , efOperator :: OpName 'ValueOpName
   -- | The value the operator is an alias for
   , efAlias :: Qualified (Either Ident (ProperName 'ConstructorName))
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData, Data)
 
 instance Serialise ExternsFixity
 
@@ -104,7 +105,7 @@ data ExternsTypeFixity = ExternsTypeFixity
   , efTypeOperator :: OpName 'TypeOpName
   -- | The value the operator is an alias for
   , efTypeAlias :: Qualified (ProperName 'TypeName)
-  } deriving (Show, Generic, NFData)
+  } deriving (Eq, Show, Generic, NFData, Data)
 
 instance Serialise ExternsTypeFixity
 
@@ -157,7 +158,7 @@ data ExternsDeclaration =
       , edInstanceNameSource      :: NameSource
       , edInstanceSourceSpan      :: SourceSpan
       }
-  deriving (Show, Generic, NFData)
+  deriving (Eq, Show, Generic, NFData, Data)
 
 instance Serialise ExternsDeclaration
 

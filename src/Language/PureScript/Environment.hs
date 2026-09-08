@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Language.PureScript.Environment where
 
 import Prelude
@@ -8,6 +9,7 @@ import Control.Monad (unless)
 import Codec.Serialise (Serialise)
 import Data.Aeson ((.=), (.:))
 import Data.Aeson qualified as A
+import Data.Data (Data)
 import Data.Foldable (find, fold)
 import Data.Functor ((<&>))
 import Data.IntMap qualified as IM
@@ -45,9 +47,10 @@ data Environment = Environment
   -- scope (ie dictionaries brought in by a constrained type).
   , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
   -- ^ Type classes
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Data)
 
 instance NFData Environment
+instance Serialise Environment
 
 -- | Information about a type class
 data TypeClassData = TypeClassData
@@ -71,9 +74,10 @@ data TypeClassData = TypeClassData
   -- ^ A sets of arguments that can be used to infer all other arguments.
   , typeClassIsEmpty :: Bool
   -- ^ Whether or not dictionaries for this type class are necessarily empty.
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Data)
 
 instance NFData TypeClassData
+instance Serialise TypeClassData
 
 -- | A functional dependency indicates a relationship between two sets of
 -- type arguments in a class declaration.
@@ -82,7 +86,7 @@ data FunctionalDependency = FunctionalDependency
   -- ^ the type arguments which determine the determined type arguments
   , fdDetermined  :: [Int]
   -- ^ the determined type arguments
-  } deriving (Show, Generic)
+  } deriving (Eq, Show, Generic, Data)
 
 instance NFData FunctionalDependency
 instance Serialise FunctionalDependency
@@ -137,7 +141,7 @@ makeTypeClassData args m s deps = TypeClassData args m' s deps determinedArgs co
     coveringSets' = S.toList coveringSets
 
     m' = map (\(a, b) -> (a, b, addVtaInfo b)) m
-    
+
     addVtaInfo :: SourceType -> Maybe (S.Set (NEL.NonEmpty Int))
     addVtaInfo memberTy = do
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex $ freeTypeVariables memberTy)
@@ -233,7 +237,7 @@ data NameVisibility
   -- ^ The name is defined in the current binding group, but is not visible
   | Defined
   -- ^ The name is defined in the another binding group, or has been made visible by a function binder
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, Data)
 
 instance NFData NameVisibility
 instance Serialise NameVisibility
@@ -248,7 +252,7 @@ data NameKind
   -- ^ A public value for a module member or foreign import declaration
   | External
   -- ^ A name for member introduced by foreign import
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, Data)
 
 instance NFData NameKind
 instance Serialise NameKind
@@ -265,7 +269,7 @@ data TypeKind
   -- ^ A local type variable
   | ScopedTypeVar
   -- ^ A scoped type variable
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, Data)
 
 instance NFData TypeKind
 instance Serialise TypeKind
@@ -276,7 +280,7 @@ data DataDeclType
   -- ^ A standard data constructor
   | Newtype
   -- ^ A newtype constructor
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData DataDeclType
 instance Serialise DataDeclType
