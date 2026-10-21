@@ -69,7 +69,7 @@ PureScript uses the following Haskell library packages. Their license files foll
   constraints
   containers
   contravariant
-  cryptonite
+  crypton
   css-text
   data-default
   data-default-class
@@ -1580,7 +1580,7 @@ contravariant LICENSE file:
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
   POSSIBILITY OF SUCH DAMAGE.
 
-cryptonite LICENSE file:
+crypton LICENSE file:
 
   Copyright (c) 2006-2015 Vincent Hanquez <vincent@snarc.org>
 

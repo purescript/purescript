@@ -68,10 +68,12 @@ jobs:
     container:
       image: "${{ matrix.image }}"
       # https://github.com/actions/runner/issues/801#issuecomment-2976165281
-      # This workaround also requires a special installation step for Node.js on arm64
+      # This workaround also requires a special installation step for Node.js on arm64.
+      # The mounted path must match the Node.js major the runner uses to execute
+      # JavaScript actions (`/__e/node<major>`);
       volumes:
         - "${{ contains(matrix.os, 'arm') && '/opt:/opt:rw,rshared' || ' ' }}"
-        - "${{ contains(matrix.os, 'arm') && '/opt:/__e/node20:ro,rshared' || ' ' }}"
+        - "${{ contains(matrix.os, 'arm') && '/opt:/__e/node24:ro,rshared' || ' ' }}"
     env:
       CI_STATIC: "${{ startsWith(matrix.os, 'ubuntu') }}"
 
