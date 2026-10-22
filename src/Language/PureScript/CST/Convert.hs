@@ -50,7 +50,7 @@ comments :: [Comment a] -> [C.Comment]
 comments = mapMaybe comment
 
 sourcePos :: SourcePos -> Pos.SourcePos
-sourcePos (SourcePos line col) = Pos.SourcePos line col
+sourcePos (SourcePos line (tabs, col)) = Pos.SourcePos line (tabs + col)
 
 sourceSpan :: String -> SourceRange -> Pos.SourceSpan
 sourceSpan name (SourceRange start end) = Pos.SourceSpan name (sourcePos start) (sourcePos end)

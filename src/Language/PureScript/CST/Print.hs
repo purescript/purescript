@@ -17,6 +17,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Language.PureScript.CST.Types (Comment(..), LineFeed(..), Module, SourceStyle(..), SourceToken(..), Token(..), TokenAnn(..))
 import Language.PureScript.CST.Flatten (flattenModule)
+import Data.Void (Void)
 
 printToken :: Token -> Text
 printToken = printToken' True
@@ -86,11 +87,10 @@ printLeadingComment :: Comment LineFeed -> Text
 printLeadingComment = \case
   Comment raw -> raw
   Space n -> Text.replicate n " "
-  Line LF -> "\n"
-  Line CRLF -> "\r\n"
+  Line LF n -> "\n" <> Text.replicate n "\t"
+  Line CRLF n -> "\r\n" <> Text.replicate n "\t"
 
-printTrailingComment :: Comment void -> Text
+printTrailingComment :: Comment Void -> Text
 printTrailingComment = \case
   Comment raw -> raw
   Space n -> Text.replicate n " "
-  Line _ -> ""

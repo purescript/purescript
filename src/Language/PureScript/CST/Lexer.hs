@@ -22,7 +22,7 @@ import Data.Text.PureScript qualified as Text
 import Language.PureScript.CST.Errors (ParserErrorInfo(..), ParserErrorType(..))
 import Language.PureScript.CST.Monad (LexResult, LexState(..), ParserM(..), throw)
 import Language.PureScript.CST.Layout (LayoutDelim(..), insertLayout, lytToken, unwindLayout)
-import Language.PureScript.CST.Positions (advanceLeading, advanceToken, advanceTrailing, applyDelta, textDelta)
+import Language.PureScript.CST.Positions (advanceLeading, advanceToken, advanceTrailing, applyDelta, textDelta, PosDelta (PosDelta))
 import Language.PureScript.CST.Types (Comment(..), LineFeed(..), SourcePos(..), SourceRange(..), SourceStyle(..), SourceToken(..), Token(..), TokenAnn(..))
 
 -- | Stops at the first lexing error and replaces it with TokEof. Otherwise,
@@ -50,10 +50,10 @@ lex' lexComments src = do
   let (leading, src') = lexComments src
 
   lexWithState $ LexState
-    { lexPos = advanceLeading (SourcePos 1 1) leading
+    { lexPos = advanceLeading (SourcePos 1 (0, 1)) leading
     , lexLeading = leading
     , lexSource = src'
-    , lexStack = [(SourcePos 0 0, LytRoot)]
+    , lexStack = [(SourcePos 0 (0, 0), LytRoot)]
     }
 
 -- | Lexes according to top-level declaration context rules.
@@ -61,13 +61,13 @@ lexTopLevel :: Text -> [LexResult]
 lexTopLevel src = do
   let
     (leading, src') = comments src
-    lexPos = advanceLeading (SourcePos 1 1) leading
+    lexPos = advanceLeading (SourcePos 1 (0, 1)) leading
     hd = Right $ lytToken lexPos TokLayoutStart
     tl = lexWithState $ LexState
       { lexPos = lexPos
       , lexLeading = leading
       , lexSource = src'
-      , lexStack = [(lexPos, LytWhere), (SourcePos 0 0, LytRoot)]
+      , lexStack = [(lexPos, LytWhere), (SourcePos 0 (0, 0), LytRoot)]
       }
   hd : tl
 
@@ -90,7 +90,7 @@ lexWithState = go
         pos = applyDelta lexPos chunkDelta
       pure $ Left
         ( state { lexSource = lexSource' }
-        , ParserErrorInfo (SourceRange pos $ applyDelta pos (0, 1)) [] lexStack err
+        , ParserErrorInfo (SourceRange pos $ applyDelta pos (PosDelta 0 0 1)) [] lexStack err
         )
 
     onSuccess _ (TokEof, _) =
@@ -183,25 +183,29 @@ breakComments = k0 []
         case mbComm of
           Just comm -> k0 (comm : acc')
           Nothing   -> pure (reverse acc', [])
-      else
-        k1 acc' (goWs [] $ Text.unpack lines)
+      else do
+        tabs <- nextWhile (== '\t')
+        k1 acc' (goWs [] $ Text.unpack (lines <> tabs))
 
   k1 trl acc = do
-    ws <- nextWhile (\c -> c == ' ' || isLineFeed c)
+    ws <- nextWhile (\c -> c == ' ' || c == '\t' || isLineFeed c)
     let acc' = goWs acc $ Text.unpack ws
     mbComm <- comment
     case mbComm of
       Just comm -> k1 trl (comm : acc')
       Nothing   -> pure (reverse trl, reverse acc')
 
-  goWs a ('\r' : '\n' : ls) = goWs (Line CRLF : a) ls
-  goWs a ('\r' : ls) = goWs (Line CRLF : a) ls
-  goWs a ('\n' : ls) = goWs (Line LF : a) ls
+  goWs a ('\r' : '\n' : ls) = goTab CRLF a 0 ls
+  goWs a ('\r' : ls) = goTab CRLF a 0 ls
+  goWs a ('\n' : ls) = goTab LF a 0 ls
   goWs a (' ' : ls) = goSpace a 1 ls
   goWs a _ = a
 
   goSpace a !n (' ' : ls) = goSpace a (n + 1) ls
   goSpace a n ls = goWs (Space n : a) ls
+
+  goTab ending a !n ('\t' : ls) = goTab ending a (n + 1) ls
+  goTab ending a n ls = goWs (Line ending n : a) ls
 
   isBlockComment = Parser $ \inp _ ksucc ->
     case Text.uncons inp of
@@ -260,13 +264,20 @@ breakShebang = shebangComment >>= \case
       Just ('\r', inp2) ->
         case Text.uncons inp2 of
           Just ('\n', inp3) ->
-            Just (Line CRLF, inp3)
+            Just (unconsTabs CRLF inp3)
           _ ->
-            Just (Line CRLF, inp2)
+            Just (unconsTabs CRLF inp2)
       Just ('\n', inp2) ->
-        Just (Line LF, inp2)
+        Just (unconsTabs LF inp2)
       _ ->
         Nothing
+
+  unconsTabs :: LineFeed -> Text -> (Comment LineFeed, Text)
+  unconsTabs l inp = case Text.takeWhile (== '\t') inp of
+    "" -> (Line l 0, inp)
+    str -> do
+      let tabs = Text.length str
+      (Line l tabs, Text.drop tabs str)
 
   unconsShebang :: Text -> Maybe (Text, Text)
   unconsShebang = fmap ("#!",) . Text.stripPrefix "#!"
