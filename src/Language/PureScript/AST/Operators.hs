@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 -- |
 -- Operators fixity and associativity
 --
@@ -12,6 +13,7 @@ import Data.Aeson ((.=))
 import Data.Aeson qualified as A
 
 import Language.PureScript.Crash (internalError)
+import Data.Data (Data)
 
 -- |
 -- A precedence level for an infix operator
@@ -22,7 +24,7 @@ type Precedence = Integer
 -- Associativity for infix operators
 --
 data Associativity = Infixl | Infixr | Infix
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData Associativity
 instance Serialise Associativity
@@ -48,7 +50,7 @@ instance A.FromJSON Associativity where
 -- Fixity data for infix operators
 --
 data Fixity = Fixity Associativity Precedence
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData Fixity
 instance Serialise Fixity

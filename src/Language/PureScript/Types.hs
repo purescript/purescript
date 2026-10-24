@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 -- |
 -- Data types for types
 --
@@ -28,6 +29,7 @@ import Language.PureScript.Constants.Prim qualified as C
 import Language.PureScript.Names (OpName, OpNameType(..), ProperName, ProperNameType(..), Qualified, coerceProperName)
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)
+import Data.Data (Data)
 
 type SourceType = Type SourceAnn
 type SourceConstraint = Constraint SourceAnn
@@ -36,7 +38,7 @@ type SourceConstraint = Constraint SourceAnn
 -- An identifier for the scope of a skolem variable
 --
 newtype SkolemScope = SkolemScope { runSkolemScope :: Int }
-  deriving (Show, Eq, Ord, A.ToJSON, A.FromJSON, Generic)
+  deriving (Show, Eq, Ord, A.ToJSON, A.FromJSON, Generic, Data)
 
 instance NFData SkolemScope
 instance Serialise SkolemScope
@@ -48,7 +50,7 @@ instance Serialise SkolemScope
 -- contained by a binding with a complete (wildcard-free) type signature.
 --
 data WildcardData = HoleWildcard Text | UnnamedWildcard | IgnoredWildcard
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData WildcardData
 instance Serialise WildcardData
@@ -56,7 +58,7 @@ instance Serialise WildcardData
 data TypeVarVisibility
   = TypeVarVisible
   | TypeVarInvisible
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData TypeVarVisibility
 instance Serialise TypeVarVisibility
@@ -110,7 +112,7 @@ data Type a
   -- Note: although it seems this constructor is not used, it _is_ useful,
   -- since it prevents certain traversals from matching.
   | ParensInType a (Type a)
-  deriving (Show, Generic, Functor, Foldable, Traversable)
+  deriving (Show, Generic, Functor, Foldable, Traversable, Data)
 
 instance NFData a => NFData (Type a)
 instance Serialise a => Serialise (Type a)
@@ -173,7 +175,7 @@ data ConstraintData
   -- not matched, and a flag indicating whether the list was truncated or not.
   -- Note: we use 'Text' here because using 'Binder' would introduce a cyclic
   -- dependency in the module graph.
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData ConstraintData
 instance Serialise ConstraintData
@@ -190,7 +192,7 @@ data Constraint a = Constraint
   -- ^ type arguments
   , constraintData  :: Maybe ConstraintData
   -- ^ additional data relevant to this constraint
-  } deriving (Show, Generic, Functor, Foldable, Traversable)
+  } deriving (Show, Generic, Functor, Foldable, Traversable, Data)
 
 instance NFData a => NFData (Constraint a)
 instance Serialise a => Serialise (Constraint a)

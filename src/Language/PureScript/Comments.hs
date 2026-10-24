@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, DeriveDataTypeable #-}
 
 -- |
 -- Defines the types of source code comments
@@ -12,11 +12,12 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 
 import Data.Aeson.TH (Options(..), SumEncoding(..), defaultOptions, deriveJSON)
+import Data.Data (Data)
 
 data Comment
   = LineComment Text
   | BlockComment Text
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData Comment
 instance Serialise Comment
