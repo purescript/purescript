@@ -1,3 +1,5 @@
 node_modules/
 bower_components/
 /.last_updated
+/.spago/
+/spago.lock

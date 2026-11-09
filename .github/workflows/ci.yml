@@ -4,7 +4,6 @@ on:
   push:
     branches: [ "master" ]
   pull_request:
-    branches: [ "master" ]
     paths:
       - .github/workflows/**/*.yml
       - app/**/*
@@ -12,7 +11,7 @@ on:
       - ci/**/*
       - license-generator/**/*
       - src/**/*
-      - test/**/*
+      - tests/**/*
       - .gitignore
       - .hlint.yaml
       - .hspec

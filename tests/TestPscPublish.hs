@@ -26,11 +26,12 @@ import TestUtils (pushd)
 spec :: Spec
 spec = do
   context "preparePackage with json roundtrips" $ do
-    it "purescript-prelude" $ do
-      testPackage
-        "tests/support/bower_components/purescript-prelude"
-        "bower.json"
-        "../../prelude-resolutions.json"
+    forM_ [("prelude", "6.0.3"), ("effect", "4.0.1")] $ \(name, version) ->
+      it (name ++ " (registry purs.json)") $
+        testPackage
+          ("tests/support/.spago/p" </> name ++ "-" ++ version)
+          "purs.json"
+          ("../../../" ++ name ++ "-resolutions.json")
 
     it "basic example (bower.json)" $ do
       testPackage

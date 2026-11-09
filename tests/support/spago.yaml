@@ -1,0 +1,40 @@
+package:
+  name: test-suite-support
+  dependencies:
+    - arrays
+    - assert
+    - bifunctors
+    - console
+    - control
+    - distributive
+    - effect
+    - either
+    - enums
+    - foldable-traversable
+    - functions
+    - gen
+    - identity
+    - integers
+    - invariant
+    - lazy
+    - lists
+    - maybe
+    - newtype
+    - nonempty
+    - numbers
+    - partial
+    - prelude
+    - psci-support
+    - refs
+    - safe-coerce
+    - st
+    - strings
+    - tailrec
+    - tuples
+    - type-equality
+    - typelevel-prelude
+    - unfoldable
+    - unsafe-coerce
+workspace:
+  packageSet:
+    registry: 81.11.4

@@ -26,7 +26,7 @@ import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Data.Time.Clock (UTCTime(), diffUTCTime, getCurrentTime, nominalDay)
 import Data.Tuple (swap)
-import System.Directory (createDirectoryIfMissing, doesDirectoryExist, getCurrentDirectory, getModificationTime, getTemporaryDirectory, listDirectory, setCurrentDirectory, withCurrentDirectory)
+import System.Directory (createDirectoryIfMissing, doesDirectoryExist, getCurrentDirectory, getModificationTime, getTemporaryDirectory, listDirectory, removePathForcibly, setCurrentDirectory, withCurrentDirectory)
 import System.Exit (exitFailure)
 import System.Environment (lookupEnv)
 import System.FilePath (dropExtensions, makeRelative, takeDirectory, takeExtensions, takeFileName, (</>))
@@ -38,12 +38,7 @@ import System.IO (Handle, IOMode(..), hPutStrLn, openFile, stderr)
 import Test.Hspec (Expectation, HasCallStack, expectationFailure, pendingWith)
 
 -- |
--- Fetches code necessary to run the tests with. The resulting support code
--- should then be checked in, so that npm/bower etc is not required to run the
--- tests.
---
--- Simply rerun this (via ghci is probably easiest) when the support code needs
--- updating.
+-- Fetches the JavaScript tools and pinned registry packages used by the tests.
 --
 updateSupportCode :: IO ()
 updateSupportCode = withCurrentDirectory "tests/support" $ do
@@ -57,12 +52,11 @@ updateSupportCode = withCurrentDirectory "tests/support" $ do
     now <- lift getCurrentTime
     guard $ now `diffUTCTime` lastUpdated < nominalDay
 
-    -- ... and the needed directories exist,
+    -- ... and the JavaScript tools are installed,
     contents <- lift $ listDirectory "."
-    guard $ "node_modules" `elem` contents && "bower_components" `elem` contents
+    guard $ all (`elem` contents) ["node_modules", ".spago"]
 
-    -- ... and everything else in `tests/support` is at least as old as
-    -- `.last_updated`.
+    -- ... and the support files are at least as old as `.last_updated`.
     modTimes <- lift $ traverse getModificationTime . filter (/= lastUpdatedFile) $ contents
     guard $ all (<= lastUpdated) modTimes
 
@@ -71,12 +65,11 @@ updateSupportCode = withCurrentDirectory "tests/support" $ do
   unless skipUpdate $ do
     heading "Updating support code"
     callCommand "npm install"
-    -- bower uses shebang "/usr/bin/env node", but we might have nodejs
+    removePathForcibly ".spago"
     node <- either cannotFindNode pure =<< findNodeProcess
-    -- Sometimes we run as a root (e.g. in simple docker containers)
-    -- And we are non-interactive: https://github.com/bower/bower/issues/1162
-    callProcess node ["node_modules/bower/bin/bower", "--allow-root", "install", "--config.interactive=false"]
+    callProcess node ["node_modules/spago/bin/bundle.js", "fetch"]
     writeFile lastUpdatedFile ""
+
   where
   cannotFindNode :: String -> IO a
   cannotFindNode message = do
@@ -109,7 +102,7 @@ getSupportModuleTuples = do
   cd <- getCurrentDirectory
   let supportDir = cd </> "tests" </> "support"
   psciFiles <- Glob.globDir1 (Glob.compile "**/*.purs") (supportDir </> "psci")
-  libraries <- Glob.globDir1 (Glob.compile "purescript-*/src/**/*.purs") (supportDir </> "bower_components")
+  libraries <- Glob.globDir1 (Glob.compile "*/src/**/*.purs") (supportDir </> ".spago" </> "p")
   let pursFiles = psciFiles ++ libraries
   fileContents <- readInput pursFiles
   modules <- runExceptT $ ExceptT . return $ CST.parseFromFiles id fileContents

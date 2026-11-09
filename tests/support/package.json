@@ -1,9 +1,12 @@
 {
   "private": true,
+  "engines": {
+    "node": "^22.13.0 || >=23.4.0"
+  },
   "dependencies": {
-    "bower": "^1.8.8",
     "glob": "^5.0.14",
     "rimraf": "^2.5.2",
-    "source-map": "^0.7.3"
+    "source-map": "^0.7.3",
+    "spago": "1.0.5"
   }
 }
