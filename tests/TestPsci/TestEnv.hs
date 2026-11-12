@@ -28,7 +28,7 @@ initTestPSCiEnv = do
   cwd <- getCurrentDirectory
   let supportDir = cwd </> "tests" </> "support"
   psciFiles <- Glob.globDir1 (Glob.compile "**/*.purs") (supportDir </> "psci")
-  libraries <- Glob.globDir1 (Glob.compile "purescript-*/src/**/*.purs") (supportDir </> "bower_components")
+  libraries <- Glob.globDir1 (Glob.compile "*/src/**/*.purs") (supportDir </> ".spago" </> "p")
   let pursFiles = psciFiles ++ libraries
   modulesOrError <- loadAllModules pursFiles
   case modulesOrError of

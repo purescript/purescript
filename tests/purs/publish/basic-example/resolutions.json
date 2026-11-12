@@ -1,23 +1,23 @@
 {
   "purescript-console": {
     "version": "1.0.0",
-    "path": "../../../support/bower_components/purescript-console"
+    "path": "../../../support/.spago/p/console-6.1.1"
   },
   "purescript-effect": {
     "version": "1.0.0",
-    "path": "../../../support/bower_components/purescript-effect"
+    "path": "../../../support/.spago/p/effect-4.0.1"
   },
   "purescript-prelude": {
     "version": "1.0.0",
-    "path": "../../../support/bower_components/purescript-prelude"
+    "path": "../../../support/.spago/p/prelude-6.0.3"
   },
   "purescript-newtype": {
-    "path": "../../../support/bower_components/purescript-newtype"
+    "path": "../../../support/.spago/p/newtype-5.0.1"
   },
   "purescript-safe-coerce": {
-    "path": "../../../support/bower_components/purescript-safe-coerce"
+    "path": "../../../support/.spago/p/safe-coerce-2.0.1"
   },
   "purescript-unsafe-coerce": {
-    "path": "../../../support/bower_components/purescript-unsafe-coerce"
+    "path": "../../../support/.spago/p/unsafe-coerce-6.0.1"
   }
 }
