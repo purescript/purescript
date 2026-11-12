@@ -4,7 +4,3 @@
   return the original signed input instead of an out-of-range unsigned value.
   Nonzero effective shift counts retain zero-fill semantics. Code relying on
   `zshr x 0` as an unsigned conversion will change behavior.
-
-  Complete correctness requires both this compiler fix and the
-  [corresponding library fix](https://github.com/purescript/purescript-integers/pull/60),
-  followed by rebuilding affected modules.
