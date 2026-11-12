@@ -29,6 +29,7 @@ extra-source-files:
   tests/json-compat/**/*.json
   tests/support/*.json
   tests/support/checkSourceMapValidity.js
+  tests/support/spago.yaml
   tests/support/psci/**/*.purs
   tests/support/psci/**/*.edit
   tests/support/pscide/src/**/*.purs

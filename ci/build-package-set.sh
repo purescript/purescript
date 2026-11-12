@@ -21,6 +21,11 @@ echo ::endgroup::
 
 echo ::group::Create dummy project
 spago init --name purescript-dummy
+index=$(spago ls paths --json | jq -er '.[] | select(.[0] == "Global registry index path") | .[1]')
+# Spago <= 1.0.5 fails on Harmonia 0.1.0's overly long description.
+# Spago >= 1.0.6 (currently unreleased) handles it without this workaround.
+jq -c 'select(.version != "0.1.0")' "$index/ha/rm/harmonia" > harmonia
+mv harmonia "$index/ha/rm/harmonia"
 echo ::endgroup::
 
 echo ::group::Compile package set
