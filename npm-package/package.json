@@ -15,7 +15,7 @@
     "purs": "purs.bin"
   },
   "engines": {
-    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+    "node": ">=22"
   },
   "dependencies": {
     "purescript-installer": "^0.4.0"
