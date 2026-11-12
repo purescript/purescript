@@ -2,6 +2,48 @@
 
 Notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.15.17
+
+New features:
+
+* Add attached `derive` clauses to `data` and `newtype` declarations (#4594 by @i-am-the-slime)
+
+  Derivable instances can now be declared directly after a type declaration:
+
+  ```purescript
+  data Color = Red | Green | Blue
+    derive (Eq, Ord)
+
+  newtype Name = Name String
+    derive (Eq, Ord)
+
+  data Box a = Empty | Full a
+    derive (Functor)
+  ```
+
+  Attached clauses support the compiler's built-in deriving mechanisms and can
+  be used alongside standalone `derive instance` declarations. They do not
+  support `derive newtype`.
+
+Bugfixes:
+
+* Keep inlined `Data.Int.Bits.zshr` results within the signed 32-bit `Int` range. (#4597 by @thomashoneyman)
+
+  Zero-fill right shifts of negative inputs by zero or a multiple of 32 now
+  return the original signed input instead of an out-of-range unsigned value.
+  Nonzero effective shift counts retain zero-fill semantics. Code relying on
+  `zshr x 0` as an unsigned conversion will change behavior.
+
+Internal:
+
+* Fix typo in CoreFn.Traversals.traverseCoreFn which caused it to not recurse into Let bodies (#4561 by @drathier)
+
+* Switch from the unmaintained cryptonite library to its maintained fork, crypton (#4596 by @f-f)
+
+* Replace the retired macOS 14 arm64 CI runner with macOS 15, retaining macOS Intel coverage. (#4598 by @thomashoneyman)
+
+* Fetch test dependencies from verified registry tarballs and exercise their published `purs.json` manifests, retaining Bower publishing compatibility tests. (#4599 by @thomashoneyman)
+
 ## 0.15.16
 
 Bugfixes:
