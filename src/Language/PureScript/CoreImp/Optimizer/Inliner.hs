@@ -155,7 +155,7 @@ inlineCommonOperators expander = everywhereTopDown $ applyAll $
   , binary' C.P_xor BitwiseXor
   , binary' C.P_shl ShiftLeft
   , binary' C.P_shr ShiftRight
-  , binary' C.P_zshr ZeroFillShiftRight
+  , binaryToInt' C.P_zshr ZeroFillShiftRight
   , unary'  C.P_complement BitwiseNot
 
   , inlineNonClassFunction (isModFnWithDict C.P_unsafeIndex) $ flip (Indexer Nothing)
@@ -174,6 +174,12 @@ inlineCommonOperators expander = everywhereTopDown $ applyAll $
   binary' fn op = convert where
     convert :: AST -> AST
     convert (App ss (App _ (Ref fn') [x]) [y]) | fn == fn' = Binary ss op x y
+    convert other = other
+  binaryToInt' :: (ModuleName, PSString) -> BinaryOperator -> AST -> AST
+  binaryToInt' fn op = convert where
+    convert :: AST -> AST
+    convert (App ss (App _ (Ref fn') [x]) [y]) | fn == fn' =
+      Binary ss BitwiseOr (Binary ss op x y) (NumericLiteral ss (Left 0))
     convert other = other
   unary :: (ModuleName, PSString) -> (ModuleName, PSString) -> UnaryOperator -> AST -> AST
   unary dict fn op = convert where
