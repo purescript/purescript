@@ -2,7 +2,9 @@
 module Language.PureScript.ModuleDependencies
   ( DependencyDepth(..)
   , sortModules
+  , sortModules'
   , ModuleGraph
+  , ModuleGraph'
   , ModuleSignature(..)
   , moduleSignature
   ) where
@@ -29,6 +31,8 @@ data ModuleSignature = ModuleSignature
   }
 
 data DependencyDepth = Direct | Transitive
+  deriving (Eq, Ord, Show)
+--data DependencyDepth = Direct | ReExports | Transitive
 
 -- | Sort a collection of modules based on module dependencies.
 --
@@ -40,7 +44,19 @@ sortModules
   -> (a -> ModuleSignature)
   -> [a]
   -> m ([a], ModuleGraph)
-sortModules dependencyDepth toSig ms = do
+sortModules dependencyDepth toSig ms =
+  map (map (map (map snd))) <$> sortModules' dependencyDepth toSig ms
+
+type ModuleGraph' = [(ModuleName, [(DependencyDepth, ModuleName)])]
+
+sortModules'
+  :: forall m a
+   . MonadError MultipleErrors m
+  => DependencyDepth
+  -> (a -> ModuleSignature)
+  -> [a]
+  -> m ([a], ModuleGraph')
+sortModules' dependencyDepth toSig ms = do
     let
       ms' = (\m -> (m, toSig m)) <$> ms
       mns = S.fromList $ map (sigModuleName . snd) ms'
@@ -49,11 +65,13 @@ sortModules dependencyDepth toSig ms = do
     let (graph, fromVertex, toVertex) = graphFromEdges verts
         moduleGraph = do (_, mn, _) <- verts
                          let v       = fromMaybe (internalError "sortModules: vertex not found") (toVertex mn)
-                             deps    = case dependencyDepth of
-                                         Direct -> graph ! v
-                                         Transitive -> reachable graph v
-                             toKey i = case fromVertex i of (_, key, _) -> key
-                         return (mn, filter (/= mn) (map toKey deps))
+                             vxDepth vx = (if vx `elem` (graph ! v) then Direct else Transitive, vx)
+                             deps    =  case dependencyDepth of
+                                         Direct -> (Direct,) <$> graph ! v
+                                         Transitive -> vxDepth <$> reachable graph v
+                             toKey (depth, i) = case fromVertex i of (_, key, _) -> (depth, key)
+                         return (mn, filter ((/= mn) . snd) (map toKey deps))
+                         --return (mn, [(Direct, mn)])
     return (fst <$> ms'', moduleGraph)
   where
     toGraphNode :: S.Set ModuleName -> (a, ModuleSignature) -> m ((a, ModuleSignature), ModuleName, [ModuleName])
@@ -86,4 +104,5 @@ toModule (CyclicSCC ms) =
         $ CycleInModules (map (sigModuleName . snd) ms')
 
 moduleSignature :: Module -> ModuleSignature
-moduleSignature (Module ss _ mn ds _) = ModuleSignature ss mn (ordNub (mapMaybe usedModules ds))
+moduleSignature (Module ss _ mn ds _) =
+  ModuleSignature ss mn (ordNub (mapMaybe usedModules ds))

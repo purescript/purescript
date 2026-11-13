@@ -16,12 +16,13 @@ import Language.PureScript qualified as P
 import Language.PureScript.CST qualified as CST
 import Language.PureScript.Errors.JSON (JSONResult(..), toJSONErrors)
 import Language.PureScript.Glob (toInputGlobs, PSCGlobs(..), warnFileTypeNotFound)
-import Language.PureScript.Make (buildMakeActions, inferForeignModules, runMake)
+import Language.PureScript.Make (MakeOptions(..), buildMakeActions, inferForeignModules, progressWithFile, printProgress, runMake)
 import Options.Applicative qualified as Opts
 import SharedCLI qualified
 import System.Console.ANSI qualified as ANSI
 import System.Exit (exitSuccess, exitFailure)
-import System.Directory (getCurrentDirectory)
+import System.FilePath ((</>))
+import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
 import System.IO (hPutStr, stderr, stdout)
 import System.IO.UTF8 (readUTF8FilesT)
 
@@ -30,6 +31,9 @@ data PSCMakeOptions = PSCMakeOptions
   , pscmInputFromFile :: Maybe FilePath
   , pscmExclude      :: [FilePath]
   , pscmOutputDir    :: FilePath
+  , pscmLogFile      :: FilePath
+  , pscmNoDiffCheck  :: Bool
+  , pscmIncWarnings  :: Bool
   , pscmOpts         :: P.Options
   , pscmUsePrefix    :: Bool
   , pscmJSONErrors   :: Bool
@@ -68,12 +72,23 @@ compile PSCMakeOptions{..} = do
                              ]
     exitFailure
   moduleFiles <- readUTF8FilesT input
+
+  _ <- createDirectoryIfMissing True pscmOutputDir
+  let logFile = pscmOutputDir </> pscmLogFile
+  let cleanFile = True
+
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
     ms <- CST.parseModulesFromFiles id moduleFiles
     let filePathMap = M.fromList $ map (\(fp, pm) -> (P.getModuleName $ CST.resPartial pm, Right fp)) ms
     foreigns <- inferForeignModules filePathMap
-    let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
-    P.make makeActions (map snd ms)
+    logProgress <- progressWithFile logFile cleanFile
+    let makeActions = (buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix)
+            { P.progress = (*>) <$> printProgress <*> logProgress }
+    let makeOpts = MakeOptions
+          { moCollectAll = not pscmIncWarnings
+          , moDiffCheck = not pscmNoDiffCheck
+          }
+    P.make' makeOpts makeActions (map snd ms)
   printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors moduleFiles makeWarnings makeErrors
   exitSuccess
 
@@ -119,6 +134,28 @@ codegenTargets = Opts.option targetParser $
       <> " The default target is 'js', but if this option is used only the targets specified will be used."
       )
 
+compileLogFile :: Opts.Parser FilePath
+compileLogFile = Opts.strOption $
+     Opts.short 'l'
+  <> Opts.long "log-file"
+  <> Opts.value "compile.log"
+  <> Opts.showDefault
+  <> Opts.help
+      "File name for compile progress log put in output directory."
+
+noDiffCheck :: Opts.Parser Bool
+noDiffCheck = Opts.switch $
+     Opts.long "no-diff-check"
+  <> Opts.help
+      ( "Disable module external changes check while incremental build."
+      <> " Useful for diagnosing an unexpected build result."
+      )
+
+incWarnings :: Opts.Parser Bool
+incWarnings = Opts.switch $
+     Opts.long "incremental-warnings"
+  <> Opts.help "Output warnings only for incrementally compiled modules."
+
 targetsMessage :: String
 targetsMessage = "Accepted codegen targets are '" <> intercalate "', '" (M.keys P.codegenTargets) <> "'."
 
@@ -147,6 +184,9 @@ pscMakeOptions = PSCMakeOptions <$> many SharedCLI.inputFile
                                 <*> SharedCLI.globInputFile
                                 <*> many SharedCLI.excludeFiles
                                 <*> outputDirectory
+                                <*> compileLogFile
+                                <*> noDiffCheck
+                                <*> incWarnings
                                 <*> options
                                 <*> (not <$> noPrefix)
                                 <*> jsonErrors

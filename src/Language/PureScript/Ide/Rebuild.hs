@@ -80,7 +80,7 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
     liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets }) do
-      newExterns <- P.rebuildModule makeEnv externs m
+      newExterns <- P.rebuildModule makeEnv externs (pwarnings, m)
       unless pureRebuild
         $ updateCacheDb codegenTargets outputDirectory file actualFile moduleName
       pure newExterns
@@ -166,7 +166,7 @@ rebuildModuleOpen
   -> m ()
 rebuildModuleOpen makeEnv externs m = void $ runExceptT do
   (openResult, _) <- liftIO $ P.runMake P.defaultOptions $
-    P.rebuildModule (shushProgress (shushCodegen makeEnv)) externs (openModuleExports m)
+    P.rebuildModule (shushProgress (shushCodegen makeEnv)) externs (mempty, openModuleExports m)
   case openResult of
     Left _ ->
       throwError (GeneralError "Failed when rebuilding with open exports")
@@ -183,7 +183,7 @@ shushProgress ma =
 -- | Stops any kind of codegen
 shushCodegen :: Monad m => P.MakeActions m -> P.MakeActions m
 shushCodegen ma =
-  ma { P.codegen = \_ _ _ -> pure ()
+  ma { P.codegen = \_ _ _ _ -> pure ()
      , P.ffiCodegen = \_ -> pure ()
      }
 

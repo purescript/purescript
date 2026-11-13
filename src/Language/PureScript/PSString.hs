@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Language.PureScript.PSString
   ( PSString
   , toUTF16CodeUnits
@@ -33,6 +34,7 @@ import Numeric (showHex)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Aeson qualified as A
 import Data.Aeson.Types qualified as A
+import Data.Data (Data)
 
 -- |
 -- Strings in PureScript are sequences of UTF-16 code units, which do not
@@ -49,7 +51,7 @@ import Data.Aeson.Types qualified as A
 -- and arrays of UTF-16 code units (integers) otherwise.
 --
 newtype PSString = PSString { toUTF16CodeUnits :: [Word16] }
-  deriving (Eq, Ord, Semigroup, Monoid, Generic)
+  deriving (Eq, Ord, Semigroup, Monoid, Generic, Data)
 
 instance NFData PSString
 instance Serialise PSString
