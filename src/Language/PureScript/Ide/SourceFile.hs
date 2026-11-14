@@ -29,6 +29,8 @@ import Language.PureScript.CST qualified as CST
 import Language.PureScript.Ide.Error (IdeError)
 import Language.PureScript.Ide.Types (DefinitionSites, IdeNamespace(..), IdeNamespaced(..), TypeAnnotations)
 import Language.PureScript.Ide.Util (ideReadFile)
+import Control.Concurrent.Async.Lifted (mapConcurrently)
+import Control.Monad.Trans.Control (MonadBaseControl)
 
 parseModule :: FilePath -> Text -> Either FilePath (FilePath, P.Module)
 parseModule path file =
@@ -37,11 +39,11 @@ parseModule path file =
     Right m -> Right (path, m)
 
 parseModulesFromFiles
-  :: (MonadIO m, MonadError IdeError m)
+  :: (MonadIO m, MonadBaseControl IO m, MonadError IdeError m)
   => [FilePath]
   -> m [Either FilePath (FilePath, P.Module)]
 parseModulesFromFiles paths = do
-  files <- traverse ideReadFile paths
+  files <- mapConcurrently ideReadFile paths
   pure (inParallel (map (uncurry parseModule) files))
   where
     inParallel :: [Either e (k, a)] -> [Either e (k, a)]
