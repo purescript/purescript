@@ -276,6 +276,9 @@ jobs:
       - "build"
       - "lint"
     if: "${{ github.event_name == 'push' && needs.build.outputs.do-not-prerelease != 'true' }}"
+    permissions:
+      contents: "write" # create the GitHub prerelease
+      id-token: "write" # npm trusted publishing
     steps:
       - uses: "actions/download-artifact@v4"
       - uses: "ncipollo/release-action@v1.10.0"
@@ -293,7 +296,6 @@ jobs:
         working-directory: "npm-package"
         env:
           BUILD_VERSION: "${{ needs.build.outputs.version }}"
-          NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}"
         run: |
           src_version=$(node -pe 'require("./package.json").version')
           npm version --allow-same-version "$BUILD_VERSION"
