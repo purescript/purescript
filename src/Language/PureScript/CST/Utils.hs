@@ -73,7 +73,7 @@ opName n = OpName (N.coerceOpName <$> n)
 
 placeholder :: SourceToken
 placeholder = SourceToken
-  { tokAnn = TokenAnn (SourceRange (SourcePos 0 0) (SourcePos 0 0)) [] []
+  { tokAnn = TokenAnn (SourceRange (SourcePos 0 (0, 0)) (SourcePos 0 (0, 0))) [] []
   , tokValue = TokLowerName [] "<placeholder>"
   }
 
