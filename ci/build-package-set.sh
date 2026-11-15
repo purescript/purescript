@@ -33,7 +33,5 @@ spago ls packages --json | jq -r 'keys[]' | xargs spago install
 echo ::endgroup::
 
 echo ::group::Document package set
-# Call purs directly: `spago docs` runs the same command, then spends minutes
-# building a search index that doesn't exercise the compiler.
 purs docs --format html 'src/**/*.purs' 'test/**/*.purs' '.spago/p/*/src/**/*.purs'
 echo ::endgroup::
