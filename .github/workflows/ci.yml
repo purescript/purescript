@@ -297,6 +297,9 @@ jobs:
         env:
           BUILD_VERSION: "${{ needs.build.outputs.version }}"
         run: |
+          # prepublishOnly also does this, but npm checks the bin path before
+          # running scripts and warns that it's missing.
+          cp purs.bin.placeholder purs.bin
           src_version=$(node -pe 'require("./package.json").version')
           npm version --allow-same-version "$BUILD_VERSION"
           sed -i -e "s/--purs-ver=${src_version//./\\.}/--purs-ver=$BUILD_VERSION/" package.json
