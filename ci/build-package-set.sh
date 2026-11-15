@@ -33,5 +33,5 @@ spago ls packages --json | jq -r 'keys[]' | xargs spago install
 echo ::endgroup::
 
 echo ::group::Document package set
-spago docs
+purs docs --format html 'src/**/*.purs' 'test/**/*.purs' '.spago/p/*/src/**/*.purs'
 echo ::endgroup::
