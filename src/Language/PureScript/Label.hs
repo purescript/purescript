@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Language.PureScript.Label (Label(..)) where
 
 import Prelude
@@ -7,6 +8,7 @@ import Control.DeepSeq (NFData)
 import Data.Monoid ()
 import Data.String (IsString(..))
 import Data.Aeson qualified as A
+import Data.Data (Data)
 
 import Language.PureScript.PSString (PSString)
 
@@ -15,7 +17,7 @@ import Language.PureScript.PSString (PSString)
 -- because records are indexable by PureScript strings at runtime.
 --
 newtype Label = Label { runLabel :: PSString }
-  deriving (Show, Eq, Ord, IsString, Semigroup, Monoid, A.ToJSON, A.FromJSON, Generic)
+  deriving (Show, Eq, Ord, IsString, Semigroup, Monoid, A.ToJSON, A.FromJSON, Generic, Data)
 
 instance NFData Label
 instance Serialise Label

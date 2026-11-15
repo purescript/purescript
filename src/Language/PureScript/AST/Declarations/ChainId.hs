@@ -1,5 +1,6 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Language.PureScript.AST.Declarations.ChainId
-  ( ChainId
+  ( ChainId(..)
   , mkChainId
   ) where
 
@@ -7,6 +8,7 @@ import Prelude
 import Language.PureScript.AST.SourcePos qualified as Pos
 import Control.DeepSeq (NFData)
 import Codec.Serialise (Serialise)
+import Data.Data (Data)
 
 -- |
 -- For a given instance chain, stores the chain's file name and
@@ -14,7 +16,7 @@ import Codec.Serialise (Serialise)
 -- This data is used to determine which instances are part of
 -- the same instance chain.
 newtype ChainId = ChainId (String, Pos.SourcePos)
-  deriving (Eq, Ord, Show, NFData, Serialise)
+  deriving (Eq, Ord, Show, NFData, Serialise, Data)
 
 mkChainId :: String -> Pos.SourcePos -> ChainId
 mkChainId fileName startingSourcePos = ChainId (fileName, startingSourcePos)

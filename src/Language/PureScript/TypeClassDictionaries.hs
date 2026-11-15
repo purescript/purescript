@@ -1,14 +1,17 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Language.PureScript.TypeClassDictionaries where
 
 import Prelude
 
 import GHC.Generics (Generic)
+import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Data.Text (Text, pack)
 
 import Language.PureScript.AST.Declarations.ChainId (ChainId)
 import Language.PureScript.Names (Ident, ProperName(..), ProperNameType(..), Qualified, disqualify)
 import Language.PureScript.Types (SourceConstraint, SourceType)
+import Data.Data (Data)
 
 --
 -- Data representing a type class dictionary which is in scope
@@ -37,9 +40,10 @@ data TypeClassDictionaryInScope v
     -- error messages
     , tcdDescription :: Maybe SourceType
     }
-    deriving (Show, Functor, Foldable, Traversable, Generic)
+    deriving (Show, Functor, Foldable, Traversable, Generic, Data)
 
 instance NFData v => NFData (TypeClassDictionaryInScope v)
+instance Serialise v => Serialise (TypeClassDictionaryInScope v)
 
 type NamedDict = TypeClassDictionaryInScope (Qualified Ident)
 

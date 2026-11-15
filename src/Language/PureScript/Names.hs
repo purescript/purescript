@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, DeriveDataTypeable #-}
 
 -- |
 -- Data types for names
@@ -11,6 +11,7 @@ import Codec.Serialise (Serialise)
 import Control.Applicative ((<|>))
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.DeepSeq (NFData)
+import Data.Data (Data)
 import Data.Functor.Contravariant (contramap)
 import Data.Vector qualified as V
 
@@ -31,7 +32,7 @@ data Name
   | DctorName (ProperName 'ConstructorName)
   | TyClassName (ProperName 'ClassName)
   | ModName ModuleName
-  deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Ord, Show, Generic, Data)
 
 instance NFData Name
 instance Serialise Name
@@ -70,7 +71,7 @@ getClassName _ = Nothing
 data InternalIdentData
   -- Used by CoreFn.Laziness
   = RuntimeLazyFactory | Lazy !Text
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData InternalIdentData
 instance Serialise InternalIdentData
@@ -95,7 +96,7 @@ data Ident
   -- A generated name used only for internal transformations
   --
   | InternalIdent !InternalIdentData
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData Ident
 instance Serialise Ident
@@ -127,7 +128,7 @@ isPlainIdent _ = False
 -- Operator alias names.
 --
 newtype OpName (a :: OpNameType) = OpName { runOpName :: Text }
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData (OpName a)
 instance Serialise (OpName a)
@@ -156,7 +157,7 @@ coerceOpName = OpName . runOpName
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
 --
 newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: Text }
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 instance NFData (ProperName a)
 instance Serialise (ProperName a)
@@ -188,7 +189,7 @@ coerceProperName = ProperName . runProperName
 -- Module names
 --
 newtype ModuleName = ModuleName Text
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
   deriving newtype Serialise
 
 instance NFData ModuleName
@@ -205,7 +206,7 @@ isBuiltinModuleName (ModuleName mn) = mn == "Prim" || "Prim." `T.isPrefixOf` mn
 data QualifiedBy
   = BySourcePos SourcePos
   | ByModuleName ModuleName
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data)
 
 pattern ByNullSourcePos :: QualifiedBy
 pattern ByNullSourcePos = BySourcePos (SourcePos 0 0)
@@ -229,7 +230,7 @@ toMaybeModuleName (BySourcePos _) = Nothing
 -- A qualified name, i.e. a name with an optional module name
 --
 data Qualified a = Qualified QualifiedBy a
-  deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic, Data)
 
 instance NFData a => NFData (Qualified a)
 instance Serialise a => Serialise (Qualified a)
