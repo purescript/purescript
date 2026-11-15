@@ -32,7 +32,7 @@ defaults:
 env:
   CI_PRERELEASE: "${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}"
   CI_RELEASE: "${{ github.event_name == 'release' }}"
-  STACK_VERSION: "3.3.1"
+  STACK_VERSION: "3.11.1"
 
 concurrency:
   # We never want two prereleases building at the same time, since they would
@@ -58,11 +58,11 @@ jobs:
             os: ubuntu-latest
 
           - image: quay.io/benz0li/ghc-musl:9.8.4
-            os: ubuntu-24.04-arm 
+            os: ubuntu-26.04-arm
 
           - os: macos-15-intel  # x64
           - os: macos-15  # arm64
-          - os: windows-2022  # x64
+          - os: windows-2025  # x64
 
     runs-on: "${{ matrix.os }}"
     container:
@@ -101,7 +101,7 @@ jobs:
           mkdir /opt/bin
           ln -s /usr/bin/node /opt/bin/node
 
-      - uses: "actions/checkout@v4"
+      - uses: "actions/checkout@v7"
 
       - id: "haskell"
         name: "(Non-Linux only) Install Haskell"
@@ -215,7 +215,7 @@ jobs:
 
       - name: "(Prerelease only) Upload bundle"
         if: "${{ env.CI_PRERELEASE == 'true' && steps.build.outputs.do-not-prerelease != 'true' }}"
-        uses: "actions/upload-artifact@v4.6.0"
+        uses: "actions/upload-artifact@v7"
         with:
           name: "${{ runner.os }}-${{ runner.arch }}-bundle"
           path: |
@@ -233,7 +233,7 @@ jobs:
     runs-on: ubuntu-latest  # Exact version is not important, as it's only the container host
 
     steps:
-      - uses: "actions/checkout@v4"
+      - uses: "actions/checkout@v7"
 
       - name: "Fix working directory ownership"
         run: |
@@ -252,7 +252,7 @@ jobs:
       - name: Install weeder
         run: |
           ci/fix-home stack --no-terminal --jobs=2 \
-            build --copy-compiler-tool weeder-2.9.0
+            build --copy-compiler-tool weeder-2.11.0
 
       - run: |
           ci/fix-home stack --no-terminal --jobs=2 \
@@ -280,24 +280,27 @@ jobs:
       contents: "write" # create the GitHub prerelease
       id-token: "write" # npm trusted publishing
     steps:
-      - uses: "actions/download-artifact@v4"
-      - uses: "ncipollo/release-action@v1.10.0"
+      - uses: "actions/download-artifact@v8"
+      - uses: "ncipollo/release-action@v1.21.0"
         with:
           tag: "v${{ needs.build.outputs.version }}"
           artifacts: "*-bundle/*"
           prerelease: true
           body: "This is an automated preview release. Get the latest stable release [here](https://github.com/purescript/purescript/releases/latest)."
-      - uses: "actions/checkout@v4"
-      - uses: "actions/setup-node@v4"
+      - uses: "actions/checkout@v7"
+      - uses: "actions/setup-node@v7"
         with:
-          node-version: "24.x"
+          node-version: "26.x"
           registry-url: "https://registry.npmjs.org"
       - name: "Publish npm package"
         working-directory: "npm-package"
         env:
           BUILD_VERSION: "${{ needs.build.outputs.version }}"
         run: |
+          # prepublishOnly also does this, but npm checks the bin path before
+          # running scripts and warns that it's missing.
+          cp purs.bin.placeholder purs.bin
           src_version=$(node -pe 'require("./package.json").version')
           npm version --allow-same-version "$BUILD_VERSION"
           sed -i -e "s/--purs-ver=${src_version//./\\.}/--purs-ver=$BUILD_VERSION/" package.json
-          npm publish --tag next
+          npm publish --tag next --loglevel verbose
