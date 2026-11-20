@@ -3,7 +3,7 @@ module Language.PureScript.CodeGen.JS.Common where
 
 import Prelude
 
-import Data.Char (isAlpha, isAlphaNum, isDigit, ord)
+import Data.Char (isAlpha, isDigit, ord)
 import Data.Text (Text)
 import Data.Text qualified as T
 
@@ -63,7 +63,10 @@ isValidJsIdentifier s =
 -- | Attempts to find a human-readable name for a symbol, if none has been specified returns the
 -- ordinal value.
 identCharToText :: Char -> Text
-identCharToText c | isAlphaNum c = T.singleton c
+-- Only letters and ASCII digits are kept as-is. 'isAlphaNum' would also accept
+-- Unicode numeric characters such as '²' (category No), which are not valid
+-- in JavaScript identifiers.
+identCharToText c | isAlpha c || isDigit c = T.singleton c
 identCharToText '_' = "_"
 identCharToText '.' = "$dot"
 identCharToText '$' = "$dollar"
